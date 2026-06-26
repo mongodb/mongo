@@ -54,14 +54,12 @@ bool ReplicaSetWriteBlockOpObserver::_isReplSetAndCanAcceptWritesForNamespace(
 void ReplicaSetWriteBlockOpObserver::_checkReplicaSetWriteAllowed(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    bool fromMigrate,
     ReplicaSetWriteBlockRejectedWriteOp opType) {
     if (!_isReplSetAndCanAcceptWritesForNamespace(opCtx, nss)) {
         return;
     }
-    if (!fromMigrate) {
-        ReplicaSetWriteBlockState::get(opCtx)->checkReplicaSetWritesAllowed(opCtx, nss, opType);
-    }
+
+    ReplicaSetWriteBlockState::get(opCtx)->checkReplicaSetWritesAllowed(opCtx, nss, opType);
 }
 
 void ReplicaSetWriteBlockOpObserver::_checkReplicaSetDeleteAllowed(OperationContext* opCtx,
@@ -85,8 +83,7 @@ void ReplicaSetWriteBlockOpObserver::onInserts(OperationContext* opCtx,
                                                OpStateAccumulator* opAccumulator) {
     const auto nss = coll->ns();
 
-    _checkReplicaSetWriteAllowed(
-        opCtx, nss, defaultFromMigrate, ReplicaSetWriteBlockRejectedWriteOp::kInsert);
+    _checkReplicaSetWriteAllowed(opCtx, nss, ReplicaSetWriteBlockRejectedWriteOp::kInsert);
 
     // TODO (SERVER-91506): Determine if we should change this to check isDataConsistent.
     if (nss == NamespaceString::kReplicaSetWritesCriticalSectionsNamespace &&
@@ -120,9 +117,7 @@ void ReplicaSetWriteBlockOpObserver::onUpdate(OperationContext* opCtx,
                                               OpStateAccumulator* opAccumulator) {
     const auto nss = args.coll->ns();
 
-    const bool fromMigrate = args.updateArgs->source == OperationSource::kFromMigrate;
-    _checkReplicaSetWriteAllowed(
-        opCtx, nss, fromMigrate, ReplicaSetWriteBlockRejectedWriteOp::kUpdate);
+    _checkReplicaSetWriteAllowed(opCtx, nss, ReplicaSetWriteBlockRejectedWriteOp::kUpdate);
 
     // TODO (SERVER-91506): Determine if we should change this to check isDataConsistent.
     if (nss == NamespaceString::kReplicaSetWritesCriticalSectionsNamespace &&
@@ -186,8 +181,7 @@ void ReplicaSetWriteBlockOpObserver::onStartIndexBuild(OperationContext* opCtx,
     if (coll && coll->numRecords(opCtx) == 0) {
         return;
     }
-    _checkReplicaSetWriteAllowed(
-        opCtx, nss, fromMigrate, ReplicaSetWriteBlockRejectedWriteOp::kInsert);
+    _checkReplicaSetWriteAllowed(opCtx, nss, ReplicaSetWriteBlockRejectedWriteOp::kInsert);
 }
 
 void ReplicaSetWriteBlockOpObserver::onStartIndexBuildSinglePhase(OperationContext* opCtx,
@@ -196,8 +190,7 @@ void ReplicaSetWriteBlockOpObserver::onStartIndexBuildSinglePhase(OperationConte
     if (coll && coll->numRecords(opCtx) == 0) {
         return;
     }
-    _checkReplicaSetWriteAllowed(
-        opCtx, nss, false /* fromMigrate */, ReplicaSetWriteBlockRejectedWriteOp::kInsert);
+    _checkReplicaSetWriteAllowed(opCtx, nss, ReplicaSetWriteBlockRejectedWriteOp::kInsert);
 }
 
 }  // namespace mongo

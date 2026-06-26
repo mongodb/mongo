@@ -49,6 +49,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_bypass.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
@@ -149,6 +150,9 @@ void MigrationBatchInserter::run(Status status) const try {
         cc().makeOperationContext(), _innerOpCtx->getCancellationToken(), executor);
 
     auto opCtx = applicationOpCtx.get();
+
+    // Chunk migration cloning must proceed even while replica set writes are blocked.
+    ReplicaSetWriteBlockBypass::get(opCtx).set(true);
 
     // In jumbo-chunk migrations the entire cloning phase may run under the critical section.
     // The recipient can't tell whether a given migration is jumbo, so we always treat cloning work

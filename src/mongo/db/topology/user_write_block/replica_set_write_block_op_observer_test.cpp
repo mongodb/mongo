@@ -365,8 +365,10 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest, ReplicaSetWriteAndDeletionBlockingEna
               false /* fromMigrate */,
               true /* shouldSucceed */);
 
-    // Migration-sourced inserts/updates, e.g., chunk migration, bypass write blocking.
-    runInsertAndUpdate(opCtx.get(), userColl, true /* fromMigrate */, true /* shouldSucceed */);
+    // fromMigrate writes that do not enable the bypass (e.g. movePrimary catalog cloning) are also
+    // blocked. Operations that must run during a block, such as chunk migration, instead enable
+    // ReplicaSetWriteBlockBypass.
+    runInsertAndUpdate(opCtx.get(), userColl, true /* fromMigrate */, false /* shouldSucceed */);
 
     // admin/local/config: exempt from replica set write blocking; insert/update/delete allowed.
     runInsertAndUpdate(opCtx.get(),
@@ -465,6 +467,13 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest, ReplicaSetWriteAndDeletionBlockingEna
     runWrites(NamespaceString::createNamespaceString_forTest("admin.coll"));
     runWrites(NamespaceString::createNamespaceString_forTest("local.coll"));
     runWrites(NamespaceString::createNamespaceString_forTest("config.coll"));
+
+    // fromMigrate writes that enable the bypass (e.g. chunk migration cloning) are allowed even
+    // while writes are blocked.
+    runInsertAndUpdate(opCtx.get(),
+                       NamespaceString::createNamespaceString_forTest("userDB.coll"),
+                       true /* fromMigrate */,
+                       true /* shouldSucceed */);
 
     // Ensure range deletions and TTL deletions succeed.
     const auto userColl = NamespaceString::createNamespaceString_forTest("userDB.coll");

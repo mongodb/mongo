@@ -7,6 +7,7 @@
  * @tags: [
  *   requires_sharding,
  *   requires_persistence,
+ *   uses_parallel_shell,
  *   does_not_support_stepdowns,
  *   assumes_balancer_off,
  *   featureFlagBlockReplicaSetWrites,
@@ -20,6 +21,7 @@ import {
 } from "jstests/libs/block_replica_set_writes_utils.js";
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {isEnterpriseShell, runEncryptedTest} from "jstests/fle2/libs/encrypted_client_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {checkLog} from "src/mongo/shell/check_log.js";
 import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
@@ -36,6 +38,7 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
         this.testDBName = jsTestName();
         this.shardedCollName = "testShardedColl";
         this.nns = `${this.testDBName}.${this.shardedCollName}`;
+        this.extraDatabasesToDrop = [];
 
         assert.commandWorked(
             this.st.s.adminCommand({
@@ -60,6 +63,10 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
                 reason: "DiskUseThresholdExceeded",
             }),
         );
+
+        for (const dbName of this.extraDatabasesToDrop) {
+            assert.commandWorked(this.st.s.getDB(dbName).dropDatabase());
+        }
 
         // Drop test database.
         assert.commandWorked(this.testDB.dropDatabase());
@@ -924,6 +931,364 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
             1,
             this.st.shard0.getDB(this.testDBName)[this.shardedCollName].find({x: 1}).itcount(),
             "Expected {x: 1} to be on shard0 after migration following write block disable",
+        );
+    });
+
+    it("Test that movePrimary is not allowed when moving data to a shard with blockReplicaSetWrites enabled", function () {
+        // Create a separate database whose primary is shard1, then create multiple unsharded
+        // collections in it so their data lives on shard1. Using more than one collection exercises
+        // the recipient cleanup path, which must drop every partially-cloned collection.
+        const movePrimaryDBName = `${this.testDBName}_movePrimary`;
+        const collNames = ["unshardedColl1", "unshardedColl2"];
+        this.extraDatabasesToDrop.push(movePrimaryDBName);
+        assert.commandWorked(
+            this.st.s.adminCommand({
+                enablesharding: movePrimaryDBName,
+                primaryShard: this.st.shard1.shardName,
+            }),
+        );
+        const movePrimaryDB = this.st.s.getDB(movePrimaryDBName);
+        for (const collName of collNames) {
+            assert.commandWorked(movePrimaryDB[collName].insert([{x: 1}, {x: 2}]));
+        }
+
+        // Enable per-shard write blocking on shard0, the destination of the movePrimary below.
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+
+        const rejectedInsertsBefore = assert.commandWorked(this.shard0PrimaryAdminDB.serverStatus())
+            .repl.replicaSetWritesBlockRejected.inserts;
+
+        // movePrimary to shard0 must clone the collections onto shard0, whose writes are blocked, so
+        // the cloner insert is rejected with ReplicaSetWritesBlocked and the operation fails.
+        assert.commandFailedWithCode(
+            this.st.s.adminCommand({movePrimary: movePrimaryDBName, to: this.st.shard0.shardName}),
+            ErrorCodes.ReplicaSetWritesBlocked,
+        );
+
+        // The rejection must have gone through the replica set write block insert check.
+        assert.gte(
+            assert.commandWorked(this.shard0PrimaryAdminDB.serverStatus()).repl
+                .replicaSetWritesBlockRejected.inserts,
+            rejectedInsertsBefore + 1,
+            "Aborted movePrimary should increment repl.replicaSetWritesBlockRejected.inserts",
+        );
+
+        // Check that the aborted operation leaves the cluster consistent
+        assert.eq(
+            this.st.shard1.shardName,
+            this.st.config.databases.findOne({_id: movePrimaryDBName}).primary,
+            "config.databases primary should still be the original donor after the aborted movePrimary",
+        );
+        for (const collName of collNames) {
+            assert.eq(
+                2,
+                movePrimaryDB[collName].find().itcount(),
+                "Collection should still be readable from the original primary after the aborted movePrimary",
+            );
+            assert(
+                !this.st.shard0.getDB(movePrimaryDBName).getCollectionNames().includes(collName),
+                "Recipient should not retain cloned data after the aborted movePrimary",
+            );
+        }
+
+        // Disable per-shard write blocking and verify that movePrimary to shard0 now succeeds.
+        disableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            "InsufficientDiskSpace" /* reason */,
+        );
+        assert.commandWorked(
+            this.st.s.adminCommand({movePrimary: movePrimaryDBName, to: this.st.shard0.shardName}),
+        );
+        assert.eq(
+            this.st.shard0.shardName,
+            this.st.config.databases.findOne({_id: movePrimaryDBName}).primary,
+            "config.databases primary should be the recipient after the successful movePrimary",
+        );
+        for (const collName of collNames) {
+            assert.eq(
+                2,
+                this.st.shard0.getDB(movePrimaryDBName)[collName].find().itcount(),
+                "Recipient should hold the cloned data after the successful movePrimary",
+            );
+        }
+    });
+
+    it("Test that movePrimary with only empty collections succeeds when the destination shard has blockReplicaSetWrites enabled", function () {
+        // Create a separate database whose primary is shard1, then create multiple empty unsharded
+        // collections in it. Cloning empty collections onto the destination bypasses the replica set
+        // write block, so the movePrimary should succeed.
+        const movePrimaryDBName = `${this.testDBName}_movePrimaryEmpty`;
+        const collNames = ["emptyColl1", "emptyColl2"];
+        this.extraDatabasesToDrop.push(movePrimaryDBName);
+        assert.commandWorked(
+            this.st.s.adminCommand({
+                enablesharding: movePrimaryDBName,
+                primaryShard: this.st.shard1.shardName,
+            }),
+        );
+        const movePrimaryDB = this.st.s.getDB(movePrimaryDBName);
+        for (const collName of collNames) {
+            assert.commandWorked(movePrimaryDB.createCollection(collName));
+        }
+
+        // Enable per-shard write blocking on shard0, the destination of the movePrimary below.
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+
+        // movePrimary clones only empty collections onto shard0, which bypasses the write block, so
+        // the operation succeeds even though writes are blocked on the destination.
+        assert.commandWorked(
+            this.st.s.adminCommand({movePrimary: movePrimaryDBName, to: this.st.shard0.shardName}),
+        );
+
+        // The primary should now be the recipient, and the (empty) collections should exist on it.
+        assert.eq(
+            this.st.shard0.shardName,
+            this.st.config.databases.findOne({_id: movePrimaryDBName}).primary,
+            "config.databases primary should be the recipient after the successful movePrimary",
+        );
+        for (const collName of collNames) {
+            assert(
+                this.st.shard0.getDB(movePrimaryDBName).getCollectionNames().includes(collName),
+                "Recipient should hold the cloned empty collection after the successful movePrimary",
+            );
+            assert.eq(
+                0,
+                this.st.shard0.getDB(movePrimaryDBName)[collName].find().itcount(),
+                "Cloned collection should be empty on the recipient",
+            );
+        }
+    });
+
+    it("Test that movePrimary aborts cleanly when blockReplicaSetWrites is enabled during cloning", function () {
+        const movePrimaryDBName = `${this.testDBName}_movePrimaryMidClone`;
+        this.extraDatabasesToDrop.push(movePrimaryDBName);
+        assert.commandWorked(
+            this.st.s.adminCommand({
+                enablesharding: movePrimaryDBName,
+                primaryShard: this.st.shard1.shardName,
+            }),
+        );
+        const movePrimaryDB = this.st.s.getDB(movePrimaryDBName);
+        assert.commandWorked(movePrimaryDB.unshardedColl.insert({x: 1}));
+
+        const hangBeforeCloningData = configureFailPoint(
+            this.st.rs1.getPrimary(),
+            "hangBeforeCloningData",
+        );
+
+        const awaitMovePrimary = startParallelShell(
+            funWithArgs(
+                function (dbName, toShard) {
+                    assert.commandFailedWithCode(
+                        db.getSiblingDB("admin").runCommand({movePrimary: dbName, to: toShard}),
+                        ErrorCodes.ReplicaSetWritesBlocked,
+                    );
+                },
+                movePrimaryDBName,
+                this.st.shard0.shardName,
+            ),
+            this.st.s.port,
+        );
+
+        try {
+            hangBeforeCloningData.wait();
+
+            // Enable per-shard write blocking on shard0 (the recipient) while the clone is paused, then
+            // let the clone proceed: its first document insert must be rejected with ReplicaSetWritesBlocked.
+            enableReplicaSetWriteBlock(
+                this.shard0PrimaryAdminDB,
+                false /* allowDeletions */,
+                "InsufficientDiskSpace" /* reason */,
+            );
+        } finally {
+            hangBeforeCloningData.off();
+        }
+
+        awaitMovePrimary();
+
+        // Check that aborting the operation before committing leaves the cluster consistent.
+        assert.eq(
+            this.st.shard1.shardName,
+            this.st.config.databases.findOne({_id: movePrimaryDBName}).primary,
+            "config.databases primary should still be the donor after the mid-clone abort",
+        );
+        assert.eq(
+            1,
+            movePrimaryDB.unshardedColl.find({x: 1}).itcount(),
+            "Collection should still be readable from the original primary after the mid-clone abort",
+        );
+        assert(
+            !this.st.shard0.getDB(movePrimaryDBName).getCollectionNames().includes("unshardedColl"),
+            "Recipient should not retain cloned data after the mid-clone abort",
+        );
+    });
+
+    it("Test that movePrimary completes when blockReplicaSetWrites is enabled after cloning finishes", function () {
+        const movePrimaryDBName = `${this.testDBName}_movePrimaryAfterClone`;
+        this.extraDatabasesToDrop.push(movePrimaryDBName);
+        assert.commandWorked(
+            this.st.s.adminCommand({
+                enablesharding: movePrimaryDBName,
+                primaryShard: this.st.shard1.shardName,
+            }),
+        );
+        const movePrimaryDB = this.st.s.getDB(movePrimaryDBName);
+        assert.commandWorked(movePrimaryDB.unshardedColl.insert({x: 1}));
+
+        const hangBeforeCriticalSection = configureFailPoint(
+            this.st.rs1.getPrimary(),
+            "hangBeforeMovePrimaryCriticalSection",
+        );
+
+        const awaitMovePrimary = startParallelShell(
+            funWithArgs(
+                function (dbName, toShard) {
+                    assert.commandWorked(
+                        db.getSiblingDB("admin").runCommand({movePrimary: dbName, to: toShard}),
+                    );
+                },
+                movePrimaryDBName,
+                this.st.shard0.shardName,
+            ),
+            this.st.s.port,
+        );
+
+        try {
+            hangBeforeCriticalSection.wait();
+
+            // Enable per-shard write blocking on shard0 (the recipient) after the clone finished.
+            enableReplicaSetWriteBlock(
+                this.shard0PrimaryAdminDB,
+                false /* allowDeletions */,
+                "InsufficientDiskSpace" /* reason */,
+            );
+        } finally {
+            hangBeforeCriticalSection.off();
+        }
+
+        awaitMovePrimary();
+
+        // Check that routing now points at the recipient and the data is readable there.
+        assert.eq(
+            this.st.shard0.shardName,
+            this.st.config.databases.findOne({_id: movePrimaryDBName}).primary,
+            "config.databases primary should be the recipient after the successful movePrimary",
+        );
+        assert.eq(
+            1,
+            movePrimaryDB.unshardedColl.find({x: 1}).itcount(),
+            "Collection should be readable after movePrimary completes",
+        );
+    });
+
+    it("Test that movePrimary off a shard with blockReplicaSetWrites enabled succeeds", function () {
+        // The database primary is shard0, the to-be-blocked donor. Moving the primary off shard0
+        // only clones data onto the recipient (shard1) and drops it on the donor, so blocking writes
+        // on the donor must not prevent the operation: a full shard must still be able to shed data.
+        const movePrimaryDBName = `${this.testDBName}_movePrimaryOffDonor`;
+        this.extraDatabasesToDrop.push(movePrimaryDBName);
+        assert.commandWorked(
+            this.st.s.adminCommand({
+                enablesharding: movePrimaryDBName,
+                primaryShard: this.st.shard0.shardName,
+            }),
+        );
+        const movePrimaryDB = this.st.s.getDB(movePrimaryDBName);
+        assert.commandWorked(movePrimaryDB.unshardedColl.insert({x: 1}));
+
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+
+        assert.commandWorked(
+            this.st.s.adminCommand({movePrimary: movePrimaryDBName, to: this.st.shard1.shardName}),
+        );
+        assert.eq(
+            this.st.shard1.shardName,
+            this.st.config.databases.findOne({_id: movePrimaryDBName}).primary,
+            "config.databases primary should be the recipient after moving primary off the blocked donor",
+        );
+        assert.eq(
+            1,
+            movePrimaryDB.unshardedColl.find({x: 1}).itcount(),
+            "Collection should be readable on the recipient after moving primary off the blocked donor",
+        );
+    });
+
+    it("Test that an in-flight chunk migration completes when blockReplicaSetWrites is enabled mid-migration", function () {
+        // Shard the collection and move the chunk containing {x: 1} to shard1, so it can be migrated
+        // back to shard0 (the to-be-blocked recipient).
+        assert.commandWorked(this.testDB.createCollection(this.shardedCollName));
+        assert.commandWorked(this.st.s.adminCommand({shardCollection: this.nns, key: {x: 1}}));
+        assert.commandWorked(this.testShardedColl.insert({x: -1}));
+        assert.commandWorked(this.testShardedColl.insert({x: 1}));
+        assert.commandWorked(this.st.s.adminCommand({split: this.nns, middle: {x: 0}}));
+        assert.commandWorked(
+            this.st.s.adminCommand({
+                moveChunk: this.nns,
+                find: {x: 1},
+                to: this.st.shard1.shardName,
+                _waitForDelete: true,
+            }),
+        );
+
+        // Pause the recipient (shard0) migrate thread after the collection has been created but
+        // before the bulk clone, i.e. once the incoming-migration start gate has already been
+        // passed. This is the window in which the cloning bypass (rather than the start gate) governs
+        // whether the migration is allowed to write.
+        const hangRecipientBeforeClone = configureFailPoint(
+            this.st.rs0.getPrimary(),
+            "migrateThreadHangAtStep3",
+        );
+
+        const awaitMoveChunk = startParallelShell(
+            funWithArgs(
+                function (ns, toShard) {
+                    assert.commandWorked(
+                        db.getSiblingDB("admin").runCommand({
+                            moveChunk: ns,
+                            find: {x: 1},
+                            to: toShard,
+                        }),
+                    );
+                },
+                this.nns,
+                this.st.shard0.shardName,
+            ),
+            this.st.s.port,
+        );
+
+        try {
+            hangRecipientBeforeClone.wait();
+
+            // Enable per-shard write blocking on shard0 while the migration is in flight. The cloning
+            // inserts enable ReplicaSetWriteBlockBypass, so the migration must still complete rather than
+            // abort.
+            enableReplicaSetWriteBlock(
+                this.shard0PrimaryAdminDB,
+                false /* allowDeletions */,
+                "InsufficientDiskSpace" /* reason */,
+            );
+        } finally {
+            hangRecipientBeforeClone.off();
+        }
+
+        awaitMoveChunk();
+
+        assert.eq(
+            1,
+            this.st.shard0.getDB(this.testDBName)[this.shardedCollName].find({x: 1}).itcount(),
+            "Migrated document should be on shard0 after the in-flight migration completes under the block",
         );
     });
 });

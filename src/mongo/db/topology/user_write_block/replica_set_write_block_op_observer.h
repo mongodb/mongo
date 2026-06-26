@@ -87,7 +87,6 @@ private:
 
     void _checkReplicaSetWriteAllowed(OperationContext* opCtx,
                                       const NamespaceString& nss,
-                                      bool fromMigrate,
                                       ReplicaSetWriteBlockRejectedWriteOp opType);
 
     void _checkReplicaSetDeleteAllowed(OperationContext* opCtx, const NamespaceString& nss);

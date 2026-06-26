@@ -107,6 +107,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_bypass.h"
 #include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/db/topology/user_write_block/user_write_block_bypass.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
@@ -1564,6 +1565,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             // Enable write blocking bypass to allow migrations to create the collection and indexes
             // even when user writes are blocked.
             WriteBlockBypass::get(altOpCtx.get()).set(true);
+            ReplicaSetWriteBlockBypass::get(altOpCtx.get()).set(true);
 
             // The first migration must ensure that indexes match the provided specs exactly,
             // including dropping stale indexes remaining from previous versions of the collection.
@@ -1654,6 +1656,11 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
         auto newOpCtxPtr = CancelableOperationContext(
             cc().makeOperationContext(), outerOpCtx->getCancellationToken(), executor);
         auto opCtx = newOpCtxPtr.get();
+
+        // The operation must proceed even while replica set writes are blocked on
+        // the recipient.
+        ReplicaSetWriteBlockBypass::get(opCtx).set(true);
+
         repl::OpTime lastOpApplied;
         {
             // 4. Initial bulk clone
