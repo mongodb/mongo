@@ -57,6 +57,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/optime_with.h"
+#include "mongo/db/repl/repl_network_traffic_stats.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_auth.h"
 #include "mongo/db/repl/replication_process.h"
@@ -130,8 +131,6 @@ BSONObj OplogBatchStats::getReport() const {
 auto& oplogBatchStats = *MetricBuilder<OplogBatchStats>("repl.network.getmores");
 // The oplog entries read via the oplog reader
 auto& opsReadStats = *MetricBuilder<Counter64>{"repl.network.ops"};
-// The bytes read via the oplog reader
-auto& networkByteStats = *MetricBuilder<Counter64>{"repl.network.bytes"};
 
 auto& readersCreatedStats = *MetricBuilder<Counter64>{"repl.network.readersCreated"};
 
@@ -914,7 +913,7 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
 
     // Increment stats. We read all of the docs in the query.
     opsReadStats.increment(info.networkDocumentCount);
-    networkByteStats.increment(info.networkDocumentBytes);
+    recordOplogBytesReceived(static_cast<int64_t>(info.networkDocumentBytes));
 
     oplogBatchStats.recordMillis(_lastBatchElapsedMS, documents.empty());
 

@@ -69,6 +69,7 @@ const expectedReplSection = {
     "initialSync": {"completed": 0, "failedAttempts": 0, "failures": 0},
     "network": {
         "bytes": 0,
+        "bytesSent": 0,
         "getmores": {"num": 0, "totalMillis": 0, "numEmptyBatches": 0},
         "notPrimaryLegacyUnacknowledgedWrites": 0,
         "notPrimaryUnacknowledgedWrites": 0,

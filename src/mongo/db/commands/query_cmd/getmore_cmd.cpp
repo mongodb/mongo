@@ -70,6 +70,7 @@
 #include "mongo/db/read_concern.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_network_traffic_stats.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
@@ -757,6 +758,15 @@ public:
             boost::optional<CursorMetrics> metrics = includeQueryStatsMetrics
                 ? boost::make_optional(CurOp::get(opCtx)->debug().getCursorMetrics())
                 : boost::none;
+
+            // Account the oplog batch served to a replication oplog fetcher. 'isReplOplogGetMore'
+            // is set only for getMores that carry a term, which only internal replication clients
+            // may use, so it identifies oplog fetching and excludes other oplog readers (backups,
+            // etc.).
+            if (curOp->debug().isReplOplogGetMore) {
+                repl::recordOplogBytesSent(static_cast<int64_t>(nextBatch.bytesUsed()));
+            }
+
             nextBatch.done(respondWithId,
                            nss,
                            metrics,

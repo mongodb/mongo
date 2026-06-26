@@ -1076,6 +1076,7 @@ replication.oplog:
     - src/mongo/db/repl/*sync_source*
     - src/mongo/db/repl/apply_container_ops_test.cpp
     - src/mongo/db/repl/local_oplog_info*
+    - src/mongo/db/repl/repl_network_traffic_stats*
     - src/mongo/db/repl/repl_worker_pool_thread_count*
     - src/mongo/s/commands/cluster_oplog_note_cmd.cpp
     - src/mongo/s/commands/cluster_repl_set_get_status_cmd.cpp

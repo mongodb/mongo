@@ -1050,6 +1050,20 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "repl_network_traffic_stats",
+    srcs = [
+        "repl_network_traffic_stats.cpp",
+    ],
+    hdrs = [
+        "repl_network_traffic_stats.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+    ],
+)
+
+mongo_cc_library(
     name = "oplog_fetcher",
     srcs = [
         "oplog_fetcher.cpp",
@@ -1057,6 +1071,7 @@ mongo_cc_library(
     deps = [
         ":abstract_async_component",
         ":repl_coordinator_interface",
+        ":repl_network_traffic_stats",
         ":repl_server_parameters",
         ":replica_set_messages",
         ":replication_auth",

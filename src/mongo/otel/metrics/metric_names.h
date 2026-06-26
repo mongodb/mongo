@@ -390,6 +390,10 @@ public:
         MetricNameMaker::make("serverStatus.metrics.repl.initialSync.failures");
     static constexpr MetricName kInitialSyncCompleted =
         MetricNameMaker::make("serverStatus.metrics.repl.initialSync.completed");
+    static constexpr MetricName kReplNetworkBytes =
+        MetricNameMaker::make("serverStatus.metrics.repl.network.bytes");
+    static constexpr MetricName kReplNetworkBytesSent =
+        MetricNameMaker::make("serverStatus.metrics.repl.network.bytesSent");
     static constexpr MetricName kGetLastErrorWtimeNum =
         MetricNameMaker::make("serverStatus.metrics.getLastError.wtime.num");
     static constexpr MetricName kGetLastErrorWtimeTotalMillis =

@@ -915,6 +915,7 @@ mongo_cc_library(
         "//src/mongo/db/query/stage_builder/sbe:query_sbe_abt",
         "//src/mongo/db/query/write_ops",
         "//src/mongo/db/query/write_ops:write_ops_exec",
+        "//src/mongo/db/repl:repl_network_traffic_stats",
         "//src/mongo/db/repl:replica_set_messages",
         "//src/mongo/db/replicated_fast_count:replicated_fast_count_enabled",
         "//src/mongo/db/replicated_fast_count:replicated_fast_count_manager",

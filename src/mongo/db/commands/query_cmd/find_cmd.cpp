@@ -100,6 +100,7 @@
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/repl_network_traffic_stats.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -967,6 +968,13 @@ public:
                 exception.addContext(str::stream() << "Executor error during find command: "
                                                    << nss.toStringForErrorMsg());
                 throw;
+            }
+
+            // Account the first oplog batch served to a replication oplog fetcher. A term is only
+            // permitted on an oplog read for internal replication clients, so (term && isOplogNss)
+            // identifies oplog fetching and excludes other oplog readers (backups, etc.).
+            if (term && isOplogNss) {
+                repl::recordOplogBytesSent(static_cast<int64_t>(firstBatch.bytesUsed()));
             }
 
             // Set up the cursor for getMore.
