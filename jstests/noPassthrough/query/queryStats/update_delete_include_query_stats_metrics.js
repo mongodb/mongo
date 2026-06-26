@@ -148,8 +148,10 @@ function runIncludeMetricsTest(testDB, opIndex, isStandalone, enabledSampling, s
 
     if (enabledSampling) {
         const entry = spec.getQueryStats(testDB.getMongo(), {collName})[0];
-        // TODO SERVER-128278 remove special handling for deletes on sharded clusters. On sharded
-        // clusters, docsExamined may exceed 8 (the number of documents in the collection) but should never exceed double.
+        // For sharded deletes, docsExamined = COLLSCAN.docsTested + DELETE.docsFetched, where
+        // docsFetched is the number of documents that were fetched again. As a result, on sharded
+        // clusters each document may be re-fetched, so we assert that docsExamined is between 8
+        // and 16.
         const isShardedDelete = !isStandalone && spec.featureFlag !== null;
         const docsExamined = isShardedDelete
             ? getQueryExecMetrics(entry.metrics).docsExamined.sum
@@ -167,7 +169,8 @@ function runIncludeMetricsTest(testDB, opIndex, isStandalone, enabledSampling, s
             keysInserted: spec.keysInserted,
             keysDeleted: spec.keysDeleted,
         };
-        // We validate docsExamined above, for assertAggregatedMetricsSingleExec to pass we will pass in the actual docsExamined value.
+        // For sharded deletes we validate docsExamined above. To make
+        // assertAggregatedMetricsSingleExec pass, we pass in the actual docsExamined value.
         assertAggregatedMetricsSingleExec(entry, {
             keysExamined: 0,
             docsExamined: docsExamined,
