@@ -43,6 +43,8 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -53,10 +55,12 @@ public:
     static inline int gEvaluations = 0;
     static inline int gEvaluationsWithTracker = 0;
     static inline int64_t gLastTrackerMaxBytes = -1;
+    static inline std::string_view gLastStageName;
     static void resetObservations() {
         gEvaluations = 0;
         gEvaluationsWithTracker = 0;
         gLastTrackerMaxBytes = -1;
+        gLastStageName = std::string_view{};
     }
 
     explicit MemoryTrackerObservingExpression(ExpressionContext* expCtx) : Expression(expCtx) {}
@@ -73,6 +77,7 @@ public:
             ++gEvaluationsWithTracker;
             gLastTrackerMaxBytes = ctx.tracker->maxAllowedMemoryUsageBytes();
         }
+        gLastStageName = ctx.stageName;
         return Value(true);
     }
 
@@ -92,7 +97,13 @@ REGISTER_TEST_EXPRESSION(_testMatchTrackerObserver,
                          AllowedWithClientType::kAny,
                          nullptr /* featureFlag */);
 
-void runMatchWithObservingExpression(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+struct MatchTestResult {
+    boost::intrusive_ptr<exec::agg::Stage> stage;
+    boost::intrusive_ptr<exec::agg::MockStage> source;  // must outlive stage
+};
+
+MatchTestResult runMatchWithObservingExpression(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     MemoryTrackerObservingExpression::resetObservations();
 
     auto matchDS = DocumentSourceMatch::create(
@@ -102,6 +113,7 @@ void runMatchWithObservingExpression(const boost::intrusive_ptr<ExpressionContex
     exec::agg::MockStage::setSource_forTest(stage, mockSource.get());
     while (stage->getNext().isAdvanced()) {
     }
+    return {stage, mockSource};
 }
 
 using MatchStageTest = AggregationContextFixture;
@@ -137,6 +149,35 @@ TEST_F(MatchStageTest, MemoryTrackerLimitReflectsKnob) {
 
     ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluationsWithTracker, 1);
     ASSERT_EQ(MemoryTrackerObservingExpression::gLastTrackerMaxBytes, customLimit);
+}
+
+TEST_F(MatchStageTest, StageNameIsSetInEvaluationContext) {
+    unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", true);
+
+    runMatchWithObservingExpression(getExpCtx());
+
+    ASSERT_EQ(MemoryTrackerObservingExpression::gLastStageName, "$match");
+}
+
+TEST_F(MatchStageTest, ExplainOutputIncludesExpressionEvaluationPeakMemoryBytesWhenEnabled) {
+    unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", true);
+
+    auto [stage, source] = runMatchWithObservingExpression(getExpCtx());
+
+    auto explain = stage->getExplainOutput();
+    ASSERT(!explain.getNestedField("expressionEvaluationPeakMemoryBytes").missing());
+}
+
+TEST_F(MatchStageTest, ExplainOutputOmitsExpressionEvaluationPeakMemoryBytesWhenDisabled) {
+    unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", false);
+
+    auto [stage, source] = runMatchWithObservingExpression(getExpCtx());
+
+    auto explain = stage->getExplainOutput();
+    ASSERT(explain.getNestedField("expressionEvaluationPeakMemoryBytes").missing());
 }
 
 }  // namespace

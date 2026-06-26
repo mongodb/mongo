@@ -64,16 +64,17 @@ MatchStage::MatchStage(std::string_view stageName,
           *pExpCtx, loadMemoryLimit(StageMemoryLimit::MatchStageMaxExpressionEvaluationBytes))) {
     // The user facing error should have been generated earlier.
     massert(17309, "Should never call getNext on a $match stage with $text clause", !isTextQuery);
-    _trackMemory = feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
-        feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled();
+    if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
+        feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
+        _expressionEvalCtx.tracker = &_memoryTracker;
+    }
+    _expressionEvalCtx.stageName = _commonStats.stageTypeStr;
 }
 
 GetNextResult MatchStage::doGetNext() {
-    const EvaluationContext evalCtx =
-        _trackMemory ? EvaluationContext{.tracker = &_memoryTracker} : EvaluationContext{};
     auto nextInput = pSource->getNext();
     for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
-        if (_matchProcessor->process(nextInput.getDocument(), evalCtx)) {
+        if (_matchProcessor->process(nextInput.getDocument(), _expressionEvalCtx)) {
             return nextInput;
         }
 
@@ -86,6 +87,15 @@ GetNextResult MatchStage::doGetNext() {
     }
 
     return nextInput;
+}
+
+Document MatchStage::getExplainOutput(const query_shape::SerializationOptions& opts) const {
+    MutableDocument out(Stage::getExplainOutput(opts));
+    if (_expressionEvalCtx.tracker) {
+        out["expressionEvaluationPeakMemoryBytes"] = opts.serializeLiteral(
+            static_cast<long long>(_expressionEvalCtx.tracker->peakTrackedMemoryBytes()));
+    }
+    return out.freeze();
 }
 
 }  // namespace agg
