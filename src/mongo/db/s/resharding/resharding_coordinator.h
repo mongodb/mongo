@@ -664,6 +664,12 @@ private:
     void _logStatsOnCompletion(bool success);
 
     /**
+     * Builds a BSON sub-object summarising the cloning and final-collection validation outcomes,
+     * derived from persisted shard-entry fields.
+     */
+    BSONObj _buildValidationStats() const;
+
+    /**
      * Returns the identity of the shard in charge of generating the pre-post commit control
      * events for change stream readers.
      */

@@ -20,6 +20,7 @@
 import {withSkipRetryOnNetworkError} from "jstests/concurrency/fsm_workload_helpers/stepdown_suite_helpers.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 import {createChunks, getShardNames} from "jstests/sharding/libs/sharding_util.js";
@@ -92,13 +93,26 @@ const newShardKey = {
     newKey: 1,
 };
 
+// Expected validation outcomes per test mode; modes not listed have no outcome assertions.
+const kExpectedValidationOutcomes = {
+    [TestMode.kSuccess]: {clonedDocumentCount: "success", finalDocumentCount: "success"},
+    [TestMode.kFailInAwaitingFetchTimestamp]: {
+        clonedDocumentCount: "incomplete",
+        finalDocumentCount: "incomplete",
+    },
+    [TestMode.kFailInApplying]: {clonedDocumentCount: "success", finalDocumentCount: "incomplete"},
+};
+
 main();
 
 function main() {
+    const verificationEnabled = FeatureFlagUtil.isEnabled(db, "ReshardingVerification");
+
     const testCases = [
         TestMode.kSuccess,
         TestMode.kFailInCloning,
         TestMode.kFailInAwaitingFetchTimestamp,
+        TestMode.kFailInApplying,
     ];
 
     for (const mode of testCases) {
@@ -116,7 +130,7 @@ function main() {
         }
         unsetFailpoints(failpoints);
         const logs = getCompletionLogs(uuid);
-        verifyCompletionLogs(collName, logs, mode);
+        verifyCompletionLogs(collName, logs, mode, verificationEnabled);
     }
 }
 
@@ -206,7 +220,7 @@ function getCompletionLogs(uuid) {
         });
 }
 
-function verifyCompletionLogs(collName, logs, mode) {
+function verifyCompletionLogs(collName, logs, mode, verificationEnabled) {
     // There could be multiple completion logs if deleting the coordinator state document is rolled
     // back.
     assert.gt(
@@ -232,8 +246,9 @@ function verifyCompletionLogs(collName, logs, mode) {
     assert.gt(stats.numberOfDestinationShards, 0, "numberOfDestinationShards");
     verifyDonorMetrics(stats, mode);
     verifyRecipientMetrics(stats, mode);
-    verifyTotals(stats, mode);
+    verifyTotals(stats, mode, verificationEnabled);
     verifyCriticalSection(stats, mode);
+    verifyValidation(stats, mode, verificationEnabled);
 }
 
 function verifyDonorMetrics(stats, mode) {
@@ -304,7 +319,7 @@ function verifyRecipientMetrics(stats, mode) {
     assertMetricGtZero("recipientTotalApplied", recipientTotals, mode);
 }
 
-function verifyTotals(stats, mode) {
+function verifyTotals(stats, mode, verificationEnabled) {
     assert(stats.hasOwnProperty("totals"), "Missing totals");
     const totals = stats.totals;
 
@@ -329,15 +344,25 @@ function verifyTotals(stats, mode) {
         totals.maxRecipientIndexes - totals.maxDonorIndexes,
         mode,
     );
+
+    assert.eq(
+        totals.hasOwnProperty("totalDocumentsCloned"),
+        verificationEnabled,
+        "totalDocumentsCloned presence should match verificationEnabled",
+        {totals},
+    );
 }
 
 function verifyCriticalSection(stats, mode) {
-    const isSuccess = mode === TestMode.kSuccess;
+    // kFailInApplying fires after the coordinator has already entered BlockingWrites, so the
+    // critical section appears in the stats even though the operation ultimately failed.
+    const hadCriticalSection = mode === TestMode.kSuccess || mode === TestMode.kFailInApplying;
     assert(
-        stats.hasOwnProperty("criticalSection") === isSuccess,
+        stats.hasOwnProperty("criticalSection") === hadCriticalSection,
         "Incorrect critical section presence",
     );
-    if (!isSuccess) {
+
+    if (mode !== TestMode.kSuccess) {
         return;
     }
     const criticalSection = stats.criticalSection;
@@ -350,4 +375,53 @@ function verifyCriticalSection(stats, mode) {
         criticalSection.hasOwnProperty("totalWritesDuringCriticalSection"),
         "Missing totalWritesDuringCriticalSection",
     );
+}
+
+function verifyValidation(stats, mode, verificationEnabled) {
+    assert.eq(
+        stats.hasOwnProperty("validation"),
+        verificationEnabled,
+        "validation field presence should match featureFlagReshardingVerification",
+    );
+    if (!verificationEnabled) {
+        return;
+    }
+
+    const {clonedDocumentCount, finalDocumentCount} = stats.validation;
+    assert(clonedDocumentCount, "Missing validation.clonedDocumentCount", {
+        validation: stats.validation,
+    });
+    assert(finalDocumentCount, "Missing validation.finalDocumentCount", {
+        validation: stats.validation,
+    });
+
+    const expected = kExpectedValidationOutcomes[mode];
+    if (expected) {
+        assert.eq(
+            clonedDocumentCount.outcome,
+            expected.clonedDocumentCount,
+            "Unexpected clonedDocumentCount outcome",
+        );
+        assert.eq(
+            finalDocumentCount.outcome,
+            expected.finalDocumentCount,
+            "Unexpected finalDocumentCount outcome",
+        );
+    }
+
+    if (clonedDocumentCount.outcome === "success") {
+        assert.eq(
+            clonedDocumentCount.documentsToCopy,
+            clonedDocumentCount.documentsCloned,
+            "cloning doc count mismatch",
+        );
+    }
+
+    if (finalDocumentCount.outcome === "success") {
+        assert.eq(
+            finalDocumentCount.sourceDocumentCount,
+            finalDocumentCount.reshardedDocumentCount,
+            "final doc count mismatch",
+        );
+    }
 }
