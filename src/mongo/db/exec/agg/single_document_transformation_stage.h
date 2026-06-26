@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/single_document_transformation_processor.h"
 #include "mongo/util/modules.h"
 
@@ -56,6 +57,9 @@ public:
         return pSource && pSource->isEOF();
     }
 
+    Document getExplainOutput(const query_shape::SerializationOptions& opts =
+                                  query_shape::SerializationOptions{}) const final;
+
 private:
     GetNextResult doGetNext() final;
 
@@ -75,9 +79,12 @@ private:
     // Tracks memory used while evaluating the transformation expressions. Reports to the
     // operation-wide tracker so all stages contribute to the operation memory total.
     SimpleMemoryUsageTracker _memoryTracker;
-    // Whether to charge expression evaluation against the memory tracker. Evaluated once at
-    // construction; feature flags must not change during stage execution.
-    bool _trackMemory{false};
+
+    // Pre-built context passed to every transformation expression evaluation. tracker points to
+    // _memoryTracker when expression memory tracking is enabled, and is null otherwise. stageName
+    // is always set so it can be reported in ExceededMemoryLimit error messages. Both fields are
+    // stable for the stage's lifetime.
+    EvaluationContext _expressionEvalCtx;
 };
 }  // namespace agg
 }  // namespace exec

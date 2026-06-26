@@ -81,8 +81,11 @@ SingleDocumentTransformationStage::SingleDocumentTransformationStage(
           loadMemoryLimit(
               StageMemoryLimit::SingleDocumentTransformationStageMaxExpressionEvaluationBytes))) {
     _commonStats.stageTypeStr = _ownedStageName;
-    _trackMemory = feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
-        feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled();
+    if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
+        feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
+        _expressionEvalCtx.tracker = &_memoryTracker;
+    }
+    _expressionEvalCtx.stageName = _commonStats.stageTypeStr;
 }
 
 GetNextResult SingleDocumentTransformationStage::doGetNext() {
@@ -97,15 +100,23 @@ GetNextResult SingleDocumentTransformationStage::doGetNext() {
         return input;
     }
 
-    return _transformationProcessor->process(
-        input.releaseDocument(),
-        _trackMemory ? EvaluationContext{.tracker = &_memoryTracker} : EvaluationContext{});
+    return _transformationProcessor->process(input.releaseDocument(), _expressionEvalCtx);
 }
 
 void SingleDocumentTransformationStage::doDispose() {
     if (_transformationProcessor) {
         _transformationProcessor.reset();
     }
+}
+
+Document SingleDocumentTransformationStage::getExplainOutput(
+    const query_shape::SerializationOptions& opts) const {
+    MutableDocument out(Stage::getExplainOutput(opts));
+    if (_expressionEvalCtx.tracker) {
+        out["expressionEvaluationPeakMemoryBytes"] = opts.serializeLiteral(
+            static_cast<long long>(_expressionEvalCtx.tracker->peakTrackedMemoryBytes()));
+    }
+    return out.freeze();
 }
 
 }  // namespace agg

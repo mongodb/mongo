@@ -43,6 +43,8 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -53,10 +55,12 @@ public:
     static inline int gEvaluations = 0;
     static inline int gEvaluationsWithTracker = 0;
     static inline int64_t gLastTrackerMaxBytes = -1;
+    static inline std::string_view gLastStageName;
     static void resetObservations() {
         gEvaluations = 0;
         gEvaluationsWithTracker = 0;
         gLastTrackerMaxBytes = -1;
+        gLastStageName = std::string_view{};
     }
 
     explicit MemoryTrackerObservingExpression(ExpressionContext* expCtx) : Expression(expCtx) {}
@@ -73,6 +77,7 @@ public:
             ++gEvaluationsWithTracker;
             gLastTrackerMaxBytes = ctx.tracker->maxAllowedMemoryUsageBytes();
         }
+        gLastStageName = ctx.stageName;
         return Value(1);
     }
 
@@ -92,7 +97,12 @@ REGISTER_TEST_EXPRESSION(_testSdtTrackerObserver,
                          AllowedWithClientType::kAny,
                          nullptr /* featureFlag */);
 
-void runSdtWithObservingExpression(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+struct SdtTestResult {
+    boost::intrusive_ptr<exec::agg::Stage> stage;
+    boost::intrusive_ptr<exec::agg::MockStage> source;  // must outlive stage
+};
+
+SdtTestResult runSdtWithObservingExpression(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     MemoryTrackerObservingExpression::resetObservations();
 
     auto addFieldsDS = DocumentSourceAddFields::create(
@@ -102,6 +112,7 @@ void runSdtWithObservingExpression(const boost::intrusive_ptr<ExpressionContext>
     exec::agg::MockStage::setSource_forTest(stage, mockSource.get());
     while (stage->getNext().isAdvanced()) {
     }
+    return {stage, mockSource};
 }
 
 using SingleDocumentTransformationStageTest = AggregationContextFixture;
@@ -138,6 +149,37 @@ TEST_F(SingleDocumentTransformationStageTest, MemoryTrackerLimitReflectsKnob) {
 
     ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluationsWithTracker, 1);
     ASSERT_EQ(MemoryTrackerObservingExpression::gLastTrackerMaxBytes, customLimit);
+}
+
+TEST_F(SingleDocumentTransformationStageTest, StageNameIsSetInEvaluationContext) {
+    unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", true);
+
+    auto [stage, source] = runSdtWithObservingExpression(getExpCtx());
+
+    ASSERT_EQ(MemoryTrackerObservingExpression::gLastStageName, "$addFields");
+}
+
+TEST_F(SingleDocumentTransformationStageTest,
+       ExplainOutputIncludesExpressionEvaluationPeakMemoryBytesWhenEnabled) {
+    unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", true);
+
+    auto [stage, source] = runSdtWithObservingExpression(getExpCtx());
+
+    auto explain = stage->getExplainOutput();
+    ASSERT(!explain.getNestedField("expressionEvaluationPeakMemoryBytes").missing());
+}
+
+TEST_F(SingleDocumentTransformationStageTest,
+       ExplainOutputOmitsExpressionEvaluationPeakMemoryBytesWhenDisabled) {
+    unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", false);
+
+    auto [stage, source] = runSdtWithObservingExpression(getExpCtx());
+
+    auto explain = stage->getExplainOutput();
+    ASSERT(explain.getNestedField("expressionEvaluationPeakMemoryBytes").missing());
 }
 
 }  // namespace
