@@ -59,8 +59,8 @@ class MONGO_MOD_NEEDS_REPLACEMENT MigrationCoordinator {
 public:
     MigrationCoordinator(UUID migrationId,
                          MigrationSessionId sessionId,
-                         ShardId donorShard,
-                         ShardId recipientShard,
+                         ShardRef donorShard,
+                         ShardRef recipientShard,
                          NamespaceString collectionNamespace,
                          UUID collectionUuid,
                          ChunkRange range,

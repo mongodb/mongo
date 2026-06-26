@@ -94,7 +94,8 @@ std::map<ShardId, int64_t> extractDocumentsToCopy(
                 donorEntry.getDocumentsToCopy());
 
         docsToCopy[donorEntry.getId()] = *donorEntry.getDocumentsToCopy();
-        reportBuilder.append(donorEntry.getId(), *donorEntry.getDocumentsToCopy());
+        // TODO SERVER-129198: getString() will break once we start using UUIDs
+        reportBuilder.append(donorEntry.getId().getString(), *donorEntry.getDocumentsToCopy());
     }
 
     LOGV2(9929908,
@@ -615,7 +616,8 @@ void ReshardingCoordinatorExternalStateImpl::verifyFinalCollection(
                               << donorEntry.getId() << "'",
                 donorEntry.getDocumentsFinal());
         numDocsOriginal += *donorEntry.getDocumentsFinal();
-        donorReportBuilder.append(donorEntry.getId(), *donorEntry.getDocumentsFinal());
+        // TODO SERVER-129198: getString() will break once we start using UUIDs
+        donorReportBuilder.append(donorEntry.getId().getString(), *donorEntry.getDocumentsFinal());
     }
 
     int64_t numDocsTemporary = 0;
@@ -628,7 +630,8 @@ void ReshardingCoordinatorExternalStateImpl::verifyFinalCollection(
                               << recipientEntry.getId() << "'",
                 finalCount);
         numDocsTemporary += *finalCount;
-        recipientReportBuilder.append(recipientEntry.getId(), *finalCount);
+        // TODO SERVER-129198: getString() will break once we start using UUIDs
+        recipientReportBuilder.append(recipientEntry.getId().getString(), *finalCount);
     }
 
     LOGV2(9858601,

@@ -72,7 +72,7 @@ structs:
                 type: CollectionInfo
                 optional: true
             collChangeStreamsNotifier:
-                type: shard_id
+                type: shard_ref
                 description:
                     "The identity of the Shard that will generate the op log entries about the sharded/unsplittable collection being dropped
                     (which drive the behavior of change stream readers V2)."

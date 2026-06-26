@@ -137,7 +137,8 @@ MovePrimaryCoordinator::MovePrimaryCoordinator(ShardingCoordinatorService* servi
           builder.append("command", "movePrimary");
           builder.append(
               "db", DatabaseNameUtil::serialize(_dbName, SerializationContext::stateDefault()));
-          builder.append("to", _doc.getToShardId());
+          // TODO SERVER-129239: getString() won't work after UUIDs are in play
+          builder.append("to", _doc.getToShardId().getString());
           return builder.obj();
       }()) {}
 
@@ -189,13 +190,13 @@ ExecutorFuture<void> MovePrimaryCoordinator::_runImpl(
             const auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
 
-            const auto& toShardId = _doc.getToShardId();
+            const auto& toShardRef = _doc.getToShardId();
 
-            if (toShardId == ShardingState::get(opCtx)->shardId()) {
+            if (toShardRef == ShardingState::get(opCtx)->asShardRef(opCtx)) {
                 LOGV2(7120200,
                       "Database already on requested primary shard",
                       logAttrs(_dbName),
-                      "to"_attr = toShardId);
+                      "to"_attr = toShardRef);
 
                 return ExecutorFuture<void>(**executor);
             }
@@ -207,20 +208,21 @@ ExecutorFuture<void> MovePrimaryCoordinator::_runImpl(
                     ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                     repl::ReadConcernLevel::kMajorityReadConcern,
                     NamespaceString::kConfigsvrShardsNamespace,
-                    BSON(ShardType::name() << toShardId),
+                    // TODO SERVER-129239: getString() won't work after UUIDs are in play
+                    BSON(ShardType::name() << toShardRef.getString()),
                     BSONObj() /* No sorting */,
                     1 /* Limit */));
 
                 uassert(
                     ErrorCodes::ShardNotFound,
-                    fmt::format("Requested primary shard {} does not exist", toShardId.toString()),
+                    fmt::format("Requested primary shard {} does not exist", toShardRef.toString()),
                     !findResponse.docs.empty());
 
                 return uassertStatusOK(ShardType::fromBSON(findResponse.docs.front()));
             }();
 
             uassert(ErrorCodes::ShardNotFound,
-                    fmt::format("Requested primary shard {} is draining", toShardId.toString()),
+                    fmt::format("Requested primary shard {} is draining", toShardRef.toString()),
                     !toShardEntry.getDraining());
 
             return runMovePrimaryWorkflow(executor, token);
@@ -234,7 +236,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
         .then(_buildPhaseHandler(  //
             Phase::kClone,
             [this, token, executor, anchor = shared_from_this()](auto* opCtx) {
-                const auto& toShardId = _doc.getToShardId();
+                const auto& toShardRef = _doc.getToShardId();
 
                 if (!_firstExecution) {
                     // The `_shardsvrCloneCatalogData` command to request the recipient to clone the
@@ -247,13 +249,13 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                         fmt::format("movePrimary operation on database {} failed cloning data to "
                                     "recipient {}",
                                     _dbName.toStringForErrorMsg(),
-                                    toShardId.toString()));
+                                    toShardRef.toString()));
                 }
 
                 LOGV2(7120201,
                       "Running movePrimary operation",
                       logAttrs(_dbName),
-                      "to"_attr = toShardId);
+                      "to"_attr = toShardRef);
 
                 logChange(opCtx, "start");
 
@@ -428,7 +430,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::_cleanupOnAbort(
             const auto thisShardId = ShardingState::get(opCtx)->shardId();
             // Copy by value: exitCriticalSectionOnRecipient() and getNewSession() below reassign
             // _doc, which would leave a reference into _doc dangling.
-            const auto toShardId = _doc.getToShardId();
+            const auto toShardRef = _doc.getToShardId();
             const auto failedPhase = _doc.getPhase();
 
             unblockReadsAndWrites(opCtx);
@@ -440,7 +442,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::_cleanupOnAbort(
                 LOGV2_INFO(7392902,
                            "Failed to exit critical section on recipient as it has been removed",
                            logAttrs(_dbName),
-                           "to"_attr = toShardId);
+                           "to"_attr = toShardRef);
             }
 
             if (failedPhase <= Phase::kCommit) {
@@ -455,7 +457,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::_cleanupOnAbort(
                     LOGV2_INFO(7392901,
                                "Failed to remove orphaned data on recipient as it has been removed",
                                logAttrs(_dbName),
-                               "to"_attr = toShardId);
+                               "to"_attr = toShardRef);
                 }
             }
 
@@ -475,7 +477,8 @@ void MovePrimaryCoordinator::logChange(OperationContext* opCtx,
                                        const Status& status) const {
     BSONObjBuilder details;
     details.append("from", ShardingState::get(opCtx)->shardId());
-    details.append("to", _doc.getToShardId());
+    // TODO SERVER-129239: getString() won't work after UUIDs are in play
+    details.append("to", _doc.getToShardId().getString());
     if (!status.isOK()) {
         details.append("error", status.toString());
     }
@@ -556,11 +559,11 @@ std::vector<NamespaceString> MovePrimaryCoordinator::getCollectionsToClone(
 
 void MovePrimaryCoordinator::assertNoOrphanedDataOnRecipient(
     OperationContext* opCtx, const std::vector<NamespaceString>& collectionsToClone) const {
-    const auto& toShardId = _doc.getToShardId();
+    const auto& toShardRef = _doc.getToShardId();
 
     auto allCollections = [&] {
         const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-        const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, toShardId));
+        const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, toShardRef));
 
         const auto listCommand = [&] {
             ListCollections listCollectionsCmd;
@@ -596,7 +599,7 @@ void MovePrimaryCoordinator::assertNoOrphanedDataOnRecipient(
         uassert(ErrorCodes::NamespaceExists,
                 fmt::format("Found orphaned collection {} on recipient {}",
                             nss.toStringForErrorMsg(),
-                            toShardId.toString()),
+                            toShardRef.toString()),
                 !std::binary_search(allCollections.cbegin(), allCollections.cend(), nss));
     };
 }
@@ -607,12 +610,12 @@ std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(Operat
 
     // Copy by value: getNewSession() below (evaluated before clonedCollections() runs) reassigns
     // _doc, which would leave a reference into _doc dangling.
-    const auto toShardId = _doc.getToShardId();
+    const auto toShardRef = _doc.getToShardId();
 
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     const auto fromShard =
         uassertStatusOK(shardRegistry->getShard(opCtx, ShardingState::get(opCtx)->shardId()));
-    const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, toShardId));
+    const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, toShardRef));
 
     auto cloneCommand = [&](boost::optional<OperationSessionInfo> osi) {
         BSONObjBuilder commandBuilder;
@@ -640,7 +643,7 @@ std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(Operat
             Shard::CommandResponse::getEffectiveStatus(cloneResponse),
             fmt::format("movePrimary operation on database {} failed to clone data to recipient {}",
                         _dbName.toStringForErrorMsg(),
-                        toShardId.toString()));
+                        toShardRef.toString()));
 
         std::vector<NamespaceString> colls;
         for (const auto& bsonElem : cloneResponse.getValue().response["clonedColls"].Obj()) {
@@ -738,12 +741,12 @@ void MovePrimaryCoordinator::commitCollectionsMetadataToShards(
         catalogClient->getCollections(opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern);
     // Copy by value: getNewSession() below reassigns _doc, which would leave a reference into _doc
     // dangling.
-    const auto toShardId = _doc.getToShardId();
+    const auto toShardRef = _doc.getToShardId();
 
     for (auto& coll : trackedColls) {
         const auto session = getNewSession(opCtx);
         sharding_ddl_util::commitCreateCollectionChunklessMetadataToShardCatalog(
-            opCtx, coll.getNss(), {toShardId}, session, executor, token);
+            opCtx, coll.getNss(), {toShardRef}, session, executor, token);
     }
 }
 
@@ -977,11 +980,11 @@ void MovePrimaryCoordinator::enterCriticalSectionOnRecipient(
             return request.toBSON();
         }();
 
-        const auto& toShardId = _doc.getToShardId();
+        const auto& toShardRef = _doc.getToShardId();
 
         const auto enterCriticalSectionResponse = [&] {
             const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-            const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, toShardId));
+            const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, toShardRef));
 
             return toShard->runCommand(opCtx,
                                        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
@@ -996,7 +999,7 @@ void MovePrimaryCoordinator::enterCriticalSectionOnRecipient(
                 "movePrimary operation on database {} failed to block read/write operations on "
                 "recipient {}",
                 _dbName.toStringForErrorMsg(),
-                toShardId.toString()));
+                toShardRef.toString()));
     }
 }
 
@@ -1028,11 +1031,11 @@ void MovePrimaryCoordinator::exitCriticalSectionOnRecipient(
             return request.toBSON();
         }();
 
-        const auto& toShardId = _doc.getToShardId();
+        const auto& toShardRef = _doc.getToShardId();
 
         const auto exitCriticalSectionResponse = [&] {
             const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-            const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, toShardId));
+            const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, toShardRef));
 
             return toShard->runCommand(opCtx,
                                        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
@@ -1047,7 +1050,7 @@ void MovePrimaryCoordinator::exitCriticalSectionOnRecipient(
                 "movePrimary operation on database {} failed to unblock read/write operations "
                 "on recipient {}",
                 _dbName.toStringForErrorMsg(),
-                toShardId.toString()));
+                toShardRef.toString()));
     }
 }
 

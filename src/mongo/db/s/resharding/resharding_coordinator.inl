@@ -2123,7 +2123,7 @@ void ReshardingCoordinator::_generateCommitNotificationForChangeStreams(
     ShardsvrNotifyShardingEventRequest request(notify_sharding_event::kCollectionResharded,
                                                eventNotification.toBSON());
 
-    const auto& notifierShard = _getChangeStreamNotifierShardId();
+    const auto& notifierShard = _getChangeStreamNotifierShardRef();
 
     // In case the recipient is running a legacy binary, swallow the error.
     try {
@@ -2154,7 +2154,7 @@ void ReshardingCoordinator::_generatePlacementChangeNotificationForChangeStreams
     ShardsvrNotifyShardingEventRequest request(notify_sharding_event::kNamespacePlacementChanged,
                                                eventNotification.toBSON());
 
-    const auto& notifierShard = _getChangeStreamNotifierShardId();
+    const auto& notifierShard = _getChangeStreamNotifierShardRef();
 
     // In case the recipient is running a legacy binary, swallow the error.
     try {
@@ -2624,7 +2624,8 @@ void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
     for (auto donor : _coordinatorDoc.getDonorShards()) {
         BSONObjBuilder shardBuilder;
         auto& state = donor.getMutableState();
-        shardBuilder.append("shardName", donor.getId());
+        // TODO SERVER-129198: getString() will break once we start using UUIDs
+        shardBuilder.append("shardName", donor.getId().getString());
         auto bytes = state.getBytesToClone().value_or(0);
         auto docs = state.getDocumentsToClone().value_or(0);
         shardBuilder.append("bytesToClone", bytes);
@@ -2660,7 +2661,8 @@ void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
     for (auto recipient : _coordinatorDoc.getRecipientShards()) {
         BSONObjBuilder shardBuilder;
         auto& state = recipient.getMutableState();
-        shardBuilder.append("shardName", recipient.getId());
+        // TODO SERVER-129198: getString() will break once we start using UUIDs
+        shardBuilder.append("shardName", recipient.getId().getString());
         auto bytes = state.getBytesCopied().value_or(0);
         auto docsCloned = state.getNumDocumentsCloned().value_or(0);
         // Prefer documentsFinal (cloned + delta, written after verification) and fall back to
@@ -2725,7 +2727,7 @@ void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
     LOGV2(10764500, "Resharding coordinator terminated", "info"_attr = builder.obj());
 }
 
-const ShardId& ReshardingCoordinator::_getChangeStreamNotifierShardId() const {
+const ShardRef& ReshardingCoordinator::_getChangeStreamNotifierShardRef() const {
     // Change stream readers expect to receive pre & post commit event notifications
     // from one of the shards holding data before the beginning of the resharding.
     return _coordinatorDoc.getDonorShards().front().getId();

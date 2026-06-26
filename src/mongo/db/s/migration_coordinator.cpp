@@ -93,8 +93,8 @@ namespace migrationutil {
 
 MigrationCoordinator::MigrationCoordinator(UUID migrationId,
                                            MigrationSessionId sessionId,
-                                           ShardId donorShard,
-                                           ShardId recipientShard,
+                                           ShardRef donorShard,
+                                           ShardRef recipientShard,
                                            NamespaceString collectionNamespace,
                                            UUID collectionUuid,
                                            ChunkRange range,

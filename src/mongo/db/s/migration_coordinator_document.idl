@@ -101,10 +101,10 @@ structs:
                 type: uuid
                 description: "The UUID of the collection that the chunk belongs to."
             donorShardId:
-                type: shard_id
+                type: shard_ref
                 description: "The shard from which the chunk is being migrated."
             recipientShardId:
-                type: shard_id
+                type: shard_ref
                 description: "The shard to which the chunk is being migrated."
             range:
                 type: chunk_range

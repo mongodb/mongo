@@ -841,7 +841,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     LOGV2_DEBUG(10488801, 2, "Acquired critical section", "nss"_attr = nss);
                 };
 
-                auto getChangeStreamNotifierShardIdFor =
+                auto getChangeStreamNotifierShardRefFor =
                     [&](const boost::optional<UUID>& collUUID) {
                         // In case of tracked collection, a data bearing shard needs to generate
                         // events about the upcoming placement change.
@@ -856,7 +856,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                         // In case the collection is untracked or does not currently exist, change
                         // stream readers are expected to tail the primary shard of the parent DB.
-                        return ShardingState::get(opCtx)->shardId();
+                        return ShardingState::get(opCtx)->asShardRef(opCtx);
                     };
 
                 // 1. Block CRUD operations on any node for both namespaces before emitting any
@@ -870,12 +870,14 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     auto newDoc = _doc;
 
                     auto changeStreamsNotifierForSource =
-                        getChangeStreamNotifierShardIdFor(_doc.getSourceUUID().value());
+                        getChangeStreamNotifierShardRefFor(_doc.getSourceUUID().value());
                     LOGV2(10488802,
                           "Defined notifier shard Id for change streams tracking the source nss",
                           "sourceNss"_attr = fromNss,
                           "notifierId"_attr = changeStreamsNotifierForSource);
-                    newDoc.setChangeStreamsNotifier(std::move(changeStreamsNotifierForSource));
+
+                    newDoc.setChangeStreamsNotifier(
+                        boost::optional<ShardId>(std::move(changeStreamsNotifierForSource)));
 
                     _updateStateDocument(opCtx, std::move(newDoc));
                 }
@@ -902,7 +904,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
 
                 const auto changeStreamNotifierForTarget =
-                    getChangeStreamNotifierShardIdFor(_doc.getTargetUUID());
+                    getChangeStreamNotifierShardRefFor(_doc.getTargetUUID());
 
                 NamespacePlacementChanged notification(toNss,
                                                        timeAtNewPlacementForTargetCollection);

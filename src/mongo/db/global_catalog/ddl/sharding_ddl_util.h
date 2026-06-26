@@ -541,13 +541,12 @@ getGrantedAuthoritativeMetadataAccessLevel(const VersionContext& vCtx,
 MONGO_MOD_NEEDS_REPLACEMENT ShardIdentificationTypeEnum getGrantedShardIdentificationType(
     const VersionContext& vCtx, const ServerGlobalParams::FCVSnapshot& snapshot);
 /*
- * Provided a collection UUID, returns the ID of one of the shards that are currently owning its
- * chunks (or boost:node when the collection is untracked or non-existing).
- * The method assumes that the caller is currently holding a Critical Section for the namespace
- * requested and ensures a stable value across calls as long as the queried routing table isn't
- * modified.
+ * Provided a collection UUID, returns the ShardRef of one of the shards that are currently owning
+ * its chunks (or boost:node when the collection is untracked or non-existing). The method assumes
+ * that the caller is currently holding a Critical Section for the namespace requested and ensures a
+ * stable value across calls as long as the queried routing table isn't modified.
  */
-MONGO_MOD_NEEDS_REPLACEMENT boost::optional<ShardId> pickShardOwningCollectionChunks(
+MONGO_MOD_NEEDS_REPLACEMENT boost::optional<ShardRef> pickShardOwningCollectionChunks(
     OperationContext* opCtx, const UUID& collUuid);
 
 /**
