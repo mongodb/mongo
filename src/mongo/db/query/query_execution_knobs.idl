@@ -469,6 +469,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: sbeDisableLookupPushdown
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQuerySlotBasedExecutionDisableLookupUnwindPushdown:
         description: "If true, the system will not push down $lookup with absorbed $unwind to the SBE execution engine."
@@ -477,6 +480,12 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: sbeDisableLookupUnwindPushdown
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQuerySlotBasedExecutionDisableGroupPushdown:
         description: "If true, the system will not push down $group to the SBE execution engine."
@@ -488,6 +497,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: sbeDisableGroupPushdown
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryAppendIdToSetWindowFieldsSort:
         description: >-
@@ -851,6 +863,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: sbeDisableTimeSeriesPushdown
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQuerySpillingMaxWaitTimeout:
         description: >-

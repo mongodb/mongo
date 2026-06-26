@@ -146,8 +146,9 @@ SbeCompatibility determineSbeCompatibility(DocumentSourceLookUp* lookup) {
     // This stage has the SBE compatibility as least the same as that of the expression context.
     SbeCompatibility sbeCompatibility = lookup->getExpCtx()->getSbeCompatibility();
     if (lookup->hasUnwindSrc()) {
-        // TODO SERVER-118544: Read the knob value through QueryKnobConfiguration.
-        if (internalQuerySlotBasedExecutionDisableLookupUnwindPushdown.loadRelaxed()) {
+        if (lookup->getExpCtx()
+                ->getQueryKnobConfiguration()
+                .getSbeDisableLookupUnwindPushdownForOp()) {
             sbeCompatibility = SbeCompatibility::notCompatible;
         } else if (!feature_flags::gFeatureFlagSbeEqLookupUnwind.checkWithContext(
                        lookup->getExpCtx()->getVersionContext(),

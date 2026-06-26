@@ -46,6 +46,10 @@
          kInternalQuerySlotBasedExecutionDisableLookupPushdownName,                       \
          internalQuerySlotBasedExecutionDisableLookupPushdown,                            \
          getSbeDisableLookupPushdownForOp)                                                \
+    KNOB(kSbeDisableLookupUnwindPushdown,                                                 \
+         kInternalQuerySlotBasedExecutionDisableLookupUnwindPushdownName,                 \
+         internalQuerySlotBasedExecutionDisableLookupUnwindPushdown,                      \
+         getSbeDisableLookupUnwindPushdownForOp)                                          \
     KNOB(kSbeDisableTimeSeriesPushdown,                                                   \
          kInternalQuerySlotBasedExecutionDisableTimeSeriesPushdownName,                   \
          internalQuerySlotBasedExecutionDisableTimeSeriesPushdown,                        \
