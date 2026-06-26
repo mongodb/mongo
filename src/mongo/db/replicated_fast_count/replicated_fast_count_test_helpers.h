@@ -178,17 +178,18 @@ void checkFastCountMetadataInInternalStore(
 /**
  * Checks the uncommitted fast count changes for the given UUID.
  */
-void checkUncommittedFastCountChanges(OperationContext* opCtx,
-                                      const UUID& uuid,
-                                      int64_t expectedCount,
-                                      int64_t expectedSize);
+void checkUncommittedSizeCount(OperationContext* opCtx,
+                               UUID uuid,
+                               CollectionSizeCount expectedSizeCount);
 
 /**
  * Checks the committed size and count for the `RecordStore` with the provided `uuid`.
  *
  * It is an invariant that the provided `uuid` exists in the catalog.
  */
-void checkCommittedSizeCount(OperationContext* opCtx, UUID uuid, CollectionSizeCount sizeCount);
+void checkCommittedSizeCount(OperationContext* opCtx,
+                             UUID uuid,
+                             CollectionSizeCount expectedSizeCount);
 
 /**
  * Inserts the specified number of documents into the given collection, using the provided function

@@ -131,24 +131,23 @@ void checkFastCountMetadataInInternalStore(
     ASSERT_TRUE(persisted.hasField(replicated_fast_count::kValidAsOfKey));
 }
 
-void checkUncommittedFastCountChanges(OperationContext* opCtx,
-                                      const UUID& uuid,
-                                      int64_t expectedCount,
-                                      int64_t expectedSize) {
-    auto uncommittedChanges = UncommittedFastCountChange::getForRead(opCtx);
-    auto uncommittedSizeAndCount = uncommittedChanges.find(uuid);
-
-    EXPECT_EQ(uncommittedSizeAndCount.count, expectedCount);
-    EXPECT_EQ(uncommittedSizeAndCount.size, expectedSize);
+void checkUncommittedSizeCount(OperationContext* opCtx,
+                               UUID uuid,
+                               CollectionSizeCount expectedSizeCount) {
+    const CollectionSizeCount uncommittedSizeAndCount =
+        UncommittedFastCountChange::getForRead(opCtx).find(uuid);
+    EXPECT_EQ(uncommittedSizeAndCount, expectedSizeCount);
 }
 
-void checkCommittedSizeCount(OperationContext* opCtx, UUID uuid, CollectionSizeCount sizeCount) {
+void checkCommittedSizeCount(OperationContext* opCtx,
+                             UUID uuid,
+                             CollectionSizeCount expectedSizeCount) {
     const auto catalog = CollectionCatalog::latest(opCtx->getServiceContext());
     const Collection* collection = catalog->lookupCollectionByUUID(opCtx, uuid);
     invariant(collection);
     const RecordStore* recordStore = collection->getRecordStore();
-    EXPECT_EQ(recordStore->accurateNumRecords(), sizeCount.count);
-    EXPECT_EQ(recordStore->accurateDataSize(), sizeCount.size);
+    EXPECT_EQ(recordStore->accurateNumRecords(), expectedSizeCount.count);
+    EXPECT_EQ(recordStore->accurateDataSize(), expectedSizeCount.size);
 }
 
 void insertDocs(OperationContext* opCtx,
@@ -172,8 +171,8 @@ void insertDocs(OperationContext* opCtx,
             BSONObj doc = makeDoc(i);
             ASSERT_OK(Helpers::insert(opCtx, coll.getCollectionPtr(), doc));
         }
-        checkUncommittedFastCountChanges(
-            opCtx, coll.uuid(), numDocs, numDocs * sampleDoc.objsize());
+        checkUncommittedSizeCount(
+            opCtx, coll.uuid(), {.size = numDocs * sampleDoc.objsize(), .count = numDocs});
         checkCommittedSizeCount(opCtx, coll.uuid(), {.size = startingSize, .count = startingCount});
         if (!abortWithoutCommit) {
             wuow.commit();
@@ -189,7 +188,7 @@ void insertDocs(OperationContext* opCtx,
                                  .count = startingCount + numDocs});
     }
 
-    checkUncommittedFastCountChanges(opCtx, coll.uuid(), 0, 0);
+    checkUncommittedSizeCount(opCtx, coll.uuid(), {.size = 0, .count = 0});
 }
 
 void updateDocs(OperationContext* opCtx,
@@ -219,7 +218,8 @@ void updateDocs(OperationContext* opCtx,
             Helpers::update(opCtx, coll, BSON("_id" << i), BSON("$set" << updated));
         }
         checkCommittedSizeCount(opCtx, coll.uuid(), {.size = startingSize, .count = startingCount});
-        checkUncommittedFastCountChanges(opCtx, coll.uuid(), 0, numTotalUpdates * sizeDelta);
+        checkUncommittedSizeCount(
+            opCtx, coll.uuid(), {.size = numTotalUpdates * sizeDelta, .count = 0});
         wuow.commit();
     }
 
@@ -227,7 +227,7 @@ void updateDocs(OperationContext* opCtx,
         opCtx,
         coll.uuid(),
         {.size = startingSize + numTotalUpdates * sizeDelta, .count = startingCount});
-    checkUncommittedFastCountChanges(opCtx, coll.uuid(), 0, 0);
+    checkUncommittedSizeCount(opCtx, coll.uuid(), {.size = 0, .count = 0});
 }
 
 void deleteDocsByIDRange(OperationContext* opCtx,
@@ -255,8 +255,10 @@ void deleteDocsByIDRange(OperationContext* opCtx,
             Helpers::deleteByRid(opCtx, coll, rid);
         }
         checkCommittedSizeCount(opCtx, coll.uuid(), {.size = startingSize, .count = startingCount});
-        checkUncommittedFastCountChanges(
-            opCtx, coll.uuid(), -numTotalDeletes, -numTotalDeletes * sampleDoc.objsize());
+        checkUncommittedSizeCount(
+            opCtx,
+            coll.uuid(),
+            {.size = -numTotalDeletes * sampleDoc.objsize(), .count = -numTotalDeletes});
         wuow.commit();
     }
 
@@ -264,7 +266,7 @@ void deleteDocsByIDRange(OperationContext* opCtx,
                             coll.uuid(),
                             {.size = startingSize - (numTotalDeletes)*sampleDoc.objsize(),
                              .count = startingCount - numTotalDeletes});
-    checkUncommittedFastCountChanges(opCtx, coll.uuid(), 0, 0);
+    checkUncommittedSizeCount(opCtx, coll.uuid(), {.size = 0, .count = 0});
 }
 
 OplogCursorMock::OplogCursorMock(std::list<repl::OplogEntry> entries) {

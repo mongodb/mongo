@@ -58,6 +58,7 @@ namespace mongo::replicated_fast_count {
 namespace {
 
 using test_helpers::checkCommittedSizeCount;
+using test_helpers::checkUncommittedSizeCount;
 
 /**
  * Tests replicated fast count across multidocument transactions.
@@ -256,13 +257,13 @@ TEST_F(ReplicatedFastCountTxnTest,
         // Since the transaction as a whole hasn't been committed, expect doc1 to only count toward
         // uncommitted changes.
         checkCommittedSizeCount(opCtx1, *uuid, {.size = 0, .count = 0});
-        test_helpers::checkUncommittedFastCountChanges(opCtx1, *uuid, 1, doc1.objsize());
+        checkUncommittedSizeCount(opCtx1, *uuid, {.size = doc1.objsize(), .count = 1});
     });
 
     // The insert shouldn't be visible outside the transaction.
     ASSERT(uuid.has_value());
     checkCommittedSizeCount(_opCtx, *uuid, {.size = 0, .count = 0});
-    test_helpers::checkUncommittedFastCountChanges(_opCtx, *uuid, 0, 0);
+    checkUncommittedSizeCount(_opCtx, *uuid, {.size = 0, .count = 0});
 
     // Continue and commit the transaction.
     continueAndCommitTxn(sessionId, txnNumber, [&](OperationContext* opCtx2) {
@@ -281,11 +282,11 @@ TEST_F(ReplicatedFastCountTxnTest,
         // Uncommitted fast count changes should include both inserts, even though they were
         // executed on different OperationContexts.
         checkCommittedSizeCount(opCtx2, *uuid, {.size = 0, .count = 0});
-        test_helpers::checkUncommittedFastCountChanges(opCtx2, *uuid, expectedCount, expectedSize);
+        checkUncommittedSizeCount(opCtx2, *uuid, {.size = expectedSize, .count = expectedCount});
     });
 
     checkCommittedSizeCount(_opCtx, *uuid, {.size = expectedSize, .count = expectedCount});
-    test_helpers::checkUncommittedFastCountChanges(_opCtx, *uuid, 0, 0);
+    checkUncommittedSizeCount(_opCtx, *uuid, {.size = 0, .count = 0});
 }
 
 TEST_F(ReplicatedFastCountTxnTest, UncommittedChangesDiscardedAfterMultiDocumentTxnAbort) {
@@ -314,19 +315,19 @@ TEST_F(ReplicatedFastCountTxnTest, UncommittedChangesDiscardedAfterMultiDocument
         // Since the transaction as a whole hasn't been committed, expect doc1 to only count toward
         // uncommitted changes.
         checkCommittedSizeCount(opCtx1, *uuid, {.size = 0, .count = 0});
-        test_helpers::checkUncommittedFastCountChanges(opCtx1, *uuid, 1, doc1.objsize());
+        checkUncommittedSizeCount(opCtx1, *uuid, {.size = doc1.objsize(), .count = 1});
     });
 
     // The insert shouldn't be visible outside the transaction.
     ASSERT(uuid.has_value());
     checkCommittedSizeCount(_opCtx, *uuid, {.size = 0, .count = 0});
-    test_helpers::checkUncommittedFastCountChanges(_opCtx, *uuid, 0, 0);
+    checkUncommittedSizeCount(_opCtx, *uuid, {.size = 0, .count = 0});
 
     abortTxn(sessionId, txnNumber);
 
     // Confirm the uncommitted changes were discarded.
     checkCommittedSizeCount(_opCtx, *uuid, {.size = 0, .count = 0});
-    test_helpers::checkUncommittedFastCountChanges(_opCtx, *uuid, 0, 0);
+    checkUncommittedSizeCount(_opCtx, *uuid, {.size = 0, .count = 0});
 }
 
 TEST_F(ReplicatedFastCountTxnTest, FastCountResetForSessionBetweenTransactions) {
@@ -354,7 +355,7 @@ TEST_F(ReplicatedFastCountTxnTest, FastCountResetForSessionBetweenTransactions) 
         }
 
         checkCommittedSizeCount(opCtx, *uuid, {.size = 0, .count = 0});
-        test_helpers::checkUncommittedFastCountChanges(opCtx, *uuid, 1, doc1.objsize());
+        checkUncommittedSizeCount(opCtx, *uuid, {.size = doc1.objsize(), .count = 1});
     });
     abortTxn(_opCtx, sessionId, txnNumber);
 
@@ -362,7 +363,7 @@ TEST_F(ReplicatedFastCountTxnTest, FastCountResetForSessionBetweenTransactions) 
     beginTxn(_opCtx, sessionId, txnNumber, [&](OperationContext* opCtx) {
         // Nothing leaked over from the previous transaction on the session.
         checkCommittedSizeCount(opCtx, *uuid, {.size = 0, .count = 0});
-        test_helpers::checkUncommittedFastCountChanges(opCtx, *uuid, 0, 0);
+        checkUncommittedSizeCount(opCtx, *uuid, {.size = 0, .count = 0});
     });
     abortTxn(_opCtx, sessionId, txnNumber);
 }
