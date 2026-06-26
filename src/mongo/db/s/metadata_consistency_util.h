@@ -32,6 +32,8 @@
 #include <memory>
 #include <vector>
 
+#include <boost/optional/optional.hpp>
+
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/clientcursor.h"
@@ -46,7 +48,6 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
-
 namespace mongo {
 namespace metadata_consistency_util {
 
@@ -54,13 +55,17 @@ namespace metadata_consistency_util {
  * Creates a MetadataInconsistencyItem object from the given parameters.
  */
 template <typename MetadataDetailsType>
-MetadataInconsistencyItem makeInconsistency(const MetadataInconsistencyTypeEnum& type,
-                                            const MetadataDetailsType& details) {
-    return {type,
-            MetadataInconsistencyDescription_serializer(
-                static_cast<MetadataInconsistencyDescriptionEnum>(type))
-                .toString(),
-            details.toBSON()};
+MetadataInconsistencyItem makeInconsistency(
+    const MetadataInconsistencyTypeEnum& type,
+    const MetadataDetailsType& details,
+    boost::optional<MetadataInconsistencySeverityEnum> severity = boost::none) {
+    MetadataInconsistencyItem item{type,
+                                   MetadataInconsistencyDescription_serializer(
+                                       static_cast<MetadataInconsistencyDescriptionEnum>(type))
+                                       .toString(),
+                                   details.toBSON()};
+    item.setSeverity(severity);
+    return item;
 }
 
 /**

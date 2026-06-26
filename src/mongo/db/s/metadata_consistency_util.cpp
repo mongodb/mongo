@@ -210,10 +210,14 @@ std::vector<MetadataInconsistencyItem> _checkInconsistenciesBetweenBothCatalogs(
     const auto& catalogUUID = catalogColl.getUuid();
     const auto& localUUID = localColl->uuid();
     if (catalogUUID != localUUID) {
+        const auto severity =
+            boost::make_optional(nss == NamespaceString::kLogicalSessionsNamespace,
+                                 MetadataInconsistencySeverityEnum::kLow);
         inconsistencies.emplace_back(makeInconsistency(
             MetadataInconsistencyTypeEnum::kCollectionUUIDMismatch,
             CollectionUUIDMismatchDetails{
-                nss, shardId, localUUID, catalogUUID, getNumDocs(opCtx, localColl.get())}));
+                nss, shardId, localUUID, catalogUUID, getNumDocs(opCtx, localColl.get())},
+            severity));
     }
 
     const auto makeOptionsMismatchInconsistencyBetweenShardAndConfig =
@@ -224,6 +228,9 @@ std::vector<MetadataInconsistencyItem> _checkInconsistenciesBetweenBothCatalogs(
             constexpr StringData kShardsFieldName = "shards"_sd;
             constexpr StringData kOptionsFieldName = "options"_sd;
             const auto configShardId = Grid::get(opCtx)->shardRegistry()->getConfigShard()->getId();
+            const auto severity =
+                boost::make_optional(nss == NamespaceString::kLogicalSessionsNamespace,
+                                     MetadataInconsistencySeverityEnum::kLow);
 
             return metadata_consistency_util::makeInconsistency(
                 MetadataInconsistencyTypeEnum::kCollectionOptionsMismatch,
@@ -232,7 +239,8 @@ std::vector<MetadataInconsistencyItem> _checkInconsistenciesBetweenBothCatalogs(
                     {BSON(kOptionsFieldName << shardOptions << kShardsFieldName
                                             << BSON_ARRAY(shardId)),
                      BSON(kOptionsFieldName << configOptions << kShardsFieldName
-                                            << BSON_ARRAY(configShardId))}});
+                                            << BSON_ARRAY(configShardId))}},
+                severity);
         };
 
     // A capped collection can't be sharded.
@@ -829,7 +837,7 @@ std::vector<MetadataInconsistencyItem> checkCollectionOptionsConsistencyAcrossSh
             pipeline.emplace_back(fromjson(R"(
                 {$group: {
                     _id: 0,
-                    docs: { $push: "$$ROOT" } 
+                    docs: { $push: "$$ROOT" }
                 }})"));
             pipeline.emplace_back(BSON(
                 "$project" << BSON(
@@ -878,9 +886,13 @@ std::vector<MetadataInconsistencyItem> checkCollectionOptionsConsistencyAcrossSh
         //
         if (results.size() > 1) {
             // Case where two or more shards have different collection options.
+            const auto severity =
+                boost::make_optional(nss == NamespaceString::kLogicalSessionsNamespace,
+                                     MetadataInconsistencySeverityEnum::kLow);
             inconsistencies.emplace_back(metadata_consistency_util::makeInconsistency(
                 MetadataInconsistencyTypeEnum::kCollectionOptionsMismatch,
-                CollectionOptionsMismatchDetails{nss, std::move(results)}));
+                CollectionOptionsMismatchDetails{nss, std::move(results)},
+                severity));
         }
     }
     return inconsistencies;
