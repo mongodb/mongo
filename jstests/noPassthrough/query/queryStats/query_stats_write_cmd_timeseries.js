@@ -90,6 +90,11 @@ function testInsert(testDB, coll, collName, expectRecorded) {
             nInserted: 1,
             nUpdateOps: 0,
             nDeleteOps: 0,
+            // keysInserted depends on how the measurement packs into buckets; assert a lower bound
+            // to verify the shard reported and mongos propagated a non-zero count without pinning
+            // the bucketing implementation. Inserts never remove index keys.
+            keysInserted: {atLeast: 1},
+            keysDeleted: 0,
         },
     });
     assertExpectedResults({
@@ -201,6 +206,10 @@ function testDelete(testDB, coll, collName, expectRecorded) {
             nInserted: 0,
             nUpdateOps: 0,
             nDeleteOps: 1,
+            // The delete runs via an internal transaction path on the shard (see comment above),
+            // which does not propagate key-maintenance metrics back to the router.
+            keysInserted: 0,
+            keysDeleted: 0,
         },
     });
     assertExpectedResults({
