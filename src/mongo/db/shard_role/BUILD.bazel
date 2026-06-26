@@ -146,6 +146,5 @@ mongo_cc_fuzztest(
         "//src/mongo/db/s:db_s_shard_server_test_deps",
         "//src/mongo/db/s:sharding_runtime_d",
         "//src/mongo/db/sharding_environment:shard_server_test_fixture",
-        "@fuzztest//fuzztest:googletest_fixture_adapter",
     ],
 )
