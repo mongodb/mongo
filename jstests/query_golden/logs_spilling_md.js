@@ -47,9 +47,11 @@ function getSpillingAttrs(obj) {
 function outputPipelineAndSlowQueryLog(coll, pipeline, comment) {
     coll.aggregate(pipeline, {comment: comment}).itcount();
     const globalLog = assert.commandWorked(db.adminCommand({getLog: "global"}));
+    // Filter for only aggregate commands with this comment to ensure we don't pick up logs from any sub-operations.
     const slowQueryLogLine = findMatchingLogLine(globalLog.log, {
         msg: "Slow query",
         comment: comment,
+        command: "aggregate",
     });
     assert(slowQueryLogLine, "Failed to find a log line matching the comment: " + comment);
 

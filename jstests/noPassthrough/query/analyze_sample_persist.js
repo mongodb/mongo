@@ -3,14 +3,14 @@
  * parameters: sampleSize, sampleRate, samplingMethod, numChunks, and mode.
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import * as PersistentSamplesUtils from "jstests/libs/query/persistent_samples_utils.js";
 
-// TODO SERVER-112627: Remove once the feature flag is enabled by default
-if (!FeatureFlagUtil.isEnabled(db, "PersistentStats")) {
-    jsTest.log.info(`Skipping ${jsTestName()} because featureFlagPersistentStats is not enabled`);
-    quit();
-}
+const conn = MongoRunner.runMongod({
+    setParameter: {
+        featureFlagPersistentStats: true,
+    },
+});
+const db = conn.getDB("test");
 
 // For future schema changes, set this value differently depending on the FCV.
 const expectedSchemaVersion = 1;
@@ -316,14 +316,154 @@ cleanup();
 }
 
 // =============================================================================
+// Test-only sampling modes override specified samplingMethod
+// =============================================================================
+
+// Enable internalQuerySamplingBySequentialScan
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: true}),
+);
+
+// Chunk sample when internalQuerySamplingBySequentialScan is enabled
+cleanup();
+insertDocs(20);
+{
+    const sampleSize = 10;
+    assert.commandWorked(
+        db.runCommand({
+            analyze: collName,
+            mode: "sample",
+            sampleSize: sampleSize,
+            samplingMethod: "chunk",
+        }),
+    );
+    PersistentSamplesUtils.verifySampleDoc(db, {
+        sampledCollName: collName,
+        mode: "sample",
+        samplingMethod: "seqScan",
+        requestedSampleSize: sampleSize,
+        actualSampleSize: sampleSize,
+        expectedSchemaVersion: expectedSchemaVersion,
+        expectedFields: sourceDocFields,
+    });
+}
+
+// Random sample when internalQuerySamplingBySequentialScan is enabled
+cleanup();
+insertDocs(20);
+{
+    const sampleSize = 10;
+    assert.commandWorked(
+        db.runCommand({
+            analyze: collName,
+            mode: "sample",
+            sampleSize: sampleSize,
+            samplingMethod: "random",
+        }),
+    );
+    PersistentSamplesUtils.verifySampleDoc(db, {
+        sampledCollName: collName,
+        mode: "sample",
+        samplingMethod: "seqScan",
+        requestedSampleSize: sampleSize,
+        actualSampleSize: sampleSize,
+        expectedSchemaVersion: expectedSchemaVersion,
+        expectedFields: sourceDocFields,
+    });
+}
+
+// Enable internalQuerySamplingByStrides
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQuerySamplingByStrides: true}));
+
+// Random sample when both knobs are enabled (sequential scan overrides strides sampling)
+cleanup();
+insertDocs(20);
+{
+    const sampleSize = 10;
+    assert.commandWorked(
+        db.runCommand({
+            analyze: collName,
+            mode: "sample",
+            sampleSize: sampleSize,
+            samplingMethod: "random",
+        }),
+    );
+    PersistentSamplesUtils.verifySampleDoc(db, {
+        sampledCollName: collName,
+        mode: "sample",
+        samplingMethod: "seqScan",
+        requestedSampleSize: sampleSize,
+        actualSampleSize: sampleSize,
+        expectedSchemaVersion: expectedSchemaVersion,
+        expectedFields: sourceDocFields,
+    });
+}
+
+// Disable internalQuerySamplingBySequentialScan
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: false}),
+);
+
+// Chunk sample when internalQuerySamplingByStrides is enabled
+cleanup();
+insertDocs(20);
+{
+    const sampleSize = 10;
+    assert.commandWorked(
+        db.runCommand({
+            analyze: collName,
+            mode: "sample",
+            sampleSize: sampleSize,
+            samplingMethod: "chunk",
+        }),
+    );
+    PersistentSamplesUtils.verifySampleDoc(db, {
+        sampledCollName: collName,
+        mode: "sample",
+        samplingMethod: "strides",
+        requestedSampleSize: sampleSize,
+        actualSampleSize: sampleSize,
+        expectedSchemaVersion: expectedSchemaVersion,
+        expectedFields: sourceDocFields,
+    });
+}
+
+// Random sample when internalQuerySamplingByStrides is enabled
+cleanup();
+insertDocs(20);
+{
+    const sampleSize = 10;
+    assert.commandWorked(
+        db.runCommand({
+            analyze: collName,
+            mode: "sample",
+            sampleSize: sampleSize,
+            samplingMethod: "random",
+        }),
+    );
+    PersistentSamplesUtils.verifySampleDoc(db, {
+        sampledCollName: collName,
+        mode: "sample",
+        samplingMethod: "strides",
+        requestedSampleSize: sampleSize,
+        actualSampleSize: sampleSize,
+        expectedSchemaVersion: expectedSchemaVersion,
+        expectedFields: sourceDocFields,
+    });
+}
+
+// Disable internalQuerySamplingByStrides
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQuerySamplingByStrides: false}));
+
+MongoRunner.stopMongod(conn);
+
+// =============================================================================
 // featureFlagPersistentStats disabled
 // =============================================================================
 
 // When the feature flag is disabled, analyze with sample mode fails with CommandNotSupported.
 // Skip in all-feature-flags environments: MongoRunner.runMongod() inherits
 // featureFlagPersistentStats=true from TestData.setParameters, so the flag cannot be off.
-
-cleanup();
 
 if (!TestData.runAllFeatureFlagTests) {
     // TODO SERVER-112627: Need to explicitly disable once the feature flag is enabled by default

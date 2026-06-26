@@ -410,6 +410,11 @@ private:
     void generateSampleForTesting(SamplingTechniqueEnum technique);
 
     /**
+     * Helper to get SamplingTechnique from test-only knobs
+     */
+    boost::optional<SamplingTechniqueEnum> getTestOnlySamplingModeIfSet();
+
+    /**
      * If '_samplingSource' is kPersistentSample, attempts to load a previously persisted sample
      * for the given method + size from `<db>.system.stats.samples` using a DBDirectClient point
      * lookup. Returns Status::OK() and populates '_sample' and '_sampleSize' on hit. Returns a

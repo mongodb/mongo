@@ -18,6 +18,25 @@ export const sampleDocFieldNames = {
     schemaVersionField: "schemaVersion",
 };
 
+// TODO SERVER-128327: may need to update for full collection scan as well
+export function getExpectedSamplingMethod(db, requestedSamplingMethod) {
+    const {internalQuerySamplingBySequentialScan, internalQuerySamplingByStrides} =
+        assert.commandWorked(
+            db.adminCommand({
+                getParameter: 1,
+                internalQuerySamplingBySequentialScan: 1,
+                internalQuerySamplingByStrides: 1,
+            }),
+        );
+    if (internalQuerySamplingBySequentialScan) {
+        return "seqScan";
+    }
+    if (internalQuerySamplingByStrides) {
+        return "strides";
+    }
+    return requestedSamplingMethod;
+}
+
 export function getPersistentSamplesConfig(db) {
     const config = assert.commandWorked(
         db.adminCommand({
@@ -125,7 +144,7 @@ export function getSampleDoc(samplesColl, expectedId) {
 // array length. Returns the doc for additional assertions by the caller.
 // sampledCollName: name of collection analyze was run on
 // mode: the analyze command mode (expected to be "sample").
-// samplingMethod: "random" or "chunk".
+// samplingMethod: the method used to generate the sample.
 // requestedSampleSize: expected sample size encoded in the _id.
 // actualSampleSize: expected doc.sampleSize value and length of doc.docs array.
 // expectedSchemaVersion: what version document we expect to find
@@ -183,14 +202,15 @@ export function verifySampleDoc(
         `Expected: ${sampleDocFieldNames.schemaVersionField} = ${expectedSchemaVersion}. Sample doc: ${tojson(doc)}`,
     );
 
-    // Method-specific checks
-    if (samplingMethod == "random") {
+    // The number of persisted docs depends on the method used to generate the sample.
+    if (samplingMethod == "random" || samplingMethod == "seqScan") {
+        // These techniques persist an exact, deterministic count of documents.
         assert.eq(
             actualSampleSize,
             doc[sampleDocFieldNames.docsField].length,
             `Value of size field and length of docs array don't match. Sample doc: ${tojson(doc)}`,
         );
-    } else {
+    } else if (samplingMethod == "chunk") {
         // When using chunk sampling, actual num docs sampled might be lower than the parameter passed to `analyze`
         // depending on whether sampleSize divides evenly into the specified number of chunks,
         // and whether the random cursors fall close to the end of the collection. In the worst case, every random
@@ -207,6 +227,20 @@ export function verifySampleDoc(
             numChunks,
             doc[sampleDocFieldNames.numChunksField],
             `Expected ${sampleDocFieldNames.numChunksField} = ${numChunks}. Sample doc: ${tojson(doc)}`,
+        );
+    } else {
+        assert.eq(
+            "strides",
+            samplingMethod,
+            `Expected samplingMethod="strides", got: ${samplingMethod}`,
+        );
+        // For strides sampling, a variable number of docs is kept (those whose hash matches the stride), capped
+        // at the requested sample size, so only an upper bound can be asserted.
+        assert.between(
+            0,
+            doc[sampleDocFieldNames.docsField].length,
+            actualSampleSize,
+            `Expected docs array length in [0, ${actualSampleSize}]. Sample doc: ${tojson(doc)}`,
         );
     }
 
