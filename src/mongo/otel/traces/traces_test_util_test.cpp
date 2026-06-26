@@ -40,6 +40,7 @@
 namespace mongo::otel::traces {
 namespace {
 
+using ::testing::AllOf;
 using ::testing::Contains;
 using ::testing::ElementsAre;
 using ::testing::Eq;
@@ -235,6 +236,95 @@ TEST(OtelTracesCapturerTest, AttributesReadable) {
                     "attributes",
                     &CapturedSpan::attributes,
                     UnorderedElementsAre(Pair("key1", "value1"), Pair("key2", "value2")))));
+}
+
+TEST(SpanNameMatcherTest, Matches) {
+    OtelTracesCapturer capturer;
+    if (!OtelTracesCapturer::canReadSpans())
+        GTEST_SKIP() << "OTel not configured";
+
+    auto telemetryCtx = Span::createTelemetryContext();
+    {
+        Span span = Span::start(telemetryCtx, span_names::kTest1);
+    }
+
+    std::vector<CapturedSpan> spans = capturer.getSpans(span_names::kTest1);
+    EXPECT_THAT(spans,
+                // Can use string literal, string_view, or SpanName.
+                ElementsAre(AllOf(HasSpanName(span_names::kTest1.getName()),
+                                  HasSpanName("test_only.span1"),
+                                  HasSpanName(span_names::kTest1),
+                                  Not(HasSpanName("unknown")))));
+}
+
+TEST(AttributesMatcherTest, Matches) {
+    OtelTracesCapturer capturer;
+    if (!OtelTracesCapturer::canReadSpans())
+        GTEST_SKIP() << "OTel not configured";
+
+    auto telemetryCtx = Span::createTelemetryContext();
+    {
+        Span span = Span::start(telemetryCtx, span_names::kTest1);
+        TRACING_SPAN_ATTR(span, "db", "test");
+        TRACING_SPAN_ATTR(span, "command", "foo");
+    }
+
+    std::vector<CapturedSpan> spans = capturer.getSpans(span_names::kTest1);
+    EXPECT_THAT(spans,
+                ElementsAre(AllOf(HasAttribute("db", "test"),
+                                  HasAttribute("command", "foo"),
+                                  Not(HasAttribute("unknown", "value")))));
+}
+
+TEST(AttributesMatcherTest, DistinguishesEmptyValueAndMissing) {
+    OtelTracesCapturer capturer;
+    if (!OtelTracesCapturer::canReadSpans())
+        GTEST_SKIP() << "OTel not configured";
+
+    auto telemetryCtx = Span::createTelemetryContext();
+    {
+        Span span = Span::start(telemetryCtx, span_names::kTest1);
+        TRACING_SPAN_ATTR(span, "db", "");
+    }
+
+    std::vector<CapturedSpan> spans = capturer.getSpans(span_names::kTest1);
+    EXPECT_THAT(spans,
+                ElementsAre(AllOf(HasAttribute("db", ""), Not(HasAttribute("missing", "")))));
+}
+
+TEST(ParentMatcherTest, Matches) {
+    OtelTracesCapturer capturer;
+    if (!OtelTracesCapturer::canReadSpans())
+        GTEST_SKIP() << "OTel not configured";
+
+    auto telemetryCtx = Span::createTelemetryContext();
+    {
+        Span root = Span::start(telemetryCtx, span_names::kTest1);
+        Span child = Span::start(telemetryCtx, span_names::kTest2);
+    }
+
+    std::vector<CapturedSpan> children = capturer.getSpans(span_names::kTest2);
+    EXPECT_THAT(children, ElementsAre(Parent(HasSpanName(span_names::kTest1))));
+}
+
+TEST(ChildrenMatcherTest, Matches) {
+    OtelTracesCapturer capturer;
+    if (!OtelTracesCapturer::canReadSpans())
+        GTEST_SKIP() << "OTel not configured";
+
+    auto telemetryCtx = Span::createTelemetryContext();
+    {
+        Span root = Span::start(telemetryCtx, span_names::kTest1);
+        {
+            Span child = Span::start(telemetryCtx, span_names::kTest2);
+        }
+        Span child2 = Span::start(telemetryCtx, span_names::kTest3);
+    }
+
+    auto roots = capturer.getSpans(span_names::kTest1);
+    ASSERT_THAT(roots,
+                ElementsAre(Children(UnorderedElementsAre(HasSpanName(span_names::kTest2),
+                                                          HasSpanName(span_names::kTest3)))));
 }
 
 }  // namespace

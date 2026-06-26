@@ -66,6 +66,13 @@ struct CapturedSpanData {
     std::vector<CapturedSpanData*> children;
 };
 #endif
+
+inline std::string_view toStringView(std::string_view s) {
+    return s;
+}
+inline std::string_view toStringView(const SpanName& s) {
+    return s.getName();
+}
 }  // namespace traces_test_util_detail
 
 /**
@@ -169,5 +176,41 @@ private:
     mutable std::vector<std::unique_ptr<traces_test_util_detail::CapturedSpanData>> _spans;
 #endif
 };
+
+// ---------------------------------------------------------------------------
+// GTest matchers
+// ---------------------------------------------------------------------------
+
+/** Matches a CapturedSpan whose name() equals the given string or SpanName. */
+MATCHER_P(HasSpanName, name, "") {
+    return arg.name() == traces_test_util_detail::toStringView(name);
+}
+
+/** Matches a CapturedSpan that has an attribute with the given key and value. */
+MATCHER_P2(HasAttribute, key, value, "") {
+    auto it = arg.attributes().find(std::string_view(key));
+    if (it == arg.attributes().end()) {
+        *result_listener << "has no attribute with key " << key;
+        return false;
+    }
+    return it->second == std::string_view(value);
+}
+
+/**
+ * Matches a CapturedSpan whose parent() satisfies the inner matcher. Fails if there is no parent.
+ */
+MATCHER_P(Parent, inner, "") {
+    auto p = arg.parent();
+    if (!p) {
+        *result_listener << "has no parent";
+        return false;
+    }
+    return testing::ExplainMatchResult(inner, *p, result_listener);
+}
+
+/** Matches a CapturedSpan whose children() satisfy the inner container matcher. */
+MATCHER_P(Children, inner, "") {
+    return testing::ExplainMatchResult(inner, arg.children(), result_listener);
+}
 
 }  // namespace mongo::otel::traces
