@@ -11,7 +11,6 @@
  *    mongos.
  *
  * @tags: [
- *   featureFlagQueryStatsInsert,
  *   featureFlagQueryStatsDelete,
  *   requires_fcv_90,
  * ]

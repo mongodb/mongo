@@ -2,7 +2,7 @@
  * This test confirms that query stats store key fields for an insert command are properly nested
  * and none are missing.
  *
- * @tags: [featureFlagQueryStatsInsert]
+ * @tags: [requires_fcv_90]
  */
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {

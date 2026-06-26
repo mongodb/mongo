@@ -333,7 +333,8 @@ feature_flags:
     featureFlagQueryStatsInsert:
         description: "Feature flag to enable query stats for the insert command."
         cpp_varname: gFeatureFlagQueryStatsInsert
-        default: false
+        default: true
+        version: 9.0
         fcv_gated: true
 
     featureFlagQueryStatsDelete:

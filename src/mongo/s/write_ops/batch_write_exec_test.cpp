@@ -411,8 +411,6 @@ TEST_F(BatchWriteExecTest, SingleOpUnordered) {
 }
 
 TEST_F(BatchWriteExecTest, SingleUpdateTargetsShardWithLet) {
-    // Enable query stats collection and configure rate limiting
-    unittest::ServerParameterGuard controller("featureFlagQueryStatsUpdateCommand", true);
     auto& limiter =
         query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
     limiter.configureWindowBased(-1);
@@ -4469,8 +4467,6 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_TransientDispatchError) {
 }
 
 TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromShardResponseForUpdates) {
-    // Enable query stats collection and configure rate limiting
-    unittest::ServerParameterGuard controller("featureFlagQueryStatsUpdateCommand", true);
     auto& limiter =
         query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
     limiter.configureWindowBased(-1);
@@ -4528,8 +4524,6 @@ TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromShardResponseForUpdate
 }
 
 TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromMultipleShardsForUpdates) {
-    // Enable query stats collection and configure rate limiting
-    unittest::ServerParameterGuard controller("featureFlagQueryStatsUpdateCommand", true);
     auto& limiter =
         query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
     limiter.configureWindowBased(-1);
@@ -4817,8 +4811,6 @@ TEST_F(BatchWriteExecTest, QueryStatsMetricsFieldSetOnOutgoingDeleteRequest) {
 // Tests that queryStatsMetrics from single shard response for insert commands are aggregated into
 // OpDebug.
 TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromSingleShardForInsert) {
-    // Enable query stats collection and configure rate limiting.
-    unittest::ServerParameterGuard controller("featureFlagQueryStatsInsert", true);
     auto& limiter =
         query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
     limiter.configureWindowBased(-1);
@@ -4868,8 +4860,6 @@ TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromSingleShardForInsert) 
 // Tests that queryStatsMetrics from multiple shard responses for insert commands are aggregated
 // into OpDebug.
 TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromMultipleShardsForInsert) {
-    // Enable query stats collection and configure rate limiting.
-    unittest::ServerParameterGuard controller("featureFlagQueryStatsInsert", true);
     auto& limiter =
         query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
     limiter.configureWindowBased(-1);

@@ -2,10 +2,6 @@
  * Tests that query stats on write commands are NOT collected for FLE (Field Level Encryption)
  * operations. A command carrying encryptionInformation signals an FLE operation and is excluded
  * from query stats collection.
- *
- * Note that featureFlagQueryStatsInsert/featureFlagQueryStatsDelete/featureFlagQueryStatsUpdateCommand
- * control query stats on write commands, but aren't required for this file because the same behavior is
- * expected with and without the feature flags.
  */
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";

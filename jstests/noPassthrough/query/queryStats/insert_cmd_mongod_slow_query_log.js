@@ -1,7 +1,7 @@
 /**
  * Test to confirm queryShapeHash is outputted in mongod slow query logs for insert commands.
  *
- * @tags: [featureFlagQueryStatsInsert]
+ * @tags: [requires_fcv_90]
  */
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {

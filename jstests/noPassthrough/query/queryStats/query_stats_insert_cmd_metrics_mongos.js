@@ -2,7 +2,7 @@
  * Tests that query stats are collected for insert commands routed through mongos and that execution
  * metrics from shards are aggregated into the router-side query stats entry.
  *
- * @tags: [featureFlagQueryStatsInsert]
+ * @tags: [requires_fcv_90]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";

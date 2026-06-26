@@ -8,7 +8,7 @@
  *   3. Concurrent user-initiated writes (insert, delete, update) on the migrating range during an
  *      active migration
  *
- * @tags: [featureFlagQueryStatsInsert, featureFlagQueryStatsDelete, requires_fcv_90]
+ * @tags: [featureFlagQueryStatsDelete, requires_fcv_90]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";

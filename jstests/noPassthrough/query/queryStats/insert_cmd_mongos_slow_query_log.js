@@ -5,7 +5,7 @@
  * documents are shapified as '?array<?object>'), so queryShapeHash should always be present in
  * mongos slow query logs regardless of the number of documents inserted.
  *
- * @tags: [featureFlagQueryStatsInsert]
+ * @tags: [requires_fcv_90]
  */
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {
