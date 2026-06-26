@@ -70,30 +70,26 @@ function simulateResharding() {
 
     if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
         assert.commandWorked(st.shard0.adminCommand({_flushDatabaseCacheUpdates: dbName}));
-    }
-    if (!FeatureFlagUtil.isPresentAndEnabled(st.shard1, "AuthoritativeShardsCRUD")) {
         assert.commandWorked(st.shard1.adminCommand({_flushDatabaseCacheUpdates: dbName}));
+        assert.commandWorked(
+            st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns, syncFromConfig: true}),
+        );
+        assert.commandWorked(
+            st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns, syncFromConfig: true}),
+        );
+        assert.commandWorked(
+            st.shard0.adminCommand({
+                _flushRoutingTableCacheUpdates: tempReshardingNss,
+                syncFromConfig: true,
+            }),
+        );
+        assert.commandWorked(
+            st.shard1.adminCommand({
+                _flushRoutingTableCacheUpdates: tempReshardingNss,
+                syncFromConfig: true,
+            }),
+        );
     }
-
-    assert.commandWorked(
-        st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns, syncFromConfig: true}),
-    );
-    assert.commandWorked(
-        st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns, syncFromConfig: true}),
-    );
-
-    assert.commandWorked(
-        st.shard0.adminCommand({
-            _flushRoutingTableCacheUpdates: tempReshardingNss,
-            syncFromConfig: true,
-        }),
-    );
-    assert.commandWorked(
-        st.shard1.adminCommand({
-            _flushRoutingTableCacheUpdates: tempReshardingNss,
-            syncFromConfig: true,
-        }),
-    );
     st.refreshCatalogCacheForNs(mongos, ns);
 }
 

@@ -9,6 +9,7 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
@@ -239,9 +240,13 @@ describe("promote and demote replicaset to sharded cluster", function () {
                     collections.add("test.system.buckets.testTsColl");
                 }
                 collections.forEach((collection) => {
-                    assert.commandWorked(
-                        adminDB.runCommand({_flushRoutingTableCacheUpdates: collection}),
-                    );
+                    if (FeatureFlagUtil.isPresentAndEnabled(adminDB, "AuthoritativeShardsCRUD")) {
+                        this.mongos.getCollection(collection).find().toArray();
+                    } else {
+                        assert.commandWorked(
+                            adminDB.runCommand({_flushRoutingTableCacheUpdates: collection}),
+                        );
+                    }
                 });
             },
             this.keyFile,

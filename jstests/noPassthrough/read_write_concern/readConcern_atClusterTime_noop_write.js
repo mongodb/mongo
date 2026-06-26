@@ -6,6 +6,7 @@
 //   uses_atclustertime,
 //   uses_transactions,
 // ]
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {getLastOpTime} from "jstests/replsets/rslib.js";
 
@@ -63,9 +64,11 @@ const createCollectionOnShard = (shard) => {
 
     // We refresh the metadata forcefully. This is to prevent the clock of any shard from being
     // ticked by an ongoing refresh while executing the test.
-    assert.commandWorked(
-        shard.rs.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: fullName}),
-    );
+    if (!FeatureFlagUtil.isPresentAndEnabled(shard.rs.getPrimary(), "AuthoritativeShardsCRUD")) {
+        assert.commandWorked(
+            shard.rs.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: fullName}),
+        );
+    }
 };
 
 createCollectionOnShard(st.shard0);

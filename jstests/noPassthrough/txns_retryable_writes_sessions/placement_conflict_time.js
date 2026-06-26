@@ -9,6 +9,7 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -59,12 +60,16 @@ describe("Test placementConflictTime", function () {
         );
 
         // Force refreshes to avoid getting stale config errors
-        assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: nsCollA}));
-        assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: nsCollA}));
+        if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
+            assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: nsCollA}));
+            assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: nsCollA}));
+        }
         st.refreshCatalogCacheForNs(st.s, nsCollA);
 
-        assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: nsCollB}));
-        assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: nsCollB}));
+        if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
+            assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: nsCollB}));
+            assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: nsCollB}));
+        }
         st.refreshCatalogCacheForNs(st.s, nsCollB);
     });
 

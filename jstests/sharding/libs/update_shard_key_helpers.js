@@ -41,13 +41,10 @@ export function shardCollectionMoveChunks(
 
     if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
         assert.commandWorked(st.shard0.adminCommand({_flushDatabaseCacheUpdates: kDbName}));
-    }
-    if (!FeatureFlagUtil.isPresentAndEnabled(st.shard1, "AuthoritativeShardsCRUD")) {
         assert.commandWorked(st.shard1.adminCommand({_flushDatabaseCacheUpdates: kDbName}));
+        assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+        assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns}));
     }
-
-    assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns}));
-    assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns}));
     st.refreshCatalogCacheForNs(st.s, ns);
 }
 

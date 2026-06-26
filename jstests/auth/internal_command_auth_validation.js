@@ -351,12 +351,18 @@ const internalCommandsMap = {
         },
     },
     _flushRoutingTableCacheUpdates: {
+        skip: true, // This command isn't valid when the shards are authoritative for collection metadata.
+        // Also, it can not be used during the FCV upgrade. The command will be removed
+        // in the future.
         testname: "_flushRoutingTableCacheUpdates",
         command: {
             _flushRoutingTableCacheUpdates: ns,
         },
     },
     _flushRoutingTableCacheUpdatesWithWriteConcern: {
+        skip: true, // This command isn't valid when the shards are authoritative for collection metadata.
+        // Also, it can not be used during the FCV upgrade. The command will be removed
+        // in the future.
         testname: "_flushRoutingTableCacheUpdatesWithWriteConcern",
         command: {_flushRoutingTableCacheUpdatesWithWriteConcern: ns, writeConcern: {w: 2}},
     },

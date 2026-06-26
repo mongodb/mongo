@@ -27,6 +27,7 @@ import {
     profilerHasSingleMatchingEntryOrThrow,
     profilerHasZeroMatchingEntriesOrThrow,
 } from "jstests/libs/profiler.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {commandsRemovedFromMongosSinceLastLTS} from "jstests/sharding/libs/last_lts_mongos_commands.js";
 
@@ -447,9 +448,14 @@ let scenarios = {
 
         // Ensure the latest version changes have been persisted and propagate to the secondary
         // before we target it with versioned commands.
-        assert.commandWorked(
-            st.rs0.getPrimary().getDB("admin").runCommand({_flushRoutingTableCacheUpdates: nss}),
-        );
+        if (!FeatureFlagUtil.isPresentAndEnabled(st.rs0.getPrimary(), "AuthoritativeShardsCRUD")) {
+            assert.commandWorked(
+                st.rs0
+                    .getPrimary()
+                    .getDB("admin")
+                    .runCommand({_flushRoutingTableCacheUpdates: nss}),
+            );
+        }
         st.rs0.awaitReplication();
 
         let res = staleMongos.getDB(test.runsAgainstAdminDb ? "admin" : db).runCommand(
@@ -512,9 +518,14 @@ let scenarios = {
 
         // Ensure the latest version changes have been persisted and propagate to the secondary
         // before we target it with versioned commands.
-        assert.commandWorked(
-            st.rs0.getPrimary().getDB("admin").runCommand({_flushRoutingTableCacheUpdates: nss}),
-        );
+        if (!FeatureFlagUtil.isPresentAndEnabled(st.rs0.getPrimary(), "AuthoritativeShardsCRUD")) {
+            assert.commandWorked(
+                st.rs0
+                    .getPrimary()
+                    .getDB("admin")
+                    .runCommand({_flushRoutingTableCacheUpdates: nss}),
+            );
+        }
         st.rs0.awaitReplication();
 
         let res = staleMongos.getDB(test.runsAgainstAdminDb ? "admin" : db).runCommand(

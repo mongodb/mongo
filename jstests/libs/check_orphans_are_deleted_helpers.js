@@ -1,3 +1,4 @@
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getRawOperationSpec} from "jstests/libs/raw_operation_utils.js";
 
 export var CheckOrphansAreDeletedHelpers = (function () {
@@ -8,6 +9,12 @@ export var CheckOrphansAreDeletedHelpers = (function () {
         // guarantee either of these happens so we force a refresh on these collections to ensure
         // recovery happens.
         const ensureMigrationsRecovered = (shardConn, configDB) => {
+            // With Authoritative Shards, filtering metadata is current after DDLs;
+            // migration recovery is triggered automatically without a cache flush.
+            if (FeatureFlagUtil.isPresentAndEnabled(shardConn, "AuthoritativeShardsCRUD")) {
+                return;
+            }
+
             let pendingMigrations = configDB
                 .getCollection("migrationCoordinators")
                 .find()

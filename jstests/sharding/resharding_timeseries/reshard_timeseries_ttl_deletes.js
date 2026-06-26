@@ -14,6 +14,7 @@ import {
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {TTLUtil} from "jstests/libs/ttl/ttl_util.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
@@ -114,8 +115,10 @@ reshardingTest.withReshardingInBackground(
         hangTTLMonitorFP.off();
 
         // Refresh donor shards to avoid staleConfig errors.
-        assert.commandWorked(donor0.adminCommand({_flushRoutingTableCacheUpdates: ns}));
-        assert.commandWorked(donor1.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+        if (!FeatureFlagUtil.isPresentAndEnabled(donor0, "AuthoritativeShardsCRUD")) {
+            assert.commandWorked(donor0.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+            assert.commandWorked(donor1.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+        }
 
         // Wait for TTL to delete the docs on the source
         // collection.

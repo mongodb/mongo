@@ -4,6 +4,7 @@
 //   uses_multi_shard_transaction,
 //   uses_transactions,
 // ]
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     failCommandWithError,
@@ -166,8 +167,10 @@ st.refreshCatalogCacheForNs(st.s, ns);
 // These forced refreshes are not strictly necessary; they just prevent extra TXN log lines
 // from the shards starting, aborting, and restarting the transaction due to needing to
 // refresh after the transaction has started.
-assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns}));
-assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
+    assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+    assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+}
 
 let mongosSession = st.s.startSession();
 

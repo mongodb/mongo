@@ -10,6 +10,7 @@
  */
 import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -196,7 +197,9 @@ withRetryOnTransientTxnError(
     // affecting the actual number of refreshing threads and sharding statistics. In sharded
     // clusters, the logical session collection is sharded and any operations on it require the
     // cached metadata to be updated, causing a refresh if necessary.
-    st.shard0.adminCommand({_flushRoutingTableCacheUpdates: "config.system.sessions"});
+    if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
+        st.shard0.adminCommand({_flushRoutingTableCacheUpdates: "config.system.sessions"});
+    }
 
     let failPoint = configureFailPoint(st.shard0, "hangInRecoverRefreshThread");
 

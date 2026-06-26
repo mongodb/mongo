@@ -67,12 +67,14 @@ function dropSessionsCollection(mainConn, priConn, configConn) {
         );
         configConn.getDB("config").getCollection("system.sessions").drop();
         priConn.getDB("config").getCollection("system.sessions").drop();
-        assert.commandWorked(
-            configConn.adminCommand({_flushRoutingTableCacheUpdates: "config.system.sessions"}),
-        );
-        assert.commandWorked(
-            priConn.adminCommand({_flushRoutingTableCacheUpdates: "config.system.sessions"}),
-        );
+        if (!FeatureFlagUtil.isPresentAndEnabled(priConn, "AuthoritativeShardsCRUD")) {
+            assert.commandWorked(
+                configConn.adminCommand({_flushRoutingTableCacheUpdates: "config.system.sessions"}),
+            );
+            assert.commandWorked(
+                priConn.adminCommand({_flushRoutingTableCacheUpdates: "config.system.sessions"}),
+            );
+        }
     }
 }
 

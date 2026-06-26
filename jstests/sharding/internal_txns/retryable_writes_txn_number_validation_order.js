@@ -10,6 +10,7 @@
  *
  * @tags: [requires_fcv_60, uses_transactions, requires_persistence]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
@@ -29,9 +30,11 @@ const mongosTestColl = mongosTestDB.getCollection(kCollName);
 let shard0TestDB = shard0Primary.getDB(kDbName);
 
 assert.commandWorked(mongosTestDB.createCollection(kCollName));
-assert.commandWorked(
-    st.shard0.adminCommand({_flushRoutingTableCacheUpdates: mongosTestColl.getFullName()}),
-);
+if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
+    assert.commandWorked(
+        st.shard0.adminCommand({_flushRoutingTableCacheUpdates: mongosTestColl.getFullName()}),
+    );
+}
 
 const kTestMode = {
     kNonRecovery: 1,

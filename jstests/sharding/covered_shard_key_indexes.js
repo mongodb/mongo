@@ -3,6 +3,7 @@
 // particular queries
 //
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getChunkSkipsFromShard} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -124,7 +125,11 @@ assert.commandWorked(st.s0.adminCommand({shardCollection: coll.getFullName(), ke
 st.printShardingStatus();
 
 // Insert some bad data manually on the shard
-assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: coll.getFullName()}));
+if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
+    assert.commandWorked(
+        st.shard0.adminCommand({_flushRoutingTableCacheUpdates: coll.getFullName()}),
+    );
+}
 assert.commandWorked(st.shard0.getCollection(coll.toString()).insert({_id: "bad data", c: true}));
 
 // Index without shard key query - not covered but succeeds

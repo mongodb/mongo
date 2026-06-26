@@ -416,12 +416,14 @@ jsTest.log("Test that dropping a sharded collection, the cached metadata on shar
     // Below we are forcing to all shards to have their valid filtering information. For the shard
     // that doesn't own any data, that means having a filtering information stating that no chunks
     // are owned by that shard.
-    assert.commandWorked(
-        st.shard0.adminCommand({_flushRoutingTableCacheUpdates: coll.getFullName()}),
-    );
-    assert.commandWorked(
-        st.shard1.adminCommand({_flushRoutingTableCacheUpdates: coll.getFullName()}),
-    );
+    if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
+        assert.commandWorked(
+            st.shard0.adminCommand({_flushRoutingTableCacheUpdates: coll.getFullName()}),
+        );
+        assert.commandWorked(
+            st.shard1.adminCommand({_flushRoutingTableCacheUpdates: coll.getFullName()}),
+        );
+    }
 
     // Drop the collection
     const uuid = getCollectionUUID(coll.getFullName());

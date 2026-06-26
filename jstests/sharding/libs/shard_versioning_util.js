@@ -2,6 +2,7 @@
  * Utilities for shard versioning testing.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export var ShardVersioningUtil = (function () {
     /*
@@ -28,7 +29,9 @@ export var ShardVersioningUtil = (function () {
     let getMetadataOnShard = function (shard, ns, waitForRefresh = false) {
         if (waitForRefresh) {
             // Wait for the last routing table cache refresh to be persisted on disk
-            assert.commandWorked(shard.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+            if (!FeatureFlagUtil.isPresentAndEnabled(shard, "AuthoritativeShardsCRUD")) {
+                assert.commandWorked(shard.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+            }
         }
 
         let res = assert.commandWorked(

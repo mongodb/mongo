@@ -7,6 +7,7 @@
  *    requires_scripting,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     checkSbeFullyEnabled,
@@ -60,9 +61,11 @@ function dropAndRecreateTestCollection() {
     );
     // The insert via direct connection will fail with stale config if the metadata is unknown, so
     // we forcefully refresh it.
-    assert.commandWorked(
-        rsConn.adminCommand({_flushRoutingTableCacheUpdates: mongosColl.getFullName()}),
-    );
+    if (!FeatureFlagUtil.isPresentAndEnabled(rsConn, "AuthoritativeShardsCRUD")) {
+        assert.commandWorked(
+            rsConn.adminCommand({_flushRoutingTableCacheUpdates: mongosColl.getFullName()}),
+        );
+    }
 }
 
 /**

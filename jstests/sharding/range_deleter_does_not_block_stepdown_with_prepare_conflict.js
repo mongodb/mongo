@@ -14,6 +14,7 @@
  *
  * @tags: [uses_transactions, uses_multi_shard_transaction]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {waitForFailpoint} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
@@ -46,7 +47,9 @@ st.rs0.getPrimary().adminCommand({configureFailPoint: "suspendRangeDeletion", mo
 // Move a chunk away from Shard0 (the donor) so its range deleter will asynchronously delete the
 // chunk's range. Flush its metadata to avoid StaleConfig during the later transaction.
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: st.shard1.shardName}));
-assert.commandWorked(st.rs0.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}));
+if (!FeatureFlagUtil.isPresentAndEnabled(st.rs0.getPrimary(), "AuthoritativeShardsCRUD")) {
+    assert.commandWorked(st.rs0.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}));
+}
 st.refreshCatalogCacheForNs(st.s, ns);
 
 // Insert a doc into the chunk still owned by the donor shard in a transaction then prepare the

@@ -7,6 +7,7 @@
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {awaitRSClientHosts, reconnect} from "jstests/replsets/rslib.js";
 
@@ -36,7 +37,9 @@ let setUp = function (rst) {
         configDB.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}),
     );
     assert.commandWorked(configDB.adminCommand({shardCollection: kShardedNs, key: {x: 1}}));
-    assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: kShardedNs}));
+    if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
+        assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: kShardedNs}));
+    }
 
     // Each time we drop the database we have to re-enable profiling. Enable profiling on 'admin'
     // to test the $currentOp aggregation stage.
