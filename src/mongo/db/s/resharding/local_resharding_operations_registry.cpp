@@ -104,6 +104,26 @@ void LocalReshardingOperationsRegistry::unregisterOperation(
     }
 }
 
+void LocalReshardingOperationsRegistry::clearOperationsForRole(Role role) {
+    std::unique_lock lock(_mutex);
+    for (auto nsIt = _namespaceToOperations.begin(); nsIt != _namespaceToOperations.end();) {
+        auto& operations = nsIt->second;
+        for (auto opIt = operations.begin(); opIt != operations.end();) {
+            opIt->second.roles.erase(role);
+            if (opIt->second.roles.empty()) {
+                operations.erase(opIt++);
+            } else {
+                ++opIt;
+            }
+        }
+        if (operations.empty()) {
+            _namespaceToOperations.erase(nsIt++);
+        } else {
+            ++nsIt;
+        }
+    }
+}
+
 boost::optional<LocalReshardingOperationsRegistry::Operation>
 LocalReshardingOperationsRegistry::getOperation(const NamespaceString& nss) const {
     std::shared_lock lock(_mutex);

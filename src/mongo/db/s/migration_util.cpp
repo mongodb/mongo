@@ -52,10 +52,12 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/migration_coordinator.h"
 #include "mongo/db/s/migration_destination_manager.h"
@@ -133,6 +135,12 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::kNoTimeout);
 
 }  // namespace
+
+BSONObj makeCriticalSectionReasonForMoveRange(const ShardsvrMoveRangeRequest& request,
+                                              const UUID& migrationId) {
+    return BSON("command" << "moveChunk" << "fromShard" << request.getFromShard() << "toShard"
+                          << request.getToShard() << "migrationId" << migrationId);
+}
 
 void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const NamespaceString& nss) {
     hangBeforeFilteringMetadataRefresh.pauseWhileSet();
@@ -445,7 +453,8 @@ ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
     OperationContext* opCtx,
     const ShardId& recipientShardId,
     const NamespaceString& nss,
-    const MigrationSessionId& sessionId) {
+    const MigrationSessionId& sessionId,
+    bool clearShardCatalogCache) {
     const auto serviceContext = opCtx->getServiceContext();
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
 
@@ -458,6 +467,7 @@ ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
         builder.append("_recvChunkReleaseCritSec",
                        NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
         sessionId.append(&builder);
+        builder.append("clearShardCatalogCache", clearShardCatalogCache);
         builder.append(WriteConcernOptions::kWriteConcernField,
                        defaultMajorityWriteConcernDoNotUse().toBSON());
         const auto commandObj = builder.obj();
@@ -489,6 +499,26 @@ ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
             },
             Backoff(Seconds(1), Milliseconds::max()));
     });
+}
+
+void notifyChangeStreamsOnChunkMigrationCommitted(OperationContext* opCtx,
+                                                  const NamespaceString& nss,
+                                                  const UUID& collectionUuid,
+                                                  const ShardId& fromShard,
+                                                  const ShardId& toShard,
+                                                  bool transfersFirstChunkToRecipient) {
+    // The authoritative post-commit placement lives on the config server. Read it from the catalog
+    // cache to decide whether the donor still owns any chunk of the collection.
+    const auto cm = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
+    const bool noMoreCollectionChunksOnDonor = !cm.getVersion(opCtx, fromShard).isSet();
+    notifyChangeStreamsOnChunkMigrated(opCtx,
+                                       nss,
+                                       collectionUuid,
+                                       fromShard,
+                                       toShard,
+                                       noMoreCollectionChunksOnDonor,
+                                       transfersFirstChunkToRecipient);
 }
 
 void persistMigrationRecipientRecoveryDocument(
@@ -598,6 +628,12 @@ void drainMigrationsPendingRecovery(OperationContext* opCtx) {
 
 SemiFuture<void> asyncRecoverMigrationUntilSuccessOrStepDown(OperationContext* opCtx,
                                                              const NamespaceString& nss) {
+    tassert(12795310,
+            "Legacy asynchronous migration recovery must not run when AuthoritativeShardsDDL is "
+            "enabled; the MoveRangeCoordinator drives migration recovery instead",
+            !feature_flags::gAuthoritativeShardsDDL.isEnabled(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
     return ExecutorFuture<void>{Grid::get(opCtx)->getExecutorPool()->getFixedExecutor()}
         .then([svcCtx{opCtx->getServiceContext()}, nss] {
             ThreadClient tc{"MigrationRecovery", svcCtx->getService()};

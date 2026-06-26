@@ -10,6 +10,8 @@
  *   # Require persistence to restart nodes
  *   requires_persistence,
  *   config_shard_incompatible,
+ *   # TODO (SERVER-129909): adapt this test to work with MoveRangeCoordinator.
+ *   featureFlagAuthoritativeShardsDDL_incompatible,
  * ]
  */
 

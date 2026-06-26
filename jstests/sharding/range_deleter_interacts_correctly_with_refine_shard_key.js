@@ -164,14 +164,10 @@ function test(st, description, testBody) {
             // The index on the original shard key shouldn't be required anymore.
             assert.commandWorked(st.s.getCollection(ns).dropIndex(originalShardKey));
 
-            // We will use this to wait until the following migration has completed. Waiting for
-            // this failpoint technically just waits for the recipient side of the migration to
-            // complete, but it's expected that if the migration can get to that point, then it
-            // should be able to succeed overall.
-            let hangDonorAtEndOfMigration = configureFailPoint(
-                st.rs1.getPrimary(),
-                "moveChunkHangAtStep6",
-            );
+            // Hang after waiting for orphan cleanup so that in the test we can check for orphans
+            // on disk before documents begin migrating. This recipient-side point is independent
+            // of whether the donor uses the legacy moveChunk path or the MoveRangeCoordinator path.
+            let hangRecipient = configureFailPoint(st.rs0.getPrimary(), "migrateThreadHangAtStep1");
 
             // Attempt to move the chunk back to shard 0. Synchronize with the parallel shell to
             // make sure that the moveChunk started.
@@ -194,10 +190,6 @@ function test(st, description, testBody) {
             hangOnStep1.wait();
             hangOnStep1.off();
 
-            // Hang after waiting for orphan cleanup so that in the test we can check for orphans
-            // on disk before documents begin migrating.
-            let hangRecipient = configureFailPoint(st.rs0.getPrimary(), "migrateThreadHangAtStep1");
-
             // Allow range deletion to continue.
             suspendRangeDeletionFailpoint.off();
 
@@ -208,11 +200,9 @@ function test(st, description, testBody) {
                 return st.rs0.getPrimary().getCollection(ns).find().itcount() == 0;
             });
 
+            hangRecipient.wait();
             hangRecipient.off();
 
-            // Wait for the previous migration to complete before continuing.
-            hangDonorAtEndOfMigration.wait();
-            hangDonorAtEndOfMigration.off();
             awaitResult();
         },
     );

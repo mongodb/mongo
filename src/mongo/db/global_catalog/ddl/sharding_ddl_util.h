@@ -479,8 +479,15 @@ MONGO_MOD_PRIVATE void commitDropCollectionMetadataToShardCatalog(
 /**
  *  Commits a shardCollection operation to the shard catalog by sending the command
  * `_shardsvrCommitCreateCollectionMetadata` to all given shards.
+ *
+ * `primaryShardId` tells the shards which one must keep a collection entry when it owns no chunks
+ * (the database primary always tracks the collection). When omitted it defaults to the shard
+ * running this code, which is correct only when that shard is the database primary. Callers that
+ * run elsewhere - such as the migration donor - must pass the real database primary shard.
+ *
+ * TODO (SERVER-129204): Review shard catalog commit modularity.
  */
-MONGO_MOD_PRIVATE void commitCreateCollectionMetadataToShardCatalog(
+MONGO_MOD_NEEDS_REPLACEMENT void commitCreateCollectionMetadataToShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const std::vector<ShardRef>& shardRefs,

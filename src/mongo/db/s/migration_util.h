@@ -46,6 +46,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
@@ -62,6 +63,13 @@ class NamespaceString;
 class ShardId;
 
 namespace migrationutil {
+
+/**
+ * Returns the BSON reason document used to acquire a migration critical section for a moveRange
+ * (chunk migration) request. The migrationId makes the reason unique per migration attempt.
+ */
+BSONObj makeCriticalSectionReasonForMoveRange(const ShardsvrMoveRangeRequest& request,
+                                              const UUID& migrationId);
 
 /**
  * Creates a report document with the provided parameters:
@@ -150,12 +158,28 @@ MONGO_MOD_PUBLIC void resumeMigrationCoordinationsOnStepUp(OperationContext* opC
 
 /**
  * Instructs the recipient shard to release its critical section.
+ *
+ * TODO (completeMigration): Remove clearShardCatalogCache field when v9.0 branches out.
  */
 ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
     OperationContext* opCtx,
     const ShardId& recipientShardId,
     const NamespaceString& nss,
-    const MigrationSessionId& sessionId);
+    const MigrationSessionId& sessionId,
+    bool clearShardCatalogCache);
+
+/**
+ * Emits the change-stream "chunk migrated" event for a committed migration. Reads the post-commit
+ * placement from the catalog cache to decide whether the donor retains any chunk of the collection,
+ * then notifies change streams. Used by both the same-term commit path and the recovery re-emit
+ * path, so the migration-specific fields are passed explicitly.
+ */
+void notifyChangeStreamsOnChunkMigrationCommitted(OperationContext* opCtx,
+                                                  const NamespaceString& nss,
+                                                  const UUID& collectionUuid,
+                                                  const ShardId& fromShard,
+                                                  const ShardId& toShard,
+                                                  bool transfersFirstChunkToRecipient);
 
 /**
  * Writes the migration recipient recovery document to config.migrationRecipients and waits for

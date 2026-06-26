@@ -919,7 +919,7 @@ TEST_F(MigrationChunkClonerSourceTest, CorrectDocumentsFetched) {
         onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
 
-    ASSERT_OK(cloner.commitClone(operationContext()));
+    ASSERT_OK(cloner.commitClone(operationContext(), true /* clearShardCatalogCache */));
     futureCommit.default_timed_get();
 }
 
@@ -1014,7 +1014,7 @@ TEST_F(MigrationChunkClonerSourceTest, RemoveDuplicateDocuments) {
         onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
 
-    ASSERT_OK(cloner.commitClone(operationContext()));
+    ASSERT_OK(cloner.commitClone(operationContext(), true /* clearShardCatalogCache */));
     futureCommit.default_timed_get();
 }
 
@@ -1077,7 +1077,7 @@ TEST_F(MigrationChunkClonerSourceTest, OneLargeDocumentTransferMods) {
         onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
 
-    ASSERT_OK(cloner.commitClone(operationContext()));
+    ASSERT_OK(cloner.commitClone(operationContext(), true /* clearShardCatalogCache */));
     futureCommit.default_timed_get();
 }
 
@@ -1154,7 +1154,7 @@ TEST_F(MigrationChunkClonerSourceTest, ManySmallDocumentsTransferMods) {
         onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
 
-    ASSERT_OK(cloner.commitClone(operationContext()));
+    ASSERT_OK(cloner.commitClone(operationContext(), true /* clearShardCatalogCache */));
     futureCommit.default_timed_get();
 }
 
@@ -1310,7 +1310,7 @@ TEST_F(MigrationChunkClonerSourceTest, CloneFetchThatOverflows) {
         onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
 
-    ASSERT_OK(cloner.commitClone(operationContext()));
+    ASSERT_OK(cloner.commitClone(operationContext(), true /* clearShardCatalogCache */));
     futureCommit.default_timed_get();
 }
 
@@ -1395,7 +1395,7 @@ TEST_F(MigrationChunkClonerSourceTest, CloneShouldNotCrashWhenNextCloneBatchThro
         onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
 
-    ASSERT_NOT_OK(cloner.commitClone(operationContext()));
+    ASSERT_NOT_OK(cloner.commitClone(operationContext(), true /* clearShardCatalogCache */));
     futureCommit.default_timed_get();
 }
 
@@ -1808,7 +1808,7 @@ TEST_F(MigrationChunkClonerSourceTest, JumboChunkIndexScanWithYielding) {
         // This is the return response for kRecvChunkCommit.
         onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
-    ASSERT_OK(cloner.commitClone(operationContext()));
+    ASSERT_OK(cloner.commitClone(operationContext(), true /* clearShardCatalogCache */));
     futureCommit.default_timed_get();
 }
 
@@ -1879,7 +1879,7 @@ TEST_F(MigrationChunkClonerSourceTest, NextModsBatchNonDeprioritizableAfterCommi
         onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
 
-    ASSERT_OK(cloner.commitClone(operationContext()));
+    ASSERT_OK(cloner.commitClone(operationContext(), true /* clearShardCatalogCache */));
     futureCommit.default_timed_get();
 
     {
@@ -1932,7 +1932,7 @@ TEST_F(MigrationChunkClonerSourceTest, NextCloneBatchNonDeprioritizableAfterComm
         onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
 
-    ASSERT_OK(cloner.commitClone(operationContext()));
+    ASSERT_OK(cloner.commitClone(operationContext(), true /* clearShardCatalogCache */));
     futureCommit.default_timed_get();
 
     {

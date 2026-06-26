@@ -1,6 +1,13 @@
-// Tests that sub-queries across shards as part of $unionWith will obey the read preference
-// specified by the user.
-// @tags: [requires_majority_read_concern]
+/**
+ * Tests that sub-queries across shards as part of $unionWith will obey the read preference
+ * specified by the user.
+ *
+ * @tags: [
+ *    requires_majority_read_concern,
+ *    # TODO (SERVER-129901) Re-enable once this ticket gets fixed
+ *    featureFlagAuthoritativeShardsDDL_incompatible,
+ * ]
+ */
 import {profilerHasAtLeastOneMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

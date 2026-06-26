@@ -14,6 +14,7 @@
  */
 import {moveChunkParallel} from "jstests/libs/chunk_manipulation_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {startParallelOps} from "jstests/libs/test_background_ops.js";
 
@@ -45,6 +46,32 @@ assert.commandWorked(
 assert.commandWorked(st.s.adminCommand({shardCollection: nsA, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({shardCollection: nsB, key: {_id: 1}}));
 
+const adminDB = st.s.getDB("admin");
+const usesMoveRangeCoordinatorPath = FeatureFlagUtil.isPresentAndEnabled(
+    adminDB,
+    "AuthoritativeShardsDDL",
+);
+const recoveryFailPointName = usesMoveRangeCoordinatorPath
+    ? "hangInMoveRangeCoordinatorDetermineOutcome"
+    : "hangInEnsureChunkVersionIsGreaterThanInterruptible";
+
+function getPendingMigrationRecoveryNss() {
+    const configDB = st.rs0.getPrimary().getDB("config");
+    if (usesMoveRangeCoordinatorPath) {
+        return configDB
+            .getCollection("system.sharding_ddl_coordinators")
+            .find({"_id.operationType": "moveRange"})
+            .toArray()
+            .map((doc) => doc._id.namespace);
+    }
+
+    return configDB
+        .getCollection("migrationCoordinators")
+        .find()
+        .toArray()
+        .map((doc) => doc.nss);
+}
+
 // Hang before commit migration
 let moveChunkHangAtStep5Failpoint = configureFailPoint(st.rs0.getPrimary(), "moveChunkHangAtStep5");
 let joinMoveChunk1 = moveChunkParallel(
@@ -68,17 +95,22 @@ let skipShardFilteringMetadataRefreshFailpoint = configureFailPoint(
     "skipShardFilteringMetadataRefresh",
 );
 
+// Don't let the migration recovery finish on the secondary that will next be stepped up.
+const rs0Secondary = st.rs0.getSecondary();
+let recoveryFailpoints = [configureFailPoint(rs0Secondary, recoveryFailPointName)];
+if (usesMoveRangeCoordinatorPath) {
+    // The MoveRangeCoordinator may advance to its recovery phase before the step-up interrupts the
+    // old primary, so hang it there too.
+    recoveryFailpoints.push(configureFailPoint(st.rs0.getPrimary(), recoveryFailPointName));
+}
+
 moveChunkHangAtStep5Failpoint.off();
 migrationCommitNetworkErrorFailpoint.wait();
 
-//  Don't let the migration recovery finish on the secondary that will next be stepped-up.
-const rs0Secondary = st.rs0.getSecondary();
-let hangInEnsureChunkVersionIsGreaterThanInterruptibleFailpoint = configureFailPoint(
-    rs0Secondary,
-    "hangInEnsureChunkVersionIsGreaterThanInterruptible",
-);
-
 st.rs0.stepUp(rs0Secondary);
+if (usesMoveRangeCoordinatorPath) {
+    recoveryFailpoints[0].wait();
+}
 
 joinMoveChunk1();
 migrationCommitNetworkErrorFailpoint.off();
@@ -86,13 +118,9 @@ skipShardFilteringMetadataRefreshFailpoint.off();
 
 // The migration is left pending recovery.
 {
-    let migrationCoordinatorDocuments = st.rs0
-        .getPrimary()
-        .getDB("config")
-        ["migrationCoordinators"].find()
-        .toArray();
-    assert.eq(1, migrationCoordinatorDocuments.length);
-    assert.eq(nsA, migrationCoordinatorDocuments[0].nss);
+    const pendingMigrationRecoveryNss = getPendingMigrationRecoveryNss();
+    assert.eq(1, pendingMigrationRecoveryNss.length);
+    assert.eq(nsA, pendingMigrationRecoveryNss[0]);
 }
 
 // Start a second migration on a different collection and wait until it persists its recovery
@@ -124,29 +152,21 @@ let joinMoveChunk2 = startParallelOps(staticMongod, runMoveChunkWithRetryOnConfl
 sleep(5 * 1000);
 {
     // There's still only one migration recovery document, corresponding to the first migration
-    let migrationCoordinatorDocuments = st.rs0
-        .getPrimary()
-        .getDB("config")
-        ["migrationCoordinators"].find()
-        .toArray();
-    assert.eq(1, migrationCoordinatorDocuments.length);
-    assert.eq(nsA, migrationCoordinatorDocuments[0].nss);
+    const pendingMigrationRecoveryNss = getPendingMigrationRecoveryNss();
+    assert.eq(1, pendingMigrationRecoveryNss.length);
+    assert.eq(nsA, pendingMigrationRecoveryNss[0]);
 }
 
 // Let the migration recovery complete
-hangInEnsureChunkVersionIsGreaterThanInterruptibleFailpoint.off();
+recoveryFailpoints.forEach((failpoint) => failpoint.off());
 moveChunkHangAtStep3Failpoint.wait();
 
-// Check that the first migration has been recovered. There must be only one
-// config.migrationCoordinators document, which corresponds to the second migration.
+// Check that the first migration has been recovered. There must be only one pending recovery
+// document, which corresponds to the second migration.
 {
-    let migrationCoordinatorDocuments = st.rs0
-        .getPrimary()
-        .getDB("config")
-        ["migrationCoordinators"].find()
-        .toArray();
-    assert.eq(1, migrationCoordinatorDocuments.length);
-    assert.eq(nsB, migrationCoordinatorDocuments[0].nss);
+    const pendingMigrationRecoveryNss = getPendingMigrationRecoveryNss();
+    assert.eq(1, pendingMigrationRecoveryNss.length);
+    assert.eq(nsB, pendingMigrationRecoveryNss[0]);
 }
 
 moveChunkHangAtStep3Failpoint.off();

@@ -8,7 +8,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let staticMongod = MongoRunner.runMongod({});
 
-let st = new ShardingTest({shards: 2, other: {rsOptions: {verbose: 1}}});
+let st = new ShardingTest({shards: 2, mongos: 2, other: {rsOptions: {verbose: 1}}});
 
 assert.commandWorked(
     st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}),
@@ -27,11 +27,15 @@ assert.commandWorked(
     }),
 );
 
+// Bump the collection version through a different mongos. This leaves st.s with stale routing
+// information for shard1 without directly modifying the config server metadata.
+assert.commandWorked(st.s1.adminCommand({split: "test.user", middle: {x: 45}}));
+
 let lsid = {id: UUID()};
 let txnNumber = 0;
 
 assert.commandWorked(
-    st.s.getDB("test").runCommand({
+    st.s1.getDB("test").runCommand({
         insert: "user",
         documents: [{x: 40}, {x: 43}],
         lsid: lsid,
@@ -41,19 +45,6 @@ assert.commandWorked(
         autocommit: false,
     }),
 );
-
-// Bumping the collection version on the config server without involving any shard
-let collUuid = st.config.collections.findOne({_id: "test.user"}).uuid;
-assert.commandWorked(
-    st.config.chunks.updateOne(
-        {uuid: collUuid, min: {x: 42}},
-        {$set: {lastmod: Timestamp(100, 0)}},
-    ),
-);
-
-// Flushing the routing information on the mongos, so next time it needs this information it will
-// perfom a full refresh and will discover the new collection version
-assert.commandWorked(st.s.adminCommand({flushRouterConfig: 1}));
 
 // Make the transaction stay in prepared state so it will hold on to the collection locks.
 assert.commandWorked(
@@ -81,7 +72,7 @@ const runCommitCode =
     "stmtId: NumberInt(0)," +
     "autocommit: false," +
     "});";
-let commitTxn = startParallelShell(runCommitCode, st.s.port);
+let commitTxn = startParallelShell(runCommitCode, st.s1.port);
 
 // Insert should be able to refresh the sharding metadata even with existing transactions
 // holding the collection lock in IX.
@@ -103,5 +94,5 @@ assert.commandWorked(
 );
 commitTxn();
 
-st.stop();
+st.stop({skipValidation: true});
 MongoRunner.stopMongod(staticMongod);

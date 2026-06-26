@@ -411,6 +411,19 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
                 "writeConcern"_attr = writeConcern);
 }
 
+bool ShardingRecoveryService::isCriticalSectionHeld(OperationContext* opCtx,
+                                                    const NamespaceString& nss,
+                                                    const BSONObj& reason) {
+    DBDirectClient dbClient(opCtx);
+    FindCommandRequest findRequest{NamespaceString::kCollectionCriticalSectionsNamespace};
+    findRequest.setLimit(1);
+    findRequest.setFilter(
+        BSON(CollectionCriticalSectionDocument::kNssFieldName
+             << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
+             << CollectionCriticalSectionDocument::kReasonFieldName << reason));
+    return dbClient.find(std::move(findRequest))->more();
+}
+
 void ShardingRecoveryService::releaseRecoverableCriticalSection(
     OperationContext* opCtx,
     const NamespaceString& nss,

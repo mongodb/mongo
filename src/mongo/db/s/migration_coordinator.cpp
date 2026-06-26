@@ -33,18 +33,21 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/range_deletion_util.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -186,7 +189,7 @@ void MigrationCoordinator::setMigrationDecision(DecisionEnum decision) {
 
 
 boost::optional<SharedSemiFuture<void>> MigrationCoordinator::completeMigration(
-    OperationContext* opCtx) {
+    OperationContext* opCtx, bool clearShardCatalogCache) {
     auto decision = _migrationInfo.getDecision();
     if (!decision) {
         LOGV2(
@@ -207,7 +210,7 @@ boost::optional<SharedSemiFuture<void>> MigrationCoordinator::completeMigration(
           logAttrs(_migrationInfo.getNss()));
 
     if (!_releaseRecipientCriticalSectionFuture) {
-        launchReleaseRecipientCriticalSection(opCtx);
+        launchReleaseRecipientCriticalSection(opCtx, clearShardCatalogCache);
     }
 
     // Persist the config time before the migration decision to ensure that in case of stepdown
@@ -405,13 +408,15 @@ void MigrationCoordinator::forgetMigration(OperationContext* opCtx) {
                  WriteConcernOptions{1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)});
 }
 
-void MigrationCoordinator::launchReleaseRecipientCriticalSection(OperationContext* opCtx) {
+void MigrationCoordinator::launchReleaseRecipientCriticalSection(OperationContext* opCtx,
+                                                                 bool clearShardCatalogCache) {
     _releaseRecipientCriticalSectionFuture =
         migrationutil::launchReleaseCriticalSectionOnRecipientFuture(
             opCtx,
             _migrationInfo.getRecipientShardId(),
             _migrationInfo.getNss(),
-            _migrationInfo.getMigrationSessionId());
+            _migrationInfo.getMigrationSessionId(),
+            clearShardCatalogCache);
 }
 
 void MigrationCoordinator::_waitForReleaseRecipientCriticalSectionFutureIgnoreShardNotFound(

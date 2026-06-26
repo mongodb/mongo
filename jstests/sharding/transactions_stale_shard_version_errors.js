@@ -4,7 +4,9 @@
 //  requires_sharding,
 //  uses_transactions,
 //  uses_multi_shard_transaction,
-//  assumes_balancer_off
+//  assumes_balancer_off,
+//  # TODO (SERVER-129875): Adapt test to work with authoritative shards commits
+//  featureFlagAuthoritativeShardsDDL_incompatible,
 // ]
 import "jstests/multiVersion/libs/verify_versions.js";
 

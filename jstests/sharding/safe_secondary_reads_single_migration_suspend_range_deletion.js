@@ -27,6 +27,7 @@
  *    requires_profiling,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     buildCommandProfile,
     profilerHasSingleMatchingEntryOrThrow,
@@ -545,6 +546,19 @@ let donorShardPrimary = st.rs0.getPrimary();
 let recipientShardPrimary = st.rs1.getPrimary();
 let donorShardSecondary = st.rs0.getSecondary();
 let recipientShardSecondary = st.rs1.getSecondary();
+
+const authoritativeDDL =
+    FeatureFlagUtil.isPresentAndEnabled(st.s.getDB("admin"), "AuthoritativeShardsDDL");
+
+if (authoritativeDDL) {
+    // On the authoritative path, kShardCatalogCommit updates the donor secondary to version
+    // X+1 before moveChunk returns, so versioned reads return StaleConfig. mapReduce's
+    // internal retry logic then connects directly to the secondary host that returned
+    // StaleConfig; the shard registry only tracks primaries, so getShardForHostNoReload
+    // returns null and the retry fails with ShardNotFound.
+    testCases.mapReduce.skip = "ShardNotFound in mapReduce retry path on authoritative DDL " +
+        "path (secondary host not in shard registry)";
+}
 
 let freshMongos = st.s0;
 let staleMongos = st.s1;

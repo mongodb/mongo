@@ -11,6 +11,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 import {
     runMoveChunkMakeDonorStepDownAfterFailpoint
 } from "jstests/sharding/migration_coordinator_failover_include.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "test";
@@ -29,6 +30,12 @@ let st = new ShardingTest({
 
 assert.commandWorked(
     st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+
+const adminDB = st.s.getDB("admin");
+const usesMoveRangeCoordinatorPath = FeatureFlagUtil.isPresentAndEnabled(
+    adminDB,
+    "AuthoritativeShardsDDL",
+);
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
     st,
@@ -54,7 +61,9 @@ runMoveChunkMakeDonorStepDownAfterFailpoint(
 runMoveChunkMakeDonorStepDownAfterFailpoint(
     st,
     dbName,
-    "hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible",
+    usesMoveRangeCoordinatorPath
+        ? "hangInMoveRangeCoordinatorDetermineOutcome"
+        : "hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible",
     true /* shouldMakeMigrationFailToCommitOnConfig */,
     [ErrorCodes.StaleEpoch],
 );
@@ -62,7 +71,9 @@ runMoveChunkMakeDonorStepDownAfterFailpoint(
 runMoveChunkMakeDonorStepDownAfterFailpoint(
     st,
     dbName,
-    "hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible",
+    usesMoveRangeCoordinatorPath
+        ? "hangInMoveRangeCoordinatorShardCatalogCommit"
+        : "hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible",
     true /* shouldMakeMigrationFailToCommitOnConfig */,
     [ErrorCodes.StaleEpoch],
 );

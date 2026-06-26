@@ -5,7 +5,10 @@
  *   featureFlagShardFilteringDistinctScan,
  *   do_not_wrap_aggregations_in_facets,
  *   not_allowed_with_signed_security_token,
- *   requires_fcv_82
+ *   requires_fcv_82,
+ *   # TODO (SERVER-129885): Enable once prepareShardedCollectionWithOrphans is adapted with
+ *   # authoritative shards.
+ *   featureFlagAuthoritativeShardsDDL_incompatible,
  * ]
  */
 

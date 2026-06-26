@@ -85,6 +85,7 @@ export function prepareCollection(database = null) {
 
 // Shard the 'coll' collection and insert orphans to the primary shard and one non-primary shard.
 // Assumes 'st' has been set up with at least two shards.
+// TODO (SERVER-129885) Adapt function to work with authoritative shards
 export function prepareShardedCollectionWithOrphans(st) {
     const db = st.getDB("test");
     const primaryShard = st.shard0.shardName;

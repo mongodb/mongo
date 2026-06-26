@@ -38,6 +38,7 @@
 #include "mongo/db/s/move_range_coordinator_document_gen.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
@@ -57,6 +58,8 @@ public:
     void checkIfOptionsConflict(const BSONObj& doc) const final;
 
     void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override;
+
+    logv2::DynamicAttributes getCoordinatorLogAttrs() const override;
 
 protected:
     bool isInCriticalSection(Phase phase) const override;
@@ -84,15 +87,49 @@ private:
 
     enum class MigrationOutcome { kCommitted, kAborted };
 
-    ExecutorFuture<MigrationOutcome> _recoveryFlow(
-        std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token);
+    // Drives the kDetermineOutcome phase: establishes a causality barrier on re-entry, resolves the
+    // migration outcome, persists the decision into the coordinator document, and writes the
+    // migration result. This is also the single place that emits the change-stream "chunk migrated"
+    // event for a committed migration, on both the same-term and recovery paths.
+    void _determineAndRecordOutcome(OperationContext* opCtx,
+                                    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                                    const CancellationToken& token);
 
-    bool _migrationCoordinatorDocumentMayExist(OperationContext* opCtx);
+    // Resolves whether the migration committed or aborted. `result` is the current migration
+    // result; an OK result means a known commit, a missing result on the same term means a known
+    // abort, and any uncertain case is determined authoritatively from the config server.
+    MigrationOutcome _resolveMigrationOutcome(OperationContext* opCtx,
+                                              const boost::optional<Status>& result);
+
+    // Sets the decision on the coordinator document (if it still exists) and persists it. No-op
+    // when the document was never persisted.
+    void _persistMigrationDecision(OperationContext* opCtx,
+                                   boost::optional<MigrationCoordinatorDocument>& doc,
+                                   DecisionEnum decision);
+
+    // Determines the outcome from the authoritative global-catalog placement on the config server.
+    MigrationOutcome _determineMigrationOutcome(OperationContext* opCtx);
+
+    // Returns the persisted MigrationCoordinatorDocument for this migration, if present. Used by
+    // the recovery finalization path to reconstruct the migration coordinator after a failover.
+    boost::optional<MigrationCoordinatorDocument> _getMigrationCoordinatorDocumentIfExists(
+        OperationContext* opCtx);
+
+    // Releases the recipient critical section and completes the migration coordinator. Dispatches
+    // to the live MigrationSourceManager on the commit term, or reconstructs the coordinator from
+    // its persisted document on the recovery path.
+    void _finalizeMigration(OperationContext* opCtx);
 
     boost::optional<Status> _getMigrationResult() const;
     void _writeMigrationResult(OperationContext* opCtx, Status result);
     void _overwriteMigrationResultWithOk(OperationContext* opCtx);
     void _writeCommitAttempted(OperationContext* opCtx);
+
+    // Commits the post-migration collection and chunk metadata to the authoritative local shard
+    // catalog on the donor and recipient. Must run while the critical section is held.
+    void _commitToShardCatalog(OperationContext* opCtx,
+                               const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                               const CancellationToken& token);
 
     class MigrationAttempt {
     public:
@@ -104,7 +141,12 @@ private:
                          UUID migrationId);
 
         Status migrate(OperationContext* opCtx);
-        Status commit(OperationContext* opCtx);
+        // Promotes the donor critical section to also block reads, just before the config commit.
+        void promoteCriticalSection(OperationContext* opCtx);
+        Status commit(OperationContext* opCtx, const OperationSessionInfo& session);
+        // Completes the migration coordinator on the same term that ran the commit (releasing the
+        // recipient critical section). Honours waitForDelete.
+        void finalize(OperationContext* opCtx);
 
     private:
         class CloneMetricsSnapshot {

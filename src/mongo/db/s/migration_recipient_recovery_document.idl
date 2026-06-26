@@ -66,3 +66,13 @@ structs:
             txnNumber:
                 type: TxnNumber
                 description: "The txnNumber that the donor use to communicate with the recipient."
+            # TODO (SERVER-98118) Remove once v9.0 branches out
+            clearShardCatalogCache:
+                type: safeBool
+                description: >-
+                    Whether the recipient must refresh its filtering metadata when releasing the
+                    migration critical section. The authoritative path installs the post-migration
+                    metadata into the shard catalog directly and does not need the refresh. Defaults
+                    to true to preserve the legacy behavior for documents written before this field
+                    existed.
+                default: true

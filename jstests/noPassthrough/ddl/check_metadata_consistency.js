@@ -596,7 +596,8 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 
     // Database level mode command
     let inconsistencies = db.checkMetadataConsistency().toArray();
-    assert.eq(3, inconsistencies.length, tojson(inconsistencies));
+    // TODO (SERVER-98118): Leave a single assert.eq(4, inconsistencies.length) once v9.0 branches out
+    assert.between(3, inconsistencies.length, 4, tojson(inconsistencies));
     assert(
         inconsistencies.some((object) => object.type === "RoutingTableRangeOverlap"),
         tojson(inconsistencies),
@@ -643,7 +644,8 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 
     // Cluster level mode command
     let inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
-    assert.eq(2, inconsistencies.length, tojson(inconsistencies));
+    // TODO (SERVER-98118): Leave a single assert.eq(3, inconsistencies.length) once v9.0 branches out
+    assert.between(2, inconsistencies.length, 3, tojson(inconsistencies));
     assert(
         inconsistencies.some((object) => object.type === "MissingRoutingTable"),
         tojson(inconsistencies),

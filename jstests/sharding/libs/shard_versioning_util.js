@@ -75,6 +75,9 @@ export var ShardVersioningUtil = (function () {
     /*
      * Moves the chunk that matches the given query to toShard. Forces the recipient to skip the
      * metadata refresh post-migration commit.
+     *
+     * TODO (SERVER-129875): Analyze all usages of this function and determine if we need to add a
+     * similar failpoint for the donor when the shard is authoritative.
      */
     let moveChunkNotRefreshRecipient = function (mongos, ns, fromShard, toShard, findQuery) {
         let failPoint = configureFailPoint(toShard, "migrationRecipientFailPostCommitRefresh");

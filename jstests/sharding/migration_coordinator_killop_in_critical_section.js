@@ -4,6 +4,11 @@
  *
  * Depends on the checkOrphansAreDeleted hook at the end of ShardingTest to verify that the orphans,
  * range deletion tasks, and migration coordinator state are deleted despite the killOps.
+ *
+ * @tags: [
+ *   # TODO (SERVER-129909): adapt this test to work with MoveRangeCoordinator.
+ *   featureFlagAuthoritativeShardsDDL_incompatible,
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

@@ -8,6 +8,8 @@
  *   # Contains commands that fail which will fail the entire transaction
  *   does_not_support_transactions,
  *   requires_fcv_80,
+ *   # TODO (SERVER-129875): Adapt test to work with authoritative shards commits
+ *   featureFlagAuthoritativeShardsDDL_incompatible,
  * ]
  */
 import {cursorEntryValidator, cursorSizeValidator} from "jstests/libs/bulk_write_utils.js";

@@ -3,6 +3,8 @@
  * block reads and refresh metadata cache when migration occurs.
  *
  * @tags: [
+ *   # TODO (SERVER-129909): Adapt this test to authoritative shards / MoveRangeCoordinator.
+ *   featureFlagAuthoritativeShardsDDL_incompatible,
  * ]
  */
 

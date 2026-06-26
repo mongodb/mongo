@@ -49,9 +49,12 @@ enums:
         values:
             kUnset: "unset"
             kMigrate: "migrate"
-            kCommit: "commit"
-            kEnsureMigrationCoordinatorComplete: "ensureMigrationCoordinatorComplete"
-            kCompleteMigration: "completeMigration"
+            kEnterCriticalSection: "enterCriticalSection"
+            kGlobalCatalogCommit: "globalCatalogCommit"
+            kDetermineOutcome: "determineOutcome"
+            kShardCatalogCommit: "shardCatalogCommit"
+            kReleaseCriticalSectionOnDonor: "releaseCriticalSectionOnDonor"
+            kFinalizeMigration: "finalizeMigration"
 
 structs:
     MoveRangeCoordinatorDocument:

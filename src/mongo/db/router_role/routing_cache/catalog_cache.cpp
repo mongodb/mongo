@@ -590,9 +590,9 @@ void CatalogCache::onStaleCollectionVersion(const NamespaceString& nss,
                                             const boost::optional<ShardVersion>& wantedVersion) {
     _stats.countStaleConfigErrors.addAndFetch(1);
 
-    const auto newChunkVersion = wantedVersion
-        ? ComparableChunkVersion::makeComparableChunkVersion(wantedVersion->placementVersion())
-        : ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh();
+    const auto newChunkVersion = (!wantedVersion || !wantedVersion->placementVersion().isSet())
+        ? ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh()
+        : ComparableChunkVersion::makeComparableChunkVersion(wantedVersion->placementVersion());
     _collectionCache.advanceTimeInStore(nss, newChunkVersion);
 }
 

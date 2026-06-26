@@ -79,3 +79,12 @@ commands:
             fromShardCollectionVersion:
                 type: ChunkVersion
                 description: "{ shardVersionField: <version> }"
+
+            # TODO (SERVER-127213, SERVER-129536): Remove the authoritative parameter once
+            # MoveRangeCoordinator starts using the new configsvr command
+            authoritative:
+                type: bool
+                description: >-
+                    Set by the MoveRangeCoordinator to request the authoritative commit path. The
+                    legacy path leaves it unset; an absent value means the legacy commit path.
+                optional: true

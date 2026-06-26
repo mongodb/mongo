@@ -52,6 +52,7 @@ enums:
             kAborted: "aborted"
 
     ManagementMode:
+        mod_visibility: public
         description:
             "Whether the migration is driven by the legacy moveChunk command path or is
             subordinate to a MoveRangeCoordinator whose coordinator service handles recovery."

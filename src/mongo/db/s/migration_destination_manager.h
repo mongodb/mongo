@@ -185,14 +185,27 @@ public:
      */
     void abortWithoutSessionIdCheck();
 
-    Status startCommit(const MigrationSessionId& sessionId);
+    /*
+     * 'clearShardCatalogCache' records whether the recipient must refresh its filtering metadata
+     * when it later releases the migration critical section. The authoritative path passes false
+     * because the post-migration metadata is installed into the shard catalog directly.
+     * TODO (SERVER-98118): Remove clearShardCatalogCache once v9.0 branches out.
+     */
+    Status startCommit(const MigrationSessionId& sessionId, bool clearShardCatalogCache);
 
     /*
      * Refreshes the filtering metadata and releases the migration recipient critical section for
      * the specified migration session. If no session is ongoing or the session doesn't match the
      * current one, it does nothing and returns OK.
+     *
+     * If clearShardCatalogCache is true, the filtering metadata is refreshed before releasing the
+     * critical section. On the authoritative path it is false because the metadata has already been
+     * installed into the shard catalog while the critical section was held.
+     * TODO (SERVER-98118) Remove clearShardCatalogCache when v9.0 branches out.
      */
-    Status exitCriticalSection(OperationContext* opCtx, const MigrationSessionId& sessionId);
+    Status exitCriticalSection(OperationContext* opCtx,
+                               const MigrationSessionId& sessionId,
+                               bool clearShardCatalogCache);
 
     /**
      * Gets the collection indexes from fromShardId. If given a chunk manager, will fetch the
@@ -384,6 +397,13 @@ private:
     State _state{kReady};
     std::string _errmsg;
 
+    // Whether the recipient must refresh its filtering metadata when it releases the migration
+    // critical section. Set by the donor when committing (see startCommit) and persisted in the
+    // recipient recovery document so the value survives failover. Defaults to true to preserve the
+    // legacy refresh behavior.
+    // TODO (SERVER-98118): Remove once v9.0 branches out
+    bool _clearShardCatalogCache{true};
+
     std::unique_ptr<SessionCatalogMigrationDestination> _sessionMigration;
 
     // Condition variable, which is signalled every time the state of the migration changes.
@@ -391,7 +411,9 @@ private:
 
     // Promise that will be fulfilled when the donor has signaled us that we can release the
     // critical section.
-    std::unique_ptr<SharedPromise<void>> _canReleaseCriticalSectionPromise;
+    // Resolves with whether the recipient should refresh its filtering metadata before releasing
+    // the critical section (true) or skip the refresh on the authoritative path (false).
+    std::unique_ptr<SharedPromise<bool>> _canReleaseCriticalSectionPromise;
 
     // Promise that will be fulfilled when the migrateThread has finished its work.
     std::unique_ptr<SharedPromise<State>> _migrateThreadFinishedPromise;

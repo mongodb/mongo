@@ -360,5 +360,17 @@ void ReshardingOpObserver::onDelete(OperationContext* opCtx,
     }
 }
 
+repl::OpTime ReshardingOpObserver::onDropCollection(OperationContext* opCtx,
+                                                    const NamespaceString& collectionName,
+                                                    const UUID& uuid,
+                                                    std::uint64_t numRecords,
+                                                    bool markFromMigrate,
+                                                    bool isTimeseries) {
+    if (shouldUseRegistry() && _nssToRoleMap.contains(collectionName)) {
+        LocalReshardingOperationsRegistry::get().clearOperationsForRole(
+            _nssToRoleMap.at(collectionName));
+    }
+    return {};
+}
 
 }  // namespace mongo

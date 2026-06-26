@@ -596,6 +596,144 @@ describe("Authoritative collection metadata vs DDLs", function () {
         });
     });
 
+    describe("moveRange", function () {
+        let donorShard;
+        let donorShardName;
+        let recipientShard;
+        let recipientShardName;
+
+        before(function () {
+            donorShard = st.shard0;
+            donorShardName = donorShard.shardName;
+            recipientShard = st.shard1;
+            recipientShardName = recipientShard.shardName;
+        });
+
+        function assertCatalogsConvergedAfterMove(ns, expectedKey) {
+            st.awaitReplicationOnShards();
+
+            assertTrackedCollectionMetadataOnShardCatalogs(ns, {oldTrackedNs: `${ns}.__absent__`});
+            assertInMemoryMetadataSharded(donorShard.rs.getPrimary(), ns, expectedKey);
+            assertInMemoryMetadataSharded(recipientShard.rs.getPrimary(), ns, expectedKey);
+        }
+
+        it("moves a whole chunk to the recipient and updates both shard catalogs", function () {
+            const db = setupDb("moverange_whole_chunk");
+            const ns = `${db.getName()}.coll`;
+
+            // Two chunks, both on the DB primary (shard0).
+            assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
+            assert.commandWorked(db.coll.insert([{x: -1}, {x: 1}]));
+
+            // Move the range [0, MaxKey) to shard1.
+            assert.commandWorked(
+                db.adminCommand({
+                    moveRange: ns,
+                    min: {x: 0},
+                    max: {x: MaxKey},
+                    toShard: recipientShardName,
+                }),
+            );
+
+            const uuid = getGlobalCatalogCollMetadata(ns).uuid;
+            assert.eq(
+                getGlobalCatalogChunks(uuid, recipientShardName).length,
+                1,
+                "recipient shard1 should own a chunk after moveRange",
+            );
+            assert.eq(
+                getGlobalCatalogChunks(uuid, donorShardName).length,
+                2,
+                "donor shard0 should still own a chunk after moveRange",
+            );
+
+            assertCatalogsConvergedAfterMove(ns, {x: 1});
+        });
+
+        it("splits a chunk and moves the sub-range, reflecting new boundaries in both shard catalogs", function () {
+            const db = setupDb("moverange_split_subrange");
+            const ns = `${db.getName()}.coll`;
+
+            // Single chunk [MinKey, MaxKey) on the DB primary (shard0).
+            assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
+            assert.commandWorked(db.coll.insert([{x: -5}, {x: 5}, {x: 15}]));
+
+            // moveRange on a strict sub-range splits the owning chunk into
+            // [MinKey, 0), [0, 10), [10, MaxKey) and moves the middle range to shard1.
+            assert.commandWorked(
+                db.adminCommand({
+                    moveRange: ns,
+                    min: {x: 0},
+                    max: {x: 10},
+                    toShard: recipientShardName,
+                }),
+            );
+
+            const uuid = getGlobalCatalogCollMetadata(ns).uuid;
+            assert.eq(
+                3,
+                getAllGlobalCatalogChunks(uuid).length,
+                "moveRange on a sub-range should split the chunk into three",
+            );
+            assert.eq(
+                3,
+                getGlobalCatalogChunks(uuid, donorShardName).length,
+                "donor shard0 should own two chunks",
+            );
+            assert.eq(
+                1,
+                getGlobalCatalogChunks(uuid, recipientShardName).length,
+                "recipient shard1 should own exactly the moved sub-range",
+            );
+
+            assertCatalogsConvergedAfterMove(ns, {x: 1});
+        });
+
+        // Chunks currently owned by a shard, matching only on the live `shard` field. Unlike
+        // getGlobalCatalogChunks, this ignores placement history, so a shard that moved its last
+        // chunk away reports zero even though it remains in the chunk's history.
+        function getCurrentlyOwnedChunks(uuid, shardId) {
+            return st.s
+                .getDB("config")
+                .chunks.find({uuid: uuid, shard: shardId})
+                .sort({min: 1})
+                .toArray();
+        }
+
+        it("moves the last chunk off the donor, leaving it a chunkless primary", function () {
+            const db = setupDb("moverange_last_chunk");
+            const ns = `${db.getName()}.coll`;
+
+            // Single chunk on the DB primary (shard0); moving it away leaves shard0 chunkless but
+            // still the database primary, so it must keep a chunkless shard catalog entry.
+            assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
+            assert.commandWorked(db.coll.insert([{x: -1}, {x: 1}]));
+
+            assert.commandWorked(
+                db.adminCommand({
+                    moveRange: ns,
+                    min: {x: MinKey},
+                    max: {x: MaxKey},
+                    toShard: recipientShardName,
+                }),
+            );
+
+            const uuid = getGlobalCatalogCollMetadata(ns).uuid;
+            assert.eq(
+                0,
+                getCurrentlyOwnedChunks(uuid, donorShardName).length,
+                "donor shard should currently own no chunks after moving its last chunk",
+            );
+            assert.eq(
+                1,
+                getCurrentlyOwnedChunks(uuid, recipientShardName).length,
+                "recipient shard should own the moved chunk",
+            );
+
+            assertCatalogsConvergedAfterMove(ns, {x: 1});
+        });
+    });
+
     describe("collMod", function () {
         it("updates shard catalog time-series fields and chunk versions", function () {
             const db = setupDb("collmod_ts");

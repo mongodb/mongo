@@ -8,6 +8,8 @@
  *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
  *   # This test invokes db.setProfilingLevel()
  *   requires_profiling,
+ *   # TODO (SERVER-129901) Re-enable once this ticket gets fixed
+ *   featureFlagAuthoritativeShardsDDL_incompatible,
  * ]
  */
 

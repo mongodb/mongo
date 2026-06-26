@@ -9,7 +9,10 @@
  *   expects_explicit_underscore_id_index,
  *   # Index filter commands do not support causal consistency.
  *   does_not_support_causal_consistency,
- *   requires_fcv_82
+ *   requires_fcv_82,
+ *   # TODO (SERVER-129885): Enable once prepareShardedCollectionWithOrphans is adapted with
+ *   # authoritative shards.
+ *   featureFlagAuthoritativeShardsDDL_incompatible,
  * ]
  */
 

@@ -253,9 +253,14 @@ public:
      * Returns statistics about the move. These are informational only and should not be
      * interpreted by the caller for any means other than reporting.
      *
+     * 'clearShardCatalogCache' tells the recipient whether it must refresh its filtering
+     * metadata when it later releases the migration critical section. The authoritative commit
+     * path installs the post-migration metadata directly, so it does not need the refresh.
+     * TODO (SERVER-98118) Remove clearShardCatalogCache once v9.0 branches out.
+     *
      * NOTE: Must be called without any locks.
      */
-    StatusWith<BSONObj> commitClone(OperationContext* opCtx);
+    StatusWith<BSONObj> commitClone(OperationContext* opCtx, bool clearShardCatalogCache);
 
     /**
      * Tells the recipient to abort the clone and cleanup any unused data. This method's

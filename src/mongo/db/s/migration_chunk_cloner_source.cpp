@@ -418,7 +418,8 @@ Status MigrationChunkClonerSource::awaitUntilCriticalSectionIsAppropriate(
     return _checkRecipientCloningStatus(opCtx, maxTimeToWait);
 }
 
-StatusWith<BSONObj> MigrationChunkClonerSource::commitClone(OperationContext* opCtx) {
+StatusWith<BSONObj> MigrationChunkClonerSource::commitClone(OperationContext* opCtx,
+                                                            bool clearShardCatalogCache) {
     invariant(_state == kCloning);
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
@@ -447,6 +448,9 @@ StatusWith<BSONObj> MigrationChunkClonerSource::commitClone(OperationContext* op
         BSONObjBuilder builder;
         builder.append(kRecvChunkCommit,
                        NamespaceStringUtil::serialize(nss(), SerializationContext::stateDefault()));
+        // Tell the recipient whether it must refresh its filtering metadata when releasing the
+        // migration critical section it is about to enter.
+        builder.append("clearShardCatalogCache", clearShardCatalogCache);
         _sessionId.append(&builder);
         return builder.obj();
     }());

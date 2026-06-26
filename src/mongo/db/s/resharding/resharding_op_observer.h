@@ -101,6 +101,13 @@ public:
                   const OplogDeleteEntryArgs& args,
                   OpStateAccumulator* opAccumulator = nullptr) override;
 
+    repl::OpTime onDropCollection(OperationContext* opCtx,
+                                  const NamespaceString& collectionName,
+                                  const UUID& uuid,
+                                  std::uint64_t numRecords,
+                                  bool markFromMigrate,
+                                  bool isTimeseries) override;
+
 private:
     const stdx::unordered_map<NamespaceString, Role> _nssToRoleMap{
         {NamespaceString::kConfigReshardingOperationsNamespace, Role::kCoordinator},

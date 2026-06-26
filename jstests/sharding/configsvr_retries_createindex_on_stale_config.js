@@ -1,5 +1,10 @@
 /**
  * Verifies creating the logical sessions collection TTL index retries on stale version errors.
+ *
+ * @tags: [
+ *   # TODO (SERVER-129875): Adapt test to work with authoritative shards commits
+ *   featureFlagAuthoritativeShardsDDL_incompatible,
+ * ]
  */
 
 import {

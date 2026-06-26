@@ -3,6 +3,8 @@
  * version errors.
  * @tags: [
  *   requires_sharding,
+ *   # TODO (SERVER-129875): Adapt test to work with authoritative shards commits
+ *   featureFlagAuthoritativeShardsDDL_incompatible,
  * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";

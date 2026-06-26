@@ -37,6 +37,7 @@
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 #include "mongo/db/s/migration_coordinator.h"
 #include "mongo/db/s/move_timing_helper.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
@@ -174,6 +175,46 @@ public:
      */
     void commitChunkMetadataOnConfig();
 
+    // The methods below split commitChunkMetadataOnConfig() into steps so the MoveRangeCoordinator
+    // can run an authoritative shard-catalog commit between the config commit and finalization,
+    // while both critical sections stay held. Used only by the MoveRangeCoordinator; the standalone
+    // path keeps using commitChunkMetadataOnConfig().
+
+    /**
+     * Promotes the donor recoverable critical section to also block reads, just before committing
+     * on the config server.
+     *
+     * Expected state: kCloneCompleted
+     */
+    void promoteCriticalSectionToBlockReads();
+
+    /**
+     * Sends the CommitChunkMigration command to the config server and returns its status. The
+     * provided session id is attached to the command so the config server can run the commit as a
+     * retryable write, making coordinator retries idempotent and protecting against replay of stale
+     * requests. Unlike commitChunkMetadataOnConfig(), this does NOT release any critical section,
+     * refresh filtering metadata, launch async recovery, or complete the migration; the caller
+     * drives those steps.
+     *
+     * Expected state: kCloneCompleted
+     * Resulting state: kCommittingOnConfig
+     */
+    Status commitMigrationToGlobalCatalog(const OperationSessionInfo& session);
+
+    /**
+     * Post-commit bookkeeping that must run once the config commit has succeeded: emits the change
+     * stream "chunk migrated" event, clears the time-series bucket catalog if needed, and records
+     * the committed decision on the migration coordinator. Does NOT refresh filtering metadata.
+     */
+    void recordCommitSuccess();
+
+    /**
+     * Completes a committed migration: releases the recipient critical section, completes the
+     * migration coordinator (range deletion + forgets the doc), and honours waitForDelete. Used by
+     * the MoveRangeCoordinator kFinalizeMigration phase on the same term that ran the commit.
+     */
+    void finishCommit();
+
     /**
      * Aborts the migration after observing a concurrent index operation by marking its operation
      * context as killed.
@@ -228,6 +269,13 @@ private:
 
     CollectionMetadata _getCurrentMetadataAndCheckForConflictingErrors();
 
+    // Serializes the shared CommitChunkMigration command body (migrated chunk + collection version
+    // + write concern) into `builder`. The collection version is supplied by the caller because the
+    // standalone and coordinator paths read it from different sources.
+    void _buildCommitChunkMigrationRequest(BSONObjBuilder* builder,
+                                           const ChunkVersion& collVersion,
+                                           bool isAuthoritative);
+
     /**
      * Called when any of the states fails. May only be called once and will put the migration
      * manager into the kDone state.
@@ -239,10 +287,20 @@ private:
      * restores the committed metadata (if in critical section) and logs error in the change log to
      * indicate that the migration has failed.
      *
+     * Only valid on the standalone path. The MoveRangeCoordinator drives cleanup through the
+     * coordinator's kFinalizeMigration phase (finishCommit()).
+     *
      * Expected state: Any
      * Resulting state: kDone
      */
     void _cleanupOnError();
+
+    /**
+     * Writes a "moveChunk.error" entry to the sharding change log, attaching the recorded _errMsg
+     * (if any). Used by both the standalone _cleanupOnError() and the MoveRangeCoordinator abort
+     * path in finishCommit().
+     */
+    void _logMoveChunkErrorToChangelog();
 
     /**
      * Sets _errMsg to the provided string before running the given callable. If the callable
@@ -273,7 +331,9 @@ private:
     // Stores a reference to the process sharding statistics object which needs to be updated
     ShardingStatistics& _stats;
 
+    // TODO (SERVER-98118): Remove this field once v9.0 branches out
     const ManagementModeEnum _managementMode;
+
     const UUID _migrationId;
 
     // Information about the moveChunk to be used in the critical section.
@@ -295,6 +355,10 @@ private:
 
     // The current state. Used only for diagnostics and validation.
     State _state{kCreated};
+
+    // Set once the live coordinator path has observed and recorded a successful config-server
+    // commit. This distinguishes a known commit from an uncertain commit attempt during cleanup.
+    bool _commitRecorded{false};
 
     // Responsible for registering and unregistering the MigrationSourceManager from the collection
     // sharding runtime for the collection

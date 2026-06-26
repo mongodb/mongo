@@ -1,7 +1,11 @@
-//
-// Tests that a StaleConfigError received from a shard on dropIndexes will allow the command to
-// successfully complete upon the mongos' command retry.
-//
+/*
+ * Tests that a StaleConfigError received from a shard on dropIndexes will allow the command to
+ * successfully complete upon the mongos' command retry.
+ * @tags: [
+ *   # TODO (SERVER-129875): Adapt test to work with authoritative shards commits
+ *   featureFlagAuthoritativeShardsDDL_incompatible,
+ * ]
+ */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";

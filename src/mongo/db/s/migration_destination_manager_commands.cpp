@@ -275,7 +275,15 @@ public:
         auto const sessionId = uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj));
         auto const mdm = MigrationDestinationManager::get(opCtx);
 
-        Status const status = mdm->startCommit(sessionId);
+        // Whether the recipient must refresh its filtering metadata when it later releases the
+        // migration critical section. Defaults to true so a donor that does not send the field
+        // (legacy path) keeps the pre-existing refresh behavior.
+        // TODO (SERVER-98118) Remove this once v9.0 branches out
+        const bool clearShardCatalogCache = cmdObj.hasField("clearShardCatalogCache")
+            ? cmdObj["clearShardCatalogCache"].Bool()
+            : true;
+
+        Status const status = mdm->startCommit(sessionId, clearShardCatalogCache);
         mdm->report(result, opCtx, false);
         if (!status.isOK()) {
             LOGV2(22014, "_recvChunkCommit failed", "error"_attr = redact(status));
@@ -391,10 +399,17 @@ public:
         CommandHelpers::uassertCommandRunWithMajority(getName(), opCtx->getWriteConcern());
         const auto sessionId = uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj));
 
+        // Whether the recipient must refresh its filtering metadata before releasing the critical
+        // section. Defaults to true so a donor that does not send the field (legacy path) keeps the
+        // pre-existing refresh behavior.
+        const bool clearShardCatalogCache = cmdObj.hasField("clearShardCatalogCache")
+            ? cmdObj["clearShardCatalogCache"].Bool()
+            : true;
+
         LOGV2_DEBUG(5899101, 2, "Received _recvChunkReleaseCritSec", "sessionId"_attr = sessionId);
 
         const auto mdm = MigrationDestinationManager::get(opCtx);
-        const auto status = mdm->exitCriticalSection(opCtx, sessionId);
+        const auto status = mdm->exitCriticalSection(opCtx, sessionId, clearShardCatalogCache);
         if (!status.isOK()) {
             LOGV2(5899109, "_recvChunkReleaseCritSec failed", "error"_attr = redact(status));
             uassertStatusOK(status);

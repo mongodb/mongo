@@ -174,6 +174,14 @@ public:
                                            bool throwIfReasonDiffers = true);
 
     /**
+     * Returns true if a recoverable critical section is currently held for the given namespace with
+     * the exact given reason, false otherwise.
+     */
+    bool isCriticalSectionHeld(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               const BSONObj& reason);
+
+    /**
      * Recovers the in-memory sharding state from disk in case of rollback.
      */
     void onReplicationRollback(OperationContext* opCtx,

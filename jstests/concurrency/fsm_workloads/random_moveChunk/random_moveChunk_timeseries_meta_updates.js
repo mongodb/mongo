@@ -43,13 +43,28 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         jsTestLog(
             "Executing bucket level update on: " + collName + " on field '" + updateField + "'",
         );
-        assert.commandWorked(
-            shardedColl.update(
-                {[updateField]: {$gte: oldValue}},
-                {$inc: {[updateField]: 1}},
-                {multi: true},
-            ),
+        const res = shardedColl.update(
+            {[updateField]: {$gte: oldValue}},
+            {$inc: {[updateField]: 1}},
+            {multi: true},
         );
+
+        // A multi:true update may run at the same time as a chunk migration. While the migration
+        // commits, it briefly clears the shard's routing metadata. If the update has already
+        // changed some documents when that happens, the server returns QueryPlanKilled so the
+        // router does not retry and apply the change twice. We accept this error here: the
+        // validation step only compares document _ids, and a partial update to the meta field does
+        // not add or remove any document.
+        // TODO (SERVER-129536): Remove QueryPlanKilled as expected error.
+        if (res.hasWriteError()) {
+            assert.eq(
+                res.getWriteError().code,
+                ErrorCodes.QueryPlanKilled,
+                () => "Unexpected write error during bucket level update: " + tojson(res),
+            );
+            return;
+        }
+        assert.commandWorked(res);
     };
 
     $config.data.validateCollection = function validate(db, collName) {
