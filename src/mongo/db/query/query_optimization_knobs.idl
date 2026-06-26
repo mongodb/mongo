@@ -150,6 +150,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: planEvaluationWorks
 
     internalQueryPlanEvaluationCollFraction:
         description: >-
@@ -213,6 +216,9 @@ server_parameters:
         validator:
             gte: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: sbePlanEvaluationMaxMemoryBytes
 
     internalQueryPlanTieBreakingWithIndexHeuristics:
         description: >-
@@ -224,6 +230,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: true
         redact: false
+        annotations:
+            query_knob:
+                wire_name: planTieBreakingWithIndexHeuristics
 
     internalQueryForceIntersectionPlans:
         description: >-
@@ -234,6 +243,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: forceIntersectionPlans
 
     internalQueryPlannerEnableIndexIntersection:
         description: "Controls whether the planner will generate and consider index intersection plans."
@@ -242,6 +254,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: true
         redact: false
+        annotations:
+            query_knob:
+                wire_name: plannerEnableIndexIntersection
 
     internalQueryPlannerEnableHashIntersection:
         description: "Controls whether we use hash-based intersection for rooted $and queries."
@@ -250,6 +265,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: plannerEnableHashIntersection
 
     internalQueryPlannerEnableSortIndexIntersection:
         description: "Controls whether we use sort-based intersection for rooted $and queries."
@@ -258,6 +276,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: plannerEnableSortIndexIntersection
 
     internalQueryPlannerEnableIndexPruning:
         description: "Prunes unnecessary candidate plans so we trial less duplicate options."
@@ -266,6 +287,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: plannerEnableIndexPruning
 
     internalQueryConcurrentMultiPlanningThreshold:
         description: "The number of concurrent trialing multiplan candidates required to enable the MultiPlan rate limiter."
@@ -276,6 +300,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: concurrentMultiPlanningThreshold
 
     internalQueryMaxConcurrentMultiPlanJobsPerCacheKey:
         description: >-
@@ -290,6 +317,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: maxConcurrentMultiPlanJobsPerCacheKey
 
     #
     # Plan cache
@@ -302,6 +332,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: disablePlanCache
 
     internalQueryCacheMaxEntriesPerCollection:
         description: >-
@@ -315,6 +348,9 @@ server_parameters:
         validator:
             gte: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: cacheMaxEntriesPerCollection
 
     internalQueryCacheMaxSizeBytesBeforeStripDebugInfo:
         description: >-
@@ -332,6 +368,9 @@ server_parameters:
         validator:
             gte: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: cacheMaxSizeBytesBeforeStripDebugInfo
 
     internalQueryCacheEvictionRatio:
         description: >-
@@ -344,6 +383,9 @@ server_parameters:
         validator:
             gte: 0.0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: cacheEvictionRatio
 
     internalQueryCacheWorksGrowthCoefficient:
         description: >-
@@ -356,6 +398,9 @@ server_parameters:
         validator:
             gt: 1.0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: cacheWorksGrowthCoefficient
 
     internalQueryCacheDisableInactiveEntries:
         description: "Whether or not cache entries can be marked as 'inactive'."
@@ -364,6 +409,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: cacheDisableInactiveEntries
 
     planCacheSize:
         description: >-
@@ -394,6 +442,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: pipelineLengthLimit
 
     internalMaxSubPipelineViewDepth:
         description: "The maximum length allowed for an aggregation sub-pipeline view."
@@ -405,6 +456,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: maxSubPipelineViewDepth
 
     internalPartialFilterExpressionMaxDepth:
         description: "The maximum depth allowed for a partialFilterExpression."
@@ -415,6 +469,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: partialFilterExpressionMaxDepth
 
     #
     # Planning and enumeration
@@ -452,6 +509,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: true
         redact: false
+        annotations:
+            query_knob:
+                wire_name: enumerationPreferLockstepOrEnumeration
 
     internalQueryEnumerationMaxOrSolutions:
         description: "How many solutions will the enumerator consider at each OR?"
@@ -462,6 +522,9 @@ server_parameters:
         validator:
             gte: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: enumerationMaxOrSolutions
 
     internalQueryEnumerationMaxIntersectPerAnd:
         description: "How many intersections will the enumerator consider at each AND?"
@@ -472,6 +535,9 @@ server_parameters:
         validator:
             gte: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: enumerationMaxIntersectPerAnd
 
     internalQueryPlanOrChildrenIndependently:
         description: "Do we want to plan each child of the OR independently?"
@@ -480,6 +546,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: true
         redact: false
+        annotations:
+            query_knob:
+                wire_name: planOrChildrenIndependently
 
     internalQueryMaxScansToExplode:
         description: >-
@@ -505,6 +574,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: plannerGenerateCoveredWholeIndexScans
 
     internalQueryPlannerUseMultiplannerForSingleSolutions:
         description: >-
@@ -526,6 +598,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: ignoreUnknownJSONSchemaKeywords
 
     internalQueryPlannerIgnoreIndexWithCollationForRegex:
         description: "Do we want to leverage indexes with collation for regex predicates?"
@@ -534,6 +609,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: true
         redact: false
+        annotations:
+            query_knob:
+                wire_name: plannerIgnoreIndexWithCollationForRegex
 
     internalEnableJoinOptimization:
         description: "Enable cost-based reordering of $lookup-$unwind pairs producing SBE plans."
@@ -556,6 +634,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: explainJoinCostComponents
 
     internalJoinReorderMode:
         description: "Picks which method is used to reorder joins (when enabled)."
@@ -654,6 +735,9 @@ server_parameters:
         validator:
             gte: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: maxPipelineRewrites
 
     internalRandomJoinOrderSeed:
         description: "Select a seed for randomized join reordering."
@@ -710,6 +794,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: enableCSTParser
 
     internalQueryCutoffForSampleFromRandomCursor:
         description: "The maximum sample ratio for random cursor."
@@ -732,6 +819,9 @@ server_parameters:
         validator:
             gte: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: autoParameterizationMaxParameterCount
 
     internalQueryEnableBooleanExpressionsSimplifier:
         description: >-
@@ -742,6 +832,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: true
         redact: false
+        annotations:
+            query_knob:
+                wire_name: enableBooleanExpressionsSimplifier
 
     internalQueryMaximumNumberOfUniquePredicatesToSimplify:
         description: >-
@@ -752,6 +845,9 @@ server_parameters:
         cpp_vartype: AtomicWord<int>
         default: 64
         redact: false
+        annotations:
+            query_knob:
+                wire_name: maximumNumberOfUniquePredicatesToSimplify
 
     internalQueryMaximumNumberOfMintermsInSimplifier:
         description: "Maximum number of minterms allowed during boolean transformations."
@@ -760,6 +856,9 @@ server_parameters:
         cpp_vartype: AtomicWord<int>
         default: 1000
         redact: false
+        annotations:
+            query_knob:
+                wire_name: maximumNumberOfMintermsInSimplifier
 
     internalQueryMaxNumPrimeImplicants:
         description: "Threshold capping number of prime implicants generated by Petrick's method."
@@ -768,6 +867,9 @@ server_parameters:
         cpp_vartype: AtomicWord<int>
         default: 10000
         redact: false
+        annotations:
+            query_knob:
+                wire_name: maxNumPrimeImplicants
 
     internalQueryMaxSizeFactorToSimplify:
         description: >-
@@ -778,6 +880,9 @@ server_parameters:
         cpp_vartype: AtomicWord<double>
         default: 1.0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: maxSizeFactorToSimplify
 
     internalQueryDoNotOpenContainedOrsInSimplifier:
         description: >-
@@ -788,6 +893,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: true
         redact: false
+        annotations:
+            query_knob:
+                wire_name: doNotOpenContainedOrsInSimplifier
 
     internalQueryCBRCEMode:
         description: "Cardinality estimation mode for the cost-based ranker."
@@ -921,6 +1029,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: samplingBySequentialScan
 
     # TODO SERVER-127563: Revisit the naming and organization of CBR-related knobs
     internalQuerySamplingByStrides:
@@ -934,6 +1045,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: samplingByStrides
 
     internalJoinPlanSamplingSize:
         description: For queries running through join optimization, control the sample size.
@@ -1009,6 +1123,9 @@ server_parameters:
             gt: 100
             lt: 10000
         redact: false
+        annotations:
+            query_knob:
+                wire_name: numWorksPerPlanForMPEstimation
 
     internalQueryMinRequiredImprovementRatioForCostBasedRankerChoice:
         description: >-
@@ -1022,6 +1139,9 @@ server_parameters:
             gte: 1.0
             lte: 10.0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: minRequiredImprovementRatioForCostBasedRankerChoice
 
     internalQueryExtraPredicateForReversedIn:
         description: >-
@@ -1033,6 +1153,9 @@ server_parameters:
         cpp_varname: internalQueryExtraPredicateForReversedIn
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: extraPredicateForReversedIn
 
     internalQueryPermitMatchSwappingForComplexRenames:
         description: >-
@@ -1051,6 +1174,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: permitMatchSwappingForComplexRenames
 
     internalEnablePipelineOptimizationAdditionalTestingRules:
         description: "Whether or not to enable pipeline optimization rules with Testing tag."
@@ -1071,6 +1197,9 @@ server_parameters:
         default: false
         test_only: true
         redact: false
+        annotations:
+            query_knob:
+                wire_name: enableDependencyGraphValidation
 
     internalEnablePathArrayness:
         description: "Whether or not to use PathArrayness when applying optimizations"
@@ -1092,6 +1221,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: true
         redact: false
+        annotations:
+            query_knob:
+                wire_name: plannerPushdownFilterToIxscanForSort
 
     internalQueryTransformHoistPolicy:
         description: >-
@@ -1101,10 +1233,13 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_class:
             name: TransformHoistPolicy
-            data: synchronized_value<TransformHoistPolicyEnum>
+            data: WithOnUpdateHook<synchronized_value<TransformHoistPolicyEnum>>
         default:
             expr: TransformHoistPolicyEnum::kForMatchPushdown
         redact: false
+        annotations:
+            query_knob:
+                wire_name: transformHoistPolicy
 
     internalQueryTransformHoistMaximumPaths:
         description: >-
@@ -1118,6 +1253,9 @@ server_parameters:
         default: 1024
         validator: {gte: 0}
         redact: false
+        annotations:
+            query_knob:
+                wire_name: transformHoistMaximumPaths
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'
