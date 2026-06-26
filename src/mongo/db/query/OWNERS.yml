@@ -227,6 +227,9 @@ filters:
   - "*plan_executor*":
     approvers:
       - 10gen/query-execution-classic
+  - "plan_executor_sbe*":
+    approvers:
+      - 10gen/query-execution-sbe
   - "plan_insert_listener*":
     approvers:
       - 10gen/query-execution-classic
