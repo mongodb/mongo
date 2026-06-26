@@ -289,6 +289,11 @@ Value evaluate(const ExpressionConcatArrays& expr,
     const size_t n = children.size();
     std::vector<Value> values;
 
+    SimpleMemoryUsageToken token;
+    if (ctx.tracker) {
+        token = SimpleMemoryUsageToken(0, ctx.tracker);
+    }
+
     for (size_t i = 0; i < n; ++i) {
         Value val = children[i]->evaluate(root, variables, ctx);
         if (val.nullish()) {
@@ -301,6 +306,14 @@ Value evaluate(const ExpressionConcatArrays& expr,
                 val.isArray());
 
         const auto& subValues = val.getArray();
+        if (ctx.tracker) {
+            size_t valuesSize = 0;
+            for (const auto& v : subValues) {
+                valuesSize += v.getApproximateSize();
+            }
+            token.add(static_cast<int64_t>(valuesSize));
+            ctx.tracker->assertWithinMemoryLimit("$concatArrays");
+        }
         values.insert(values.end(), subValues.begin(), subValues.end());
     }
     return Value(std::move(values));

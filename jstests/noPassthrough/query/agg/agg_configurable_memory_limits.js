@@ -1,4 +1,5 @@
 // Tests that certain aggregation operators have configurable memory limits.
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
@@ -180,6 +181,58 @@ assert.commandWorked(bulk.execute());
         () => coll.aggregate([{$project: {a: {$range: [0, 100]}}}]),
         ErrorCodes.ExceededMemoryLimit,
     );
+})();
+
+(function testConcatArraysExpressionMemoryLimit() {
+    // featureFlagExpressionMemoryTracking turns on the expression evaluation tracking.
+    if (!FeatureFlagUtil.isEnabled(db, "ExpressionMemoryTracking")) {
+        return;
+    }
+
+    // TODO SERVER-129929: remove once SBE tracks $concatArrays.
+    if (sbeFullyEnabled) {
+        jsTest.log.info(
+            "Skipping test because $concatArrays memory tracking is not yet implemented in SBE",
+        );
+        return;
+    }
+    const knob = "internalQueryMaxMemoryUsageBytesPerOperation";
+    const chunkSizeKnob = "internalQueryMaxWriteToCurOpMemoryUsageBytes";
+
+    const pipeline = [
+        {$limit: 1},
+        {
+            $project: {
+                a: {
+                    $concatArrays: [
+                        {$range: [0, {$add: ["$_id", 50]}]},
+                        {$range: [{$add: ["$_id", 50]}, {$add: ["$_id", 100]}]},
+                    ],
+                },
+            },
+        },
+    ];
+
+    // Unbounded by default (knob at its max). The operation succeeds.
+    assert.doesNotThrow(() => coll.aggregate(pipeline).toArray());
+
+    // Lower the operation-wide limit so the $concatArrays result exceeds it.
+    const originalVal = setParam(knob, 1024);
+    // TODO SERVER-129201: Remove this explicit knob set.
+    const chunkOriginalVal = setParam(chunkSizeKnob, 256);
+
+    const err = assert.throwsWithCode(
+        () => coll.aggregate(pipeline).toArray(),
+        ErrorCodes.ExceededMemoryLimit,
+    );
+    assert(
+        err.message.includes("$concatArrays needs too much memory"),
+        "Expected error message to mention $concatArrays, but got: " + err.message,
+        {err},
+    );
+
+    setParam(knob, originalVal);
+    setParam(chunkSizeKnob, chunkOriginalVal);
 })();
 
 MongoRunner.stopMongod(conn);

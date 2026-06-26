@@ -925,5 +925,92 @@ TEST(ExpressionSetTest, ManyArgsEqual) {
 
 }  // namespace set
 
+/* ----------------------- ExpressionConcatArrays memory tracking ----------------------- */
+
+TEST(ExpressionConcatArraysTest, MemoryTrackerAccumulatesOutputSize) {
+    auto expCtx = ExpressionContextForTest{};
+    auto expr = Expression::parseExpression(
+        &expCtx,
+        BSON("$concatArrays" << BSON_ARRAY(BSON_ARRAY(1 << 2 << 3) << BSON_ARRAY(4 << 5))),
+        expCtx.variablesParseState);
+
+    SimpleMemoryUsageTracker tracker{1024 * 1024};
+    EvaluationContext ctx{.tracker = &tracker};
+    ASSERT_DOES_NOT_THROW(expr->evaluate({}, &expCtx.variables, ctx));
+    // The token tracking $concatArrays's transient memory is released when evaluate() returns, so
+    // inUseTrackedMemoryBytes() is back to 0 here. Assert on the retained high-water mark instead.
+    ASSERT_GT(tracker.peakTrackedMemoryBytes(), 0);
+}
+
+TEST(ExpressionConcatArraysTest, MemoryTrackerThrowsWhenLimitExceeded) {
+    auto expCtx = ExpressionContextForTest{};
+    // 20 integer elements should exceed the 100-byte limit when tracked via
+    // Value::getApproximateSize().
+    BSONArrayBuilder arr1, arr2;
+    for (int i = 0; i < 10; ++i)
+        arr1.append(i);
+    for (int i = 10; i < 20; ++i)
+        arr2.append(i);
+    auto expr =
+        Expression::parseExpression(&expCtx,
+                                    BSON("$concatArrays" << BSON_ARRAY(arr1.arr() << arr2.arr())),
+                                    expCtx.variablesParseState);
+
+    SimpleMemoryUsageTracker tracker{100};
+    EvaluationContext ctx{.tracker = &tracker};
+    try {
+        expr->evaluate({}, &expCtx.variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$concatArrays");
+    }
+}
+
+TEST(ExpressionConcatArraysTest, MemoryTrackerThrowsWhenQueryLimitExceeded) {
+    auto expCtx = ExpressionContextForTest{};
+    // 20 integer elements exceed the operation-wide (query) limit. Here the stage tracker's own
+    // local limit is generous, so the throw must come from the per-operation cap held by the root
+    // tracker, not the local one.
+    BSONArrayBuilder arr1, arr2;
+    for (int i = 0; i < 10; ++i)
+        arr1.append(i);
+    for (int i = 10; i < 20; ++i)
+        arr2.append(i);
+    auto expr =
+        Expression::parseExpression(&expCtx,
+                                    BSON("$concatArrays" << BSON_ARRAY(arr1.arr() << arr2.arr())),
+                                    expCtx.variablesParseState);
+
+    // Root (operation-wide) tracker carries the 100-byte cap; the stage tracker reports into it but
+    // has a large local limit of its own. Usage rolls up via the base chain.
+    SimpleMemoryUsageTracker operationTracker{100};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, 100 * 1024 * 1024};
+    EvaluationContext ctx{.tracker = &stageTracker};
+    try {
+        expr->evaluate({}, &expCtx.variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$concatArrays");
+    }
+}
+
+TEST(ExpressionConcatArraysTest, NoTrackerDoesNotThrow) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONArrayBuilder arr1, arr2;
+    for (int i = 0; i < 10; ++i)
+        arr1.append(i);
+    for (int i = 10; i < 20; ++i)
+        arr2.append(i);
+    auto expr =
+        Expression::parseExpression(&expCtx,
+                                    BSON("$concatArrays" << BSON_ARRAY(arr1.arr() << arr2.arr())),
+                                    expCtx.variablesParseState);
+
+    // No tracker, must evaluate normally regardless of output size.
+    ASSERT_DOES_NOT_THROW(expr->evaluate({}, &expCtx.variables));
+}
+
 }  // namespace expression_evaluation_test
 }  // namespace mongo
