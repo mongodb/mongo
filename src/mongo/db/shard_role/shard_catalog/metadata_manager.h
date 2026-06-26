@@ -120,8 +120,7 @@ public:
      */
     SharedSemiFuture<void> getOngoingQueriesCompletionFuture(ChunkRange const& range);
 
-    void invalidateRangePreserversOlderThanShardVersion(OperationContext* opCtx,
-                                                        const ChunkVersion& shardVersion);
+    void invalidateRangePreserversOlderThanShardVersion(const ChunkVersion& shardVersion);
     /**
      * Returns whether the active metadata has routing table.
      */

@@ -211,7 +211,7 @@ CollectionShardingRuntime::acquireExclusive(OperationContext* opCtx, const Names
 }
 
 void CollectionShardingRuntime::invalidateRangePreserversOlderThanShardVersion(
-    OperationContext* opCtx, const ChunkVersion& shardVersion, const UUID& collectionUUID) {
+    const ChunkVersion& shardVersion, const UUID& collectionUUID) {
     if (shardVersion == ChunkVersion::IGNORED()) {
         return;
     }
@@ -229,7 +229,7 @@ void CollectionShardingRuntime::invalidateRangePreserversOlderThanShardVersion(
                 "shardVersion"_attr = shardVersion);
             return;
         }
-        _metadataManager->invalidateRangePreserversOlderThanShardVersion(opCtx, shardVersion);
+        _metadataManager->invalidateRangePreserversOlderThanShardVersion(shardVersion);
     }
 }
 

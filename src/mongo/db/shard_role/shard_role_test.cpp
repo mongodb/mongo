@@ -3451,7 +3451,6 @@ void ShardRoleTest::testRestoreFailsWhenMetadataInvalidated(
     {
         const auto& csr = CollectionShardingRuntime::acquireExclusive(operationContext(), nss);
         csr->invalidateRangePreserversOlderThanShardVersion(
-            operationContext(),
             shardVersionShardedCollection1.placementVersion(),
             getCollectionUUID(operationContext(), nss));
     }

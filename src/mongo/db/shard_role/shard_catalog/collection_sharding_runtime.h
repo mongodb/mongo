@@ -308,8 +308,7 @@ public:
      * The invalidation will be skipped if the provided collectionUUID doesn't match the UUID of the
      * metadataManager.
      */
-    void invalidateRangePreserversOlderThanShardVersion(OperationContext* opCtx,
-                                                        const ChunkVersion& shardVersion,
+    void invalidateRangePreserversOlderThanShardVersion(const ChunkVersion& shardVersion,
                                                         const UUID& collectionUUID);
 
     /*

@@ -271,7 +271,7 @@ SharedSemiFuture<void> MetadataManager::getOngoingQueriesCompletionFuture(ChunkR
 }
 
 void MetadataManager::invalidateRangePreserversOlderThanShardVersion(
-    OperationContext* opCtx, const ChunkVersion& shardVersion) {
+    const ChunkVersion& shardVersion) {
     if (shardVersion == ChunkVersion::IGNORED()) {
         return;
     }

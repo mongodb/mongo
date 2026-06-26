@@ -863,23 +863,22 @@ TEST_F(CollectionShardingRuntimeTest, InvalidateRangePreserversOlderThanShardVer
     ASSERT_TRUE(ownershipFilter.isRangePreserverStillValid());
 
     // Test that the trackers will not be invalidated with version ChunkVersion::IGNORED()
-    csr.invalidateRangePreserversOlderThanShardVersion(
-        opCtx, ChunkVersion::IGNORED(), collectionUUID);
+    csr.invalidateRangePreserversOlderThanShardVersion(ChunkVersion::IGNORED(), collectionUUID);
     ASSERT_TRUE(ownershipFilter.isRangePreserverStillValid());
 
     // Test that the trackers will not be invalidated with version which is older
-    csr.invalidateRangePreserversOlderThanShardVersion(
-        opCtx, metadataInThePast.getShardPlacementVersion(), collectionUUID);
+    csr.invalidateRangePreserversOlderThanShardVersion(metadataInThePast.getShardPlacementVersion(),
+                                                       collectionUUID);
     ASSERT_TRUE(ownershipFilter.isRangePreserverStillValid());
 
     // Test that the trackers will not be invalidated when collection UUID does not match
-    csr.invalidateRangePreserversOlderThanShardVersion(
-        opCtx, metadata.getShardPlacementVersion(), UUID::gen());
+    csr.invalidateRangePreserversOlderThanShardVersion(metadata.getShardPlacementVersion(),
+                                                       UUID::gen());
     ASSERT_TRUE(ownershipFilter.isRangePreserverStillValid());
 
     // Test that the trackers will be invalidated with current version
-    csr.invalidateRangePreserversOlderThanShardVersion(
-        opCtx, metadata.getShardPlacementVersion(), collectionUUID);
+    csr.invalidateRangePreserversOlderThanShardVersion(metadata.getShardPlacementVersion(),
+                                                       collectionUUID);
     ASSERT_FALSE(ownershipFilter.isRangePreserverStillValid());
 }
 
@@ -900,8 +899,7 @@ TEST_F(CollectionShardingRuntimeTest, InvalidateRangePreserversOlderThanUnsharde
     // case ownershipFilter::shardPlacementVersion = UNTRACKED. Currently it's not possible to test
     // as in this case metadataManager is not created for unsharded collection. When it will be
     // changed it will be possible to test against a current version.
-    csr.invalidateRangePreserversOlderThanShardVersion(
-        opCtx, ChunkVersion::UNTRACKED(), collectionUUID);
+    csr.invalidateRangePreserversOlderThanShardVersion(ChunkVersion::UNTRACKED(), collectionUUID);
     ASSERT_FALSE(ownershipFilter.isRangePreserverStillValid());
 }
 
@@ -923,8 +921,8 @@ TEST_F(CollectionShardingRuntimeTest, InvalidateRangePreserversUntrackedCollecti
 
     ASSERT_TRUE(ownershipFilter.isRangePreserverStillValid());
 
-    csr.invalidateRangePreserversOlderThanShardVersion(
-        opCtx, metadata.getShardPlacementVersion(), collectionUUID);
+    csr.invalidateRangePreserversOlderThanShardVersion(metadata.getShardPlacementVersion(),
+                                                       collectionUUID);
     ASSERT_FALSE(ownershipFilter.isRangePreserverStillValid());
 }
 
