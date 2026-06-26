@@ -57,11 +57,9 @@ LiteParsedUnionWith::LiteParsedUnionWith(const BSONElement& spec,
                                          NamespaceString foreignNss,
                                          boost::optional<OwnedLiteParsedPipeline> pipeline,
                                          std::vector<BSONObj> rawPipeline,
-                                         bool hasForeignDB,
                                          bool isHybridSearch)
     : LiteParsedDocumentSourceNestedPipelines(spec, std::move(foreignNss), std::move(pipeline)),
       _rawPipeline(std::move(rawPipeline)),
-      _hasForeignDB(hasForeignDB),
       _isHybridSearch(isHybridSearch) {}
 
 std::unique_ptr<LiteParsedUnionWith> LiteParsedUnionWith::parse(const NamespaceString& nss,
@@ -76,7 +74,6 @@ std::unique_ptr<LiteParsedUnionWith> LiteParsedUnionWith::parse(const NamespaceS
     NamespaceString unionNss;
     boost::optional<OwnedLiteParsedPipeline> ownedPipeline;
     std::vector<BSONObj> rawPipeline;
-    bool hasForeignDb = false;
     bool isHybridSearch = false;
     if (spec.type() == BSONType::string) {
         unionNss = NamespaceStringUtil::deserialize(nss.dbName(), spec.valueStringData());
@@ -84,17 +81,7 @@ std::unique_ptr<LiteParsedUnionWith> LiteParsedUnionWith::parse(const NamespaceS
         auto unionWithSpec =
             UnionWithSpec::parse(spec.embeddedObject(), IDLParserContext(kStageName));
         if (unionWithSpec.getColl()) {
-            if (unionWithSpec.getDb()) {
-                // For LiteParsing, we just assume this is not a view definition, and thus do not
-                // assert when 'db' is specified.
-                const auto tenantId = nss.dbName().tenantId();
-                auto dbName = DatabaseNameUtil::deserialize(
-                    tenantId, *unionWithSpec.getDb(), SerializationContext::stateDefault());
-                unionNss = NamespaceStringUtil::deserialize(dbName, *unionWithSpec.getColl());
-                hasForeignDb = true;
-            } else {
-                unionNss = NamespaceStringUtil::deserialize(nss.dbName(), *unionWithSpec.getColl());
-            }
+            unionNss = NamespaceStringUtil::deserialize(nss.dbName(), *unionWithSpec.getColl());
         } else {
             // If no collection specified, it must have $documents as first field in pipeline.
             validateUnionWithCollectionlessPipeline(unionWithSpec.getPipeline());
@@ -115,8 +102,7 @@ std::unique_ptr<LiteParsedUnionWith> LiteParsedUnionWith::parse(const NamespaceS
     return std::make_unique<LiteParsedUnionWith>(spec,
                                                  std::move(unionNss),
                                                  std::move(ownedPipeline),
-                                                 rawPipeline,
-                                                 hasForeignDb,
+                                                 std::move(rawPipeline),
                                                  isHybridSearch);
 }
 
@@ -156,7 +142,6 @@ std::unique_ptr<StageParams> LiteParsedUnionWith::getStageParams() const {
     }
     return std::make_unique<UnionWithStageParams>(*_foreignNss,
                                                   _rawPipeline,
-                                                  _hasForeignDB,
                                                   _isHybridSearch,
                                                   getOriginalBson().wrap(),
                                                   std::move(subParams),

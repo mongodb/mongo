@@ -59,7 +59,6 @@ using namespace std::literals::string_view_literals;
 struct ClusterAggregateCommandD {
     using Request = AggregateCommandRequest;
     static constexpr std::string_view kCommandName = "clusterAggregate"sv;
-    static constexpr bool kAlwaysUsingMongos = false;
 
     static const std::set<std::string>& getApiVersions() {
         return kNoApiVersions;

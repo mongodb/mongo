@@ -55,9 +55,7 @@ LiteParsedPipeline makeLiteParsedPipeline(const boost::intrusive_ptr<ExpressionC
         // TODO SERVER-129127 These options should be passed via a ParseContext struct rather than
         // through LiteParserOptions.
         LiteParserOptions{.allowGenericForeignDbLookup = expCtx->getAllowGenericForeignDbLookup(),
-                          .ifrContext = expCtx->getIfrContext(),
-                          .usingMongos = expCtx->getInRouter() || expCtx->getFromRouter(),
-                          .isParsingViewDefinition = expCtx->getIsParsingViewDefinition()});
+                          .ifrContext = expCtx->getIfrContext()});
 }
 
 void addViewInvolvedNamespaces(const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,

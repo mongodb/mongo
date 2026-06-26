@@ -168,45 +168,24 @@ TEST_F(LiteParsedLookUpTest, ValidatePassesForSameDatabaseLookup) {
     ASSERT_DOES_NOT_THROW(lp->validate());
 }
 
-TEST_F(LiteParsedLookUpTest, ParseRejectsCrossDbWhenUsingMongos) {
-    LiteParserOptions opts;
-    opts.usingMongos = true;
+TEST_F(LiteParsedLookUpTest, ParseRejectsCrossDbByDefault) {
     ASSERT_THROWS_CODE(
-        parse(R"({$lookup: {from: {db: "other", coll: "c"}, as: "a", pipeline: []}})", opts),
+        parse(R"({$lookup: {from: {db: "other", coll: "c"}, as: "a", pipeline: []}})"),
         AssertionException,
         ErrorCodes::FailedToParse);
 }
 
-TEST_F(LiteParsedLookUpTest, ParseRejectsCrossDbWhenParsingViewDefinition) {
-    LiteParserOptions opts;
-    opts.isParsingViewDefinition = true;
-    ASSERT_THROWS_CODE(
-        parse(R"({$lookup: {from: {db: "other", coll: "c"}, as: "a", pipeline: []}})", opts),
-        AssertionException,
-        ErrorCodes::FailedToParse);
-}
-
-TEST_F(LiteParsedLookUpTest, ParseAllowsCrossDbToConfigCacheChunksWhenUsingMongos) {
-    LiteParserOptions opts;
-    opts.usingMongos = true;
-    // config.cache.chunks.* is explicitly allowed even on mongos.
+TEST_F(LiteParsedLookUpTest, ParseAllowsCrossDbToConfigCacheChunks) {
+    // config.cache.chunks.* is explicitly allowed.
     auto lp = parse(
-        R"({$lookup: {from: {db: "config", coll: "cache.chunks.test.foo"}, as: "a", pipeline: []}})",
-        opts);
+        R"({$lookup: {from: {db: "config", coll: "cache.chunks.test.foo"}, as: "a", pipeline: []}})");
     ASSERT_DOES_NOT_THROW(lp->validate());
 }
 
 TEST_F(LiteParsedLookUpTest, ParseAllowsCrossDbWhenAllowGenericForeignDbLookupSet) {
     LiteParserOptions opts;
-    opts.usingMongos = true;
     opts.allowGenericForeignDbLookup = true;
     auto lp = parse(R"({$lookup: {from: {db: "other", coll: "c"}, as: "a", pipeline: []}})", opts);
-    ASSERT_DOES_NOT_THROW(lp->validate());
-}
-
-TEST_F(LiteParsedLookUpTest, ParseAllowsCrossDbWhenNotUsingMongos) {
-    // Default options: usingMongos=false, so cross-db lookup is not restricted.
-    auto lp = parse(R"({$lookup: {from: {db: "other", coll: "c"}, as: "a", pipeline: []}})");
     ASSERT_DOES_NOT_THROW(lp->validate());
 }
 

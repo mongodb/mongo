@@ -76,16 +76,6 @@ using namespace std::literals::string_view_literals;
 
 DocumentSourceContainer DocumentSourceUnionWith::createFromStageParams(
     UnionWithStageParams& params, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    if (params.hasForeignDB) {
-        uassert(ErrorCodes::FailedToParse,
-                "db cannot be specified in $unionWith in a view",
-                !expCtx->getIsParsingViewDefinition());
-        uassert(ErrorCodes::FailedToParse,
-                "db cannot be specified in $unionWith on mongos, namespace:" +
-                    expCtx->getNamespaceString().toStringForErrorMsg(),
-                !expCtx->getInRouter() && !expCtx->getFromRouter());
-    }
-
     // TODO SERVER-121094 This can be removed once hybrid search desugars into the internal hybrid
     // search stage.
     if (hybrid_scoring_util::isHybridSearchPipeline(params.pipeline) || params.isHybridSearch) {
@@ -99,8 +89,7 @@ DocumentSourceContainer DocumentSourceUnionWith::createFromStageParams(
                                                         std::move(params.unionNss),
                                                         std::move(*params.subpipelineStageParams),
                                                         std::move(params.pipeline),
-                                                        std::move(params.resolvedBackingNss),
-                                                        params.hasForeignDB)};
+                                                        std::move(params.resolvedBackingNss))};
     }
 
     // A $unionWith with no user pipeline against a view should just forward the view's LPP
@@ -111,13 +100,12 @@ DocumentSourceContainer DocumentSourceUnionWith::createFromStageParams(
                                                         std::move(params.unionNss),
                                                         std::move(stageParams),
                                                         std::move(params.pipeline),
-                                                        std::move(*view),
-                                                        params.hasForeignDB)};
+                                                        std::move(*view))};
     }
 
 
     return {make_intrusive<DocumentSourceUnionWith>(
-        expCtx, std::move(params.unionNss), std::move(params.pipeline), params.hasForeignDB)};
+        expCtx, std::move(params.unionNss), std::move(params.pipeline))};
 }
 
 DocumentSourceContainer unionWithStageParamsToDocumentSourceFn(
@@ -231,10 +219,8 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
 DocumentSourceUnionWith::DocumentSourceUnionWith(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     NamespaceString unionNss,
-    std::vector<BSONObj> pipeline,
-    bool hasForeignDB)
+    std::vector<BSONObj> pipeline)
     : DocumentSource(kStageName, expCtx) {
-    _hasForeignDB = hasForeignDB;
     boost::optional<ResolvedNamespace> resolvedUnionNs;
     try {
         auto resolvedNamespaces = expCtx->getResolvedNamespaces();
@@ -301,10 +287,8 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
     NamespaceString unionNss,
     StageParamsPipeline subpipelineStageParams,
     std::vector<BSONObj> userPipeline,
-    ResolvedNamespace resolvedBackingNss,
-    bool hasForeignDB)
+    ResolvedNamespace resolvedBackingNss)
     : DocumentSource(kStageName, expCtx) {
-    _hasForeignDB = hasForeignDB;
     boost::optional<ResolvedNamespace> resolvedUnionNs;
     try {
         // A view stitched at lite-parse time arrives via resolvedBackingNss; otherwise consult the
@@ -408,7 +392,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
 
     NamespaceString unionNss;
     std::vector<BSONObj> pipeline;
-    bool hasForeignDB = false;
     if (elem.type() == BSONType::string) {
         unionNss = NamespaceStringUtil::deserialize(expCtx->getNamespaceString().dbName(),
                                                     elem.valueStringData());
@@ -418,30 +401,9 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
         auto unionWithSpec =
             UnionWithSpec::parse(elem.embeddedObject(), IDLParserContext(kStageName));
         if (unionWithSpec.getColl()) {
-            if (unionWithSpec.getDb()) {
-                // We could simply assert only if db != the current db, but this is safer in the
-                // presence of dynamically set dbs in scripting (users will not have a createView
-                // work in some dynamic contexts and not in others, a source of possible
-                // frustration).
-                // TODO (SPM-1966): Both of these asserts that there is no involved mongos can be
-                // removed after SPM-1966
-                uassert(ErrorCodes::FailedToParse,
-                        "db cannot be specified in $unionWith in a view",
-                        !expCtx->getIsParsingViewDefinition());
-                uassert(ErrorCodes::FailedToParse,
-                        "db cannot be specified in $unionWith on mongos, namespace:" +
-                            expCtx->getNamespaceString().toStringForErrorMsg(),
-                        !expCtx->getInRouter() && !expCtx->getFromRouter());
-                hasForeignDB = true;
-                const auto tenantId = expCtx->getNamespaceString().dbName().tenantId();
-                auto dbName = DatabaseNameUtil::deserialize(
-                    tenantId, *unionWithSpec.getDb(), SerializationContext::stateDefault());
-                unionNss = NamespaceStringUtil::deserialize(dbName, *unionWithSpec.getColl());
-            } else {
-                // If no database specified, use the same database as the current namespace.
-                unionNss = NamespaceStringUtil::deserialize(expCtx->getNamespaceString().dbName(),
-                                                            *unionWithSpec.getColl());
-            }
+            // If no database specified, use the same database as the current namespace.
+            unionNss = NamespaceStringUtil::deserialize(expCtx->getNamespaceString().dbName(),
+                                                        *unionWithSpec.getColl());
         } else {
             // if no collection specified, it must have $documents as first field in pipeline
             LiteParsedUnionWith::validateUnionWithCollectionlessPipeline(
@@ -462,7 +424,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
         }
     }
     return make_intrusive<DocumentSourceUnionWith>(
-        expCtx, std::move(unionNss), std::move(pipeline), hasForeignDB);
+        expCtx, std::move(unionNss), std::move(pipeline));
 }
 
 DocumentSourceContainer::iterator DocumentSourceUnionWith::optimizeAt(
@@ -488,16 +450,11 @@ DocumentSourceContainer::iterator DocumentSourceUnionWith::optimizeAt(
     return std::next(itr);
 };
 
-Value DocumentSourceUnionWith::buildUnionWithResult(Value pipelineValue,
-                                                    Value db,
-                                                    Value coll) const {
+Value DocumentSourceUnionWith::buildUnionWithResult(Value pipelineValue, Value coll) const {
     auto collectionless =
         _sharedState->_pipeline->getContext()->getNamespaceString().isCollectionlessAggregateNS();
     MutableDocument spec;
     if (!collectionless) {
-        if (_hasForeignDB) {
-            spec["db"] = db;
-        }
         spec["coll"] = coll;
     }
     spec["pipeline"] = pipelineValue;
@@ -513,19 +470,14 @@ Value DocumentSourceUnionWith::legacyUnionWithSerialize(
                                            _sharedState->_pipeline->getContext(),
                                            pipeline_factory::kOptionsMinimal)
                 ->serializeToBson(opts);
-        return buildUnionWithResult(
-            Value(serializedPipeline),
-            Value(opts.serializeIdentifier(_userNss.dbName().db(OmitTenant{}))),
-            Value(opts.serializeIdentifier(_userNss.coll())));
+        return buildUnionWithResult(Value(serializedPipeline),
+                                    Value(opts.serializeIdentifier(_userNss.coll())));
     } else {
         MutableDocument spec;
         if (!_sharedState->_pipeline->getContext()
                  ->getNamespaceString()
                  .isCollectionlessAggregateNS()) {
             const auto underlyingNss = _sharedState->_pipeline->getContext()->getNamespaceString();
-            if (_hasForeignDB) {
-                spec["db"] = Value(underlyingNss.dbName().db(OmitTenant{}));
-            }
             spec["coll"] = Value(opts.serializeIdentifier(underlyingNss.coll()));
         }
         // Strip $mergeCursors if present (injected by mongos post-dispatch; invalid on re-parse).
@@ -549,11 +501,10 @@ Value DocumentSourceUnionWith::legacyUnionWithSerialize(
 }
 
 Value DocumentSourceUnionWith::serialize(const query_shape::SerializationOptions& opts) const {
-    // The db and coll values used by most serialization paths (explain, default).
+    // The coll value used by most serialization paths (explain, default).
     // Query stats uses _userNss instead (see below).
     Value pipelineContextColl{opts.serializeIdentifier(
         _sharedState->_pipeline->getContext()->getNamespaceString().coll())};
-    Value userDb{_userNss.dbName().db(OmitTenant{})};
 
     if (opts.isSerializingForExplain()) {
         // When $unionWith is inside a $lookup's pipeline, we cannot independently
@@ -561,8 +512,8 @@ Value DocumentSourceUnionWith::serialize(const query_shape::SerializationOptions
         // that won't be in scope when the explain is forwarded to shards. Fall back to simple
         // serialization; the $lookup handles explaining its own pipeline.
         if (getExpCtx()->getInLookup()) {
-            return buildUnionWithResult(
-                Value(_sharedState->_pipeline->serializeToBson(opts)), userDb, pipelineContextColl);
+            return buildUnionWithResult(Value(_sharedState->_pipeline->serializeToBson(opts)),
+                                        pipelineContextColl);
         }
 
         // There are several different possible states depending on the explain verbosity as well as
@@ -615,8 +566,8 @@ Value DocumentSourceUnionWith::serialize(const query_shape::SerializationOptions
         } else {
             // The plan does not require reading from the sub-pipeline, so just include the
             // serialization in the explain output.
-            return buildUnionWithResult(
-                Value(_sharedState->_pipeline->serializeToBson(opts)), userDb, pipelineContextColl);
+            return buildUnionWithResult(Value(_sharedState->_pipeline->serializeToBson(opts)),
+                                        pipelineContextColl);
         }
 
         tassert(11282958, "Missing pipeline copy", pipeCopy);
@@ -670,8 +621,7 @@ Value DocumentSourceUnionWith::serialize(const query_shape::SerializationOptions
                 "Expecting pipeline explain to contain exactly 1 field",
                 explainLocal.nFields() == 1);
 
-        return buildUnionWithResult(
-            Value(explainLocal.firstElement()), userDb, pipelineContextColl);
+        return buildUnionWithResult(Value(explainLocal.firstElement()), pipelineContextColl);
     } else {
         // TODO SERVER-121094: Remove legacyUnionWithSerialize() and this gate when
         // featureFlagExtensionsInsideHybridSearch is removed.
@@ -688,10 +638,8 @@ Value DocumentSourceUnionWith::serialize(const query_shape::SerializationOptions
                                                _sharedState->_pipeline->getContext(),
                                                pipeline_factory::kOptionsMinimal)
                     ->serializeToBson(opts);
-            return buildUnionWithResult(
-                Value(serializedPipeline),
-                Value(opts.serializeIdentifier(_userNss.dbName().db(OmitTenant{}))),
-                Value(opts.serializeIdentifier(_userNss.coll())));
+            return buildUnionWithResult(Value(serializedPipeline),
+                                        Value(opts.serializeIdentifier(_userNss.coll())));
         }
 
         MutableDocument spec;
@@ -702,9 +650,6 @@ Value DocumentSourceUnionWith::serialize(const query_shape::SerializationOptions
             const auto& serializeNss = _fromNsIsAView
                 ? _sharedState->_pipeline->getContext()->getNamespaceString()
                 : _userNss;
-            if (_hasForeignDB) {
-                spec["db"] = Value(serializeNss.dbName().db(OmitTenant{}));
-            }
             spec["coll"] = Value(opts.serializeIdentifier(serializeNss.coll()));
         }
         // Strip $mergeCursors if present (injected by mongos post-dispatch; invalid on re-parse).

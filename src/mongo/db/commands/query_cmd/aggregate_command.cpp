@@ -126,16 +126,11 @@ public:
               }()),
               _extensionMetrics(
                   static_cast<const AggregateCommand*>(cmd)->getExtensionMetricsAllocation()),
-              _liteParsedPipeline(
-                  request(),
-                  false /* isRunningAgainstView_ForHybridSearch */,
-                  {.ifrContext = _ifrContext,
-                   .opCtx = opCtx,
-                   .extensionMetrics = &_extensionMetrics,
-                   // TODO SERVER-129127 the `usingMongos` field should be populated via a
-                   // ParseContext struct instead of LiteParserOptions.
-                   .usingMongos =
-                       aggregation_request_helper::getFromRouter(request()).value_or(false)}),
+              _liteParsedPipeline(request(),
+                                  false /* isRunningAgainstView_ForHybridSearch */,
+                                  {.ifrContext = _ifrContext,
+                                   .opCtx = opCtx,
+                                   .extensionMetrics = &_extensionMetrics}),
               _privileges(uassertStatusOK(
                   auth::getPrivilegesForAggregate(opCtx,
                                                   AuthorizationSession::get(opCtx->getClient()),

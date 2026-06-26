@@ -39,10 +39,6 @@ structs:
         description: Specification for a $unionWith stage given in the full, explicit format.
         strict: true
         fields:
-            db:
-                description: The database to union with.
-                optional: true
-                type: string
             coll:
                 description: The collection to union with.
                 optional: true

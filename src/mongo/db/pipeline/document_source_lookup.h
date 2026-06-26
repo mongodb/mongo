@@ -96,13 +96,11 @@ struct LookUpSharedState {
 void lookupPipeValidator(const Pipeline& pipeline);
 
 // Parses $lookup's 'from' field. Accepts a string or a '{db, coll}' object with specific
-// exceptions. `usingMongos` and `isParsingViewDefinition` tighten validation; lite-parse omits
-// them because expCtx is unavailable.
+// exceptions for internal namespaces (config.cache.chunks.*, local.oplog.rs,
+// config.collections, config.chunks) and when allowGenericForeignDbLookup is set.
 NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
                                                    const DatabaseName& defaultDb,
-                                                   bool allowGenericForeignDbLookup,
-                                                   bool usingMongos = false,
-                                                   bool isParsingViewDefinition = false);
+                                                   bool allowGenericForeignDbLookup);
 
 /**
  * Queries separate collection for equality matches with documents in the pipeline collection.

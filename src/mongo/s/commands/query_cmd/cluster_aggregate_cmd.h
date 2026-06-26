@@ -93,12 +93,7 @@ public:
               _liteParsedPipeline(
                   request(),
                   false /* isRunningAgainstView_ForHybridSearch */,
-                  {.ifrContext = _ifrContext,
-                   .extensionMetrics = &_extensionMetrics,
-                   // TODO SERVER-129127 the `usingMongos` field should be populated via a
-                   // ParseContext struct instead of LiteParserOptions.
-                   .usingMongos = Impl::kAlwaysUsingMongos ||
-                       aggregation_request_helper::getFromRouter(request()).value_or(false)}),
+                  {.ifrContext = _ifrContext, .extensionMetrics = &_extensionMetrics}),
               _privileges(uassertStatusOK(
                   auth::getPrivilegesForAggregate(opCtx,
                                                   AuthorizationSession::get(opCtx->getClient()),

@@ -110,43 +110,6 @@ public:
 const long long kDefaultMaxCacheSize =
     loadMemoryLimit(StageMemoryLimit::DocumentSourceLookupCacheSizeBytes);
 
-TEST_F(DocumentSourceLookUpTest, SpecialNamespaceCrossDBLookupAllowedInView) {
-    auto expCtx = getExpCtx();
-    expCtx->setIsParsingViewDefinition(true);
-    NamespaceString fromNs = NamespaceString::createNamespaceString_forTest(
-        boost::none, "config", "cache.chunks.randomNameBecauseAnyNameShouldWork");
-    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
-    ASSERT_DOES_NOT_THROW(DocumentSourceLookUp::createFromBson(
-        BSON("$lookup" << BSON("from"
-                               << BSON("db" << "config" << "coll"
-                                            << "cache.chunks.randomNameBecauseAnyNameShouldWork")
-                               << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
-                               << "as"))
-            .firstElement(),
-        expCtx));
-    NamespaceString fromNs2 =
-        NamespaceString::createNamespaceString_forTest(boost::none, "local", "oplog.rs");
-    expCtx->setResolvedNamespaces(
-        ResolvedNamespaceMap{{fromNs2, {fromNs, std::vector<BSONObj>()}}});
-    ASSERT_DOES_NOT_THROW(DocumentSourceLookUp::createFromBson(
-        BSON("$lookup" << BSON("from" << BSON("db" << "local" << "coll" << "oplog.rs") << "pipeline"
-                                      << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
-                                      << "as"))
-            .firstElement(),
-        expCtx));
-    // must be exactly oplog.rs! when in view definition
-    ASSERT_THROWS_CODE(
-        DocumentSourceLookUp::createFromBson(
-            BSON("$lookup" << BSON("from" << BSON("db" << "local" << "coll" << "oplog.rs1")
-                                          << "pipeline"
-                                          << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
-                                          << "as"))
-                .firstElement(),
-            expCtx),
-        AssertionException,
-        ErrorCodes::FailedToParse);
-}
-
 // A 'let' variable defined in a $lookup stage is expected to be available to all sub-pipelines. For
 // sub-pipelines below the immediate one, they are passed to via ExpressionContext. This test
 // confirms that variables defined in the ExpressionContext are captured by the $lookup stage.
@@ -955,6 +918,73 @@ TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithSearchPipelineS
 
     ASSERT_EQ(newSerialization.size(), 1UL);
     ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
+}
+
+// $lookup : {from : {db: <>, coll: <>}} syntax doesn't work for a namespace that isn't
+// config.cache.chunks.*, config.collections, config.chunks, or local.oplog.rs.
+TEST_F(DocumentSourceLookUpTest, RejectsPipelineFromDBAndCollWithBadDBAndColl) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    auto stageSpec =
+        fromjson("{$lookup: {from: {db: 'test', coll: 'coll'}, as: 'as', pipeline: []}}");
+
+    ASSERT_THROWS_CODE(LiteParsedLookUp::parse(expCtx->getNamespaceString(),
+                                               stageSpec.firstElement(),
+                                               LiteParserOptions{}),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+
+    ASSERT_THROWS_CODE(DocumentSourceLookUp::createFromBson(stageSpec.firstElement(), expCtx),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+}
+
+// $lookup : {from : {db: <>, coll: <>}} syntax fails when "db" is "config" but "coll" is
+// not "cache.chunks.*", "collections", or "chunks".
+TEST_F(DocumentSourceLookUpTest, RejectsPipelineFromDBAndCollWithBadColl) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "config", "coll");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    auto stageSpec =
+        fromjson("{$lookup: {from: {db: 'config', coll: 'coll'}, as: 'as', pipeline: []}}");
+
+    ASSERT_THROWS_CODE(LiteParsedLookUp::parse(expCtx->getNamespaceString(),
+                                               stageSpec.firstElement(),
+                                               LiteParserOptions{}),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+
+    ASSERT_THROWS_CODE(DocumentSourceLookUp::createFromBson(stageSpec.firstElement(), expCtx),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+}
+
+// $lookup : {from : {db: <>, coll: <>}} syntax doesn't work for a namespace when "coll" is
+// "cache.chunks.*" but "db" is not "config".
+TEST_F(DocumentSourceLookUpTest, RejectsPipelineFromDBAndCollWithBadDB) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs = NamespaceString::createNamespaceString_forTest(
+        boost::none, "test", "cache.chunks.test.foo");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    auto stageSpec = fromjson(
+        "{$lookup: {from: {db: 'test', coll: 'cache.chunks.test.foo'}, "
+        "as: 'as', pipeline: []}}");
+
+    ASSERT_THROWS_CODE(LiteParsedLookUp::parse(expCtx->getNamespaceString(),
+                                               stageSpec.firstElement(),
+                                               LiteParserOptions{}),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+
+    ASSERT_THROWS_CODE(DocumentSourceLookUp::createFromBson(stageSpec.firstElement(), expCtx),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
 }
 
 TEST_F(DocumentSourceLookUpTest, ExplainSerializesSubpipeline) {

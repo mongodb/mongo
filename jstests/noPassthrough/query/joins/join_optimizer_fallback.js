@@ -11,16 +11,23 @@ import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 let conn = MongoRunner.runMongod({setParameter: {featureFlagPathArrayness: true}});
 
-// Test that cross-DB joins are not accepted by the join optimizer.
 const db1 = "test";
 const db2 = "test2";
 const db3 = "test3";
+const configDb = "config";
 
 const coll1 = conn.getDB(db1)[jsTestName() + "_coll1"];
 const coll12 = conn.getDB(db1)[jsTestName() + "_coll2"];
 const coll13 = conn.getDB(db1)[jsTestName() + "_coll3"];
 const coll2 = conn.getDB(db2)[jsTestName() + "_coll2"];
 const coll3 = conn.getDB(db3)[jsTestName() + "_coll3"];
+const internalForeignCollPrefix = "cache.chunks." + db1 + "." + jsTestName();
+const internalForeignColl2 = conn
+    .getDB(configDb)
+    .getCollection(internalForeignCollPrefix + "_coll2");
+const internalForeignColl3 = conn
+    .getDB(configDb)
+    .getCollection(internalForeignCollPrefix + "_coll3");
 const collBase = conn.getDB(db1)[jsTestName() + "_base"];
 const collLeft = conn.getDB(db1)[jsTestName() + "_left"];
 const collRight = conn.getDB(db1)[jsTestName() + "_right"];
@@ -30,6 +37,8 @@ coll12.drop();
 coll13.drop();
 coll2.drop();
 coll3.drop();
+internalForeignColl2.drop();
+internalForeignColl3.drop();
 collBase.drop();
 collLeft.drop();
 collRight.drop();
@@ -39,12 +48,16 @@ assert.commandWorked(coll12.insertOne({a: 1, b: 1, c: 1, d: "foo"}));
 assert.commandWorked(coll13.insertOne({a: 1, b: 1, d: "foo"}));
 assert.commandWorked(coll2.insertOne({a: 1, b: 1}));
 assert.commandWorked(coll3.insertOne({a: 1, b: 1}));
+assert.commandWorked(internalForeignColl2.insertOne({a: 1, b: 1}));
+assert.commandWorked(internalForeignColl3.insertOne({a: 1, b: 1}));
 // Add index for multikeyness info for path arrayness.
 assert.commandWorked(coll1.createIndex({dummy: 1, a: 1, b: 1, "x.c": 1}));
 assert.commandWorked(coll12.createIndex({dummy: 1, a: 1, b: 1, c: 1, d: 1}));
 assert.commandWorked(coll13.createIndex({dummy: 1, a: 1, b: 1, d: 1}));
 assert.commandWorked(coll2.createIndex({dummy: 1, a: 1, b: 1}));
 assert.commandWorked(coll3.createIndex({dummy: 1, a: 1, b: 1}));
+assert.commandWorked(internalForeignColl2.createIndex({dummy: 1, a: 1, b: 1}));
+assert.commandWorked(internalForeignColl3.createIndex({dummy: 1, a: 1, b: 1}));
 assert.commandWorked(collBase.insert({_id: 0, lk: 1, rk: 1}));
 assert.commandWorked(collLeft.insert({_id: "left", lk: 1, a: 1}));
 assert.commandWorked(collRight.insert({_id: "right", rk: 1, b: 1}));
@@ -130,14 +143,16 @@ function runTestCaseEligiblePipeline({coll = coll1, pipeline, aggOptions = {}, e
     );
 }
 
-// Cross-db $lookup (eg join collections on different databases) is ineligible for optimization.
+// Cross-db $lookup is generally not supported, but config.cache.chunks.* is an internal exemption
+// to the {from: {db: ..., coll: ...}} syntax. The join optimizer must still reject these pipelines
+// because the foreign collections are in another database.
 runTestCaseIneligiblePipeline({
     pipeline: [
         {
             $lookup: {
                 from: {
-                    db: db2,
-                    coll: coll2.getName(),
+                    db: configDb,
+                    coll: internalForeignColl2.getName(),
                 },
                 localField: "a",
                 foreignField: "a",
@@ -148,8 +163,8 @@ runTestCaseIneligiblePipeline({
         {
             $lookup: {
                 from: {
-                    db: db3,
-                    coll: coll3.getName(),
+                    db: configDb,
+                    coll: internalForeignColl3.getName(),
                 },
                 localField: "a",
                 foreignField: "a",
@@ -161,26 +176,24 @@ runTestCaseIneligiblePipeline({
     expectedCount: 1,
 });
 
-// Prefix is eligible but suffix is cross-DB $lookup and therefore ineligible.
+// Prefix is eligible but suffix is an internally-exempt cross-DB $lookup and therefore the whole
+// pipeline is ineligible for join optimization.
 runTestCaseIneligiblePipeline({
     pipeline: [
         {
             $lookup: {
-                from: {
-                    db: db1,
-                    coll: coll12.getName(),
-                },
+                from: coll12.getName(),
                 localField: "a",
                 foreignField: "a",
-                as: "coll2",
+                as: "coll12",
             },
         },
-        {$unwind: "$coll2"},
+        {$unwind: "$coll12"},
         {
             $lookup: {
                 from: {
-                    db: db3,
-                    coll: coll3.getName(),
+                    db: configDb,
+                    coll: internalForeignColl3.getName(),
                 },
                 localField: "a",
                 foreignField: "a",

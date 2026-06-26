@@ -197,75 +197,6 @@ TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithPipeline) {
     ASSERT(unionWith->isInstanceOf<DocumentSourceUnionWith>());
 }
 
-TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithForeignDB) {
-    auto expCtx = getExpCtx();
-    NamespaceString nsToUnionWith =
-        NamespaceString::createNamespaceString_forTest(boost::none, "crossDB", "coll");
-    expCtx->setResolvedNamespaces(
-        ResolvedNamespaceMap{{nsToUnionWith, {nsToUnionWith, std::vector<BSONObj>()}}});
-    auto bson = BSON("$unionWith" << BSON("db" << "crossDB"
-                                               << "coll" << nsToUnionWith.coll() << "pipeline"
-                                               << BSONArray()));
-    auto unionWith = DocumentSourceUnionWith::createFromBson(bson.firstElement(), expCtx);
-    ASSERT(unionWith->isInstanceOf<DocumentSourceUnionWith>());
-    std::vector<Value> serializedArray;
-    unionWith->serializeToArray(serializedArray);
-    auto serializedBson = serializedArray[0].getDocument().toBson();
-    ASSERT_BSONOBJ_EQ(serializedBson, bson);
-    unionWith = DocumentSourceUnionWith::createFromBson(serializedBson.firstElement(), expCtx);
-    ASSERT(unionWith != nullptr);
-    ASSERT(unionWith->isInstanceOf<DocumentSourceUnionWith>());
-}
-
-TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithForeignDBAndPipeline) {
-    auto expCtx = getExpCtx();
-    NamespaceString nsToUnionWith =
-        NamespaceString::createNamespaceString_forTest(boost::none, "crossDB", "coll");
-    expCtx->setResolvedNamespaces(
-        ResolvedNamespaceMap{{nsToUnionWith, {nsToUnionWith, std::vector<BSONObj>()}}});
-    auto bson =
-        BSON("$unionWith" << BSON(
-                 "db" << "crossDB"
-                      << "coll" << nsToUnionWith.coll() << "pipeline"
-                      << BSON_ARRAY(BSON("$addFields" << BSON("a" << BSON("$const" << 3))))));
-    auto unionWith = DocumentSourceUnionWith::createFromBson(bson.firstElement(), expCtx);
-    ASSERT(unionWith->isInstanceOf<DocumentSourceUnionWith>());
-    std::vector<Value> serializedArray;
-    unionWith->serializeToArray(serializedArray);
-    auto serializedBson = serializedArray[0].getDocument().toBson();
-    ASSERT_BSONOBJ_EQ(serializedBson, bson);
-    unionWith = DocumentSourceUnionWith::createFromBson(serializedBson.firstElement(), expCtx);
-    ASSERT(unionWith != nullptr);
-    ASSERT(unionWith->isInstanceOf<DocumentSourceUnionWith>());
-}
-
-TEST_F(DocumentSourceUnionWithTest, QueryStatsSerializeWithForeignDBIncludesDbField) {
-    auto expCtx = getExpCtx();
-    NamespaceString nsToUnionWith =
-        NamespaceString::createNamespaceString_forTest(boost::none, "crossDB", "coll");
-    expCtx->setResolvedNamespaces(
-        ResolvedNamespaceMap{{nsToUnionWith, {nsToUnionWith, std::vector<BSONObj>()}}});
-    auto bson =
-        BSON("$unionWith" << BSON("db" << "crossDB"
-                                       << "coll" << nsToUnionWith.coll() << "pipeline"
-                                       << BSON_ARRAY(BSON("$addFields" << BSON("a" << 3)))));
-    auto unionWith = DocumentSourceUnionWith::createFromBson(bson.firstElement(), expCtx);
-
-    // Serialize with query stats options that transform identifiers.
-    auto opts = query_shape::SerializationOptions::kMarkIdentifiers_FOR_TEST;
-    std::vector<Value> serializedArray;
-    unionWith->serializeToArray(serializedArray, opts);
-    auto serializedBson = serializedArray[0].getDocument().toBson();
-
-    // The serialized output must include the "db" field for cross-database $unionWith.
-    auto unionWithSpec = serializedBson["$unionWith"].Obj();
-    ASSERT_TRUE(unionWithSpec.hasField("db")) << "Expected 'db' field in query stats "
-                                                 "serialization for cross-database $unionWith: "
-                                              << serializedBson;
-    ASSERT_EQ(unionWithSpec["db"].String(), "HASH<crossDB>");
-    ASSERT_EQ(unionWithSpec["coll"].String(), "HASH<coll>");
-}
-
 TEST_F(DocumentSourceUnionWithTest, QueryStatsSerializeWithSameDBOmitsDbField) {
     auto expCtx = getExpCtx();
     NamespaceString nsToUnionWith = NamespaceString::createNamespaceString_forTest(
@@ -398,42 +329,7 @@ TEST_F(DocumentSourceUnionWithTest, ParseErrors) {
                            getExpCtx()),
                        AssertionException,
                        ErrorCodes::TypeMismatch);
-    // $unionWith db is not allowed within a view definition.
-    expCtx->setIsParsingViewDefinition(true);
-    ASSERT_THROWS_CODE(
-        DocumentSourceUnionWith::createFromBson(
-            BSON("$unionWith" << BSON("db" << nsToUnionWith.dbName().toString_forTest() << "coll"
-                                           << nsToUnionWith.coll()))
-                .firstElement(),
-            expCtx),
-        AssertionException,
-        ErrorCodes::FailedToParse);
 }
-
-TEST_F(DocumentSourceUnionWithTest, CrossDBNotAllowedOnMongos) {
-    auto expCtx = getExpCtx();
-    expCtx->setFromRouter(true);
-    // Test that we fail with an unresolved namespace, if it is in a different database.
-    ASSERT_THROWS_CODE(DocumentSourceUnionWith::createFromBson(
-                           BSON("$unionWith" << BSON("db" << "some_db" << "coll"
-                                                          << "some_coll"))
-                               .firstElement(),
-                           expCtx),
-                       AssertionException,
-                       ErrorCodes::FailedToParse);
-
-    expCtx->setFromRouter(false);
-    expCtx->setInRouter(true);
-    // Test that we fail with an unresolved namespace, if it is in a different database.
-    ASSERT_THROWS_CODE(DocumentSourceUnionWith::createFromBson(
-                           BSON("$unionWith" << BSON("db" << "some_db" << "coll"
-                                                          << "some_coll"))
-                               .firstElement(),
-                           expCtx),
-                       AssertionException,
-                       ErrorCodes::FailedToParse);
-}
-
 
 TEST_F(DocumentSourceUnionWithTest, PropagatePauses) {
     const auto mock =
@@ -856,30 +752,6 @@ TEST_F(DocumentSourceUnionWithTest, RedactsCorrectlyBasic) {
         redact(*docSource));
 }
 
-TEST_F(DocumentSourceUnionWithTest, RedactsCorrectlyCrossDB) {
-    auto expCtx = getExpCtx();
-    auto nsToUnionWith =
-        NamespaceString::createNamespaceString_forTest(boost::none, "crossDB", "coll");
-    expCtx->setResolvedNamespaces(
-        ResolvedNamespaceMap{{nsToUnionWith, {nsToUnionWith, std::vector<BSONObj>()}}});
-
-    auto docSource = DocumentSourceUnionWith::createFromBson(
-        BSON("$unionWith" << BSON("db" << "crossDB"
-                                       << "coll" << nsToUnionWith.coll()))
-            .firstElement(),
-        expCtx);
-
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "$unionWith": {
-                "db": "HASH<crossDB>",
-                "coll": "HASH<coll>",
-                "pipeline": []
-            }
-        })",
-        redact(*docSource));
-}
-
 TEST_F(DocumentSourceUnionWithTest, RedactsCorrectlyWithPipeline) {
     auto expCtx = getExpCtx();
     auto nsToUnionWith = NamespaceString::createNamespaceString_forTest(
@@ -999,7 +871,6 @@ TEST_F(DocumentSourceUnionWithTest, StageParamsCarriesParsedData) {
         ASSERT_EQ(params->unionNss.coll(), "target_coll");
         ASSERT_EQ(params->unionNss.dbName(), nss.dbName());
         ASSERT_EQ(params->pipeline.size(), 1U);
-        ASSERT_FALSE(params->hasForeignDB);
         ASSERT_TRUE(params->subpipelineStageParams.has_value());
         ASSERT_EQ(params->subpipelineStageParams->size(), 1U);
     }
@@ -1013,31 +884,7 @@ TEST_F(DocumentSourceUnionWithTest, StageParamsCarriesParsedData) {
         ASSERT(params);
         ASSERT_EQ(params->unionNss.coll(), "target_coll");
         ASSERT_TRUE(params->pipeline.empty());
-        ASSERT_FALSE(params->hasForeignDB);
         ASSERT_FALSE(params->subpipelineStageParams.has_value());
-    }
-
-    // Foreign DB sets hasForeignDB, even if it matches the current DB.
-    {
-        auto bson = BSON("$unionWith" << BSON("db" << "other_db"
-                                                   << "coll" << "target_coll"
-                                                   << "pipeline" << BSONArray()));
-        auto liteParsed = LiteParsedUnionWith::parse(nss, bson.firstElement(), LiteParserOptions{});
-        auto stageParams = liteParsed->getStageParams();
-        auto* params = dynamic_cast<UnionWithStageParams*>(stageParams.get());
-        ASSERT(params);
-        ASSERT_EQ(params->unionNss.dbName().db(OmitTenant{}), "other_db");
-        ASSERT_TRUE(params->hasForeignDB);
-    }
-    {
-        auto bson = BSON("$unionWith" << BSON("db" << nss.dbName().db(OmitTenant{}) << "coll"
-                                                   << "target_coll"
-                                                   << "pipeline" << BSONArray()));
-        auto liteParsed = LiteParsedUnionWith::parse(nss, bson.firstElement(), LiteParserOptions{});
-        auto stageParams = liteParsed->getStageParams();
-        auto* params = dynamic_cast<UnionWithStageParams*>(stageParams.get());
-        ASSERT(params);
-        ASSERT_TRUE(params->hasForeignDB);
     }
 
     // Object spec with empty pipeline: LPP present but has zero stages.
@@ -1065,64 +912,6 @@ TEST_F(DocumentSourceUnionWithTest, StageParamsCarriesParsedData) {
         ASSERT(params);
         ASSERT_TRUE(params->subpipelineStageParams.has_value());
         ASSERT_EQ(params->subpipelineStageParams->size(), 2U);
-    }
-}
-
-TEST_F(DocumentSourceUnionWithTest, BuilderRejectsForeignDBInViewAndRouter) {
-    auto expCtx = getExpCtx();
-    NamespaceString nss = expCtx->getNamespaceString();
-    auto foreignDBSpec = BSON("$unionWith" << BSON("db" << "other_db"
-                                                        << "coll" << "target_coll"
-                                                        << "pipeline" << BSONArray()));
-
-    // Rejected in view definitions.
-    {
-        auto viewExpCtx = getExpCtx();
-        viewExpCtx->setIsParsingViewDefinition(true);
-        auto liteParsed =
-            LiteParsedUnionWith::parse(nss, foreignDBSpec.firstElement(), LiteParserOptions{});
-        ASSERT_THROWS_CODE(buildDocumentSource(*liteParsed, viewExpCtx),
-                           AssertionException,
-                           ErrorCodes::FailedToParse);
-    }
-
-    // Rejected when fromRouter is set.
-    {
-        auto routerExpCtx = getExpCtx();
-        routerExpCtx->setFromRouter(true);
-        auto liteParsed =
-            LiteParsedUnionWith::parse(nss, foreignDBSpec.firstElement(), LiteParserOptions{});
-        ASSERT_THROWS_CODE(buildDocumentSource(*liteParsed, routerExpCtx),
-                           AssertionException,
-                           ErrorCodes::FailedToParse);
-    }
-
-    // Rejected when inRouter is set.
-    {
-        auto routerExpCtx = getExpCtx();
-        routerExpCtx->setInRouter(true);
-        auto liteParsed =
-            LiteParsedUnionWith::parse(nss, foreignDBSpec.firstElement(), LiteParserOptions{});
-        ASSERT_THROWS_CODE(buildDocumentSource(*liteParsed, routerExpCtx),
-                           AssertionException,
-                           ErrorCodes::FailedToParse);
-    }
-
-    // Same-DB without explicit db field is allowed even in view definitions.
-    {
-        auto viewExpCtx = getExpCtx();
-        NamespaceString nsToUnionWith = NamespaceString::createNamespaceString_forTest(
-            viewExpCtx->getNamespaceString().dbName(), "target_coll");
-        viewExpCtx->setResolvedNamespaces(
-            ResolvedNamespaceMap{{nsToUnionWith, {nsToUnionWith, std::vector<BSONObj>()}}});
-        viewExpCtx->setIsParsingViewDefinition(true);
-
-        auto sameDBSpec = BSON("$unionWith" << BSON("coll" << "target_coll"
-                                                           << "pipeline" << BSONArray()));
-        auto liteParsed = LiteParsedUnionWith::parse(
-            viewExpCtx->getNamespaceString(), sameDBSpec.firstElement(), LiteParserOptions{});
-        auto docSources = buildDocumentSource(*liteParsed, viewExpCtx);
-        ASSERT_EQ(docSources.size(), 1U);
     }
 }
 
@@ -1169,16 +958,6 @@ TEST_F(DocumentSourceUnionWithTest, BuilderRoundTripMatchesCreateFromBson) {
         auto nsToUnionWith = NamespaceString::createNamespaceString_forTest(
             expCtx->getNamespaceString().dbName(), "target_coll");
         verifyRoundTrip(BSON("$unionWith" << "target_coll"), nsToUnionWith);
-    }
-
-    // With foreign DB.
-    {
-        auto nsToUnionWith =
-            NamespaceString::createNamespaceString_forTest(boost::none, "crossDB", "target_coll");
-        verifyRoundTrip(BSON("$unionWith" << BSON("db" << "crossDB"
-                                                       << "coll" << "target_coll"
-                                                       << "pipeline" << BSONArray())),
-                        nsToUnionWith);
     }
 }
 

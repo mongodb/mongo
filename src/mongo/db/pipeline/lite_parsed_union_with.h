@@ -60,7 +60,6 @@ class UnionWithStageParams : public DefaultStageParams {
 public:
     UnionWithStageParams(NamespaceString unionNss,
                          std::vector<BSONObj> pipeline,
-                         bool hasForeignDB,
                          bool isHybridSearch,
                          BSONObj ownedBsonObj,
                          boost::optional<StageParamsPipeline> subpipelineStageParams = boost::none,
@@ -68,7 +67,6 @@ public:
         : DefaultStageParams(ownedBsonObj.firstElement()),
           unionNss(std::move(unionNss)),
           pipeline(std::move(pipeline)),
-          hasForeignDB(hasForeignDB),
           isHybridSearch(isHybridSearch),
           subpipelineStageParams(std::move(subpipelineStageParams)),
           resolvedBackingNss(std::move(resolvedBackingNss)),
@@ -81,7 +79,6 @@ public:
 
     NamespaceString unionNss;
     std::vector<BSONObj> pipeline;
-    bool hasForeignDB;
 
     // TODO SERVER-121094 This can be removed once hybrid search desugars into the internal hybrid
     // search stage.
@@ -114,7 +111,6 @@ public:
                         NamespaceString foreignNss,
                         boost::optional<OwnedLiteParsedPipeline> pipeline,
                         std::vector<BSONObj> rawPipeline,
-                        bool hasForeignDB,
                         bool isHybridSearch);
 
     PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const final;
@@ -137,7 +133,6 @@ protected:
 
 private:
     std::vector<BSONObj> _rawPipeline;
-    bool _hasForeignDB;
     bool _isHybridSearch;
 };
 

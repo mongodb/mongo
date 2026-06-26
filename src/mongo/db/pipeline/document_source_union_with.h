@@ -117,14 +117,13 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     // Builds a DocumentSourceUnionWith from pre-parsed StageParams.
-    // Performs expCtx-dependent validations (hasForeignDB, hybrid search timeseries).
+    // Performs expCtx-dependent validations (hybrid search timeseries).
     static DocumentSourceContainer createFromStageParams(
         UnionWithStageParams& params, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     DocumentSourceUnionWith(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                             NamespaceString unionNss,
-                            std::vector<BSONObj> pipeline,
-                            bool hasForeignDB = false);
+                            std::vector<BSONObj> pipeline);
 
     // Constructor used by createFromStageParams(): accepts pre-parsed StageParams for the
     // subpipeline together with the user-facing fields that the copy constructor and serialize()
@@ -136,8 +135,7 @@ public:
                             NamespaceString unionNss,
                             StageParamsPipeline subpipelineStageParams,
                             std::vector<BSONObj> userPipeline,
-                            ResolvedNamespace resolvedBackingNss,
-                            bool hasForeignDB);
+                            ResolvedNamespace resolvedBackingNss);
 
     // Expose a constructor that skips the parsing step for testing purposes.
     DocumentSourceUnionWith(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -284,9 +282,9 @@ private:
     Value serialize(const query_shape::SerializationOptions& opts =
                         query_shape::SerializationOptions{}) const final;
 
-    // Builds the complete {$unionWith: {coll: ..., db: ..., pipeline: ...}} Value from
-    // pre-computed components. Handles collectionless and cross-db variations.
-    Value buildUnionWithResult(Value pipelineValue, Value db, Value coll) const;
+    // Builds the complete {$unionWith: {coll: ..., pipeline: ...}} Value from
+    // pre-computed components. Handles collectionless variations.
+    Value buildUnionWithResult(Value pipelineValue, Value coll) const;
 
     // TODO SERVER-121094: Remove when featureFlagExtensionsInsideHybridSearch is removed.
     Value legacyUnionWithSerialize(const query_shape::SerializationOptions& opts) const;
@@ -312,10 +310,6 @@ private:
     // $unionWith with a view. Otherwise we wouldn't be able to see details about the execution of
     // the view pipeline in the explain result.
     boost::optional<ResolvedNamespace> _resolvedNsForView;
-
-    // States whether this unionWith is crossDB and thus needs to serialize the db name in the
-    // namespace.
-    bool _hasForeignDB = false;
 
     bool _fromNsIsAView = false;
 };

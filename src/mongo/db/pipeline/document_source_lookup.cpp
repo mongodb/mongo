@@ -78,19 +78,17 @@
 namespace mongo {
 using namespace std::literals::string_view_literals;
 
-// Parses $lookup 'from' field. The 'from' field must be a string or one of the following
-// exceptions:
-// {from: {db: "config", coll: "cache.chunks.*"}, ...} or
-// {from: {db: "local", coll: "oplog.rs"}, ...}
+// Parses $lookup 'from' field. The 'from' field must be a string, or an object {db: "", coll: ""}
+// that resolves to one of the following allowed namespaces:
+//   - config.cache.chunks.* (any database's chunk cache)
+//   - config.collections
+//   - config.chunks
+//   - local.oplog.rs
+// The {db, coll} object form is otherwise rejected unless the 'allowGenericForeignDbLookup' is set.
 NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
                                                    const DatabaseName& defaultDb,
-                                                   bool allowGenericForeignDbLookup,
-                                                   // usingMongos is assumed false any time there is
-                                                   // no expCtx available.
-                                                   bool usingMongos,
-                                                   bool isParsingViewDefinition) {
-    // The 'from' field must be a string or an object. Since we now support the object form
-    // any time we are connected directly to mongod, we include it in the error message.
+                                                   bool allowGenericForeignDbLookup) {
+    // The 'from' field must be a string or an object.
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "$lookup 'from' field must be a string or an object, but found "
                           << typeName(elem.type()),
@@ -100,7 +98,7 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
         return NamespaceStringUtil::deserialize(defaultDb, elem.valueStringData());
     }
 
-    // Valdate the db and coll names.
+    // Validate the db and coll names.
     const auto tenantId = defaultDb.tenantId();
     const auto vts = tenantId
         ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
@@ -116,26 +114,12 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
     // lookup as the merge will be done on the config server
     bool isConfigSvrSupportedCollection = nss == NamespaceString::kConfigsvrCollectionsNamespace ||
         nss == NamespaceString::kConfigsvrChunksNamespace;
-    auto extraContext = "";
-
-    if (usingMongos && isParsingViewDefinition) {
-        extraContext = " when executing on or with a mongos or in a view definition";
-    } else if (usingMongos) {
-        extraContext = " when executing on or with a mongos";
-    } else if (isParsingViewDefinition) {
-        extraContext = " in a view definition";
-    }
-    // TODO SPM-1966: This assert can be removed entirely once the view catalog is centralized in
-    // SPM-1966.
     uassert(
         ErrorCodes::FailedToParse,
         str::stream() << "$lookup with syntax {from: {db:<>, coll:<>},..} is not supported for db: "
-                      << nss.dbName().toStringForErrorMsg() << " and coll: " << nss.coll()
-                      << extraContext,
+                      << nss.dbName().toStringForErrorMsg() << " and coll: " << nss.coll(),
         nss.isConfigDotCacheDotChunks() || nss == NamespaceString::kRsOplogNamespace ||
-            isConfigSvrSupportedCollection || allowGenericForeignDbLookup ||
-            // gcc requires these unnecessary parentheses
-            (!usingMongos && !isParsingViewDefinition));
+            isConfigSvrSupportedCollection || allowGenericForeignDbLookup);
     return nss;
 }
 
@@ -1305,12 +1289,9 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
     auto lookupSpec = DocumentSourceLookupSpec::parse(elem.Obj(), IDLParserContext(kStageName));
 
     if (lookupSpec.getFrom().has_value()) {
-        fromNs =
-            parseLookupFromAndResolveNamespace(lookupSpec.getFrom().value().getElement(),
-                                               pExpCtx->getNamespaceString().dbName(),
-                                               pExpCtx->getAllowGenericForeignDbLookup(),
-                                               pExpCtx->getInRouter() || pExpCtx->getFromRouter(),
-                                               pExpCtx->getIsParsingViewDefinition());
+        fromNs = parseLookupFromAndResolveNamespace(lookupSpec.getFrom().value().getElement(),
+                                                    pExpCtx->getNamespaceString().dbName(),
+                                                    pExpCtx->getAllowGenericForeignDbLookup());
     }
 
     as = std::string{lookupSpec.getAs()};

@@ -86,16 +86,6 @@ struct LiteParserOptions {
     // Optional tracker to note when extensions are used in a given aggregate, and track whether
     // that command succeeds. Should be owned by the command invocation, not here.
     ExtensionMetrics* extensionMetrics = nullptr;
-
-    // True when the query is executing on or was forwarded from a router (mongos).
-    // TODO SERVER-129127 This should be removed in favor of storing this attribute on a
-    // ParseContext struct.
-    bool usingMongos = false;
-
-    // True when the pipeline is being parsed as part of a view definition.
-    // TODO SERVER-129127 This should be removed in favor of storing this attribute on a
-    // ParseContext struct.
-    bool isParsingViewDefinition = false;
 };
 
 namespace exec::agg {

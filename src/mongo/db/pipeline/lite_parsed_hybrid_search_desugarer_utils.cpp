@@ -281,7 +281,6 @@ std::unique_ptr<LiteParsedDocumentSource> buildUnionWithLPDS(const NamespaceStri
         std::move(foreignNss),
         boost::optional<OwnedLiteParsedPipeline>(std::move(innerLpp)),
         std::move(rawPipeline),
-        /*hasForeignDB=*/false,  // views are flattened before this point
         /*isHybridSearch=*/true);
 
     // makeOwned() wraps _originalBson (a BSONElement view into unionWithObj) into a shared buffer,

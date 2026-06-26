@@ -177,7 +177,6 @@ HybridSearchPipelineBuilder::constructDesugaredOutput(
 
                 UnionWithStageParams params(std::move(unionNss),
                                             std::move(bsonPipeline),
-                                            /* hasForeignDB= */ false,
                                             /* isHybridSearch= */ true,
                                             /* ownedBsonObj= */ BSONObj{},
                                             std::move(subParams));
