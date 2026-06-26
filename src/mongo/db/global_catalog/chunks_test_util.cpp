@@ -43,18 +43,13 @@
 #include <array>
 #include <cstdlib>
 #include <iterator>
-#include <optional>
 #include <utility>
-
-#include <boost/none.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 
 namespace mongo::chunks_test_util {
 namespace {
-
-constexpr std::string shardNamePrefix = "shard_";
 
 UUID buildShardUuid(int shardIdx) {
     std::array<unsigned char, UUID::kNumBytes> bytes{};
@@ -68,19 +63,6 @@ UUID buildShardUuid(int shardIdx) {
     return UUID::fromCDR(bytes);
 }
 
-int getShardIndexFromUuid(const UUID& uuid) {
-    const auto bytes = uuid.data();
-    int64_t idx = 0;
-    for (int i = 8; i < 16; ++i) {
-        idx = (idx << 8) | bytes[i];
-    }
-    return static_cast<int>(idx);
-}
-
-std::string buildShardName(int shardIdx) {
-    return std::string(str::stream() << shardNamePrefix << shardIdx);
-}
-
 /**
  * Returns a stable shard ref for the given shard index. If useUuid is true, returns a shard UUID
  * otherwise returns a shard id of the form "shard_<shardIdx>". Used by genChunkVector and
@@ -90,7 +72,7 @@ ShardRef buildShardRef(int shardIdx, bool useUuid = false) {
     if (useUuid) {
         return ShardRef(buildShardUuid(shardIdx));
     }
-    return ShardRef(buildShardName(shardIdx));
+    return ShardRef(std::string(str::stream() << "shard_" << shardIdx));
 }
 
 PseudoRandom _random{SecureRandom().nextInt64()};
@@ -112,23 +94,6 @@ std::vector<ChunkHistory> genChunkHistory(const ShardRef& currentShard,
 }
 
 }  // namespace
-
-ShardRefToHandleMap buildTestShardRefToHandleMap(const std::vector<ChunkType>& chunks) {
-    ShardRefToHandleMap shardRefToHandleMap;
-    for (const auto& chunk : chunks) {
-        const auto& shardRef = chunk.getShard();
-        if (shardRef.isString()) {
-            const auto& index = std::stoi(shardRef.getString().substr(shardNamePrefix.length()));
-            shardRefToHandleMap.emplace(shardRef,
-                                        ShardHandle(shardRef.getString(), buildShardUuid(index)));
-        } else {
-            const auto& index = getShardIndexFromUuid(shardRef.getUUID());
-            shardRefToHandleMap.emplace(
-                shardRef, ShardHandle(ShardId(buildShardName(index)), shardRef.getUUID()));
-        }
-    }
-    return shardRefToHandleMap;
-}
 
 void assertEqualChunkInfo(const ChunkInfo& x, const ChunkInfo& y) {
     ASSERT_BSONOBJ_EQ(x.getMin(), y.getMin());

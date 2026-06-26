@@ -324,14 +324,6 @@ public:
                                        bool allowNonShardIdIdentifiers);
 
     /**
-     * Returns a map of shard ref -> shard handle. For a ShardHandle that contains both a shardId
-     * and UUID, the shard handle will appear twice in the map (once for each shard ref).  This
-     * helper should only be used for CAR internals which need to know both identifiers for a shard.
-     * TODO (SERVER-126212): Remove once 9.0 becomes last LTS.
-     */
-    ShardRefToHandleMap getShardRefToHandleMap(OperationContext* opCtx);
-
-    /**
      * Returns a vector containing all known shard IDs.
      * The order of the elements is not guaranteed.
      */

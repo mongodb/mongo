@@ -45,7 +45,6 @@
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
@@ -83,29 +82,6 @@ protected:
         ASSERT_BSONOBJ_EQ(chunkRange.getMax(), max);
     }
 };
-
-TEST_F(ChunkManagerTest, ResolveShardHandlesForChunkManagerUsesTestOverride) {
-    const ShardId shardId{"overrideShard"};
-    const UUID shardUuid = UUID::gen();
-    const ShardHandle shardHandle{shardId, shardUuid};
-
-    ShardRefToHandleMap overrideMap;
-    overrideMap.emplace(ShardRef(shardId), shardHandle);
-    overrideMap.emplace(ShardRef(shardUuid), shardHandle);
-
-    chunk_manager_shard_resolver::setChunkManagerShardResolver_forTest(operationContext(),
-                                                                       overrideMap);
-    ON_BLOCK_EXIT([&] {
-        chunk_manager_shard_resolver::clearChunkManagerShardResolver_forTest(operationContext());
-    });
-
-    const auto resolved =
-        chunk_manager_shard_resolver::resolveShardHandlesForChunkManager(operationContext());
-
-    ASSERT_EQ(resolved.size(), 2u);
-    ASSERT_EQ(resolved.at(ShardRef(shardId)), shardHandle);
-    ASSERT_EQ(resolved.at(ShardRef(shardUuid)), shardHandle);
-}
 
 TEST_F(ChunkManagerTest, FindIntersectingWithVaryingHashedPrefixAndConstantRangedSuffix) {
     // Create 4 chunks and 4 shards such that shardId '0' has chunk [MinKey, -2^62), '1' has chunk

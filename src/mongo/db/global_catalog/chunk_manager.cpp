@@ -968,64 +968,19 @@ std::string ChunkManager::toString() const {
     return _rt->optRt ? _rt->optRt->toString() : "UNSHARDED";
 }
 
-PlacementVersionTargetingInfo RoutingTableHistory::_getVersion(
-    const ShardRef& shardRef, const ShardRefToHandleMap& shardRefToHandleMap) const {
-    auto getVersionFor = [&](const ShardRef& shardRef) {
-        auto it = _chunkMap.getShardPlacementVersionMap().find(shardRef);
-        if (it == _chunkMap.getShardPlacementVersionMap().end()) {
-            // Shards without explicitly tracked placement versions (meaning they have no chunks)
-            // always have a version of (epoch, timestamp, 0, 0)
-            auto collPlacementVersion = _chunkMap.getVersion();
-            return PlacementVersionTargetingInfo(ChunkVersion(collPlacementVersion, {0, 0}),
-                                                 Timestamp(0, 0));
-        }
-
-        const auto& placementVersionTargetingInfo = it->second;
-        return PlacementVersionTargetingInfo(placementVersionTargetingInfo.placementVersion,
-                                             placementVersionTargetingInfo.validAfter);
-    };
-
-    // TODO (SERVER-126212): Remove fallback mechanism once all callers provide a
-    // ShardRefToHandleMap.
-    bool skipHandleResolution = shardRefToHandleMap.empty() && shardRef.isString();
-    if (MONGO_likely(skipHandleResolution)) {
-        return getVersionFor(shardRef);
+PlacementVersionTargetingInfo RoutingTableHistory::_getVersion(const ShardId& shardName) const {
+    auto it = _chunkMap.getShardPlacementVersionMap().find(shardName);
+    if (it == _chunkMap.getShardPlacementVersionMap().end()) {
+        // Shards without explicitly tracked placement versions (meaning they have no chunks) always
+        // have a version of (epoch, timestamp, 0, 0)
+        auto collPlacementVersion = _chunkMap.getVersion();
+        return PlacementVersionTargetingInfo(ChunkVersion(collPlacementVersion, {0, 0}),
+                                             Timestamp(0, 0));
     }
-    // We have to resolve the user input into a shard handle and check both the ID and UUID in case
-    // both are present in the placement version map.
-    // TODO (SERVER-126212): Remove the resolution logic once all shard refs are UUIDs.
-    const auto shardHandleIt = shardRefToHandleMap.find(shardRef);
-    uassert(ErrorCodes::ShardNotFound,
-            str::stream() << "Shard " << shardRef << " not found",
-            shardHandleIt != shardRefToHandleMap.end());
-    const auto& shardHandle = shardHandleIt->second;
-    const auto& idVersion = getVersionFor(shardHandle.name());
-    if (!shardHandle.uuid()) {
-        return idVersion;
-    }
-    const auto& uuidVersion = getVersionFor(ShardRef(*shardHandle.uuid()));
 
-    const auto& greaterPlacementVersion = [&]() -> const ChunkVersion& {
-        // In this case, set counts as greater than unset because having some set placement version
-        // implies that the shard has chunks at this time, meaning unset cannot be the newer
-        // version.
-        if (!idVersion.placementVersion.isSet()) {
-            return uuidVersion.placementVersion.isSet() ? uuidVersion.placementVersion
-                                                        : idVersion.placementVersion;
-        }
-        if (!uuidVersion.placementVersion.isSet()) {
-            return idVersion.placementVersion;
-        }
-        return (idVersion.placementVersion <=> uuidVersion.placementVersion) ==
-                std::partial_ordering::less
-            ? uuidVersion.placementVersion
-            : idVersion.placementVersion;
-    }();
-    const auto greaterValidAfter = idVersion.validAfter > uuidVersion.validAfter
-        ? idVersion.validAfter
-        : uuidVersion.validAfter;
-
-    return PlacementVersionTargetingInfo(greaterPlacementVersion, greaterValidAfter);
+    const auto& placementVersionTargetingInfo = it->second;
+    return PlacementVersionTargetingInfo(placementVersionTargetingInfo.placementVersion,
+                                         placementVersionTargetingInfo.validAfter);
 }
 
 std::string RoutingTableHistory::toString() const {
