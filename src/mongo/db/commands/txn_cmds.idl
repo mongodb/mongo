@@ -42,7 +42,7 @@ structs:
         fields:
             shardId:
                 description: "The name of the shard that was added as a participant"
-                type: shard_id
+                type: shard_ref
             readOnly:
                 description:
                     "True if the shard has the transaction in progress but has not done a

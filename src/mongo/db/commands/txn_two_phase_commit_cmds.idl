@@ -39,7 +39,7 @@ structs:
         fields:
             shardId:
                 description: "The id of the shard"
-                type: shard_id
+                type: shard_ref
 
     PrepareReply:
         description: "Reply to prepareTransactionCommand"

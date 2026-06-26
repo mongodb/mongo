@@ -279,7 +279,7 @@ std::set<ShardRef> validateParticipants(OperationContext* opCtx,
 
     ss << '[';
     for (const auto& participant : participants) {
-        const auto& shardRef = ShardRef{participant.getShardId()};
+        const auto& shardRef = participant.getShardId();
         const bool inserted = participantsSet.emplace(shardRef).second;
         uassert(51162,
                 str::stream() << "Participant list contains duplicate shard " << shardRef,

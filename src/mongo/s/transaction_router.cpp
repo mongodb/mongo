@@ -1563,7 +1563,8 @@ BSONObj TransactionRouter::Router::_handOffCommitToCoordinator(OperationContext*
     std::vector<CommitParticipant> participantList;
     for (const auto& participantEntry : o().participants) {
         CommitParticipant commitParticipant;
-        commitParticipant.setShardId(participantEntry.first);
+        // TODO SERVER-128815: Remove the explicit conversion
+        commitParticipant.setShardId(ShardRef(participantEntry.first));
         participantList.push_back(std::move(commitParticipant));
     }
 
