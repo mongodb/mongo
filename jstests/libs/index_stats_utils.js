@@ -1,5 +1,5 @@
 /**
- * Helpers for asserting on serverStatus().indexStats.
+ * Helpers for asserting on index-usage statistics.
  */
 
 /**
@@ -67,3 +67,26 @@ export const assertFeatureAccessIncrease = (last, current, feature, inc) => {
         "incorrect feature accesses for " + feature,
     );
 };
+
+/**
+ * Returns the number of `accesses.ops` recorded for `indexName` via the $indexStats stage on the
+ * node `coll` is bound to. Returns 0 if the index has no recorded accesses on that node. `coll` is a
+ * node-bound DBCollection (e.g. shardPrimary.getCollection(ns)), so the count is that node's only.
+ */
+export function getIndexAccessOps(coll, indexName = "_id_") {
+    const res = coll.aggregate([{$indexStats: {}}, {$match: {name: indexName}}]).toArray();
+    return res.length === 0 ? 0 : res[0].accesses.ops;
+}
+
+/**
+ * Returns a map of {indexName: accesses.ops} for every index via the $indexStats stage on the node
+ * `coll` is bound to. Use this to attribute accesses across multiple indexes (e.g. to assert which
+ * index a lookup used) over a single operation window.
+ */
+export function indexAccessOpsByName(coll) {
+    const byName = {};
+    for (const entry of coll.aggregate([{$indexStats: {}}]).toArray()) {
+        byName[entry.name] = entry.accesses.ops;
+    }
+    return byName;
+}

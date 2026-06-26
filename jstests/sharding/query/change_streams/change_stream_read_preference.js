@@ -5,157 +5,160 @@
 //   requires_profiling,
 //   uses_change_streams,
 // ]
-import {enableLocalReadLogs, getLocalReadCount} from "jstests/libs/local_reads.js";
+import {enableLocalReadLogs} from "jstests/libs/local_reads.js";
+import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {
     profilerHasAtLeastOneMatchingEntryOrThrow,
     profilerHasSingleMatchingEntryOrThrow,
 } from "jstests/libs/profiler.js";
-import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
+import {
+    withChangeStreamTest,
+    observePostImageLookup,
+} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const st = new ShardingTest({
-    name: "change_stream_read_pref",
-    shards: 2,
-    rs: {
-        nodes: 2,
-        // Use a higher frequency for periodic noops to speed up the test.
-        setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true},
-    },
-});
+describe("change stream and update lookup read preference", function () {
+    const dbName = jsTestName();
+    let st;
+    let db;
+    let coll;
 
-const dbName = jsTestName();
-const mongosDB = st.s0.getDB(dbName);
-const mongosColl = mongosDB[jsTestName()];
+    // Opens an updateLookup change stream with the given read preference, applies 'update' to both
+    // documents, and asserts that both the stream and its post-image update lookup ran on the node
+    // selected by the read preference (the primary or the lone secondary of each shard).
+    function runReadPreferenceTest({comment, readPreference, nodeUnderTest}) {
+        const ns = coll.getFullName();
+        withChangeStreamTest(db, function (cst) {
+            const stream = cst.startWatchingChanges({
+                collection: coll,
+                pipeline: [{$changeStream: {fullDocument: "updateLookup"}}],
+                aggregateOptions: {comment, $readPreference: readPreference},
+            });
 
-// Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-assert.commandWorked(
-    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}),
-);
+            assert.commandWorked(coll.update({_id: -1}, {$set: {updated: true}}));
+            assert.commandWorked(coll.update({_id: 1}, {$set: {updated: true}}));
 
-// Shard the test collection on _id.
-assert.commandWorked(
-    mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}),
-);
+            // Consume both updates while observing where the post-image lookup ran on each shard.
+            let changes;
+            const lookupFn = () => (changes = cst.getNextChanges(stream, 2));
+            const nodeObservationMap = observePostImageLookup({
+                nodes: [st.rs0, st.rs1].map(nodeUnderTest),
+                ns,
+                comment,
+                fn: lookupFn,
+            });
+            assert.eq(changes[0].fullDocument, {_id: -1, updated: true});
+            assert.eq(changes[1].fullDocument, {_id: 1, updated: true});
 
-// Split the collection into 2 chunks: [MinKey, 0), [0, MaxKey].
-assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {_id: 0}}));
+            for (const [node, observation] of nodeObservationMap) {
+                const nodeDB = node.getDB(dbName);
 
-// Move the [0, MaxKey] chunk to st.shard1.shardName.
-assert.commandWorked(
-    mongosDB.adminCommand({
-        moveChunk: mongosColl.getFullName(),
-        find: {_id: 1},
-        to: st.rs1.getURL(),
-    }),
-);
+                // The change stream itself runs on the read-preference-selected node. There might be
+                // more than one entry if we needed multiple getMores to retrieve the changes.
+                // TODO SERVER-31650 We have to use 'originatingCommand' here and look for the getMore
+                // because the initial aggregate will not show up.
+                profilerHasAtLeastOneMatchingEntryOrThrow({
+                    profileDB: nodeDB,
+                    filter: {"originatingCommand.comment": comment},
+                });
 
-// Turn on the profiler.
-for (let rs of [st.rs0, st.rs1]) {
-    assert.commandWorked(rs.getPrimary().getDB(dbName).setProfilingLevel(2));
-    assert.commandWorked(rs.getSecondary().getDB(dbName).setProfilingLevel(2));
-    enableLocalReadLogs(rs.getPrimary());
-    enableLocalReadLogs(rs.getSecondary());
-}
+                // The post-image update lookup runs on the same node: either as a local read (counted
+                // by localReadCount) or as a separately-routed 'aggregate' visible in the profiler.
+                // TODO SERVER-129059 When the optimized local lookup is enabled for sharded clusters,
+                // the post-image is read locally via an _id index scan with no routed 'aggregate';
+                // assert obs.indexOpsDelta["_id_"] === 1 instead.
+                if (observation.localReadCount === 0) {
+                    // Filter out any profiler entries with a stale config - this can be the first read
+                    // on this node with a readConcern specified, which enforces shard version.
+                    profilerHasSingleMatchingEntryOrThrow({
+                        profileDB: nodeDB,
+                        filter: {
+                            op: "command",
+                            ns: ns,
+                            "command.comment": comment,
+                            "command.aggregate": coll.getName(),
+                            errCode: {$ne: ErrorCodes.StaleConfig},
+                        },
+                    });
+                }
+            }
+        });
+    }
 
-// Write a document to each chunk.
-assert.commandWorked(mongosColl.insert({_id: -1}, {writeConcern: {w: "majority"}}));
-assert.commandWorked(mongosColl.insert({_id: 1}, {writeConcern: {w: "majority"}}));
+    before(function () {
+        st = new ShardingTest({
+            name: "change_stream_read_pref",
+            shards: 2,
+            rs: {
+                nodes: 2,
+                // Use a higher frequency for periodic noops to speed up the test.
+                setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true},
+            },
+        });
 
-// Test that change streams go to the primary by default.
-let primaryStreamTest = new ChangeStreamTest(mongosDB);
-let changeStreamComment = "change stream against primary";
-const primaryStream = primaryStreamTest.startWatchingChanges({
-    collection: mongosColl,
-    pipeline: [{$changeStream: {fullDocument: "updateLookup"}}],
-    aggregateOptions: {comment: changeStreamComment},
-});
+        db = st.s0.getDB(dbName);
+        coll = db[jsTestName()];
 
-assert.commandWorked(mongosColl.update({_id: -1}, {$set: {updated: true}}));
-assert.commandWorked(mongosColl.update({_id: 1}, {$set: {updated: true}}));
+        // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
+        assert.commandWorked(
+            db.adminCommand({
+                enableSharding: db.getName(),
+                primaryShard: st.rs0.getURL(),
+            }),
+        );
 
-let primaryUpdates = primaryStreamTest.getNextChanges(primaryStream, 2);
-assert.eq(primaryUpdates[0].fullDocument, {_id: -1, updated: true});
-assert.eq(primaryUpdates[1].fullDocument, {_id: 1, updated: true});
+        // Shard the test collection on _id.
+        assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
 
-for (let rs of [st.rs0, st.rs1]) {
-    const primaryDB = rs.getPrimary().getDB(dbName);
-    // Test that the change stream itself goes to the primary. There might be more than one if
-    // we needed multiple getMores to retrieve the changes.
-    // TODO SERVER-31650 We have to use 'originatingCommand' here and look for the getMore
-    // because the initial aggregate will not show up.
-    profilerHasAtLeastOneMatchingEntryOrThrow({
-        profileDB: primaryDB,
-        filter: {"originatingCommand.comment": changeStreamComment},
+        // Split the collection into 2 chunks: [MinKey, 0), [0, MaxKey].
+        assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: {_id: 0}}));
+
+        // Move the [0, MaxKey] chunk to st.shard1.shardName.
+        assert.commandWorked(
+            db.adminCommand({
+                moveChunk: coll.getFullName(),
+                find: {_id: 1},
+                to: st.rs1.getURL(),
+            }),
+        );
+
+        // Turn on the profiler and local-read logging on every node.
+        for (let rs of [st.rs0, st.rs1]) {
+            assert.commandWorked(rs.getPrimary().getDB(dbName).setProfilingLevel(2));
+            assert.commandWorked(rs.getSecondary().getDB(dbName).setProfilingLevel(2));
+            enableLocalReadLogs(rs.getPrimary());
+            enableLocalReadLogs(rs.getSecondary());
+        }
     });
 
-    // Test that the update lookup goes to the primary as well.
-    const localReadCount = getLocalReadCount(
-        primaryDB,
-        mongosColl.getFullName(),
-        changeStreamComment,
-    );
-    if (localReadCount === 0) {
-        let filter = {
-            op: "command",
-            ns: mongosColl.getFullName(),
-            "command.comment": changeStreamComment,
-            "command.aggregate": mongosColl.getName(),
-            "errName": {$ne: "StaleConfig"},
-        };
-
-        profilerHasSingleMatchingEntryOrThrow({profileDB: primaryDB, filter: filter});
-    }
-}
-
-primaryStreamTest.cleanUp();
-
-// Test that change streams go to the secondary when the readPreference is {mode: "secondary"}.
-let secondaryStreamTest = new ChangeStreamTest(mongosDB);
-changeStreamComment = "change stream against secondary";
-let secondaryStream = secondaryStreamTest.startWatchingChanges({
-    pipeline: [{$changeStream: {fullDocument: "updateLookup"}}],
-    collection: mongosColl,
-    aggregateOptions: {comment: changeStreamComment, $readPreference: {mode: "secondary"}},
-});
-
-assert.commandWorked(mongosColl.update({_id: -1}, {$set: {updatedCount: 2}}));
-assert.commandWorked(mongosColl.update({_id: 1}, {$set: {updatedCount: 2}}));
-
-let secondaryUpdates = secondaryStreamTest.getNextChanges(secondaryStream, 2);
-assert.eq(secondaryUpdates[0].fullDocument, {_id: -1, updated: true, updatedCount: 2});
-assert.eq(secondaryUpdates[1].fullDocument, {_id: 1, updated: true, updatedCount: 2});
-
-for (let rs of [st.rs0, st.rs1]) {
-    const secondaryDB = rs.getSecondary().getDB(dbName);
-    // Test that the change stream itself goes to the secondary. There might be more than one if
-    // we needed multiple getMores to retrieve the changes.
-    // TODO SERVER-31650 We have to use 'originatingCommand' here and look for the getMore
-    // because the initial aggregate will not show up.
-    profilerHasAtLeastOneMatchingEntryOrThrow({
-        profileDB: secondaryDB,
-        filter: {"originatingCommand.comment": changeStreamComment},
+    beforeEach(function () {
+        // Write a document to each chunk.
+        assert.commandWorked(coll.insert({_id: -1}, {writeConcern: {w: "majority"}}));
+        assert.commandWorked(coll.insert({_id: 1}, {writeConcern: {w: "majority"}}));
     });
 
-    // Test that the update lookup goes to the secondary as well.
-    const localReadCount = getLocalReadCount(
-        secondaryDB,
-        mongosColl.getFullName(),
-        changeStreamComment,
-    );
-    if (localReadCount === 0) {
-        let filter = {
-            op: "command",
-            ns: mongosColl.getFullName(),
-            "command.comment": changeStreamComment,
-            // We need to filter out any profiler entries with a stale config - this is the
-            // first read on this secondary with a readConcern specified, so it is the first
-            // read on this secondary that will enforce shard version.
-            errCode: {$ne: ErrorCodes.StaleConfig},
-            "command.aggregate": mongosColl.getName(),
-        };
-        profilerHasSingleMatchingEntryOrThrow({profileDB: secondaryDB, filter: filter});
-    }
-}
+    afterEach(function () {
+        // Drop all documents.
+        assert.commandWorked(coll.deleteMany({}));
+    });
 
-secondaryStreamTest.cleanUp();
-st.stop();
+    after(function () {
+        st.stop();
+    });
+
+    it("targets the primary by default", function () {
+        runReadPreferenceTest({
+            comment: "change stream against primary",
+            readPreference: {mode: "primary"},
+            nodeUnderTest: (rs) => rs.getPrimary(),
+        });
+    });
+
+    it("targets a secondary with readPreference 'secondary'", function () {
+        runReadPreferenceTest({
+            comment: "change stream against secondary",
+            readPreference: {mode: "secondary"},
+            nodeUnderTest: (rs) => rs.getSecondary(),
+        });
+    });
+});

@@ -3,6 +3,8 @@
  * opened cursors and kills them on cleanup.
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {indexAccessOpsByName} from "jstests/libs/index_stats_utils.js";
+import {getLocalReadCount} from "jstests/libs/local_reads.js";
 import {getCollectionNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
@@ -823,6 +825,15 @@ export function ChangeStreamTest(_db, options) {
     };
 }
 
+export function withChangeStreamTest(db, fn) {
+    const cst = new ChangeStreamTest(db);
+    try {
+        fn(cst);
+    } finally {
+        cst.cleanUp();
+    }
+}
+
 /**
  * Asserts that the given pipeline will eventually return an error with the provided code, either in
  * the initial aggregate, or a subsequent getMore. Throws an exception if there are any results from
@@ -1472,6 +1483,36 @@ export function assertCollDataDistribution(db, coll, expectedCounts) {
 export function ensureShardDistribution(db, coll, distributionConfig) {
     distributeCollectionDataOverShards(db, coll, distributionConfig);
     assertCollDataDistribution(db, coll, distributionConfig.expectedCounts);
+}
+
+/**
+ * Runs `fn` once (typically consuming change events that trigger a post-image lookup) and reports,
+ * per node, where the lookup ran. Returns a map of node -> observation:
+ *   - localReadCount: legacy local-read log (id 5837600) scoped to `comment`. Omit `comment` to skip.
+ *   - indexOpsDelta: {indexName: $indexStats accesses.ops delta across `fn`}, i.e. which index the
+ *     lookup used.
+ */
+export function observePostImageLookup({nodes, ns, comment, fn}) {
+    const opsBefore = nodes.map((node) => indexAccessOpsByName(node.getCollection(ns)));
+    fn();
+    return new Map(
+        nodes.map((node, i) => {
+            const opsAfter = indexAccessOpsByName(node.getCollection(ns));
+            const indexOpsDelta = Object.fromEntries(
+                Object.keys(opsAfter).map((indexName) => {
+                    return [indexName, opsAfter[indexName] - (opsBefore[i][indexName] || 0)];
+                }),
+            );
+            return [
+                node,
+                {
+                    localReadCount:
+                        comment === undefined ? undefined : getLocalReadCount(node, ns, comment),
+                    indexOpsDelta: indexOpsDelta,
+                },
+            ];
+        }),
+    );
 }
 
 /** Helper class to hold cursors and close them all at once. */
