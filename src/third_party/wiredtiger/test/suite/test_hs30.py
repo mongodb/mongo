@@ -170,9 +170,7 @@ class test_hs30(wttest.WiredTigerTestCase):
         session3.rollback_transaction()
 
         # Check via stats that the history store was used.
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        hs_read = stat_cursor[stat.conn.cache_hs_read][2]
-        stat_cursor.close()
+        hs_read = self.get_stat(stat.conn.cache_hs_read)
 
         if self.do_evict:
             # Should have at least read nrows twice.

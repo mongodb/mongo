@@ -44,12 +44,6 @@ class test_hs03(wttest.WiredTigerTestCase):
     value_format='u'
     scenarios = make_scenarios(format_values)
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def large_updates(self, session, uri, value, ds, nrows, nops):
         # Update a large number of records, we'll hang if the history store table
         # isn't doing its thing.

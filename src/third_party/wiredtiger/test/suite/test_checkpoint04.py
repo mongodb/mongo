@@ -63,12 +63,6 @@ class test_checkpoint04(wttest.WiredTigerTestCase):
             session.commit_transaction()
         cursor.close()
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def test_checkpoint_stats(self):
         nrows = 100
         ntables = 50

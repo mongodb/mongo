@@ -40,12 +40,6 @@ class test_stat14(wttest.WiredTigerTestCase):
 
     conn_config = 'statistics=(all)'
 
-    def get_stat(self, stat_name, expect):
-        stat_cursor = self.session.open_cursor('statistics:' + self.uri, None, None)
-        stat = stat_cursor[stat_name][2]
-        self.assertEqual(stat, expect)
-        stat_cursor.close()
-
     def test_eviction_threshold_stats(self):
         # Test that eviction threshold statistics are correctly reported and updated.
         # These stats are multiplied by 100 for precision (e.g., 80% becomes 8000).

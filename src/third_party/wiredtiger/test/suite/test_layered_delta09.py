@@ -64,14 +64,6 @@ class test_layered_delta09(wttest.WiredTigerTestCase):
     def conn_config(self):
         return self.conn_base_config + f'disaggregated=(role="leader"),{self.delta_config},'
 
-    def get_stat(self, stat, uri = None):
-        if not uri:
-            uri = ''
-        stat_cursor = self.session.open_cursor(f'statistics:{uri}', None, None)
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def insert_or_update(self, kv, ts):
         cursor = self.session.open_cursor(self.uri, None, None)
         for k, v in kv.items():
@@ -102,12 +94,12 @@ class test_layered_delta09(wttest.WiredTigerTestCase):
         self.insert_or_update(kv, initial_ts)
         self.session.checkpoint()
         # We should see suffix compression happened.
-        self.assertGreater(self.get_stat(stat.dsrc.rec_suffix_compression, self.uri), 0)
+        self.assertStatGreaterSoon(stat.dsrc.rec_suffix_compression, 0, uri=self.uri)
         # There's no prefix compression for delta yet.
         self.assertEqual(self.get_stat(stat.dsrc.rec_prefix_compression_delta, self.uri), 0)
         # We should see prefix compression for full page if it is configured.
         if (prefix_compression):
-            self.assertGreater(self.get_stat(stat.dsrc.rec_prefix_compression_full, self.uri), 0)
+            self.assertStatGreaterSoon(stat.dsrc.rec_prefix_compression_full, 0, uri=self.uri)
         else:
             self.assertEqual(self.get_stat(stat.dsrc.rec_prefix_compression_full, self.uri), 0)
 
@@ -120,13 +112,13 @@ class test_layered_delta09(wttest.WiredTigerTestCase):
         self.insert_or_update(kv_modified, initial_ts + 1)
         self.session.checkpoint()
         if (self.delta_type == 'both' or self.delta_type == 'leaf_only'):
-            self.assertGreater(self.get_stat(stat.conn.rec_page_delta_leaf), 0)
+            self.assertStatGreaterSoon(stat.conn.rec_page_delta_leaf, 0)
             # We should see prefix compression for delta and there's no prefix compression for full page.
             if (prefix_compression):
-                self.assertGreater(self.get_stat(stat.dsrc.rec_prefix_compression_delta, self.uri), 0)
+                self.assertStatGreaterSoon(stat.dsrc.rec_prefix_compression_delta, 0, uri=self.uri)
                 self.assertEqual(self.get_stat(stat.dsrc.rec_prefix_compression_full, self.uri), 0)
         if (self.delta_type == 'both' or self.delta_type == 'internal_only'):
-            self.assertGreater(self.get_stat(stat.conn.rec_page_delta_internal), 0)
+            self.assertStatGreaterSoon(stat.conn.rec_page_delta_internal, 0)
 
         # Re-open the connection to clear contents out of memory.
         self.reopen_disagg_conn(self.conn_config())
@@ -134,7 +126,7 @@ class test_layered_delta09(wttest.WiredTigerTestCase):
         self.verify(kv, kv_modified)
          # Assert that we have constructed at least one internal page delta.
         if (self.delta_type == 'both' or self.delta_type == 'internal_only'):
-            self.assertGreater(self.get_stat(stat.conn.cache_read_internal_delta), 0)
+            self.assertStatGreaterSoon(stat.conn.cache_read_internal_delta, 0)
         else:
             self.assertEqual(self.get_stat(stat.conn.cache_read_internal_delta), 0)
 
@@ -146,7 +138,7 @@ class test_layered_delta09(wttest.WiredTigerTestCase):
         self.verify(kv, kv_modified)
         # Assert that we have constructed at least one internal page delta.
         if (self.delta_type == 'both' or self.delta_type == 'internal_only'):
-            self.assertGreater(self.get_stat(stat.conn.cache_read_internal_delta), 0)
+            self.assertStatGreaterSoon(stat.conn.cache_read_internal_delta, 0)
         else:
             self.assertEqual(self.get_stat(stat.conn.cache_read_internal_delta), 0)
 

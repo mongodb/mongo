@@ -51,11 +51,15 @@ class test_disagg_wt_page(wttest.WiredTigerTestCase, suite_subprocess, DisaggCon
     stable_uri = "file:wt_page_test.wt_stable"
     nrows = 1000
 
-    # palite flag bit indicating a tombstoned page chain entry; mirrors
-    # WT_PAGE_LOG_DISCARDED in ext/page_log/palite/palite.cpp.
+    # palite stores the put-args flags; these mirror the WT_PAGE_LOG_* bits in
+    # ext/page_log/palite/palite.cpp.
+    PAGE_LOG_COMPRESSED = 0x1
+    PAGE_LOG_DELTA = 0x2
     PAGE_LOG_DISCARDED = 0x10000
 
-    conn_config = 'disaggregated=(role="leader")'
+    # delta_pct=100 lifts the delta-size threshold so a delta is always
+    # preferred over a rewrite.
+    conn_config = 'disaggregated=(role="leader"),page_delta=(delta_pct=100)'
 
     # Skip inside the test method (not setUp): unittest does not call tearDown
     # when skipTest is raised from setUp, which would leak the open connection.
@@ -65,6 +69,7 @@ class test_disagg_wt_page(wttest.WiredTigerTestCase, suite_subprocess, DisaggCon
 
     def conn_extensions(self, extlist):
         extlist.skip_if_missing = True
+        extlist.extension('compressors', 'zstd')
         DisaggConfigMixin.conn_extensions(self, extlist)
 
     def _wt_page_extra_config(self):
@@ -135,7 +140,7 @@ class test_disagg_wt_page(wttest.WiredTigerTestCase, suite_subprocess, DisaggCon
     def test_help(self):
         self._skip_if_not_diagnostic()
         _, stderr = self._run_wt_page('-?')
-        self.assertIn('page -p page_id', stderr)
+        self.assertIn('-p page_id', stderr)
         self.assertIn('-l lsn', stderr)
 
     def test_unknown_page_id(self):
@@ -167,7 +172,57 @@ class test_disagg_wt_page(wttest.WiredTigerTestCase, suite_subprocess, DisaggCon
         page = self._find_delta_page()
         stdout, _ = self._run_wt_page(
             "-p", str(page.page_id), "-l", str(page.lsn), self.stable_uri)
+        result_count = self._assert_chain_header(stdout, page)
+        self.assertGreater(result_count, 1)
+        self.assertEqual(stdout.count("- delta page"), result_count - 1)
+        self.assertIn("delta_op: update", stdout)
+
+    def test_delta_chain_with_deletes(self):
+        self._skip_if_not_diagnostic()
+        self._populate()
+        c = self.session.open_cursor(self.uri)
+        for i in range(0, self.nrows, max(1, self.nrows // 8)):
+            c.set_key(f"k{i:08}")
+            self.assertEqual(c.remove(), 0)
+        c.close()
+        self.session.checkpoint()
+        page = self._find_delta_page()
+        stdout, _ = self._run_wt_page(
+            "-p", str(page.page_id), "-l", str(page.lsn), self.stable_uri)
         self.assertGreater(self._assert_chain_header(stdout, page), 1)
+        self.assertIn("delta_op: delete", stdout)
+
+    def test_delta_chain_compressed(self):
+        self._skip_if_not_diagnostic()
+        # One large leaf so the delta below stays a small fraction of the page
+        # (reconciliation keeps it as a delta instead of rewriting), while still
+        # being larger than the allocation unit so zstd shrinks it and the block
+        # is stored compressed.
+        self.session.create(self.uri,
+            "key_format=S,value_format=S,block_compressor=zstd,"
+            "leaf_page_max=10MB,memory_page_max=10MB")
+        c = self.session.open_cursor(self.uri)
+        for i in range(self.nrows):
+            c[f"k{i:08}"] = "v" * 100
+        c.close()
+        self.session.checkpoint()
+        c = self.session.open_cursor(self.uri)
+        for i in range(100):
+            c[f"k{i:08}"] = "V" * 100
+        c.close()
+        self.session.checkpoint()
+
+        # Require both compressed and delta bits so we skip compressed
+        # full-image rewrites (which also carry a backlink).
+        page = self._find_page(
+            f"(flags & {self.PAGE_LOG_COMPRESSED}) != 0 AND "
+            f"(flags & {self.PAGE_LOG_DELTA}) != 0 AND "
+            f"(flags & {self.PAGE_LOG_DISCARDED}) = 0",
+            "compressed delta")
+        stdout, _ = self._run_wt_page(
+            "-p", str(page.page_id), "-l", str(page.lsn), self.stable_uri)
+        self.assertGreater(self._assert_chain_header(stdout, page), 1)
+        self.assertIn("delta_op: update", stdout)
 
     def test_missing_required_p(self):
         self._skip_if_not_diagnostic()

@@ -48,12 +48,6 @@ class test_hs06(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(format_values)
     nrows = 2000
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def get_non_page_image_memory_usage(self):
         return self.get_stat(stat.conn.cache_bytes_other)
 

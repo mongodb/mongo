@@ -55,12 +55,6 @@ class test_hs01(wttest.WiredTigerTestCase):
             config += ',precise_checkpoint=true'
         return config
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def large_updates(self, session, uri, value, ds, nrows, timestamp=False):
         cursor = session.open_cursor(uri)
         for i in range(1, nrows):

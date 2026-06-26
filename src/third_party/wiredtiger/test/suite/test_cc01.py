@@ -32,12 +32,6 @@ from wiredtiger import stat
 # Shared base class used by cc tests.
 class test_cc_base(wttest.WiredTigerTestCase):
 
-    def get_stat(self, stat, uri = ""):
-        stat_cursor = self.session.open_cursor(f'statistics:{uri}')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def large_updates(self, uri, value, ds, nrows, commit_ts):
         # Update a large number of records.
         session = self.session
@@ -82,23 +76,17 @@ class test_cc_base(wttest.WiredTigerTestCase):
     # Trigger checkpoint cleanup. The function waits for checkpoint cleanup to make progress before
     # exiting.
     def wait_for_cc_to_run(self, ckpt_name = ""):
-        c = self.session.open_cursor('statistics:')
-        cc_success = prev_cc_success = c[stat.conn.checkpoint_cleanup_success][2]
-        c.close()
+        cc_success = prev_cc_success = self.get_stat(stat.conn.checkpoint_cleanup_success)
         ckpt_config = "debug=(checkpoint_cleanup=true)"
         if ckpt_name:
             ckpt_config += f",name={ckpt_name}"
         self.session.checkpoint(ckpt_config)
         while cc_success - prev_cc_success == 0:
             time.sleep(0.1)
-            c = self.session.open_cursor('statistics:')
-            cc_success = c[stat.conn.checkpoint_cleanup_success][2]
-            c.close()
+            cc_success = self.get_stat(stat.conn.checkpoint_cleanup_success)
 
     # Trigger checkpoint clean up and check it has visited and removed pages.
     def check_cc_stats(self, ckpt_name = ""):
         self.wait_for_cc_to_run(ckpt_name=ckpt_name)
-        c = self.session.open_cursor('statistics:')
-        self.assertGreater(c[stat.conn.checkpoint_cleanup_pages_visited][2], 0)
-        self.assertGreater(c[stat.conn.checkpoint_cleanup_pages_removed][2], 0)
-        c.close()
+        self.assertStatGreaterSoon(stat.conn.checkpoint_cleanup_pages_visited, 0)
+        self.assertStatGreaterSoon(stat.conn.checkpoint_cleanup_pages_removed, 0)

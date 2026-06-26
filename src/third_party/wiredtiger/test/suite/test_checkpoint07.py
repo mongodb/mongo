@@ -44,12 +44,8 @@ class test_checkpoint07(wttest.WiredTigerTestCase):
     def conn_config(self):
         return 'cache_size=50MB,statistics=(all),' + self.ckpt_config
 
-    def get_stat(self, uri):
-        stat_uri = 'statistics:' + uri
-        stat_cursor = self.session.open_cursor(stat_uri)
-        val = stat_cursor[stat.dsrc.btree_clean_checkpoint_timer][2]
-        stat_cursor.close()
-        return val
+    def get_btree_clean_checkpoint_timer(self, uri):
+        return self.get_stat(stat.dsrc.btree_clean_checkpoint_timer, uri=uri)
 
     def test_checkpoint07(self):
         # Avoid checkpoint error with precise checkpoint
@@ -75,11 +71,11 @@ class test_checkpoint07(wttest.WiredTigerTestCase):
         self.session.checkpoint(None)
         c1[2] = 2
         self.session.checkpoint(None)
-        val1 = self.get_stat(self.uri1)
+        val1 = self.get_btree_clean_checkpoint_timer(self.uri1)
         self.assertEqual(val1, 0)
-        val2 = self.get_stat(self.uri2)
+        val2 = self.get_btree_clean_checkpoint_timer(self.uri2)
         self.assertNotEqual(val2, 0)
-        val3 = self.get_stat(self.uri3)
+        val3 = self.get_btree_clean_checkpoint_timer(self.uri3)
         self.assertNotEqual(val3, 0)
         # It is possible that we could span the second timer when processing table
         # two and table three during the checkpoint. If they're different check
@@ -89,22 +85,22 @@ class test_checkpoint07(wttest.WiredTigerTestCase):
 
         # Now force a checkpoint on clean tables. No clean timer should be set.
         self.session.checkpoint('force=true')
-        val = self.get_stat(self.uri1)
+        val = self.get_btree_clean_checkpoint_timer(self.uri1)
         self.assertEqual(val, 0)
-        val = self.get_stat(self.uri2)
+        val = self.get_btree_clean_checkpoint_timer(self.uri2)
         self.assertEqual(val, 0)
-        val = self.get_stat(self.uri3)
+        val = self.get_btree_clean_checkpoint_timer(self.uri3)
         self.assertEqual(val, 0)
 
         # Modify the first two tables and reverify all three.
         c1[3] = 3
         c2[3] = 3
         self.session.checkpoint(None)
-        val = self.get_stat(self.uri1)
+        val = self.get_btree_clean_checkpoint_timer(self.uri1)
         self.assertEqual(val, 0)
-        val = self.get_stat(self.uri2)
+        val = self.get_btree_clean_checkpoint_timer(self.uri2)
         self.assertEqual(val, 0)
-        val = self.get_stat(self.uri3)
+        val = self.get_btree_clean_checkpoint_timer(self.uri3)
         self.assertNotEqual(val, 0)
 
         # Open a backup cursor. This will pin the most recent checkpoint.
@@ -113,16 +109,16 @@ class test_checkpoint07(wttest.WiredTigerTestCase):
         backup_cursor = self.session.open_cursor('backup:', None, None)
         c1[4] = 4
         self.session.checkpoint(None)
-        val = self.get_stat(self.uri1)
+        val = self.get_btree_clean_checkpoint_timer(self.uri1)
         self.assertEqual(val, 0)
 
         c2[4] = 4
         self.session.checkpoint(None)
-        val2 = self.get_stat(self.uri2)
+        val2 = self.get_btree_clean_checkpoint_timer(self.uri2)
         self.assertEqual(val2, 0)
 
-        val1 = self.get_stat(self.uri1)
-        val3 = self.get_stat(self.uri3)
+        val1 = self.get_btree_clean_checkpoint_timer(self.uri1)
+        val3 = self.get_btree_clean_checkpoint_timer(self.uri3)
         # Assert table 1 does not have the forever timer value, but it is set.
         # This assumes table 3 has the forever value.
         self.assertNotEqual(val1, 0)
@@ -135,17 +131,17 @@ class test_checkpoint07(wttest.WiredTigerTestCase):
         # to table 2. Since table 1 and table 3 are clean again, this should
         # force both table 1 and table 3 to have the smaller timer.
         self.session.checkpoint('force=true')
-        val1 = self.get_stat(self.uri1)
-        val3 = self.get_stat(self.uri3)
+        val1 = self.get_btree_clean_checkpoint_timer(self.uri1)
+        val3 = self.get_btree_clean_checkpoint_timer(self.uri3)
         self.assertEqual(val1, 0)
         self.assertEqual(val3, 0)
         c2[5] = 5
         self.session.checkpoint(None)
-        val2 = self.get_stat(self.uri2)
+        val2 = self.get_btree_clean_checkpoint_timer(self.uri2)
         self.assertEqual(val2, 0)
 
-        val1 = self.get_stat(self.uri1)
-        val3 = self.get_stat(self.uri3)
+        val1 = self.get_btree_clean_checkpoint_timer(self.uri1)
+        val3 = self.get_btree_clean_checkpoint_timer(self.uri3)
         self.assertNotEqual(val1, 0)
         self.assertNotEqual(val3, 0)
         self.assertLess(val3, foreverValue)
@@ -161,16 +157,16 @@ class test_checkpoint07(wttest.WiredTigerTestCase):
         # closing the backup cursor to check that both tables are now marked
         # with the forever value.
         self.session.checkpoint('force=true')
-        val1 = self.get_stat(self.uri1)
-        val3 = self.get_stat(self.uri3)
+        val1 = self.get_btree_clean_checkpoint_timer(self.uri1)
+        val3 = self.get_btree_clean_checkpoint_timer(self.uri3)
         self.assertEqual(val1, 0)
         self.assertEqual(val3, 0)
         c2[6] = 6
         self.session.checkpoint(None)
-        val2 = self.get_stat(self.uri2)
+        val2 = self.get_btree_clean_checkpoint_timer(self.uri2)
         self.assertEqual(val2, 0)
 
-        val3 = self.get_stat(self.uri3)
+        val3 = self.get_btree_clean_checkpoint_timer(self.uri3)
         self.assertEqual(val3, foreverValue)
 
         self.session.close()

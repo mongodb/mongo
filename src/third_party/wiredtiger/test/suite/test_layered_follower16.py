@@ -119,14 +119,6 @@ class test_layered_follower16(wttest.WiredTigerTestCase):
     def follower_config(self):
         return self.extensionsConfig() + self.conn_base_config + 'disaggregated=(role="follower")'
 
-    def get_stat(self, session, stat_key):
-        stat_cursor = session.open_cursor('statistics:')
-        stat_cursor.set_key(stat_key)
-        stat_cursor.search()
-        val = stat_cursor.get_value()[2]
-        stat_cursor.close()
-        return val
-
     def insert_keys(self, session, nkeys, ts):
         cursor = session.open_cursor(self.uri)
         for i in range(nkeys):
@@ -164,7 +156,7 @@ class test_layered_follower16(wttest.WiredTigerTestCase):
         # Any operation before a checkpoint must not open stable.
         session_follow.begin_transaction()
         self.do_op(cursor_follow)
-        self.assertEqual(self.get_stat(session_follow, wiredtiger.stat.conn.layered_curs_open_stable), 0)
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.layered_curs_open_stable, session=session_follow), 0)
 
         if self.txn_mode != 'survive':
             self.end_txn(session_follow)
@@ -182,8 +174,8 @@ class test_layered_follower16(wttest.WiredTigerTestCase):
         self.do_op(cursor_follow)
         self.end_txn(session_follow)
 
-        self.assertEqual(self.get_stat(session_follow, wiredtiger.stat.conn.layered_curs_open_stable), opens_stable)
-        self.assertEqual(self.get_stat(session_follow, wiredtiger.stat.conn.layered_curs_reopen_stable), 0)
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.layered_curs_open_stable, session=session_follow), opens_stable)
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.layered_curs_reopen_stable, session=session_follow), 0)
 
         cursor_follow.close()
         conn_follow.close()

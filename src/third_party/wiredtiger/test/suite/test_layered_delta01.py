@@ -98,9 +98,7 @@ class test_layered_delta01(wttest.WiredTigerTestCase):
                 self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(10))
         self.session.checkpoint()
 
-        stat_cursor = self.session.open_cursor('statistics:')
-        self.assertGreater(stat_cursor[stat.conn.rec_page_delta_leaf][2], 0)
-        stat_cursor.close()
+        self.assertStatGreaterSoon(stat.conn.rec_page_delta_leaf, 0)
 
         follower_config = self.conn_base_config + 'disaggregated=(role="follower",' +\
             f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'
@@ -148,9 +146,7 @@ class test_layered_delta01(wttest.WiredTigerTestCase):
 
         self.session.checkpoint()
 
-        stat_cursor = self.session.open_cursor('statistics:')
-        self.assertGreater(stat_cursor[stat.conn.rec_page_delta_leaf][2], 0)
-        stat_cursor.close()
+        self.assertStatGreaterSoon(stat.conn.rec_page_delta_leaf, 0)
 
         follower_config = self.conn_base_config + 'disaggregated=(role="follower",' +\
             f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'
@@ -197,9 +193,7 @@ class test_layered_delta01(wttest.WiredTigerTestCase):
 
         self.session.checkpoint()
 
-        stat_cursor = self.session.open_cursor('statistics:')
-        self.assertGreater(stat_cursor[stat.conn.rec_page_delta_leaf][2], 0)
-        stat_cursor.close()
+        self.assertStatGreaterSoon(stat.conn.rec_page_delta_leaf, 0)
 
         follower_config = self.conn_base_config + 'disaggregated=(role="follower",' +\
             f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'
@@ -245,9 +239,7 @@ class test_layered_delta01(wttest.WiredTigerTestCase):
 
         self.session.checkpoint()
 
-        stat_cursor = self.session.open_cursor('statistics:')
-        self.assertGreater(stat_cursor[stat.conn.rec_page_delta_leaf][2], 0)
-        stat_cursor.close()
+        self.assertStatGreaterSoon(stat.conn.rec_page_delta_leaf, 0)
 
         follower_config = self.conn_base_config + 'disaggregated=(role="follower",' +\
             f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'
@@ -304,9 +296,7 @@ class test_layered_delta01(wttest.WiredTigerTestCase):
 
         self.session.checkpoint()
 
-        stat_cursor = self.session.open_cursor('statistics:')
-        self.assertGreater(stat_cursor[stat.conn.rec_page_delta_leaf][2], 0)
-        stat_cursor.close()
+        self.assertStatGreaterSoon(stat.conn.rec_page_delta_leaf, 0)
 
         follower_config = self.conn_base_config + 'disaggregated=(role="follower",' +\
             f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'
@@ -372,9 +362,7 @@ class test_layered_delta01(wttest.WiredTigerTestCase):
 
         self.session.checkpoint()
 
-        stat_cursor = self.session.open_cursor('statistics:')
-        self.assertGreater(stat_cursor[stat.conn.rec_page_delta_leaf][2], 0)
-        stat_cursor.close()
+        self.assertStatGreaterSoon(stat.conn.rec_page_delta_leaf, 0)
 
         follower_config = self.conn_base_config + 'disaggregated=(role="follower",' +\
             f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'

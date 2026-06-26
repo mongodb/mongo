@@ -381,19 +381,6 @@ __clayered_can_advance_stable(WT_CURSOR_LAYERED *clayered, uint64_t conn_lsn, bo
         return (false);
 
     /*
-     * Layered cursor is positioned on the stable cursor. Changing it may lose the layered cursor
-     * position.
-     *
-     * FIXME-WT-16467: If we are reading with a timestamp and can ensure that we never select a
-     * checkpoint with an oldest timestamp greater than the pinned timestamp, we should safely
-     * advance to a newer checkpoint. This is because the version we intend to read would still be
-     * present in the newer checkpoint.
-     */
-    if (clayered->stable_cursor != NULL && clayered->current_cursor == clayered->stable_cursor &&
-      F_ISSET(clayered->stable_cursor, WT_CURSTD_KEY_INT))
-        return (false);
-
-    /*
      * First, layered cursors are sometimes paired with read timestamps. When using read
      timestamps,
      * it's always safe to update cursors, even during iterations. That's because the view at a
@@ -403,6 +390,14 @@ __clayered_can_advance_stable(WT_CURSOR_LAYERED *clayered, uint64_t conn_lsn, bo
     if (txn_shared != NULL && txn_shared->read_timestamp != WT_TS_NONE)
         return (true);
     else {
+        /*
+         * Layered cursor is positioned on the stable cursor. Changing it may lose the layered
+         * cursor position.
+         */
+        if (F_ISSET(&clayered->iface, WT_CURSTD_KEY_INT) &&
+          clayered->current_cursor == clayered->stable_cursor)
+            return (false);
+
         /* if this is an iteration, we won't reopen the cursor, we're done. */
         if (iteration)
             return (false);

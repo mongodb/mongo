@@ -83,7 +83,7 @@ class test_layered_fast_truncate03(LayeredFastTruncateConfigMixin, wttest.WiredT
         self.leader_checkpoint(20)
         conn, sess = self.open_follower()
         sample = list(range(self.trunc_start, self.trunc_stop + 1, 10))
-        dirty_before = self.get_stat(conn, stat.conn.cache_pages_dirty)
+        dirty_before = self.get_stat(stat.conn.cache_pages_dirty, conn=conn)
 
         # Initial read: no deleted key found, no pages dirtied.
         cur = sess.open_cursor(self.uri)
@@ -93,7 +93,7 @@ class test_layered_fast_truncate03(LayeredFastTruncateConfigMixin, wttest.WiredT
             self.assertEqual(cur.search(), wiredtiger.WT_NOTFOUND)
         sess.rollback_transaction()
         cur.close()
-        self.assertEqual(self.get_stat(conn, stat.conn.cache_pages_dirty), dirty_before)
+        self.assertEqual(self.get_stat(stat.conn.cache_pages_dirty, conn=conn), dirty_before)
 
         self.evict_range(sess, self.trunc_start, self.trunc_stop)
 
@@ -105,7 +105,7 @@ class test_layered_fast_truncate03(LayeredFastTruncateConfigMixin, wttest.WiredT
             self.assertEqual(cur.search(), wiredtiger.WT_NOTFOUND)
         sess.rollback_transaction()
         cur.close()
-        self.assertEqual(self.get_stat(conn, stat.conn.cache_pages_dirty), dirty_before)
+        self.assertEqual(self.get_stat(stat.conn.cache_pages_dirty, conn=conn), dirty_before)
 
         self.evict_range(sess, self.trunc_start, self.trunc_stop)
         sess.close()
@@ -120,7 +120,7 @@ class test_layered_fast_truncate03(LayeredFastTruncateConfigMixin, wttest.WiredT
         self.leader_checkpoint(20)
         conn, sess = self.open_follower()
         sample = list(range(self.trunc_start, self.trunc_stop + 1, 10))
-        dirty_before = self.get_stat(conn, stat.conn.cache_pages_dirty)
+        dirty_before = self.get_stat(stat.conn.cache_pages_dirty, conn=conn)
 
         # No pages dirtied by reading the truncated range across many small leaf pages.
         cur = sess.open_cursor(self.uri)
@@ -130,7 +130,7 @@ class test_layered_fast_truncate03(LayeredFastTruncateConfigMixin, wttest.WiredT
             self.assertEqual(cur.search(), wiredtiger.WT_NOTFOUND)
         sess.rollback_transaction()
         cur.close()
-        self.assertEqual(self.get_stat(conn, stat.conn.cache_pages_dirty), dirty_before)
+        self.assertEqual(self.get_stat(stat.conn.cache_pages_dirty, conn=conn), dirty_before)
 
         self.evict_range(sess, self.trunc_start, self.trunc_stop)
         self.advance_follower(conn)
@@ -204,15 +204,15 @@ class test_layered_fast_truncate03(LayeredFastTruncateConfigMixin, wttest.WiredT
         self.leader_checkpoint(20)
         conn, sess = self.open_follower()
 
-        dirty_before = self.get_stat(conn, stat.conn.cache_pages_dirty)
-        rd_before    = self.get_stat(conn, stat.conn.cache_read_deleted)
+        dirty_before = self.get_stat(stat.conn.cache_pages_dirty, conn=conn)
+        rd_before    = self.get_stat(stat.conn.cache_read_deleted, conn=conn)
 
         # Pre-truncation read forces page load: key found, read_deleted increments, page stays clean.
         ret, val = self.search_at(sess, self.trunc_start + 100, 10)
         self.assertEqual(ret, 0)
         self.assertEqual(val, self.value)
-        self.assertGreater(self.get_stat(conn, stat.conn.cache_read_deleted), rd_before)
-        self.assertEqual(self.get_stat(conn, stat.conn.cache_pages_dirty), dirty_before)
+        self.assertGreater(self.get_stat(stat.conn.cache_read_deleted, conn=conn), rd_before)
+        self.assertEqual(self.get_stat(stat.conn.cache_pages_dirty, conn=conn), dirty_before)
         self.evict_range(sess, self.trunc_start + 100, self.trunc_start + 100)
 
         sess.close()

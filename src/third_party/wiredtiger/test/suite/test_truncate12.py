@@ -157,8 +157,7 @@ class test_truncate12(wttest.WiredTigerTestCase):
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(30))
 
         # Make sure we did at least one fast-delete. (Unless we specifically didn't want to)
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        fastdelete_pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
+        fastdelete_pages = self.get_stat(stat.conn.rec_page_delete_fast)
         if self.runningHook('tiered'):
             # There's no way the test can guess whether fast delete is possible when
             # flush_tier calls are "randomly" inserted.
@@ -177,10 +176,8 @@ class test_truncate12(wttest.WiredTigerTestCase):
         cursor1.close()
 
         # Doing that should not have instantiated any deleted pages.
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        read_deleted = stat_cursor[stat.conn.cache_read_deleted][2]
+        read_deleted = self.get_stat(stat.conn.cache_read_deleted)
         self.assertEqual(read_deleted, 0)
-        stat_cursor.close()
 
         # Advance stable to 35. We'll be rolling back the updated keys but not the truncate.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(35))
@@ -195,10 +192,8 @@ class test_truncate12(wttest.WiredTigerTestCase):
 
         # Recovery should not have instantiated any deleted pages. But it should have loaded
         # the first internal page, which should contain at least a few deleted pages.
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        read_deleted = stat_cursor[stat.conn.cache_read_deleted][2]
+        read_deleted = self.get_stat(stat.conn.cache_read_deleted)
         self.assertEqual(read_deleted, 0)
-        stat_cursor.close()
 
         # Validate the data. Because we cranked forward the transaction IDs, the truncate
         # transactions should have large transaction IDs and if we mishandle the write

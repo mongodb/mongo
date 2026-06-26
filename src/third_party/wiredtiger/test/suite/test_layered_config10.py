@@ -57,12 +57,6 @@ class test_layered_config10(wttest.WiredTigerTestCase, DisaggConfigMixin):
             check_func(c.get_value())
         c.close()
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def add_data(self, uri, nitems):
         cursor = self.session.open_cursor(uri, None, None)
         for i in range(nitems):
@@ -118,7 +112,7 @@ class test_layered_config10(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
         self.add_data(uri, 1000)
 
-        self.assertGreater(self.get_stat(stat.conn.disagg_block_put_cold), 0)
+        self.assertStatGreaterSoon(stat.conn.disagg_block_put_cold, 0)
 
     def test_cold_read(self):
         self.conn.reconfigure('disaggregated=(role=leader)')
@@ -134,4 +128,4 @@ class test_layered_config10(wttest.WiredTigerTestCase, DisaggConfigMixin):
         # Verify the table to read all pages.
         self.verifyUntilSuccess(uri=uri)
 
-        self.assertGreater(self.get_stat(stat.conn.disagg_block_get_cold), 0)
+        self.assertStatGreaterSoon(stat.conn.disagg_block_get_cold, 0)

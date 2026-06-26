@@ -76,10 +76,7 @@ class compact_util(wttest.WiredTigerTestCase):
         return self.get_stat(stat.dsrc.btree_compact_pages_rewritten, uri)
 
     def get_bg_compaction_files_skipped(self):
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        skipped = stat_cursor[stat.conn.background_compact_skipped][2]
-        stat_cursor.close()
-        return skipped
+        return self.get_stat(stat.conn.background_compact_skipped)
 
     # Return the size of the given file.
     def get_size(self, uri):
@@ -90,14 +87,6 @@ class compact_util(wttest.WiredTigerTestCase):
         sz = cstat[stat.dsrc.block_size][2]
         cstat.close()
         return sz
-
-    def get_stat(self, stat, uri = None):
-        if not uri:
-            uri = ''
-        stat_cursor = self.session.open_cursor(f'statistics:{uri}', None, None)
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
 
     def populate(self, uri, start_key, num_keys, value=None, value_size=1024):
         c = self.session.open_cursor(uri, None)

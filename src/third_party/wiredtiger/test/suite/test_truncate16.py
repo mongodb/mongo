@@ -134,8 +134,7 @@ class test_truncate16(wttest.WiredTigerTestCase):
         session2.prepare_transaction('prepare_timestamp=' + self.timestamp_str(20))
 
         # Make sure we did at least one fast-delete. (Unless we specifically didn't want to)
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        fastdelete_pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
+        fastdelete_pages = self.get_stat(stat.conn.rec_page_delete_fast)
         if self.runningHook('tiered'):
             # There's no way the test can guess whether fast delete is possible when
             # flush_tier calls are "randomly" inserted.
@@ -144,7 +143,6 @@ class test_truncate16(wttest.WiredTigerTestCase):
             self.assertEqual(fastdelete_pages, 0)
         else:
             self.assertGreater(fastdelete_pages, 0)
-        stat_cursor.close()
 
         # Optionally checkpoint at this stage, just in case it breaks or trips on
         # the prepared truncation.
@@ -161,8 +159,7 @@ class test_truncate16(wttest.WiredTigerTestCase):
 
         # It should have instantiated the page under the key we read, and nothing else.
         # (But not if we weren't fast-deleting.)
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        read_deleted = stat_cursor[stat.conn.cache_read_deleted][2]
+        read_deleted = self.get_stat(stat.conn.cache_read_deleted)
         if self.runningHook('tiered'):
             # There's no way the test can guess whether fast delete is possible when
             # flush_tier calls are "randomly" inserted.
@@ -171,7 +168,6 @@ class test_truncate16(wttest.WiredTigerTestCase):
             self.assertEqual(read_deleted, 0)
         else:
             self.assertEqual(read_deleted, 1)
-        stat_cursor.close()
 
         # Now toss the prepared transaction, and just for kicks make sure we can read the whole
         # table.
@@ -185,7 +181,5 @@ class test_truncate16(wttest.WiredTigerTestCase):
 
         # Unlike RTS, transaction rollback should not instantiate pages, so the number of
         # instantiated pages should remain 1.
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        read_deleted_still = stat_cursor[stat.conn.cache_read_deleted][2]
+        read_deleted_still = self.get_stat(stat.conn.cache_read_deleted)
         self.assertEqual(read_deleted_still, read_deleted)
-        stat_cursor.close()

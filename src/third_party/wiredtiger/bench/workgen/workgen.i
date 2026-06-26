@@ -38,6 +38,12 @@
 %include "attribute.i"
 %include "carrays.i"
 
+/*
+ * SWIG doesn't support nested classes when bridging to Python.
+ * Use 'flatnested' feature to generate a non-nested proxy class.
+ */
+%feature("flatnested");
+
 /* We only need to reference WiredTiger types. */
 %import "wiredtiger.h"
 

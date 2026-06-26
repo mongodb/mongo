@@ -62,12 +62,6 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
 
     scenarios = make_scenarios(commit_values, format_values)
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def search_keys_timestamp_and_ignore(self, ds, txn_config, expected_value, conflict=False):
         cursor = self.session.open_cursor(self.uri)
 

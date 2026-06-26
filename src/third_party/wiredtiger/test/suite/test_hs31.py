@@ -55,12 +55,6 @@ class test_hs31(wttest.WiredTigerTestCase):
             return str(i)
         return i
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def test_mm_tombstone_clear_hs(self):
         uri = f'file:{self.test_name}'
         create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)

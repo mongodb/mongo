@@ -46,9 +46,7 @@ class test_cache_evict_config02(wttest.WiredTigerTestCase):
         cursor.close()
 
         # Baseline eviction stats before enabling scrub
-        stat_cursor = self.session.open_cursor("statistics:")
-        pages_scrubbed_baseline = stat_cursor[stat.conn.cache_write_restore_scrub][2]
-        stat_cursor.close()
+        pages_scrubbed_baseline = self.get_stat(stat.conn.cache_write_restore_scrub)
 
         # Enable prefer_scrub_eviction flag
         self.conn.reconfigure(
@@ -60,14 +58,6 @@ class test_cache_evict_config02(wttest.WiredTigerTestCase):
             cursor[i % 100] = val
         cursor.close()
 
-        # Check eviction stats after enabling scrub
-        stat_cursor = self.session.open_cursor("statistics:")
-        pages_scrubbed_with_flag = stat_cursor[stat.conn.cache_write_restore_scrub][2]
-        stat_cursor.close()
-
         # Check that by enabling scrub-under-target flag, more pages were scrub evicted
-        self.assertGreater(
-            pages_scrubbed_with_flag,
-            pages_scrubbed_baseline,
-            "Scrub eviction should increase restored updates when enabled"
-        )
+        self.assertStatGreaterSoon(stat.conn.cache_write_restore_scrub, pages_scrubbed_baseline,
+            msg="Scrub eviction should increase restored updates when enabled")

@@ -96,12 +96,6 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
                 break
             self.session.checkpoint()
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def check_data(self, ds, message, nkeys, nrows, timestamp, expected_value):
         # Search for the keys inserted with commit timestamp
         cursor = self.session.open_cursor(self.uri)

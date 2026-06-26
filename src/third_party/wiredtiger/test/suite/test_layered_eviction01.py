@@ -48,12 +48,6 @@ class test_layered_eviction01(wttest.WiredTigerTestCase):
     def session_create_config(self):
         return 'key_format=S,value_format=S,'
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def evict(self, uri, keys):
         self.session.begin_transaction()
         # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.

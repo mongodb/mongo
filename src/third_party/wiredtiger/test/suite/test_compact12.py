@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import time, wttest
+import wttest
 from compact_util import compact_util
 from test_cc01 import test_cc_base
 from wiredtiger import stat
@@ -51,10 +51,7 @@ class test_compact12(compact_util, test_cc_base):
     value_size = kilobyte # The value should be small enough so that we don't create overflow pages.
 
     def get_fast_truncated_pages(self):
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
-        stat_cursor.close()
-        return pages
+        return self.get_stat(stat.conn.rec_page_delete_fast)
 
     def populate(self, uri, num_keys):
         c = self.session.open_cursor(uri, None)

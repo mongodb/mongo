@@ -63,10 +63,7 @@ class test_prepare28(wttest.WiredTigerTestCase):
 
         ooo_thread.join()
 
-        stat_cursor = self.session.open_cursor('statistics:')
-        race_prepare_commit = stat_cursor[wiredtiger.stat.conn.txn_read_race_prepare_commit][2]
-        self.assertGreater(race_prepare_commit, 0)
-        stat_cursor.close()
+        self.assertStatGreaterSoon(wiredtiger.stat.conn.txn_read_race_prepare_commit, 0)
 
     def read_update(self):
         sleep(0.1)

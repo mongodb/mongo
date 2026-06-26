@@ -112,14 +112,6 @@ class test_layered_stepup09(wttest.WiredTigerTestCase):
     def follower_config(self):
         return self.extensionsConfig() + self.conn_base_config + 'disaggregated=(role="follower")'
 
-    def get_stat(self, session, stat_key):
-        stat_cursor = session.open_cursor('statistics:')
-        stat_cursor.set_key(stat_key)
-        stat_cursor.search()
-        val = stat_cursor.get_value()[2]
-        stat_cursor.close()
-        return val
-
     def insert_keys(self, session, nkeys, ts):
         cursor = session.open_cursor(self.uri)
         for i in range(nkeys):
@@ -153,13 +145,13 @@ class test_layered_stepup09(wttest.WiredTigerTestCase):
         # Replicate the leader's rows to the follower's ingest.
         # `insert_keys` opens a default (overwrite) cursor so stable stays unopened.
         self.insert_keys(session_follow, 5, 10)
-        self.assertEqual(self.get_stat(session_follow, wiredtiger.stat.conn.layered_curs_open_stable), 0)
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.layered_curs_open_stable, session=session_follow), 0)
 
         # First read opens the stable cursor in read-only mode.
         cursor_follow.set_key('key_0')
         self.assertEqual(cursor_follow.search(), 0)
-        self.assertEqual(self.get_stat(session_follow, wiredtiger.stat.conn.layered_curs_open_stable), 1)
-        self.assertEqual(self.get_stat(session_follow, wiredtiger.stat.conn.layered_curs_reopen_stable), 0)
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.layered_curs_open_stable, session=session_follow), 1)
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.layered_curs_reopen_stable, session=session_follow), 0)
 
         # Close the leader and step up on the follower.
         cursor_follow.reset()
@@ -170,8 +162,8 @@ class test_layered_stepup09(wttest.WiredTigerTestCase):
         session_follow.begin_transaction()
         self.do_op(cursor_follow)
         session_follow.rollback_transaction()
-        self.assertEqual(self.get_stat(session_follow, wiredtiger.stat.conn.layered_curs_open_stable), 1)
-        self.assertEqual(self.get_stat(session_follow, wiredtiger.stat.conn.layered_curs_reopen_stable), 1)
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.layered_curs_open_stable, session=session_follow), 1)
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.layered_curs_reopen_stable, session=session_follow), 1)
 
         cursor_follow.close()
         conn_follow.close()
@@ -186,7 +178,7 @@ class test_layered_stepup09(wttest.WiredTigerTestCase):
         # Replicate the leader's rows to the follower's ingest.
         # `insert_keys` opens a default (overwrite) cursor so stable stays unopened.
         self.insert_keys(session_follow, 3, 10)
-        self.assertEqual(self.get_stat(session_follow, wiredtiger.stat.conn.layered_curs_open_stable), 0)
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.layered_curs_open_stable, session=session_follow), 0)
 
         # Close the leader and step up on the follower.
         cursor_follow.reset()
@@ -197,8 +189,8 @@ class test_layered_stepup09(wttest.WiredTigerTestCase):
         session_follow.begin_transaction()
         self.do_op(cursor_follow)
         session_follow.rollback_transaction()
-        self.assertEqual(self.get_stat(session_follow, wiredtiger.stat.conn.layered_curs_open_stable), 1)
-        self.assertEqual(self.get_stat(session_follow, wiredtiger.stat.conn.layered_curs_reopen_stable), 0)
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.layered_curs_open_stable, session=session_follow), 1)
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.layered_curs_reopen_stable, session=session_follow), 0)
 
         cursor_follow.close()
         conn_follow.close()

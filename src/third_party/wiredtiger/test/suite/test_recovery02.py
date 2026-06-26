@@ -26,27 +26,19 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import time
-import wttest
-from wiredtiger import stat
+import wiredtiger, wttest
 
-# Base class providing checkpoint-related helpers.
-class checkpoint_util(wttest.WiredTigerTestCase):
+class test_recovery02(wttest.WiredTigerTestCase):
+    def test_recovery02(self):
+        # Open the metadata cursor in write mode.
+        cursor = self.session.open_cursor('metadata:', None, 'readonly=0')
 
-    def wait_for_checkpoint_start(self, session=None, timeout=60, poll_interval=0.1):
-        """
-        Poll until a checkpoint is running (the checkpoint_state connection statistic becomes
-        non-zero). Bounded so the test fails fast with a clear message instead of spinning to a
-        task-level timeout if a checkpoint never starts. poll_interval controls how often the
-        statistic is sampled.
-        """
-        if session is None:
-            session = self.session
-        deadline = time.time() + timeout
-        while True:
-            state = self.get_stat(stat.conn.checkpoint_state, session=session)
-            if state != 0:
-                break
-            self.assertLess(time.time(), deadline,
-                'checkpoint did not start running within %d seconds' % timeout)
-            time.sleep(poll_interval)
+        # Insert an incomplete table config (empty config string with no columns key).
+        cursor['table:recovery02'] = ''
+        cursor.close()
+
+        # Close the connection to ensure the metadata checkpoint is written to disk.
+        self.close_conn()
+
+        self.assertRaisesWithMessage(
+            wiredtiger.WiredTigerError, lambda: self.open_conn(), "/Recovery failed/")

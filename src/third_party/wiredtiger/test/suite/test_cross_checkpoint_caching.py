@@ -49,26 +49,20 @@ class test_cross_checkpoint_caching(wttest.WiredTigerTestCase):
     disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
-    def get_stat(self, stat_key, session):
-        stat_cursor = session.open_cursor('statistics:')
-        val = stat_cursor[stat_key][2]
-        stat_cursor.close()
-        return val
-
     # Scan the table on the follower, returning the scan's miss and hit deltas
     # so reads done outside the scan don't count.
     def follower_scan(self, session_follow):
-        miss_before = self.get_stat(wiredtiger.stat.conn.cache_shared_dsk_miss, session_follow)
-        hit_before = self.get_stat(wiredtiger.stat.conn.cache_shared_dsk_hit, session_follow)
+        miss_before = self.get_stat(wiredtiger.stat.conn.cache_shared_dsk_miss, session=session_follow)
+        hit_before = self.get_stat(wiredtiger.stat.conn.cache_shared_dsk_hit, session=session_follow)
         cursor = session_follow.open_cursor(self.uri)
         count = 0
         while cursor.next() == 0:
             count += 1
         cursor.close()
         self.assertEqual(count, self.nrows)
-        miss = self.get_stat(wiredtiger.stat.conn.cache_shared_dsk_miss, session_follow) \
+        miss = self.get_stat(wiredtiger.stat.conn.cache_shared_dsk_miss, session=session_follow) \
             - miss_before
-        hit = self.get_stat(wiredtiger.stat.conn.cache_shared_dsk_hit, session_follow) \
+        hit = self.get_stat(wiredtiger.stat.conn.cache_shared_dsk_hit, session=session_follow) \
             - hit_before
         return miss, hit
 

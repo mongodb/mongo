@@ -47,10 +47,7 @@ class test_truncate27(wttest.WiredTigerTestCase):
         self.session.rollback_transaction()
 
     def get_fast_truncated_pages(self):
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
-        stat_cursor.close()
-        return pages
+        return self.get_stat(stat.conn.rec_page_delete_fast)
 
     def test_truncate27(self):
         nrows = 100000

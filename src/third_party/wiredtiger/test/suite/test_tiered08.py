@@ -64,12 +64,6 @@ class test_tiered08(wttest.WiredTigerTestCase, TieredConfigMixin):
     def conn_extensions(self, extlist):
         TieredConfigMixin.conn_extensions(self, extlist)
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def key_gen(self, i):
         return 'KEY' + str(i)
 

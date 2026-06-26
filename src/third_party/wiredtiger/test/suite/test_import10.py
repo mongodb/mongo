@@ -43,12 +43,6 @@ class test_import10(backup_base):
         ('import_repair', dict(repair=True)),
     ])
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def test_import_with_open_backup_cursor(self):
         # Create and populate the table.
         table_uri = 'table:' + self.uri

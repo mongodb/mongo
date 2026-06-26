@@ -44,12 +44,6 @@ class test_alter05(TieredConfigMixin, wttest.WiredTigerTestCase):
         conf += 'statistics=(all)'
         return conf
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def verify_metadata(self, metastr):
         c = self.session.open_cursor('metadata:', None, None)
 

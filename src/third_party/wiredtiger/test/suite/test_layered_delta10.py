@@ -50,14 +50,6 @@ class test_layered_delta10(wttest.WiredTigerTestCase):
     # Make scenarios for different cloud service providers
     scenarios = make_scenarios(disagg_storages, split)
 
-    def get_stat(self, stat, uri = None):
-        if not uri:
-            uri = ''
-        stat_cursor = self.session.open_cursor(f'statistics:{uri}', None, None)
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def test_page_split_delta(self):
         self.session.create(self.uri,
             'key_format=S,value_format=S,block_manager=disagg,' +

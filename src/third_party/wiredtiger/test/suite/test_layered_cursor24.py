@@ -27,11 +27,11 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 # test_layered_cursor24.py
-#   A follower cursor positioned on the stable constituent must not reopen the stable table to a
-#   newer checkpoint while it is still positioned, even when one is available. A write operation
-#   localizes the cursor's key (WT_CURSTD_KEY_INT becomes WT_CURSTD_KEY_EXT) before entering, so the
-#   reopen guard must test WT_CURSTD_KEY_SET rather than WT_CURSTD_KEY_INT; otherwise the localized
-#   key slips past the guard and the stable cursor is reopened underneath the live position.
+#   When a follower cursor update runs inside a transaction with a read timestamp, the stable
+#   constituent is allowed to advance to a newer checkpoint even while the cursor is positioned.
+#   A read timestamp guarantees the required version is still present in any newer checkpoint, so
+#   the reopen is safe. The guard that blocks stable advancement while positioned only applies when
+#   the transaction carries no read timestamp.
 
 import wiredtiger, wttest
 from wiredtiger import stat
@@ -76,7 +76,7 @@ class test_layered_cursor24(wttest.WiredTigerTestCase):
         stat_cursor.close()
         return number
 
-    def test_no_reopen_while_positioned_on_stable(self):
+    def test_reopen_stable_allowed_with_read_timestamp(self):
         # Seed the key into the stable constituent and position a follower cursor on it.
         self.write_stable(1, 'v1', 1)
         cursor = self.session_follow.open_cursor(self.uri)
@@ -87,13 +87,12 @@ class test_layered_cursor24(wttest.WiredTigerTestCase):
         # now be possible.
         self.write_stable(2, 'v2', 2)
 
-        # A positioned write localizes the key and runs in a later transaction with a read timestamp.
-        # The stable cursor is still positioned, so it must not be reopened to pick up the newer
-        # checkpoint; without the WT_CURSTD_KEY_SET guard the localized key slips past the check and
-        # the stable btree is reopened underneath the live position.
+        # The update runs inside a transaction pinned to read_timestamp=1. Because a read timestamp
+        # is set, the stable cursor is allowed to reopen to the newer checkpoint  the version
+        # pinned by the read timestamp is still present there. Expect exactly one stable reopen.
         before = self.reopen_stable_count()
         self.session_follow.begin_transaction('read_timestamp=' + self.timestamp_str(1))
         cursor.set_value('v3')
         self.assertEqual(cursor.update(), 0)
         self.session_follow.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
-        self.assertEqual(self.reopen_stable_count(), before)
+        self.assertEqual(self.reopen_stable_count(), before + 1)

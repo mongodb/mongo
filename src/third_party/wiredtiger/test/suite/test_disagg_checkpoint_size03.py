@@ -81,9 +81,7 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
 
         # With delta_pct=20 and this workload (rewriting every row each cycle),
         # no deltas should ever be emitted, only full page images.
-        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
-        delta_count = stat_cursor[stat.dsrc.rec_page_delta_leaf][2]
-        stat_cursor.close()
+        delta_count = self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri)
         self.assertEqual(delta_count, 0,
             f"Expected no deltas with delta_pct=20, but got {delta_count}")
 
@@ -128,10 +126,7 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
             f"Check delta chain termination handling in rec_write.c")
 
         # Verify we actually created deltas during the test
-        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
-        total_deltas = stat_cursor[stat.dsrc.rec_page_delta_leaf][2]
-        stat_cursor.close()
-        self.assertGreater(total_deltas, 0, "No deltas were created during test")
+        self.assertStatGreaterSoon(stat.dsrc.rec_page_delta_leaf, 0, uri=self.uri, msg="No deltas were created during test")
 
     # Uses the class-level delta_pct=90 -- no reconfigure needed.
     def test_bytes_total_leak_delta_normal_ops(self):
@@ -155,11 +150,8 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
             self.session.checkpoint()
 
             # Verify deltas were created
-            stat_cursor = self.session.open_cursor('statistics:' + self.uri)
-            delta_count = stat_cursor[stat.dsrc.rec_page_delta_leaf][2]
-            stat_cursor.close()
-            self.assertGreater(delta_count, 0,
-                f"Cycle {cycle}: Expected leaf page deltas but got {delta_count}")
+            self.assertStatGreaterSoon(stat.dsrc.rec_page_delta_leaf, 0, uri=self.uri,
+                msg=f"Cycle {cycle}: Expected leaf page deltas but got 0")
 
     # Regression test for the size leak after rec_result is set to WT_PAGE_CLEAN.
     def test_size_leak_after_rec_result_page_clean(self):
@@ -249,13 +241,9 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
             size_after_delta = self.get_checkpoint_size()
 
             # Verify a new delta was actually created this cycle.
-            stat_cursor = self.session.open_cursor('statistics:' + self.uri)
-            delta_count = stat_cursor[stat.dsrc.rec_page_delta_leaf][2]
-            stat_cursor.close()
-            new_deltas = delta_count - prev_delta_count
-            prev_delta_count = delta_count
-            self.assertGreater(new_deltas, 0,
-                f"Cycle {cycle}: expected new deltas but got {new_deltas}")
+            self.assertStatGreaterSoon(stat.dsrc.rec_page_delta_leaf, prev_delta_count, uri=self.uri,
+                msg=f"Cycle {cycle}: expected new deltas but did not get")
+            prev_delta_count = self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri)
 
             # Step 2: Evict the leaf page. On next access it will be read from the page service,
             # prior to the fix this would set cumulative_size to the last delta's raw size instead

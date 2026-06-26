@@ -26,9 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import threading, time
 import wttest
-import wiredtiger
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from wiredtiger import stat
@@ -100,17 +98,13 @@ class test_checkpoint32(wttest.WiredTigerTestCase):
         self.session.checkpoint()
 
         # Get the existing in-memory delete page skip statistic value.
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        prev_cur_inmem_del_page_skip = stat_cursor[stat.conn.cursor_tree_walk_inmem_del_page_skip][2]
-        stat_cursor.close()
+        prev_cur_inmem_del_page_skip = self.get_stat(stat.conn.cursor_tree_walk_inmem_del_page_skip)
 
         # Now read the removed data.
         self.check(ds, 0, value_a)
 
         # Get the new in-memory delete page skip statistic value.
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        cur_inmem_del_page_skip = stat_cursor[stat.conn.cursor_tree_walk_inmem_del_page_skip][2]
-        stat_cursor.close()
+        cur_inmem_del_page_skip = self.get_stat(stat.conn.cursor_tree_walk_inmem_del_page_skip)
 
         self.assertGreater(cur_inmem_del_page_skip, prev_cur_inmem_del_page_skip)
 

@@ -47,10 +47,7 @@ class test_truncate29(wttest.WiredTigerTestCase):
         return random_string
 
     def get_fast_truncated_pages(self):
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
-        stat_cursor.close()
-        return pages
+        return self.get_stat(stat.conn.rec_page_delete_fast)
 
     def test_truncate29(self):
         ds = SimpleDataSet(self, self.uri, 0, key_format='i', value_format='S')

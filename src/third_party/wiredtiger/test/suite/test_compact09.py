@@ -46,10 +46,7 @@ class test_compact09(compact_util):
     n_tables = 2
 
     def get_bg_compaction_files_excluded(self):
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        files = stat_cursor[stat.conn.background_compact_skipped_exclude][2]
-        stat_cursor.close()
-        return files
+        return self.get_stat(stat.conn.background_compact_skipped_exclude)
 
     # Test the exclude list functionality of the background compaction server.
     def test_compact09(self):

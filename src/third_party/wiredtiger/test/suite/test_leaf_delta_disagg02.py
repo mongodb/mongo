@@ -68,13 +68,6 @@ class test_leaf_delta_disagg02(wttest.WiredTigerTestCase):
     def conn_config(self):
         return self.conn_base_config + self.conn_delta_config
 
-    def get_stat(self, stat_key, uri=None):
-        target = f'statistics:{uri}' if uri else 'statistics:'
-        cursor = self.session.open_cursor(target, None, None)
-        val = cursor[stat_key][2]
-        cursor.close()
-        return val
-
     def make_key(self, i):
         # Zero-pad so all keys are the same width, helping prefix compression produce
         # a deterministic page layout.
@@ -152,9 +145,7 @@ class test_leaf_delta_disagg02(wttest.WiredTigerTestCase):
 
         # Threshold fired: too many keys removed from disk image, full page written.
         self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri), 0)
-        self.assertGreater(
-            self.get_stat(stat.dsrc.rec_page_delta_rejected_delete_threshold, self.uri), 0
-        )
+        self.assertStatGreaterSoon(stat.dsrc.rec_page_delta_rejected_delete_threshold, 0, uri=self.uri)
 
         # Data must be correct after the full-page write.
         self.verify_absent(deleted, delete_ts)
@@ -191,7 +182,7 @@ class test_leaf_delta_disagg02(wttest.WiredTigerTestCase):
         self.session.checkpoint()
 
         # Removed fraction (3/10 = 30%) is below the threshold: a delta must be written.
-        self.assertGreater(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri), 0)
+        self.assertStatGreaterSoon(stat.dsrc.rec_page_delta_leaf, 0, uri=self.uri)
         self.assertEqual(
             self.get_stat(stat.dsrc.rec_page_delta_rejected_delete_threshold, self.uri), 0
         )

@@ -88,12 +88,6 @@ class test_disagg_checkpoint_size06(wttest.WiredTigerTestCase):
         evict.close()
         self.session.rollback_transaction()
 
-    def get_stat(self, stat_key):
-        s = self.session.open_cursor('statistics:' + self.stable_uri)
-        val = s[stat_key][2]
-        s.close()
-        return val
-
     def get_conn_stat(self, stat_key):
         s = self.session.open_cursor('statistics:')
         val = s[stat_key][2]
@@ -139,7 +133,7 @@ class test_disagg_checkpoint_size06(wttest.WiredTigerTestCase):
             c.close()
             self.session.checkpoint()
 
-            deltas = self.get_stat(stat.dsrc.rec_page_delta_leaf)
+            deltas = self.get_stat(stat.dsrc.rec_page_delta_leaf, uri=self.stable_uri)
             self.assertGreater(deltas, 0,
                 f'cycle {cycle}: expected a leaf delta but got {deltas}')
 
@@ -203,7 +197,7 @@ class test_disagg_checkpoint_size06(wttest.WiredTigerTestCase):
         self.session.checkpoint()
         size_after_delta = self.get_checkpoint_size()
 
-        deltas = self.get_stat(stat.dsrc.rec_page_delta_leaf)
+        deltas = self.get_stat(stat.dsrc.rec_page_delta_leaf, uri=self.stable_uri)
         self.assertGreater(deltas, 0,
             f'Expected a leaf delta but stat shows {deltas}')
         self.assertGreater(size_after_delta, size_baseline,

@@ -36,15 +36,6 @@ from wtbound import set_prefix_bound
 class test_cursor_bound11(wttest.WiredTigerTestCase):
     conn_config = 'statistics=(all)'
 
-    def get_stat(self, stat, local_session = None):
-        if (local_session != None):
-            stat_cursor = local_session.open_cursor('statistics:')
-        else:
-            stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def unique_insert(self, cursor, prefix, id, keys):
         key = prefix +  ',' +  str(id)
         keys.append(key)
@@ -296,7 +287,7 @@ class test_cursor_bound11(wttest.WiredTigerTestCase):
         cursor2.set_key('c')
         self.assertEqual(cursor2.search_near(), wiredtiger.WT_NOTFOUND)
 
-        skip_count = self.get_stat(stat.conn.cursor_next_skip_total, session2)
+        skip_count = self.get_stat(stat.conn.cursor_next_skip_total, session=session2)
         # This should be equal to roughly key_count as we're going to traverse the whole
         # range forwards. Not including 'a' and 'b'.
         self.assertGreaterEqual(skip_count, key_count - 2*26)
@@ -305,13 +296,13 @@ class test_cursor_bound11(wttest.WiredTigerTestCase):
         cursor2.set_key('c')
         self.assertEqual(cursor2.search_near(), wiredtiger.WT_NOTFOUND)
 
-        bound_skip_count = self.get_stat(stat.conn.cursor_next_skip_total, session2)
+        bound_skip_count = self.get_stat(stat.conn.cursor_next_skip_total, session=session2)
         # We expect to traverse one entry, 'cc'.
         self.assertEqual(bound_skip_count - skip_count, 1)
         skip_count = bound_skip_count
 
         # We early exit here as "cc" is not the last key.
-        self.assertEqual(self.get_stat(stat.conn.cursor_bounds_next_early_exit, session2), 1)
+        self.assertEqual(self.get_stat(stat.conn.cursor_bounds_next_early_exit, session=session2), 1)
 
         session2.rollback_transaction()
         session2.begin_transaction('ignore_prepare=true')
@@ -319,7 +310,7 @@ class test_cursor_bound11(wttest.WiredTigerTestCase):
         set_prefix_bound(self, cursor4, 'c')
         cursor4.set_key('c')
         self.assertEqual(cursor4.search_near(), 1)
-        bound_skip_count = self.get_stat(stat.conn.cursor_next_skip_total, session2)
+        bound_skip_count = self.get_stat(stat.conn.cursor_next_skip_total, session=session2)
         # We expect to not skip any entries and return 'cc'
         self.assertEqual(bound_skip_count - skip_count, 0)
         self.assertEqual(cursor4.get_key(), b'cc')
@@ -330,4 +321,4 @@ class test_cursor_bound11(wttest.WiredTigerTestCase):
         ret = cursor4.search_near()
         self.assertTrue(ret == -1 or ret == 1)
         # We expect to not skip any entries and return 'cc'
-        self.assertEqual(self.get_stat(stat.conn.cursor_next_skip_total, session2) - skip_count, 0)
+        self.assertEqual(self.get_stat(stat.conn.cursor_next_skip_total, session=session2) - skip_count, 0)

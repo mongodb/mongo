@@ -48,12 +48,6 @@ class eviction_util(wttest.WiredTigerTestCase):
         session_evict.rollback_transaction()
         session_evict.close()
 
-    def get_stat(self, stat, uri = ""):
-        stat_cursor = self.session.open_cursor(f'statistics:{uri}')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def populate(self, uri, start_key, num_keys, value):
         c = self.session.open_cursor(uri, None)
         for k in range(start_key, num_keys):

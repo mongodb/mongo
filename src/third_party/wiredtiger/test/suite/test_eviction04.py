@@ -40,12 +40,6 @@ class test_eviction04(wttest.WiredTigerTestCase):
         config = 'cache_size=10MB,statistics=(all),statistics_log=(json,on_close,wait=1)'
         return config
 
-    def get_stat(self, uri):
-        stat_cursor = self.session.open_cursor('statistics:' + uri)
-        cache_write_restore_invisible = stat_cursor[stat.dsrc.cache_write_restore_invisible][2]
-        stat_cursor.close()
-        return cache_write_restore_invisible
-
     def test_eviction(self):
         uri = f'table:{self.test_name}'
 
@@ -70,7 +64,7 @@ class test_eviction04(wttest.WiredTigerTestCase):
         self.assertEqual(evict_cursor.reset(), 0)
         evict_cursor.close()
 
-        self.assertGreater(self.get_stat(uri), 0)
+        self.assertStatGreaterSoon(stat.dsrc.cache_write_restore_invisible, 0, uri=uri)
 
         session2.commit_transaction()
         cursor2.close()

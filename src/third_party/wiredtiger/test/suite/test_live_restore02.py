@@ -58,12 +58,6 @@ class test_live_restore02(backup_base):
         ]
         self.ignoreStdoutPattern("|".join(live_restore_patterns))
 
-    def get_stat(self, statistic):
-        stat_cursor = self.session.open_cursor("statistics:")
-        val = stat_cursor[statistic][2]
-        stat_cursor.close()
-        return val
-
     def test_live_restore02(self):
         # Live restore is not supported on Windows.
         if os.name == 'nt':

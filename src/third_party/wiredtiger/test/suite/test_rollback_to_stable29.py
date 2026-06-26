@@ -100,8 +100,4 @@ class test_rollback_to_stable29(test_rollback_to_stable_base):
 
         self.check(value_d, uri, nrows, 10)
 
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        hs_removed = stat_cursor[stat.conn.txn_rts_hs_removed][2]
-        stat_cursor.close()
-
-        self.assertGreaterEqual(hs_removed, 0)
+        self.assertGreaterEqual(self.get_stat(stat.conn.txn_rts_hs_removed), 0)

@@ -54,12 +54,6 @@ class test_checkpoint38(wttest.WiredTigerTestCase):
                 ',statistics=(all),statistics_log=(json,on_close,wait=1)'
                 f',checkpoint_threads={self.checkpoint_threads}')
 
-    def get_stat(self, stat_key):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat_key][2]
-        stat_cursor.close()
-        return val
-
     def test_parallel_checkpoint(self):
         uri = 'table:checkpoint38'
         value_size = 10000

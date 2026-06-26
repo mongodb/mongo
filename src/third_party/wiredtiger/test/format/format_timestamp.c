@@ -204,8 +204,14 @@ timestamp(void *arg)
      */
     while (!g.workers_finished) {
         if (!GV(RUNS_PREDICTABLE_REPLAY)) {
+            /*
+             * Under precise checkpoint, eviction can only write pages whose updates are at or below
+             * the stable timestamp. A long gap between stable timestamp advances lets dirty pages
+             * accumulate above-stable writes faster than eviction can drain them, increasing the
+             * risk of cache pressure. Sleep 0-9ms to keep the interval short.
+             */
             if (GV(PRECISE_CHECKPOINT))
-                random_sleep(&g.extra_rnd, 1);
+                __wt_sleep(0, rng(&g.extra_rnd) % (10 * WT_THOUSAND));
             else
                 random_sleep(&g.extra_rnd, 15);
         } else {

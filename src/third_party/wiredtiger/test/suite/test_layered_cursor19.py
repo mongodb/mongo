@@ -58,10 +58,7 @@ class test_layered_cursor19(wttest.WiredTigerTestCase):
         self.session_follow = self.conn_follow.open_session('')
 
     def get_conn_stat(self, session, stat_id):
-        stat_cursor = session.open_cursor('statistics:', None, None)
-        val = stat_cursor[stat_id][2]
-        stat_cursor.close()
-        return val
+        return self.get_stat(stat_id, session=session)
 
     # Return the number of cursor opens triggered on the follower connection
     # by running op. The stats cursor is opened and closed outside op, so

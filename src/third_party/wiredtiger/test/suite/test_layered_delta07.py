@@ -80,9 +80,7 @@ class test_layered_delta07(wttest.WiredTigerTestCase):
         # We should build a delta
         self.session.checkpoint()
 
-        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri), 1)
 
         session2 = self.conn.open_session()
         # Do an uncommitted update
@@ -93,9 +91,7 @@ class test_layered_delta07(wttest.WiredTigerTestCase):
         # We should skip writing the page
         self.session.checkpoint()
 
-        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri), 1)
 
         session2.close()
         cursor.close()
@@ -124,9 +120,7 @@ class test_layered_delta07(wttest.WiredTigerTestCase):
 
         # We should build a delta
         self.session.checkpoint()
-        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri), 1)
 
         session2 = self.conn.open_session()
         # Do an uncommitted update
@@ -137,9 +131,7 @@ class test_layered_delta07(wttest.WiredTigerTestCase):
         # We should skip writing the page
         self.session.checkpoint()
 
-        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri), 1)
 
         session2.rollback_transaction()
 
@@ -148,9 +140,7 @@ class test_layered_delta07(wttest.WiredTigerTestCase):
         # Delete is already durable, so this checkpoint should not add another leaf delta
         self.session.checkpoint()
 
-        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri), 1)
 
         session2.close()
         session2 = self.conn.open_session()
@@ -162,9 +152,7 @@ class test_layered_delta07(wttest.WiredTigerTestCase):
         # We should skip writing the page
         self.session.checkpoint()
 
-        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri), 1)
 
         session2.close()
         cursor.close()
@@ -193,9 +181,7 @@ class test_layered_delta07(wttest.WiredTigerTestCase):
 
         # We should build a delta
         self.session.checkpoint()
-        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri), 1)
 
         session2 = self.conn.open_session()
         # Do an uncommitted update on the deleted key
@@ -213,9 +199,7 @@ class test_layered_delta07(wttest.WiredTigerTestCase):
         session3.rollback_transaction()
         session3.close()
 
-        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri), 1)
 
         session2.rollback_transaction()
 
@@ -224,9 +208,7 @@ class test_layered_delta07(wttest.WiredTigerTestCase):
         # We should build a delta with delete
         self.session.checkpoint()
 
-        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri), 1)
 
         session2.close()
         session2 = self.conn.open_session()
@@ -238,9 +220,7 @@ class test_layered_delta07(wttest.WiredTigerTestCase):
         # We should skip writing the page
         self.session.checkpoint()
 
-        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri), 1)
 
         session2.close()
         cursor.close()
@@ -274,9 +254,7 @@ class test_layered_delta07(wttest.WiredTigerTestCase):
         # We should build a delta
         session2.checkpoint()
 
-        stat_cursor = session2.open_cursor('statistics:' + self.uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri, session=session2), 1)
 
         session3 = self.conn.open_session()
         # Do an uncommitted update
@@ -288,9 +266,7 @@ class test_layered_delta07(wttest.WiredTigerTestCase):
         # We should skip writing the page
         session2.checkpoint()
 
-        stat_cursor = session2.open_cursor('statistics:' + self.uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri, session=session2), 1)
 
         self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(20)},durable_timestamp={self.timestamp_str(30)}')
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(30))
@@ -298,16 +274,12 @@ class test_layered_delta07(wttest.WiredTigerTestCase):
         # We should build a delta
         session2.checkpoint()
 
-        stat_cursor = session2.open_cursor('statistics:' + self.uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri, session=session2), 2)
 
         # We should skip writing the page
         session2.checkpoint()
 
-        stat_cursor = session2.open_cursor('statistics:' + self.uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri, session=session2), 2)
 
         session3.close()
         session2.close()
@@ -343,9 +315,7 @@ class test_layered_delta07(wttest.WiredTigerTestCase):
         # We should build a delta
         session2.checkpoint()
 
-        stat_cursor = session2.open_cursor('statistics:' + self.uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri, session=session2), 1)
 
         session3 = self.conn.open_session()
         # Do an uncommitted update
@@ -357,9 +327,7 @@ class test_layered_delta07(wttest.WiredTigerTestCase):
         # We should skip writing the page
         session2.checkpoint()
 
-        stat_cursor = session2.open_cursor('statistics:' + self.uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri, session=session2), 1)
 
         self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(20)},durable_timestamp={self.timestamp_str(30)}')
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(30))
@@ -367,16 +335,12 @@ class test_layered_delta07(wttest.WiredTigerTestCase):
         # We should build a delta
         session2.checkpoint()
 
-        stat_cursor = session2.open_cursor('statistics:' + self.uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri, session=session2), 2)
 
         # We should skip writing the page
         session2.checkpoint()
 
-        stat_cursor = session2.open_cursor('statistics:' + self.uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri, session=session2), 2)
 
         session3.close()
         session2.close()
@@ -413,9 +377,7 @@ class test_layered_delta07(wttest.WiredTigerTestCase):
         # We should build a delta
         session2.checkpoint()
 
-        stat_cursor = session2.open_cursor('statistics:' + self.uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri, session=session2), 1)
 
         session3 = self.conn.open_session()
         # Do an uncommitted update
@@ -427,9 +389,7 @@ class test_layered_delta07(wttest.WiredTigerTestCase):
         # We should skip writing the page
         session2.checkpoint()
 
-        stat_cursor = session2.open_cursor('statistics:' + self.uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri, session=session2), 1)
 
         self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(20)},durable_timestamp={self.timestamp_str(30)}')
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(30))
@@ -437,16 +397,12 @@ class test_layered_delta07(wttest.WiredTigerTestCase):
         # We should build a delta
         session2.checkpoint()
 
-        stat_cursor = session2.open_cursor('statistics:' + self.uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri, session=session2), 2)
 
         # We should skip writing the page
         session2.checkpoint()
 
-        stat_cursor = session2.open_cursor('statistics:' + self.uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri, session=session2), 2)
 
         session3.close()
         session2.close()

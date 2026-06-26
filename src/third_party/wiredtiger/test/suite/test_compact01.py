@@ -74,9 +74,7 @@ class test_compact(compact_util, suite_subprocess):
         self.reopen_conn()
 
         # Confirm the tree starts big
-        stat_cursor = self.session.open_cursor('statistics:' + uri, None, None)
-        self.assertGreater(stat_cursor[stat.dsrc.btree_row_leaf][2], self.maxpages)
-        stat_cursor.close()
+        self.assertGreater(self.get_stat(stat.dsrc.btree_row_leaf, uri), self.maxpages)
 
         # Remove most of the object.
         c1 = ds.open_cursor(uri, None)
@@ -113,6 +111,4 @@ class test_compact(compact_util, suite_subprocess):
 
         # Confirm compaction worked: check the number of on-disk pages
         self.reopen_conn()
-        stat_cursor = self.session.open_cursor('statistics:' + uri, None, None)
-        self.assertLess(stat_cursor[stat.dsrc.btree_row_leaf][2], self.maxpages)
-        stat_cursor.close()
+        self.assertLess(self.get_stat(stat.dsrc.btree_row_leaf, uri), self.maxpages)

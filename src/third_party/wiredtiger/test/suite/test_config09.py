@@ -61,12 +61,6 @@ class test_config09(wttest.WiredTigerTestCase):
         self.session.checkpoint()
 
     # Verify statistics.
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def test_config09_invalid(self):
         self.conn.close()
 

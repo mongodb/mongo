@@ -57,12 +57,6 @@ class test_layered_config02(wttest.WiredTigerTestCase):
     def early_setup(self):
         self.skipTest("FIXME-WT-15663: currently block cache is disabled.")
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     # Test long delta chains
     def test_layered_config02(self):
 
@@ -123,7 +117,7 @@ class test_layered_config02(wttest.WiredTigerTestCase):
         cursor.close()
         self.session.rollback_transaction()
 
-        self.assertGreater(self.get_stat(stat.conn.block_cache_blocks_removed), prev_block_cache_blocks_removed)
+        self.assertStatGreaterSoon(stat.conn.block_cache_blocks_removed, prev_block_cache_blocks_removed)
 
         # Remember the relevant statistics
         stat_cursor = self.session.open_cursor('statistics:')
@@ -139,8 +133,5 @@ class test_layered_config02(wttest.WiredTigerTestCase):
         self.session.rollback_transaction()
 
         # Check the relevant statistics
-        stat_cursor = self.session.open_cursor('statistics:')
-        self.assertEqual(stat_cursor[wiredtiger.stat.conn.cache_read_leaf][2], prev_cache_read_leaf)
-        self.assertGreater(stat_cursor[wiredtiger.stat.conn.cache_pages_requested_leaf][2],
-                           prev_cache_pages_requested_leaf)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.cache_read_leaf), prev_cache_read_leaf)
+        self.assertStatGreaterSoon(wiredtiger.stat.conn.cache_pages_requested_leaf, prev_cache_pages_requested_leaf)

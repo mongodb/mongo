@@ -239,9 +239,7 @@ class test_rollback_to_stable47(test_rollback_to_stable_base):
             ckpt_snapshot = 0
             while not ckpt_snapshot:
                 time.sleep(1)
-                stat_cursor = self.session.open_cursor('statistics:', None, None)
-                ckpt_snapshot = stat_cursor[stat.conn.checkpoint_snapshot_acquired][2]
-                stat_cursor.close()
+                ckpt_snapshot = self.get_stat(stat.conn.checkpoint_snapshot_acquired)
 
             # Evict all rows while the checkpoint is in progress.
             evict_cur = self.session.open_cursor(uri, None, "debug=(release_evict)")

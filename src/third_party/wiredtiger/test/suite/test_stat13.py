@@ -46,10 +46,8 @@ class test_stat13(wttest.WiredTigerTestCase):
     conn_config = 'statistics=(all)'
 
     def check_depth(self, expect):
-        stat_cursor = self.session.open_cursor('statistics:' + self.uri, None, None)
-        depth = stat_cursor[stat.dsrc.btree_maximum_depth][2]
+        depth = self.get_stat(stat.dsrc.btree_maximum_depth, self.uri)
         self.assertEqual(depth, expect)
-        stat_cursor.close()
 
     def test_btree_depth(self):
         # Populate a table with a few records. This will create a two-level tree with a root

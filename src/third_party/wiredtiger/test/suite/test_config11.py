@@ -101,6 +101,4 @@ class test_config11(wttest.WiredTigerTestCase):
             s.rollback_transaction()
 
         # Check the cache has at least halve.
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        self.assertGreater(current_cache_usage, stat_cursor[stat.conn.cache_bytes_inuse][2] * 2)
-        stat_cursor.close()
+        self.assertGreater(current_cache_usage, self.get_stat(stat.conn.cache_bytes_inuse) * 2)

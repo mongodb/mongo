@@ -53,16 +53,10 @@ class test_compact07(compact_util):
     n_tables = 2
 
     def get_bg_compaction_files_tracked(self):
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        files = stat_cursor[stat.conn.background_compact_files_tracked][2]
-        stat_cursor.close()
-        return files
+        return self.get_stat(stat.conn.background_compact_files_tracked)
 
     def get_free_space(self, uri):
-        stat_cursor = self.session.open_cursor('statistics:' + uri, None, 'statistics=(all)')
-        bytes = stat_cursor[stat.dsrc.block_reuse_bytes][2]
-        stat_cursor.close()
-        return bytes // megabyte
+        return self.get_stat(stat.dsrc.block_reuse_bytes, uri) // megabyte
 
     # Test the basic functionality of the background compaction server.
     def test_compact07(self):
@@ -124,12 +118,8 @@ class test_compact07(compact_util):
 
         # Check the background compaction server stats. We should have skipped at least once and
         # been successful at least once.
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        skipped = stat_cursor[stat.conn.session_table_compact_skipped][2]
-        success = stat_cursor[stat.conn.background_compact_success][2]
-        self.assertGreater(skipped, 0)
-        self.assertGreater(success, 0)
-        stat_cursor.close()
+        self.assertStatGreaterSoon(stat.conn.session_table_compact_skipped, 0)
+        self.assertStatGreaterSoon(stat.conn.background_compact_success, 0)
 
         # Perform foreground compaction on the remaining file by setting a free_space_target value
         # that is guaranteed to run on it. Make sure background compaction is disabled before

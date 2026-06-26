@@ -1149,6 +1149,9 @@ __curhs_remove_int(WT_CURSOR_BTREE *cbt, const WT_ITEM *value, u_int modify_type
         WT_WITH_PAGE_INDEX(session, ret = __curhs_search(cbt, false));
         WT_ERR(ret);
     }
+    WT_ERR(ret);
+    /* We no longer own the update memory, the page does; don't free it under any circumstances. */
+    hs_tombstone = NULL;
 
     if (0) {
 err:
@@ -1270,6 +1273,9 @@ __curhs_update(WT_CURSOR *cursor)
         WT_WITH_PAGE_INDEX(session, ret = __curhs_search(cbt, false));
         WT_ERR(ret);
     }
+    WT_ERR(ret);
+    /* We no longer own the update memory, the page does; don't free it under any circumstances. */
+    hs_tombstone = hs_upd = NULL;
 
     __curhs_set_key_ptr(cursor, file_cursor);
     __curhs_set_value_ptr(cursor, file_cursor);

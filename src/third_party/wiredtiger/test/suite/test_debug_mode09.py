@@ -53,7 +53,4 @@ class test_debug_mode09(wttest.WiredTigerTestCase):
         self.trigger_eviction(self.uri)
 
         # Read the statistics of pages that have been update restored without update_restore
-        stat_cursor = self.session.open_cursor('statistics:')
-        pages_update_restored = stat_cursor[stat.conn.cache_write_restore_scrub][2]
-        stat_cursor.close()
-        self.assertGreater(pages_update_restored, 0)
+        self.assertStatGreaterSoon(stat.conn.cache_write_restore_scrub, 0)

@@ -107,28 +107,6 @@ class test_layered_schema07(wttest.WiredTigerTestCase, suite_subprocess):
             session = self.session
         session.publish(uri, 'disaggregated=(schema_epoch=' + self.timestamp_str(epoch) + ')')
 
-    def get_stat(self, stat_name):
-        """
-        Get the value of a statistic by name.
-        """
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        value = stat_cursor[stat_name][2]
-        stat_cursor.close()
-        return value
-
-    def assertStatEqual(self, stat_name, expected_value, retries=10):
-        """
-        Assert that a statistic has the expected value, retrying if necessary.
-        """
-        # Stats may be updated asynchronously, so retry a few times if the expected value is not
-        # observed.
-        for attempt in range(retries):
-            value = self.get_stat(stat_name)
-            if value == expected_value:
-                return
-            if attempt < retries - 1:
-                time.sleep(0.1)
-        self.assertEqual(value, expected_value)
 
     #
     # Functional tests
@@ -344,36 +322,36 @@ class test_layered_schema07(wttest.WiredTigerTestCase, suite_subprocess):
 
         # No schema_epoch in config: no-op, returns success.
         self.session.publish(self.uri, '')
-        self.assertStatEqual(stat.conn.session_table_publish_success, 1)
-        self.assertStatEqual(stat.conn.session_table_publish_fail, 0)
+        self.assertStatEqualSoon(stat.conn.session_table_publish_success, 1)
+        self.assertStatEqualSoon(stat.conn.session_table_publish_fail, 0)
 
         # Publish create with a valid epoch: success stat increments.
         self.publish(self.uri, 10)
-        self.assertStatEqual(stat.conn.session_table_publish_success, 2)
-        self.assertStatEqual(stat.conn.session_table_publish_fail, 0)
+        self.assertStatEqualSoon(stat.conn.session_table_publish_success, 2)
+        self.assertStatEqualSoon(stat.conn.session_table_publish_fail, 0)
 
         # Checkpoint with stable schema epoch lower than the published epoch: the operation is
         # counted as unstable and deferred to the next checkpoint.
         self.set_stable_epoch(5)
         self.leader_checkpoint(1)
-        self.assertStatEqual(stat.conn.checkpoint_disagg_metadata_unstable, 1)
-        self.assertStatEqual(stat.conn.checkpoint_disagg_metadata_apply, 0)
+        self.assertStatEqualSoon(stat.conn.checkpoint_disagg_metadata_unstable, 1)
+        self.assertStatEqualSoon(stat.conn.checkpoint_disagg_metadata_apply, 0)
 
         # Checkpoint with stable schema epoch matching the published epoch: the operation is applied.
         self.set_stable_epoch(10)
         self.leader_checkpoint(2)
-        self.assertStatEqual(stat.conn.checkpoint_disagg_metadata_unstable, 1)
-        self.assertStatEqual(stat.conn.checkpoint_disagg_metadata_apply, 1)
+        self.assertStatEqualSoon(stat.conn.checkpoint_disagg_metadata_unstable, 1)
+        self.assertStatEqualSoon(stat.conn.checkpoint_disagg_metadata_apply, 1)
 
         # Publish drop with a valid epoch: success stat increments.
         self.session.drop(self.uri)
         self.publish(self.uri, 20)
-        self.assertStatEqual(stat.conn.session_table_publish_success, 3)
-        self.assertStatEqual(stat.conn.session_table_publish_fail, 0)
+        self.assertStatEqualSoon(stat.conn.session_table_publish_success, 3)
+        self.assertStatEqualSoon(stat.conn.session_table_publish_fail, 0)
 
         # Zero epoch: returns EINVAL (fail stat increments).
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.publish(self.uri, 'disaggregated=(schema_epoch=0)'),
             '/zero not permitted/')
-        self.assertStatEqual(stat.conn.session_table_publish_success, 3)
-        self.assertStatEqual(stat.conn.session_table_publish_fail, 1)
+        self.assertStatEqualSoon(stat.conn.session_table_publish_success, 3)
+        self.assertStatEqualSoon(stat.conn.session_table_publish_fail, 1)

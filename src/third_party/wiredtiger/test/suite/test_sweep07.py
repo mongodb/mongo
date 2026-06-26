@@ -54,9 +54,7 @@ class test_sweep07(wttest.WiredTigerTestCase):
         time.sleep(2)
 
         # Check the sweeping statistic
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        remove1 = stat_cursor[stat.conn.dh_sweep_remove][2]
-        stat_cursor.close()
+        remove1 = self.get_stat(stat.conn.dh_sweep_remove)
 
         # Checkpoint the table
         self.session.checkpoint()
@@ -76,9 +74,7 @@ class test_sweep07(wttest.WiredTigerTestCase):
 
         # Reopen the session and compare the statistic
         self.session = self.conn.open_session('')
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        remove2 = stat_cursor[stat.conn.dh_sweep_remove][2]
-        stat_cursor.close()
+        remove2 = self.get_stat(stat.conn.dh_sweep_remove)
 
         self.assertLess(remove1, remove2)
 

@@ -118,7 +118,4 @@ class test_layered_delta06(wttest.WiredTigerTestCase):
         self.session.rollback_transaction()
 
         # Assert that we have written no leaf page delta.
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        rec_page_delta_leaf = stat_cursor[stat.conn.rec_page_delta_leaf][2]
-        self.assertEqual(rec_page_delta_leaf, 0)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.conn.rec_page_delta_leaf), 0)

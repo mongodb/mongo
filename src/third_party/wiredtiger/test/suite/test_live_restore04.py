@@ -43,12 +43,6 @@ class test_live_restore04(backup_base):
     ntables = 3
     conn_config = 'log=(enabled)'
 
-    def get_stat(self, statistic):
-        stat_cursor = self.session.open_cursor("statistics:")
-        val = stat_cursor[statistic][2]
-        stat_cursor.close()
-        return val
-
     def test_live_restore04(self):
         # FIXME-WT-14051: Live restore is not supported on Windows.
         if os.name == 'nt':

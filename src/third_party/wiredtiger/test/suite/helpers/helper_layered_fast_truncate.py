@@ -200,9 +200,3 @@ class LayeredFastTruncateConfigMixin:
         finally:
             evict_cur.close()
 
-    def get_stat(self, conn, stat_key):
-        """Read a connection statistic on the given connection."""
-        s = conn.open_session('')
-        val = s.open_cursor('statistics:')[stat_key][2]
-        s.close()
-        return val

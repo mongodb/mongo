@@ -57,9 +57,7 @@ class test_split(wttest.WiredTigerTestCase):
         # Stabilize
         self.reopen_conn()
 
-        stat_cursor = self.session.open_cursor('statistics:' + self.uri, None)
-        self.assertEqual(1, stat_cursor[stat.dsrc.btree_row_leaf][2])
-        stat_cursor.close()
+        self.assertEqual(1, self.get_stat(stat.dsrc.btree_row_leaf, self.uri))
 
         # Now append a few records so we're definitely (a little) over 4KB
         cursor = self.session.open_cursor(self.uri, None)
@@ -69,9 +67,7 @@ class test_split(wttest.WiredTigerTestCase):
         # Stabilize
         self.reopen_conn()
 
-        stat_cursor = self.session.open_cursor('statistics:' + self.uri, None)
-        self.assertEqual(2, stat_cursor[stat.dsrc.btree_row_leaf][2])
-        stat_cursor.close()
+        self.assertEqual(2, self.get_stat(stat.dsrc.btree_row_leaf, self.uri))
 
         # Now insert some more records in between
         cursor = self.session.open_cursor(self.uri, None)
@@ -81,6 +77,4 @@ class test_split(wttest.WiredTigerTestCase):
         # Stabilize
         self.reopen_conn()
 
-        stat_cursor = self.session.open_cursor('statistics:' + self.uri, None)
-        self.assertEqual(2, stat_cursor[stat.dsrc.btree_row_leaf][2])
-        stat_cursor.close()
+        self.assertEqual(2, self.get_stat(stat.dsrc.btree_row_leaf, self.uri))

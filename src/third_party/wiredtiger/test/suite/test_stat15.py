@@ -37,10 +37,7 @@ class test_stat15(wttest.WiredTigerTestCase):
     conn_config = 'statistics=(all),cache_size=100MB'
 
     def get_conn_stat(self, stat_key):
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        val = stat_cursor[stat_key][2]
-        stat_cursor.close()
-        return val
+        return self.get_stat(stat_key)
 
     def test_cache_pages_inuse_leaf(self):
         # Create a table and insert enough data to bring leaf pages into cache

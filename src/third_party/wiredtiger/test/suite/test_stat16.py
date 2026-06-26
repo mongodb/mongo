@@ -40,10 +40,7 @@ class test_stat16(wttest.WiredTigerTestCase):
     create_config = 'key_format=S,value_format=S,leaf_page_max=4KB,internal_page_max=4KB'
 
     def get_conn_stat(self, stat_key):
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        val = stat_cursor[stat_key][2]
-        stat_cursor.close()
-        return val
+        return self.get_stat(stat_key)
 
     def test_cache_read_internal_and_leaf(self):
         self.session.create(self.uri, self.create_config)

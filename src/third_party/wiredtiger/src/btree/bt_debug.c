@@ -51,6 +51,10 @@ static const /* Output separator */
 
 static int __debug_col_skip(WT_DBG *, WT_INSERT_HEAD *, const char *, bool, WT_CURSOR *);
 static int __debug_config(WT_SESSION_IMPL *, WT_DBG *, const char *, uint32_t);
+static int __debug_disagg_image(
+  WT_SESSION_IMPL *, uint64_t, WT_ITEM *, WT_ITEM **, const WT_PAGE_HEADER **);
+static int __debug_disk_delta(
+  WT_SESSION_IMPL *, const WT_PAGE_HEADER *, const WT_PAGE_HEADER *, const char *);
 static int __debug_modify(WT_DBG *, const uint8_t *);
 static int __debug_page(WT_DBG *, WT_REF *);
 static int __debug_page_col_int(WT_DBG *, WT_PAGE *);
@@ -418,9 +422,59 @@ __wti_debug_offset_blind(WT_SESSION_IMPL *session, wt_off_t offset, const char *
 }
 
 /*
+ * __debug_disagg_image --
+ *     Resolve a fetched disagg block to a decodable page image, decompressing into the scratch
+ *     buffer when needed. Encryption is not supported.
+ */
+static int
+__debug_disagg_image(WT_SESSION_IMPL *session, uint64_t page_id, WT_ITEM *result,
+  WT_ITEM **scratchp, const WT_PAGE_HEADER **displayp)
+{
+    WT_COMPRESSOR *compressor;
+    WT_PAGE_HEADER *dsk;
+    size_t result_len;
+
+    dsk = (WT_PAGE_HEADER *)result->data;
+    *displayp = dsk;
+
+    if (F_ISSET(dsk, WT_PAGE_ENCRYPTED))
+        WT_RET_MSG(session, ENOTSUP,
+          "page %" PRIu64 " is encrypted; wt page does not yet support decryption", page_id);
+
+    if (!F_ISSET(dsk, WT_PAGE_COMPRESSED))
+        return (0);
+
+    compressor = S2BT(session)->compressor;
+    if (compressor == NULL || compressor->decompress == NULL)
+        WT_RET_MSG(session, ENOTSUP,
+          "page %" PRIu64 " is compressed but no decompressor is configured on the dhandle",
+          page_id);
+
+    WT_RET(__wt_scr_alloc(session, dsk->mem_size, scratchp));
+    (*scratchp)->size = dsk->mem_size;
+    memcpy((*scratchp)->mem, result->data, WT_BLOCK_COMPRESS_SKIP);
+    WT_RET(compressor->decompress(compressor, &session->iface,
+      (uint8_t *)result->data + WT_BLOCK_COMPRESS_SKIP, result->size - WT_BLOCK_COMPRESS_SKIP,
+      (uint8_t *)(*scratchp)->mem + WT_BLOCK_COMPRESS_SKIP, dsk->mem_size - WT_BLOCK_COMPRESS_SKIP,
+      &result_len));
+    if (result_len != dsk->mem_size - WT_BLOCK_COMPRESS_SKIP)
+        WT_RET_MSG(session, WT_ERROR,
+          "page %" PRIu64 ": decompression produced %" WT_SIZET_FMT " bytes, expected %" PRIu32,
+          page_id, result_len, (uint32_t)(dsk->mem_size - WT_BLOCK_COMPRESS_SKIP));
+
+    WT_RET(__wt_msg(session,
+      "decompressed page %" PRIu64 ": on-disk %" WT_SIZET_FMT " bytes -> in-memory %" PRIu32
+      " bytes",
+      page_id, result->size, dsk->mem_size));
+
+    *displayp = (*scratchp)->mem;
+    return (0);
+}
+
+/*
  * __wt_debug_disagg_page_id --
  *     Fetch and dump a disaggregated page chain by (page_id, lsn), bypassing the address-cookie
- *     path; deltas are raw-dumped because structured delta decoding is not yet supported.
+ *     path.
  */
 int
 __wt_debug_disagg_page_id(
@@ -428,14 +482,12 @@ __wt_debug_disagg_page_id(
 {
     WT_BLOCK_DISAGG_HEADER *blk, swap;
     WT_BTREE *btree;
-    WT_COMPRESSOR *compressor;
-    WT_DECL_ITEM(decompressed);
+    WT_DECL_ITEM(base_decompressed);
+    WT_DECL_ITEM(delta_decompressed);
     WT_DECL_RET;
     WT_ITEM results[WT_DELTA_LIMIT + 1];
-    WT_PAGE_HEADER *dsk;
-    const WT_PAGE_HEADER *display;
+    const WT_PAGE_HEADER *base_display, *delta_display;
     WT_PAGE_LOG_GET_ARGS get_args;
-    size_t result_len;
     uint32_t size;
     uint8_t expected_magic;
     u_int count, i;
@@ -446,7 +498,6 @@ __wt_debug_disagg_page_id(
     if (!F_ISSET(btree, WT_BTREE_DISAGGREGATED))
         WT_RET_MSG(session, ENOTSUP, "wt page is only supported in disaggregated storage mode");
 
-    compressor = btree->compressor;
     memset(results, 0, sizeof(results));
     count = WT_ELEMENTS(results);
 
@@ -461,12 +512,11 @@ __wt_debug_disagg_page_id(
       get_args.backlink_checkpoint_id, get_args.delta_count));
     WT_ERR(__wt_msg(session, "results: count=%u", count));
 
-    if (count > 1)
-        WT_ERR(__wt_msg(session,
-          "note: structured delta decoding is not yet supported; the %u delta result(s) below "
-          "are dumped as raw bytes",
-          count - 1));
-
+    /*
+     * Internal deltas decode against the base image. Seed it with the raw base so a delta has a
+     * valid pointer even when the base is corrupt and skipped; the base iteration overwrites it.
+     */
+    base_display = results[0].data;
     for (i = 0; i < count; i++) {
         /* Validate the block header magic and checksum before interpreting the buffer. */
         size = (uint32_t)results[i].size;
@@ -495,54 +545,22 @@ __wt_debug_disagg_page_id(
             continue;
         }
 
+        __wt_page_header_byteswap((void *)results[i].data);
         if (i == 0) {
-            __wt_page_header_byteswap((void *)results[i].data);
-            dsk = (WT_PAGE_HEADER *)results[i].data;
-            display = dsk;
-
-            if (F_ISSET(dsk, WT_PAGE_ENCRYPTED))
-                WT_ERR_MSG(session, ENOTSUP,
-                  "page %" PRIu64 " is encrypted; wt page does not yet support decryption",
-                  page_id);
-
-            if (F_ISSET(dsk, WT_PAGE_COMPRESSED)) {
-                if (compressor == NULL || compressor->decompress == NULL)
-                    WT_ERR_MSG(session, ENOTSUP,
-                      "page %" PRIu64
-                      " is compressed but no decompressor is configured on the dhandle",
-                      page_id);
-
-                WT_ERR(__wt_scr_alloc(session, dsk->mem_size, &decompressed));
-                decompressed->size = dsk->mem_size;
-
-                memcpy(decompressed->mem, results[i].data, WT_BLOCK_COMPRESS_SKIP);
-                WT_ERR(compressor->decompress(compressor, &session->iface,
-                  (uint8_t *)results[i].data + WT_BLOCK_COMPRESS_SKIP,
-                  results[i].size - WT_BLOCK_COMPRESS_SKIP,
-                  (uint8_t *)decompressed->mem + WT_BLOCK_COMPRESS_SKIP,
-                  dsk->mem_size - WT_BLOCK_COMPRESS_SKIP, &result_len));
-                if (result_len != dsk->mem_size - WT_BLOCK_COMPRESS_SKIP)
-                    WT_ERR_MSG(session, WT_ERROR,
-                      "page %" PRIu64 ": decompression produced %" WT_SIZET_FMT
-                      " bytes, expected %" PRIu32,
-                      page_id, result_len, (uint32_t)(dsk->mem_size - WT_BLOCK_COMPRESS_SKIP));
-
-                WT_ERR(__wt_msg(session,
-                  "decompressed base page: on-disk %" WT_SIZET_FMT " bytes -> in-memory %" PRIu32
-                  " bytes",
-                  results[i].size, dsk->mem_size));
-
-                display = decompressed->mem;
-            }
-
-            WT_TRET(__wti_debug_disk(session, display, ofile, true, false));
-        } else
-            __wt_log_data_dump(session, results[i].data, results[i].size,
-              "delta %u of %u: page_id %" PRIu64 ", lsn %" PRIu64, i, count - 1, page_id, lsn);
+            WT_ERR(__debug_disagg_image(
+              session, page_id, &results[i], &base_decompressed, &base_display));
+            WT_TRET(__wti_debug_disk(session, base_display, ofile, false, false));
+        } else {
+            WT_ERR(__debug_disagg_image(
+              session, page_id, &results[i], &delta_decompressed, &delta_display));
+            WT_TRET(__debug_disk_delta(session, base_display, delta_display, ofile));
+            __wt_scr_free(session, &delta_decompressed);
+        }
     }
 
 err:
-    __wt_scr_free(session, &decompressed);
+    __wt_scr_free(session, &base_decompressed);
+    __wt_scr_free(session, &delta_decompressed);
     for (i = 0; i < WT_ELEMENTS(results); i++)
         __wt_buf_free(session, &results[i]);
     return (ret);
@@ -848,6 +866,134 @@ __debug_cell_kv(
     }
 
     return (0);
+}
+
+/*
+ * __debug_cell_delta_leaf --
+ *     Dump one key/value pair from a leaf delta.
+ */
+static int
+__debug_cell_delta_leaf(WT_DBG *ds, int page_type, WT_CELL_UNPACK_DELTA_LEAF_KV *unpack)
+{
+    const char *op;
+
+    WT_RET(__debug_cell_kv(ds, NULL, page_type, "K", &unpack->delta_key));
+
+    /* Absence of the delete bit means update only when no unknown bits are set. */
+    if (F_ISSET(unpack, ~WT_DELTA_LEAF_IS_DELETE)) {
+        WT_RET(ds->f(ds,
+          "\t"
+          "delta_op: unknown flag 0x%" PRIx8 "\n",
+          unpack->flags));
+        return (0);
+    }
+    op = F_ISSET(unpack, WT_DELTA_LEAF_IS_DELETE) ? "delete" : "update";
+    WT_RET(ds->f(ds,
+      "\t"
+      "delta_op: %s\n",
+      op));
+
+    if (!WT_TIME_WINDOW_IS_EMPTY(&unpack->delta_value.tw)) {
+        char time_string[WT_TIME_STRING_SIZE];
+        WT_RET(ds->f(ds,
+          "\t"
+          "time_window: %s\n",
+          __wt_time_window_to_string(&unpack->delta_value.tw, time_string)));
+    }
+
+    if (!F_ISSET(unpack, WT_DELTA_LEAF_IS_DELETE))
+        WT_RET(__debug_item_value(
+          ds, "V", unpack->delta_value_data.data, unpack->delta_value_data.size));
+
+    return (0);
+}
+
+/*
+ * __debug_cell_delta_int --
+ *     Dump one key/child-address pair from an internal delta.
+ */
+static int
+__debug_cell_delta_int(WT_DBG *ds, WT_CELL_UNPACK_DELTA_INT *unpack)
+{
+    WT_BLOCK_DISAGG_ADDRESS_COOKIE cookie;
+    WT_DECL_RET;
+    const uint8_t *cookie_data;
+
+    WT_RET(__debug_cell_kv(ds, NULL, WT_PAGE_ROW_INT, "K", &unpack->key));
+
+    cookie_data = unpack->value.data;
+    ret = __wt_block_disagg_addr_unpack(ds->session, &cookie_data, unpack->value.size, &cookie);
+    if (ret != 0) {
+        WT_RET(ds->f(ds,
+          "\t"
+          "child: <cookie unpack failed: %s>\n",
+          __wt_strerror(ds->session, ret, NULL, 0)));
+        return (0);
+    }
+    WT_RET(ds->f(ds,
+      "\t"
+      "child: page_id=%" PRIu64 " flags=0x%" PRIx64 " lsn=%" PRIu64 " base_lsn=%" PRIu64
+      " size=%" PRIu32 " checksum=0x%" PRIx32 "\n",
+      cookie.page_id, cookie.flags, cookie.lsn, cookie.base_lsn, cookie.size, cookie.checksum));
+    return (0);
+}
+
+/*
+ * __debug_disk_delta --
+ *     Dump a delta page in the structured style of __wti_debug_disk.
+ */
+static int
+__debug_disk_delta(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *base_dsk,
+  const WT_PAGE_HEADER *delta_dsk, const char *ofile)
+{
+    WT_DBG *ds, _ds;
+    WT_DECL_RET;
+
+    WT_ASSERT(session, S2BT_SAFE(session) != NULL);
+
+    ds = &_ds;
+    WT_RET(__debug_config(session, ds, ofile, 0));
+
+    WT_ERR(ds->f(ds,
+      "- delta page (underlying: %s)\n"
+      "\t> entries: %" PRIu32 " | generation: %" PRIu64 "\n",
+      __wt_page_type_string(delta_dsk->type), delta_dsk->u.entries, delta_dsk->write_gen));
+
+    switch (delta_dsk->type) {
+    case WT_PAGE_ROW_LEAF: {
+        WT_CELL_UNPACK_DELTA_LEAF_KV _unpack;
+        WT_CELL_UNPACK_DELTA_LEAF_KV *unpack;
+        unpack = &_unpack;
+        WT_CELL_FOREACH_DELTA_LEAF(session, delta_dsk, unpack)
+        {
+            WT_ERR(__debug_cell_delta_leaf(ds, delta_dsk->type, unpack));
+        }
+        WT_CELL_FOREACH_END;
+        break;
+    }
+    case WT_PAGE_ROW_INT: {
+        WTI_DELTA_INT_MERGE_STATE state;
+
+        WT_CLEAR(state);
+        state.cell = WT_PAGE_HEADER_BYTE(S2BT(session), delta_dsk);
+        state.entries = delta_dsk->u.entries;
+
+        /* Each entry is a key cell plus a value cell, so the count decreases by two. */
+        while (state.entries > 0) {
+            WT_CELL_DELTA_INT_UNPACK(session, base_dsk, &state);
+            WT_ERR(__debug_cell_delta_int(ds, &state.unpack));
+            state.unpacked = false;
+            state.entries -= 2;
+        }
+        break;
+    }
+    default:
+        WT_ERR(__wt_illegal_value(session, delta_dsk->type));
+    }
+
+err:
+    WT_TRET(__debug_wrapup(ds));
+    return (ret);
 }
 
 /*

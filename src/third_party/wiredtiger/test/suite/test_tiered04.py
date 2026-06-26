@@ -76,15 +76,6 @@ class test_tiered04(wttest.WiredTigerTestCase, TieredConfigMixin):
         c.close()
         self.assertTrue(val_str in val)
 
-    def get_stat(self, stat, uri):
-        if uri == None:
-            stat_cursor = self.session.open_cursor('statistics:')
-        else:
-            stat_cursor = self.session.open_cursor('statistics:' + uri)
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def check(self, tc, base, n):
         get_check(self, tc, base, n)
 
@@ -130,7 +121,7 @@ class test_tiered04(wttest.WiredTigerTestCase, TieredConfigMixin):
         self.session.checkpoint('flush_tier=(enabled)')
         flush += 1
         # We should not have flushed either tiered table.
-        skip = self.get_stat(stat.conn.flush_tier_skipped, None)
+        skip = self.get_stat(stat.conn.flush_tier_skipped)
         self.assertEqual(skip, 2)
 
         # Test data source statistics for a tiered table after the flush tier and checkpoint.
@@ -139,9 +130,9 @@ class test_tiered04(wttest.WiredTigerTestCase, TieredConfigMixin):
 
         self.session.checkpoint('flush_tier=(enabled)')
         # Now we should have switched both tables. The skip value should stay the same.
-        skip = self.get_stat(stat.conn.flush_tier_skipped, None)
+        skip = self.get_stat(stat.conn.flush_tier_skipped)
         self.assertEqual(skip, 2)
-        switch = self.get_stat(stat.conn.flush_tier_switched, None)
+        switch = self.get_stat(stat.conn.flush_tier_switched)
         self.assertEqual(switch, 2)
         flush += 1
         self.pr("Check for ")
@@ -149,7 +140,7 @@ class test_tiered04(wttest.WiredTigerTestCase, TieredConfigMixin):
         self.assertTrue(os.path.exists(self.obj1file))
         self.assertTrue(os.path.exists(self.obj2file))
 
-        remove1 = self.get_stat(stat.conn.local_objects_removed, None)
+        remove1 = self.get_stat(stat.conn.local_objects_removed)
         time.sleep(self.retention + 1)
         # We call flush_tier here because otherwise the internal thread that
         # processes the work units won't run for a while. This call will signal
@@ -158,9 +149,9 @@ class test_tiered04(wttest.WiredTigerTestCase, TieredConfigMixin):
         flush += 1
         # We called a forced flush, even though the flush before switched the files, and no new
         # data has been written, we should do a switch
-        skip = self.get_stat(stat.conn.flush_tier_skipped, None)
+        skip = self.get_stat(stat.conn.flush_tier_skipped)
         self.assertEqual(skip, 2)
-        switch = self.get_stat(stat.conn.flush_tier_switched, None)
+        switch = self.get_stat(stat.conn.flush_tier_switched)
         self.assertEqual(switch, 4)
         # We still sleep to give the internal thread a chance to run. Some slower
         # systems can fail here if we don't give them time.
@@ -168,7 +159,7 @@ class test_tiered04(wttest.WiredTigerTestCase, TieredConfigMixin):
         self.pr("Check removal of ")
         self.pr(self.obj1file)
         self.assertFalse(os.path.exists(self.obj1file))
-        remove2 = self.get_stat(stat.conn.local_objects_removed, None)
+        remove2 = self.get_stat(stat.conn.local_objects_removed)
         self.assertTrue(remove2 > remove1)
 
         c = self.session.open_cursor(self.uri)
@@ -195,7 +186,7 @@ class test_tiered04(wttest.WiredTigerTestCase, TieredConfigMixin):
         self.check(c, 0, 4)
         c.close()
 
-        calls = self.get_stat(stat.conn.flush_tier, None)
+        calls = self.get_stat(stat.conn.flush_tier)
         self.assertEqual(calls, flush)
 
         # As we flush each object, the next object exists, but our first flush was a no-op.
@@ -221,30 +212,30 @@ class test_tiered04(wttest.WiredTigerTestCase, TieredConfigMixin):
         self.check_metadata(self.file_none, tiered_false)
 
         # Now test some connection statistics with operations.
-        retain = self.get_stat(stat.conn.tiered_retention, None)
+        retain = self.get_stat(stat.conn.tiered_retention)
         self.assertEqual(retain, self.retention)
         self.session.checkpoint('flush_tier=(enabled)')
-        skip1 = self.get_stat(stat.conn.flush_tier_skipped, None)
-        switch1 = self.get_stat(stat.conn.flush_tier_switched, None)
+        skip1 = self.get_stat(stat.conn.flush_tier_skipped)
+        switch1 = self.get_stat(stat.conn.flush_tier_switched)
         # Make sure the last checkpoint and this flush tier are timed differently
         # so that we can specifically check the statistics and code paths in the test.
         # Sleep some to control the execution.
         time.sleep(2)
         self.session.checkpoint('flush_tier=(enabled,force=true)')
-        skip2 = self.get_stat(stat.conn.flush_tier_skipped, None)
-        switch2 = self.get_stat(stat.conn.flush_tier_switched, None)
+        skip2 = self.get_stat(stat.conn.flush_tier_skipped)
+        switch2 = self.get_stat(stat.conn.flush_tier_switched)
         self.assertGreater(switch2, switch1)
 
         self.assertEqual(skip1, skip2)
         flush += 2
-        calls = self.get_stat(stat.conn.flush_tier, None)
+        calls = self.get_stat(stat.conn.flush_tier)
         self.assertEqual(calls, flush)
 
         # Test reconfiguration.
         config = 'tiered_storage=(local_retention=%d)' % self.retention1
         self.pr("reconfigure")
         self.conn.reconfigure(config)
-        retain = self.get_stat(stat.conn.tiered_retention, None)
+        retain = self.get_stat(stat.conn.tiered_retention)
         self.assertEqual(retain, self.retention1)
 
         # Call flush_tier with its various configuration arguments. It is difficult
@@ -254,18 +245,18 @@ class test_tiered04(wttest.WiredTigerTestCase, TieredConfigMixin):
         # There have been no data changes nor checkpoints since the last flush_tier with
         # force, above. The skip statistics should increase and the switched
         # statistics should stay the same.
-        skip1 = self.get_stat(stat.conn.flush_tier_skipped, None)
-        switch1 = self.get_stat(stat.conn.flush_tier_switched, None)
+        skip1 = self.get_stat(stat.conn.flush_tier_skipped)
+        switch1 = self.get_stat(stat.conn.flush_tier_switched)
         self.session.checkpoint('flush_tier=(enabled,timeout=100)')
-        skip2 = self.get_stat(stat.conn.flush_tier_skipped, None)
-        switch2 = self.get_stat(stat.conn.flush_tier_switched, None)
+        skip2 = self.get_stat(stat.conn.flush_tier_skipped)
+        switch2 = self.get_stat(stat.conn.flush_tier_switched)
         self.assertEqual(switch1, switch2)
         self.assertGreater(skip2, skip1)
 
         self.session.checkpoint('flush_tier=(enabled,sync=false)')
         flush += 2
         self.pr("reconfigure get stat")
-        calls = self.get_stat(stat.conn.flush_tier, None)
+        calls = self.get_stat(stat.conn.flush_tier)
         self.assertEqual(calls, flush)
 
         # Test that the checkpoint and flush times work across a connection restart.
@@ -278,12 +269,12 @@ class test_tiered04(wttest.WiredTigerTestCase, TieredConfigMixin):
         # Manually reopen the connection because the default function above tries to
         # make the bucket directories.
         self.reopen_conn(config = self.saved_conn)
-        remove1 = self.get_stat(stat.conn.local_objects_removed, None)
-        skip1 = self.get_stat(stat.conn.flush_tier_skipped, None)
-        switch1 = self.get_stat(stat.conn.flush_tier_switched, None)
+        remove1 = self.get_stat(stat.conn.local_objects_removed)
+        skip1 = self.get_stat(stat.conn.flush_tier_skipped)
+        switch1 = self.get_stat(stat.conn.flush_tier_switched)
         self.session.checkpoint('flush_tier=(enabled)')
-        skip2 = self.get_stat(stat.conn.flush_tier_skipped, None)
-        switch2 = self.get_stat(stat.conn.flush_tier_switched, None)
+        skip2 = self.get_stat(stat.conn.flush_tier_skipped)
+        switch2 = self.get_stat(stat.conn.flush_tier_switched)
 
         # The first flush_tier after restart should have queued removal work units
         # for other objects. Sleep and then force a flush tier to signal the internal
@@ -294,7 +285,7 @@ class test_tiered04(wttest.WiredTigerTestCase, TieredConfigMixin):
         # Sleep to give the internal thread time to run and process.
         time.sleep(1)
         self.assertFalse(os.path.exists(self.obj1file))
-        remove2 = self.get_stat(stat.conn.local_objects_removed, None)
+        remove2 = self.get_stat(stat.conn.local_objects_removed)
         self.assertTrue(remove2 > remove1)
         #
         # Due to the above modification, we should skip the 'other' table while
