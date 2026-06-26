@@ -84,7 +84,7 @@ public:
                     str::stream() << Request::kCommandName << " cannot be run on standalones",
                     repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet());
 
-            // Only one attempt to change whether writes are blocked may make progress at once
+            // Only one attempt to change whether writes are blocked may make progress at once.
             std::lock_guard lock(_mutex);
             if (MONGO_unlikely(hangInBlockReplicaSetWritesCommand.shouldFail())) {
                 LOGV2(12096400, "hangInBlockReplicaSetWritesCommand failpoint enabled");
@@ -153,7 +153,7 @@ public:
                             ActionType::blockReplicaSetWrites}));
         }
 
-        std::mutex _mutex;
+        inline static std::mutex _mutex;
     };
 };
 MONGO_REGISTER_COMMAND(BlockReplicaSetWritesCommand)
