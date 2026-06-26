@@ -197,5 +197,22 @@ TEST_F(ReshardingDonorPostCloningDeltaCollectorTest,
     ASSERT_NOT_OK(status);
 }
 
+TEST_F(ReshardingDonorPostCloningDeltaCollectorTest, LaunchFutureResolvesWhenExecutorIsShutDown) {
+    CancellationSource abortSource;
+    auto externalState = std::make_shared<SuccessMockExternalState>(
+        std::map<ShardId, int64_t>{{ShardId("shard0"), 5}});
+    // kCommitting skips the fetch, leaving only launch's getAsync completion callback to exercise.
+    auto doc = makeDoc(CoordinatorStateEnum::kCommitting, {ShardId("shard0")});
+    auto collector = makeCollector(doc, externalState, abortSource.token());
+
+    // With a shut-down executor, a plain getAsync drops its callback and the future hangs;
+    // unsafeToInlineFuture() runs it inline so launch() still resolves.
+    (*scopedExecutor())->shutdown();
+
+    auto status = launchCollector(collector).getNoThrow();
+    ASSERT_OK(status);
+    ASSERT_TRUE(status.getValue().empty());
+}
+
 }  // namespace
 }  // namespace mongo

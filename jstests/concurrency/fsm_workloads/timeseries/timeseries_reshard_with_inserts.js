@@ -21,6 +21,7 @@ import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
+import {isSlowBuild} from "jstests/sharding/libs/sharding_util.js";
 
 export const $config = (function () {
     // This test manually shards the collection.
@@ -34,7 +35,24 @@ export const $config = (function () {
     const data = {
         shardKey: shardKeys[0],
         reshardingCount: 0,
+        numDocsPerInsert: 250,
+        originalValidationParams: null,
     };
+
+    function setReshardingServerParameters(cluster, params) {
+        const previous = {};
+        const apply = (adminDb) => {
+            for (const [name, value] of Object.entries(params)) {
+                const res = assert.commandWorked(
+                    adminDb.adminCommand({setParameter: 1, [name]: value}),
+                );
+                previous[name] = res.was;
+            }
+        };
+        cluster.executeOnConfigNodes(apply);
+        cluster.executeOnMongodNodes(apply);
+        return previous;
+    }
 
     function generateMetaFieldValueForInitialInserts(range) {
         return {x: Math.floor(Math.random() * range), y: Math.floor(Math.random() * range)};
@@ -52,18 +70,6 @@ export const $config = (function () {
         let ns = db + "." + collName;
         let reshardCollectionCmd = {reshardCollection: ns, key: newShardKey, numInitialChunks: 1};
         if (TestData.runningWithShardStepdowns) {
-            const isVerificationFeatureFlagEnabled = FeatureFlagUtil.isEnabled(
-                db,
-                "ReshardingVerification",
-            );
-            if (isVerificationFeatureFlagEnabled) {
-                // TODO (SERVER-101249): Re-enable resharding verification in
-                // timeseries_reshard_with_inserts.js when running in stepdown suites
-                // 'performVerification' defaults to true when the feature flag is enabled.
-                // Currently, in a suite with stepdown, this test hangs when performing resharding
-                // verification.
-                reshardCollectionCmd.performVerification = false;
-            }
             assert.soonRetryOnAcceptableErrors(
                 () => {
                     assert.commandWorkedOrFailedWithCode(db.adminCommand(reshardCollectionCmd), [
@@ -87,7 +93,7 @@ export const $config = (function () {
         insert: function insert(db, collName) {
             print(`Inserting documents for collection ${collName}.`);
             const docs = [];
-            for (let i = 0; i < 250; ++i) {
+            for (let i = 0; i < this.numDocsPerInsert; ++i) {
                 docs.push({
                     [metaField]: generateMetaFieldValueForInitialInserts(15),
                     [timeField]: new Date(),
@@ -127,7 +133,35 @@ export const $config = (function () {
         insert: {insert: 0.85, reshardTimeseries: 0.15},
     };
 
+    function teardown(_db, _collName, cluster) {
+        if (data.originalValidationParams !== null) {
+            setReshardingServerParameters(cluster, data.originalValidationParams);
+        }
+    }
+
     function setup(db, collName, cluster) {
+        const reduceLoadForValidation =
+            TestData.runningWithShardStepdowns &&
+            isSlowBuild(db.getMongo()) &&
+            FeatureFlagUtil.isEnabled(db, "ReshardingVerification");
+        if (reduceLoadForValidation) {
+            // On slow builds with stepdowns, the verification monitor is interrupted before completing its oplog scan.
+            // Reduce write volume to allow more frequent checkpoints.
+            this.numDocsPerInsert = 100;
+
+            // Limit the critical section to 30 minutes (vs the 24-hour test default) with shorter batch limits
+            // and a 1% verification wait. This allows resharding to skip validation if it takes too long.
+            const validationParamsUnderStepdowns = {
+                reshardingVerificationChangeStreamsEventsBatchTimeLimitSeconds: 4,
+                reshardingCriticalSectionTimeoutMillis: 30 * 60 * 1000,
+                reshardingVerificationDeltaWaitRemainingCriticalSectionPercent: 1,
+            };
+            data.originalValidationParams = setReshardingServerParameters(
+                cluster,
+                validationParamsUnderStepdowns,
+            );
+        }
+
         db[collName].drop();
 
         assert.commandWorked(
@@ -139,19 +173,19 @@ export const $config = (function () {
 
         const shards = Object.keys(cluster.getSerializedCluster().shards);
         ChunkHelper.splitChunkAt(db, getTimeseriesCollForDDLOps(db, db[collName]).getName(), {
-            "meta.x": 5,
+            "meta.x": 8,
         });
 
         ChunkHelper.moveChunk(
             db,
             getTimeseriesCollForDDLOps(db, db[collName]).getName(),
-            [{"meta.x": MinKey}, {"meta.x": 5}],
+            [{"meta.x": MinKey}, {"meta.x": 8}],
             shards[0],
         );
         ChunkHelper.moveChunk(
             db,
             getTimeseriesCollForDDLOps(db, db[collName]).getName(),
-            [{"meta.x": 5}, {"meta.x": MaxKey}],
+            [{"meta.x": 8}, {"meta.x": MaxKey}],
             shards[1],
         );
 
@@ -183,6 +217,7 @@ export const $config = (function () {
         states: states,
         transitions: transitions,
         setup: setup,
+        teardown: teardown,
         data: data,
     };
 })();

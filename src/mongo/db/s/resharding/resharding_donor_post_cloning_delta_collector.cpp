@@ -52,7 +52,10 @@ SharedSemiFuture<std::map<ShardId, int64_t>> ReshardingDonorPostCloningDeltaColl
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     otel::traces::Span span,
     std::function<void()> onRetry) {
+    // unsafeToInlineFuture() ensures the callback runs even if the executor is shut down; otherwise
+    // getAsync skips it, leaving _completionPromise unset and hanging waitForCompletion().
     _run(executor, std::move(onRetry))
+        .unsafeToInlineFuture()
         .getAsync([self = shared_from_this(),
                    span = std::move(span)](StatusWith<std::map<ShardId, int64_t>> sw) mutable {
             auto localSpan = std::move(span);
