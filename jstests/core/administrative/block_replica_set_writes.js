@@ -9,6 +9,7 @@
 //   assumes_against_mongod_not_mongos,
 //   featureFlagBlockReplicaSetWrites,
 //   does_not_support_config_fuzzer,
+//   wildcard_indexes_incompatible,
 // ]
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
@@ -699,6 +700,135 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             null,
             testColl.getIndexes().find((idx) => idx.name === "a_1"),
             "Expected index to exist after write block is disabled",
+        );
+    });
+
+    it("Test that in-progress index builds before the commit phase are aborted when blockReplicaSetWrites is enabled", function () {
+        const testDB = this.replicaSetPrimary.getDB(this.testDbName);
+        const testColl = testDB.getCollection("inProgressIndexBuildColl");
+        assert.commandWorked(testColl.insert({_id: 1, a: 1}));
+
+        // Verify that index builds succeed normally before write blocking is enabled.
+        assert.commandWorked(testColl.createIndex({a: 1}));
+        assert.neq(
+            null,
+            testColl.getIndexes().find((idx) => idx.name === "a_1"),
+            "Expected index to exist before write blocking is enabled",
+        );
+        assert.commandWorked(testColl.dropIndex("a_1"));
+
+        // Pause the index build after initialization so we can enable the write block while it is in progress.
+        const hangFp = configureFailPoint(
+            this.replicaSetPrimary,
+            "hangAfterInitializingIndexBuild",
+        );
+
+        // Start the index build in a parallel shell.
+        const awaitIndexBuild = startParallelShell(() => {
+            const res = assert.commandFailedWithCode(
+                db
+                    .getSiblingDB("testDB")
+                    .getCollection("inProgressIndexBuildColl")
+                    .createIndex({a: 1}),
+                [ErrorCodes.IndexBuildAborted, ErrorCodes.ReplicaSetWritesBlocked],
+            );
+            // The build must fail because of write blocking. This surfaces in one of two ways: the
+            // in-progress build is aborted with a "Write blocking" reason (IndexBuildAborted), or the
+            // build's setup write is rejected outright with "Replica set write blocked"
+            // (ReplicaSetWritesBlocked) when the build restarts after the block is already enabled
+            // (e.g. when a concurrent FCV change interrupts the paused build).
+            assert(
+                res.errmsg.includes("Write blocking") ||
+                    res.errmsg.includes("Replica set write blocked"),
+                "Unexpected index build failure reason",
+                {res},
+            );
+        }, this.replicaSetPrimaryPort);
+
+        hangFp.wait();
+
+        // Enable replica set write blocking while the index build is paused.
+        enableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB, false, "InsufficientDiskSpace");
+
+        hangFp.off();
+        awaitIndexBuild();
+
+        // Verify the index was not created.
+        assert.eq(
+            null,
+            testColl.getIndexes().find((idx) => idx.name === "a_1"),
+            "Expected index to not exist after in-progress build was aborted",
+        );
+
+        // Disable write blocking and verify that index builds succeed again.
+        disableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB, "InsufficientDiskSpace");
+        assert.commandWorked(testColl.createIndex({a: 1}));
+        assert.neq(
+            null,
+            testColl.getIndexes().find((idx) => idx.name === "a_1"),
+            "Expected index to exist after write blocking is disabled",
+        );
+    });
+
+    it("Test that an index build already in the commit phase is not aborted but waited on when blockReplicaSetWrites is enabled", function () {
+        const testDB = this.replicaSetPrimary.getDB(this.testDbName);
+        const testColl = testDB.getCollection("commitPhaseIndexBuildColl");
+        assert.commandWorked(testColl.insert({_id: 1, a: 1}));
+
+        // Pause the index build once it has reached the commit phase. At this point the build is
+        // past the point where it can be aborted, so enabling write blocking must wait for it to
+        // finish rather than abort it.
+        const hangFp = configureFailPoint(this.replicaSetPrimary, "hangIndexBuildBeforeCommit");
+
+        // Start the index build; it should succeed (not be aborted).
+        const awaitIndexBuild = startParallelShell(() => {
+            assert.commandWorked(
+                db
+                    .getSiblingDB("testDB")
+                    .getCollection("commitPhaseIndexBuildColl")
+                    .createIndex({a: 1}),
+            );
+        }, this.replicaSetPrimaryPort);
+
+        hangFp.wait();
+
+        // Enable replica set write blocking in a parallel shell. Because the index build is already
+        // committing and cannot be aborted, the command must wait for the build to finish before
+        // it completes.
+        const awaitWriteBlock = startParallelShell(() => {
+            assert.commandWorked(
+                db.getSiblingDB("admin").runCommand({
+                    blockReplicaSetWrites: 1,
+                    enabled: true,
+                    allowDeletions: false,
+                    reason: "InsufficientDiskSpace",
+                }),
+            );
+        }, this.replicaSetPrimaryPort);
+
+        // While the index build is still paused in commit, the write-blocking command must not have
+        // finished: it is blocked waiting on the build that it could not abort.
+        assert.soon(
+            () =>
+                this.replicaSetPrimaryAdminDB
+                    .aggregate([
+                        {$currentOp: {}},
+                        {$match: {"command.blockReplicaSetWrites": {$exists: true}}},
+                    ])
+                    .toArray().length > 0,
+            "Expected blockReplicaSetWrites to still be waiting on the committing index build",
+        );
+
+        // Let the index build commit; both the build and the write-blocking command should finish.
+        hangFp.off();
+        awaitIndexBuild();
+        awaitWriteBlock();
+
+        // Verify the index was created: a commit-phase build must not be aborted.
+        assert.neq(
+            null,
+            testColl.getIndexes().find((idx) => idx.name === "a_1"),
+            "Expected index to exist.",
         );
     });
 

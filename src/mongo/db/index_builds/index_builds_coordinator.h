@@ -278,7 +278,11 @@ public:
                                   const DatabaseName& dbName,
                                   const std::string& reason);
 
-    void abortUserIndexBuildsForUserWriteBlocking(OperationContext* opCtx);
+    /**
+     * Aborts non-internal DBs index builds and waits for any that are already finishing
+     * (and thus cannot be aborted) to complete.
+     */
+    void abortIndexBuildsForWriteBlocking(OperationContext* opCtx);
 
     /**
      * Signals all of the index builds to abort and then waits until the index builds are no longer

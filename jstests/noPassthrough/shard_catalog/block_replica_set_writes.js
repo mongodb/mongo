@@ -526,6 +526,32 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
         );
     });
 
+    it("Test that sharding an empty collection with a hashed shard key succeeds when blockReplicaSetWrites is enabled", function () {
+        // Enable per-shard write blocking on shard0, the primary shard for this database.
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+
+        // Sharding with a hashed shard key builds a hashed index on the new (empty) collection.
+        // Because the index build is on an empty collection, it bypasses the write block and
+        // sharding succeeds.
+        assert.commandWorked(
+            this.st.s.adminCommand({shardCollection: this.nns, key: {x: "hashed"}}),
+        );
+
+        // Verify the hashed shard key index was created on shard0.
+        const shard0Coll = this.shard0Primary
+            .getDB(this.testDBName)
+            .getCollection(this.shardedCollName);
+        assert.neq(
+            null,
+            shard0Coll.getIndexes().find((idx) => idx.key && idx.key.x === "hashed"),
+            "Expected hashed shard key index to exist after sharding under write blocking",
+        );
+    });
+
     it("Test that convertToCapped on a shard is blocked when blockReplicaSetWrites is enabled", function () {
         // Create an unsharded collection on the primary shard (shard0), where the block is enabled.
         const testColl = this.testDB.getCollection("convertToCappedColl");
@@ -588,6 +614,74 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
             null,
             testColl.getIndexes().find((idx) => idx.name === "a_1"),
             "Expected index to exist after write block is disabled",
+        );
+    });
+
+    it("Test that the replica set write block and the disk space monitor do not conflict on index builds", function () {
+        const shard0LocalDB = this.st.shard0.getDB(this.testDBName);
+        const emptyColl = shard0LocalDB.getCollection("emptyColl");
+        const nonEmptyColl = shard0LocalDB.getCollection("nonEmptyColl");
+
+        // Populate nonEmptyColl before enabling the write block so its index build actually runs.
+        assert.commandWorked(nonEmptyColl.insert({_id: 1, a: 1}));
+
+        // Simulate low available disk space on shard0 (below the default 500 MB threshold) so the
+        // disk space monitor would reject index builds, then enable the replica set write block.
+        const simulateDiskSpaceFp = configureFailPoint(
+            this.shard0Primary,
+            "simulateAvailableDiskSpace",
+            {bytes: 450 * 1024 * 1024},
+        );
+        try {
+            enableReplicaSetWriteBlock(
+                this.shard0PrimaryAdminDB,
+                false /* allowDeletions */,
+                "InsufficientDiskSpace" /* reason */,
+            );
+
+            // An index build on an empty collection does not start a real build, so it is exempt
+            // from both the write block and the disk space check and should succeed.
+            assert.commandWorked(emptyColl.createIndex({a: 1}));
+            assert.neq(
+                null,
+                emptyColl.getIndexes().find((idx) => idx.name === "a_1"),
+                "Expected index to exist on empty collection with both write block and disk space monitor enabled",
+            );
+
+            // An index build on a non-empty collection would be rejected by each mechanism on its
+            // own. With both enabled it must still fail cleanly with one of the expected errors.
+            assert.commandFailedWithCode(
+                nonEmptyColl.createIndex({b: 1}),
+                [ErrorCodes.ReplicaSetWritesBlocked, ErrorCodes.OutOfDiskSpace],
+                "Expected non-empty collection index build to fail while both mechanisms are enabled",
+            );
+            assert.eq(
+                null,
+                nonEmptyColl.getIndexes().find((idx) => idx.name === "b_1"),
+                "Expected index to not exist while both mechanisms are enabled",
+            );
+
+            // Lifting only the write block must leave the disk space monitor still rejecting the
+            // build, confirming the two mechanisms operate independently.
+            disableReplicaSetWriteBlock(
+                this.shard0PrimaryAdminDB,
+                "InsufficientDiskSpace" /* reason */,
+            );
+            assert.commandFailedWithCode(
+                nonEmptyColl.createIndex({b: 1}),
+                ErrorCodes.OutOfDiskSpace,
+                "Expected disk space monitor to still reject the index build after lifting the write block",
+            );
+        } finally {
+            simulateDiskSpaceFp.off();
+        }
+
+        // With both mechanisms disabled the index build on the non-empty collection succeeds.
+        assert.commandWorked(nonEmptyColl.createIndex({b: 1}));
+        assert.neq(
+            null,
+            nonEmptyColl.getIndexes().find((idx) => idx.name === "b_1"),
+            "Expected index to exist after both write block and disk space monitor are disabled",
         );
     });
 

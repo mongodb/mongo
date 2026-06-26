@@ -1223,9 +1223,8 @@ void IndexBuildsCoordinator::abortAllIndexBuildsDueToDiskSpace(OperationContext*
     }
 }
 
-void IndexBuildsCoordinator::abortUserIndexBuildsForUserWriteBlocking(OperationContext* opCtx) {
-    LOGV2(6511600,
-          "About to abort index builders running on user databases for user write blocking");
+void IndexBuildsCoordinator::abortIndexBuildsForWriteBlocking(OperationContext* opCtx) {
+    LOGV2(6511600, "About to abort index builders for write blocking");
 
     auto builds = [&]() -> std::vector<std::shared_ptr<ReplIndexBuildState>> {
         auto indexBuildFilter = [](const auto& replState) {
@@ -1237,11 +1236,10 @@ void IndexBuildsCoordinator::abortUserIndexBuildsForUserWriteBlocking(OperationC
     std::vector<std::shared_ptr<ReplIndexBuildState>> buildsWaitingToFinish;
 
     for (const auto& replState : builds) {
-        if (!abortIndexBuildByBuildUUID(
-                opCtx,
-                replState->buildUUID,
-                IndexBuildAction::kPrimaryAbort,
-                Status{ErrorCodes::IndexBuildAborted, "User write blocking"})) {
+        if (!abortIndexBuildByBuildUUID(opCtx,
+                                        replState->buildUUID,
+                                        IndexBuildAction::kPrimaryAbort,
+                                        Status{ErrorCodes::IndexBuildAborted, "Write blocking"})) {
             // If the index build is already finishing and thus can't be aborted, we must wait on
             // it.
             LOGV2(6511601,

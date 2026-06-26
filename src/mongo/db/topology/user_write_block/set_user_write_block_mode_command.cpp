@@ -103,8 +103,7 @@ public:
                     ScopeGuard guard(
                         [&]() { writeBlockState->disableUserIndexBuildBlocking(opCtx); });
                     // Abort and wait for ongoing index builds to finish.
-                    IndexBuildsCoordinator::get(opCtx)->abortUserIndexBuildsForUserWriteBlocking(
-                        opCtx);
+                    IndexBuildsCoordinator::get(opCtx)->abortIndexBuildsForWriteBlocking(opCtx);
 
                     // Engage write blocking
                     UserWritesRecoverableCriticalSectionService::get(opCtx)

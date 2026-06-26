@@ -35,6 +35,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/generic_argument_util.h"
+#include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -102,6 +103,8 @@ public:
                 // Temporarily block new index builds during setup. Once the critical section
                 // is committed the op observer takes over enforcement, so this is always reset.
                 ScopeGuard guard([&]() { writeBlockState->disableUserIndexBuildBlocking(); });
+                // Abort and wait for any ongoing index builds to finish.
+                IndexBuildsCoordinator::get(opCtx)->abortIndexBuildsForWriteBlocking(opCtx);
 
                 // Enable write blocking
                 UserWritesRecoverableCriticalSectionService::get(opCtx)

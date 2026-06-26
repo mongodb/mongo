@@ -536,5 +536,79 @@ TEST_F(ReplicaSetWriteBlockStateTest, IncomingMigrationAllowedWhenBypassEnabled)
     ASSERT_DOES_NOT_THROW(state->checkIfIncomingMigrationAllowedToStart(opCtx.get()));
 }
 
+TEST_F(ReplicaSetWriteBlockStateTest, IndexBuildAllowedWhenIndexBuildBlockingDisabled) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
+
+    const auto nss = NamespaceString::createNamespaceString_forTest("userDB.coll");
+    ASSERT_OK(state->checkIfIndexBuildAllowedToStart(opCtx.get(), nss));
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, IndexBuildBlockedWhenIndexBuildBlockingEnabled) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
+
+    state->enableUserIndexBuildBlocking();
+
+    const auto nss = NamespaceString::createNamespaceString_forTest("userDB.coll");
+    ASSERT_EQ(state->checkIfIndexBuildAllowedToStart(opCtx.get(), nss),
+              ErrorCodes::ReplicaSetWritesBlocked);
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, DisableIndexBuildBlockingRestoresAllowedState) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
+
+    state->enableUserIndexBuildBlocking();
+    const auto nss = NamespaceString::createNamespaceString_forTest("userDB.coll");
+    ASSERT_EQ(state->checkIfIndexBuildAllowedToStart(opCtx.get(), nss),
+              ErrorCodes::ReplicaSetWritesBlocked);
+
+    state->disableUserIndexBuildBlocking();
+    ASSERT_OK(state->checkIfIndexBuildAllowedToStart(opCtx.get(), nss));
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, IndexBuildAllowedOnInternalDb) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
+
+    state->enableUserIndexBuildBlocking();
+
+    ASSERT_OK(state->checkIfIndexBuildAllowedToStart(
+        opCtx.get(), NamespaceString::createNamespaceString_forTest("admin.coll")));
+    ASSERT_OK(state->checkIfIndexBuildAllowedToStart(
+        opCtx.get(), NamespaceString::createNamespaceString_forTest("config.coll")));
+    ASSERT_OK(state->checkIfIndexBuildAllowedToStart(
+        opCtx.get(), NamespaceString::createNamespaceString_forTest("local.coll")));
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, IndexBuildAllowedWhenBypassEnabled) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    state->enableUserIndexBuildBlocking();
+
+    auto authSession = AuthorizationSession::get(opCtx->getClient());
+    authSession->grantInternalAuthorization();
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).setFromMetadata(opCtx.get(), {});
+    ASSERT(ReplicaSetWriteBlockBypass::get(opCtx.get()).isEnabled());
+
+    const auto nss = NamespaceString::createNamespaceString_forTest("userDB.coll");
+    ASSERT_OK(state->checkIfIndexBuildAllowedToStart(opCtx.get(), nss));
+}
+
 }  // namespace
 }  // namespace mongo
