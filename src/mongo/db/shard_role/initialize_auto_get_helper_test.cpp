@@ -334,5 +334,77 @@ TEST_F(InitializeAutoGetHelperTest, InTransactionRcLocal) {
     ASSERT_EQ(true, anySecondaryCollectionIsNotLocal);
 }
 
+// --- resolveShardRoleVersions ------------------------------------------------------------------
+
+TEST_F(InitializeAutoGetHelperTest, ResolveShardRoleVersionsTracked) {
+    const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "db1");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest(dbName, "coll");
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 0));
+
+    const auto cri = CatalogCacheMock::makeCollectionRoutingInfoSharded(
+        nss,
+        kMyShardName,
+        dbVersion,
+        BSON("skey" << 1),
+        {{ChunkRange(BSON("skey" << MINKEY), BSON("skey" << MAXKEY)), kMyShardName}});
+
+    auto [shardVersion, resolvedDbVersion] = resolveShardRoleVersions(
+        operationContext(), cri, kMyShardName, boost::none /* placementConflictTime */);
+
+    // Tracked collection: shardVersion is this shard's, dbVersion is unset.
+    ASSERT_EQ(cri.getShardVersion(operationContext(), kMyShardName), shardVersion);
+    ASSERT_EQ(boost::none, resolvedDbVersion);
+}
+
+TEST_F(InitializeAutoGetHelperTest, ResolveShardRoleVersionsUntrackedOnPrimary) {
+    const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "db1");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest(dbName, "coll");
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 0));
+
+    const auto cri =
+        CatalogCacheMock::makeCollectionRoutingInfoUntracked(nss, kMyShardName, dbVersion);
+
+    auto [shardVersion, resolvedDbVersion] = resolveShardRoleVersions(
+        operationContext(), cri, kMyShardName, boost::none /* placementConflictTime */);
+
+    // Untracked collection on its dbPrimary: UNTRACKED sentinel + the DatabaseVersion attached.
+    ASSERT_EQ(ShardVersion::UNTRACKED(), shardVersion);
+    ASSERT_EQ(dbVersion, resolvedDbVersion);
+}
+
+TEST_F(InitializeAutoGetHelperTest, ResolveShardRoleVersionsUntrackedOnNonPrimary) {
+    const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "db1");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest(dbName, "coll");
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 0));
+
+    // dbPrimary is otherShard, so this shard must not attach the DatabaseVersion.
+    const auto cri =
+        CatalogCacheMock::makeCollectionRoutingInfoUntracked(nss, otherShard, dbVersion);
+
+    auto [shardVersion, resolvedDbVersion] = resolveShardRoleVersions(
+        operationContext(), cri, kMyShardName, boost::none /* placementConflictTime */);
+
+    ASSERT_EQ(ShardVersion::UNTRACKED(), shardVersion);
+    ASSERT_EQ(boost::none, resolvedDbVersion);
+}
+
+TEST_F(InitializeAutoGetHelperTest, ResolveShardRoleVersionsStampsPlacementConflictTime) {
+    const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "db1");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest(dbName, "coll");
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 0));
+    const auto placementConflictTime = LogicalTime(Timestamp(1000, 0));
+
+    // Untracked on primary so both shardVersion and dbVersion are produced and stamped.
+    const auto cri =
+        CatalogCacheMock::makeCollectionRoutingInfoUntracked(nss, kMyShardName, dbVersion);
+
+    auto [shardVersion, resolvedDbVersion] =
+        resolveShardRoleVersions(operationContext(), cri, kMyShardName, placementConflictTime);
+
+    ASSERT_EQ(placementConflictTime, shardVersion.placementConflictTime_DEPRECATED());
+    ASSERT(resolvedDbVersion);
+    ASSERT_EQ(placementConflictTime, resolvedDbVersion->getPlacementConflictTime_DEPRECATED());
+}
+
 }  // namespace
 }  // namespace mongo

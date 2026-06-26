@@ -33,6 +33,42 @@
 
 namespace mongo {
 
+std::pair<ShardVersion, boost::optional<DatabaseVersion>> resolveShardRoleVersions(
+    OperationContext* opCtx,
+    const CollectionRoutingInfo& cri,
+    const ShardId& myShardId,
+    const boost::optional<LogicalTime>& placementConflictTime) {
+    const bool isTracked = cri.hasRoutingTable();
+
+    auto shardVersion =
+        isTracked ? cri.getShardVersion(opCtx, myShardId) : ShardVersion::UNTRACKED();
+    if (placementConflictTime) {
+        // TODO (SERVER-115178): Remove placementConflictTime stamping once v9.0 branches out.
+        shardVersion.setPlacementConflictTime_DEPRECATED(*placementConflictTime);
+    }
+
+    // For UNTRACKED collections, the collection will only be potentially considered local if this
+    // shard is the dbPrimary shard.
+    //
+    // If the routing info tells this shard is, then attach the DatabaseVersion to validate that.
+    // For the opposite case, where the routing info says that this shard is not the dbPrimary
+    // shard, we cannot attach the DatabaseVersion because the protocol does not allow a way to
+    // express that, so it won't be validated. If the routing info was stale, this will potentially
+    // result in executing a correct but sub-optimal query plan (only this time, because the next
+    // executions will see an updated routing info as a side effect of this execution having
+    // targeted a "remotely" and therefore will choose the optimal plan).
+    const bool isDbPrimaryShard = cri.getDbPrimaryShardId() == myShardId;
+    auto dbVersion = !isTracked && isDbPrimaryShard
+        ? boost::optional<DatabaseVersion>(cri.getDbVersion())
+        : boost::none;
+    if (placementConflictTime && dbVersion) {
+        // TODO (SERVER-115178): Remove placementConflictTime stamping once v9.0 branches out.
+        dbVersion->setPlacementConflictTime_DEPRECATED(*placementConflictTime);
+    }
+
+    return {std::move(shardVersion), std::move(dbVersion)};
+}
+
 std::vector<ScopedSetShardRole> createScopedShardRoles(
     OperationContext* opCtx,
     const stdx::unordered_map<NamespaceString, CollectionRoutingInfo>& criMap,
@@ -49,35 +85,8 @@ std::vector<ScopedSetShardRole> createScopedShardRoles(
                 "Must be an entry in criMap for namespace " + nss.toStringForErrorMsg(),
                 nssCri != criMap.end());
 
-        bool isTracked = nssCri->second.hasRoutingTable();
-
-        auto shardVersion = [&] {
-            auto sv = isTracked ? nssCri->second.getShardVersion(opCtx, myShardId)
-                                : ShardVersion::UNTRACKED();
-            if (placementConflictTime) {
-                sv.setPlacementConflictTime_DEPRECATED(*placementConflictTime);
-            }
-            return sv;
-        }();
-
-        // For UNTRACKED collections, the collection will only be potentially considered local if
-        // this shard is the dbPrimary shard.
-        //
-        // If the routing info tells this shard is, then attach the DatabaseVersion to validate
-        // that. For the opposite case, where the routing info says that this shard is not the
-        // dbPrimary shard, we cannot attach the DatabaseVersion because the protocol does not allow
-        // a way to express that, so it won't be validated. If the routing info was stale, this will
-        // potentially result in executing a correct but sub-optimal query plan (only this time,
-        // because the next executions will see an updated routing info as a side effect of this
-        // execution having targeted a "remotely" and therefore will choose the optimal plan).
-        const bool isDbPrimaryShard = nssCri->second.getDbPrimaryShardId() == myShardId;
-        auto dbVersion = !isTracked && isDbPrimaryShard
-            ? boost::optional<DatabaseVersion>(nssCri->second.getDbVersion())
-            : boost::none;
-
-        if (placementConflictTime && dbVersion) {
-            dbVersion->setPlacementConflictTime_DEPRECATED(*placementConflictTime);
-        }
+        auto [shardVersion, dbVersion] =
+            resolveShardRoleVersions(opCtx, nssCri->second, myShardId, placementConflictTime);
 
         try {
             // Versioning checks are safely disabled for UNTRACKED collections when no

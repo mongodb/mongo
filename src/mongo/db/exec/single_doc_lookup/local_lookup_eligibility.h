@@ -39,9 +39,14 @@
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/util/functional.h"
 
+#include <functional>
 #include <variant>
 
 #include <boost/optional/optional.hpp>
+
+namespace mongo {
+class ScopedCollectionFilter;
+}  // namespace mongo
 
 namespace mongo::exec::agg {
 
@@ -91,17 +96,49 @@ public:
         return std::holds_alternative<Local>(d);
     }
 
+    /**
+     * What acquisition (if any) the caller already holds, passed to run() so eligibility can skip
+     * routing when ownership is already determinable from a held acquisition.
+     *
+     * The arms differ in how a Local decision relates to placement staleness:
+     *   - HeldUnshardedCollectionLocally / HeldShardedCollection: the decision reflects the
+     *     placement observed when the held acquisition was taken (some time T). The caller installs
+     *     nothing further.
+     *   - NoHeldAcquisition: the decision is based on the latest, possibly stale, cached routing
+     *     information. A Local decision therefore carries the shard/db version it was based on, and
+     *     the caller MUST take a versioned acquisition on the namespace. If placement changed since
+     *     the decision, that acquisition throws StaleConfig, which run() refreshes and retries.
+     *
+     * Arm -> decision:
+     *   NoHeldAcquisition              -> Use routing information to determine if the document
+     *                                     belongs to this shard. Returns a version to attach to
+     *                                     ScopedSetShardRole before acquiring the collection.
+     *   HeldUnshardedCollectionLocally -> Collection is unsharded on the local shard.
+     *                                     Nothing to install as collection is already acquired.
+     *   HeldShardedCollection          -> Consult keyBelongsToMe() on the ScopedCollectionFilter.
+     *                                     Nothing to install as collection is already acquired.
+     */
+    struct NoHeldAcquisition {};
+    struct HeldUnshardedCollectionLocally {};
+    struct HeldShardedCollection {
+        std::reference_wrapper<const ScopedCollectionFilter> filter;
+    };
+    using AcquisitionState =
+        std::variant<NoHeldAcquisition, HeldUnshardedCollectionLocally, HeldShardedCollection>;
+
     virtual ~LocalLookupEligibility() = default;
 
     /**
-     * Computes the Decision for (nss, documentKey), invokes 'body' with it, and returns body's
-     * result. The eligibility owns catalog-and-routing (CAR) error handling, so 'body' stays
-     * sharding-agnostic.
+     * Computes the Decision for (nss, documentKey) given what the caller currently holds
+     * 'acquisitionState', invokes 'body' with it, and returns body's result. On the
+     * NoHeldAcquisition arm the eligibility owns catalog-and-routing (CAR) error handling, so
+     * 'body' stays sharding-agnostic.
      */
     virtual SingleDocumentLookupExecutor::LookupResult run(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
         const Document& documentKey,
+        const AcquisitionState& acquisitionState,
         function_ref<SingleDocumentLookupExecutor::LookupResult(const Decision&)> body) const = 0;
 };
 
@@ -117,6 +154,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
         const Document& documentKey,
+        const AcquisitionState& acquisitionState,
         function_ref<SingleDocumentLookupExecutor::LookupResult(const Decision&)> body)
         const override {
         return body(Local{});
@@ -132,6 +170,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
         const Document& documentKey,
+        const AcquisitionState& acquisitionState,
         function_ref<SingleDocumentLookupExecutor::LookupResult(const Decision&)> body)
         const override {
         return body(Unknown{});

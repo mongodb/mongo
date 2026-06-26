@@ -55,6 +55,7 @@ LocalLookupEligibility::Decision decisionOf(const LocalLookupEligibility& eligib
     eligibility.run(expCtx,
                     nss,
                     documentKey,
+                    LocalLookupEligibility::NoHeldAcquisition{},
                     [&](const LocalLookupEligibility::Decision& d)
                         -> SingleDocumentLookupExecutor::LookupResult {
                         captured = d;

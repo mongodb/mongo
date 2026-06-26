@@ -74,6 +74,7 @@
 #include "mongo/db/router_role/router_role.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/shard_role/initialize_auto_get_helper.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/sharding_environment/grid.h"
@@ -579,6 +580,7 @@ std::unique_ptr<Pipeline> tryAttachCursorSourceForLocalRead(
     const auto& targetingCri = routingCtx.getCollectionRoutingInfo(nss);
 
     try {
+        // TODO (SERVER-115178): Remove the TransactionRouter access once v9.0 branches out.
         boost::optional<LogicalTime> optOriginalPlacementConflictTime;
         if (auto txnRouter = TransactionRouter::get(opCtx);
             txnRouter && opCtx->inMultiDocumentTransaction()) {
@@ -586,25 +588,8 @@ std::unique_ptr<Pipeline> tryAttachCursorSourceForLocalRead(
         }
 
         // TODO (SERVER-128786): Remove getShardId once getShardVersion uses ShardRef.
-        ShardVersion shardVersion = std::invoke([&] {
-            auto sv = targetingCri.hasRoutingTable()
-                ? targetingCri.getShardVersion(opCtx, localShardRef.getShardId())
-                : ShardVersion::UNTRACKED();
-            if (optOriginalPlacementConflictTime.has_value())
-                sv.setPlacementConflictTime_DEPRECATED(*optOriginalPlacementConflictTime);
-            return sv;
-        });
-        boost::optional<DatabaseVersion> dbVersion =
-            std::invoke([&]() -> boost::optional<DatabaseVersion> {
-                if (targetingCri.hasRoutingTable()) {
-                    return boost::none;
-                }
-                auto dbv = targetingCri.getDbVersion();
-                if (optOriginalPlacementConflictTime.has_value()) {
-                    dbv.setPlacementConflictTime_DEPRECATED(*optOriginalPlacementConflictTime);
-                }
-                return dbv;
-            });
+        auto [shardVersion, dbVersion] = resolveShardRoleVersions(
+            opCtx, targetingCri, localShardRef.getShardId(), optOriginalPlacementConflictTime);
         ScopedSetShardRole shardRole{opCtx, nss, shardVersion, dbVersion};
 
         // Mark routing table as validated as we have "sent" the versioned command to a shard by

@@ -75,6 +75,51 @@ mongo_cc_library(
     ],
 )
 
+# Sharded-cluster eligibility. Split into its own target because it pulls the router / catalog-cache
+# / shard-targeting libraries; only the change-stream updateLookup wiring point links it, so the base
+# eligibility (interface + AlwaysLocal/AlwaysUnknown) stays sharding-router-free.
+mongo_cc_library(
+    name = "sharded_cluster_local_lookup_eligibility",
+    srcs = [
+        "sharded_cluster_local_lookup_eligibility.cpp",
+    ],
+    hdrs = [
+        "sharded_cluster_local_lookup_eligibility.h",
+    ],
+    deps = [
+        ":local_lookup_eligibility",
+        ":single_document_lookup_executor",
+        # CollationSpec::kSimpleSpec for shard-key targeting.
+        "//src/mongo/db/query/collation:collator_interface",
+        # resolveShardRoleVersions: shared tracked/untracked version derivation.
+        "//src/mongo/db/shard_role",
+        # CollectionRouter, CollectionRoutingInfo, CatalogCache::getCollectionRoutingInfo.
+        "//src/mongo/s:grid",
+        "//src/mongo/s:sharding_router_api",
+        # getTargetedShardsForQuery.
+        "//src/mongo/s/query:shard_targeting_helpers",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "sharded_cluster_local_lookup_eligibility_test",
+    srcs = [
+        "sharded_cluster_local_lookup_eligibility_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":sharded_cluster_local_lookup_eligibility",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_test_service_context",
+        # CatalogCacheMock + the static CRI builders.
+        "//src/mongo/db/sharding_environment:sharding_test_fixture_common",
+        # ShardServerTestFixtureWithCatalogCacheMock: a shard-server fixture with CatalogCacheMock in
+        # Grid, so run()'s CollectionRouter::route() resolves against it AND its withStaleShardRetry
+        # (CollectionShardingState access) runs against real shard-role infrastructure.
+        "//src/mongo/db/sharding_environment:shard_server_test_fixture",
+    ],
+)
+
 # Production factory producing LocalLookupEligibility instances based on ShardingState.
 mongo_cc_library(
     name = "local_lookup_eligibility_factory",

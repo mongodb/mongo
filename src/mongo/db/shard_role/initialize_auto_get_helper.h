@@ -29,15 +29,40 @@
 
 #pragma once
 
+#include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/router_role/router_role.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_role_loop.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/modules.h"
 
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
 namespace mongo {
+
+/**
+ * Derives the (ShardVersion, DatabaseVersion) pair that a ScopedSetShardRole on 'myShardId' should
+ * carry for the collection described by 'cri'. This is the single source of truth for the
+ * tracked/untracked rules:
+ *   - tracked collection:   ShardVersion = cri.getShardVersion(myShardId), no DatabaseVersion.
+ *   - untracked collection: ShardVersion = UNTRACKED(); DatabaseVersion attached only when this
+ *                           shard is the dbPrimary (an untracked collection only lives there).
+ *
+ * Inside a multi-document transaction, 'placementConflictTime' is stamped onto both versions so the
+ * receiving shard can detect a placement change against the transaction's read snapshot. Outside a
+ * transaction it is boost::none and nothing is stamped.
+ */
+MONGO_MOD_PUBLIC
+std::pair<ShardVersion, boost::optional<DatabaseVersion>> resolveShardRoleVersions(
+    OperationContext* opCtx,
+    const CollectionRoutingInfo& cri,
+    const ShardId& myShardId,
+    const boost::optional<LogicalTime>& placementConflictTime);
 
 /**
  * Function which produces an vector of 'ScopedShardRole' objects for the namespaces in 'nssList'

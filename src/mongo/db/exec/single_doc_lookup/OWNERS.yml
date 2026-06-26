@@ -12,3 +12,8 @@ filters:
   - "express_*":
     approvers:
       - 10gen/query-execution-classic
+  # The sharded (route-based) eligibility decision touches catalog/routing internals.
+  - "sharded_cluster_local_lookup_eligibility*":
+    approvers:
+      - 10gen/query-execution-router
+      - 10gen/server-catalog-and-routing-shard-catalog

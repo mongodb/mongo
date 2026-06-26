@@ -113,6 +113,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
         const Document& documentKey,
+        const AcquisitionState& acquisitionState,
         function_ref<SingleDocumentLookupExecutor::LookupResult(const Decision&)> body)
         const override {
         _calls.push_back(Call{nss, documentKey});

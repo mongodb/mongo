@@ -129,11 +129,13 @@ SingleDocumentLookupExecutor::LookupResult ExpressSingleDocumentLookupExecutor::
     boost::optional<Timestamp> afterClusterTime) {
     OperationContext* opCtx = expCtx->getOperationContext();
 
-    // The eligibility runs the body under local routing and owns CAR error handling.
+    // Express executor does not cache the acquisition and eligibility check is done before
+    // acquiring the collection and therefore we always pass NoHeldAcquisition.
     return _localEligibility->run(
         expCtx,
         nss,
         documentKey,
+        LocalLookupEligibility::NoHeldAcquisition{},
         [&](const LocalLookupEligibility::Decision& decision) -> LookupResult {
             // The document does not live on local shard. Early exit.
             if (!LocalLookupEligibility::isLocal(decision)) {
