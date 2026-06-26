@@ -99,4 +99,12 @@ ResumeIndexInfo resumeInfo(OperationContext* opCtx,
 void deleteSorterEntriesOutsideRanges(OperationContext* opCtx,
                                       const std::vector<IndexStateInfo>& resumeInfoIndexes);
 
+/**
+ * For each index, deletes all entries in the index table.
+ */
+void deleteAllIndexEntries(OperationContext* opCtx,
+                           DatabaseName dbName,
+                           const UUID& collectionUUID,
+                           const std::vector<IndexBuildInfo>& indexes);
+
 }  // namespace mongo::index_builds::primary_driven

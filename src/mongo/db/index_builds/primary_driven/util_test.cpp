@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/collection_crud/container_write.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_builds/resumable_index_builds_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
@@ -885,6 +886,98 @@ TEST_F(UtilTest,
                     remainingKeys.end());
     }
 }
+
+StringKeyedContainer& indexContainer(OperationContext* opCtx,
+                                     const CollectionPtr& coll,
+                                     const std::string& indexIdent) {
+    auto* entry = coll->getIndexCatalog()->findIndexByIdent(
+        opCtx, indexIdent, IndexCatalog::InclusionPolicy::kUnfinished);
+    ASSERT_TRUE(entry);
+    return entry->accessMethod()->asSortedData()->getSortedDataInterface()->getContainer();
+}
+
+std::vector<std::string> getIndexKeys(OperationContext* opCtx,
+                                      DatabaseName dbName,
+                                      const UUID& collUUID,
+                                      const std::string& indexIdent) {
+    auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, {std::move(dbName), collUUID}, AcquisitionPrerequisites::OperationType::kWrite),
+        MODE_IX);
+
+    auto cursor = indexContainer(opCtx, coll.getCollectionPtr(), indexIdent)
+                      .getCursor(*shard_role_details::getRecoveryUnit(opCtx));
+    std::vector<std::string> keys;
+    while (auto entry = cursor->next()) {
+        keys.emplace_back(entry->first.data(), entry->first.size());
+    }
+    return keys;
+}
+
+void insertIndexEntries(OperationContext* opCtx,
+                        DatabaseName dbName,
+                        const UUID& collUUID,
+                        const std::string& indexIdent,
+                        int count) {
+    auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, {std::move(dbName), collUUID}, AcquisitionPrerequisites::OperationType::kWrite),
+        MODE_IX);
+
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    auto& container = indexContainer(opCtx, coll.getCollectionPtr(), indexIdent);
+
+    WriteUnitOfWork wuow{opCtx};
+    std::string value(8, 'v');
+    for (int i = 0; i < count; ++i) {
+        auto key = fmt::format("key-{:08d}", i);
+        ASSERT_OK(container_write::insert(opCtx,
+                                          ru,
+                                          container,
+                                          std::span<const char>(key.data(), key.size()),
+                                          std::span<const char>(value.data(), value.size())));
+    }
+    wuow.commit();
+}
+
+class DeleteAllIndexEntriesTest : public UtilTest, public testing::WithParamInterface<long long> {};
+
+TEST_P(DeleteAllIndexEntriesTest, DeletesEverything) {
+    unittest::ServerParameterGuard containerWritesEnabled{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard batchBytes{"primaryDrivenIndexBuildIndexTableCleanupBatchBytes",
+                                              GetParam()};
+    static_cast<repl::ReplicationCoordinatorMock*>(
+        repl::ReplicationCoordinator::get(getServiceContext()))
+        ->alwaysAllowWrites(true);
+
+    auto opCtx = operationContext();
+    auto buildUUID = UUID::gen();
+    auto indexes = makeIndexes({"a", "b", "c"});
+    auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
+    ASSERT_OK(start(opCtx, ns.dbName(), collUUID, buildUUID, indexes, indexBuildIdent));
+
+    insertIndexEntries(opCtx, ns.dbName(), collUUID, indexes[0].indexIdent, 25);
+    insertIndexEntries(
+        opCtx, ns.dbName(), collUUID, indexes[2].indexIdent, 10);  // indexes[1] empty.
+    EXPECT_EQ(getIndexKeys(opCtx, ns.dbName(), collUUID, indexes[0].indexIdent).size(), 25);
+    EXPECT_EQ(getIndexKeys(opCtx, ns.dbName(), collUUID, indexes[1].indexIdent).size(), 0);
+    EXPECT_EQ(getIndexKeys(opCtx, ns.dbName(), collUUID, indexes[2].indexIdent).size(), 10);
+
+    auto failPoint = enableWriteConflictForWrites(
+        FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
+    deleteAllIndexEntries(opCtx, ns.dbName(), collUUID, indexes);
+
+    EXPECT_TRUE(getIndexKeys(opCtx, ns.dbName(), collUUID, indexes[0].indexIdent).empty());
+    EXPECT_TRUE(getIndexKeys(opCtx, ns.dbName(), collUUID, indexes[1].indexIdent).empty());
+    EXPECT_TRUE(getIndexKeys(opCtx, ns.dbName(), collUUID, indexes[2].indexIdent).empty());
+}
+
+INSTANTIATE_TEST_SUITE_P(All,
+                         DeleteAllIndexEntriesTest,
+                         testing::Values(1, 64, 4 * 1024 * 1024),
+                         testing::PrintToStringParamName{});
 
 }  // namespace
 }  // namespace mongo::index_builds::primary_driven

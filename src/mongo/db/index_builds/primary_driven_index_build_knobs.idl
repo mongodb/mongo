@@ -39,3 +39,16 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: true
         redact: false
+
+    primaryDrivenIndexBuildIndexTableCleanupBatchBytes:
+        description:
+            "The maximum number of bytes per batch when cleaning up index entries before
+            resuming a primary-driven index build."
+        set_at: [startup, runtime]
+        cpp_varname: indexTableCleanupBatchBytes
+        cpp_vartype: Atomic<long long>
+        default:
+            expr: 4 * 1024 * 1024
+        validator:
+            gte: 1
+        redact: false

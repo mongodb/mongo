@@ -32,8 +32,10 @@
 #include "mongo/db/aggregated_index_usage_tracker.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/collection_crud/container_write.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_builds/index_build_interceptor.h"
 #include "mongo/db/index_builds/multi_index_block_gen.h"
+#include "mongo/db/index_builds/primary_driven_index_build_knobs_gen.h"
 #include "mongo/db/index_builds/resumable_index_builds_common.h"
 #include "mongo/db/index_key_validate.h"
 #include "mongo/db/op_observer/op_observer.h"
@@ -41,12 +43,15 @@
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/ttl/ttl_collection_cache.h"
@@ -453,6 +458,45 @@ void deleteSorterEntriesOutsideRanges(OperationContext* opCtx,
               "numDeleted"_attr = numDeleted,
               "firstRangeStart"_attr = firstStart,
               "lastRangeEnd"_attr = lastEnd);
+    }
+}
+
+void deleteAllIndexEntries(OperationContext* opCtx,
+                           DatabaseName dbName,
+                           const UUID& collectionUUID,
+                           const std::vector<IndexBuildInfo>& indexes) {
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx,
+                                                {std::move(dbName), collectionUUID},
+                                                AcquisitionPrerequisites::OperationType::kWrite),
+        MODE_IX);
+
+    for (auto&& index : indexes) {
+        auto* entry = collection.getCollectionPtr()->getIndexCatalog()->findIndexByIdent(
+            opCtx, index.indexIdent, IndexCatalog::InclusionPolicy::kUnfinished);
+        invariant(entry);
+        auto& indexContainer =
+            entry->accessMethod()->asSortedData()->getSortedDataInterface()->getContainer();
+
+        writeConflictRetry(opCtx, ru, "deleteAllIndexEntries", collection.nss(), [&] {
+            boost::optional<WriteUnitOfWork> wuow{opCtx};
+            auto cursor = indexContainer.getCursor(ru);
+            int64_t bytesDeleted = 0;
+
+            while (auto record = cursor->next()) {
+                bytesDeleted += record->first.size_bytes() + record->second.size_bytes();
+                uassertStatusOK(container_write::remove(opCtx, ru, indexContainer, record->first));
+                if (bytesDeleted >= indexTableCleanupBatchBytes.load()) {
+                    wuow->commit();
+                    wuow.emplace(opCtx);
+                    bytesDeleted = 0;
+                }
+            }
+
+            wuow->commit();
+        });
     }
 }
 
