@@ -42,17 +42,19 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
+namespace {
+
+MONGO_FAIL_POINT_DEFINE(failDuringFlush);
+MONGO_FAIL_POINT_DEFINE(hangAfterReplicatedFastCountSnapshot);
+MONGO_FAIL_POINT_DEFINE(hangBeforePersistingNewFastCountEntries);
+MONGO_FAIL_POINT_DEFINE(sleepAfterFlush);
+}  // namespace
+
 namespace mongo::replicated_fast_count {
 
 SizeCountCheckpointFlusher::SizeCountCheckpointFlusher(SizeCountStore* sizeCountStore,
                                                        SizeCountTimestampStore* timestampStore)
-    : _sizeCountStore(sizeCountStore), _timestampStore(timestampStore) {
-    auto& registry = globalFailPointRegistry();
-    _fpFailDuringFlush = registry.find("failDuringFlush");
-    _fpHangAfterReplicatedFastCountSnapshot = registry.find("hangAfterReplicatedFastCountSnapshot");
-    _fpSleepAfterFlush = registry.find("sleepAfterFlush");
-    _fpHangBeforePersistingNewEntries = registry.find("hangBeforePersistingNewFastCountEntries");
-}
+    : _sizeCountStore(sizeCountStore), _timestampStore(timestampStore) {}
 
 void SizeCountCheckpointFlusher::run(OperationContext* opCtx, SizeCountCheckpointBuffer& buffer) {
     ON_BLOCK_EXIT([&] {
@@ -110,27 +112,23 @@ void SizeCountCheckpointFlusher::_runOneFlushCycle(OperationContext* opCtx,
     const Date_t flushStart = Date_t::now();
     const size_t entryWriteCount = _doFlush(opCtx, buffer);
 
-    if (_fpSleepAfterFlush) {
-        _fpSleepAfterFlush->execute([](const BSONObj& data) {
-            if (auto elem = data["sleepMs"]; elem) {
-                sleepmillis(elem.numberInt());
-            }
-        });
-    }
+    sleepAfterFlush.execute([](const BSONObj& data) {
+        if (auto elem = data["sleepMs"]; elem) {
+            sleepmillis(elem.numberInt());
+        }
+    });
 
     recordFlush(flushStart, entryWriteCount);
 }
 
 size_t SizeCountCheckpointFlusher::_doFlush(OperationContext* opCtx,
                                             SizeCountCheckpointBuffer& buffer) {
-    if (_fpFailDuringFlush && MONGO_unlikely(_fpFailDuringFlush->shouldFail())) {
+    if (MONGO_unlikely(failDuringFlush.shouldFail())) {
         uasserted(12101802, "Injected failure in _runOneFlushCycle for testing");
     }
 
     auto batch = buffer.checkoutForFlush();
-    if (_fpHangAfterReplicatedFastCountSnapshot) {
-        _fpHangAfterReplicatedFastCountSnapshot->pauseWhileSet();
-    }
+    hangAfterReplicatedFastCountSnapshot.pauseWhileSet();
 
     if (!batch) {
         // No batch to flush, 0 flushed batch size.
@@ -155,9 +153,7 @@ size_t SizeCountCheckpointFlusher::_doFlush(OperationContext* opCtx,
             return;
         }
 
-        if (_fpHangBeforePersistingNewEntries) {
-            _fpHangBeforePersistingNewEntries->pauseWhileSet();
-        }
+        hangBeforePersistingNewFastCountEntries.pauseWhileSet();
 
         WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
         entryWriteCount =

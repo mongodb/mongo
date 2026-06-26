@@ -31,7 +31,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/replicated_fast_count/size_count_checkpoint_buffer.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/util/fail_point.h"
 
 #include <mutex>
 
@@ -75,11 +74,6 @@ private:
 
     SizeCountStore* _sizeCountStore;
     SizeCountTimestampStore* _timestampStore;
-
-    FailPoint* _fpFailDuringFlush{nullptr};
-    FailPoint* _fpHangAfterReplicatedFastCountSnapshot{nullptr};
-    FailPoint* _fpSleepAfterFlush{nullptr};
-    FailPoint* _fpHangBeforePersistingNewEntries{nullptr};
 
     mutable std::mutex _mutex;
     stdx::condition_variable _flushCv;

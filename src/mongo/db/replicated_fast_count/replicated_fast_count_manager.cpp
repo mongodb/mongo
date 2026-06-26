@@ -47,18 +47,8 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-MONGO_FAIL_POINT_DEFINE(hangAfterReplicatedFastCountSnapshot);
-
 namespace mongo::replicated_fast_count {
 using namespace std::literals::string_view_literals;
-
-namespace {
-
-MONGO_FAIL_POINT_DEFINE(sleepAfterFlush);
-MONGO_FAIL_POINT_DEFINE(failDuringFlush);
-MONGO_FAIL_POINT_DEFINE(hangBeforePersistingNewFastCountEntries);
-
-}  // namespace
 
 static const ServiceContext::Decoration<ReplicatedFastCountManager> getReplicatedFastCountManager =
     ServiceContext::declareDecoration<ReplicatedFastCountManager>();
