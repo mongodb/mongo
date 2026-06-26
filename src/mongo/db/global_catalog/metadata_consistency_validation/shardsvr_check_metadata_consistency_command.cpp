@@ -434,12 +434,9 @@ public:
             participantRequest.setCommonFields(request().getCommonFields());
             participantRequest.setPrimaryShardId(ShardingState::get(opCtx)->shardId());
             participantRequest.setCursor(request().getCursor());
-            auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-            if (std::find(participants.begin(), participants.end(), ShardId::kConfigServerId) ==
-                participants.end()) {
-                // Include config server as shard when it is not embedded
-                participants.push_back(ShardId::kConfigServerId);
-            }
+            // Includes the config server (whether dedicated or embedded) exactly once.
+            auto participants =
+                Grid::get(opCtx)->shardRegistry()->getAllShardRefsIncludingConfigServer(opCtx);
             BSONObjBuilder participantRequestBob;
             participantRequest.serialize(&participantRequestBob);
             appendOpKey(shardOpKey, &participantRequestBob);
@@ -447,8 +444,8 @@ public:
 
             std::vector<AsyncRequestsSender::Request> requests;
             requests.reserve(participants.size() + 1);
-            for (const auto& shardId : participants) {
-                requests.emplace_back(shardId, participantRequestWithOpKey.getOwned());
+            for (const auto& shardRef : participants) {
+                requests.emplace_back(shardRef, participantRequestWithOpKey.getOwned());
             }
 
             // Config server request

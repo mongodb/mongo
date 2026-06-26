@@ -76,7 +76,7 @@ namespace {
  */
 std::vector<ShardRef> getParticipantShards(OperationContext* opCtx, bool isTracked) {
     if (isTracked) {
-        return Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
+        return Grid::get(opCtx)->shardRegistry()->getAllShardRefs(opCtx);
     } else {
         return {ShardingState::get(opCtx)->asShardRef(opCtx)};
     }
@@ -512,7 +512,7 @@ ExecutorFuture<void> TimeseriesUpgradeDowngradeCoordinator::_runImpl(
                     collUuid,
                     boost::none /* targetUUID */,
                     boost::none /* newTargetUUID */,
-                    Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx),
+                    Grid::get(opCtx)->shardRegistry()->getAllShardRefs(opCtx),
                     session,
                     executor,
                     token);

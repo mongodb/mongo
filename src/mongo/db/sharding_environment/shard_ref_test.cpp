@@ -30,6 +30,7 @@
 #include "mongo/db/sharding_environment/shard_ref.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/sharding_environment/shard_handle.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/unittest.h"
@@ -213,6 +214,43 @@ TEST(ShardRef, UsableInSort) {
     ASSERT_EQUALS(refs[0].getString(), std::string{"aaa"});
     ASSERT_EQUALS(refs[1].getString(), std::string{"mmm"});
     ASSERT_EQUALS(refs[2].getString(), std::string{"zzz"});
+}
+
+TEST(ShardRef, EqualityWithShardHandleStringRef) {
+    ShardHandle handle{ShardId{"myShard"}, boost::none};
+    ShardRef matchingRef{std::string{"myShard"}};
+    ShardRef mismatchRef{std::string{"otherShard"}};
+
+    ASSERT_TRUE(handle == matchingRef);
+    ASSERT_TRUE(matchingRef == handle);
+    ASSERT_FALSE(handle != matchingRef);
+
+    ASSERT_FALSE(handle == mismatchRef);
+    ASSERT_FALSE(mismatchRef == handle);
+    ASSERT_TRUE(handle != mismatchRef);
+}
+
+TEST(ShardRef, EqualityWithShardHandleUuidRef) {
+    UUID uuid = UUID::gen();
+    ShardHandle handle{ShardId{"myShard"}, uuid};
+    ShardRef matchingRef{uuid};
+    ShardRef mismatchRef{UUID::gen()};
+
+    ASSERT_TRUE(handle == matchingRef);
+    ASSERT_TRUE(matchingRef == handle);
+    ASSERT_FALSE(handle != matchingRef);
+
+    ASSERT_FALSE(handle == mismatchRef);
+    ASSERT_FALSE(mismatchRef == handle);
+}
+
+TEST(ShardRef, UuidRefReturnsFalseWhenHandleHasNoUuid) {
+    ShardHandle handle{ShardId{"myShard"}, boost::none};
+    ShardRef uuidRef{UUID::gen()};
+
+    ASSERT_FALSE(handle == uuidRef);
+    ASSERT_FALSE(uuidRef == handle);
+    ASSERT_TRUE(handle != uuidRef);
 }
 
 }  // namespace

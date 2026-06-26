@@ -362,12 +362,7 @@ long long getChunkForShardCount(OperationContext* opCtx, Shard* shard, const Sha
 
 void joinOngoingShardingDDLCoordinatorsOnShards(OperationContext* opCtx) {
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-    auto allShards = shardRegistry->getAllShardIds(opCtx);
-    if (std::find(allShards.begin(), allShards.end(), ShardId::kConfigServerId) ==
-        allShards.end()) {
-        // The config server may be a shard, so only add if it isn't already in participants.
-        allShards.emplace_back(shardRegistry->getConfigShard()->getId());
-    }
+    auto allShards = shardRegistry->getAllShardRefsIncludingConfigServer(opCtx);
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
 
     ShardsvrJoinDDLCoordinators cmd;
@@ -425,12 +420,7 @@ void waitUntilReadyToBlockNewDDLCoordinators(OperationContext* opCtx) {
     const auto wouldJoinCoordinatorsBlock = [](OperationContext* opCtx) -> bool {
         // Check that all shards will be able to join ongoing DDLs quickly.
         const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-        auto allShards = shardRegistry->getAllShardIds(opCtx);
-        if (std::find(allShards.begin(), allShards.end(), ShardId::kConfigServerId) ==
-            allShards.end()) {
-            // The config server may be a shard, so only add if it isn't already in participants.
-            allShards.emplace_back(shardRegistry->getConfigShard()->getId());
-        }
+        auto allShards = shardRegistry->getAllShardRefsIncludingConfigServer(opCtx);
         auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
 
         ShardsvrJoinDDLCoordinators cmd;

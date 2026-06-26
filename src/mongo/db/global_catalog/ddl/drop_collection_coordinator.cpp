@@ -288,7 +288,7 @@ void DropCollectionCoordinator::_enterCriticalSection(
     const CancellationToken& token) {
     LOGV2_DEBUG(7038100, 2, "Acquiring critical section", logAttrs(nss()));
 
-    const auto shardRefs = Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
+    const auto shardRefs = Grid::get(opCtx)->shardRegistry()->getAllShardRefs(opCtx);
     const auto session = getNewSession(opCtx);
     sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
         opCtx,
@@ -387,7 +387,7 @@ void DropCollectionCoordinator::_commitDropCollection(
                 opCtx,
                 nss(),
                 _doc.getCollInfo()->getUuid(),
-                Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx),
+                Grid::get(opCtx)->shardRegistry()->getAllShardRefs(opCtx),
                 session,
                 executor,
                 token);
@@ -427,7 +427,9 @@ void DropCollectionCoordinator::_commitDropCollection(
             false /* requireCollectionEmpty */);
     };
 
-    auto otherParticipants = Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
+    auto otherParticipants = Grid::get(opCtx)->shardRegistry()->getAllShardRefs(opCtx);
+    // TODO SERVER-129691 convert changeStreamsNotifierShardId to support ShardRef,
+    // otherParticipants to ShardHandles, and handle the mixed-variant case correctly.
     otherParticipants.erase(std::remove(otherParticipants.begin(),
                                         otherParticipants.end(),
                                         changeStreamsNotifierShardId),
@@ -474,7 +476,7 @@ void DropCollectionCoordinator::_exitCriticalSection(
     const CancellationToken& token) {
     LOGV2_DEBUG(7038102, 2, "Releasing critical section", logAttrs(nss()));
 
-    const auto shardRefs = Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
+    const auto shardRefs = Grid::get(opCtx)->shardRegistry()->getAllShardRefs(opCtx);
     const auto session = getNewSession(opCtx);
     sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
         opCtx,

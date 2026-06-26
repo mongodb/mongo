@@ -541,9 +541,44 @@ std::vector<ShardId> ShardRegistry::getAllShardIds(OperationContext* opCtx) {
     return shardIds;
 }
 
-std::vector<ShardRef> ShardRegistry::getAllShardRefs_UNSAFE(OperationContext* opCtx) {
-    auto shardIds = getAllShardIds(opCtx);
-    return std::vector<ShardRef>(shardIds.cbegin(), shardIds.cend());
+std::vector<ShardRef> ShardRegistry::getAllShardRefs(OperationContext* opCtx) {
+    auto shardRefs = _getData(opCtx)->getAllShardRefs();
+    if (shardRefs.empty()) {
+        reload(opCtx);
+        shardRefs = _getData(opCtx)->getAllShardRefs();
+    }
+    return shardRefs;
+}
+
+std::vector<ShardHandle> ShardRegistry::getAllShardHandles(OperationContext* opCtx) {
+    auto shardHandles = _getData(opCtx)->getAllShardHandles();
+    if (shardHandles.empty()) {
+        reload(opCtx);
+        shardHandles = _getData(opCtx)->getAllShardHandles();
+    }
+    return shardHandles;
+}
+
+std::vector<ShardRef> ShardRegistry::getAllShardRefsIncludingConfigServer(OperationContext* opCtx) {
+    // Use the same registry data snapshot for both shard listing and config-shard determination to
+    // ensure a consistent view.
+    auto data = _getData(opCtx);
+    auto shardRefs = data->getAllShardRefs();
+    if (shardRefs.empty()) {
+        reload(opCtx);
+        data = _getData(opCtx);
+        shardRefs = data->getAllShardRefs();
+    }
+    // If the config server is itself a shard (embedded config server topology), it is already in
+    // 'shardRefs'; otherwise append it explicitly. findShard resolves kConfigServerId by name, so
+    // this is correct regardless of whether the config server's ref holds a UUID.
+    if (!data->findShard(ShardId::kConfigServerId)) {
+        // A dedicated config server may also carry a UUID, but the registry's config shard object
+        // does not expose it yet, so we append it by its ShardId.
+        // TODO SERVER-128153: append the UUID variant if present, instead of kConfigServerId.
+        shardRefs.emplace_back(ShardId::kConfigServerId);
+    }
+    return shardRefs;
 }
 
 int ShardRegistry::getNumShards(OperationContext* opCtx) {
@@ -1098,6 +1133,29 @@ std::vector<ShardId> ShardRegistryData::getAllShardIds() const {
                    std::back_inserter(shardIds),
                    [](const auto& shard) { return shard.second->getId(); });
     return shardIds;
+}
+
+std::vector<ShardRef> ShardRegistryData::getAllShardRefs() const {
+    std::vector<ShardRef> shardRefs;
+    shardRefs.reserve(_shardIdLookup.size());
+    std::transform(_shardIdLookup.begin(),
+                   _shardIdLookup.end(),
+                   std::back_inserter(shardRefs),
+                   [](const auto& entry) {
+                       const auto& handle = entry.second->getHandle();
+                       return handle.uuid() ? ShardRef(*handle.uuid()) : ShardRef(handle.name());
+                   });
+    return shardRefs;
+}
+
+std::vector<ShardHandle> ShardRegistryData::getAllShardHandles() const {
+    std::vector<ShardHandle> shardHandles;
+    shardHandles.reserve(_shardIdLookup.size());
+    std::transform(_shardIdLookup.begin(),
+                   _shardIdLookup.end(),
+                   std::back_inserter(shardHandles),
+                   [](const auto& entry) { return entry.second->getHandle(); });
+    return shardHandles;
 }
 
 void ShardRegistryData::_addShard(std::shared_ptr<Shard> shard) {

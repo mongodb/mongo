@@ -71,8 +71,8 @@ void tellShardsToRefresh(OperationContext* opCtx,
     // shard and this flush is not sent to that donor, stopMigrations will not wait for the critical
     // section to finish on that shard (SERVER-73984).
     const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-    const auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-    sharding_util::tellShardsToRefreshCollection(opCtx, allShardIds, nss, executor);
+    const auto allShardRefs = Grid::get(opCtx)->shardRegistry()->getAllShardRefs(opCtx);
+    sharding_util::tellShardsToRefreshCollection(opCtx, allShardRefs, nss, executor);
     if (resourceYielder) {
         resourceYielder->unyield(opCtx);
     }

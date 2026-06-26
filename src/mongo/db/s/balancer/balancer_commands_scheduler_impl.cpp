@@ -74,12 +74,12 @@ void waitForQuiescedCluster(OperationContext* opCtx) {
     ShardsvrJoinMigrations joinShardOnMigrationsRequest;
     joinShardOnMigrationsRequest.setDbName(DatabaseName::kAdmin);
 
-    auto unquiescedShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+    auto unquiescedShardRefs = Grid::get(opCtx)->shardRegistry()->getAllShardRefs(opCtx);
 
     const auto responses = sharding_util::sendCommandToShards(opCtx,
                                                               DatabaseName::kAdmin,
                                                               joinShardOnMigrationsRequest.toBSON(),
-                                                              unquiescedShardIds,
+                                                              unquiescedShardRefs,
                                                               executor,
                                                               false /*throwOnError*/);
     for (const auto& r : responses) {

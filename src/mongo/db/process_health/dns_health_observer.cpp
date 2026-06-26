@@ -100,13 +100,13 @@ Future<HealthCheckStatus> DnsHealthObserver::periodicCheckImpl(
 
         auto opCtx = client->makeOperationContext();
         auto const shardRegistry = Grid::get(_svcCtx)->shardRegistry();
-        auto shardIds = shardRegistry->getAllShardIds(opCtx.get());
+        auto shardRefs = shardRegistry->getAllShardRefs(opCtx.get());
 
-        if (shardIds.size() == 0) {
+        if (shardRefs.size() == 0) {
             connString = shardRegistry->getConfigServerConnectionString();
         } else {
-            auto shardSW = shardRegistry->getShard(opCtx.get(),
-                                                   shardIds.at(_random.nextInt32(shardIds.size())));
+            auto shardSW = shardRegistry->getShard(
+                opCtx.get(), shardRefs.at(_random.nextInt32(shardRefs.size())));
             auto shardSWStatus = shardSW.getStatus();
             if (shardSWStatus.isOK()) {
                 connString = shardSW.getValue()->getConnString();

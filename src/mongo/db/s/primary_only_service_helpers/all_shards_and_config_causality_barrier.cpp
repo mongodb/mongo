@@ -40,18 +40,11 @@ AllShardsAndConfigCausalityBarrier::AllShardsAndConfigCausalityBarrier(
 
 void AllShardsAndConfigCausalityBarrier::perform(OperationContext* opCtx,
                                                  const OperationSessionInfo& osi) {
-    const auto shardsAndConfigsvr = [&] {
-        const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-        auto participants = shardRegistry->getAllShardIds(opCtx);
-        if (std::find(participants.begin(), participants.end(), ShardId::kConfigServerId) ==
-            participants.end()) {
-            // The config server may be a shard, so only add if it isn't already in participants.
-            participants.emplace_back(shardRegistry->getConfigShard()->getId());
-        }
-        return participants;
-    }();
+    auto shardsAndConfigsvr =
+        Grid::get(opCtx)->shardRegistry()->getAllShardRefsIncludingConfigServer(opCtx);
 
-    ParticipantCausalityBarrier{shardsAndConfigsvr, _executor, _token}.perform(opCtx, osi);
+    ParticipantCausalityBarrier{std::move(shardsAndConfigsvr), _executor, _token}.perform(opCtx,
+                                                                                          osi);
 }
 
 }  // namespace mongo

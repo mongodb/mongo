@@ -53,6 +53,13 @@ namespace sharding_util {
  */
 MONGO_MOD_NEEDS_REPLACEMENT void tellShardsToRefreshCollection(
     OperationContext* opCtx,
+    const std::vector<ShardRef>& shardRefs,
+    const NamespaceString& nss,
+    const std::shared_ptr<executor::TaskExecutor>& executor);
+
+// TODO SERVER-127411: remove this ShardId overload once all callers pass ShardRef.
+MONGO_MOD_NEEDS_REPLACEMENT void tellShardsToRefreshCollection(
+    OperationContext* opCtx,
     const std::vector<ShardId>& shardIds,
     const NamespaceString& nss,
     const std::shared_ptr<executor::TaskExecutor>& executor);
@@ -80,6 +87,15 @@ MONGO_MOD_NEEDS_REPLACEMENT std::vector<AsyncRequestsSender::Response> processSh
  * Generic utility to send a command to a list of shards. If `throwOnError=true`, throws in case one
  * of the commands fails.
  */
+MONGO_MOD_NEEDS_REPLACEMENT std::vector<AsyncRequestsSender::Response> sendCommandToShards(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    const BSONObj& command,
+    const std::vector<ShardRef>& shardRefs,
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    bool throwOnError = true);
+
+// TODO SERVER-127411: remove this ShardId overload once all callers pass ShardRef.
 MONGO_MOD_NEEDS_REPLACEMENT std::vector<AsyncRequestsSender::Response> sendCommandToShards(
     OperationContext* opCtx,
     const DatabaseName& dbName,

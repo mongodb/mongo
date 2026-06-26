@@ -77,7 +77,7 @@ boost::optional<Timestamp> getEarliestOpLogTimestampAmongAllShards(OperationCont
     // send server status and get earliest oplog time
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     const auto serverStatusCmd = BSON("serverStatus" << 1 << "oplog" << 1);
-    const auto recipients = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+    const auto recipients = Grid::get(opCtx)->shardRegistry()->getAllShardRefs(opCtx);
 
     auto responses = sharding_util::sendCommandToShards(
         opCtx, DatabaseName::kAdmin, serverStatusCmd, recipients, executor, false /*throwOnError*/);

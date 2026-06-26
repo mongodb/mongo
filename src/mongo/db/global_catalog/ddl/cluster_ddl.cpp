@@ -74,14 +74,14 @@ MONGO_FAIL_POINT_DEFINE(createUnshardedCollectionRandomizeDataShard);
 MONGO_FAIL_POINT_DEFINE(hangCreateUnshardedCollection);
 
 std::vector<AsyncRequestsSender::Request> buildUntrackedRequestsForAllShards(
-    OperationContext* opCtx, std::vector<ShardId> shardIds, const BSONObj& cmdObj) {
+    OperationContext* opCtx, std::vector<ShardRef> shardRefs, const BSONObj& cmdObj) {
     auto cmdToSend = cmdObj;
     appendShardVersion(cmdToSend, ShardVersion::UNTRACKED());
 
     std::vector<AsyncRequestsSender::Request> requests;
-    requests.reserve(shardIds.size());
-    for (auto&& shardId : shardIds)
-        requests.emplace_back(std::move(shardId), cmdToSend);
+    requests.reserve(shardRefs.size());
+    for (auto&& shardRef : shardRefs)
+        requests.emplace_back(std::move(shardRef), cmdToSend);
 
     return requests;
 }
@@ -93,10 +93,13 @@ AsyncRequestsSender::Response executeCommandAgainstFirstShard(OperationContext* 
                                                               const BSONObj& cmdObj,
                                                               const ReadPreferenceSetting& readPref,
                                                               Shard::RetryPolicy retryPolicy) {
-    auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-    uassert(ErrorCodes::IllegalOperation, "there are no shards to target", !shardIds.empty());
-    std::sort(shardIds.begin(), shardIds.end());
-    ShardId shardId = shardIds[0];
+    auto shardRefs = Grid::get(opCtx)->shardRegistry()->getAllShardRefs(opCtx);
+    uassert(ErrorCodes::IllegalOperation, "there are no shards to target", !shardRefs.empty());
+    // The sort may occur on mixed-type variants, which will break the canonical lexicographical
+    // ordering. This is not a problem, because the sort is simply a way to obtain a shard for the
+    // command to be sent to, and callers cannot rely on determinism of the sort order.
+    std::sort(shardRefs.begin(), shardRefs.end());
+    const auto shardRef = shardRefs[0];
 
     auto responses =
         gatherResponses(opCtx,
@@ -105,7 +108,7 @@ AsyncRequestsSender::Response executeCommandAgainstFirstShard(OperationContext* 
                         readPref,
                         retryPolicy,
                         buildUntrackedRequestsForAllShards(
-                            opCtx, {shardId}, appendDbVersionIfPresent(cmdObj, dbInfo)));
+                            opCtx, {shardRef}, appendDbVersionIfPresent(cmdObj, dbInfo)));
     return std::move(responses.front());
 }
 

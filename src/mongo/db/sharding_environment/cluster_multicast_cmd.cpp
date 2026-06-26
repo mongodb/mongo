@@ -66,11 +66,11 @@ namespace {
 std::vector<HostAndPort> getAllClusterHosts(OperationContext* opCtx) {
     auto registry = Grid::get(opCtx)->shardRegistry();
 
-    const auto shardIds = registry->getAllShardIds(opCtx);
+    const auto shardRefs = registry->getAllShardRefs(opCtx);
 
     std::vector<HostAndPort> servers;
-    for (const auto& shardId : shardIds) {
-        auto shard = uassertStatusOK(registry->getShard(opCtx, shardId));
+    for (const auto& shardRef : shardRefs) {
+        auto shard = uassertStatusOK(registry->getShard(opCtx, shardRef));
 
         auto cs = shard->getConnString();
         for (auto&& host : cs.getServers()) {
