@@ -283,6 +283,30 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_unit_test(
+    name = "wasm_scope_concurrency_test",
+    size = "large",
+    timeout = "long",
+    srcs = [
+        "//src/mongo/scripting/mozjs/wasm/scope:scope_test_concurrency.cpp",
+    ],
+    auto_header = False,
+    tags = [
+        "mongo_unittest_third_group",
+        "mozjs_wasm_tests",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":wasmtime_engine",
+        "//src/mongo:base",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/scripting:scripting_common",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "wasm_scope_security_test",
     size = "large",
     timeout = "long",

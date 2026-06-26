@@ -37,6 +37,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstring>
+#include <mutex>
 #include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -61,117 +62,172 @@ constexpr std::string_view kGetReturnValueBson = "get-return-value-bson";
 constexpr std::string_view kGetMemoryStats = "get-memory-stats";
 constexpr std::string_view kReturnValue = "__returnValue";
 
+namespace {
+// Serialises all wasmtime Engine/Component/Store lifecycle ops (deserialize, instantiate,
+// cold-start initialize/shutdown, and destruction) process-wide. wasmtime does not
+// synchronise these against each other, so running a context/store teardown on one thread
+// while another is mid-deserialize, instantiating, or executing cold-start JIT corrupts
+// shared JIT state and segfaults (SEGV_MAPERR). Steady-state execution
+// (invoke/createFunction/reset*) runs on a fully-built store and is left lock-free.
+std::mutex& wasmLifecycleMutex() {
+    static std::mutex m;
+    return m;
+}
+}  // namespace
+
 std::shared_ptr<WasmEngineContext> WasmEngineContext::createFromPrecompiled(const uint8_t* data,
                                                                             size_t size) {
-    wt::Config config;
-    config.wasm_component_model(true);
-    config.epoch_interruption(true);
-    config.wasm_exceptions(true);
+    std::unique_ptr<WasmEngineContext> ctx;
+    {
+        std::lock_guard<std::mutex> lifecycleLock(wasmLifecycleMutex());
+        wt::Config config;
+        config.wasm_component_model(true);
+        config.epoch_interruption(true);
+        config.wasm_exceptions(true);
 
-    wt::Engine engine(std::move(config));
+        wt::Engine engine(std::move(config));
 
-    wt::Span<uint8_t> span(const_cast<uint8_t*>(data), size);
-    auto result = wc::Component::deserialize(engine, span);
-    invariant(result);
+        wt::Span<uint8_t> span(const_cast<uint8_t*>(data), size);
+        auto result = wc::Component::deserialize(engine, span);
+        invariant(result);
 
-    // Build and configure the linker once per context. MozJSWasmBridge instances
-    // reuse this linker for instantiation, avoiding the add_wasip2() cost per bridge.
-    wc::Linker linker(engine);
-    invariant(linker.add_wasip2());
+        // Build and configure the linker once per context. MozJSWasmBridge instances
+        // reuse this linker for instantiation, avoiding the add_wasip2() cost per bridge.
+        wc::Linker linker(engine);
+        invariant(linker.add_wasip2());
 
-    return std::shared_ptr<WasmEngineContext>(
-        new WasmEngineContext(std::move(engine), result.ok(), std::move(linker)));
+        ctx.reset(new WasmEngineContext(std::move(engine), result.ok(), std::move(linker)));
+    }
+
+    // Wrap in shared_ptr *after* releasing the lifecycle lock: the shared_ptr control-block
+    // allocation can throw (e.g. bad_alloc), and on failure it runs the held pointer's deleter
+    // -> ~WasmEngineContext, which re-locks wasmLifecycleMutex(). Doing it under the lock would
+    // self-deadlock on the non-recursive mutex.
+    return std::shared_ptr<WasmEngineContext>(std::move(ctx));
+}
+
+WasmEngineContext::~WasmEngineContext() {
+    std::lock_guard<std::mutex> lifecycleLock(wasmLifecycleMutex());
+    // Release in reverse construction order under the lifecycle lock.
+    _linker.reset();
+    _component.reset();
+    _engine.reset();
 }
 
 MozJSWasmBridge::MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx, Options opts)
     : _javascriptProtection(opts.javascriptProtection), _ctx(std::move(ctx)) {
-    _store = wt::Store(_ctx->_engine);
-    _stats.createdAtMonoNanos = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                    std::chrono::steady_clock::now().time_since_epoch())
-                                    .count();
+    // Serialise Store creation + instantiation against all other wasm lifecycle ops.
+    std::lock_guard<std::mutex> lifecycleLock(wasmLifecycleMutex());
+    // If construction fails partway, the Store/Instance must be torn down while we still
+    // hold the lifecycle lock. ~MozJSWasmBridge does not run for a constructor that throws,
+    // so without this the optional members would be destroyed during unwinding *after*
+    // lifecycleLock has already released the mutex — exactly the unsynchronised store
+    // teardown the lock exists to prevent.
+    try {
+        _store = wt::Store(*_ctx->_engine);
+        _stats.createdAtMonoNanos = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                        std::chrono::steady_clock::now().time_since_epoch())
+                                        .count();
 
-    invariant(opts.linearMemoryLimitMB > 0);
+        invariant(opts.linearMemoryLimitMB > 0);
 
-    // The JS heap lives inside WASM linear memory alongside SpiderMonkey's
-    // runtime overhead (stack, GC metadata, self-hosted code, malloc arena).
-    // The store limit must exceed the heap limit to leave room for that overhead.
-    //
-    // Resolve the effective limit: if a per-query override is set, take the
-    // minimum of it and the global limit (matching MozJSImplScope::MozRuntime
-    // semantics in the shell scripting engine). Otherwise use the global limit.
-    const uint32_t globalLimitMB = static_cast<uint32_t>(gJSHeapLimitMB.load());
-    _jsHeapLimitMB =
-        opts.jsHeapLimitMB > 0 ? std::min(opts.jsHeapLimitMB, globalLimitMB) : globalLimitMB;
-    _storeLimitMB = opts.linearMemoryLimitMB;
-    uint32_t minOverheadMB = std::max(64u, _jsHeapLimitMB / 10);
-    uint32_t minStoreMB = _jsHeapLimitMB + minOverheadMB;
+        // The JS heap lives inside WASM linear memory alongside SpiderMonkey's
+        // runtime overhead (stack, GC metadata, self-hosted code, malloc arena).
+        // The store limit must exceed the heap limit to leave room for that overhead.
+        //
+        // Resolve the effective limit: if a per-query override is set, take the
+        // minimum of it and the global limit (matching MozJSImplScope::MozRuntime
+        // semantics in the shell scripting engine). Otherwise use the global limit.
+        const uint32_t globalLimitMB = static_cast<uint32_t>(gJSHeapLimitMB.load());
+        _jsHeapLimitMB =
+            opts.jsHeapLimitMB > 0 ? std::min(opts.jsHeapLimitMB, globalLimitMB) : globalLimitMB;
+        _storeLimitMB = opts.linearMemoryLimitMB;
+        uint32_t minOverheadMB = std::max(64u, _jsHeapLimitMB / 10);
+        uint32_t minStoreMB = _jsHeapLimitMB + minOverheadMB;
 
-    uassert(ErrorCodes::BadValue,
-            fmt::format("wasmtimeStoreMemoryLimitMB ({}) must be at least jsHeapLimitMB ({}) + "
-                        "overhead ({}) = {}",
-                        opts.linearMemoryLimitMB,
-                        _jsHeapLimitMB,
-                        minOverheadMB,
-                        minStoreMB),
-            opts.linearMemoryLimitMB >= minStoreMB);
+        uassert(ErrorCodes::BadValue,
+                fmt::format("wasmtimeStoreMemoryLimitMB ({}) must be at least jsHeapLimitMB ({}) + "
+                            "overhead ({}) = {}",
+                            opts.linearMemoryLimitMB,
+                            _jsHeapLimitMB,
+                            minOverheadMB,
+                            minStoreMB),
+                opts.linearMemoryLimitMB >= minStoreMB);
 
-    auto bytes = static_cast<int64_t>(opts.linearMemoryLimitMB) * 1024 * 1024;
+        auto bytes = static_cast<int64_t>(opts.linearMemoryLimitMB) * 1024 * 1024;
 
-    _store->limiter(bytes,
-                    /*table_elements=*/-1,
-                    /*instances=*/-1,
-                    /*tables=*/-1,
-                    /*memories=*/1);  // One linear memory is all MozJS in WASM needs.
+        _store->limiter(bytes,
+                        /*table_elements=*/-1,
+                        /*instances=*/-1,
+                        /*tables=*/-1,
+                        /*memories=*/1);  // One linear memory is all MozJS in WASM needs.
 
-    auto storeCtx = _store->context();
+        auto storeCtx = _store->context();
 
-    // This is used to signal process killing.
-    storeCtx.set_epoch_deadline(1);
+        // This is used to signal process killing.
+        storeCtx.set_epoch_deadline(1);
 
-    // The default 128 MiB hostcall fuel cap is exhausted by long-running $accumulator /
-    // mapReduce pipelines that pass multi-megabyte BSON state across WIT calls.
-    // Disable it here; resource use is already bounded by the linear-memory limiter
-    // (opts.linearMemoryLimitMB), internalQueryMaxJsEmitBytes, and BSON 16 MiB per object.
-    storeCtx.set_hostcall_fuel(SIZE_MAX);
+        // The default 128 MiB hostcall fuel cap is exhausted by long-running $accumulator /
+        // mapReduce pipelines that pass multi-megabyte BSON state across WIT calls.
+        // Disable it here; resource use is already bounded by the linear-memory limiter
+        // (opts.linearMemoryLimitMB), internalQueryMaxJsEmitBytes, and BSON 16 MiB per object.
+        storeCtx.set_hostcall_fuel(SIZE_MAX);
 
-    wt::WasiConfig wasiConfig;
-    wasiConfig.inherit_stdout();
-    wasiConfig.inherit_stderr();
-    invariant(storeCtx.set_wasi(std::move(wasiConfig)));
+        wt::WasiConfig wasiConfig;
+        wasiConfig.inherit_stdout();
+        wasiConfig.inherit_stderr();
+        invariant(storeCtx.set_wasi(std::move(wasiConfig)));
 
-    // Use the per-context cached linker (already configured with add_wasip2).
-    auto instanceResult = _ctx->_linker.instantiate(storeCtx, _ctx->_component);
-    if (!instanceResult) {
-        uasserted(
-            ErrorCodes::JSInterpreterFailure,
-            fmt::format("WASM component instantiation failed: {}", instanceResult.err().message()));
+        // Use the per-context cached linker (already configured with add_wasip2).
+        auto instanceResult = _ctx->_linker->instantiate(storeCtx, *_ctx->_component);
+        if (!instanceResult) {
+            uasserted(ErrorCodes::JSInterpreterFailure,
+                      fmt::format("WASM component instantiation failed: {}",
+                                  instanceResult.err().message()));
+        }
+        _instance = wc::Instance(instanceResult.ok());
+
+        _initEngineFunc = _getFunc(kInitEngine);
+        _shutdownEngineFunc = _getFunc(kShutdownEngine);
+        _resetEngineFunc = _getFunc(kResetEngine);
+        _createFunctionFunc = _getFunc(kCreateFunction);
+        _invokeFunctionFunc = _getFunc(kInvokeFunction);
+        _setGlobalFunc = _getFunc(kSetGlobal);
+        _setGlobalValueFunc = _getFunc(kSetGlobalValue);
+        _invokePredicateFunc = _getFunc(kInvokePredicate);
+        _setupEmitFunc = _getFunc(kSetupEmit);
+        _invokeMapFunc = _getFunc(kInvokeMap);
+        _drainEmitBufferFunc = _getFunc(kDrainEmitBuffer);
+        _getGlobalFunc = _getFunc(kGetGlobal);
+        _getReturnValueBsonFunc = _getFunc(kGetReturnValueBson);
+
+        // reset-realm is optional: older pre-built WASM modules may not export it.
+        // Falls back gracefully to reset-engine when absent.
+        invariant(_instance);
+        _resetRealmFunc = wasm_helpers::getMozjsFuncOptional(
+            *_instance, getContext(), kMozjsWitInterface, kResetRealm);
+
+        // get-memory-stats is optional for the same reason; getMemoryStats() returns an
+        // empty object when the module doesn't export it.
+        _getMemoryStatsFunc = wasm_helpers::getMozjsFuncOptional(
+            *_instance, getContext(), kMozjsWitInterface, kGetMemoryStats);
+    } catch (...) {
+        // Release the partially-built Store/Instance while we still hold lifecycleLock.
+        _instance.reset();
+        _store.reset();
+        throw;
     }
-    _instance = wc::Instance(instanceResult.ok());
+}
 
-    _initEngineFunc = _getFunc(kInitEngine);
-    _shutdownEngineFunc = _getFunc(kShutdownEngine);
-    _resetEngineFunc = _getFunc(kResetEngine);
-    _createFunctionFunc = _getFunc(kCreateFunction);
-    _invokeFunctionFunc = _getFunc(kInvokeFunction);
-    _setGlobalFunc = _getFunc(kSetGlobal);
-    _setGlobalValueFunc = _getFunc(kSetGlobalValue);
-    _invokePredicateFunc = _getFunc(kInvokePredicate);
-    _setupEmitFunc = _getFunc(kSetupEmit);
-    _invokeMapFunc = _getFunc(kInvokeMap);
-    _drainEmitBufferFunc = _getFunc(kDrainEmitBuffer);
-    _getGlobalFunc = _getFunc(kGetGlobal);
-    _getReturnValueBsonFunc = _getFunc(kGetReturnValueBson);
-
-    // reset-realm is optional: older pre-built WASM modules may not export it.
-    // Falls back gracefully to reset-engine when absent.
-    invariant(_instance);
-    _resetRealmFunc = wasm_helpers::getMozjsFuncOptional(
-        *_instance, getContext(), kMozjsWitInterface, kResetRealm);
-
-    // get-memory-stats is optional for the same reason; getMemoryStats() returns an
-    // empty object when the module doesn't export it.
-    _getMemoryStatsFunc = wasm_helpers::getMozjsFuncOptional(
-        *_instance, getContext(), kMozjsWitInterface, kGetMemoryStats);
+MozJSWasmBridge::~MozJSWasmBridge() {
+    {
+        std::lock_guard<std::mutex> lifecycleLock(wasmLifecycleMutex());
+        _instance.reset();
+        _store.reset();
+    }
+    // Drop the shared context outside the lock: if this is the last reference,
+    // ~WasmEngineContext takes the lock itself (the mutex is non-recursive).
+    _ctx.reset();
 }
 
 void MozJSWasmBridge::_assertUsable() {
@@ -259,6 +315,8 @@ inline uint64_t wcValByteSize(const wc::Val& v) {
 }  // namespace
 
 bool MozJSWasmBridge::initialize() {
+    // Cold-start init runs freshly-built JIT; serialise it against lifecycle teardown.
+    std::lock_guard<std::mutex> lifecycleLock(wasmLifecycleMutex());
     wc::Val result(wc::WitResult::ok(std::nullopt));
     LOGV2_DEBUG(11542332,
                 2,
@@ -283,6 +341,8 @@ bool MozJSWasmBridge::initialize() {
 }
 
 void MozJSWasmBridge::shutdown() {
+    // Shutdown runs JIT (shutdown-engine); serialise it against lifecycle teardown.
+    std::lock_guard<std::mutex> lifecycleLock(wasmLifecycleMutex());
     _assertUsable();
     wc::Val result(wc::WitResult::ok(std::nullopt));
     // Full state dump on shutdown to correlate per-bridge counters
@@ -498,7 +558,7 @@ void MozJSWasmBridge::kill() {
 void MozJSWasmBridge::_signalInterrupt() {
     _killPending.store(true);
     _stats.killCount.fetchAndAdd(1);
-    _ctx->_engine.increment_epoch();
+    _ctx->_engine->increment_epoch();
     LOGV2(11542376,
           "WASM bridge kill signalled",
           "killCount"_attr = _stats.killCount.load(),

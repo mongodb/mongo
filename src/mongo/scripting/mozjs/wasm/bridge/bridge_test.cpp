@@ -80,6 +80,14 @@ public:
         _s_engineCtx = WasmEngineContext::createFromPrecompiled(wasmData, wasmSize);
     }
 
+    static void TearDownTestSuite() {
+        // Release the WasmEngineContext while wasmLifecycleMutex() is still alive.
+        // Without this, _s_engineCtx outlives the function-local wasmLifecycleMutex()
+        // static (destroyed first in reverse-init order), causing ~WasmEngineContext()
+        // to lock an already-destroyed mutex → EINVAL → system_error on macOS.
+        _s_engineCtx.reset();
+    }
+
 protected:
     void setUp() override {
         MozJSWasmBridge::Options opts{};

@@ -93,6 +93,9 @@ struct WasmEngineContext {
     static std::shared_ptr<WasmEngineContext> createFromPrecompiled(const uint8_t* data,
                                                                     size_t size);
 
+    // Destroys the wasmtime members under wasmLifecycleMutex() (see bridge.cpp).
+    ~WasmEngineContext();
+
 private:
     WasmEngineContext(wt::Engine engine, wc::Component component, wc::Linker linker)
         : _engine(std::move(engine)),
@@ -100,11 +103,12 @@ private:
           _linker(std::move(linker)) {}
 
     friend class MozJSWasmBridge;
-    wt::Engine _engine;
-    wc::Component _component;
+    // optional so the destructor can release them explicitly while holding the lifecycle lock.
+    boost::optional<wt::Engine> _engine;
+    boost::optional<wc::Component> _component;
     // Linker is constructed once with add_wasip2() so each bridge instantiation
     // can skip the per-call WASIP2 registration cost.
-    wc::Linker _linker;
+    boost::optional<wc::Linker> _linker;
 };
 
 // Wasmtime trap error code used by MozJSWasmBridge::_callFunc / _callFuncNoArgs.
@@ -132,6 +136,9 @@ public:
     };
 
     explicit MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx, Options opts);
+
+    // Tears down the Store/Instance under wasmLifecycleMutex() (see bridge.cpp).
+    ~MozJSWasmBridge();
 
     bool initialize();
     void shutdown();
