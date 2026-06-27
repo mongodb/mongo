@@ -80,8 +80,6 @@ protected:
         _opCtx = operationContext();
 
         if (getMode() == FastCountStoreMode::kContainer) {
-            _ffDurability = std::make_unique<unittest::ServerParameterGuard>(
-                "featureFlagReplicatedFastCountDurability", true);
             _ffContainerWrites = std::make_unique<unittest::ServerParameterGuard>(
                 "featureFlagContainerWrites", true);
         }
@@ -152,7 +150,6 @@ protected:
     BSONObj sampleDocForInsert = BSON("_id" << 0 << "x" << 0);
     BSONObj sampleDocForUpdate = BSON("_id" << 0 << "x" << 0 << "y" << 0);
 
-    std::unique_ptr<unittest::ServerParameterGuard> _ffDurability;
     std::unique_ptr<unittest::ServerParameterGuard> _ffContainerWrites;
 };
 

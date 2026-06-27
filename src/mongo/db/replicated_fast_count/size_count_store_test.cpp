@@ -61,8 +61,6 @@ protected:
             return;
         }
 
-        _ffDurability = std::make_unique<unittest::ServerParameterGuard>(
-            "featureFlagReplicatedFastCountDurability", true);
         _ffContainerWrites =
             std::make_unique<unittest::ServerParameterGuard>("featureFlagContainerWrites", true);
 
@@ -89,7 +87,6 @@ protected:
         return std::make_unique<ContainerSizeCountStore>(std::move(_recordStore));
     }
 
-    std::unique_ptr<unittest::ServerParameterGuard> _ffDurability;
     std::unique_ptr<unittest::ServerParameterGuard> _ffContainerWrites;
     std::unique_ptr<RecordStore> _recordStore;
 };

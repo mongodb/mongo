@@ -155,13 +155,6 @@ protected:
     OtelMetricsCapturer _capturer;
 };
 
-// Sub-fixture that forces the legacy (non-durability) path. Used for tests that explicitly cover
-// code that behaves differently between paths.
-class ReplicatedFastCountManagerLegacyMetricsTest : public ReplicatedFastCountManagerMetricsTest {
-protected:
-    unittest::ServerParameterGuard _ffDurability{"featureFlagReplicatedFastCountDurability", false};
-};
-
 TEST_F(ReplicatedFastCountManagerMetricsTest, IsRunningGaugeSetByStartup) {
     EXPECT_EQ(_capturer.readInt64Gauge(MetricNames::kReplicatedFastCountIsRunning), 1);
 }
@@ -513,8 +506,6 @@ protected:
             return;
         }
 
-        _ffDurability = std::make_unique<unittest::ServerParameterGuard>(
-            "featureFlagReplicatedFastCountDurability", true);
         _ffContainerWrites =
             std::make_unique<unittest::ServerParameterGuard>("featureFlagContainerWrites", true);
 
@@ -541,7 +532,6 @@ protected:
     OtelMetricsCapturer capturer;
 
 private:
-    std::unique_ptr<unittest::ServerParameterGuard> _ffDurability;
     std::unique_ptr<unittest::ServerParameterGuard> _ffContainerWrites;
 };
 

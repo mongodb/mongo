@@ -57,8 +57,6 @@ protected:
             return;
         }
 
-        _ffDurability = std::make_unique<unittest::ServerParameterGuard>(
-            "featureFlagReplicatedFastCountDurability", true);
         _ffContainerWrites =
             std::make_unique<unittest::ServerParameterGuard>("featureFlagContainerWrites", true);
 
@@ -92,7 +90,6 @@ protected:
         return _store->read(operationContext());
     }
 
-    std::unique_ptr<unittest::ServerParameterGuard> _ffDurability;
     std::unique_ptr<unittest::ServerParameterGuard> _ffContainerWrites;
     std::unique_ptr<SizeCountTimestampStore> _store;
 };

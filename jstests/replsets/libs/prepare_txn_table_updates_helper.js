@@ -100,15 +100,11 @@ export function checkPrepareTxnTableUpdate(
             }
 
             if (
-                (FeatureFlagUtil.isPresentAndEnabled(
-                    primary.getDB("admin"),
-                    "ReplicatedFastCountDurability",
+                PersistenceProviderUtil.allNodesHavePropertyWithValue(
+                    primary,
+                    "shouldUseReplicatedFastCount",
+                    true,
                 ) ||
-                    PersistenceProviderUtil.allNodesHavePropertyWithValue(
-                        primary,
-                        "shouldUseReplicatedFastCount",
-                        true,
-                    )) &&
                 FeatureFlagUtil.isPresentAndEnabled(primary.getDB("admin"), "ReplicatedFastCount")
             ) {
                 assert(

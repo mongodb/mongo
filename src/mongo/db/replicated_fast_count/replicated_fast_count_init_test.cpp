@@ -115,7 +115,6 @@ TEST_F(ReplicatedFastCountInitTest,
 }
 
 TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesRecordStoreIdents) {
-    unittest::ServerParameterGuard ffDurability("featureFlagReplicatedFastCountDurability", true);
     unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
 
     auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
@@ -139,7 +138,6 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesRecordStoreId
 }
 
 TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountIdempotentIdents) {
-    unittest::ServerParameterGuard ffDurability("featureFlagReplicatedFastCountDurability", true);
     unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
 
     auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
@@ -198,7 +196,6 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountIdempotentIdents) {
 }
 
 TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountSkipsContainersWhenFlagDisabled) {
-    unittest::ServerParameterGuard ffDurability("featureFlagReplicatedFastCountDurability", false);
     unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", false);
 
     auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
@@ -217,7 +214,6 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountSkipsContainersWhenF
 }
 
 TEST_F(ReplicatedFastCountInitTest, StartingUpThenShuttingDownDoesNotHang) {
-    unittest::ServerParameterGuard ffDurability("featureFlagReplicatedFastCountDurability", true);
     unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
 
     const int numIterations = 100;
@@ -228,7 +224,6 @@ TEST_F(ReplicatedFastCountInitTest, StartingUpThenShuttingDownDoesNotHang) {
 }
 
 TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesBothWhenOnlyMetadataExists) {
-    unittest::ServerParameterGuard ffDurability("featureFlagReplicatedFastCountDurability", true);
     unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
 
     auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
@@ -258,7 +253,6 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesBothWhenOnlyM
 }
 
 TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountFailsWhenOnlyNonEmptyMetadataExists) {
-    unittest::ServerParameterGuard ffDurability("featureFlagReplicatedFastCountDurability", true);
     unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
 
     auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
@@ -299,7 +293,6 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountFailsWhenOnlyNonEmpt
 }
 
 TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesBothWhenOnlyTimestampsExists) {
-    unittest::ServerParameterGuard ffDurability("featureFlagReplicatedFastCountDurability", true);
     unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
 
     auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
@@ -329,7 +322,6 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesBothWhenOnlyT
 }
 
 TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountFailsWhenOnlyNonEmptyTimestampsExists) {
-    unittest::ServerParameterGuard ffDurability("featureFlagReplicatedFastCountDurability", true);
     unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
 
     auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
