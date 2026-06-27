@@ -29,6 +29,8 @@
 
 #include "mongo/db/pipeline/document_source_lookup.h"
 
+#include <algorithm>
+#include <array>
 #include <string_view>
 
 #include <boost/none.hpp>
@@ -53,6 +55,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_documents.h"
 #include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
+#include "mongo/db/pipeline/document_source_internal_hybrid_search.h"
 #include "mongo/db/pipeline/document_source_lookup_gen.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
@@ -62,6 +65,11 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/resolved_namespace.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
+#include "mongo/db/pipeline/search/document_source_search.h"
+#include "mongo/db/pipeline/search/document_source_search_meta.h"
+#include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/pipeline/sort_reorder_helpers.h"
@@ -232,7 +240,9 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
     if (!_fromNs.isOnInternalDb()) {
         globalOpCounters().gotNestedAggregate();
     }
-    const auto& resolvedNamespace = expCtx->getResolvedNamespace(_fromNs);
+    const auto resolvedNamespace = expCtx->hasResolvedNamespace(_fromNs)
+        ? expCtx->getResolvedNamespace(_fromNs)
+        : ResolvedNamespace{_fromNs, std::vector<BSONObj>{}};
     _resolvedNs = resolvedNamespace.ns;
     _fromNsIsAView = resolvedNamespace.involvedNamespaceIsAView;
 
@@ -419,6 +429,30 @@ DocumentSourceLookUp::DocumentSourceLookUp(
     }
     _fromExpCtx->stopExpressionCounters();
 
+    // For hybrid-search ($rankFusion/$scoreFusion) pipelines on a view, replace resolvedPipeline
+    // with the serialized introspection pipeline when nested sub-pipelines are present. At
+    // introspection time, bindResolvedNamespaceToStages stitches the view into every nested
+    // sub-pipeline; without this, buildPipeline re-parses the raw user pipeline and those nested
+    // stages scan the underlying collection instead of the view.
+    //
+    // Restricted to isHybridSearch() because plain $search/$vectorSearch stages have a 'view'
+    // field injected into their spec by createFromBson; serializing them would embed that field
+    // and fail validateViewNotSetByUser (error 5491300) on re-parse.
+    //
+    // Skipped for localField/foreignField joins: those need a per-getNext() $match placeholder
+    // that the introspection pipeline omits.
+    if (_fromNsIsAView && !hasLocalFieldForeignFieldJoin() && _fromExpCtx->isHybridSearch()) {
+        const auto& sources = _sharedState->resolvedIntrospectionPipeline->getSources();
+        const bool hasNestedSubPipeline =
+            std::any_of(sources.begin(), sources.end(), [](const auto& source) {
+                return source->getSubPipeline() != nullptr;
+            });
+        if (hasNestedSubPipeline) {
+            _sharedState->resolvedPipeline =
+                _sharedState->resolvedIntrospectionPipeline->serializeToBson();
+        }
+    }
+
     // Note that we can't just check `userPipeline.empty()` here.
     // For localField/foreignField joins, a placeholder $match is injected into userPipeline, making
     // it non-empty even though no pipeline was given explicitly by the user.
@@ -453,11 +487,51 @@ void DocumentSourceLookUp::relocateFieldMatchPlaceholder(
     lookupStage->_fieldMatchPipelineIdx = newIdx;
 }
 
+namespace {
+// TODO SERVER-121094 Remove when legacy mongot branches are removed from pipeline
+// parsing/desugaring/resolution.
+// Computes where the localField/foreignField equality $match placeholder must live in a mongot
+// $lookup subpipeline on the shard. The placeholder must sit immediately after the mongot search
+// prefix.
+size_t computeDesugaredMongotFieldMatchIdx(const std::vector<BSONObj>& resolvedPipeline) {
+    static constexpr std::array kPrefixStageNames = {
+        DocumentSourceInternalSearchIdLookUp::kStageName,
+        DocumentSourceInternalSearchMongotRemote::kStageName,
+        DocumentSourceSearch::kStageName,
+        DocumentSourceSearchMeta::kStageName,
+        DocumentSourceVectorSearch::kStageName,
+    };
+    for (std::string_view stageName : kPrefixStageNames) {
+        for (size_t i = 0; i < resolvedPipeline.size(); ++i) {
+            if (resolvedPipeline[i].hasField(stageName)) {
+                return i + 1;
+            }
+        }
+    }
+    return resolvedPipeline.size() - 1;
+}
+
+// TODO SERVER-121094 Remove when legacy mongot branches are removed from pipeline
+// parsing/desugaring/resolution.
+// Computes where the localField/foreignField equality $match placeholder must live in a hybrid
+// search ($rankFusion/$scoreFusion) $lookup subpipeline on the shard.
+size_t computeHybridSearchFieldMatchIdx(const std::vector<BSONObj>& resolvedPipeline) {
+    for (size_t i = resolvedPipeline.size(); i-- > 0;) {
+        if (resolvedPipeline[i].hasField(DocumentSourceInternalHybridSearch::kStageName)) {
+            return i;
+        }
+    }
+    return resolvedPipeline.size() - 1;
+}
+}  // namespace
+
 DocumentSourceContainer DocumentSourceLookUp::createFromStageParams(
     LookUpStageParams& params, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     // TODO SERVER-121094 This can be removed once hybrid search desugars into the internal hybrid
     // search stage.
-    if (params.isHybridSearch || hybrid_scoring_util::isHybridSearchPipeline(params.pipeline)) {
+    const bool isHybridSearchLookup =
+        params.isHybridSearch || hybrid_scoring_util::isHybridSearchPipeline(params.pipeline);
+    if (isHybridSearchLookup) {
         hybrid_scoring_util::assertForeignCollectionIsNotTimeseries(params.fromNss, expCtx);
     }
 
@@ -503,8 +577,21 @@ DocumentSourceContainer DocumentSourceLookUp::createFromStageParams(
                                              expCtx,
                                              !params.noUserPipeline);
 
-    if (const auto& idx = params.internalFieldMatchPipelineIdx)
+    // TODO SERVER-121094 Remove when legacy mongot branches are removed from pipeline
+    // parsing/desugaring/resolution.
+    if (params.internalFromIsAView && lookupStage->hasLocalFieldForeignFieldJoin() &&
+        params.internalFieldMatchPipelineIdx) {
+        // The router computed internalFieldMatchPipelineIdx against the undesugared pipeline (index
+        // 1, right after the leading search/hybrid stage). On the shard the pipeline arrives
+        // desugared, so we recompute the field match placeholder's position.
+        const auto& resolvedPipeline = lookupStage->_sharedState->resolvedPipeline;
+        size_t newIdx = isHybridSearchLookup
+            ? computeHybridSearchFieldMatchIdx(resolvedPipeline)
+            : computeDesugaredMongotFieldMatchIdx(resolvedPipeline);
+        relocateFieldMatchPlaceholder(lookupStage, newIdx);
+    } else if (const auto& idx = params.internalFieldMatchPipelineIdx) {
         relocateFieldMatchPlaceholder(lookupStage, static_cast<size_t>(*idx));
+    }
 
     if (params.internalFromIsAView) {
         lookupStage->_fromNsIsAView = true;
@@ -525,18 +612,6 @@ DocumentSourceContainer lookupStageParamsToDocumentSourceFn(
         ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
     if (!hybridSearchFlagEnabled) {
         return {DocumentSourceLookUp::createFromBson(typedParams->getOriginalBson(), expCtx)};
-    }
-
-    if (hybrid_scoring_util::isHybridSearchPipeline(typedParams->pipeline)) {
-        const auto& resolvedNamespaces = expCtx->getResolvedNamespaces();
-        auto it = resolvedNamespaces.find(typedParams->fromNss);
-        bool fromNsIsView = it != resolvedNamespaces.end() && it->second.involvedNamespaceIsAView;
-        search_helpers::throwIfrKickbackIfNecessary(
-            fromNsIsView,
-            feature_flags::gFeatureFlagExtensionsInsideHybridSearch,
-            search_metrics::inLookupKickbackRetryCount,
-            "$lookup with $rankFusion/$scoreFusion targeting a view is not supported with "
-            "featureFlagExtensionsInsideHybridSearch enabled.");
     }
 
     return DocumentSourceLookUp::createFromStageParams(*typedParams, expCtx);

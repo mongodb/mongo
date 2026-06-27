@@ -56,6 +56,7 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/aggregation_hint_translation.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/change_stream_invalidation_info.h"
@@ -105,6 +106,7 @@
 #include "mongo/db/query/util/retry.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/router_role/router_role.h"
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -112,6 +114,7 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/shard_role/resource_yielders.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/shard_role/shard_catalog/external_data_source_scope_guard.h"
@@ -121,11 +124,13 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/views/pipeline_resolver.h"
 #include "mongo/db/views/view.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
 #include "mongo/s/query_analysis_sampler_util.h"
@@ -157,6 +162,10 @@ using std::unique_ptr;
 using NamespaceStringSet = stdx::unordered_set<NamespaceString>;
 
 Counter64& allowDiskUseFalseCounter = *MetricBuilder<Counter64>{"query.allowDiskUseFalse"};
+// Counts view resolutions proactively performed before catalog lock acquisition to avoid
+// issuing router operations while holding catalog locks.
+Counter64& proactiveForeignViewResolutionsCounter =
+    *MetricBuilder<Counter64>{"query.extensionsInsideHybridSearch.proactiveForeignViewResolutions"};
 namespace {
 using namespace std::literals::string_view_literals;
 // Ticks for server-side Javascript deprecation log messages.
@@ -164,6 +173,7 @@ Rarely _samplerAccumulatorJs, _samplerFunctionJs;
 
 MONGO_FAIL_POINT_DEFINE(hangAfterCreatingAggregationPlan);
 MONGO_FAIL_POINT_DEFINE(hangBeforeCreatingAggCatalogState);
+MONGO_FAIL_POINT_DEFINE(hangAfterResolvingForeignViews);
 
 bool checkRetryableWriteAlreadyApplied(const AggExState& aggExState,
                                        rpc::ReplyBuilderInterface* result) {
@@ -1058,8 +1068,14 @@ SecondParseRequirement maybeApplyViewPipeline(const AggExState& aggExState,
                 aggExState.getOriginalNss(),
                 uassertStatusOK(aggCatalogState.resolveInvolvedNamespaces(aggExState.getOpCtx())),
                 LiteParserOptions{.ifrContext = aggExState.getIfrContext()});
+            return currentRequirement;
         }
-        return currentRequirement;
+
+        auto resolvedNamespaces =
+            uassertStatusOK(aggCatalogState.resolveInvolvedNamespaces(aggExState.getOpCtx()));
+        bool anyViewBound = PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(
+            desugaredLPP, aggExState.getOriginalNss(), resolvedNamespaces);
+        return anyViewBound ? SecondParseRequirement::kReparseFromLPP : currentRequirement;
     }
 
     auto resolvedNamespaces =
@@ -1482,6 +1498,110 @@ Status runAggregateOnShardedView(std::unique_ptr<ResolvedViewAggExState> resolve
  *
  * On success, fills out 'result' with the command response.
  */
+namespace {
+/**
+ * Resolves foreign views by contacting the database primary shard via _shardsvrResolveView. Checks
+ * whether or not it is valid (originating from non-primary shard, sharding is enabled, etc.) to
+ * make the foreign views RPC before issuing the request, so it is safe to call from any
+ * role/topology.
+ */
+ResolvedNamespaceMap resolveForeignViewsOnPrimary(AggExState& aggExState) {
+    ResolvedNamespaceMap closure;
+    const auto& ifrContext = aggExState.getIfrContext();
+    const bool enabled = ifrContext &&
+        ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+    if (!enabled) {
+        return closure;
+    }
+
+    auto* opCtx = aggExState.getOpCtx();
+    if (serverGlobalParams.clusterRole.has(ClusterRole::None) ||
+        !ShardingState::get(opCtx)->enabled()) {
+        return closure;
+    }
+
+    // TODO SERVER-129738 We cannot run the resolveViews command under transactions because it would
+    // incorrectly add the primary shard as a participant.
+    if (opCtx->inMultiDocumentTransaction()) {
+        return closure;
+    }
+
+    const auto& mainNss = aggExState.getExecutionNss();
+    auto catalog = CollectionCatalog::get(opCtx);
+
+    for (const auto& involvedNss : aggExState.getInvolvedNamespaces()) {
+        if (involvedNss == mainNss) {
+            continue;
+        }
+        // Short circuit if we can resolve this namespace locally.
+        if (catalog->lookupCollectionByNamespace(opCtx, involvedNss) ||
+            catalog->lookupView(opCtx, involvedNss)) {
+            continue;
+        }
+
+        boost::optional<ResolvedNamespace> resolved;
+        try {
+            sharding::router::DBPrimaryRouter router(opCtx, involvedNss.dbName());
+            resolved = router.route(
+                "resolve foreign view for aggregation sub-pipeline",
+                [&](OperationContext* opCtx,
+                    const CachedDatabaseInfo& cdb) -> boost::optional<ResolvedNamespace> {
+                    // Self-requests are not necessary because the view catalog is available
+                    // locally.
+                    if (cdb->getPrimary() == ShardingState::get(opCtx)->shardId()) {
+                        return boost::none;
+                    }
+
+                    BSONObjBuilder bob;
+                    bob.append("_shardsvrResolveView", 1);
+                    bob.append("nss",
+                               NamespaceStringUtil::serialize(
+                                   involvedNss, SerializationContext::stateDefault()));
+                    IgnoreAPIParametersBlock ignoreAPIParams(opCtx);
+                    auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+                        opCtx,
+                        involvedNss.dbName(),
+                        cdb,
+                        bob.obj(),
+                        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                        Shard::RetryPolicy::kIdempotent);
+                    auto data = uassertStatusOK(response.swResponse).data;
+                    uassertStatusOK(getStatusFromCommandResult(data));
+                    if (!data.hasField("resolvedView")) {
+                        return boost::none;
+                    }
+                    auto rv = ResolvedNamespace::parseFromBSON(data["resolvedView"]);
+                    // _shardsvrResolveView returns an identity ResolvedNamespace (resolved
+                    // namespace == requested) for a plain/non-existent collection. Only record an
+                    // entry when it actually resolved to a different underlying namespace (a view).
+                    if (rv.getResolvedNamespace() == involvedNss) {
+                        return boost::none;
+                    }
+                    ResolvedNamespaceViewOptions opts{
+                        .involvedNamespaceIsAView = true,
+                        .timeseriesMetadata = rv.getTimeseriesViewMetadata(),
+                        .options = std::make_shared<LiteParserOptions>(
+                            LiteParserOptions{.ifrContext = ifrContext}),
+                        .shouldParseLpp = true,
+                    };
+                    return ResolvedNamespace(involvedNss,
+                                             rv.getResolvedNamespace(),
+                                             rv.getBsonPipeline(),
+                                             rv.getDefaultCollation(),
+                                             std::move(opts));
+                });
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+            continue;
+        }
+        if (resolved) {
+            proactiveForeignViewResolutionsCounter.increment();
+            closure.insert_or_assign(involvedNss, std::move(*resolved));
+        }
+    }
+    return closure;
+}
+}  // namespace
+
 Status _runAggregate(std::unique_ptr<AggExState> aggExState, rpc::ReplyBuilderInterface* result) {
     // Perform the validation checks on the request and its derivatives before proceeding.
     aggExState->performValidationChecks();
@@ -1505,6 +1625,17 @@ Status _runAggregate(std::unique_ptr<AggExState> aggExState, rpc::ReplyBuilderIn
         [&](const auto&) {
             hangBeforeCreatingAggCatalogState.pauseWhileSet(aggExState->getOpCtx());
         },
+        [&](const BSONObj& data) {
+            auto nsElem = data["ns"];
+            return !nsElem || nsElem.str() == aggExState->getOriginalNss().toStringForErrorMsg();
+        });
+
+    // Resolve foreign views by contacting the DB primary shard before acquiring catalog locks, to
+    // avoid issuing router operations while holding locks.
+    aggExState->setPreResolvedForeignViews(resolveForeignViewsOnPrimary(*aggExState));
+
+    hangAfterResolvingForeignViews.executeIf(
+        [&](const auto&) { hangAfterResolvingForeignViews.pauseWhileSet(aggExState->getOpCtx()); },
         [&](const BSONObj& data) {
             auto nsElem = data["ns"];
             return !nsElem || nsElem.str() == aggExState->getOriginalNss().toStringForErrorMsg();

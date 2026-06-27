@@ -134,11 +134,9 @@ GetNextResult UnionWithStage::doGetNext() {
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
             // Preparation of sub pipeline failed. The pipeline will be modified to use the view
             // definition instead, and we attempt to prepare it again.
+            const auto& resolvedNs = *e.extraInfo<ResolvedNamespace>();
             _sharedState->_pipeline = DocumentSourceUnionWith::parsePipelineWithMaybeViewDefinition(
-                pExpCtx,
-                ResolvedNamespace{e->getResolvedNamespace(), e->getBsonPipeline()},
-                std::move(serializedPipeline),
-                _userNss);
+                pExpCtx, resolvedNs, std::move(serializedPipeline), _userNss);
             logShardedViewFound(e, *_sharedState->_pipeline);
 
             // Serialize the new pipeline.

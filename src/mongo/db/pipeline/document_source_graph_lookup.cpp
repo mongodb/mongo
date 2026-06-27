@@ -340,7 +340,9 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
         globalOpCounters().gotNestedAggregate();
     }
 
-    const auto& resolvedNamespace = getExpCtx()->getResolvedNamespace(getFromNs());
+    const auto resolvedNamespace = getExpCtx()->hasResolvedNamespace(getFromNs())
+        ? getExpCtx()->getResolvedNamespace(getFromNs())
+        : ResolvedNamespace{getFromNs(), std::vector<BSONObj>{}};
     _fromExpCtx = makeCopyForSubPipelineFromExpressionContext(
         getExpCtx(), resolvedNamespace.ns, resolvedNamespace.uuid);
     _fromExpCtx->setInLookup(true);
@@ -366,12 +368,13 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
     const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
     : DocumentSource(kStageName, newExpCtx),
       _params(original._params),
-      _fromExpCtx(makeCopyFromExpressionContext(
-          original._fromExpCtx,
-          original.getExpCtx()->getResolvedNamespace(getFromNs()).ns,
-          original.getExpCtx()->getResolvedNamespace(getFromNs()).uuid)),
       _variables(original._variables),
       _variablesParseState(original._variablesParseState.copyWith(_variables.useIdGenerator())) {
+    const auto resolvedNamespace = original.getExpCtx()->hasResolvedNamespace(getFromNs())
+        ? original.getExpCtx()->getResolvedNamespace(getFromNs())
+        : ResolvedNamespace{getFromNs(), std::vector<BSONObj>{}};
+    _fromExpCtx = makeCopyFromExpressionContext(
+        original._fromExpCtx, resolvedNamespace.ns, resolvedNamespace.uuid);
     if (_params.startWith) {
         // re-create startWith expression using newExpCtx.
         _params.startWith = _params.startWith->clone(*newExpCtx);

@@ -195,6 +195,15 @@ public:
     }
 
     /**
+     * Returns true if this is the merging half of a split sharded aggregation, i.e. it begins with
+     * a $mergeCursors stage (injected by mongos when dispatching the merge). Such a pipeline is
+     * issued by a router even though it carries no shard/database version.
+     */
+    bool isMergePipeline() const {
+        return !_stageSpecs.empty() && _stageSpecs.front()->getParseTimeName() == "$mergeCursors"sv;
+    }
+
+    /**
      * Returns a list of the priviliges required for this pipeline.
      */
     PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const {

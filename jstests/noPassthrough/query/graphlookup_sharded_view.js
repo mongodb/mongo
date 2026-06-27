@@ -7,6 +7,7 @@
 //  ]
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {getProactiveResolutionTotal} from "jstests/libs/query/proactive_view_resolution_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const sharded = new ShardingTest({
@@ -21,18 +22,9 @@ assert(sharded.adminCommand({enableSharding: testDBName, primaryShard: primarySh
 
 const testDB = sharded.getDB(testDBName);
 
-// Under featureFlagExtensionsInsideHybridSearch, mongos proactively walks a
-// top-level view's pipeline transitively at kickback time and folds nested-view discoveries into
-// the same kickback's 'additionalResolvedNamespaces'. The single kickback's slow-query
-// 'resolvedViews' profile entry then records each folded view's 'dependencyChain', so
-// per-namespace chain-occurrence counts go up by one for every test case that involves a nested
-// view chain. 'chainCount(legacy)' returns the appropriate count for either path.
-// TODO SERVER-121094: remove this gate (and inline the new counts at every call site) when
-// the legacy view-resolution path is removed.
+// TODO SERVER-121094: Remove this gate (and the legacy expectedExceptions path) when the legacy
+// view-resolution path is removed.
 const proactiveViewResolution = FeatureFlagUtil.isEnabled(testDB, "ExtensionsInsideHybridSearch");
-function chainCount(legacyCount) {
-    return proactiveViewResolution ? legacyCount + 1 : legacyCount;
-}
 
 // Drop the 'profile' tables and then enable profiling on all shards.
 for (const shard of [sharded.shard0, sharded.shard1, sharded.shard2]) {
@@ -75,11 +67,7 @@ assert(sharded.s.adminCommand({shardCollection: subjects.getFullName(), key: {sh
 
 let testCount = 0;
 
-// To resolve view 'view1' defined on view 'view2' defined on collection 'coll', we would get a
-// dependency chain of the form [view1, view2, coll] in the 'resolvedViews' field of the
-// system.profile entry. This function combines all namespaces listed in the dependency chains of an
-// aggregation's resolved views to produce a map counting how many times each namesapce was seen,
-// e.g.: {"test.view1": 1, "test.view2": 1, "test.coll": 1}
+// TODO SERVER-121094: Remove when the legacy view-resolution path is removed.
 function getShardedViewExceptions(comment) {
     return primaryShard
         .getDB(testDBName)
@@ -106,29 +94,59 @@ function getShardedViewExceptions(comment) {
         }, {});
 }
 
-function testGraphLookupView({collection, pipeline, expectedResults, expectedExceptions}) {
+function testGraphLookupView({
+    collection,
+    pipeline,
+    expectedResults,
+    expectedExceptions,
+    expectedProactiveResolutions,
+}) {
     const comment = "test " + testCount;
+    const proactiveBefore = getProactiveResolutionTotal([
+        sharded.shard0,
+        sharded.shard1,
+        sharded.shard2,
+    ]);
     assertArrayEq({
         actual: collection.aggregate(pipeline, {comment}).toArray(),
         expected: expectedResults,
     });
-    if (expectedExceptions) {
-        // Count how many CommandOnShardedViewNotSupported exceptions we get and verify that they
-        // match the number we were expecting.
-        const actualEx = getShardedViewExceptions(comment);
-        for (const ns in expectedExceptions) {
-            const actualCount = actualEx[ns] || 0;
-            const expectedCount = expectedExceptions[ns];
-            assert(
-                actualCount == expectedCount,
-                "expected: " +
-                    expectedCount +
-                    " exceptions for ns " +
-                    ns +
-                    ", actually got " +
-                    actualCount +
-                    " exceptions.",
+    if (proactiveViewResolution) {
+        // TODO SERVER-121094: Remove this branch when the legacy view-resolution path is removed.
+        if (expectedProactiveResolutions !== undefined) {
+            const proactiveDelta =
+                getProactiveResolutionTotal([sharded.shard0, sharded.shard1, sharded.shard2]) -
+                proactiveBefore;
+            assert.eq(
+                proactiveDelta,
+                expectedProactiveResolutions,
+                "expected " +
+                    expectedProactiveResolutions +
+                    " proactive foreign-view resolutions for '" +
+                    comment +
+                    "' but got " +
+                    proactiveDelta,
             );
+        }
+    } else {
+        if (expectedExceptions) {
+            // Count how many CommandOnShardedViewNotSupported exceptions we get and verify that
+            // they match the number we were expecting.
+            const actualEx = getShardedViewExceptions(comment);
+            for (const ns in expectedExceptions) {
+                const actualCount = actualEx[ns] || 0;
+                const expectedCount = expectedExceptions[ns];
+                assert(
+                    actualCount == expectedCount,
+                    "expected: " +
+                        expectedCount +
+                        " exceptions for ns " +
+                        ns +
+                        ", actually got " +
+                        actualCount +
+                        " exceptions.",
+                );
+            }
         }
     }
     testCount++;
@@ -190,6 +208,7 @@ testGraphLookupView({
     ],
     // Expect only one exception when trying to resolve the view 'emptyViewOnSubjects'.
     expectedExceptions: {"test.docs": 0, "test.subjects": 1},
+    expectedProactiveResolutions: 1,
 });
 
 // Test a $graphLookup with a restrictSearchWithMatch that triggers a
@@ -225,6 +244,7 @@ testGraphLookupView({
     ],
     // Expect only one exception when trying to resolve the view 'emptyViewOnSubjects'.
     expectedExceptions: {"test.docs": 0, "test.subjects": 1},
+    expectedProactiveResolutions: 1,
 });
 
 // Create a view with an empty pipeline on the existing empty view on 'subjects'.
@@ -263,6 +283,7 @@ testGraphLookupView({
     ],
     // Expect only one exception when trying to resolve the view 'emptyViewOnSubjects'.
     expectedExceptions: {"test.docs": 0, "test.subjects": 1},
+    expectedProactiveResolutions: 1,
 });
 
 // Create a view with a pipeline on 'docs' that runs another $graphLookup.
@@ -350,7 +371,8 @@ testGraphLookupView({
     ],
     // Expect one exception when trying to resolve the view 'physicists' on collection 'docs' and
     // another four on 'subjects' when trying to resolve 'emptyViewOnSubjects'.
-    expectedExceptions: {"test.docs": 1, "test.subjects": chainCount(4)},
+    expectedExceptions: {"test.docs": 1, "test.subjects": 4},
+    expectedProactiveResolutions: 2,
 });
 
 // Create a view with a pipeline on 'physicists' to test resolution of a view on another view.
@@ -392,7 +414,8 @@ testGraphLookupView({
     ],
     // Expect one exception when trying to resolve the view 'physicists' on collection 'docs' and
     // one on 'subjects' when trying to resolve 'emptyViewOnSubjects'.
-    expectedExceptions: {"test.docs": 1, "test.subjects": chainCount(1)},
+    expectedExceptions: {"test.docs": 1, "test.subjects": 1},
+    expectedProactiveResolutions: 2,
 });
 
 // Test a $graphLookup with restrictSearchWithMatch that triggers a
@@ -429,7 +452,8 @@ testGraphLookupView({
     ],
     // Expect one exception when trying to resolve the view 'physicists' on collection 'docs' and
     // another two on 'subjects' when trying to resolve 'emptyViewOnSubjects'.
-    expectedExceptions: {"test.docs": 1, "test.subjects": chainCount(2)},
+    expectedExceptions: {"test.docs": 1, "test.subjects": 2},
+    expectedProactiveResolutions: 2,
 });
 
 sharded.stop();

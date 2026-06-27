@@ -36,3 +36,6 @@ filters:
   - "replicated_truncates_utils.js":
     approvers:
       - 10gen/query-execution
+  - "proactive_view_resolution_util.js":
+    approvers:
+      - 10gen/query-integration-search

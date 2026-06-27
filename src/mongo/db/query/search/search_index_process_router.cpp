@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/search/search_index_process_router.h"
 
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/router_role/router_role.h"
 #include "mongo/db/service_context.h"
@@ -69,6 +70,10 @@ StatusWith<std::pair<boost::optional<UUID>, boost::optional<ResolvedNamespace>>>
     bob.append("_shardsvrResolveView", 1);
     bob.append("nss", NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
 
+    // _shardsvrResolveView is an internal command that does not participate in API versioning.
+    // Strip any API parameters so they are not forwarded with the command, which would cause it
+    // to fail if the client set apiStrict: true.
+    IgnoreAPIParametersBlock ignoreAPIParams(opCtx);
     auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
         opCtx,
         nss.dbName(),

@@ -138,6 +138,9 @@ public:
         }
 
         ResolvedNamespaceMap resolvedNamespaces;
+        for (const auto& [nss, rn] : _aggExState.getPreResolvedForeignViews()) {
+            resolvedNamespaces.insert_or_assign(nss, rn);
+        }
         std::deque<NamespaceString> namespaces(pipelineInvolvedNamespaces.begin(),
                                                pipelineInvolvedNamespaces.end());
         auto status = extendResolvedNamespaces(opCtx, std::move(namespaces), resolvedNamespaces);
@@ -834,11 +837,19 @@ void AggCatalogState::maybeProactivelyResolveInvolvedNamespaces(AggExState& aggE
     // connections), there is no mongos to receive the ResolvedView exception — the existing
     // ExpressionContext view-resolution path handles those cases in-line.
     const bool fromRouter = OperationShardingState::get(opCtx).shouldBeTreatedAsFromRouter(opCtx);
-    if (!extensionsInsideHybridSearchEnabled || !fromRouter) {
+
+    // The merging half of a sharded aggregation is dispatched by mongos with a leading
+    // $mergeCursors, but - because it merges already-established cursors rather than targeting a
+    // versioned collection - it carries no shard/database version, so shouldBeTreatedAsFromRouter()
+    // returns false for it. A mongos is nonetheless present to receive a kickback, and the merging
+    // pipeline is the only place a merge-stage $lookup/$unionWith foreign view surfaces as an
+    // involved namespace. Treat it as from-router so the proactive resolver inspects those
+    // namespaces and can kick the view resolution back to mongos.
+    const auto& lpp = aggExState.getOriginalLiteParsedPipeline();
+    if (!extensionsInsideHybridSearchEnabled || (!fromRouter && !lpp.isMergePipeline())) {
         return;
     }
 
-    const auto& lpp = aggExState.getOriginalLiteParsedPipeline();
     const bool mainIsView = shouldExpandMainView();
     if (lpp.getInvolvedNamespaces().empty() && !mainIsView) {
         return;

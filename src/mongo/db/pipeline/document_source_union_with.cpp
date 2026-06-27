@@ -122,18 +122,6 @@ DocumentSourceContainer unionWithStageParamsToDocumentSourceFn(
         return {DocumentSourceUnionWith::createFromBson(typedParams->getOriginalBson(), expCtx)};
     }
 
-    if (hybrid_scoring_util::isHybridSearchPipeline(typedParams->pipeline)) {
-        const auto& resolvedNamespaces = expCtx->getResolvedNamespaces();
-        auto it = resolvedNamespaces.find(typedParams->unionNss);
-        bool unionNssIsView = it != resolvedNamespaces.end() && it->second.involvedNamespaceIsAView;
-        search_helpers::throwIfrKickbackIfNecessary(
-            unionNssIsView,
-            feature_flags::gFeatureFlagExtensionsInsideHybridSearch,
-            search_metrics::inUnionWithKickbackRetryCount,
-            "$unionWith with $rankFusion/$scoreFusion targeting a view is not supported with "
-            "featureFlagExtensionsInsideHybridSearch enabled.");
-    }
-
     return DocumentSourceUnionWith::createFromStageParams(*typedParams, expCtx);
 }
 
@@ -251,10 +239,10 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
         }
     } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
         logShardedViewFound(e, pipeline);
-        // This takes care of the case where this code is executing on mongos and we had to get the
-        // view pipeline from a shard.
-        // We set the resolvedUnionNs from the execption view defintion.
-        resolvedUnionNs = ResolvedNamespace{e->getResolvedNamespace(), e->getBsonPipeline()};
+        // The subpipeline targeted a namespace that resolved to a sharded view. A shard returned
+        // the view definition via this exception; re-parse the union pipeline with the resolved
+        // view folded in.
+        resolvedUnionNs = *e.extraInfo<ResolvedNamespace>();
         _sharedState = std::make_shared<UnionWithSharedState>(
             parsePipelineWithMaybeViewDefinition(expCtx, *resolvedUnionNs, pipeline, unionNss),
             nullptr,
@@ -337,7 +325,7 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
         }
     } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
         logShardedViewFound(e, userPipeline);
-        resolvedUnionNs = ResolvedNamespace{e->getResolvedNamespace(), e->getBsonPipeline()};
+        resolvedUnionNs = *e.extraInfo<ResolvedNamespace>();
         // Fall back to BSON-based parsing for the sharded view case since the view pipeline
         // is discovered dynamically from the exception and needs full re-parsing.
         _sharedState = std::make_shared<UnionWithSharedState>(
@@ -552,12 +540,11 @@ Value DocumentSourceUnionWith::serialize(const query_shape::SerializationOptions
             if (_resolvedNsForView.has_value()) {
                 // This takes care of the case where this code is executing on a mongod and we have
                 // the full catalog information, so we can resolve the view.
-                pipeCopy = parsePipelineWithMaybeViewDefinition(
-                    getExpCtx(),
-                    ResolvedNamespace{_resolvedNsForView->ns, _resolvedNsForView->pipeline},
-                    std::move(recoveredPipeline),
-                    _userNss,
-                    _userPipelineIsHybridSearch);
+                pipeCopy = parsePipelineWithMaybeViewDefinition(getExpCtx(),
+                                                                *_resolvedNsForView,
+                                                                std::move(recoveredPipeline),
+                                                                _userNss,
+                                                                _userPipelineIsHybridSearch);
             } else {
                 pipeCopy = pipeline_factory::makePipeline(recoveredPipeline,
                                                           _sharedState->_pipeline->getContext(),
@@ -605,12 +592,12 @@ Value DocumentSourceUnionWith::serialize(const query_shape::SerializationOptions
                 // namespace rather than the view name.
                 pipelineContextColl =
                     Value(opts.serializeIdentifier(e->getResolvedNamespace().coll()));
-                auto resolvedPipeline = parsePipelineWithMaybeViewDefinition(
-                    getExpCtx(),
-                    ResolvedNamespace{e->getResolvedNamespace(), e->getBsonPipeline()},
-                    std::move(serializedPipe),
-                    _userNss,
-                    _userPipelineIsHybridSearch);
+                auto resolvedPipeline =
+                    parsePipelineWithMaybeViewDefinition(getExpCtx(),
+                                                         *e.extraInfo<ResolvedNamespace>(),
+                                                         std::move(serializedPipe),
+                                                         _userNss,
+                                                         _userPipelineIsHybridSearch);
                 return preparePipelineAndExplain(std::move(resolvedPipeline));
             }
         }();
