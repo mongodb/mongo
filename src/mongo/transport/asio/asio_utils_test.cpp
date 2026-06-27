@@ -37,10 +37,6 @@
 
 #include <asio.hpp>
 
-#ifdef MONGO_CONFIG_SSL
-#include "mongo/util/net/ssl.hpp"
-#endif
-
 namespace mongo::transport {
 namespace {
 using namespace std::literals::string_view_literals;
@@ -184,20 +180,6 @@ TEST(ASIOUtils, PeekPastAvailableBytesTCPNonBlocking) {
     TCPSocketPair sockets;
     sockets.clientSocket().non_blocking(true);
     peekPastBuffer(sockets.serverSocket(), sockets.clientSocket(), "example"sv);
-}
-// The peer-closed asio/OpenSSL error codes must map to
-// ErrorCodes::ConnectionClosedByPeer so SpecificPool::finishRefresh can classify them by code
-// rather than by reason string. The reason carries ec.message(), so the two transport modes remain
-// distinguishable in diagnostics under the single code.
-TEST(ASIOUtils, PeerClosedMapsToConnectionClosedByPeer) {
-    ASSERT_EQ(errorCodeToStatus(asio::error::eof).code(), ErrorCodes::ConnectionClosedByPeer);
-#ifdef MONGO_CONFIG_SSL
-    ASSERT_EQ(errorCodeToStatus(asio::ssl::error::stream_truncated).code(),
-              ErrorCodes::ConnectionClosedByPeer);
-    // Same code, distinct reasons: ec.message() differs between eof and stream_truncated.
-    ASSERT_NE(errorCodeToStatus(asio::error::eof).reason(),
-              errorCodeToStatus(asio::ssl::error::stream_truncated).reason());
-#endif
 }
 }  // namespace
 }  // namespace mongo::transport

@@ -181,15 +181,11 @@ export function verifyTLSConfigurationFails({mongotMockTLSMode, mongodTLSMode, s
     assert.commandWorked(coll.insert({"_id": 3, "title": "vegetables"}));
     const searchQuery = {query: "cakes", path: "title"};
 
-    // Perform a $search query. mongod's egress to mongot fails because the TLS mode doesn't match
-    // what mongot expects, so mongot tears the connection down during the TLS handshake. Which
-    // code surfaces isn't deterministic: it depends on whether the peer's close is a graceful FIN
-    // (-> ConnectionClosedByPeer) or an abortive RST (-> HostUnreachable). That's a TCP-level race
-    // -- closing a socket with unread handshake bytes buffered forces a RST -- plus OS/transport
-    // differences, so we accept either.
+    // Perform a $search query. It should fail with 'HostUnreachable' since the TLS mode of mongod
+    // doesn't match what mongot expects.
     assert.commandFailedWithCode(
         db.runCommand({aggregate: "search", pipeline: [{$search: searchQuery}], cursor: {}}),
-        [ErrorCodes.HostUnreachable, ErrorCodes.ConnectionClosedByPeer],
+        ErrorCodes.HostUnreachable,
     );
 
     MongoRunner.stopMongod(mongodConn);

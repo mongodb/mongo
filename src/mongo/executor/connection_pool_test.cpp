@@ -1067,14 +1067,13 @@ TEST_F(ConnectionPoolQueuingTest,
 
 /**
  * Verify that when the pool's pending connection timeout fires first, the error returned is
- * ConnectionEstablishmentTimeout (the connection-establishment timeout now has a
- * dedicated error code rather than the generic HostUnreachable).
+ * HostUnreachable.
  */
 TEST_F(ConnectionPoolQueuingTest,
-       PendingTimeoutBeforeAcquisitionTimeoutReturnsConnectionEstablishmentTimeoutError) {
+       PendingTimeoutBeforeAcquisitionTimeoutReturnsHostUnreachableError) {
     assertTimeoutHelper(
         /* timeout duration */ Milliseconds{500},
-        /* expected timeout codes */ ErrorCodes::ConnectionEstablishmentTimeout);
+        /* expected timeout codes */ ErrorCodes::HostUnreachable);
 }
 
 /**
@@ -2259,11 +2258,11 @@ TEST_F(ConnectionPoolSetupTest, SetupTimeoutsFailOtherPendingRequestsWhenPoolIsE
 
     ASSERT(conn1);
     ASSERT(!conn1->isOK());
-    ASSERT_EQ(conn1->getStatus(), ErrorCodes::ConnectionEstablishmentTimeout);
+    ASSERT_EQ(conn1->getStatus(), ErrorCodes::HostUnreachable);
     ASSERT(conn2);
     ASSERT(!conn2->isOK());
     // Pending connection fails with the same timeout status.
-    ASSERT_EQ(conn2->getStatus(), ErrorCodes::ConnectionEstablishmentTimeout);
+    ASSERT_EQ(conn2->getStatus(), ErrorCodes::HostUnreachable);
 }
 
 /**
@@ -2326,7 +2325,6 @@ TEST_F(ConnectionPoolSetupTest, SetupTimeoutsDontFailOtherPendingRequestsWhenPoo
     ASSERT(conn1);
     ASSERT_EQ(conn1->getStatus(), ErrorCodes::PooledConnectionAcquisitionExceededTimeLimit);
 }
-
 
 /**
  * Verify that a refresh timeout fails all pending requests for the same host.
@@ -3520,13 +3518,19 @@ TEST_F(ConnectionPoolMetricsTest, ConnectionStatsCoverAllHosts) {
     EXPECT_EQ(1u, stats.statsByHost.at(host2).available);
 }
 
-// SERVER-68329: a ConnectionError setup failure (e.g. asio::error::in_progress
-// race in the transport layer) drops only the failing connection without flushing the pool.
-TEST_F(ConnectionPoolTest, SetupFailureWithConnectionErrorDoesNotDropOpenConnections) {
+/**
+ * Verify that a setup failure with established connections does not cause pool failure.
+ */
+TEST_F(ConnectionPoolSetupTest, SetupFailureWithEstablishedConnectionsDoesNotCausePoolFailure) {
+    // None of these errors should drop available connections. The pool spawns replacement
+    // connections for each failure.
+    std::vector<ErrorCodes::Error> setupFailures = {
+        ErrorCodes::HostUnreachable, ErrorCodes::SocketException, ErrorCodes::NetworkTimeout};
+
     auto [pool, inUseConnections] = setupConnectionPool(
         1,
         1,
-        1,
+        setupFailures.size(),
         [&](ConnectionPool::Options& options) { options.refreshTimeout = Seconds(100); },
         [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {});
 
@@ -3536,18 +3540,21 @@ TEST_F(ConnectionPoolTest, SetupFailureWithConnectionErrorDoesNotDropOpenConnect
         }
     });
 
-    ConnectionImpl::pushSetup(Status(ErrorCodes::ConnectionError, "rate-limited"));
 
-    // The failing pending connection is dropped, but the in-use and available connections survive
-    // and the pool spawns a replacement pending connection.
+    for (auto ec : setupFailures) {
+        ConnectionImpl::pushSetup(Status(ec, ""));
+    }
+
+    // Verify that there is still one available connection and the pool maintains the target
+    // number of refreshing connections.
     {
         const auto connStats = getStats(pool);
         ASSERT_EQ(1, connStats.totalInUse);
         ASSERT_EQ(1, connStats.totalAvailable);
-        ASSERT_EQ(1, connStats.totalRefreshing);
+        ASSERT_EQ(setupFailures.size(), connStats.totalRefreshing);
     }
 
-    // Return the in-use connection; it should not be refreshed away.
+    // Return the in-use connection, which should not be refreshed.
     {
         auto conn = std::move(inUseConnections.back());
         inUseConnections.pop_back();
@@ -3555,163 +3562,18 @@ TEST_F(ConnectionPoolTest, SetupFailureWithConnectionErrorDoesNotDropOpenConnect
 
         const auto connStats = getStats(pool);
         ASSERT_EQ(0, connStats.totalInUse);
+        ASSERT_EQ(setupFailures.size(), connStats.totalRefreshing);
         ASSERT_EQ(2, connStats.totalAvailable);
-        ASSERT_EQ(1, connStats.totalRefreshing);
     }
 
-    // Contrarily, when a setup connection fails with a non-ConnectionError, the available
-    // connections get dropped via processFailure.
+    // Contrarily, when a setup connection fails with another error, the available connection gets
+    // dropped.
     ConnectionImpl::pushSetup(Status(ErrorCodes::NetworkInterfaceExceededTimeLimit, ""));
     {
         const auto connStats = getStats(pool);
         ASSERT_EQ(0, connStats.totalInUse);
         ASSERT_EQ(0, connStats.totalRefreshing);
         ASSERT_EQ(0, connStats.totalAvailable);
-    }
-}
-
-// Any setup failure that is not ConnectionError and is not one of the transient
-// rate-limiter signals (ConnectionClosedByPeer / ConnectionEstablishmentTimeout) must drop open
-// connections via processFailure, even when the pool already has established connections. This
-// covers plain HostUnreachable (e.g. a peer RST / connection_reset in the connect phase, or an
-// otherwise-unhealthy host) and unrelated network errors. Note on timeouts: a timeout during
-// connect or the initial hello is reported as ConnectionEstablishmentTimeout and single-drops (so
-// it is not in this flush list); a timeout during the later authentication step is reported as
-// HostUnreachable, which flushes -- so HostUnreachable is exercised here.
-TEST_F(ConnectionPoolTest, SetupFailureWithNonConnectionErrorDropsOpenConnections) {
-    const std::vector<ErrorCodes::Error> nonConnectionErrorFailures = {
-        ErrorCodes::HostUnreachable,
-        ErrorCodes::SocketException,
-        ErrorCodes::NetworkTimeout,
-        ErrorCodes::AuthenticationFailed,
-        ErrorCodes::HostNotFound,
-        ErrorCodes::SSLHandshakeFailed,
-    };
-
-    for (auto ec : nonConnectionErrorFailures) {
-        auto [pool, inUseConnections] = setupConnectionPool(
-            1,
-            3,
-            1,
-            [&](ConnectionPool::Options& options) { options.refreshTimeout = Seconds(100); },
-            [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {});
-
-        ON_BLOCK_EXIT([&]() {
-            for (auto& conn : inUseConnections) {
-                doneWith(conn);
-            }
-        });
-
-        // Sanity check: pool starts with one in-use, three available, one refreshing.
-        {
-            const auto connStats = getStats(pool);
-            ASSERT_EQ(1, connStats.totalInUse) << "ec=" << ErrorCodes::errorString(ec);
-            ASSERT_EQ(3, connStats.totalAvailable) << "ec=" << ErrorCodes::errorString(ec);
-            ASSERT_EQ(1, connStats.totalRefreshing) << "ec=" << ErrorCodes::errorString(ec);
-        }
-
-        // Inject the non-ConnectionError setup failure. The pool must process it as a real failure:
-        // the available pool and any in-flight refreshes are cleared and the pool transitions to
-        // kFailed. Currently checked-out (in-use) connections survive processFailure -- they are
-        // owned by the caller and only become stale via the generation bump.
-        ConnectionImpl::pushSetup(Status(ec, "non-ConnectionError setup failure"));
-
-        const auto connStats = getStats(pool);
-        ASSERT_EQ(1, connStats.totalInUse) << "ec=" << ErrorCodes::errorString(ec);
-        ASSERT_EQ(0, connStats.totalAvailable) << "ec=" << ErrorCodes::errorString(ec);
-        ASSERT_EQ(0, connStats.totalRefreshing) << "ec=" << ErrorCodes::errorString(ec);
-
-        const auto hostStats = connStats.statsByHost.at(HostAndPort());
-        ASSERT_EQ(static_cast<int>(hostStats.poolState),
-                  static_cast<int>(ConnectionPoolState::kFailed))
-            << "ec=" << ErrorCodes::errorString(ec);
-    }
-}
-
-// A transient rate-limiter signal during setup -- ConnectionClosedByPeer (the peer closed the
-// socket: asio::error::eof for non-TLS, asio::ssl::error::stream_truncated for TLS) or
-// ConnectionEstablishmentTimeout (setup timed out) -- must single-drop the failing attempt, not
-// flush the pool, when the pool already has established connections. finishRefresh keys on the code
-// (not the reason string), so we inject the code directly.
-TEST_F(ConnectionPoolTest, RateLimiterRejectionsDoNotClearPool) {
-    for (auto ec :
-         {ErrorCodes::ConnectionClosedByPeer, ErrorCodes::ConnectionEstablishmentTimeout}) {
-        auto [pool, inUseConnections] = setupConnectionPool(
-            1,
-            3,
-            1,
-            [&](ConnectionPool::Options& options) { options.refreshTimeout = Seconds(100); },
-            [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {});
-
-        ON_BLOCK_EXIT([&]() {
-            for (auto& conn : inUseConnections) {
-                doneWith(conn);
-            }
-        });
-
-        // Sanity: pool starts with one in-use, three available, one refreshing.
-        {
-            const auto s = getStats(pool);
-            ASSERT_EQ(1, s.totalInUse) << "ec=" << ErrorCodes::errorString(ec);
-            ASSERT_EQ(3, s.totalAvailable) << "ec=" << ErrorCodes::errorString(ec);
-            ASSERT_EQ(1, s.totalRefreshing) << "ec=" << ErrorCodes::errorString(ec);
-        }
-
-        // The failing pending connection is single-dropped; the in-use and the three available
-        // connections must survive and a replacement is spawned.
-        ConnectionImpl::pushSetup(Status(ec, "transient single-drop signal"));
-        {
-            const auto s = getStats(pool);
-            ASSERT_EQ(1, s.totalInUse) << "ec=" << ErrorCodes::errorString(ec);
-            ASSERT_EQ(3, s.totalAvailable) << "ec=" << ErrorCodes::errorString(ec);
-            ASSERT_EQ(1, s.totalRefreshing) << "ec=" << ErrorCodes::errorString(ec);
-        }
-
-        // Returning the in-use connection keeps the pool healthy.
-        {
-            auto conn = std::move(inUseConnections.back());
-            inUseConnections.pop_back();
-            doneWithAsync(conn).get();
-
-            const auto s = getStats(pool);
-            ASSERT_EQ(0, s.totalInUse) << "ec=" << ErrorCodes::errorString(ec);
-            ASSERT_EQ(4, s.totalAvailable) << "ec=" << ErrorCodes::errorString(ec);
-            ASSERT_EQ(1, s.totalRefreshing) << "ec=" << ErrorCodes::errorString(ec);
-        }
-
-        // Drain the replacement pending connection before the next iteration / teardown.
-        ConnectionImpl::pushSetup(Status::OK());
-    }
-}
-
-// Negative case: the same signals with no established connections have nothing to protect, so they
-// fall through to processFailure and clear the pool.
-TEST_F(ConnectionPoolTest, RateLimiterRejectionsClearPoolWhenNoEstablishedConnections) {
-    for (auto ec :
-         {ErrorCodes::ConnectionClosedByPeer, ErrorCodes::ConnectionEstablishmentTimeout}) {
-        auto [pool, inUseConnections] = setupConnectionPool(
-            0,
-            0,
-            1,
-            [&](ConnectionPool::Options& options) { options.refreshTimeout = Seconds(100); },
-            [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {});
-
-        // No established connections -- pool is entirely in the "refreshing" (setup) state.
-        {
-            const auto s = getStats(pool);
-            ASSERT_EQ(0, s.totalInUse) << "ec=" << ErrorCodes::errorString(ec);
-            ASSERT_EQ(0, s.totalAvailable) << "ec=" << ErrorCodes::errorString(ec);
-            ASSERT_EQ(1, s.totalRefreshing) << "ec=" << ErrorCodes::errorString(ec);
-        }
-
-        // The failure triggers processFailure and clears the pool.
-        ConnectionImpl::pushSetup(Status(ec, "transient single-drop signal"));
-        {
-            const auto s = getStats(pool);
-            ASSERT_EQ(0, s.totalInUse) << "ec=" << ErrorCodes::errorString(ec);
-            ASSERT_EQ(0, s.totalAvailable) << "ec=" << ErrorCodes::errorString(ec);
-            ASSERT_EQ(0, s.totalRefreshing) << "ec=" << ErrorCodes::errorString(ec);
-        }
     }
 }
 
@@ -4028,16 +3890,27 @@ TEST_F(ConnectionPoolSetupTest, MultipleConsecutiveSetupFailuresDoNotBlockNewCon
         ASSERT_EQ(3, connStats.totalRefreshing);
     }
 
-    // Push a single-drop failure of each code in sequence (establishedConnections > 0, so all three
-    // take the single-drop path). The pool immediately spawns a replacement for each, so
-    // consecutive failures never block it.
-    for (auto ec : {ErrorCodes::ConnectionError,
-                    ErrorCodes::ConnectionClosedByPeer,
-                    ErrorCodes::ConnectionEstablishmentTimeout}) {
-        ConnectionImpl::pushSetup(Status(ec, ""));
+    // Push multiple HostUnreachable failures in sequence. The pool immediately spawns a
+    // replacement for each failed connection.
+    ConnectionImpl::pushSetup(Status(ErrorCodes::HostUnreachable, ""));
+    {
         const auto connStats = getStats(pool);
-        ASSERT_EQ(1, connStats.totalInUse) << "ec=" << ErrorCodes::errorString(ec);
-        ASSERT_EQ(3, connStats.totalRefreshing) << "ec=" << ErrorCodes::errorString(ec);
+        ASSERT_EQ(1, connStats.totalInUse);
+        ASSERT_EQ(3, connStats.totalRefreshing);
+    }
+
+    ConnectionImpl::pushSetup(Status(ErrorCodes::HostUnreachable, ""));
+    {
+        const auto connStats = getStats(pool);
+        ASSERT_EQ(1, connStats.totalInUse);
+        ASSERT_EQ(3, connStats.totalRefreshing);
+    }
+
+    ConnectionImpl::pushSetup(Status(ErrorCodes::HostUnreachable, ""));
+    {
+        const auto connStats = getStats(pool);
+        ASSERT_EQ(1, connStats.totalInUse);
+        ASSERT_EQ(3, connStats.totalRefreshing);
     }
 
     // Verify the pool is still healthy (not in failed state) because there's an established
@@ -4047,7 +3920,6 @@ TEST_F(ConnectionPoolSetupTest, MultipleConsecutiveSetupFailuresDoNotBlockNewCon
     ASSERT_EQ(static_cast<int>(hostStats.poolState),
               static_cast<int>(ConnectionPoolState::kHealthy));
 }
-
 
 /**
  * Verify that a connection that completes setup after a failure event is discarded rather than

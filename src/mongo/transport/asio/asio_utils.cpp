@@ -32,15 +32,10 @@
 #include "mongo/config.h"
 #include "mongo/logv2/log.h"
 
-#ifdef MONGO_CONFIG_SSL
-#include "mongo/util/net/ssl.hpp"
-#endif
-
 #include <string_view>
 
-#include <fmt/format.h>
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 
 namespace mongo::transport {
 
@@ -53,8 +48,8 @@ Status errorCodeToStatus(const std::error_code& ec, std::string_view context) {
         return Status::OK();
 
     // Add additional context string to Status reason if included.
-    auto makeStatus = [&](ErrorCodes::Error code, std::string reason) {
-        Status result(code, std::move(reason));
+    auto makeStatus = [&](ErrorCodes::Error code, std::string_view reason) {
+        Status result(code, reason);
         if (context.data())
             result.addContext(context);
         return result;
@@ -71,16 +66,7 @@ Status errorCodeToStatus(const std::error_code& ec, std::string_view context) {
 #endif
         return makeStatus(ErrorCodes::NetworkTimeout, "Socket operation timed out");
     } else if (ec == asio::error::eof) {
-        // Non-TLS graceful FIN. Same code as stream_truncated below; the appended ec.message()
-        // distinguishes the two transport modes for diagnosis.
-        return makeStatus(ErrorCodes::ConnectionClosedByPeer,
-                          fmt::format("Connection closed by peer: {}", ec.message()));
-#ifdef MONGO_CONFIG_SSL
-    } else if (ec == asio::ssl::error::stream_truncated) {
-        // TLS peer closed without a proper close_notify — semantically identical to EOF.
-        return makeStatus(ErrorCodes::ConnectionClosedByPeer,
-                          fmt::format("Connection closed by peer: {}", ec.message()));
-#endif
+        return makeStatus(ErrorCodes::HostUnreachable, "Connection closed by peer");
     } else if (ec == asio::error::connection_reset) {
         return makeStatus(ErrorCodes::HostUnreachable, "Connection reset by peer");
     } else if (ec == asio::error::network_reset) {
