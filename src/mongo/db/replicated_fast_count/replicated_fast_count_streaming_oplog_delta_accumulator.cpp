@@ -148,6 +148,10 @@ bool nsIsFastCountStore(BSONElement nsElem) {
     return isFastCountStoreCollName(ns.substr(kConfigDot.size()));
 }
 
+bool isContainerOpType(std::string_view op) {
+    return op.size() == 2 && op[0] == 'c' && (op[1] == 'i' || op[1] == 'u' || op[1] == 'd');
+}
+
 // Categorizes the `o.firstElement` of a `c` (command) entry.
 enum class CommandKind {
     kMalformed,
@@ -230,8 +234,7 @@ FastDecision classifyForFastLane(const ScanFields& f, const BSONObj& raw) {
         }
     } else if (opStr.size() == 2) {
         // Container ops (ci/cu/cd) and key material (km) never carry size metadata we count.
-        const bool isContainerOp =
-            opStr[0] == 'c' && (opStr[1] == 'i' || opStr[1] == 'u' || opStr[1] == 'd');
+        const bool isContainerOp = isContainerOpType(opStr);
         if (isContainerOp || (opStr[0] == 'k' && opStr[1] == 'm')) {
             // Container ops targeting a replicated-fast-count ident are internal writes; skip
             // them without advancing lastTimestamp to avoid the feedback loop the typed path
@@ -325,13 +328,16 @@ struct FastApplyOpsOutcome {
     int processed = 0;
 };
 
-// Layer 2.5: handle a non-partial `applyOps` whose inner ops are all simple CRUD (i/u/d) with
-// their own `m` size metadata and `ui`. The caller must not have an active partial-txn chain.
+// Layer 2.5: handle a non-partial `applyOps` whose inner ops are simple CRUD (i/u/d) with their
+// own `m` size metadata and `ui`, and/or container ops (ci/cu/cd). The caller must not have an
+// active partial-txn chain.
 //
-// Inner ops that target the internal fast-count-store are tracked separately. If every inner op
-// is internal the outcome is `kAllInternal` (skip the entry, like `operationsOnFastCountStores`).
-// If the applyOps mixes user and internal inner ops, the internal ones are dropped silently and
-// only the user-collection deltas are recorded.
+// Inner ops that target the internal fast-count-store (a fast-count-store namespace, or a
+// container op on a replicated-fast-count ident) are tracked separately. If every inner op is
+// internal the outcome is `kAllInternal` (skip the entry, like `operationsOnFastCountStores`).
+// Otherwise the outcome is `kProcessed`: internal inner ops are dropped silently, container ops on
+// other idents contribute no delta but still advance the checkpoint, and user-collection CRUD
+// deltas are recorded.
 FastApplyOpsOutcome tryFastApplyOps(const ScanFields& f, SizeCountDeltas& sizeCountDeltasOut) {
     const auto oObj = f.o.Obj();
 
@@ -358,7 +364,7 @@ FastApplyOpsOutcome tryFastApplyOps(const ScanFields& f, SizeCountDeltas& sizeCo
     // Accumulate into a local map so that if a later inner op forces a Layer 3 fall-through, the
     // earlier inner ops' deltas don't double-count when Layer 3 reprocesses the whole applyOps.
     SizeCountDeltas localDeltas;
-    bool sawUserOp = false;
+    bool sawNonInternalOp = false;
     int processed = 0;
 
     for (const auto& innerElem : innerArray) {
@@ -376,12 +382,30 @@ FastApplyOpsOutcome tryFastApplyOps(const ScanFields& f, SizeCountDeltas& sizeCo
             innerF.m = f.m;
         }
 
-        // Layer 2.5 only handles inner CRUD. Anything else (nested applyOps, kCreate/kDrop,
-        // truncateRange, etc.) requires the full dispatch.
+        // Layer 2.5 handles inner CRUD (i/u/d) and container ops (ci/cu/cd). Anything else (nested
+        // applyOps, kCreate/kDrop, truncateRange, etc.) requires the full dispatch.
         if (innerF.op.type() != BSONType::string) {
             return {FastApplyOpsOutcome::kFallThrough};
         }
         const auto innerOp = innerF.op.valueStringData();
+
+        // Container ops (ci/cu/cd) carry no collection size/count delta. Mirrors the bare-container
+        // handling in classifyForFastLane().
+        if (isContainerOpType(innerOp)) {
+            if (innerF.container.type() != BSONType::string) {
+                return {FastApplyOpsOutcome::kFallThrough};
+            }
+            if (ident::isReplicatedFastCountIdent(innerF.container.valueStringData())) {
+                // Internal fast-count-store inner op; skip it without advancing the checkpoint, to
+                // avoid the feedback loop documented in operationsOnFastCountStores().
+                continue;
+            }
+            // Container op on any other ident (e.g. an index container). No delta, but it is a real
+            // replicated op, so the entry must still advance the checkpoint timestamp.
+            sawNonInternalOp = true;
+            continue;
+        }
+
         if (innerOp.size() != 1) {
             return {FastApplyOpsOutcome::kFallThrough};
         }
@@ -395,7 +419,7 @@ FastApplyOpsOutcome tryFastApplyOps(const ScanFields& f, SizeCountDeltas& sizeCo
             continue;
         }
 
-        sawUserOp = true;
+        sawNonInternalOp = true;
         auto handled = tryRecordFastCrud(innerF, innerRaw, localDeltas);
         if (!handled) {
             // Inner op had a shape Layer 2 couldn't handle. Bail out so Layer 3 can reprocess
@@ -405,7 +429,7 @@ FastApplyOpsOutcome tryFastApplyOps(const ScanFields& f, SizeCountDeltas& sizeCo
         processed += *handled;
     }
 
-    if (!sawUserOp) {
+    if (!sawNonInternalOp) {
         // Every inner op was on the fast-count-store. Skip the entry entirely.
         return {FastApplyOpsOutcome::kAllInternal};
     }

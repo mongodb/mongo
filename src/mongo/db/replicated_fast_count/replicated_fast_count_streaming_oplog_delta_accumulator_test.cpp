@@ -231,6 +231,15 @@ protected:
                          << BSON("_id" << 1) << "m" << BSON("sz" << sizeDelta));
     }
 
+    // Builds a raw container op (ci/cu/cd) inner-op BSON for use inside an applyOps array.
+    BSONObj makeInnerContainerOpBson(std::string_view opStr, std::string_view containerIdent) {
+        BSONObjBuilder b;
+        b.append("op", opStr);
+        b.append("container", containerIdent);
+        b.append("o", BSON("k" << 1));
+        return b.obj();
+    }
+
     test_helpers::NsAndUUID collA = {.nss = NamespaceString::createNamespaceString_forTest(
                                          "streaming_accumulator_test", "collA"),
                                      .uuid = UUID::gen()};
@@ -545,6 +554,43 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_ApplyOpsInnerNonCrud_FallsTh
     const auto applyOpsBson = makeApplyOpsBson(ts, BSON_ARRAY(innerNoop));
     const auto result = runAccumulatorRaw({applyOpsBson});
     EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest,
+       FastLane_ApplyOpsContainerInnerOps_AdvancesTimestampNoDeltas) {
+    const Timestamp ts{1, 1};
+    const auto applyOpsBson =
+        makeApplyOpsBson(ts, BSON_ARRAY(makeInnerContainerOpBson("ci"sv, "internal-sorter-0"sv)));
+    const auto result = runAccumulatorRaw({applyOpsBson});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest,
+       FastLane_ApplyOpsAllFastCountIdentContainerOps_NoTimestampAdvance) {
+    const Timestamp ts{1, 1};
+    const auto applyOpsBson = makeApplyOpsBson(
+        ts,
+        BSON_ARRAY(makeInnerContainerOpBson("ci"sv, ident::kFastCountMetadataStore)
+                   << makeInnerContainerOpBson("cu"sv, ident::kFastCountMetadataStore)));
+    const auto result = runAccumulatorRaw({applyOpsBson});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_FALSE(result.lastTimestamp);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest,
+       FastLane_ApplyOpsMixedFastCountIdentContainerAndUserOp_OnlyUserDeltaRecorded) {
+    const Timestamp ts{1, 1};
+    const auto applyOpsBson =
+        makeApplyOpsBson(ts,
+                         BSON_ARRAY(makeInnerContainerOpBson("ci"sv, ident::kFastCountMetadataStore)
+                                    << makeInnerInsertBson(collA, 100)));
+    const auto result = runAccumulatorRaw({applyOpsBson});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 100);
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, 1);
+    EXPECT_EQ(result.deltas.size(), 1u);
     EXPECT_EQ(result.lastTimestamp, ts);
 }
 
