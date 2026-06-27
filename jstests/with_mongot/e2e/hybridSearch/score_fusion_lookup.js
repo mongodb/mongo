@@ -1,6 +1,6 @@
 /*
- * Tests hybrid search with $rankFusion inside of a $lookup subpipeline.
- * @tags: [ featureFlagRankFusionBasic, requires_fcv_81 ]
+ * Tests hybrid search with $scoreFusion inside of a $lookup subpipeline.
+ * @tags: [ featureFlagSearchHybridScoringFull, requires_fcv_82 ]
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
@@ -17,8 +17,8 @@ import {
     datasets,
 } from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
-const collAName = "search_rank_fusion_collA";
-const collBName = "search_rank_fusion_collB";
+const collAName = "search_score_fusion_collA";
+const collBName = "search_score_fusion_collB";
 const collA = db.getCollection(collAName);
 const collB = db.getCollection(collBName);
 collA.drop();
@@ -44,7 +44,7 @@ const extensionsInHybridSearchEnabled = FeatureFlagUtil.isEnabled(
 
 let collATestQuery = [
     {
-        $rankFusion: {
+        $scoreFusion: {
             input: {
                 pipelines: {
                     vector: [
@@ -69,7 +69,9 @@ let collATestQuery = [
                         {$limit: limit},
                     ],
                 },
+                normalization: "none",
             },
+            combination: {method: "avg"},
         },
     },
     {$limit: limit},
@@ -82,7 +84,6 @@ const identityLookupPipeline = [
     {$unwind: "$out"},
     {$replaceRoot: {newRoot: "$out"}},
 ];
-
 // TODO SERVER-121094 Remove this check when the feature flag is removed.
 // $unionWith is only allowed inside of $lookup when featureFlagExtensionsInsideHybridSearch is enabled.
 if (extensionsInHybridSearchEnabled) {
@@ -97,13 +98,13 @@ if (extensionsInHybridSearchEnabled) {
 }
 
 /*
- * Two $rankFusion queries on the same dataset connected by a $lookup.
+ * Two $scoreFusion queries on the same dataset connected by a $lookup.
  */
 assert.commandWorked(collB.insertMany(getMovieData()));
 
 let collBTestQuery = [
     {
-        $rankFusion: {
+        $scoreFusion: {
             input: {
                 pipelines: {
                     search: [
@@ -117,7 +118,9 @@ let collBTestQuery = [
                         {$limit: 5},
                     ],
                 },
+                normalization: "none",
             },
+            combination: {method: "avg"},
         },
     },
     {$lookup: {from: collA.getName(), pipeline: collATestQuery, as: "out"}},
@@ -151,9 +154,9 @@ if (extensionsInHybridSearchEnabled) {
      *     .
      * ]
      *
-     * This means that in order to run assertDocArrExpectedFuzzy() as recommended for $rankedFusion
+     * This means that in order to run assertDocArrExpectedFuzzy() as recommended for $scoreFusion
      * tests, it's necessary to do some post-parsing of the results to ensure that:
-     *      1. The "top-level" documents (from $rankFusion being executed on collB) are separated
+     *      1. The "top-level" documents (from $scoreFusion being executed on collB) are separated
      * from the "nested" documents (from $lookup being executed on collA).
      *      2. The "nested" documents are appended after the "top-level" documents, without repeats.
      */
