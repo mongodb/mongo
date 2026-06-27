@@ -33,12 +33,14 @@
 #include "mongo/db/global_catalog/sharding_catalog_client_mock.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
+#include "mongo/db/op_observer/op_observer_noop.h"
+#include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/shard_role/shard_catalog/collection_cache_recoverer.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
+#include "mongo/db/sharding_environment/shard_server_op_observer.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
-#include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -55,7 +57,18 @@ const NamespaceString kFromNss =
     NamespaceString::createNamespaceString_forTest("TestDB", "FromColl");
 const NamespaceString kToNss = NamespaceString::createNamespaceString_forTest("TestDB", "ToColl");
 const std::string kShardKey = "_id";
-const BSONObj kShardKeyPattern = BSON(kShardKey << 1);
+
+// Builds a point on the shard key, e.g. key(50) -> {_id: 50}. Accepts MINKEY/MAXKEY too.
+template <typename T>
+BSONObj key(const T& value) {
+    return BSON(kShardKey << value);
+}
+
+const BSONObj kShardKeyPattern = key(1);
+
+// The shard id of the local node. Must match the value configured by ShardServerTestFixture
+// (its kMyShardName member).
+const ShardId kThisShard{"myShardName"};
 
 class MockCatalogClient final : public ShardingCatalogClientMock {
 public:
@@ -103,6 +116,40 @@ private:
     bool _notFound = false;
 };
 
+class ShardCatalogWriteOrderObserver final : public OpObserverNoop {
+public:
+    void onInserts(OperationContext* opCtx,
+                   const CollectionPtr& coll,
+                   std::vector<InsertStatement>::const_iterator begin,
+                   std::vector<InsertStatement>::const_iterator end,
+                   const std::vector<RecordId>& recordIds,
+                   std::vector<bool> fromMigrate,
+                   bool defaultFromMigrate,
+                   OpStateAccumulator* opAccumulator = nullptr) override {
+        _recordShardCatalogWrite(coll->ns());
+    }
+
+    void onUpdate(OperationContext* opCtx,
+                  const OplogUpdateEntryArgs& args,
+                  OpStateAccumulator* opAccumulator = nullptr) override {
+        _recordShardCatalogWrite(args.coll->ns());
+    }
+
+    const std::vector<NamespaceString>& writes() const {
+        return _writes;
+    }
+
+private:
+    void _recordShardCatalogWrite(const NamespaceString& nss) {
+        if (nss == NamespaceString::kConfigShardCatalogChunksNamespace ||
+            nss == NamespaceString::kConfigShardCatalogCollectionsNamespace) {
+            _writes.push_back(nss);
+        }
+    }
+
+    std::vector<NamespaceString> _writes;
+};
+
 struct CollectionAndChunksMetadata {
     CollectionType collType;
     std::vector<ChunkType> chunks;
@@ -118,9 +165,8 @@ CollectionAndChunksMetadata makeCollectionMetadata(const NamespaceString& nss, i
     std::vector<ChunkType> chunks;
     auto chunkVersion = ChunkVersion({epoch, timestamp}, {1, 0});
     for (int i = 0; i < nChunks; i++) {
-        auto min = i == 0 ? BSON(kShardKey << MINKEY) : BSON(kShardKey << (i * 100));
-        auto max =
-            i == (nChunks - 1) ? BSON(kShardKey << MAXKEY) : BSON(kShardKey << ((i + 1) * 100));
+        auto min = i == 0 ? key(MINKEY) : key((i * 100));
+        auto max = i == (nChunks - 1) ? key(MAXKEY) : key(((i + 1) * 100));
         auto range = ChunkRange(min, max);
         auto& chunk = chunks.emplace_back(uuid, std::move(range), chunkVersion, ShardId("0"));
         chunk.setName(OID::gen());
@@ -132,6 +178,69 @@ CollectionAndChunksMetadata makeCollectionMetadata(const NamespaceString& nss, i
 
 CollectionAndChunksMetadata makeCollectionMetadata(int nChunks) {
     return makeCollectionMetadata(kTestNss, nChunks);
+}
+
+ChunkType makeChunk(const CollectionType& collType,
+                    BSONObj min,
+                    BSONObj max,
+                    ChunkVersion version,
+                    ShardId shardId = ShardId("0")) {
+    ChunkType chunk(collType.getUuid(),
+                    ChunkRange(std::move(min), std::move(max)),
+                    version,
+                    std::move(shardId));
+    chunk.setName(OID::gen());
+    return chunk;
+}
+
+std::vector<BSONObj> toConfigBSONVector(const std::vector<ChunkType>& chunks) {
+    std::vector<BSONObj> docs;
+    docs.reserve(chunks.size());
+    for (const auto& chunk : chunks) {
+        docs.push_back(chunk.toConfigBSON());
+    }
+    return docs;
+}
+
+std::vector<ChunkType> makeSplitChunks(const CollectionType& collType, const ChunkType& chunk) {
+    auto splitVersion = chunk.getVersion();
+    splitVersion.incMajor();
+    auto splitFirst = makeChunk(collType, chunk.getMin(), key(50), splitVersion);
+
+    splitVersion.incMinor();
+    auto splitSecond = makeChunk(collType, key(50), chunk.getMax(), splitVersion);
+
+    return {std::move(splitFirst), std::move(splitSecond)};
+}
+
+void addHistoryEntries(ChunkType& chunk, int numHistoryEntries) {
+    std::vector<ChunkHistory> history;
+    history.reserve(numHistoryEntries);
+    for (int i = 0; i < numHistoryEntries; ++i) {
+        history.emplace_back(Timestamp(numHistoryEntries - i, 1), chunk.getShard());
+    }
+
+    chunk.setOnCurrentShardSince(history.front().getValidAfter());
+    chunk.setHistory(std::move(history));
+}
+
+std::vector<ChunkType> makeCoveringChunks(const CollectionType& collType,
+                                          int nChunks,
+                                          ChunkVersion chunkVersion,
+                                          int numHistoryEntries = 0) {
+    std::vector<ChunkType> chunks;
+    chunks.reserve(nChunks);
+    for (int i = 0; i < nChunks; ++i) {
+        chunkVersion.incMajor();
+        auto min = i == 0 ? key(MINKEY) : key(i);
+        auto max = i == (nChunks - 1) ? key(MAXKEY) : key((i + 1));
+        auto chunk = makeChunk(collType, min, max, chunkVersion);
+        if (numHistoryEntries > 0) {
+            addHistoryEntries(chunk, numHistoryEntries);
+        }
+        chunks.push_back(std::move(chunk));
+    }
+    return chunks;
 }
 
 class CommitCollectionMetadataLocallyTest : public ShardServerTestFixture {
@@ -179,6 +288,25 @@ protected:
             client.insert(NamespaceString::kConfigShardCatalogChunksNamespace,
                           chunk.toConfigBSON());
         }
+    }
+
+    BSONObj findLastOplogEntry() {
+        DBDirectClient client(operationContext());
+        FindCommandRequest findCmd(NamespaceString::kRsOplogNamespace);
+        findCmd.setSort(BSON("$natural" << -1));
+        findCmd.setLimit(1);
+        auto cursor = client.find(std::move(findCmd));
+        ASSERT_TRUE(cursor->more());
+        return cursor->next().getOwned();
+    }
+
+    ShardCatalogWriteOrderObserver* installWriteOrderObserver() {
+        auto opObserverRegistry =
+            checked_cast<OpObserverRegistry*>(getServiceContext()->getOpObserver());
+        auto observer = std::make_unique<ShardCatalogWriteOrderObserver>();
+        auto observerPtr = observer.get();
+        opObserverRegistry->addObserver(std::move(observer));
+        return observerPtr;
     }
 
     long long countCommandOplogEntries(std::string_view commandField, const NamespaceString& nss) {
@@ -309,6 +437,395 @@ TEST_F(CommitCollectionMetadataLocallyTest, CreateCollectionReplacesStaleChunksO
     }
 }
 
+TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsWritesDeltaOplogEntryForSmallPayload) {
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
+
+    auto splitChunks = makeSplitChunks(collType, chunks[0]);
+
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, toConfigBSONVector(splitChunks));
+
+    auto oplogEntry = findLastOplogEntry();
+    auto object = oplogEntry.getObjectField("o");
+    ASSERT_EQ(object.firstElementFieldNameStringData(), "applyCollectionShardingStateDelta");
+    ASSERT_EQ(object.firstElement().valueStringData(), kTestNss.coll());
+    ASSERT_EQ(object.getField("changedChunks").Obj().nFields(), 2);
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsWritesDeltaOplogEntryAtChunkLimit) {
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
+
+    constexpr int kNumChangedChunks = 100;
+    auto changedChunks =
+        makeCoveringChunks(collType, kNumChangedChunks, chunks.back().getVersion());
+
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, toConfigBSONVector(changedChunks));
+
+    auto oplogEntry = findLastOplogEntry();
+    auto object = oplogEntry.getObjectField("o");
+    ASSERT_EQ(object.firstElementFieldNameStringData(), "applyCollectionShardingStateDelta");
+    ASSERT_EQ(object.getField("changedChunks").Obj().nFields(), kNumChangedChunks);
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsFallsBackToInvalidateOverChunkLimit) {
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
+
+    auto changedChunks = makeCoveringChunks(collType, 101, chunks.back().getVersion());
+
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, toConfigBSONVector(changedChunks));
+
+    auto oplogEntry = findLastOplogEntry();
+    auto object = oplogEntry.getObjectField("o");
+    ASSERT_EQ(object.firstElementFieldNameStringData(), "invalidateCollectionMetadata");
+    ASSERT_FALSE(object.hasField("changedChunks"));
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest,
+       ChunkOperationsFallsBackToInvalidateForOversizedPayload) {
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
+
+    auto changedChunks = makeCoveringChunks(
+        collType, 40 /* nChunks */, chunks.back().getVersion(), 12000 /* numHistoryEntries */);
+
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, toConfigBSONVector(changedChunks));
+
+    auto oplogEntry = findLastOplogEntry();
+    auto object = oplogEntry.getObjectField("o");
+    ASSERT_EQ(object.firstElementFieldNameStringData(), "invalidateCollectionMetadata");
+    ASSERT_FALSE(object.hasField("changedChunks"));
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsPersistsSplitToDisk) {
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
+
+    auto splitChunks = makeSplitChunks(collType, chunks[0]);
+
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, toConfigBSONVector(splitChunks));
+
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 2);
+
+    auto chunkDocs = findLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace);
+    std::set<OID> persistedNames;
+    for (const auto& doc : chunkDocs) {
+        persistedNames.insert(doc.getField(ChunkType::name.name()).OID());
+    }
+    ASSERT_EQ(persistedNames.count(splitChunks[0].getName()), 1);
+    ASSERT_EQ(persistedNames.count(splitChunks[1].getName()), 1);
+    ASSERT_EQ(persistedNames.count(chunks[0].getName()), 0);
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsIsIdempotent) {
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
+
+    auto splitChunks = makeSplitChunks(collType, chunks[0]);
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, toConfigBSONVector(splitChunks));
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, toConfigBSONVector(splitChunks));
+
+    auto chunkDocs = findLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace);
+    std::set<OID> persistedNames;
+    for (const auto& doc : chunkDocs) {
+        persistedNames.insert(doc.getField(ChunkType::name.name()).OID());
+    }
+    ASSERT_EQ(chunkDocs.size(), 2u);
+    ASSERT_EQ(persistedNames.count(splitChunks[0].getName()), 1);
+    ASSERT_EQ(persistedNames.count(splitChunks[1].getName()), 1);
+    ASSERT_EQ(persistedNames.count(chunks[0].getName()), 0);
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsUpdatesCSR) {
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
+
+    auto splitChunks = makeSplitChunks(collType, chunks[0]);
+
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, toConfigBSONVector(splitChunks));
+
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadata);
+    ASSERT_TRUE(metadata->isSharded());
+    ASSERT_EQ(metadata->getChunkManager()->getUUID(), collType.getUuid());
+    ASSERT_EQ(metadata->getChunkManager()->numChunks(), 2);
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsPreservesGapsInOwnedChunks) {
+    // The shard owns a gapped set of chunks ([0, 10) and [30, 40)): it does not own the whole key
+    // space, so its filtering metadata is built with real gaps (makeNewAllowingGaps). The chunks
+    // use this node's shard id so keyBelongsToMe reflects real ownership.
+    auto shardId = kThisShard;
+    auto [collType, _] = makeCollectionMetadata(0);
+    auto ownedVersion = ChunkVersion({collType.getEpoch(), collType.getTimestamp()}, {1, 0});
+    auto owned1 = makeChunk(collType, key(0), key(10), ownedVersion, shardId);
+    ownedVersion.incMajor();
+    auto owned2 = makeChunk(collType, key(30), key(40), ownedVersion, shardId);
+    mockCatalogClient()->setCollectionMetadata(collType, {owned1, owned2});
+
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
+
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+        auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+        ASSERT_TRUE(metadata);
+        ASSERT_EQ(metadata->getChunkManager()->numChunks(), 2);
+    }
+
+    // Receiving a new chunk [50, 60) that is not adjacent to any owned chunk must not be rejected
+    // as a gap, and the pre-existing gaps must be preserved.
+    auto newVersion = ChunkVersion({collType.getEpoch(), collType.getTimestamp()}, {3, 0});
+    auto newChunk = makeChunk(collType, key(50), key(60), newVersion, shardId);
+
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, toConfigBSONVector({newChunk}));
+
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 3);
+
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadata);
+    ASSERT_EQ(metadata->getChunkManager()->numChunks(), 3);
+    ASSERT(metadata->keyBelongsToMe(key(5)));
+    ASSERT(metadata->keyBelongsToMe(key(35)));
+    ASSERT(metadata->keyBelongsToMe(key(55)));
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsMergeDeletesAllCoveredChunks) {
+    // Start with the key space tiled as [MIN,1) [1,2) [2,3) [3,MAX).
+    auto [collType, _] = makeCollectionMetadata(0);
+    auto chunks = makeCoveringChunks(
+        collType, 4, ChunkVersion({collType.getEpoch(), collType.getTimestamp()}, {1, 0}));
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 4);
+
+    // Merge the two middle chunks [1,2) and [2,3) into one [1,3). Both go away. The neighbours
+    // [MIN,1) and [3,MAX) only touch the merged range at a boundary, so they stay.
+    auto mergeVersion = ChunkVersion({collType.getEpoch(), collType.getTimestamp()}, {5, 0});
+    auto merged = makeChunk(collType, key(1), key(3), mergeVersion);
+
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, toConfigBSONVector({merged}));
+
+    auto chunkDocs = findLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace);
+    std::set<OID> persistedNames;
+    for (const auto& doc : chunkDocs) {
+        persistedNames.insert(doc.getField(ChunkType::name.name()).OID());
+    }
+    ASSERT_EQ(chunkDocs.size(), 3u);
+    ASSERT(persistedNames.count(chunks[0].getName()));   // [MIN,1) kept (only touches at boundary).
+    ASSERT(persistedNames.count(merged.getName()));      // [1,3) inserted.
+    ASSERT(persistedNames.count(chunks[3].getName()));   // [3,MAX) kept.
+    ASSERT(!persistedNames.count(chunks[1].getName()));  // [1,2) deleted.
+    ASSERT(!persistedNames.count(chunks[2].getName()));  // [2,3) deleted.
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsHandlesNonContiguousNewChunks) {
+    // Tile the key space as [MIN,10) [10,20) [20,30) [30,MAX).
+    auto [collType, _] = makeCollectionMetadata(0);
+    auto chunkVersion = ChunkVersion({collType.getEpoch(), collType.getTimestamp()}, {1, 0});
+    std::vector<ChunkType> chunks;
+    chunks.push_back(makeChunk(collType, key(MINKEY), key(10), chunkVersion));
+    chunkVersion.incMajor();
+    chunks.push_back(makeChunk(collType, key(10), key(20), chunkVersion));
+    chunkVersion.incMajor();
+    chunks.push_back(makeChunk(collType, key(20), key(30), chunkVersion));
+    chunkVersion.incMajor();
+    chunks.push_back(makeChunk(collType, key(30), key(MAXKEY), chunkVersion));
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
+
+    // Split two chunks that are not next to each other in one operation: [MIN,10) into
+    // [MIN,5),[5,10) and [20,30) into [20,25),[25,30). This gives two separate ranges. Each range
+    // deletes only its own parent and leaves the other chunks alone.
+    auto version = ChunkVersion({collType.getEpoch(), collType.getTimestamp()}, {5, 0});
+    auto firstA = makeChunk(collType, key(MINKEY), key(5), version);
+    version.incMinor();
+    auto firstB = makeChunk(collType, key(5), key(10), version);
+    version.incMajor();
+    auto thirdA = makeChunk(collType, key(20), key(25), version);
+    version.incMinor();
+    auto thirdB = makeChunk(collType, key(25), key(30), version);
+
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, toConfigBSONVector({firstA, firstB, thirdA, thirdB}));
+
+    auto chunkDocs = findLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace);
+    std::set<OID> persistedNames;
+    for (const auto& doc : chunkDocs) {
+        persistedNames.insert(doc.getField(ChunkType::name.name()).OID());
+    }
+    ASSERT_EQ(chunkDocs.size(), 6u);
+    ASSERT(!persistedNames.count(chunks[0].getName()));  // [MIN,10) split away.
+    ASSERT(!persistedNames.count(chunks[2].getName()));  // [20,30) split away.
+    ASSERT(persistedNames.count(chunks[1].getName()));   // [10,20) untouched.
+    ASSERT(persistedNames.count(chunks[3].getName()));   // [30,MAX) untouched.
+    ASSERT(persistedNames.count(firstA.getName()));
+    ASSERT(persistedNames.count(firstB.getName()));
+    ASSERT(persistedNames.count(thirdA.getName()));
+    ASSERT(persistedNames.count(thirdB.getName()));
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest,
+       ChunkOperationsLeavesGappedNeighboursWhenNewChunkFallsInGap) {
+    // The shard owns [0,10) and [30,40), leaving a gap in between. The stored chunks do not tile
+    // the whole key space.
+    auto [collType, _] = makeCollectionMetadata(0);
+    auto ownedVersion = ChunkVersion({collType.getEpoch(), collType.getTimestamp()}, {1, 0});
+    auto owned1 = makeChunk(collType, key(0), key(10), ownedVersion);
+    ownedVersion.incMajor();
+    auto owned2 = makeChunk(collType, key(30), key(40), ownedVersion);
+    mockCatalogClient()->setCollectionMetadata(collType, {owned1, owned2});
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 2);
+
+    // A new chunk [15,25) sits entirely inside the gap, so it overlaps neither neighbour. Nothing
+    // should be deleted: the new chunk is simply added next to the untouched [0,10) and [30,40).
+    auto newVersion = ChunkVersion({collType.getEpoch(), collType.getTimestamp()}, {3, 0});
+    auto newChunk = makeChunk(collType, key(15), key(25), newVersion);
+
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, toConfigBSONVector({newChunk}));
+
+    auto chunkDocs = findLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace);
+    std::set<OID> persistedNames;
+    for (const auto& doc : chunkDocs) {
+        persistedNames.insert(doc.getField(ChunkType::name.name()).OID());
+    }
+    ASSERT_EQ(chunkDocs.size(), 3u);
+    ASSERT(persistedNames.count(owned1.getName()));    // [0,10) untouched.
+    ASSERT(persistedNames.count(owned2.getName()));    // [30,40) untouched.
+    ASSERT(persistedNames.count(newChunk.getName()));  // [15,25) added.
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsDeletesChunkExtendingPastNewRange) {
+    // The shard owns [2,10) and [20,30).
+    auto [collType, _] = makeCollectionMetadata(0);
+    auto ownedVersion = ChunkVersion({collType.getEpoch(), collType.getTimestamp()}, {1, 0});
+    auto owned1 = makeChunk(collType, key(2), key(10), ownedVersion);
+    ownedVersion.incMajor();
+    auto owned2 = makeChunk(collType, key(20), key(30), ownedVersion);
+    mockCatalogClient()->setCollectionMetadata(collType, {owned1, owned2});
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 2);
+
+    // The new chunk [2,6) starts inside [2,10) but ends before it: [2,10) starts in the new range
+    // yet extends past its max. It overlaps and must be deleted; [20,30), which starts past the
+    // new range, is untouched. (The leftover [6,10) span is a gap the operation intends to leave.)
+    auto newVersion = ChunkVersion({collType.getEpoch(), collType.getTimestamp()}, {3, 0});
+    auto newChunk = makeChunk(collType, key(2), key(6), newVersion);
+
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, toConfigBSONVector({newChunk}));
+
+    auto chunkDocs = findLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace);
+    std::set<OID> persistedNames;
+    for (const auto& doc : chunkDocs) {
+        persistedNames.insert(doc.getField(ChunkType::name.name()).OID());
+    }
+    ASSERT_EQ(chunkDocs.size(), 2u);
+    ASSERT(!persistedNames.count(owned1.getName()));   // [2,10) deleted (extends past new range).
+    ASSERT(persistedNames.count(owned2.getName()));    // [20,30) untouched.
+    ASSERT(persistedNames.count(newChunk.getName()));  // [2,6) added.
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsDeltaOplogEntryIsIdempotentOnSecondary) {
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
+
+    boost::optional<CollectionMetadata> originalMetadata;
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+        originalMetadata = scopedCsr->getCurrentMetadataIfKnown();
+    }
+    ASSERT_TRUE(originalMetadata);
+
+    auto splitChunks = makeSplitChunks(collType, chunks[0]);
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, toConfigBSONVector(splitChunks));
+    auto oplogEntry = repl::OplogEntry(findLastOplogEntry());
+
+    CollectionShardingRuntime::acquireExclusive(operationContext(), kTestNss)
+        ->setCollectionMetadata(operationContext(), std::move(*originalMetadata));
+
+    ShardServerOpObserver observer;
+    observer.onApplyCollectionShardingStateDelta(operationContext(), oplogEntry);
+    observer.onApplyCollectionShardingStateDelta(operationContext(), oplogEntry);
+
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadata);
+    ASSERT_EQ(metadata->getChunkManager()->numChunks(), 2);
+    ASSERT_EQ(metadata->getCollPlacementVersion(), splitChunks.back().getVersion());
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsBootstrapsLocalCollectionMetadata) {
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    auto splitChunks = makeSplitChunks(collType, chunks[0]);
+
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, toConfigBSONVector(splitChunks));
+
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 1);
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 2);
+
+    auto collDocs = findLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    ASSERT_EQ(collDocs.size(), 1u);
+    ASSERT_EQ(UUID::fromCDR(collDocs[0].getField("uuid").uuid()), collType.getUuid());
+}
+
+// This test verifies that chunks are inserted before collections. This is necessary because
+// cleanup removes collection entries with no chunks. Inserting the collection entry first
+// could race with cleanup and cause it to be removed.
+TEST_F(CommitCollectionMetadataLocallyTest,
+       ChunkOperationsBootstrapsCollectionMetadataAfterChunks) {
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+    auto writeOrderObserver = installWriteOrderObserver();
+
+    auto realChunk =
+        makeCoveringChunks(collType,
+                           1 /* nChunks */,
+                           ChunkVersion({collType.getEpoch(), collType.getTimestamp()}, {0, 0}));
+
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, toConfigBSONVector(realChunk));
+
+    ASSERT_EQ(writeOrderObserver->writes().size(), 2u);
+    ASSERT_EQ(writeOrderObserver->writes()[0], NamespaceString::kConfigShardCatalogChunksNamespace);
+    ASSERT_EQ(writeOrderObserver->writes()[1],
+              NamespaceString::kConfigShardCatalogCollectionsNamespace);
+}
+
 TEST_F(CommitCollectionMetadataLocallyTest, ChunklessCollectionPersistsTokenToDisk) {
     auto [collType, chunks] = makeCollectionMetadata(0);
     mockCatalogClient()->setCollectionMetadata(collType, {});
@@ -418,7 +935,7 @@ TEST_F(CommitCollectionMetadataLocallyTest,
 TEST_F(CommitCollectionMetadataLocallyTest, CommitChunklessPreservesCSRWithOwnedChunks) {
     auto [collType1, chunks] = makeCollectionMetadata(2);
     for (auto& chunk : chunks) {
-        chunk.setShard(ShardingState::get(operationContext())->shardId());
+        chunk.setShard(kThisShard);
     }
     mockCatalogClient()->setCollectionMetadata(collType1, chunks);
     shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss, false);
@@ -567,7 +1084,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, DropCollectionOnlyDeletesTargetColle
         const Timestamp ts(Date_t::now());
         CollectionType coll{otherNss, epoch, ts, Date_t::now(), uuid, kShardKeyPattern};
         ChunkType chunk(uuid,
-                        ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
+                        ChunkRange(key(MINKEY), key(MAXKEY)),
                         ChunkVersion({epoch, ts}, {1, 0}),
                         ShardId("0"));
         chunk.setName(OID::gen());
