@@ -72,11 +72,9 @@ StageConstraints DocumentSourceExtensionForQueryShape::constraints(
 
 Value DocumentSourceExtensionForQueryShape::serialize(
     const query_shape::SerializationOptions& opts) const {
-    tassert(10978000,
-            "query_shape::SerializationOptions should change literals while represented as a "
-            "DocumentSourceExtensionForQueryShape",
-            !opts.isKeepingLiteralsUnchanged());
-
+    // TODO SERVER-129346 Ideally we should tassert here that literals are being changed, but we
+    // cannot because hybrid search desugars when running against query stats. Restore the tassert
+    // when hybrid search can compute query shape without desugaring.
     host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
     return Value(_parseNode->getQueryShape(adapter));
 }

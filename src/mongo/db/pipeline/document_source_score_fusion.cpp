@@ -128,6 +128,8 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceScoreFusion::creat
             combinationSpec->getWeights()->getOwned(), inputPipelines, kStageName);
     }
 
+    // TODO SERVER-129346 This should create a DocumentSourceScoreFusion that simply computes query
+    // shape.
     ScoreFusionPipelineBuilder builder(spec, weights);
     return builder.constructDesugaredOutput(inputPipelines, pExpCtx);
 }

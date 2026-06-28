@@ -38,7 +38,6 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
-#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -65,17 +64,29 @@ protected:
         sdk::shared_test_stages::TransformAggStageDescriptor::make()};
 };
 
-using DocumentSourceExtensionForQueryShapeTestDeathTest = DocumentSourceExtensionForQueryShapeTest;
-DEATH_TEST_F(DocumentSourceExtensionForQueryShapeTestDeathTest,
-             SerializeWithWrongOptsFails,
-             "10978000") {
+TEST_F(DocumentSourceExtensionForQueryShapeTest, SerializeWithDefaultOptsRoundTrips) {
     auto rawStage = BSON(sdk::shared_test_stages::TransformAggStageDescriptor::kStageName
                          << BSON("foo" << true));
 
     auto expandable = host::DocumentSourceExtensionForQueryShape::create(
         getExpCtx(), rawStage, AggStageDescriptorHandle(&_transformStageDescriptor));
 
-    [[maybe_unused]] auto serialized = expandable->serialize(query_shape::SerializationOptions{});
+    auto serialized = expandable->serialize(query_shape::SerializationOptions{});
+    ASSERT_BSONOBJ_EQ(serialized.getDocument().toBson(), rawStage);
+}
+
+// Serializing for query stats (literals abstracted to debug type strings) must also succeed and
+// delegate to the parse node's query shape generation without tripping a tripwire.
+TEST_F(DocumentSourceExtensionForQueryShapeTest, SerializeForQueryStatsSucceeds) {
+    auto rawStage = BSON(sdk::shared_test_stages::TransformAggStageDescriptor::kStageName
+                         << BSON("foo" << true));
+
+    auto expandable = host::DocumentSourceExtensionForQueryShape::create(
+        getExpCtx(), rawStage, AggStageDescriptorHandle(&_transformStageDescriptor));
+
+    auto serialized =
+        expandable->serialize(query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions);
+    ASSERT_FALSE(serialized.getDocument().toBson().isEmpty());
 }
 
 }  // namespace mongo::extension

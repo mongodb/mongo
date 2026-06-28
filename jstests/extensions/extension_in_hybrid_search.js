@@ -155,4 +155,71 @@ describe("extension stages inside hybrid search input pipelines", function () {
             "$nativeVectorSearch",
         );
     });
+
+    it("rejects a multi-stage non-selection extension in a $scoreFusion input pipeline", function () {
+        assertRejectedAsNonSelection(
+            [
+                {
+                    $scoreFusion: {
+                        input: {
+                            pipelines: {
+                                a: [
+                                    nativeVectorSearchStage,
+                                    {$score: {score: "$x", normalization: "minMaxScaler"}},
+                                ],
+                                b: [{$score: {score: "$y", normalization: "minMaxScaler"}}],
+                            },
+                            normalization: "none",
+                        },
+                        combination: {method: "avg"},
+                    },
+                },
+            ],
+            12108713,
+            "$nativeVectorSearch",
+        );
+    });
+
+    it("allows selection extensions in all $scoreFusion input pipelines simultaneously", function () {
+        const res = coll
+            .aggregate([
+                {
+                    $scoreFusion: {
+                        input: {
+                            pipelines: {
+                                a: [
+                                    {
+                                        $matchTopN: {
+                                            filter: {x: {$gt: 2}},
+                                            sort: {x: -1},
+                                            limit: 3,
+                                        },
+                                    },
+                                    {$score: {score: "$x", normalization: "minMaxScaler"}},
+                                ],
+                                b: [
+                                    {
+                                        $matchTopN: {
+                                            filter: {y: {$gt: 20}},
+                                            sort: {y: -1},
+                                            limit: 3,
+                                        },
+                                    },
+                                    {$score: {score: "$y", normalization: "minMaxScaler"}},
+                                ],
+                            },
+                            normalization: "none",
+                        },
+                        combination: {method: "avg"},
+                    },
+                },
+            ])
+            .toArray();
+        assert.gt(
+            res.length,
+            0,
+            "expected some documents when both $scoreFusion pipelines contain $matchTopN",
+            {res},
+        );
+    });
 });
