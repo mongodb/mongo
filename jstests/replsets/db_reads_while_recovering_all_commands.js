@@ -143,7 +143,6 @@ const allCommands = {
     _shardsvrRefineCollectionShardKey: {skip: isPrimaryOnly},
     _shardsvrCommitRefineCollectionShardKey: {skip: isPrimaryOnly},
     _shardsvrCommitCollModCollectionMetadata: {skip: isPrimaryOnly},
-    _shardsvrCommitChunkOperationsMetadata: {skip: isPrimaryOnly},
     _shardsvrCommitDropCollectionMetadata: {skip: isPrimaryOnly},
     _shardsvrCommitCreateCollectionMetadata: {skip: isPrimaryOnly},
     _shardsvrCommitCreateCollectionChunklessMetadata: {skip: isPrimaryOnly},

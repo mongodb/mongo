@@ -1165,39 +1165,6 @@ void commitCreateCollectionChunklessMetadataToShardCatalog(
     sendAuthenticatedCommandToShards(opCtx, opts, shardRefs);
 }
 
-void commitChunkOperationsMetadataToShardCatalog(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const std::vector<ChunkType>& newChunks,
-    const std::vector<ShardRef>& shardRefs,
-    const OperationSessionInfo& osi,
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& token) {
-    ShardsvrCommitChunkOperationsMetadata request(nss);
-    request.setDbName(DatabaseName::kAdmin);
-
-    std::vector<BSONObj> newChunkDocs;
-    newChunkDocs.reserve(newChunks.size());
-    for (const auto& chunk : newChunks) {
-        newChunkDocs.push_back(chunk.toConfigBSON());
-    }
-    request.setNewChunks(std::move(newChunkDocs));
-
-    generic_argument_util::setMajorityWriteConcern(request);
-    generic_argument_util::setOperationSessionInfo(request, osi);
-
-    const auto requestSize = request.toBSON().objsize();
-    tassert(12698804,
-            str::stream() << "Commit chunk operations request size " << requestSize
-                          << " exceeds maximum BSON object size " << BSONObjMaxUserSize,
-            requestSize <= BSONObjMaxUserSize);
-
-    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrCommitChunkOperationsMetadata>>(
-        **executor, token, std::move(request));
-
-    sendAuthenticatedCommandToShards(opCtx, opts, shardRefs);
-}
-
 AuthoritativeMetadataAccessLevelEnum getGrantedAuthoritativeMetadataAccessLevel(
     const VersionContext& vCtx, const ServerGlobalParams::FCVSnapshot& snapshot) {
     const bool isAuthoritativeDDLEnabled =

@@ -1270,20 +1270,3 @@ commands:
         reply_type: OkReply
         chained_structs:
             SetAllowChunkOperationsFields: SetAllowChunkOperationsFields
-
-    _shardsvrCommitChunkOperationsMetadata:
-        command_name: _shardsvrCommitChunkOperationsMetadata
-        cpp_name: ShardsvrCommitChunkOperationsMetadata
-        description: "Internal command to commit chunk operations metadata into the shard catalog."
-        strict: false
-        namespace: type
-        type: namespacestring
-        api_version: ""
-        fields:
-            newChunks:
-                type: array<object_owned>
-                description:
-                    "Chunk documents to insert into the shard catalog. The shard reconciles overlaps
-                    with pre-existing chunks locally, splitting or removing them so the durable
-                    catalog stays contiguous and non-overlapping."
-        reply_type: OkReply
