@@ -222,4 +222,29 @@ describe("extension stages inside hybrid search input pipelines", function () {
             {res},
         );
     });
+
+    it("allows selection extensions in all $rankFusion input pipelines simultaneously", function () {
+        const res = coll
+            .aggregate([
+                {
+                    $rankFusion: {
+                        input: {
+                            pipelines: {
+                                a: [{$matchTopN: {filter: {x: {$gt: 2}}, sort: {x: -1}, limit: 3}}],
+                                b: [
+                                    {$matchTopN: {filter: {y: {$gt: 20}}, sort: {y: -1}, limit: 3}},
+                                ],
+                            },
+                        },
+                    },
+                },
+            ])
+            .toArray();
+        assert.gt(
+            res.length,
+            0,
+            "expected some documents when both $rankFusion pipelines contain $matchTopN",
+            {res},
+        );
+    });
 });
