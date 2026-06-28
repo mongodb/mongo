@@ -348,6 +348,10 @@ public:
         return Status::OK();
     }
 
+    Timestamp getCachedEarliestTimestamp() const override {
+        return Timestamp();
+    }
+
 private:
     int64_t _maxSize;
 };

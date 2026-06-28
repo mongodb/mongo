@@ -45,8 +45,6 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/write_ops/write_ops.h"
@@ -346,25 +344,7 @@ public:
                 return Timestamp();
             }
 
-            // Try getting earliest oplog timestamp using getEarliestOplogTimestamp
-            auto swEarliestOplogTimestamp =
-                oplogCollection->getRecordStore()->oplog()->getEarliestTimestamp(
-                    *shard_role_details::getRecoveryUnit(opCtx));
-
-            if (swEarliestOplogTimestamp.getStatus() == ErrorCodes::OplogOperationUnsupported) {
-                // Falling back to use getSingleton if the storage engine does not support
-                // getEarliestOplogTimestamp.
-                // Note that getSingleton will take a global IS lock, but this won't block because
-                // we are already holding the global IS lock.
-                BSONObj o;
-                if (Helpers::getSingleton(opCtx, NamespaceString::kRsOplogNamespace, o)) {
-                    return o["ts"].timestamp();
-                }
-            }
-            if (!swEarliestOplogTimestamp.isOK()) {
-                return Timestamp();
-            }
-            return swEarliestOplogTimestamp.getValue();
+            return oplogCollection->getRecordStore()->oplog()->getCachedEarliestTimestamp();
         }();
 
         result.append("earliestOptime", earliestOplogTimestampFetch);

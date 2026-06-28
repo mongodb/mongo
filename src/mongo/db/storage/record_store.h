@@ -764,6 +764,12 @@ public:
      * Unsupported RecordStores return the OplogOperationUnsupported error code.
      */
     virtual StatusWith<Timestamp> getEarliestTimestamp(RecoveryUnit&) = 0;
+
+    /**
+     * Returns the last value successfully returned by getEarliestTimestamp(), or an empty
+     * Timestamp if getEarliestTimestamp() has not yet succeeded. Never performs storage I/O.
+     */
+    virtual Timestamp getCachedEarliestTimestamp() const = 0;
 };
 
 }  // namespace mongo

@@ -1488,6 +1488,26 @@ RecordStore::Capped::TruncateAfterResult WiredTigerRecordStore::Capped::_truncat
 void WiredTigerRecordStore::Capped::_handleTruncateAfter(WiredTigerRecoveryUnit&,
                                                          const RecordId& lastKeptId) {}
 
+Status WiredTigerRecordStore::Oplog::_rangeTruncate(OperationContext* opCtx,
+                                                    RecoveryUnit& ru,
+                                                    const RecordId& minRecordId,
+                                                    const RecordId& maxRecordId,
+                                                    int64_t hintDataSizeIncrement,
+                                                    int64_t hintNumRecordsIncrement) {
+    auto status = WiredTigerRecordStore::_rangeTruncate(
+        opCtx, ru, minRecordId, maxRecordId, hintDataSizeIncrement, hintNumRecordsIncrement);
+    if (status.isOK()) {
+        auto swTs = _readEarliestTimestamp(ru);
+        if (swTs.isOK()) {
+            ru.onCommit(
+                [this, ts = swTs.getValue()](OperationContext*, boost::optional<Timestamp>) {
+                    _cachedEarliestTimestamp.store(ts.asULL());
+                });
+        }
+    }
+    return status;
+}
+
 void WiredTigerRecordStore::Oplog::_handleTruncateAfter(WiredTigerRecoveryUnit& ru,
                                                         const RecordId& lastKeptId) {
     // Immediately rewind visibility to our truncation point, to prevent new
@@ -1526,6 +1546,9 @@ WiredTigerRecordStore::Oplog::Oplog(WiredTigerKVEngine* engine,
     // may change during replication recovery (if truncated).
     sizeRecoveryState(getGlobalServiceContext())
         .markCollectionAsAlwaysNeedsSizeAdjustment(WiredTigerRecordStore::getIdent());
+
+    // Update the cached earliest oplog timestamp.
+    [[maybe_unused]] auto _ = getEarliestTimestamp(ru);
 }
 
 std::unique_ptr<SeekableRecordCursor> WiredTigerRecordStore::Oplog::getRawCursor(
@@ -1610,8 +1633,15 @@ StatusWith<Timestamp> WiredTigerRecordStore::Oplog::getLatestTimestamp(RecoveryU
     return {Timestamp(static_cast<unsigned long long>(recordId.getLong()))};
 }
 
-StatusWith<Timestamp> WiredTigerRecordStore::Oplog::getEarliestTimestamp(RecoveryUnit& ru) {
+StatusWith<Timestamp> WiredTigerRecordStore::Oplog::_readEarliestTimestamp(RecoveryUnit& ru) {
     auto wtRu = WiredTigerRecoveryUnit::get(&ru);
+
+    bool ruWasActive = wtRu->isActive();
+    ON_BLOCK_EXIT([&] {
+        if (!ruWasActive) {
+            wtRu->abandonSnapshot();
+        }
+    });
 
     auto cursorParams = getWiredTigerCursorParams(*wtRu, tableId(), /*allowOverwrite=*/true);
     WiredTigerCursor curwrap(std::move(cursorParams), getURI(), *wtRu->getSession());
@@ -1625,6 +1655,18 @@ StatusWith<Timestamp> WiredTigerRecordStore::Oplog::getEarliestTimestamp(Recover
 
     auto firstRecord = getKey(cursor, KeyFormat::Long);
     return Timestamp(static_cast<uint64_t>(firstRecord.getLong()));
+}
+
+StatusWith<Timestamp> WiredTigerRecordStore::Oplog::getEarliestTimestamp(RecoveryUnit& ru) {
+    auto swTs = _readEarliestTimestamp(ru);
+    if (swTs.isOK()) {
+        _cachedEarliestTimestamp.store(swTs.getValue().asULL());
+    }
+    return swTs;
+}
+
+Timestamp WiredTigerRecordStore::Oplog::getCachedEarliestTimestamp() const {
+    return Timestamp(_cachedEarliestTimestamp.load());
 }
 
 Status WiredTigerRecordStore::Oplog::_insertRecords(OperationContext* opCtx,

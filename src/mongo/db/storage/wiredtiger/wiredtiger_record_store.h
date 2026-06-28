@@ -487,15 +487,27 @@ public:
 
     StatusWith<Timestamp> getEarliestTimestamp(RecoveryUnit&) override;
 
+    Timestamp getCachedEarliestTimestamp() const override;
+
 private:
     Status _insertRecords(OperationContext*,
                           RecoveryUnit&,
                           std::vector<Record>*,
                           const std::vector<Timestamp>&) override;
 
+    Status _rangeTruncate(OperationContext*,
+                          RecoveryUnit&,
+                          const RecordId& minRecordId = RecordId(),
+                          const RecordId& maxRecordId = RecordId(),
+                          int64_t hintDataSizeIncrement = 0,
+                          int64_t hintNumRecordsIncrement = 0) override;
+
     void _handleTruncateAfter(WiredTigerRecoveryUnit&, const RecordId& lastKeptId) override;
 
+    StatusWith<Timestamp> _readEarliestTimestamp(RecoveryUnit&);
+
     AtomicWord<int64_t> _maxSize;
+    AtomicWord<uint64_t> _cachedEarliestTimestamp{0};
 };
 
 class WiredTigerRecordStoreCursorBase : public SeekableRecordCursor {

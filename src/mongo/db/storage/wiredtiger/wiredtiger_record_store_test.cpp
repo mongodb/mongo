@@ -556,6 +556,62 @@ TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
     ASSERT_EQ(tsThree, wtRS->getLatestTimestamp(ru1));
 }
 
+TEST(WiredTigerRecordStoreTest, CachedEarliestOplogTimestamp) {
+    std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
+    auto engine = harnessHelper->getEngine();
+
+    auto wtRS = checked_cast<WiredTigerRecordStore::Oplog*>(rs.get());
+
+    ServiceContext::UniqueOperationContext op(harnessHelper->newOperationContext());
+    auto& ru = *shard_role_details::getRecoveryUnit(op.get());
+
+    // Insert three entries: ts1, ts2, ts3.
+    RecordId rid1, rid2;
+    Timestamp ts1 = [&] {
+        StorageWriteTransaction txn(ru);
+        rid1 = oplogOrderInsertOplog(op.get(), engine, rs, 1);
+        Timestamp ts(static_cast<unsigned long long>(rid1.getLong()));
+        txn.commit();
+        return ts;
+    }();
+    Timestamp ts2 = [&] {
+        StorageWriteTransaction txn(ru);
+        rid2 = oplogOrderInsertOplog(op.get(), engine, rs, 2);
+        Timestamp ts(static_cast<unsigned long long>(rid2.getLong()));
+        txn.commit();
+        return ts;
+    }();
+    {
+        StorageWriteTransaction txn(ru);
+        oplogOrderInsertOplog(op.get(), engine, rs, 3);
+        txn.commit();
+    }
+
+    // Cache starts null; getEarliestTimestamp() populates it.
+    ASSERT_TRUE(wtRS->getCachedEarliestTimestamp().isNull());
+    auto swTs = wtRS->getEarliestTimestamp(ru);
+    ASSERT_OK(swTs);
+    ASSERT_EQ(ts1, swTs.getValue());
+    ASSERT_EQ(ts1, wtRS->getCachedEarliestTimestamp());
+
+    // Committed truncation updates the cache.
+    {
+        StorageWriteTransaction txn(ru);
+        ASSERT_OK(wtRS->rangeTruncate(op.get(), ru, RecordId(), rid1, 0, -1));
+        txn.commit();
+    }
+    ASSERT_EQ(ts2, wtRS->getCachedEarliestTimestamp());
+
+    // Rolled-back truncation does not change the cache.
+    {
+        StorageWriteTransaction txn(ru);
+        ASSERT_OK(wtRS->rangeTruncate(op.get(), ru, RecordId(), rid2, 0, -1));
+        txn.abort();
+    }
+    ASSERT_EQ(ts2, wtRS->getCachedEarliestTimestamp());
+}
+
 TEST(WiredTigerRecordStoreTest, OplogDestructorAutomaticallyStopsOplogManager) {
     auto harnessHelper = newRecordStoreHarnessHelper();
     auto oplogManager =
