@@ -657,6 +657,7 @@ mongo_cc_unit_test(
         "query_planner_tree_test.cpp",
         "query_planner_wildcard_index_test.cpp",
         "//src/mongo/db/query/plan_ranking:cbr_for_no_mp_results_test.cpp",
+        "//src/mongo/db/query/plan_ranking:cost_based_plan_ranking_test.cpp",
         "//src/mongo/db/query/plan_ranking:plan_ranker_short_circuit_test.cpp",
     ],
     data = [

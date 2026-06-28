@@ -34,12 +34,16 @@
 #include "mongo/db/exec/runtime_planners/planner_interface.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/query_planner.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 
 #include <memory>
 #include <utility>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace plan_ranking {
@@ -153,6 +157,32 @@ MultipleCollectionAccessor PlanRankingTestFixture::getCollsAccessor() {
     auto coll = getCollection();
     return MultipleCollectionAccessor(
         std::move(coll), {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+}
+
+StatusWith<PlanRankingResult> PlanRankingTestFixture::planAndRank(PlanRankingStrategy& strategy,
+                                                                  PlannerData& plannerData) {
+    auto& query = *plannerData.cq;
+    const auto& plannerParams = *plannerData.plannerParams;
+
+    auto topLevelSampleFieldNames =
+        ce::extractTopLevelFieldsFromMatchExpression(query.getPrimaryMatchExpression());
+    bool hasRelevantMultikeyIndex = false;
+    auto statusWithMultiPlanSolns =
+        QueryPlanner::plan(query,
+                           plannerParams,
+                           topLevelSampleFieldNames,
+                           boost::optional<bool&>(hasRelevantMultikeyIndex));
+    if (!statusWithMultiPlanSolns.isOK()) {
+        return statusWithMultiPlanSolns.getStatus().withContext(
+            str::stream() << "error processing query: " << query.toStringForErrorMsg()
+                          << " planner returned error");
+    }
+    auto solutions = std::move(statusWithMultiPlanSolns.getValue());
+
+    RankingContext rctx{.solutions = std::move(solutions),
+                        .topLevelSampleFieldNames = std::move(topLevelSampleFieldNames),
+                        .hasRelevantMultikeyIndex = hasRelevantMultikeyIndex};
+    return strategy.rankPlans(plannerData, rctx);
 }
 
 }  // namespace plan_ranking

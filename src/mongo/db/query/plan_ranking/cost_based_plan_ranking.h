@@ -32,6 +32,7 @@
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/exec/runtime_planners/planner_interface.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/plan_ranking/cbr_plan_ranking.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner.h"
@@ -39,6 +40,10 @@
 #include "mongo/util/modules.h"
 
 namespace mongo::plan_ranking {
+
+// TODO SERVER-115642 Implement a complete cost model for sampling CE
+cost_based_ranker::CostEstimate estimateCBRCost(
+    const CanonicalQuery& query, const std::vector<std::unique_ptr<QuerySolution>>& solutions);
 
 // SERVER-118020: Investigate a more distinctive name to contrast with CBRPlanRankingStrategy
 class CostBasedPlanRankingStrategy : public PlanRankingStrategy {

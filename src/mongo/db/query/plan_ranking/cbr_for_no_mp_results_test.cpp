@@ -28,11 +28,9 @@
  */
 #include "mongo/db/query/plan_ranking/cbr_for_no_mp_results.h"
 
-#include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/stats/collection_statistics_impl.h"
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
 #include "mongo/db/query/plan_ranking/plan_ranking_test_fixture.h"
-#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/unittest.h"
@@ -69,33 +67,6 @@ public:
         return res;
     }
 };
-
-StatusWith<PlanRankingResult> planAndRank(plan_ranking::PlanRankingStrategy& strategy,
-                                          PlannerData& plannerData) {
-    auto& query = *plannerData.cq;
-    const auto& plannerParams = *plannerData.plannerParams;
-
-    auto topLevelSampleFieldNames =
-        ce::extractTopLevelFieldsFromMatchExpression(query.getPrimaryMatchExpression());
-    bool hasRelevantMultikeyIndex = false;
-    auto statusWithMultiPlanSolns =
-        QueryPlanner::plan(query,
-                           plannerParams,
-                           topLevelSampleFieldNames,
-                           boost::optional<bool&>(hasRelevantMultikeyIndex));
-    if (!statusWithMultiPlanSolns.isOK()) {
-        return statusWithMultiPlanSolns.getStatus().withContext(
-            str::stream() << "error processing query: " << query.toStringForErrorMsg()
-                          << " planner returned error");
-    }
-    auto solutions = std::move(statusWithMultiPlanSolns.getValue());
-
-    plan_ranking::RankingContext rctx{.solutions = std::move(solutions),
-                                      .topLevelSampleFieldNames =
-                                          std::move(topLevelSampleFieldNames),
-                                      .hasRelevantMultikeyIndex = hasRelevantMultikeyIndex};
-    return strategy.rankPlans(plannerData, rctx);
-}
 
 TEST_F(CBRForNoMPResultsTest, SingleSolutionDoesNotUseMultiPlanner) {
     insertNDocuments(10);
@@ -228,10 +199,14 @@ TEST_F(CBRForNoMPResultsTest, LittleResultsMultiPlannerMakesADecisionWithoutCBR)
     ASSERT_TRUE(status.getValue().execState);
 }
 
+// Large collection (7000 docs): remaining MP cost after the capped trial exceeds CBR cost,
+// so the strategy switches to CBR. With 2000 remaining works per plan
+// (7000 - cappedWorksPerPlan=5000), remMPCost > cbrCost (break-even ~420 remaining works).
 TEST_F(CBRForNoMPResultsTest, NoResultsMultiPlannerUsesCBR) {
     createIndexOnEmptyCollection(operationContext(), BSON("a" << 1), "a_1");
     createIndexOnEmptyCollection(operationContext(), BSON("b" << 1), "b_1");
-    insertNDocuments(5001);
+    constexpr size_t collSize = 7000;
+    insertNDocuments(collSize);
     auto colls = getCollsAccessor();
 
     auto [cq, plannerData] =
@@ -241,7 +216,7 @@ TEST_F(CBRForNoMPResultsTest, NoResultsMultiPlannerUsesCBR) {
     plannerData.plannerParams =
         makePlannerParams({.indices = indices,
                            .collStats = std::make_unique<stats::CollectionStatisticsImpl>(
-                               static_cast<double>(5001), kNss)});
+                               static_cast<double>(collSize), kNss)});
 
     CBRForNoMPResultsStrategySpy strategy;
     auto status = planAndRank(strategy, plannerData);
@@ -261,7 +236,9 @@ TEST_F(CBRForNoMPResultsTest, NoResultsMultiPlannerUsesCBR) {
     ASSERT_TRUE(stats->earlyExit);
     ASSERT_EQ(stats->numResultsFound, 0);
     ASSERT_EQ(stats->numCandidatePlans, 2);
-    ASSERT_EQ(stats->totalWorks, 10001);
+    // Capped trial: 5000 works × 2 plans = 10000. Second trial (CBR winner only): 2000 works
+    // to EOF (7000 - 5000 already scanned). Total: 12000.
+    ASSERT_EQ(stats->totalWorks, 12000);
     ASSERT_EQ(status.getValue().needsWorksMeasuredForPlanCache, true);
 
     ASSERT_TRUE(status.getValue().execState);
@@ -274,7 +251,8 @@ TEST_F(CBRForNoMPResultsTest, NoResultsMultiPlannerUsesCBR) {
 TEST_F(CBRForNoMPResultsTest, NoResultsMultiPlannerUsesCBRWithoutExplain) {
     createIndexOnEmptyCollection(operationContext(), BSON("a" << 1), "a_1");
     createIndexOnEmptyCollection(operationContext(), BSON("b" << 1), "b_1");
-    insertNDocuments(5001);
+    constexpr size_t collSize = 7000;
+    insertNDocuments(collSize);
     auto colls = getCollsAccessor();
 
     auto [cq, plannerData] =
@@ -285,7 +263,7 @@ TEST_F(CBRForNoMPResultsTest, NoResultsMultiPlannerUsesCBRWithoutExplain) {
     plannerData.plannerParams =
         makePlannerParams({.indices = indices,
                            .collStats = std::make_unique<stats::CollectionStatisticsImpl>(
-                               static_cast<double>(5001), kNss)});
+                               static_cast<double>(collSize), kNss)});
 
     CBRForNoMPResultsStrategySpy strategy;
     auto status = planAndRank(strategy, plannerData);
@@ -304,6 +282,40 @@ TEST_F(CBRForNoMPResultsTest, NoResultsMultiPlannerUsesCBRWithoutExplain) {
     ASSERT_TRUE(mp);
 }
 
+// Small collection (5100 docs): remaining MP cost after the capped trial is cheaper than CBR,
+// so the strategy stays with the multiplanner. With only 100 remaining works per plan
+// (5100 - cappedWorksPerPlan = 5000), remMPCost < cbrCost (break-even ~420 remaining works).
+TEST_F(CBRForNoMPResultsTest, NoResultsSmallCollectionUsesMultiplanner) {
+    createIndexOnEmptyCollection(operationContext(), BSON("a" << 1), "a_1");
+    createIndexOnEmptyCollection(operationContext(), BSON("b" << 1), "b_1");
+    insertNDocuments(5100);
+    auto colls = getCollsAccessor();
+
+    auto [cq, plannerData] =
+        createCQAndPlannerData(colls, BSON("a" << GT << 0 << "b" << GT << 0 << "c" << -1));
+
+    plannerData.plannerParams = makePlannerParams({.indices = indices});
+    CBRForNoMPResultsStrategySpy strategy;
+    auto status = planAndRank(strategy, plannerData);
+    ASSERT_OK(status.getStatus());
+    ASSERT_EQ(status.getValue().solutions.size(), 1);
+    auto& explainData = status.getValue().maybeExplainData.value();
+    ASSERT_EQ(explainData.rejectedPlansWithStages.size(), 1);
+    ASSERT_EQ(explainData.estimates.size(), 0);
+    ASSERT_FALSE(explainData.rejectedPlansWithStages[0].solution == nullptr);
+    auto rejectedPlanStats = explainData.rejectedPlansWithStages[0].planStage->getStats();
+    ASSERT_EQ(rejectedPlanStats->common.works, 5100);
+    ASSERT_EQ(rejectedPlanStats->common.advanced, 0);
+    ASSERT_TRUE(strategy.getMultiPlanner().has_value());
+    auto stats = strategy.getMultiPlanner()->getSpecificStats();
+    ASSERT_TRUE(stats->earlyExit);
+    ASSERT_EQ(stats->numResultsFound, 0);
+    ASSERT_EQ(stats->numCandidatePlans, 2);
+    ASSERT_EQ(stats->totalWorks, 10200);
+    ASSERT_EQ(status.getValue().needsWorksMeasuredForPlanCache, false);
+    ASSERT_TRUE(status.getValue().execState);
+}
+
 TEST_F(CBRForNoMPResultsTest, CBRCannotDecideUsesMultiPlanner) {
     createIndexOnEmptyCollection(operationContext(), BSON("a" << 1), "a_1");
     createIndexOnEmptyCollection(operationContext(), BSON("b" << 1), "b_1");
@@ -312,8 +324,8 @@ TEST_F(CBRForNoMPResultsTest, CBRCannotDecideUsesMultiPlanner) {
                                  "c_1",
                                  BSON("partialFilterExpression" << BSON("b" << GTE << 0)));
 
-    // Insert documents into the collection
-    // Note that this makes b_1 the CBR loser
+    // Insert documents into the collection.
+    // Note that this makes the plan with b_1 index the CBR loser.
     {
         std::vector<BSONObj> docs;
         for (int i = 0; i < 1000; i++) {
@@ -341,7 +353,7 @@ TEST_F(CBRForNoMPResultsTest, CBRCannotDecideUsesMultiPlanner) {
     plannerData.plannerParams =
         makePlannerParams({.indices = indices,
                            .collStats = std::make_unique<stats::CollectionStatisticsImpl>(
-                               static_cast<double>(5001), kNss)});
+                               static_cast<double>(11001), kNss)});
 
     CBRForNoMPResultsStrategySpy strategy;
     auto status = planAndRank(strategy, plannerData);
@@ -385,7 +397,8 @@ TEST_F(CBRForNoMPResultsTest, CBRCannotDecideUsesMultiPlanner) {
 TEST_F(CBRForNoMPResultsTest, MPPicksBlockingSortAndEOFs) {
     createIndexOnEmptyCollection(operationContext(), BSON("a" << 1), "a_1");
     createIndexOnEmptyCollection(operationContext(), BSON("b" << 1), "b_1");
-    insertNDocuments(10);
+    constexpr size_t collSize = 10;
+    insertNDocuments(collSize);
     auto colls = getCollsAccessor();
 
     auto [cq, plannerData] =
@@ -396,7 +409,7 @@ TEST_F(CBRForNoMPResultsTest, MPPicksBlockingSortAndEOFs) {
     plannerData.plannerParams =
         makePlannerParams({.indices = indices,
                            .collStats = std::make_unique<stats::CollectionStatisticsImpl>(
-                               static_cast<double>(5001), kNss)});
+                               static_cast<double>(collSize), kNss)});
     CBRForNoMPResultsStrategySpy strategy;
     auto status = planAndRank(strategy, plannerData);
     ASSERT_OK(status.getStatus());
