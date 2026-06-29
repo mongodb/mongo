@@ -72,20 +72,6 @@ server_parameters:
         default: 32767
         redact: false
 
-    searchTaskExecutorShutdownTimeoutMS:
-        description: <-
-            Maximum time, in milliseconds, that server shutdown will wait for outstanding references
-            to the mongot and search-index-management task executors to be released before
-            proceeding anyway. Outstanding references may be held by in-progress or idle
-            $search/$vectorSearch/$searchMeta cursors. A value of 0 means wait forever, which can
-            hang shutdown indefinitely.
-        set_at: [startup, runtime]
-        cpp_varname: "globalMongotParams.shutdownTimeoutMS"
-        validator:
-            gte: 0
-        default: 60000
-        redact: false
-
     useGrpcForSearch:
         description: Configures whether or not shards should communicate with mongot using gRPC.
         set_at: [startup]

@@ -217,16 +217,6 @@ public:
     std::size_t numCursors() const;
 
     /**
-     * Disposes of every idle (non-pinned) cursor registered with this manager, returning the number
-     * disposed. Intended to be called once during shutdown (after operations are killed) so cursors
-     * release the resources they hold - notably the references $search cursors keep to the mongot
-     * task executors. Cursors still pinned by an in-progress operation are skipped; those
-     * operations have already been interrupted by setKillAllOperations() and will clean up their
-     * own cursors as they unwind.
-     */
-    std::size_t killAllCursorsForShutdown(OperationContext* opCtx);
-
-    /**
      * Kills cursors in this cursor manager with matching logical sessions. Returns a pair with the
      * overall Status of the operation and the number of cursors successfully killed.
      */

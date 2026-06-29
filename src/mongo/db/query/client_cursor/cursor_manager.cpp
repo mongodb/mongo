@@ -174,41 +174,6 @@ std::size_t CursorManager::timeoutCursors(OperationContext* opCtx, Date_t now) {
     return toDisposeWithoutMutex.size();
 }
 
-std::size_t CursorManager::killAllCursorsForShutdown(OperationContext* opCtx) {
-    std::vector<std::unique_ptr<ClientCursor, ClientCursor::Deleter>> toDisposeWithoutMutex;
-
-    for (size_t partitionId = 0; partitionId < kNumPartitions; ++partitionId) {
-        auto lockedPartition = _cursorMap->lockOnePartitionById(partitionId);
-        for (auto it = lockedPartition->begin(); it != lockedPartition->end();) {
-            auto* cursor = it->second;
-            if (cursor->_operationUsingCursor) {
-                // Pinned by an in-progress operation. That operation has already been interrupted
-                // by setKillAllOperations(); skip the cursor and let the operation clean it up as
-                // it unwinds, otherwise we would dispose a cursor that is still in use.
-                ++it;
-                continue;
-            }
-            toDisposeWithoutMutex.emplace_back(cursor);
-            // Advance the iterator first since erasing from the lockedPartition will invalidate any
-            // references to it.
-            ++it;
-            removeCursorFromMap(lockedPartition, cursor);
-        }
-    }
-
-    // The partition lock is released before disposing of any cursors.
-    for (auto&& cursor : toDisposeWithoutMutex) {
-        cursor->dispose(opCtx, boost::none);
-    }
-
-    if (!toDisposeWithoutMutex.empty()) {
-        LOGV2(12984900,
-              "Disposed of idle cursors during shutdown",
-              "numDisposed"_attr = toDisposeWithoutMutex.size());
-    }
-    return toDisposeWithoutMutex.size();
-}
-
 std::vector<CursorId> CursorManager::getCursorIdsForNamespace(const NamespaceString& nss) {
     std::vector<CursorId> cursorIds;
 

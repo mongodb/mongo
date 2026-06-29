@@ -108,7 +108,6 @@
 #include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
 #include "mongo/db/profile_filter_impl.h"
 #include "mongo/db/query/client_cursor/clientcursor.h"
-#include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/compiler/stats/stats_cache_loader_impl.h"
 #include "mongo/db/query/compiler/stats/stats_catalog.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
@@ -1733,6 +1732,13 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         globalConnPool.shutdown();
     }
 
+    {
+        SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                       TimedSectionId::shutDownSearchTaskExecutors,
+                                       &shutdownTimeElapsedBuilder);
+        executor::shutdownSearchExecutorsIfNeeded(serviceContext);
+    }
+
     // Inform Flow Control to stop gating writes on ticket admission. This must be done before the
     // Periodic Runner is shut down (see SERVER-41751).
     if (auto flowControlTicketholder = FlowControlTicketholder::get(serviceContext)) {
@@ -1864,18 +1870,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
                                            &shutdownTimeElapsedBuilder);
             LOGV2_OPTIONS(4784913, {LogComponent::kCommand}, "Shutting down all open transactions");
             killSessionsLocalShutdownAllTransactions(opCtx);
-        }
-
-        // Dispose idle cursors so they release their references to the search task executors before
-        // shutdownSearchExecutorsIfNeeded() below.
-        {
-            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                           TimedSectionId::shutDownSearchTaskExecutors,
-                                           &shutdownTimeElapsedBuilder);
-            if (auto cursorManager = CursorManager::get(serviceContext)) {
-                cursorManager->killAllCursorsForShutdown(opCtx);
-            }
-            executor::shutdownSearchExecutorsIfNeeded(serviceContext);
         }
 
         {

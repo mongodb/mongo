@@ -58,8 +58,6 @@ struct MONGO_MOD_PUB MongotParams {
     AtomicWord<int> minConnections;
     AtomicWord<int> maxConnections;
     transport::ConnectSSLMode sslMode;
-
-    AtomicWord<int> shutdownTimeoutMS;
 };
 
 MONGO_MOD_PUB extern MongotParams globalMongotParams;

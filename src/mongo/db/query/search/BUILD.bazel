@@ -245,17 +245,3 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context",
     ],
 )
-
-mongo_cc_unit_test(
-    name = "search_task_executors_shutdown_test",
-    srcs = [
-        "search_task_executors_shutdown_test.cpp",
-    ],
-    tags = ["mongo_unittest_second_group"],
-    deps = [
-        "mongot_options",
-        "search_task_executors",
-        "//src/mongo/db:service_context",
-        "//src/mongo/stdx",
-    ],
-)
