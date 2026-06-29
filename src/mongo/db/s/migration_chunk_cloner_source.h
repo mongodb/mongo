@@ -420,6 +420,10 @@ private:
     friend class LogTransactionOperationsForShardingHandler;
     friend class LogBatchedWriteForSessionMigrationHandler;
 
+    // Allows the unit test to exercise the deferred-xferMods reconciliation path, which is
+    // otherwise only reachable through the transaction op-observer handler.
+    friend class MigrationChunkClonerSourceTest;
+
     using RecordIdSet = std::set<RecordId>;
 
     /**

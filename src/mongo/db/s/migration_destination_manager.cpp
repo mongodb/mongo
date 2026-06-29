@@ -2089,16 +2089,22 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
                 }
             }
 
-            writeConflictRetry(opCtx, "transferModsDeletes", _nss, [&] {
-                deleteObjects(opCtx,
-                              collection,
-                              id,
-                              true /* justOne */,
-                              false /* god */,
-                              true /* fromMigrate */);
+            const auto numDeleted = writeConflictRetry(opCtx, "transferModsDeletes", _nss, [&] {
+                return deleteObjects(opCtx,
+                                     collection,
+                                     id,
+                                     true /* justOne */,
+                                     false /* god */,
+                                     true /* fromMigrate */);
             });
 
-            changeInOrphans--;
+            // Only adjust the orphan counter when a document was actually removed. The donor may
+            // legitimately send a delete for an _id that is no longer present on the recipient (for
+            // example a delete that is redundant with a deferred-update reconciliation), and
+            // decrementing for a no-op delete would corrupt the persisted orphan count.
+            if (numDeleted > 0) {
+                changeInOrphans--;
+            }
             didAnything = true;
         }
     }
