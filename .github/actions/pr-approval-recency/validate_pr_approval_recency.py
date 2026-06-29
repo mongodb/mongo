@@ -29,6 +29,7 @@
 """Validate that a PR's approvals still cover its most recent change (diff-aware)."""
 
 import datetime
+import json
 import logging
 import os
 import sys
@@ -74,9 +75,31 @@ REASON_TO_RESULT = {
 }
 
 
+REVIEW_JSON_MARKER = "POST_MERGE_REVIEW_JSON"
+
+
 def _status_for_reason(reason: str) -> int:
     """Exit code for a reason: 0 for pass reasons, 1 for fail/error reasons."""
     return STATUS_OK if REASON_TO_RESULT[reason] == RESULT_PASS else STATUS_ERROR
+
+
+def _build_review_json(metrics: Mapping) -> str:
+    """One-line JSON the codeowners-service worker parses out of the run log."""
+    reason = metrics.get("reason", "")
+    return json.dumps(
+        {
+            "org": metrics.get("org", ""),
+            "repo": metrics.get("repo", ""),
+            "pr_number": metrics.get("pr_number", 0),
+            "reason": reason,
+            "result": metrics.get("result", ""),
+            "needs_review": reason == REASON_CONTENT_CHANGED,
+            "head_sha": metrics.get("head_sha", ""),
+            "approval_sha": metrics.get("approval_sha", ""),
+            "changed_files": list(metrics.get("post_approval_changed_file_paths", [])),
+        },
+        separators=(",", ":"),
+    )
 
 
 # GitHub's API is intermittently flaky; PyGithub's GithubRetry retries with backoff.
@@ -271,6 +294,11 @@ def _check_approved_pr(repo: "Repository", pull: "PullRequest", metrics: Metrics
         metrics["was_restack"] = False
         metrics["post_approval_changed_files"] = changed_files
         metrics["post_approval_changed_loc"] = changed_loc
+        metrics["post_approval_changed_file_paths"] = sorted(
+            f
+            for f in set(approved_content.keys()) | set(current_content.keys())
+            if approved_content.get(f) != current_content.get(f)
+        )
         LOGGER.error(
             "This PR is fully approved, but the introduced code changed since the most "
             "recent approval (commit %s). The current code has not been reviewed; please "
@@ -329,9 +357,12 @@ def main() -> int:
         metrics["result"] = REASON_TO_RESULT[reason]
         if buildevent_file:
             try:
-                write_logfmt(buildevent_file, metrics)
+                write_logfmt(
+                    buildevent_file, {k: v for k, v in metrics.items() if not isinstance(v, list)}
+                )
             except OSError as exc:
                 LOGGER.error("Failed to write metrics to %s: %s", buildevent_file, exc)
+        LOGGER.info("%s %s", REVIEW_JSON_MARKER, _build_review_json(metrics))
         return _status_for_reason(reason)
 
     github_org = os.environ.get("GITHUB_ORG", "")
