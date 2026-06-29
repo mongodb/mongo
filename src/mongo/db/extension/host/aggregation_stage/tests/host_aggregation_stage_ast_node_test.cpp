@@ -130,58 +130,6 @@ TEST(HostAstNodeTest, IsNotHostAllocated) {
     ASSERT_FALSE(host::HostAggStageAstNodeAdapter::isHostAllocated(*handle.get()));
 }
 
-// TODO SERVER-123101: Move these death tests to host_aggregation_stage_death_test.cpp alongside the
-// other host adapter death tests (see host_aggregation_stage_death_test.cpp).
-DEATH_TEST(HostAstNodeVTableTestDeathTest, InvalidAstNodeVTableFailsGetName, "11217601") {
-    auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
-    vtable.get_name = nullptr;
-    AggStageAstNodeAPI::assertVTableConstraints(vtable);
-}
-
-DEATH_TEST(HostAstNodeVTableTestDeathTest, InvalidAstNodeVTableFailsGetProperties, "11347800") {
-    auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
-    vtable.get_properties = nullptr;
-    AggStageAstNodeAPI::assertVTableConstraints(vtable);
-}
-
-DEATH_TEST(HostAstNodeVTableTestDeathTest, InvalidAstNodeVTableFailsPromote, "11113700") {
-    auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
-    vtable.promote = nullptr;
-    AggStageAstNodeAPI::assertVTableConstraints(vtable);
-}
-
-DEATH_TEST(HostAstNodeVTableTestDeathTest,
-           InvalidAstNodeVTableFailsGetFirstStageViewApplicationPolicy,
-           "11507400") {
-    auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
-    vtable.get_first_stage_view_application_policy = nullptr;
-    AggStageAstNodeAPI::assertVTableConstraints(vtable);
-}
-
-DEATH_TEST(HostAstNodeVTableTestDeathTest,
-           InvalidAstNodeVTableFailsBindResolvedNamespace,
-           "11507500") {
-    auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
-    vtable.bind_resolved_namespace = nullptr;
-    AggStageAstNodeAPI::assertVTableConstraints(vtable);
-}
-
-DEATH_TEST(HostAstNodeTestDeathTest, HostGetPropertiesUnimplemented, "11347801") {
-    auto noOpAstNode = new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode());
-    auto handle = AggStageAstNodeHandle{noOpAstNode};
-
-    ::MongoExtensionByteBuf** buf = nullptr;
-    handle.get()->vtable->get_properties(noOpAstNode, buf);
-}
-
-DEATH_TEST(HostAstNodeTestDeathTest, HostPromoteUnimplemented, "11133600") {
-    auto noOpAstNode = new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode());
-    auto handle = AggStageAstNodeHandle{noOpAstNode};
-
-    ::MongoExtensionLogicalAggStage** bind = nullptr;
-    handle.get()->vtable->promote(noOpAstNode, nullptr, bind);
-}
-
 TEST(HostAstNodeCloneTest, CloneIdLookupPreservesNameAndType) {
     auto astNode = makeIdLookupAstNode();
     auto cloned = astNode->clone();

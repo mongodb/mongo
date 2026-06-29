@@ -32,7 +32,6 @@
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
 #include "mongo/db/extension/host/query_execution_context.h"
-#include "mongo/db/extension/host_connector/adapter/executable_agg_stage_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/query_execution_context_adapter.h"
 #include "mongo/db/extension/public/api.h"
@@ -522,44 +521,6 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest, NoSourceStageForTransformStage, "109
         std::make_unique<host::QueryExecutionContext>(expCtx.get()));
     // Call getNext() without setting a source.
     [[maybe_unused]] auto result = transformStage->getNext(&ctxAdapter, nullptr);
-}
-
-// TODO SERVER-123101: Move these death tests to host_aggregation_stage_death_test.cpp alongside the
-// other host adapter death tests (see host_aggregation_stage_death_test.cpp).
-DEATH_TEST_F(AggStageErrorFixtureDeathTest, HostExecAggStageAdapterNullStageAsserts, "10957207") {
-    [[maybe_unused]] auto adapter = host_connector::HostExecAggStageAdapter{nullptr};
-}
-
-DEATH_TEST_F(AggStageErrorFixtureDeathTest, SetSourceOnSourceStageFails, "10957210") {
-    // Setting the source of a source stage should fail irrespective of the type of the stage being
-    // set as the source.
-    auto sourceHandle =
-        extension::ExecAggStageHandle{new extension::sdk::ExtensionExecAggStageAdapter(
-            shared_test_stages::AddFruitsToDocumentsExecStage::make())};
-    // ValidExtensionExecAggStage is a source stage.
-    auto handle = extension::ExecAggStageHandle{new extension::sdk::ExtensionExecAggStageAdapter(
-        shared_test_stages::ValidExtensionExecAggStage::make())};
-
-    // Calling setSource on a source stage should fail.
-    handle->setSource(sourceHandle);
-}
-
-DEATH_TEST_F(AggStageErrorFixtureDeathTest, GetSourceOnSourceStageFails, "10957208") {
-
-    shared_test_stages::FruitsAsDocumentsExecStage sourceStage{};
-    // Calling getSource on a source stage should fail.
-    [[maybe_unused]] auto source = sourceStage._getSource();
-}
-
-DEATH_TEST_F(AggStageErrorFixtureDeathTest, GetNameOnMovedHandleFails, "10596403") {
-    auto sourceHandle =
-        extension::ExecAggStageHandle{new extension::sdk::ExtensionExecAggStageAdapter(
-            shared_test_stages::AddFruitsToDocumentsExecStage::make())};
-
-    auto sourceHandle2 = std::move(sourceHandle);
-
-    // Calling getName on a source handle should fail.
-    [[maybe_unused]] auto source = sourceHandle->getName();
 }
 
 }  // namespace
