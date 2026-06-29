@@ -227,11 +227,11 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
                                      const UUID& collUUID,
                                      const ChunkRange& range,
                                      const ChunkVersion& preMigrationChunkVersion) {
-    {
-        // TODO (SERVER-127444): Remove this and tassert with the feature flag.
-        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-        scopedCsr->setNonAuthoritative();
-    }
+    tassert(12598400,
+            "Legacy migration recovery must not run when shards are authoritative",
+            !feature_flags::gAuthoritativeShardsDDL.isEnabled(
+                kVersionContextIgnored_UNSAFE,
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     ConfigsvrEnsureChunkVersionIsGreaterThan ensureChunkVersionIsGreaterThanRequest;
     ensureChunkVersionIsGreaterThanRequest.setDbName(DatabaseName::kAdmin);

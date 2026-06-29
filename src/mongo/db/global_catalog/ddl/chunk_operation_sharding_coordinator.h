@@ -41,6 +41,12 @@ protected:
     void _checkSetAllowChunkOperations(OperationContext* opCtx, const NamespaceString& nss);
 };
 
+/**
+ * Asserts no chunk operation coordinator is running.
+ */
+// TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+MONGO_MOD_NEEDS_REPLACEMENT void assertNoChunkOperationCoordinatorsRunning(OperationContext* opCtx);
+
 template <typename StateDoc>
 class MONGO_MOD_UNFORTUNATELY_OPEN ChunkOperationShardingCoordinator
     : public RecoverableShardingCoordinator,

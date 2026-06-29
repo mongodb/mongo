@@ -49,6 +49,7 @@
 #include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/generic_argument_util.h"
+#include "mongo/db/global_catalog/ddl/chunk_operation_sharding_coordinator.h"
 #include "mongo/db/global_catalog/ddl/configsvr_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
@@ -673,13 +674,26 @@ public:
                 .beforeStartWithoutFCVLock(opCtx, originalVersion, requestedVersion);
 
             {
-                // On shard servers, drain any in-flight chunk operations and block new ones for
-                // the window in which we flip the local FCV document to the transitional state.
+                // Drain any in-flight chunk operations and block new ones for the window in which
+                // we flip the FCV document to the transitional state for Authoritative Shards.
                 // TODO (SERVER-98118): Remove this guard.
                 boost::optional<MigrationBlockingGuard> drainChunkOperations;
-                if (role && role->has(ClusterRole::ShardServer)) {
+                if (role && role->has(ClusterRole::ShardServer) &&
+                    (feature_flags::gAuthoritativeShardsDDL
+                         .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
+                                                                       originalVersion) ||
+                     feature_flags::gAuthoritativeShardsDDL
+                         .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
+                                                                       originalVersion))) {
                     drainChunkOperations.emplace(opCtx,
                                                  std::string{"setFeatureCompatibilityVersion"});
+
+                    // At this point, because we are holding the MigrationBlockingGuard, no new
+                    // migrations can start and there are no active ongoing ones. Still, there could
+                    // be migrations pending recovery. Drain them.
+                    migrationutil::drainMigrationsPendingRecovery(opCtx);
+                    migrationutil::assertNoMigrationsRemaining(opCtx);
+                    assertNoChunkOperationCoordinatorsRunning(opCtx);
                 }
 
                 // Start transition to 'requestedVersion' by updating the local FCV document to a

@@ -626,6 +626,18 @@ void drainMigrationsPendingRecovery(OperationContext* opCtx) {
     }
 }
 
+void assertNoMigrationsRemaining(OperationContext* opCtx) {
+    PersistentTaskStore<MigrationCoordinatorDocument> migrationCoordinators(
+        NamespaceString::kMigrationCoordinatorsNamespace);
+    tassert(12952700,
+            "Found migration coordinator documents on disk",
+            migrationCoordinators.count(opCtx) == 0);
+
+    tassert(12952702,
+            "Found ongoing migrations in the ActiveMigrationsRegistry",
+            ActiveMigrationsRegistry::get(opCtx).getActiveMigrationStatusReport(opCtx).isEmpty());
+}
+
 SemiFuture<void> asyncRecoverMigrationUntilSuccessOrStepDown(OperationContext* opCtx,
                                                              const NamespaceString& nss) {
     tassert(12795310,

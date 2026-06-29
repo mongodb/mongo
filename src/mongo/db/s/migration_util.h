@@ -204,7 +204,14 @@ MONGO_MOD_PUBLIC void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx)
  * Recovers all unfinished migrations pending recovery.
  * Note: This method assumes its caller is preventing new migrations from starting.
  */
-void drainMigrationsPendingRecovery(OperationContext* opCtx);
+// TODO (SERVER-98118): remove MONGO_MOD_NEEDS_REPLACEMENT once 9.0 becomes last LTS.
+MONGO_MOD_NEEDS_REPLACEMENT void drainMigrationsPendingRecovery(OperationContext* opCtx);
+
+/**
+ * Asserts no migration is in progress or pending recovery.
+ */
+// TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+MONGO_MOD_NEEDS_REPLACEMENT void assertNoMigrationsRemaining(OperationContext* opCtx);
 
 /**
  * Refreshes the filtering metadata for the given namespace from the config server, retrying until
