@@ -205,8 +205,6 @@ last-continuous:
       ticket: SERVER-128307
     - test_file: jstests/replsets/initial_sync_replSetGetStatus.js
       ticket: SERVER-121218
-    - test_file: jstests/replsets/server_status_metrics.js
-      ticket: SERVER-120318
     - test_file: jstests/noPassthrough/query/runtime_constants_user_roles_auth_bypass.js
       ticket: SERVER-128433
     - test_file: jstests/aggregation/expressions/expression_function.js
