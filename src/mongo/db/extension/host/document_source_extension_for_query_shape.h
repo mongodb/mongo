@@ -51,11 +51,15 @@ public:
             new DocumentSourceExtensionForQueryShape(expCtx, rawStage, staticDescriptor));
     }
 
-    // Needed by the StageParams -> DS map.
+    // Needed by the StageParams -> DS map. 'rawStage' is the original user-provided stage object,
+    // used to round-trip literal-preserving serialization.
     static boost::intrusive_ptr<DocumentSourceExtensionForQueryShape> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, AggStageParseNodeHandle parseNode) {
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        AggStageParseNodeHandle parseNode,
+        BSONObj rawStage) {
         return boost::intrusive_ptr<DocumentSourceExtensionForQueryShape>(
-            new DocumentSourceExtensionForQueryShape(expCtx, std::move(parseNode)));
+            new DocumentSourceExtensionForQueryShape(
+                expCtx, std::move(parseNode), std::move(rawStage)));
     }
 
     std::string_view getSourceName() const override {
@@ -87,21 +91,27 @@ public:
 
 protected:
     DocumentSourceExtensionForQueryShape(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         AggStageParseNodeHandle parseNode)
+                                         AggStageParseNodeHandle parseNode,
+                                         BSONObj rawStage)
         : DocumentSource(parseNode->getName(), expCtx),
           _stageName(std::string(parseNode->getName())),
-          _parseNode(std::move(parseNode)) {}
+          _parseNode(std::move(parseNode)),
+          _rawStage(rawStage.getOwned()) {}
 
 private:
     const std::string _stageName;
     const AggStageParseNodeHandle _parseNode;
+    // The original user-provided stage object, returned verbatim by literal-preserving
+    // serialization (e.g. when a desugarer re-serializes a sub-pipeline for later re-parse).
+    const BSONObj _rawStage;
 
     DocumentSourceExtensionForQueryShape(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          BSONObj rawStage,
                                          extension::AggStageDescriptorHandle staticDescriptor)
         : DocumentSource(staticDescriptor->getName(), expCtx),
           _stageName(std::string(staticDescriptor->getName())),
-          _parseNode(staticDescriptor->parse(rawStage)) {}
+          _parseNode(staticDescriptor->parse(rawStage)),
+          _rawStage(rawStage.getOwned()) {}
 };
 
 }  // namespace mongo::extension::host

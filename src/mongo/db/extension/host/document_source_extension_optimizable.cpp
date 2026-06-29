@@ -64,8 +64,10 @@ DocumentSourceContainer expandableStageParamsToDocumentSourceFn(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto* expandableParams = static_cast<ExpandableStageParams*>(stageParams.get());
     auto parseNode = expandableParams->releaseParseNode();
+    auto originalStage = expandableParams->releaseOriginalStage();
 
-    return {DocumentSourceExtensionForQueryShape::create(expCtx, std::move(parseNode))};
+    return {DocumentSourceExtensionForQueryShape::create(
+        expCtx, std::move(parseNode), std::move(originalStage))};
 }
 
 REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(expandable,

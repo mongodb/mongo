@@ -68,7 +68,8 @@ using LiteParsedList = std::list<std::unique_ptr<LiteParsedDocumentSource>>;
  */
 class ExpandableStageParams : public StageParams {
 public:
-    ExpandableStageParams(AggStageParseNodeHandle parseNode) : _parseNode(std::move(parseNode)) {}
+    ExpandableStageParams(AggStageParseNodeHandle parseNode, BSONObj originalStage)
+        : _parseNode(std::move(parseNode)), _originalStage(originalStage.getOwned()) {}
 
     static const Id& id;
 
@@ -80,8 +81,14 @@ public:
         return std::move(_parseNode);
     }
 
+    BSONObj releaseOriginalStage() {
+        return std::move(_originalStage);
+    }
+
 private:
     AggStageParseNodeHandle _parseNode;
+    // The original user-provided stage object, e.g. {$myStage: {...}}.
+    BSONObj _originalStage;
 };
 
 /**
@@ -148,7 +155,8 @@ public:
               }()) {}
 
         std::unique_ptr<StageParams> getStageParams() const override {
-            return std::make_unique<ExpandableStageParams>(_parseNode->clone());
+            return std::make_unique<ExpandableStageParams>(_parseNode->clone(),
+                                                           getOriginalBson().wrap().getOwned());
         }
 
         /**

@@ -64,6 +64,8 @@ protected:
         sdk::shared_test_stages::TransformAggStageDescriptor::make()};
 };
 
+// Literal-preserving serialization (e.g. $rankFusion's desugarer re-serializing a non-first input
+// pipeline into the $unionWith it constructs) must round-trip the original user-provided stage.
 TEST_F(DocumentSourceExtensionForQueryShapeTest, SerializeWithDefaultOptsRoundTrips) {
     auto rawStage = BSON(sdk::shared_test_stages::TransformAggStageDescriptor::kStageName
                          << BSON("foo" << true));
@@ -87,6 +89,21 @@ TEST_F(DocumentSourceExtensionForQueryShapeTest, SerializeForQueryStatsSucceeds)
     auto serialized =
         expandable->serialize(query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions);
     ASSERT_FALSE(serialized.getDocument().toBson().isEmpty());
+}
+
+// Same contract for the parse-node create() overload (the path taken when a lite-parsed extension
+// stage is converted to a DocumentSource via StageParams).
+TEST_F(DocumentSourceExtensionForQueryShapeTest,
+       SerializeWithDefaultOptsFromParseNodeReturnsOriginalStage) {
+    auto rawStage = BSON(sdk::shared_test_stages::TransformAggStageDescriptor::kStageName
+                         << BSON("foo" << true));
+
+    auto descriptor = AggStageDescriptorHandle(&_transformStageDescriptor);
+    auto expandable = host::DocumentSourceExtensionForQueryShape::create(
+        getExpCtx(), descriptor->parse(rawStage), rawStage);
+
+    auto serialized = expandable->serialize(query_shape::SerializationOptions{});
+    ASSERT_BSONOBJ_EQ(serialized.getDocument().toBson(), rawStage);
 }
 
 }  // namespace mongo::extension

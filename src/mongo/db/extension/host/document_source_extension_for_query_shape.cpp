@@ -72,6 +72,17 @@ StageConstraints DocumentSourceExtensionForQueryShape::constraints(
 
 Value DocumentSourceExtensionForQueryShape::serialize(
     const query_shape::SerializationOptions& opts) const {
+    if (opts.isKeepingLiteralsUnchanged() && !opts.transformIdentifiers) {
+        // Round-trippable serialization: emit the original user-provided stage so that callers
+        // re-serializing this pipeline (e.g. a hybrid search desugarer embedding an input pipeline
+        // in the $unionWith it constructs) produce BSON that re-parses to the same stage. Every
+        // construction path populates _rawStage; an empty one means this wrapper was built in a
+        // state that cannot round-trip, which should never reach literal-preserving serialization.
+        tassert(11766200,
+                "pre-desugar extension wrapper has no original BSON to round-trip",
+                !_rawStage.isEmpty());
+        return Value(Document{_rawStage});
+    }
     // TODO SERVER-129346 Ideally we should tassert here that literals are being changed, but we
     // cannot because hybrid search desugars when running against query stats. Restore the tassert
     // when hybrid search can compute query shape without desugaring.
