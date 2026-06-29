@@ -123,6 +123,11 @@ public:
         meta.setStartTime(getServiceContext()->getFastClockSource()->now());
         meta.setProvenance(GetParam());
 
+        ForwardableOperationMetadata fom;
+        fom.setVersionContext(
+            VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
+        meta.setForwardableOpMetadata(std::move(fom));
+
         ReshardingCoordinatorDocument doc(CoordinatorStateEnum::kUnused, donors, recipients);
         doc.setCommonReshardingMetadata(meta);
         resharding::emplaceCloneTimestampIfExists(doc, _cloneTimestamp);

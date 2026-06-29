@@ -800,7 +800,20 @@ boost::optional<BSONObj> ReshardingRecipientService::RecipientStateMachine::repo
     if (state == RecipientStateEnum::kBuildingIndex) {
         _tryFetchBuildIndexMetrics(opCtx);
     }
-    return _metrics->reportForCurrentOp();
+    auto obj = _metrics->reportForCurrentOp();
+    BSONObjBuilder b(std::move(obj));
+    // TODO(SERVER-99655): Remove this try/catch once getVersionContextOrDefault() can no longer
+    // throw.
+    try {
+        b.append("versionContext",
+                 resharding::getVersionContextOrDefault(_forwardableOpMetadata).toBSON());
+    } catch (const DBException& ex) {
+        LOGV2_DEBUG(13001302,
+                    2,
+                    "Failed to report versionContext in $currentOp",
+                    "error"_attr = ex.toStatus());
+    }
+    return b.obj();
 }
 
 void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChanges(

@@ -53,6 +53,7 @@
 #include "mongo/db/s/resharding/resharding_noop_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -65,6 +66,7 @@
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/version_context.h"
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/span/span.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
@@ -74,6 +76,7 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
@@ -978,16 +981,59 @@ TEST_F(MakeReshardingOperationContextTest, PropagationIsPreservedByFactory) {
 
 TEST_F(MakeReshardingOperationContextTest,
        GetVersionContextFallsBackToDefaultWhenNoVersionContext) {
-    // A ForwardableOperationMetadata with no VersionContext set should fall back to default.
-    ForwardableOperationMetadata fom;
-    ASSERT_FALSE(fom.getVersionContext().has_value());
+    // TODO(SERVER-99655) Remove this test when lastLTS is 9.0 and ForwardableOperationMetadata
+    // should always have a VersionContext.
 
-    // TODO SERVER-103014: Empty VersionContexts should be disallowed after v9.0.
-    auto vCtx = getVersionContextOrDefault(boost::optional<ForwardableOperationMetadata>(fom));
-    ASSERT_TRUE(vCtx.hasOperationFCV());
-    // Note: getOperationFCV can only be called with Passkey that is available to friend class
-    // of VersionContext, so we can't assert the exact value of the FCV here.
-    // Instead, we just assert that it is set to some value.
+    // (Generic FCV reference): used for testing, should exist across LTS binary version
+    using GenericFCV = multiversion::GenericFCV;
+
+    // Save the original FCV to restore at the end.
+    auto originalFCV = serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
+    ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });
+
+    // Test kLastLTS -> kLastLTS
+    {
+        SCOPED_TRACE("kLastLTS");
+        // (Generic FCV reference): used for testing, should exist across LTS binary versions.
+        serverGlobalParams.mutableFCV.setVersion(GenericFCV::kLastLTS);
+        ForwardableOperationMetadata emptyFom;
+        auto vCtx =
+            getVersionContextOrDefault(boost::optional<ForwardableOperationMetadata>(emptyFom));
+        ASSERT_EQ(vCtx, VersionContext{GenericFCV::kLastLTS});
+    }
+
+    // Test kLastContinuous -> kLastContinuous
+    {
+        SCOPED_TRACE("kLastContinuous");
+        // (Generic FCV reference): used for testing, should exist across LTS binary versions.
+        serverGlobalParams.mutableFCV.setVersion(GenericFCV::kLastContinuous);
+        ForwardableOperationMetadata emptyFom;
+        auto vCtx =
+            getVersionContextOrDefault(boost::optional<ForwardableOperationMetadata>(emptyFom));
+        ASSERT_EQ(vCtx, VersionContext{GenericFCV::kLastContinuous});
+    }
+
+    // Test kUpgradingFromLastLTSToLatest -> kLastLTS
+    {
+        SCOPED_TRACE("kUpgradingFromLastLTSToLatest");
+        // (Generic FCV reference): used for testing, should exist across LTS binary versions.
+        serverGlobalParams.mutableFCV.setVersion(GenericFCV::kUpgradingFromLastLTSToLatest);
+        ForwardableOperationMetadata emptyFom;
+        auto vCtx =
+            getVersionContextOrDefault(boost::optional<ForwardableOperationMetadata>(emptyFom));
+        ASSERT_EQ(vCtx, VersionContext{GenericFCV::kLastLTS});
+    }
+
+    // Test kUpgradingFromLastContinuousToLatest -> kLastContinuous
+    {
+        SCOPED_TRACE("kUpgradingFromLastContinuousToLatest");
+        // (Generic FCV reference): used for testing, should exist across LTS binary versions.
+        serverGlobalParams.mutableFCV.setVersion(GenericFCV::kUpgradingFromLastContinuousToLatest);
+        ForwardableOperationMetadata emptyFom;
+        auto vCtx =
+            getVersionContextOrDefault(boost::optional<ForwardableOperationMetadata>(emptyFom));
+        ASSERT_EQ(vCtx, VersionContext{GenericFCV::kLastContinuous});
+    }
 }
 
 class ReshardingDonorCloneCountUtilTest : public CatalogTestFixture {

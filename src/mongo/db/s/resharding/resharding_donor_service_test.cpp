@@ -298,6 +298,11 @@ public:
         commonMetadata.setStartTime(getServiceContext()->getFastClockSource()->now());
         commonMetadata.setPerformVerification(testOptions.performVerification);
 
+        ForwardableOperationMetadata fom;
+        fom.setVersionContext(
+            VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
+        commonMetadata.setForwardableOpMetadata(std::move(fom));
+
         doc.setCommonReshardingMetadata(std::move(commonMetadata));
         return doc;
     }

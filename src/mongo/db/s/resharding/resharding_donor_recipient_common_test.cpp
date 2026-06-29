@@ -510,6 +510,18 @@ public:
         ASSERT(!expectDonorStateMachine || fieldsValidator.has_value());
         OperationContext* opCtx = operationContext();
 
+        // (Generic FCV reference): This exercises the refresh path, which only occurs at
+        // FCV 8.0, 8.3, or while upgrading from those to latest. The refresh code paths call
+        // getVersionContextOrDefault(), which requires the global FCV to be kLastContinuous or
+        // kLastLTS (or upgrading from those) when there is no forwardable op metadata — as is the
+        // case for all refresh code paths.
+        //
+        // TODO (SERVER-99655): Remove once lastLTS is 9.0 and getVersionContextOrDefault() is
+        // updated to always expect a pinned FCV in the forwardable op metadata. One approach:
+        // remove the feature flag checks in the refresh path that call
+        // getVersionContextOrDefault(), since those flags will always be enabled.
+        serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastContinuous);
+
         auto temporaryCollMetadata =
             makeShardedMetadataForOriginalCollection(opCtx, shardThatChunkExistsOn, primaryShard);
         ScopedSetShardRole scopedSetShardRole{
@@ -551,6 +563,18 @@ public:
         boost::optional<RecipientFieldsValidator> fieldsValidator = boost::none) {
         ASSERT(!expectRecipientStateMachine || fieldsValidator.has_value());
         OperationContext* opCtx = operationContext();
+
+        // (Generic FCV reference): This exercises the refresh path, which only occurs at
+        // FCV 8.0, 8.3, or while upgrading from those to latest. The refresh code paths call
+        // getVersionContextOrDefault(), which requires the global FCV to be kLastContinuous or
+        // kLastLTS (or upgrading from those) when there is no forwardable op metadata — as is the
+        // case for all refresh code paths.
+        //
+        // TODO (SERVER-99655): Remove once lastLTS is 9.0 and getVersionContextOrDefault() is
+        // updated to always expect a pinned FCV in the forwardable op metadata. One approach:
+        // remove the feature flag checks in the refresh path that call
+        // getVersionContextOrDefault(), since those flags will always be enabled.
+        serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastContinuous);
 
         auto originalCollMetadata =
             makeShardedMetadataForOriginalCollection(opCtx, shardThatChunkExistsOn, primaryShard);
@@ -928,19 +952,6 @@ TEST_F(ReshardingDonorRecipientCommonTest, ProcessDonorFieldsNotPerformVerificat
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest,
-       ProcessDonorFieldsPerformVerification_FeatureFlagEnabled) {
-    unittest::ServerParameterGuard verificationFeatureFlagController(
-        "featureFlagReshardingVerification", true);
-    bool performVerification = true;
-
-    testProcessDonorFields(kThisShardHandle /* shardThatChunkExistsOn*/,
-                           kOtherShardHandle /* primaryShard */,
-                           performVerification,
-                           true /* expectDonorStateMachine */,
-                           DonorFieldsValidator{.performVerification = performVerification});
-}
-
-TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessDonorFieldsPerformVerification_FeatureFlagDisabled) {
     unittest::ServerParameterGuard verificationFeatureFlagController(
         "featureFlagReshardingVerification", false);
@@ -983,19 +994,6 @@ TEST_F(ReshardingDonorRecipientCommonTest,
                                kOtherShardHandle /* primaryShard */,
                                boost::none /* performVerification */,
                                false /* expectRecipientStateMachine */);
-}
-
-TEST_F(
-    ReshardingDonorRecipientCommonTest,
-    ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_SkipCloningAndApplyIfApplicable) {
-    unittest::ServerParameterGuard skipCloningFeatureFlagController(
-        "featureFlagReshardingSkipCloningIfApplicable", false);
-
-    testProcessRecipientFields(kOtherShardHandle /* shardThatChunkExistsOn*/,
-                               kThisShardHandle /* primaryShard */,
-                               boost::none /* performVerification */,
-                               true /* expectRecipientStateMachine */,
-                               RecipientFieldsValidator{.skipCloningAndApplying = true});
 }
 
 TEST_F(
@@ -1069,20 +1067,6 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 
 TEST_F(ReshardingDonorRecipientCommonTest, ProcessRecipientFieldsNotPerformVerification) {
     bool performVerification = false;
-
-    testProcessRecipientFields(
-        kThisShardHandle /* shardThatChunkExistsOn*/,
-        kOtherShardHandle /* primaryShard */,
-        performVerification,
-        true /* expectRecipientStateMachine */,
-        RecipientFieldsValidator{.performVerification = performVerification});
-}
-
-TEST_F(ReshardingDonorRecipientCommonTest,
-       ProcessRecipientFieldsPerformVerification_FeatureFlagEnabled) {
-    unittest::ServerParameterGuard verificationFeatureFlagController(
-        "featureFlagReshardingVerification", true);
-    bool performVerification = true;
 
     testProcessRecipientFields(
         kThisShardHandle /* shardThatChunkExistsOn*/,

@@ -657,12 +657,17 @@ CancelableOperationContext makeReshardingOperationContext(
     const boost::optional<ForwardableOperationMetadata>& fom = boost::none);
 
 /**
- * Extracts the VersionContext from an optional ForwardableOperationMetadata, falling back to
- * "version context with FCV v8.0" when it is absent.
+ * Extracts the VersionContext from an optional ForwardableOperationMetadata. When no VersionContext
+ * is present, falls back to a default derived from the current global FCV: uses v8.3 when the
+ * cluster is at v8.3 (or upgrading from v8.3 to v9.0), or uses v8.0 when the cluster is at v8.0 (or
+ * upgrading from v8.0 to v9.0).
  *
  * NOTE: The returned VersionContext is tied to the lifetime of the resharding coordinator.
  * Using it after the resharding coordinator has finished is incorrect, as it won't serialize with
  * setFCV.
+ *
+ * TODO (SERVER-99655): Update comment to reflect that ForwadableOpMetadata should always have a
+ * pinned FCV when this function is called.
  */
 VersionContext getVersionContextOrDefault(const boost::optional<ForwardableOperationMetadata>& fom);
 

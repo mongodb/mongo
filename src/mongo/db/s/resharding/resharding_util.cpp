@@ -888,17 +888,46 @@ CancelableOperationContext makeReshardingOperationContext(
 VersionContext getVersionContextOrDefault(
     const boost::optional<ForwardableOperationMetadata>& fom) {
     // TODO(SERVER-99655): Simplify when 9.0 is last LTS and we always have a FOM with
-    // VersionContext. Remove kDefaultVersionContext and assert VersionContext::hasOperationFCV.
-
-    // Empty VersionContext means use current value of globalFCV. The only time we expect
-    // versionContext to be empty in resharding code is when FCV is in v8.0. So we must
-    // override the default behavior by providing a default VersionContext.
-    const auto kDefaultVersionContext =
-        VersionContext(multiversion::FeatureCompatibilityVersion::kVersion_8_0);
+    // VersionContext. Remove the default computation below and assert
+    // VersionContext::hasOperationFCV.
     if (fom) {
-        return fom->getVersionContext().value_or(kDefaultVersionContext);
+        if (auto vc = fom->getVersionContext()) {
+            return *vc;
+        }
     }
-    return kDefaultVersionContext;
+
+    // When the ForwardableOperationMetadata carries no pinned FCV, we supply a default so that
+    // participants resolve to the same FCV as the coordinator. This happens in two cases, keyed off
+    // the FCV that resharding started in (resharding can never start in a transitional FCV):
+    //
+    // (1) Started in FCV v8.0 (so global FCV is v8.0 or v8.0 -> v9.0): the coordinator never pinned
+    // an FCV in its FOM, and neither did the participants, so we default to v8.0 (kLastLTS).
+    // (2) Started in FCV v8.3 (so global FCV is v8.3 or v8.3 -> v9.0): the coordinator pinned v8.3
+    // in its FOM, but the participants don't have it because the coordinator reaches them via the
+    //     refresh path, so we default to v8.3 (kLastContinuous).
+    //
+    // At FCV 9.0, the coordinator doc is always created with forwardable op metadata containing a
+    // pinned FCV which is also propagated to the participants.
+    using GenericFCV = multiversion::GenericFCV;
+    const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
+
+    switch (fcv) {
+        // (Generic FCV reference): these generic references are used to determine the default
+        // FCV when no VersionContext is set in ForwardableOperationMetadata.
+        // Case (1): resharding started in kLastLTS.
+        case GenericFCV::kLastLTS:
+        case GenericFCV::kUpgradingFromLastLTSToLatest:
+            return VersionContext{GenericFCV::kLastLTS};
+        // Case (2): resharding started in kLastContinuous.
+        case GenericFCV::kLastContinuous:
+        case GenericFCV::kUpgradingFromLastContinuousToLatest:
+            return VersionContext{GenericFCV::kLastContinuous};
+        default:
+            tasserted(13001300,
+                      "Expected global FCV to be kLastLTS or kLastContinuous (or upgrading from "
+                      "those to kLatest) when no VersionContext is set in "
+                      "ForwardableOperationMetadata");
+    }
 }
 
 boost::optional<BSONObj> determineCloneCountHint(OperationContext* opCtx,
