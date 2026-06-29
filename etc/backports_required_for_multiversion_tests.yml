@@ -207,8 +207,6 @@ last-continuous:
       ticket: SERVER-121218
     - test_file: jstests/replsets/server_status_metrics.js
       ticket: SERVER-120318
-    - test_file: jstests/sharding/chunk_migration_maxkey_boundary.js
-      ticket: SERVER-121533
     - test_file: jstests/noPassthrough/query/runtime_constants_user_roles_auth_bypass.js
       ticket: SERVER-128433
     - test_file: jstests/aggregation/expressions/expression_function.js
