@@ -29,14 +29,13 @@
 
 #pragma once
 
+#include "mongo/db/service_context.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <memory>
 
 namespace mongo {
-
-class ServiceContext;
 
 /**
  * Snapshot of system-level health values sampled from /proc/stat and /proc/sys/fs/file-nr.
@@ -63,14 +62,18 @@ struct SystemHealthSnapshot {
 
 /**
  * Owns the OpenTelemetry instruments for system health metrics:
- *   - mongodb.cpu.user / mongodb.cpu.system: counters reporting the absolute cumulative CPU
- *     time (ms) read directly from /proc/stat on each sample
- *   - mongodb.cpu.iowait: counter reporting the absolute cumulative iowait time (ms) since boot
- *   - mongodb.thread.{active,queued}: gauges for OS-level runnable/blocked process counts
- *   - mongodb.fd.open: gauge for the system-wide open file handle count
+ *   - mongodb.system.cpu.time: counter of cumulative CPU time (ms) since boot, read directly from
+ *     /proc/stat on each sample, broken down by a `mode` attribute (user, nice, system, idle,
+ *     iowait, irq, softirq, steal, guest, guest_nice).
+ *   - mongodb.system.cpu.utilization: per-mode CPU utilization, summing to 1.0. If there has been
+ *     no activity, the gauges return their most recent value.
+ *   - mongodb.system.thread.{active,queued}: gauges for OS-level runnable/blocked process counts.
+ *   - mongodb.system.fd.open: gauge for the system-wide open file handle count.
+ *   - mongodb.systemHealth.collectErrors: counter of failed snapshot collections.
  *
  * Thread and fd instruments are set to the latest snapshot value on each call to update().
  */
+
 class SystemHealthMetrics {
 public:
     SystemHealthMetrics();

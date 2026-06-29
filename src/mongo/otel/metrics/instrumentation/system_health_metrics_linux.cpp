@@ -140,6 +140,7 @@ public:
         int64_t totalDelta = 0;
 
         auto record = [&](std::string_view mode, int64_t& prev, int64_t current) {
+            invariant(n < modes.size());
             int64_t delta = std::max<int64_t>(current - std::exchange(prev, current), 0);
             modes[n++] = {mode, delta};
             totalDelta += delta;

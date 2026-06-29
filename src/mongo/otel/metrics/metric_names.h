@@ -418,13 +418,26 @@ public:
     // Query Integration Team Metrics
 
     // System Health
-    static constexpr MetricName kCpuTime = MetricNameMaker::make("mongodb.cpu.time");
-    static constexpr MetricName kCpuUtilization = MetricNameMaker::make("mongodb.cpu.utilization");
-    static constexpr MetricName kThreadActive = MetricNameMaker::make("mongodb.thread.active");
-    static constexpr MetricName kThreadQueued = MetricNameMaker::make("mongodb.thread.queued");
-    static constexpr MetricName kFdOpen = MetricNameMaker::make("mongodb.fd.open");
+    static constexpr MetricName kCpuTime = MetricNameMaker::make("mongodb.system.cpu.time");
+    static constexpr MetricName kCpuUtilization =
+        MetricNameMaker::make("mongodb.system.cpu.utilization");
+    static constexpr MetricName kThreadActive =
+        MetricNameMaker::make("mongodb.system.thread.active");
+    static constexpr MetricName kThreadQueued =
+        MetricNameMaker::make("mongodb.system.thread.queued");
+    static constexpr MetricName kFdOpen = MetricNameMaker::make("mongodb.system.fd.open");
     static constexpr MetricName kSystemHealthCollectErrors =
         MetricNameMaker::make("mongodb.systemHealth.collectErrors");
+
+    static constexpr MetricName kProcessCpuTime = MetricNameMaker::make("mongodb.process.cpu.time");
+    static constexpr MetricName kProcessCpuUtilization =
+        MetricNameMaker::make("mongodb.process.cpu.utilization");
+    static constexpr MetricName kProcessContextSwitches =
+        MetricNameMaker::make("mongodb.process.context.switch");
+    static constexpr MetricName kProcessThreadCount =
+        MetricNameMaker::make("mongodb.process.threads.count");
+    static constexpr MetricName kProcessPagingFaults =
+        MetricNameMaker::make("mongodb.process.paging.faults");
 
     // Global Lock
     static constexpr MetricName kGlobalLockTotalTime =

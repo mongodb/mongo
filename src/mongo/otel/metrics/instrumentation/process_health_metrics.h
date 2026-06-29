@@ -27,38 +27,47 @@
  *    it in the license file.
  */
 
-#include "mongo/otel/metrics/instrumentation/metrics_installer.h"
+#pragma once
 
-#include "mongo/db/admission/ingress_request_rate_limiter.h"
-#include "mongo/otel/metrics/instrumentation/connections_metrics.h"
-#include "mongo/otel/metrics/instrumentation/disk_metrics.h"
-#include "mongo/otel/metrics/instrumentation/global_lock_metrics.h"
-#include "mongo/otel/metrics/instrumentation/index_build_metrics.h"
-#include "mongo/otel/metrics/instrumentation/mongodb_build_info_metrics.h"
-#include "mongo/otel/metrics/instrumentation/process_health_metrics.h"
-#include "mongo/otel/metrics/instrumentation/system_health_metrics.h"
-#include "mongo/otel/metrics/instrumentation/system_mount_metrics.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
+
+#include <cstdint>
+#include <memory>
 
 namespace mongo {
 
-void installCommonOtelMetrics(ServiceContext* svcCtx) {
-    installSystemMountOtelMetrics(svcCtx);
-    installDiskOtelMetrics(svcCtx);
-    installProcessHealthOtelMetrics(svcCtx);
-    installSystemHealthOtelMetrics(svcCtx);
-    installMongoDBBuildInfoMetrics();
-    admission::IngressRequestRateLimiter::get(svcCtx).installOtelMetrics(svcCtx);
-}
+struct ProcessHealthSnapshot {
+    int64_t userMs{0};
+    int64_t systemMs{0};
+    int64_t waitMs{0};
+    int64_t voluntaryContextSwitches{0};
+    int64_t involuntaryContextSwitches{0};
+    int64_t threadCount{0};
+    int64_t majorPagingFaults{0};
+    int64_t minorPagingFaults{0};
+};
 
-void installMongodOtelMetrics(ServiceContext* svcCtx) {
-    installCommonOtelMetrics(svcCtx);
-    installGlobalLockOtelMetrics(svcCtx);
-    installIndexBuildOtelMetrics(svcCtx);
-    installConnectionsOtelMetrics(svcCtx);
-}
+/**
+ * Owns the OpenTelemetry instruments for process health metrics
+ */
+class ProcessHealthMetrics {
+public:
+    ProcessHealthMetrics();
+    ~ProcessHealthMetrics();
 
-void installMongosOtelMetrics(ServiceContext* svcCtx) {
-    installCommonOtelMetrics(svcCtx);
-}
+    void update(const ProcessHealthSnapshot& snap);
+
+private:
+    class Impl;
+    std::unique_ptr<Impl> _impl;
+};
+
+/**
+ * Registers OpenTelemetry process health instruments and starts a periodic job (1 Hz) that
+ * collects their metrics.
+ * No-op on unsupported platforms.
+ */
+MONGO_MOD_PUBLIC void installProcessHealthOtelMetrics(ServiceContext* svcCtx);
 
 }  // namespace mongo
