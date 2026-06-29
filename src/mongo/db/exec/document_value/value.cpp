@@ -499,17 +499,29 @@ bool Value::coerceToBool() const {
 
 namespace {
 
+constexpr int kIntValueOutOfRangeMsgId = 31108;
+
+MONGO_COMPILER_NORETURN void throwValueOutOfRangeInt(std::string_view msg) {
+    uasserted(kIntValueOutOfRangeMsgId, msg);
+}
+
 template <typename T>
 void assertValueInRangeInt(const T& val) {
-    uassert(31108,
+    uassert(kIntValueOutOfRangeMsgId,
             str::stream() << "Can't coerce out of range value " << val << " to int",
             val >= std::numeric_limits<int32_t>::min() &&
                 val <= std::numeric_limits<int32_t>::max());
 }
 
+constexpr int kLongValueOutOfRangeMsgId = 31109;
+
+MONGO_COMPILER_NORETURN void throwValueOutOfRangeLong(std::string_view msg) {
+    uasserted(kLongValueOutOfRangeMsgId, msg);
+}
+
 template <typename T>
 void assertValueInRangeLong(const T& val) {
-    uassert(31109,
+    uassert(kLongValueOutOfRangeMsgId,
             str::stream() << "Can't coerce out of range value " << val << " to long",
             val >= std::numeric_limits<long long>::min() &&
                 val < BSONElement::kLongLongMaxPlusOneAsDouble);
@@ -529,9 +541,22 @@ int Value::coerceToInt() const {
             assertValueInRangeInt(_storage.doubleValue);
             return static_cast<int>(_storage.doubleValue);
 
-        case BSONType::numberDecimal:
-            assertValueInRangeInt(_storage.getDecimal().toDouble());
-            return (_storage.getDecimal()).toInt();
+        case BSONType::numberDecimal: {
+            // Round fractional Decimal128 values using the default rounding mode, which is
+            // 'kRoundTiesToEven'. This is inconsistent with how double values are rounded in the
+            // case above, as they always round towards zero. However, intentionally keep the
+            // difference for downwards-compability.
+            std::uint32_t signalingFlags = Decimal128::SignalingFlag::kNoFlag;
+            std::int32_t intValue = _storage.getDecimal().toInt(&signalingFlags);
+
+            // Check if coerced number is safely representable as an int.
+            if (signalingFlags != Decimal128::SignalingFlag::kNoFlag) {
+                throwValueOutOfRangeInt(str::stream()
+                                        << "Can't coerce out of range decimal value "
+                                        << _storage.getDecimal().toString() << " to int");
+            }
+            return static_cast<int>(intValue);
+        }
 
         default:
             uassert(16003,
@@ -553,9 +578,22 @@ long long Value::coerceToLong() const {
             assertValueInRangeLong(_storage.doubleValue);
             return static_cast<long long>(_storage.doubleValue);
 
-        case BSONType::numberDecimal:
-            assertValueInRangeLong(_storage.doubleValue);
-            return (_storage.getDecimal()).toLong();
+        case BSONType::numberDecimal: {
+            // Round fractional Decimal128 values using the default rounding mode, which is
+            // 'kRoundTiesToEven'. This is inconsistent with how double values are rounded in the
+            // case above, as they always round towards zero. However, intentionally keep the
+            // difference for downwards-compability.
+            std::uint32_t signalingFlags = Decimal128::SignalingFlag::kNoFlag;
+            std::int64_t longValue = _storage.getDecimal().toLong(&signalingFlags);
+
+            // Check if coerced number is safely representable as a long.
+            if (signalingFlags != Decimal128::SignalingFlag::kNoFlag) {
+                throwValueOutOfRangeLong(str::stream()
+                                         << "Can't coerce out of range decimal value "
+                                         << _storage.getDecimal().toString() << " to long");
+            }
+            return static_cast<long long>(longValue);
+        }
 
         default:
             uassert(16004,

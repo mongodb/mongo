@@ -52,6 +52,7 @@
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstring>
 #include <initializer_list>
 #include <iosfwd>

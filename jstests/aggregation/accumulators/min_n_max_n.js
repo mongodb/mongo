@@ -221,7 +221,7 @@ assert.commandFailedWithCode(
         ],
         cursor: {},
     }),
-    5787903,
+    [31109, 5787903],
 );
 
 // Reject invalid specifications.

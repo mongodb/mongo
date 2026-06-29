@@ -2174,6 +2174,30 @@ public:
     }
 };
 
+// Integer limits.
+const int kIntMax = std::numeric_limits<int>::max();
+const int kIntMin = std::numeric_limits<int>::lowest();
+const long long kIntMaxAsLongLong = kIntMax;
+const long long kIntMinAsLongLong = kIntMin;
+const double kIntMaxAsDouble = kIntMax;
+const double kIntMinAsDouble = kIntMin;
+const Decimal128 kIntMaxAsDecimal = Decimal128(kIntMax);
+const Decimal128 kIntMinAsDecimal = Decimal128(kIntMin);
+
+// 64-bit integer limits.
+const long long kLongLongMax = std::numeric_limits<long long>::max();
+const long long kLongLongMin = std::numeric_limits<long long>::lowest();
+const double kLongLongMaxAsDouble = static_cast<double>(kLongLongMax);
+const double kLongLongMinAsDouble = static_cast<double>(kLongLongMin);
+const Decimal128 kLongLongMaxAsDecimal = Decimal128(static_cast<int64_t>(kLongLongMax));
+const Decimal128 kLongLongMinAsDecimal = Decimal128(static_cast<int64_t>(kLongLongMin));
+
+// Double limits.
+const double kDoubleMax = std::numeric_limits<double>::max();
+const double kDoubleMin = std::numeric_limits<double>::lowest();
+const Decimal128 kDoubleMaxAsDecimal = Decimal128(kDoubleMax);
+const Decimal128 kDoubleMinAsDecimal = Decimal128(kDoubleMin);
+
 namespace Coerce {
 
 class ToBoolBase {
@@ -2336,12 +2360,42 @@ class IntToInt : public ToIntBase {
 };
 
 /** Coerce long to int. */
-class LongToInt : public ToIntBase {
+class LongToIntTooLarge : public ToIntBase {
     Value value() override {
         return Value(0xff00000007LL);
     }
     bool asserts() override {
         return true;
+    }
+};
+
+/** Coerce long to int. */
+class LongToIntMinLong : public ToIntBase {
+    Value value() override {
+        return Value(kLongLongMin);
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce long to int. */
+class LongToIntMaxLong : public ToIntBase {
+    Value value() override {
+        return Value(kLongLongMax);
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce long to int. */
+class LongToInt : public ToIntBase {
+    Value value() override {
+        return Value(-10LL);
+    }
+    int expected() override {
+        return -10;
     }
 };
 
@@ -2352,6 +2406,136 @@ class DoubleToInt : public ToIntBase {
     }
     int expected() override {
         return 9;
+    }
+};
+
+/** Coerce negative value to int. */
+class DoubleNegativeToInt : public ToIntBase {
+    Value value() override {
+        return Value(-35.992);
+    }
+    int expected() override {
+        return -35;
+    }
+};
+
+/** Coerce min int as double to int. */
+class DoubleMinIntToInt : public ToIntBase {
+    Value value() override {
+        return Value(kIntMinAsDouble);
+    }
+    int expected() override {
+        return kIntMin;
+    }
+};
+
+/** Coerce max int as double to int. */
+class DoubleMaxIntToInt : public ToIntBase {
+    Value value() override {
+        return Value(kIntMaxAsDouble);
+    }
+    int expected() override {
+        return kIntMax;
+    }
+};
+
+/** Coerce Decimal128 to int **/
+class Decimal128ToInt : public ToIntBase {
+    Value value() override {
+        return Value(Decimal128("952.1234"));
+    }
+    int expected() override {
+        return 952;
+    }
+};
+
+/** Coerce negative Decimal128 to int **/
+class Decimal128NegativeToInt : public ToIntBase {
+    Value value() override {
+        return Value(Decimal128("-35.992"));
+    }
+    int expected() override {
+        return -36;
+    }
+};
+
+/** Coerce Decimal128 int to int **/
+class Decimal128MinIntToInt : public ToIntBase {
+    Value value() override {
+        return Value(kIntMinAsDecimal);
+    }
+    int expected() override {
+        return kIntMin;
+    }
+};
+
+/** Coerce Decimal128 int max to int **/
+class Decimal128MaxIntToInt : public ToIntBase {
+    Value value() override {
+        return Value(kIntMaxAsDecimal);
+    }
+    int expected() override {
+        return kIntMax;
+    }
+};
+
+/** Coerce Decimal128 int min - 1 to int **/
+class Decimal128TooSmallToInt : public ToIntBase {
+    Value value() override {
+        return Value(kIntMinAsDecimal.subtract(Decimal128(1)));
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce Decimal128 int max + 1 to int **/
+class Decimal128TooLargeToInt : public ToIntBase {
+    Value value() override {
+        return Value(kIntMaxAsDecimal.add(Decimal128(1)));
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce Decimal128 +Inf to int **/
+class Decimal128PositiveInfToInt : public ToIntBase {
+    Value value() override {
+        return Value(Decimal128::kPositiveInfinity);
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce Decimal128 -Inf to int **/
+class Decimal128NegativeInfToInt : public ToIntBase {
+    Value value() override {
+        return Value(Decimal128::kNegativeInfinity);
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce Decimal128 +NaN to int **/
+class Decimal128PositiveNaNToInt : public ToIntBase {
+    Value value() override {
+        return Value(Decimal128::kPositiveNaN);
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce Decimal128 -NaN to int **/
+class Decimal128NegativeNaNToInt : public ToIntBase {
+    Value value() override {
+        return Value(Decimal128::kNegativeNaN);
+    }
+    bool asserts() override {
+        return true;
     }
 };
 
@@ -2473,6 +2657,77 @@ class DoubleToLong : public ToLongBase {
     }
 };
 
+/** Coerce negative value to long. */
+class DoubleNegativeToLong : public ToLongBase {
+    Value value() override {
+        return Value(-35.992);
+    }
+    long long expected() override {
+        return -35;
+    }
+};
+
+/** Coerce long min double to long. */
+class DoubleMinLongToLong : public ToLongBase {
+    Value value() override {
+        return Value(kLongLongMinAsDouble);
+    }
+    long long expected() override {
+        return kLongLongMin;
+    }
+};
+
+/** Coerce smallest safe long as double to long. */
+class DoubleSmallestSafeLongToLong : public ToLongBase {
+    Value value() override {
+        return Value(static_cast<double>(BSONElement::kSmallestSafeLongLongAsDouble));
+    }
+    long long expected() override {
+        return BSONElement::kSmallestSafeLongLongAsDouble;
+    }
+};
+
+/** Coerce largest safe long as double to long. */
+class DoubleLargestSafeLongToLong : public ToLongBase {
+    Value value() override {
+        return Value(static_cast<double>(BSONElement::kLargestSafeLongLongAsDouble));
+    }
+    long long expected() override {
+        return BSONElement::kLargestSafeLongLongAsDouble;
+    }
+};
+
+/** Coerce large double value to long. */
+class DoubleLargeWithPrecisionLossToLong : public ToLongBase {
+    Value value() override {
+        // Large number that can be safely represented as a double.
+        return Value(9223372036854772736.0);
+    }
+    long long expected() override {
+        return 9223372036854772736LL;
+    }
+};
+
+/** Coerce largest long + 1 as double to long. */
+class DoubleLongMaxPlusOneToLong : public ToLongBase {
+    Value value() override {
+        return Value(BSONElement::kLongLongMaxPlusOneAsDouble);
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce long max double to long. */
+class DoubleMaxLongToLong : public ToLongBase {
+    Value value() override {
+        return Value(kLongLongMaxAsDouble);
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
 /** Coerce infinity to long. */
 class InfToLong : public ToLongBase {
     Value value() override {
@@ -2518,6 +2773,106 @@ class TowardsInfinityToLong : public ToLongBase {
     Value value() override {
         return Value(static_cast<double>(std::nextafter(std::numeric_limits<long long>::lowest(),
                                                         std::numeric_limits<double>::lowest())));
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce Decimal128 to long **/
+class Decimal128ToLong : public ToLongBase {
+    Value value() override {
+        return Value(Decimal128("952.1234"));
+    }
+    long long expected() override {
+        return 952;
+    }
+};
+
+/** Coerce negative Decimal128 to long **/
+class Decimal128NegativeToLong : public ToLongBase {
+    Value value() override {
+        return Value(Decimal128("-35.992"));
+    }
+    long long expected() override {
+        return -36;
+    }
+};
+
+/** Coerce Decimal128 long min to long **/
+class Decimal128MinLongToLong : public ToLongBase {
+    Value value() override {
+        return Value(kLongLongMinAsDecimal);
+    }
+    long long expected() override {
+        return kLongLongMin;
+    }
+};
+
+/** Coerce Decimal128 long max to long **/
+class Decimal128MaxLongToLong : public ToLongBase {
+    Value value() override {
+        return Value(kLongLongMaxAsDecimal);
+    }
+    long long expected() override {
+        return kLongLongMax;
+    }
+};
+
+/** Coerce Decimal128 long min - 1 to long **/
+class Decimal128TooSmallToLong : public ToLongBase {
+    Value value() override {
+        return Value(kLongLongMinAsDecimal.subtract(Decimal128(1)));
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce Decimal128 long long max + 1 to long **/
+class Decimal128TooLargeToLong : public ToLongBase {
+    Value value() override {
+        return Value(kLongLongMaxAsDecimal.add(Decimal128(1)));
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce Decimal128 +Inf to long **/
+class Decimal128PositiveInfToLong : public ToLongBase {
+    Value value() override {
+        return Value(Decimal128::kPositiveInfinity);
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce Decimal128 -Inf to long **/
+class Decimal128NegativeInfToLong : public ToLongBase {
+    Value value() override {
+        return Value(Decimal128::kNegativeInfinity);
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce Decimal128 +NaN to long **/
+class Decimal128PositiveNaNToLong : public ToLongBase {
+    Value value() override {
+        return Value(Decimal128::kPositiveNaN);
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce Decimal128 -NaN to long **/
+class Decimal128NegativeNaNToLong : public ToLongBase {
+    Value value() override {
+        return Value(Decimal128::kNegativeNaN);
     }
     bool asserts() override {
         return true;
@@ -3072,30 +3427,6 @@ public:
     }
 };
 
-// Integer limits.
-const int kIntMax = std::numeric_limits<int>::max();
-const int kIntMin = std::numeric_limits<int>::lowest();
-const long long kIntMaxAsLongLong = kIntMax;
-const long long kIntMinAsLongLong = kIntMin;
-const double kIntMaxAsDouble = kIntMax;
-const double kIntMinAsDouble = kIntMin;
-const Decimal128 kIntMaxAsDecimal = Decimal128(kIntMax);
-const Decimal128 kIntMinAsDecimal = Decimal128(kIntMin);
-
-// 64-bit integer limits.
-const long long kLongLongMax = std::numeric_limits<long long>::max();
-const long long kLongLongMin = std::numeric_limits<long long>::lowest();
-const double kLongLongMaxAsDouble = static_cast<double>(kLongLongMax);
-const double kLongLongMinAsDouble = static_cast<double>(kLongLongMin);
-const Decimal128 kLongLongMaxAsDecimal = Decimal128(static_cast<int64_t>(kLongLongMax));
-const Decimal128 kLongLongMinAsDecimal = Decimal128(static_cast<int64_t>(kLongLongMin));
-
-// Double limits.
-const double kDoubleMax = std::numeric_limits<double>::max();
-const double kDoubleMin = std::numeric_limits<double>::lowest();
-const Decimal128 kDoubleMaxAsDecimal = Decimal128(kDoubleMin);
-const Decimal128 kDoubleMinAsDecimal = Decimal128(kDoubleMin);
-
 TEST(ValueIntegral, CorrectlyIdentifiesValidIntegralValues) {
     ASSERT_TRUE(Value(kIntMax).integral());
     ASSERT_TRUE(Value(kIntMin).integral());
@@ -3202,8 +3533,13 @@ public:
         add<Value::Coerce::NullToBool>();
         add<Value::Coerce::UndefinedToBool>();
         add<Value::Coerce::IntToInt>();
-        add<Value::Coerce::LongToInt>();
+        add<Value::Coerce::LongToIntTooLarge>();
+        add<Value::Coerce::LongToIntMinLong>();
+        add<Value::Coerce::LongToIntMaxLong>();
         add<Value::Coerce::DoubleToInt>();
+        add<Value::Coerce::DoubleNegativeToInt>();
+        add<Value::Coerce::DoubleMinIntToInt>();
+        add<Value::Coerce::DoubleMaxIntToInt>();
         add<Value::Coerce::NullToInt>();
         add<Value::Coerce::UndefinedToInt>();
         add<Value::Coerce::StringToInt>();
@@ -3214,6 +3550,23 @@ public:
         add<Value::Coerce::IntToLong>();
         add<Value::Coerce::LongToLong>();
         add<Value::Coerce::DoubleToLong>();
+        add<Value::Coerce::DoubleNegativeToLong>();
+        add<Value::Coerce::DoubleMinLongToLong>();
+        add<Value::Coerce::DoubleMaxLongToLong>();
+        add<Value::Coerce::DoubleSmallestSafeLongToLong>();
+        add<Value::Coerce::DoubleLargestSafeLongToLong>();
+        add<Value::Coerce::DoubleLargeWithPrecisionLossToLong>();
+        add<Value::Coerce::DoubleLongMaxPlusOneToLong>();
+        add<Value::Coerce::Decimal128ToInt>();
+        add<Value::Coerce::Decimal128NegativeToInt>();
+        add<Value::Coerce::Decimal128MinIntToInt>();
+        add<Value::Coerce::Decimal128MaxIntToInt>();
+        add<Value::Coerce::Decimal128TooSmallToInt>();
+        add<Value::Coerce::Decimal128TooLargeToInt>();
+        add<Value::Coerce::Decimal128PositiveInfToInt>();
+        add<Value::Coerce::Decimal128NegativeInfToInt>();
+        add<Value::Coerce::Decimal128PositiveNaNToInt>();
+        add<Value::Coerce::Decimal128NegativeNaNToInt>();
         add<Value::Coerce::NullToLong>();
         add<Value::Coerce::UndefinedToLong>();
         add<Value::Coerce::StringToLong>();
@@ -3222,6 +3575,16 @@ public:
         add<Value::Coerce::InvalidLargeToLong>();
         add<Value::Coerce::LowestDoubleToLong>();
         add<Value::Coerce::TowardsInfinityToLong>();
+        add<Value::Coerce::Decimal128ToLong>();
+        add<Value::Coerce::Decimal128NegativeToLong>();
+        add<Value::Coerce::Decimal128MinLongToLong>();
+        add<Value::Coerce::Decimal128MaxLongToLong>();
+        add<Value::Coerce::Decimal128TooSmallToLong>();
+        add<Value::Coerce::Decimal128TooLargeToLong>();
+        add<Value::Coerce::Decimal128PositiveInfToLong>();
+        add<Value::Coerce::Decimal128NegativeInfToLong>();
+        add<Value::Coerce::Decimal128PositiveNaNToLong>();
+        add<Value::Coerce::Decimal128NegativeNaNToLong>();
         add<Value::Coerce::IntToDouble>();
         add<Value::Coerce::LongToDouble>();
         add<Value::Coerce::DoubleToDouble>();

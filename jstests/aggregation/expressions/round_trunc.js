@@ -135,7 +135,7 @@ assertErrorCode(coll, [{$project: {a: {$trunc: [1, -21]}}}], 51083);
 assertErrorCode(coll, [{$project: {a: {$round: [1, NumberDecimal("1.4")]}}}], 51082);
 assertErrorCode(coll, [{$project: {a: {$trunc: [1, 10.5]}}}], 51082);
 assertErrorCode(coll, [{$project: {a: {$round: [0, NaN]}}}], 31109);
-assertErrorCode(coll, [{$project: {a: {$round: [0, NumberDecimal("NaN")]}}}], 51082);
+assertErrorCode(coll, [{$project: {a: {$round: [0, NumberDecimal("NaN")]}}}], [31109, 51082]);
 assertErrorCode(coll, [{$project: {a: {$round: [BinData(0, ""), 0]}}}], 51081);
 assertErrorCode(coll, [{$project: {a: {$round: [0, BinData(0, "")]}}}], 16004);
 assertErrorCode(coll, [{$project: {a: {$round: MinKey}}}], 51081);
