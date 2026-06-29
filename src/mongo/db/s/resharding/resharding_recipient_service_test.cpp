@@ -2869,6 +2869,11 @@ TEST_F(ReshardingRecipientServiceTest, RetryableErrorDuringChangeStreamsMonitorT
           "test"_attr = unittest::getTestName(),
           "testOptions"_attr = testOptions);
 
+    // Guard on kStrictConsistency transition so that reshardDoneCatchUp oplog does not race with
+    // writeToCollection, which can cause the recreated monitor to report the wrong delta.
+    PauseDuringStateTransitions stateTransitionsGuard{controller(),
+                                                      RecipientStateEnum::kStrictConsistency};
+
     // Fire the failpoint once with a retryable error. The monitor should clean up, recreate
     // itself from the last persisted resume token, and complete normally.
     auto fp = globalFailPointRegistry().find(
@@ -2883,6 +2888,10 @@ TEST_F(ReshardingRecipientServiceTest, RetryableErrorDuringChangeStreamsMonitorT
     notifyToStartCloning(opCtx.get(), *recipient, doc);
     awaitChangeStreamsMonitorStarted(opCtx.get(), *recipient, doc);
     notifyCriticalSectionStarted(opCtx.get(), *recipient, doc);
+
+    stateTransitionsGuard.wait(RecipientStateEnum::kStrictConsistency);
+    stateTransitionsGuard.unset(RecipientStateEnum::kStrictConsistency);
+
     awaitChangeStreamsMonitorCompleted(opCtx.get(), *recipient, doc);
     notifyReshardingCommitting(opCtx.get(), *recipient, doc);
 
