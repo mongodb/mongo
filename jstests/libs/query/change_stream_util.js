@@ -323,6 +323,7 @@ export function ChangeStreamTest(_db, options) {
         collection,
         aggregateOptions,
         doNotModifyInPassthroughs,
+        querySettings,
     }) {
         aggregateOptions = aggregateOptions || {};
         aggregateOptions.cursor = aggregateOptions.cursor || {batchSize: 1};
@@ -337,6 +338,13 @@ export function ChangeStreamTest(_db, options) {
         const collName = collection instanceof DBCollection ? collection.getName() : collection;
 
         return runInFixture(() => {
+            const cmdObj = Object.merge(
+                {aggregate: collName, pipeline, querySettings},
+                aggregateOptions,
+            );
+            if (querySettings) {
+                cmdObj.querySettings = querySettings;
+            }
             // Maximum number of tries, i.e. 1 initial attempt + 3 retries.
             // If adjusting this value in the future, be sure to constraint the maximum backoff time
             // below to avoid overly long sleeps.
@@ -347,7 +355,7 @@ export function ChangeStreamTest(_db, options) {
                     res = assert.commandWorked(
                         runCommandChangeStreamPassthroughAware(
                             _db,
-                            Object.merge({aggregate: collName, pipeline}, aggregateOptions),
+                            cmdObj,
                             doNotModifyInPassthroughs,
                         ),
                     );
@@ -362,12 +370,17 @@ export function ChangeStreamTest(_db, options) {
                 }
             }
             assert.neq(res.cursor.id, 0);
-            _cursorData.set(String(res.cursor.id), {
-                pipeline: pipeline,
-                collName: collName,
-                doNotModifyInPassthroughs: doNotModifyInPassthroughs,
-                aggregateOptions: aggregateOptions,
-            });
+
+            const cursorInfo = {
+                pipeline,
+                collName,
+                doNotModifyInPassthroughs,
+                aggregateOptions,
+            };
+            if (querySettings) {
+                cursorInfo.querySettings = querySettings;
+            }
+            _cursorData.set(String(res.cursor.id), cursorInfo);
             updateResumeToken(res.cursor, res.cursor.firstBatch);
             _allCursors.push(new DBCommandCursor(_db, res));
             return {...res.cursor, _changeStreamVersion: res._changeStreamVersion};
@@ -379,14 +392,19 @@ export function ChangeStreamTest(_db, options) {
      * ChangeStreamTest has been created on the 'admin' db, and will assert if not. It uses the
      * 'aggregateOptions' if provided and saves the cursor so that it can be cleaned up later.
      */
-    self.startWatchingAllChangesForCluster = function (aggregateOptions, changeStreamOptions = {}) {
+    self.startWatchingAllChangesForCluster = function (
+        aggregateOptions,
+        changeStreamOptions = {},
+        querySettings,
+    ) {
         assert.eq(_db.getName(), "admin");
         return self.startWatchingChanges({
             pipeline: [
                 {$changeStream: Object.assign({allChangesForCluster: true}, changeStreamOptions)},
             ],
             collection: 1,
-            aggregateOptions: aggregateOptions,
+            aggregateOptions,
+            querySettings,
         });
     };
 
@@ -406,14 +424,18 @@ export function ChangeStreamTest(_db, options) {
         });
         const pipeline = addResumeToken(cursorInfo.pipeline, cursorInfo.resumeToken);
 
-        const newCursor = self.startWatchingChanges({
-            pipeline: pipeline,
+        const params = {
+            pipeline,
             collection: cursorInfo.collName,
             aggregateOptions: Object.merge(cursorInfo.aggregateOptions || {}, {
                 cursor: {batchSize: 0},
             }),
             doNotModifyInPassthroughs: cursorInfo.doNotModifyInPassthroughs,
-        });
+        };
+        if (cursorInfo.querySettings) {
+            params.querySettings = cursorInfo.querySettings;
+        }
+        const newCursor = self.startWatchingChanges(params);
         Object.assign(cursor, newCursor);
         jsTest.log.info("ChangeStreamTest.restartChangeStream: restart complete", {
             oldCursorId: cursorId,
@@ -426,6 +448,7 @@ export function ChangeStreamTest(_db, options) {
                 `This may indicate the server reused the cursor ID or Object.assign failed to ` +
                 `update cursor.id.`,
         );
+        return newCursor;
     };
 
     /**
