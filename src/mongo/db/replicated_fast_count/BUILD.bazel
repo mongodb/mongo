@@ -49,26 +49,6 @@ mongo_cc_library(
     ],
 )
 
-idl_generator(
-    name = "logical_size_snapshot_gen",
-    src = "logical_size_snapshot.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-    ],
-)
-
-mongo_cc_library(
-    name = "logical_size_snapshot_idl",
-    srcs = [
-        ":logical_size_snapshot_gen",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/db:server_base",
-        "//src/mongo/idl:idl_parser",
-    ],
-)
-
 mongo_cc_library(
     name = "replicated_fast_count_metrics",
     srcs = [
@@ -558,52 +538,6 @@ mongo_cc_unit_test(
         "replicated_fast_count_streaming_oplog_delta_accumulator",
         "replicated_fast_count_test_helpers",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
-    ],
-)
-
-mongo_cc_unit_test(
-    name = "logical_size_tracker_test",
-    srcs = [
-        "logical_size_tracker_test.cpp",
-    ],
-    tags = [
-        "mongo_unittest_eighth_group",
-        "server-collection-write-path",
-    ],
-    deps = [
-        "logical_size_snapshot_receiver",
-        "logical_size_tracker",
-        "replicated_fast_count_test_helpers",
-        "//src/mongo/db/shard_role/lock_manager",
-        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
-        "//src/mongo/db/shard_role/shard_catalog:collection_catalog",
-        "//src/mongo/db/shard_role/shard_catalog:collection_mock",
-    ],
-)
-
-mongo_cc_library(
-    name = "logical_size_snapshot_receiver",
-    srcs = [
-        "logical_size_snapshot_receiver.cpp",
-    ],
-    deps = [
-        "logical_size_snapshot_idl",
-        "//src/mongo/db:service_context",
-    ],
-)
-
-mongo_cc_library(
-    name = "logical_size_tracker",
-    srcs = [
-        "logical_size_tracker.cpp",
-    ],
-    deps = [
-        "logical_size_snapshot_idl",
-        "logical_size_snapshot_receiver",
-        "//src/mongo/db:service_context",
-        "//src/mongo/db/shard_role",
-        "//src/mongo/db/shard_role/shard_catalog:collection_options",
-        "//src/mongo/db/storage:storage_engine_impl",
     ],
 )
 
