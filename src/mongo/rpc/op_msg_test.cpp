@@ -287,15 +287,38 @@ TEST_F(OpMsgParser, FailsIfNoBody) {
 }
 
 TEST_F(OpMsgParser, FailsIfNoBodyAndEmitsMsgParseLog) {
+    // The parse-failure log (id 22632) is rate-limited by a process-global SeveritySuppressor.
+    // Raise the component to Debug(2) so the single failure below is always emitted (and captured)
+    // regardless of the order in which the tests run.
+    unittest::MinimumLoggedSeverityGuard severityGuard{logv2::LogComponent::kNetwork,
+                                                       logv2::LogSeverity::Debug(2)};
+
     unittest::LogCaptureGuard logs;
 
     auto msg = OpMsgBytes{
-        kNoFlags,  //
+        kNoFlags,
     };
 
     ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::MissingOpMsgBodySection);
     ASSERT_EQ(logs.countBSONContainingSubset(BSON("c" << "OP_MSG" << "id" << 22632)), 1);
     ASSERT_EQ(logs.countBSONContainingSubset(BSON("c" << "NETWORK" << "id" << 22632)), 0);
+}
+
+TEST_F(OpMsgParser, RateLimitsParseFailureLog) {
+    // Ensure that OP_MSG parsing failure logs (id 22632) can only emit one log at Debug(1)
+    // verbosity per suppression period. Every subsequent log should be Debug(2), so in this
+    // test, we should see 1 log in the capture guard even though 5 errors happened.
+    unittest::LogCaptureGuard logs;
+
+    for (int i = 0; i < 5; ++i) {
+        auto msg = OpMsgBytes{
+            kNoFlags,
+        };
+
+        ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::MissingOpMsgBodySection);
+    }
+
+    ASSERT_LTE(logs.countBSONContainingSubset(BSON("c" << "OP_MSG" << "id" << 22632)), 1);
 }
 
 TEST_F(OpMsgParser, FailsIfNoBodyEvenWithSequence) {

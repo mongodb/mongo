@@ -43,10 +43,14 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 #include "mongo/util/bufreader.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
 
 #include <bitset>
@@ -265,9 +269,11 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
 
     return msg;
 } catch (const DBException& ex) {
+    static StaticImmortal<logv2::SeveritySuppressor> logSuppressor{
+        Seconds{1}, logv2::LogSeverity::Debug(1), logv2::LogSeverity::Debug(2)};
     LOGV2_DEBUG_OPTIONS(
         22632,
-        1,
+        (*logSuppressor)().toInt(),
         {logv2::LogComponent::kOpMsg},
         "invalid message: {ex_code} {ex} -- {hexdump_message_singleData_view2ptr_message_size}",
         "ex_code"_attr = ex.code(),
