@@ -31,26 +31,13 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/scripting/mozjs/wasm/scope/scope.h"
+#include "mongo/scripting/mozjs/wasm/scope/scope_test_fixture.h"
 #include "mongo/scripting/mozjs/wasm/wasmtime_engine.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 
 using namespace mongo;
 using namespace mongo::mozjs;
-
-namespace {
-struct GlobalEngineGuard {
-    GlobalEngineGuard() {
-        setGlobalScriptEngine(new WasmtimeScriptEngine());
-    }
-    ~GlobalEngineGuard() {
-        setGlobalScriptEngine(nullptr);
-    }
-    WasmtimeScriptEngine& engine() {
-        return *static_cast<WasmtimeScriptEngine*>(getGlobalScriptEngine());
-    }
-};
-}  // namespace
 
 // ---------------------------------------------------------------------------
 // Constructor freeze security tests
@@ -166,7 +153,6 @@ TEST(WasmtimeScope, Security_RealmReset_FreshConstructors) {
     scope->reset();
 
     // After reset, __savedObj is gone (new Realm) and Object is a new object.
-    // We can't directly compare across scopes, but we can verify the old stash is gone.
     ScriptingFunction checkClean =
         scope->createFunction("return typeof globalThis.__savedObj === 'undefined';");
     ScriptingFunction fn2 = scope->createFunction("return 1;");
@@ -187,7 +173,9 @@ TEST(WasmtimeScope, Security_RealmReset_ArrayHelpersPresent) {
     ASSERT_EQ(42.0, scope->getNumber("__returnValue"));
 }
 
-// --- Idle bridge lifecycle ---
+// ---------------------------------------------------------------------------
+// Idle bridge lifecycle
+// ---------------------------------------------------------------------------
 
 // A bridge parked within kMaxBridgeIdleTime is reused by the next createScopeForCurrentThread
 // on the same thread (fast resetRealm path rather than full re-instantiation).
@@ -200,7 +188,6 @@ TEST(WasmtimeScope, IdleBridge_FreshBridgeIsReused) {
     }
 
     // Immediately create a second scope — bridge should be reused (no full re-init).
-    // Verify the scope is functional: correct JS execution proves the reuse path is healthy.
     std::unique_ptr<Scope> scope2(engineGuard.engine().createScopeForCurrentThread(boost::none));
     ScriptingFunction fn = scope2->createFunction("return 1 + 1;");
     ASSERT_EQ(0, scope2->invoke(fn, nullptr, nullptr, 0));
@@ -476,9 +463,6 @@ TEST(WasmtimeScope, IdleBridge_ReuseCountIncrements) {
     constexpr uint32_t kLimit = WasmtimeScriptEngine::kMaxBridgeReuseCount;
 
     // Create+destroy kLimit+1 scopes to drive reuseCount to kLimit+1 in the idle slot.
-    // Iteration 0 creates a fresh bridge (idle slot empty) and parks it with reuseCount=1.
-    // Iteration k>0 revives the bridge (reuseCount=k ≤ kLimit → OK) and re-parks with
-    // reuseCount=k+1.  After kLimit+1 iterations reuseCount == kLimit+1.
     for (uint32_t i = 0; i <= kLimit; ++i) {
         std::unique_ptr<Scope> s(engineGuard.engine().createScopeForCurrentThread(boost::none));
     }
@@ -491,4 +475,128 @@ TEST(WasmtimeScope, IdleBridge_ReuseCountIncrements) {
     ScriptingFunction fn = s->createFunction("return 99;");
     ASSERT_EQ(0, s->invoke(fn, nullptr, nullptr, 0));
     ASSERT_EQ(99.0, s->getNumber("__returnValue"));
+}
+
+// ---------------------------------------------------------------------------
+// Cross-scope isolation
+// ---------------------------------------------------------------------------
+
+// Two scopes from the same engine have independent global state.
+TEST(WasmtimeScope, ScopeIsolation_IndependentGlobals) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope1(engine.createScopeForCurrentThread(boost::none));
+    std::unique_ptr<Scope> scope2(engine.createScopeForCurrentThread(boost::none));
+
+    scope1->setNumber("x", 1.0);
+    scope2->setNumber("x", 2.0);
+
+    ASSERT_EQ(1.0, scope1->getNumber("x"));
+    ASSERT_EQ(2.0, scope2->getNumber("x"));
+}
+
+// ---------------------------------------------------------------------------
+// reset() scrubs cross-request state
+// ---------------------------------------------------------------------------
+
+// Direct globalThis property writes (bypassing setGlobal) must not survive reset().
+// This is a security requirement: cross-request data leakage via globalThis pollution.
+TEST(WasmtimeScope, Security_Reset_ClearsDirectGlobalThisWrites) {
+    GlobalEngineGuard engineGuard;
+    std::unique_ptr<Scope> scope(engineGuard.engine().createScopeForCurrentThread(boost::none));
+
+    // Write directly to globalThis — bypasses _userGlobalNames tracking.
+    ScriptingFunction pollute =
+        scope->createFunction("globalThis.__secret__ = 'leaked'; return 1;");
+    ASSERT_EQ(0, scope->invoke(pollute, nullptr, nullptr, 0));
+
+    scope->reset();
+
+    // After reset, the property must be gone.
+    ScriptingFunction check =
+        scope->createFunction("return typeof globalThis.__secret__ === 'undefined';");
+    ASSERT_EQ(0, scope->invoke(check, nullptr, nullptr, 0));
+    ASSERT_TRUE(scope->getBoolean("__returnValue"));
+}
+
+// Non-enumerable properties written to globalThis must not survive reset().
+TEST(WasmtimeScope, Security_Reset_ClearsNonEnumerableGlobalWrites) {
+    GlobalEngineGuard engineGuard;
+    std::unique_ptr<Scope> scope(engineGuard.engine().createScopeForCurrentThread(boost::none));
+
+    ScriptingFunction pollute = scope->createFunction(
+        "Object.defineProperty(globalThis, '__hidden__', "
+        "  { value: 'leaked', enumerable: false, configurable: true });"
+        "return 1;");
+    ASSERT_EQ(0, scope->invoke(pollute, nullptr, nullptr, 0));
+
+    scope->reset();
+
+    ScriptingFunction check =
+        scope->createFunction("return typeof globalThis.__hidden__ === 'undefined';");
+    ASSERT_EQ(0, scope->invoke(check, nullptr, nullptr, 0));
+    ASSERT_TRUE(scope->getBoolean("__returnValue"));
+}
+
+// Object.prototype pollution must not persist across reset().
+TEST(WasmtimeScope, Security_Reset_ClearsPrototypePollution) {
+    GlobalEngineGuard engineGuard;
+    std::unique_ptr<Scope> scope(engineGuard.engine().createScopeForCurrentThread(boost::none));
+
+    ScriptingFunction pollute =
+        scope->createFunction("Object.prototype.__evil__ = 'leaked'; return 1;");
+    ASSERT_EQ(0, scope->invoke(pollute, nullptr, nullptr, 0));
+
+    scope->reset();
+
+    ScriptingFunction check = scope->createFunction("return typeof ({}).__evil__ === 'undefined';");
+    ASSERT_EQ(0, scope->invoke(check, nullptr, nullptr, 0));
+    ASSERT_TRUE(scope->getBoolean("__returnValue"));
+}
+
+// Replacing built-in functions (e.g. Math.abs) must not persist across reset().
+TEST(WasmtimeScope, Security_Reset_RestoresBuiltinFunctions) {
+    GlobalEngineGuard engineGuard;
+    std::unique_ptr<Scope> scope(engineGuard.engine().createScopeForCurrentThread(boost::none));
+
+    ScriptingFunction pollute =
+        scope->createFunction("Math.abs = function() { return 99; }; return 1;");
+    ASSERT_EQ(0, scope->invoke(pollute, nullptr, nullptr, 0));
+
+    scope->reset();
+
+    ScriptingFunction check = scope->createFunction("return Math.abs(-1) === 1;");
+    ASSERT_EQ(0, scope->invoke(check, nullptr, nullptr, 0));
+    ASSERT_TRUE(scope->getBoolean("__returnValue"));
+}
+
+// Properties attached to a cached function object must not survive reset().
+TEST(WasmtimeScope, Security_Reset_ClearsFunctionSlotState) {
+    GlobalEngineGuard engineGuard;
+    std::unique_ptr<Scope> scope(engineGuard.engine().createScopeForCurrentThread(boost::none));
+
+    // Compile the function once — it will be cached in _slots.
+    ScriptingFunction fn = scope->createFunction("return 1;");
+    ASSERT_EQ(0, scope->invoke(fn, nullptr, nullptr, 0));
+
+    // Stash data on the function object itself.
+    ScriptingFunction stash = scope->createFunction(
+        "var fns = Object.keys(globalThis).map(function(k) { return globalThis[k]; })"
+        "  .filter(function(v) { return typeof v === 'function'; });"
+        "if (fns.length > 0) { fns[0].__stash__ = 'SENSITIVE_DATA'; }"
+        "return 1;");
+    ASSERT_EQ(0, scope->invoke(stash, nullptr, nullptr, 0));
+
+    scope->reset();
+
+    // Re-invoke the cached function handle — __stash__ must be gone.
+    ScriptingFunction check = scope->createFunction(
+        "var leaked = false;"
+        "var fns = Object.keys(globalThis).map(function(k) { return globalThis[k]; })"
+        "  .filter(function(v) { return typeof v === 'function'; });"
+        "for (var i = 0; i < fns.length; i++) {"
+        "  if (fns[i].__stash__ !== undefined) { leaked = true; break; }"
+        "}"
+        "return !leaked;");
+    ASSERT_EQ(0, scope->invoke(check, nullptr, nullptr, 0));
+    ASSERT_TRUE(scope->getBoolean("__returnValue"));
 }

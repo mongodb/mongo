@@ -15,6 +15,17 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const st = new ShardingTest({shards: 2});
 const mongos = st.s;
 
+// OOM thresholds are unreliable on debug builds: the WASM runtime's per-object overhead is higher,
+// so neither the "too small" nor "sufficient" heap sizes produce consistent results.
+if (mongos.adminCommand("buildInfo").debug) {
+    jsTestLog(
+        "Skipping javascript_heap_limit_wasm.js: OOM thresholds are unreliable on debug " +
+            "builds due to higher WASM memory overhead.",
+    );
+    st.stop();
+    quit();
+}
+
 let mongosDB = mongos.getDB("test");
 let mongosColl = mongosDB.coll;
 

@@ -47,7 +47,11 @@ using namespace mongo::mozjs;
 // Each scope is thread-local (no sharing), so this exercises the pool and Engine creation
 // under concurrent load without any data races on scope state.
 TEST(WasmtimeScopeConcurrency, ConcurrentIndependentScopes) {
-    constexpr int kThreads = 16;
+    // 8 threads is enough concurrency to exercise the pool + on-demand Engine creation path
+    // while bounding peak memory: each scope holds a ~1.2 GB WASM linear-memory store, so larger
+    // counts pile up tens of GB of resident memory and tip slower CI hosts (notably macOS) into
+    // swapping, which previously blew the unit-test timeout.
+    constexpr int kThreads = 8;
     WasmtimeScriptEngine engine;
 
     std::vector<std::thread> threads;
@@ -69,10 +73,13 @@ TEST(WasmtimeScopeConcurrency, ConcurrentIndependentScopes) {
     ASSERT_EQ(successCount.load(), kThreads);
 }
 
-// More threads than the pre-warmed pool size forces pool exhaustion and on-demand context
-// creation — verifies the pool's mutex and fallback path are race-free.
+// More threads than the pre-warmed pool size (kContextPoolSize == 4) forces pool exhaustion and
+// on-demand context creation — verifies the pool's mutex and fallback path are race-free. 12 is
+// comfortably above the pool size to keep several threads racing on the fallback while bounding
+// peak memory: each scope holds a ~1.2 GB store, so larger counts swap slower CI hosts into the
+// unit-test timeout.
 TEST(WasmtimeScopeConcurrency, ConcurrentPoolExhaustion) {
-    constexpr int kThreads = 32;
+    constexpr int kThreads = 12;
     WasmtimeScriptEngine engine;
 
     std::vector<std::thread> threads;
@@ -154,7 +161,9 @@ TEST(WasmtimeScopeConcurrency, KillFromAnotherThread) {
 // N threads each create a scope, invoke a function, and destroy — simulating the
 // scopes, simulating the ScriptPool reuse pattern (create scope, invoke, discard).
 TEST(WasmtimeScopeConcurrency, ConcurrentFunctionInvoke) {
-    constexpr int kThreads = 16;
+    // Bounded to 8 for the same memory reason as ConcurrentIndependentScopes: each concurrent
+    // scope holds a ~1.2 GB store, and larger counts swap slower CI hosts into the timeout.
+    constexpr int kThreads = 8;
     WasmtimeScriptEngine engine;
 
     std::atomic<int> successCount{0};

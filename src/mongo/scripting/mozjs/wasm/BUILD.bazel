@@ -259,15 +259,16 @@ embed_binary_rc(
 )
 
 mongo_cc_unit_test(
-    name = "wasm_scope_test",
+    name = "wasm_scope_test_invocation",
     size = "large",
     timeout = "long",
     srcs = [
-        "//src/mongo/scripting/mozjs/wasm/scope:scope_test.cpp",
+        "//src/mongo/scripting/mozjs/wasm/scope:scope_test_invocation.cpp",
     ],
     auto_header = False,
+    private_hdrs = ["//src/mongo/scripting/mozjs/wasm/scope:scope_test_fixture.h"],
     tags = [
-        "mongo_unittest_second_group",
+        "mongo_unittest_fifth_group",
         "mozjs_wasm_tests",
     ],
     target_compatible_with = select({
@@ -283,7 +284,107 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_unit_test(
-    name = "wasm_scope_concurrency_test",
+    name = "wasm_scope_test_type_handling",
+    size = "large",
+    timeout = "long",
+    srcs = [
+        "//src/mongo/scripting/mozjs/wasm/scope:scope_test_type_handling.cpp",
+    ],
+    auto_header = False,
+    private_hdrs = ["//src/mongo/scripting/mozjs/wasm/scope:scope_test_fixture.h"],
+    tags = [
+        "mongo_unittest_fourth_group",
+        "mozjs_wasm_tests",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":wasmtime_engine",
+        "//src/mongo:base",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/scripting:scripting_common",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "wasm_scope_test_lifecycle",
+    size = "large",
+    timeout = "long",
+    srcs = [
+        "//src/mongo/scripting/mozjs/wasm/scope:scope_test_lifecycle.cpp",
+    ],
+    auto_header = False,
+    private_hdrs = ["//src/mongo/scripting/mozjs/wasm/scope:scope_test_fixture.h"],
+    tags = [
+        "mongo_unittest_fifth_group",
+        "mozjs_wasm_tests",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":wasmtime_engine",
+        "//src/mongo:base",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/scripting:scripting_common",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "wasm_scope_test_memory_limits",
+    size = "large",
+    timeout = "long",
+    srcs = [
+        "//src/mongo/scripting/mozjs/wasm/scope:scope_test_memory_limits.cpp",
+    ],
+    auto_header = False,
+    private_hdrs = ["//src/mongo/scripting/mozjs/wasm/scope:scope_test_fixture.h"],
+    tags = [
+        "mongo_unittest_eighth_group",
+        "mozjs_wasm_tests",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":wasmtime_engine",
+        "//src/mongo:base",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/scripting:scripting_common",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "wasm_scope_test_error_handling",
+    size = "large",
+    timeout = "long",
+    srcs = [
+        "//src/mongo/scripting/mozjs/wasm/scope:scope_test_error_handling.cpp",
+    ],
+    auto_header = False,
+    private_hdrs = ["//src/mongo/scripting/mozjs/wasm/scope:scope_test_fixture.h"],
+    tags = [
+        "mongo_unittest_fifth_group",
+        "mozjs_wasm_tests",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":wasmtime_engine",
+        "//src/mongo:base",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/scripting:scripting_common",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "wasm_scope_test_concurrency",
     size = "large",
     timeout = "long",
     srcs = [
@@ -291,7 +392,7 @@ mongo_cc_unit_test(
     ],
     auto_header = False,
     tags = [
-        "mongo_unittest_third_group",
+        "mongo_unittest_fourth_group",
         "mozjs_wasm_tests",
     ],
     target_compatible_with = select({
@@ -314,6 +415,7 @@ mongo_cc_unit_test(
         "//src/mongo/scripting/mozjs/wasm/scope:scope_test_security.cpp",
     ],
     auto_header = False,
+    private_hdrs = ["//src/mongo/scripting/mozjs/wasm/scope:scope_test_fixture.h"],
     tags = [
         "mongo_unittest_first_group",
         "mozjs_wasm_tests",
