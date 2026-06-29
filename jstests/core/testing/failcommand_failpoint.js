@@ -8,6 +8,8 @@
  *   assumes_read_preference_unchanged,
  *   no_selinux,
  *   does_not_support_repeated_reads,
+ *   # TODO SERVER-129949: Enable the test on gRPC
+ *   grpc_incompatible,
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
