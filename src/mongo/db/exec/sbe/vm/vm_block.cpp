@@ -558,7 +558,7 @@ value::TagValueOwned ByteCode::builtinValueBlockAggSum(ArityType arity) {
         8151801, "Expected block and bitset to be the same size", block.count() == bitset.count());
     dassert(allBools(bitset.tags(), bitset.count()), "Expected bitset to be all bools");
 
-    value::TagValueOwned blockRes;
+    value::TagValueOwned blockRes = value::TagValueOwned::nothing();
     for (size_t i = 0; i < bitset.count(); ++i) {
         if (value::bitcastTo<bool>(bitset[i].value) && value::isNumber(block.tags()[i])) {
             // If 'blockRes' is Nothing, set 'blockRes' equal to 'block[i]'. Otherwise, compute the

@@ -492,39 +492,6 @@ inline std::size_t hashCombine(std::size_t state, std::size_t val) noexcept {
     return state;
 }
 
-/**
- * RAII guard.
- */
-class ValueGuard {
-public:
-    MONGO_COMPILER_ALWAYS_INLINE ValueGuard(const std::pair<TypeTags, Value> typedValue)
-        : ValueGuard(typedValue.first, typedValue.second) {}
-    MONGO_COMPILER_ALWAYS_INLINE ValueGuard(TypeTags tag, Value val) : _tag(tag), _value(val) {}
-    MONGO_COMPILER_ALWAYS_INLINE ValueGuard(bool owned, TypeTags tag, Value val)
-        : ValueGuard(owned ? tag : TypeTags::Nothing, owned ? val : 0) {}
-    MONGO_COMPILER_ALWAYS_INLINE ValueGuard(
-        const FastTuple<bool, value::TypeTags, value::Value>& tuple)
-        : ValueGuard(tuple.a, tuple.b, tuple.c) {}
-    ValueGuard() = delete;
-    ValueGuard(const ValueGuard&) = delete;
-    ValueGuard(ValueGuard&& other) = delete;
-    MONGO_COMPILER_ALWAYS_INLINE ~ValueGuard() {
-        releaseValue(_tag, _value);
-    }
-
-    ValueGuard& operator=(const ValueGuard&) = delete;
-    ValueGuard& operator=(ValueGuard&& other) = delete;
-
-    void reset() {
-        _tag = TypeTags::Nothing;
-        _value = 0;
-    }
-
-private:
-    TypeTags _tag;
-    Value _value;
-};
-
 // Forward-declared here because TagValueView::copy() references it.
 class TagValueOwned;
 
@@ -601,23 +568,28 @@ public:
     static TagValueOwned date(int64_t v) noexcept;
     static TagValueOwned timestamp(uint64_t v) noexcept;
 
-    TagValueOwned() : _tag(TypeTags::Nothing), _value(0) {}
+    TagValueOwned() = delete;
 
-    TagValueOwned(TypeTags tag, Value value) : _tag(tag), _value(value) {}
+    MONGO_COMPILER_ALWAYS_INLINE TagValueOwned(TypeTags tag, Value value)
+        : _tag(tag), _value(value) {}
 
-    TagValueOwned(std::pair<TypeTags, Value> tv) : TagValueOwned(tv.first, tv.second) {}
+    MONGO_COMPILER_ALWAYS_INLINE TagValueOwned(bool owned, TypeTags tag, Value value)
+        : TagValueOwned(owned ? tag : TypeTags::Nothing, owned ? value : 0) {}
 
-    TagValueOwned(TagValueOwned&& o) {
+    MONGO_COMPILER_ALWAYS_INLINE TagValueOwned(std::pair<TypeTags, Value> tv)
+        : TagValueOwned(tv.first, tv.second) {}
+
+    MONGO_COMPILER_ALWAYS_INLINE TagValueOwned(TagValueOwned&& o) {
         _tag = o._tag;
         _value = o._value;
         o.disown();
     }
 
-    ~TagValueOwned() {
+    MONGO_COMPILER_ALWAYS_INLINE ~TagValueOwned() {
         release();
     }
 
-    TagValueOwned& operator=(TagValueOwned&& o) {
+    MONGO_COMPILER_ALWAYS_INLINE TagValueOwned& operator=(TagValueOwned&& o) {
         if (&o != this) {
             release();
             _tag = o._tag;
@@ -669,6 +641,10 @@ public:
         _value = 0;
     }
 
+    void reset() {
+        disown();
+    }
+
     void swap(TagValueOwned& o) noexcept {
         std::swap(_tag, o._tag);
         std::swap(_value, o._value);
@@ -684,6 +660,8 @@ private:
 };
 
 static_assert(sizeof(TagValueOwned) <= 16ULL, "TagValueOwned should not be larger than 16 bytes");
+
+using ValueGuard = TagValueOwned;
 
 inline void swap(TagValueOwned& a, TagValueOwned& b) noexcept {
     a.swap(b);

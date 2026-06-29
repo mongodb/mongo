@@ -495,7 +495,7 @@ TsBlock::TsBlock(size_t ncells,
                  bool isTimeField,
                  std::pair<TypeTags, Value> controlMin,
                  std::pair<TypeTags, Value> controlMax)
-    : _block({owned, blockTag, blockVal}),
+    : _block(owned, blockTag, blockVal),
       _count(ncells),
       _bucketVersion(bucketVersion),
       _isTimeField(isTimeField),
