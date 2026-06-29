@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/execution_control/in_progress_time_accumulator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/shard_role/shard_catalog/authoritative_collection_metadata_statistics.h"
 #include "mongo/db/shard_role/shard_catalog/authoritative_database_statistics.h"
@@ -99,6 +100,18 @@ struct MONGO_MOD_NEEDS_REPLACEMENT ShardingStatistics {
     // Cumulative, always-increasing counter of how many bytes have been deleted by the
     // rangeDeleter.
     AtomicWord<long long> countBytesDeletedByRangeDeleter{0};
+
+    // Cumulative, always-increasing counters of how many execution tickets the rangeDeleter
+    // acquired (including how many came from the low-priority pool, which the rangeDeleter uses
+    // when background task deprioritization is enabled).
+    AtomicWord<long long> rangeDeleterTicketAdmissions{0};
+    AtomicWord<long long> rangeDeleterLowPriorityTicketAdmissions{0};
+
+    // Total time rangeDeleter operations have spent queued waiting for an execution ticket, and
+    // processing while holding one, each including the in-progress time of any deletion currently
+    // in that state. The queue accumulator also exposes the "currently queued" gauge.
+    admission::execution_control::InProgressTimeAccumulator rangeDeleterTicketQueueTime;
+    admission::execution_control::InProgressTimeAccumulator rangeDeleterTicketProcessingTime;
 
     // Cumulative, always-increasing counter of how many chunks this node started to receive
     // (whether the receiving succeeded or not)

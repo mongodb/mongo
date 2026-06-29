@@ -1,31 +1,31 @@
 /**
- * Tests that TTL deletions and index builds report their execution ticket statistics — time queued
- * for tickets, time processing while holding tickets, and admission counts — in serverStatus and in
- * their per-operation log lines.
+ * Tests that background tasks (TTL deletions, index builds, and range deletions) report their
+ * execution ticket statistics — time queued for tickets, time processing while holding tickets,
+ * and admission counts — in serverStatus and in their per-operation log lines.
  *
- * Each case forces the task to wait for a ticket by zeroing the low-priority ticket pools, waiting
- * until it is parked in the queue, then granting a single ticket. This makes the queued-time
- * counters advance deterministically rather than relying on incidental contention.
+ * Each case forces the background task to wait for a ticket by zeroing the low-priority ticket
+ * pools, waiting until the task is parked in the queue, then granting a single ticket. This makes
+ * the queued-time counters advance deterministically rather than relying on incidental contention.
  *
  * @tags: [
  *   # The test deploys replica sets with execution control concurrency adjustment configured by
  *   # each test case, which should not be overwritten and expect to have 'throughputProbing' as
  *   # default.
  *   incompatible_with_execution_control_with_prioritization,
+ *   requires_sharding,
  * ]
  */
 
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {insertTestDocuments} from "jstests/noPassthrough/admission/execution_control/libs/execution_control_helper.js";
 
 const kNumDocs = 1000;
 
-// Attribute predicates shared by all per-operation ticket-stats log lines. The check is loose for
-// the queued fields because a log line attributes ticket cost to a single unit of work, which does
-// not necessarily cover the operation's whole execution — so the queue wait may land elsewhere and
-// read 0 on a given line. Admissions and processing time, by contrast, are always incurred.
+// Attribute predicates shared by all per-operation ticket-stats log lines. The check is very loose because
+// logged values might not capture the waits we induce in the test.
 const kTicketStatsLogAttrs = {
     timeQueuedForTicketsMicros: (v) => v >= 0,
     timeProcessingWithTicketsMicros: (v) => v > 0,
@@ -40,6 +40,14 @@ const kTicketStatsFields = {
     processing: "timeProcessingWithTicketsMicros",
     queued: "timeQueuedForTicketsMicros",
     queuedGauge: "queuedForTickets",
+};
+
+const kRangeDeleterTicketStatsFields = {
+    admissions: "rangeDeleterTicketAdmissions",
+    lowPriority: "rangeDeleterLowPriorityTicketAdmissions",
+    processing: "rangeDeleterTimeProcessingWithTicketsMicros",
+    queued: "rangeDeleterTimeQueuedForTicketsMicros",
+    queuedGauge: "rangeDeleterQueuedForTickets",
 };
 
 function setLowPriorityTickets(conn, numTickets) {
@@ -67,8 +75,8 @@ function awaitQueuedThenRelease(conn, getStats, queuedGaugeField, taskName) {
 // updated continuously while the task runs (at every ticket acquisition/release), but may
 // slightly trail the visible completion of its work, hence the polling.
 function awaitTicketStatsIncreased(getStats, beforeStats, fields) {
-    // Counters may not be rendered in serverStatus until they are first incremented, so treat
-    // missing 'before' fields as zero.
+    // Counters backed by OTEL metrics may not be rendered in serverStatus until they are first
+    // incremented, so treat missing 'before' fields as zero.
     const before = (name) => beforeStats[name] ?? 0;
 
     let afterStats;
@@ -76,7 +84,8 @@ function awaitTicketStatsIncreased(getStats, beforeStats, fields) {
         () => {
             afterStats = getStats();
             for (const [key, name] of Object.entries(fields)) {
-                // The currently-queued gauge may be absent until the task first queues.
+                // The currently-queued gauge may be absent until the task first queues (OTEL
+                // metrics are only rendered once first updated).
                 if (key === "queuedGauge") {
                     continue;
                 }
@@ -116,7 +125,7 @@ describe("Background task ticket admission statistics", function () {
                         executionControlHeuristicDeprioritization: false,
                         internalQueryExecYieldIterations: 1,
                     },
-                    // Log every slow operation so the per-operation log lines can be asserted on.
+                    // Log every TTL deletion so the slow-op log line can be asserted on.
                     slowms: 0,
                 },
             });
@@ -198,6 +207,88 @@ describe("Background task ticket admission statistics", function () {
             assert(
                 checkLog.checkContainsOnceJson(primary, 20663, kTicketStatsLogAttrs),
                 "index build completion log line missing required ticket stats attributes",
+            );
+        });
+    });
+
+    describe("Range deletions", function () {
+        let st, donor, coll, ns;
+
+        before(function () {
+            st = new ShardingTest({
+                shards: 2,
+                other: {
+                    rsOptions: {
+                        setParameter: {
+                            executionControlDeprioritizationGate: true,
+                            // Make sure nothing else is competing for low-priority tickets.
+                            executionControlHeuristicDeprioritization: false,
+                            internalQueryExecYieldIterations: 1,
+                        },
+                    },
+                },
+            });
+
+            const dbName = jsTestName();
+            coll = st.s.getDB(dbName).coll;
+            ns = coll.getFullName();
+
+            assert.commandWorked(
+                st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+            );
+            assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
+
+            insertTestDocuments(coll, kNumDocs, {payloadSize: 1024});
+            assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: kNumDocs / 2}}));
+
+            donor = st.shard0;
+        });
+
+        after(function () {
+            st.stop();
+        });
+
+        it("reports range deleter ticket stats in serverStatus and the range deletion log line", function () {
+            const getStats = () => donor.getDB("admin").serverStatus().shardingStatistics;
+            const before = getStats();
+
+            // Zero the low-priority ticket pools on the donor so the range deletion parks in the
+            // ticket queue. The chunk migration itself runs at normal priority and is unaffected;
+            // only the deprioritized orphan-range deletion stalls. moveChunk with _waitForDelete
+            // blocks until the deletion completes, so run it in a parallel shell.
+            setLowPriorityTickets(donor, 0);
+            const awaitMoveChunk = startParallelShell(
+                funWithArgs(
+                    function (ns, toShard) {
+                        assert.commandWorked(
+                            db.adminCommand({
+                                moveChunk: ns,
+                                find: {_id: 0},
+                                to: toShard,
+                                _waitForDelete: true,
+                            }),
+                        );
+                    },
+                    ns,
+                    st.shard1.shardName,
+                ),
+                st.s.port,
+            );
+            awaitQueuedThenRelease(
+                donor,
+                getStats,
+                kRangeDeleterTicketStatsFields.queuedGauge,
+                "range deletion",
+            );
+            awaitMoveChunk();
+
+            awaitTicketStatsIncreased(getStats, before, kRangeDeleterTicketStatsFields);
+
+            // "Finished deletion of documents in orphan range" must carry the ticket stats
+            // attributes.
+            assert(
+                checkLog.checkContainsOnceJson(st.rs0.getPrimary(), 9239400, kTicketStatsLogAttrs),
+                "range deletion log line missing required ticket stats attributes",
             );
         });
     });

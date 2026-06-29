@@ -29,6 +29,7 @@
 
 #include "mongo/db/s/ready_range_deletions_processor.h"
 
+#include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/range_deleter_service.h"
@@ -37,6 +38,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -77,6 +79,23 @@ BSONObj getShardKeyPattern(OperationContext* opCtx,
             .ignore();
         continue;
     }
+}
+
+admission::execution_control::ScopedTicketAdmissionStatsRecorder::OnUpdateFn
+makeRangeDeleterTicketStatsUpdater(ShardingStatistics& shardingStats) {
+    return [&shardingStats](const admission::execution_control::TicketAdmissionStats& delta) {
+        shardingStats.rangeDeleterTicketAdmissions.fetchAndAddRelaxed(delta.admissions);
+        shardingStats.rangeDeleterLowPriorityTicketAdmissions.fetchAndAddRelaxed(
+            delta.lowPriorityAdmissions);
+        if (delta.startedQueueing || delta.finishedQueueing) {
+            shardingStats.rangeDeleterTicketQueueTime.onCountChange(delta.startedQueueing -
+                                                                    delta.finishedQueueing);
+        }
+        if (delta.admissions || delta.releases) {
+            shardingStats.rangeDeleterTicketProcessingTime.onCountChange(delta.admissions -
+                                                                         delta.releases);
+        }
+    };
 }
 }  // namespace
 
@@ -324,16 +343,36 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
                             AlternativeClientRegion acr(newClient);
                             auto batchOpCtxHolder = opCtxFactory.makeOperationContext(&cc());
                             auto* batchOpCtx = batchOpCtxHolder.get();
+
+                            // Keep the serverStatus ticket metrics up to date as the deletion
+                            // acquires and releases execution tickets, so a range deletion
+                            // stalled on ticket admission is visible in serverStatus/FTDC while
+                            // it is stalled. The local stats are attached to the completion log
+                            // line below.
+                            auto& shardingStats = ShardingStatistics::get(batchOpCtx);
+                            admission::execution_control::ScopedTicketAdmissionStatsRecorder
+                                ticketStatsRecorder(
+                                    batchOpCtx, makeRangeDeleterTicketStatsUpdater(shardingStats));
+
                             auto numDocsAndBytesDeleted =
                                 uassertStatusOK(rangedeletionutil::deleteRangeInBatches(
                                     batchOpCtx, dbName, collectionUuid, shardKeyPattern, range));
+                            const auto& ticketStats = ticketStatsRecorder.stats();
                             LOGV2_INFO(9239400,
                                        "Finished deletion of documents in orphan range",
                                        "namespace"_attr = possiblyStaleNss,
                                        "collectionUUID"_attr = collectionUuid.toString(),
                                        "range"_attr = redact(range.toString()),
                                        "docsDeleted"_attr = numDocsAndBytesDeleted.first,
-                                       "bytesDeleted"_attr = numDocsAndBytesDeleted.second);
+                                       "bytesDeleted"_attr = numDocsAndBytesDeleted.second,
+                                       "timeQueuedForTicketsMicros"_attr =
+                                           ticketStats.timeQueuedMicros,
+                                       "timeProcessingWithTicketsMicros"_attr =
+                                           ticketStats.timeProcessingMicros,
+                                       "ticketAdmissions"_attr = ticketStats.admissions,
+                                       "lowPriorityTicketAdmissions"_attr =
+                                           ticketStats.lowPriorityAdmissions,
+                                       "ticketQueueEntries"_attr = ticketStats.startedQueueing);
                         }
                         orphansRemovalCompleted = true;
                     } catch (ExceptionFor<

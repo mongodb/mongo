@@ -78,6 +78,16 @@ void ShardingStatistics::report(BSONObjBuilder* builder) const {
     builder->append("countDocsDeletedByRangeDeleter", countDocsDeletedByRangeDeleter.loadRelaxed());
     builder->append("countBytesDeletedByRangeDeleter",
                     countBytesDeletedByRangeDeleter.loadRelaxed());
+    // Computed at read time so a deletion currently stalled on ticket admission shows its
+    // in-progress wait growing in real time, not just once it is granted a ticket.
+    builder->append("rangeDeleterTimeQueuedForTicketsMicros",
+                    rangeDeleterTicketQueueTime.totalMicros());
+    builder->append("rangeDeleterTimeProcessingWithTicketsMicros",
+                    rangeDeleterTicketProcessingTime.totalMicros());
+    builder->append("rangeDeleterTicketAdmissions", rangeDeleterTicketAdmissions.loadRelaxed());
+    builder->append("rangeDeleterLowPriorityTicketAdmissions",
+                    rangeDeleterLowPriorityTicketAdmissions.loadRelaxed());
+    builder->append("rangeDeleterQueuedForTickets", rangeDeleterTicketQueueTime.currentCount());
     builder->append("countDonorMoveChunkLockTimeout", countDonorMoveChunkLockTimeout.loadRelaxed());
     builder->append("countDonorMoveChunkAbortConflictingIndexOperation",
                     countDonorMoveChunkAbortConflictingIndexOperation.loadRelaxed());
