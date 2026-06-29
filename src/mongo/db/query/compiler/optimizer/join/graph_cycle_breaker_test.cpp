@@ -131,6 +131,12 @@ public:
             cost_based_ranker::EstimationSource::Code);
     }
 
+    void setSelectivitySourceAsMetadata(EdgeId edgeId, double newSelectivity) {
+        edgeSelectivities[edgeId] = cost_based_ranker::SelectivityEstimate(
+            cost_based_ranker::SelectivityType(newSelectivity),
+            cost_based_ranker::EstimationSource::Metadata);
+    }
+
     GraphCycleBreaker makeCycleBreaker() {
         if (!joinGraphSrorage.has_value()) {
             joinGraphSrorage = JoinGraph(std::move(graph));
@@ -197,8 +203,9 @@ TEST_F(GraphCycleBreakerTest, NoCompoundEdgeSelection) {
     auto edge_cd = addEdge(c, d);
     auto edge_da = addCompoundEdge(d, a);
 
-    // We expected that the only non-compound edge C-D will be removed to break the 4-cycle.
-    std::vector<EdgeId> expectedEdges{edge_ab, edge_bc, edge_da};
+    // The 4 candidates sorted ascending by selectivity: [edge_ab, edge_bc, edge_cd, edge_da].
+    // (size-1)/2 = 1 → edge_bc (higher selectivity, smaller value) is removed.
+    std::vector<EdgeId> expectedEdges{edge_ab, edge_cd, edge_da};
 
     auto newEdges = breakCycles(edge_ab, edge_bc, edge_cd, edge_da);
     std::sort(newEdges.begin(), newEdges.end());
@@ -435,6 +442,106 @@ TEST_F(GraphCycleBreakerTest, CliqueOf6) {
     }
 
     validateCycles(/*expectedNumberOfCycles*/ cyclesInClique(6));
+}
+
+/**
+ * Tests that a cycle larger than 3 removes the edge at index (size-1)/2 after sorting by
+ * selectivity ascending, i.e. the higher-selectivity (smaller value) of the two middle edges.
+ */
+TEST_F(GraphCycleBreakerTest, MiddleEdgeForLargerCycle) {
+    auto edge_ab = addEdge(a, b);
+    auto edge_bc = addEdge(b, c);
+    auto edge_cd = addEdge(c, d);
+    auto edge_da = addEdge(d, a);
+
+    // Sorted ascending: edge_ab(0.001), edge_bc(0.003), edge_cd(0.005), edge_da(0.007)
+    // (size-1)/2 = 1 → edge_bc (higher selectivity) is removed.
+    setSelectivity(edge_ab, 0.001);
+    setSelectivity(edge_bc, 0.003);
+    setSelectivity(edge_cd, 0.005);
+    setSelectivity(edge_da, 0.007);
+
+    std::vector<EdgeId> expectedEdges{edge_ab, edge_cd, edge_da};
+    auto newEdges = breakCycles(edge_ab, edge_bc, edge_cd, edge_da);
+    std::sort(newEdges.begin(), newEdges.end());
+    ASSERT_EQ(newEdges, expectedEdges);
+
+    // Rearrange so that a different edge lands at index 1.
+    // Sorted ascending: edge_da(0.003), edge_cd(0.005), edge_bc(0.007), edge_ab(0.009)
+    // (size-1)/2 = 1 → edge_cd is removed.
+    setSelectivity(edge_ab, 0.009);
+    setSelectivity(edge_bc, 0.007);
+    setSelectivity(edge_cd, 0.005);
+    setSelectivity(edge_da, 0.003);
+
+    expectedEdges = {edge_ab, edge_bc, edge_da};
+    newEdges = breakCycles(edge_ab, edge_bc, edge_cd, edge_da);
+    std::sort(newEdges.begin(), newEdges.end());
+    ASSERT_EQ(newEdges, expectedEdges);
+}
+
+/**
+ * Tests that Metadata edges are preserved when at least one non-Metadata edge is available:
+ * only non-Metadata edges are candidates for removal.
+ */
+TEST_F(GraphCycleBreakerTest, MetadataEdgesExcludedWhenNonMetadataPresent) {
+    auto edge_ab = addEdge(a, b);
+    auto edge_bc = addEdge(b, c);
+    auto edge_ca = addEdge(c, a);
+
+    // edge_ab is Metadata; edge_bc and edge_ca are Code.
+    // Only non-Metadata edges are candidates: [edge_bc(0.002), edge_ca(0.006)].
+    // (size-1)/2 = 0 → edge_bc (higher selectivity) is removed.
+    setSelectivitySourceAsMetadata(edge_ab, 0.001);
+    setSelectivity(edge_bc, 0.002);
+    setSelectivity(edge_ca, 0.006);
+
+    std::vector<EdgeId> expectedEdges{edge_ab, edge_ca};
+    auto newEdges = breakCycles(edge_ab, edge_bc, edge_ca);
+    std::sort(newEdges.begin(), newEdges.end());
+    ASSERT_EQ(newEdges, expectedEdges);
+}
+
+/**
+ * Tests that when all edges have Metadata selectivity the breaker falls back to using all edges
+ * and removes the one at the median index.
+ */
+TEST_F(GraphCycleBreakerTest, AllMetadataEdgesFallbackToMedian) {
+    auto edge_ab = addEdge(a, b);
+    auto edge_bc = addEdge(b, c);
+    auto edge_ca = addEdge(c, a);
+
+    // All Metadata. Sorted: [edge_ab(0.001), edge_bc(0.003), edge_ca(0.007)].
+    // Median index = 3/2 = 1 → edge_bc is removed.
+    setSelectivitySourceAsMetadata(edge_ab, 0.001);
+    setSelectivitySourceAsMetadata(edge_bc, 0.003);
+    setSelectivitySourceAsMetadata(edge_ca, 0.007);
+
+    std::vector<EdgeId> expectedEdges{edge_ab, edge_ca};
+    auto newEdges = breakCycles(edge_ab, edge_bc, edge_ca);
+    std::sort(newEdges.begin(), newEdges.end());
+    ASSERT_EQ(newEdges, expectedEdges);
+}
+
+/**
+ * Tests that a single non-Metadata edge is always removed to preserve the more reliable Metadata
+ * edges, regardless of the relative selectivity values.
+ */
+TEST_F(GraphCycleBreakerTest, SingleNonMetadataEdgeAlwaysRemoved) {
+    auto edge_ab = addEdge(a, b);
+    auto edge_bc = addEdge(b, c);
+    auto edge_ca = addEdge(c, a);
+
+    // edge_ab is Code with a very high (unselective) value; the other two are Metadata with
+    // very low values. Only edge_ab is a candidate, so it is always removed.
+    setSelectivity(edge_ab, 0.9);
+    setSelectivitySourceAsMetadata(edge_bc, 0.001);
+    setSelectivitySourceAsMetadata(edge_ca, 0.002);
+
+    std::vector<EdgeId> expectedEdges{edge_bc, edge_ca};
+    auto newEdges = breakCycles(edge_ab, edge_bc, edge_ca);
+    std::sort(newEdges.begin(), newEdges.end());
+    ASSERT_EQ(newEdges, expectedEdges);
 }
 
 

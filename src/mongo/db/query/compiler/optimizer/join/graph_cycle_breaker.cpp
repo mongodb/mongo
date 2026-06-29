@@ -228,31 +228,50 @@ std::vector<EdgeId> GraphCycleBreaker::breakCycles(std::vector<EdgeId> subgraph)
     return subgraph;
 }
 
+// Returns true if at least one edge in 'cycleBitset' has a selectivity estimate derived from a
+// source other than Metadata. Metadata-sourced estimates are the most reliable (derived from index
+// metadata), so we prefer to keep those edges and drop non-Metadata ones instead.
+bool containsNonMetadataSelectivities(const Bitset& cycleBitset,
+                                      const EdgeSelectivities& edgeSelectivities) {
+    for (auto edgeId : makePopulationView(cycleBitset)) {
+        if (edgeSelectivities.at(edgeId).source() !=
+            cost_based_ranker::EstimationSource::Metadata) {
+            return true;
+        }
+    }
+    return false;
+}
+
 EdgeId GraphCycleBreaker::breakCycle(const Bitset& cycleBitset,
                                      const EdgeSelectivities& edgeSelectivities,
                                      const Bitset& edgesWithSimplePredicates) const {
-    // 1. Break a cycle of 3 by removing the middle edge sorted by selectivity.
-    if (cycleBitset.count() == 3) {
-        absl::InlinedVector<std::pair<cost_based_ranker::SelectivityEstimate, EdgeId>, 3>
-            selectivities;
+    absl::InlinedVector<std::pair<cost_based_ranker::SelectivityEstimate, EdgeId>, 8> selectivities;
+    // 1. Exclude Metadata-sourced edges from the drop candidates: Metadata estimates are the most
+    // reliable (derived from index metadata), so we prefer to keep those edges. Only non-Metadata
+    // edges are candidates for removal.
+    if (containsNonMetadataSelectivities(cycleBitset, edgeSelectivities)) {
+        for (auto edgeId : makePopulationView(cycleBitset)) {
+            if (edgeSelectivities.at(edgeId).source() !=
+                cost_based_ranker::EstimationSource::Metadata) {
+                selectivities.emplace_back(edgeSelectivities.at(edgeId),
+                                           static_cast<EdgeId>(edgeId));
+            }
+        }
+    } else {  // If all edges are Metadata-sourced, fall back to considering all edges.
         for (auto edgeId : makePopulationView(cycleBitset)) {
             selectivities.emplace_back(edgeSelectivities.at(edgeId), static_cast<EdgeId>(edgeId));
         }
-        // Sort by selectivity using an exact (strict-weak-ordering) comparison; the estimates'
-        // approximate ordering is not transitive and is unsafe for std::sort.
-        std::sort(selectivities.begin(), selectivities.end(), [](const auto& a, const auto& b) {
-            return cost_based_ranker::exactLt(a.first, b.first);
-        });
-        return selectivities[1].second;
     }
 
-    // 2. Or break a cycle by selecting a non-compound edge.
-    if (cycleBitset.intersects(edgesWithSimplePredicates)) {
-        return (cycleBitset & edgesWithSimplePredicates).findFirst();
-    }
+    // 2. Sort by selectivity using an exact (strict-weak-ordering) comparison; the estimates'
+    // approximate ordering is not transitive and is unsafe for std::sort.
+    std::sort(selectivities.begin(), selectivities.end(), [](const auto& a, const auto& b) {
+        return cost_based_ranker::exactLt(a.first, b.first);
+    });
 
-    // 3. Or break a cycle by selecting any edge.
-    return cycleBitset.findFirst();
+    // 3. Drop the middle edge. For an odd number of candidates there is exactly one middle edge.
+    // For an even number there are two middle edges,drop the one with higher selectivity.
+    return selectivities[(selectivities.size() - 1) / 2].second;
 }
 
 Bitset GraphCycleBreaker::getEdgeBitset(
