@@ -453,6 +453,7 @@ const skips = new Set([
     "$listExtensions",
     "$listLocalSessions",
     "$listMqlEntities",
+    "$listQueryKnobs",
     "$listSampledQueries", // Tested in list_sampled_queries.js.
     "$listSearchIndexes",
     "$listSessions",

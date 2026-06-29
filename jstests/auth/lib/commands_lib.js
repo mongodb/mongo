@@ -10462,6 +10462,26 @@ export const authCommandsLib = {
             ],
         },
         {
+            testname: "aggregate_$listQueryKnobs",
+            command: {
+                aggregate: 1,
+                pipeline: [{$listQueryKnobs: {}}],
+                cursor: {},
+            },
+            testcases: [
+                // expectFail is true because $listQueryKnobs is only allowed to run on the admin database,
+                // but this check occurs post-auth.
+                // A user defined role with no privileges is authorized to run this stage because it is a
+                // test-only command (enabled only under --enableTestCommands).
+                {
+                    runOnDb: firstDbName,
+                    roles: roles_all,
+                    privileges: [],
+                    expectFail: true,
+                },
+            ],
+        },
+        {
             testname: "aggregate_$listExtensions",
             skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagExtensionsAPI"),
             command: {

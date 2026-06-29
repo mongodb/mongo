@@ -415,6 +415,7 @@ mongo_cc_library(
         "document_source_list_cached_and_active_users.cpp",
         "document_source_list_local_sessions.cpp",
         "document_source_list_mql_entities.cpp",
+        "document_source_list_query_knobs.cpp",
         "document_source_list_sampled_queries.cpp",
         "document_source_list_sessions.cpp",
         "document_source_lookup.cpp",
