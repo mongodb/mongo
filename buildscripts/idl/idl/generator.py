@@ -1317,7 +1317,6 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             "mongo/bson/bsonobjbuilder.h",
             "mongo/bson/simple_bsonobj_comparator.h",
             "mongo/idl/idl_parser.h",
-            "mongo/rpc/op_msg.h",
             "mongo/stdx/unordered_map.h",
             "mongo/util/decimal_counter.h",
             "mongo/util/serialization_context.h",
@@ -1325,6 +1324,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         if self.has_module_tag(spec):
             header_list.append("mongo/util/modules.h")
+
+        if spec.commands:
+            header_list.append("mongo/rpc/op_msg.h")
 
         if spec.configs:
             header_list.append("mongo/util/options_parser/option_description.h")
