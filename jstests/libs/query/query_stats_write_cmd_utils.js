@@ -419,9 +419,12 @@ export function runMongosWriteMetricsTests({
                 undefined,
                 "assertExecMetrics requires keysPerDoc (index count on the collection)",
             );
-            // TODO SERVER-128278 remove special handling for deletes on sharded clusters. On sharded
-            // clusters, docsExamined may exceed the expected value, so we have to validate it
-            // differently, but we never expect it to be double the expected value.
+
+            // On sharded clusters, deletes can double-count docsExamined: the COLLSCAN phase counts
+            // each matching document once, and then the DELETE stage could re-fetch it from the
+            // shard, counting it a second time. So docsExamined may be anywhere in [expected,
+            // expected * 2]. When docsExaminedOverride is set, we assert the range rather than an
+            // exact value.
             let resolvedDocsExamined = docsExamined;
             if (docsExaminedOverride) {
                 const actual = getQueryExecMetrics(entry.metrics).docsExamined.sum;
@@ -429,7 +432,9 @@ export function runMongosWriteMetricsTests({
                 assert.lte(actual, docsExamined * 2);
                 resolvedDocsExamined = actual;
             }
-            // We validate docsExamined above, for assertAggregatedMetricsSingleExec to pass we will pass in the actual docsExamined value.
+
+            // We validate docsExamined above, for assertAggregatedMetricsSingleExec to pass we will
+            // pass in the actual docsExamined value.
             assertAggregatedMetricsSingleExec(entry, {
                 keysExamined,
                 docsExamined: resolvedDocsExamined,

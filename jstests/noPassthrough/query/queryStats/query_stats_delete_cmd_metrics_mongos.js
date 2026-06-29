@@ -43,6 +43,5 @@ runMongosWriteMetricsTests({
     }),
     validateCmdFn: (result) => assert.eq(result.n, 1, result),
     getQueryStatsFn: getQueryStatsDeleteCmd,
-    // TODO SERVER-128278 remove special handling for deletes on sharded clusters.
     docsExaminedOverride: true,
 });
