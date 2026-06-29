@@ -45,12 +45,14 @@ _AUBSAN_TASK_FACTOR_OVERRIDES = [
     {"task": r"sharded_causally_consistent_jscore_passthrough", "factor": 0.125},
     {"task": "sharded_causally_consistent_read_concern_snapshot_passthrough", "factor": 0.25},
     {"task": r"sharding_jscore_passthrough.*", "factor": 0.25},
+    # NOTE: this more-specific entry must precede the broader sharding.*stepdown.* entry below,
+    # otherwise first-match-wins in get_task_factor() would shadow it and 0.09375 would never apply.
+    {"task": "sharding_stepdown_fcv_upgrade_downgrade_jscore_passthrough", "factor": 0.09375},
     {"task": r"sharding.*stepdown.*jscore_passthrough.*", "factor": 0.125},
     {
         "task": r"sharded_collections_causally_consistent_jscore_txns_passthrough.*",
         "factor": 0.125,
     },
-    {"task": "sharding_stepdown_fcv_upgrade_downgrade_jscore_passthrough", "factor": 0.09375},
     # more common overrides should be placed after more specific overrides
     {"task": r".*shard.*", "factor": 0.25},
 ]
