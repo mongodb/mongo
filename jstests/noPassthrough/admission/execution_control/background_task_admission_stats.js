@@ -1,9 +1,9 @@
 /**
- * Tests that index builds report their execution ticket statistics — time queued for tickets, time
- * processing while holding tickets, and admission counts — in serverStatus and in the build
- * completion log line.
+ * Tests that TTL deletions and index builds report their execution ticket statistics — time queued
+ * for tickets, time processing while holding tickets, and admission counts — in serverStatus and in
+ * their per-operation log lines.
  *
- * The test forces the build to wait for a ticket by zeroing the low-priority ticket pools, waiting
+ * Each case forces the task to wait for a ticket by zeroing the low-priority ticket pools, waiting
  * until it is parked in the queue, then granting a single ticket. This makes the queued-time
  * counters advance deterministically rather than relying on incidental contention.
  *
@@ -129,6 +129,44 @@ describe("Background task ticket admission statistics", function () {
 
         after(function () {
             replTest.stopSet();
+        });
+
+        it("reports TTL ticket stats in serverStatus and the TTL deletion log line", function () {
+            assert.commandWorked(coll.createIndex({expireAt: 1}, {expireAfterSeconds: 0}));
+
+            const pastDate = new Date(Date.now() - 5000);
+            insertTestDocuments(coll, kNumDocs, {
+                payloadSize: 1024,
+                docGenerator: (id, payload) => ({_id: id, expireAt: pastDate, payload: payload}),
+            });
+
+            const getStats = () => primary.getDB("admin").serverStatus().metrics.ttl;
+            const before = getStats();
+
+            // Zero the low-priority ticket pools so the TTL deletion parks in the ticket queue, then
+            // enable the monitor so a pass begins and stalls on ticket admission.
+            setLowPriorityTickets(primary, 0);
+            assert.commandWorked(primary.adminCommand({setParameter: 1, ttlMonitorEnabled: true}));
+            awaitQueuedThenRelease(
+                primary,
+                getStats,
+                kTicketStatsFields.queuedGauge,
+                "TTL deletion",
+            );
+
+            assert.soon(
+                () => coll.countDocuments({}) === 0,
+                "TTL monitor did not delete documents",
+            );
+
+            awaitTicketStatsIncreased(getStats, before, kTicketStatsFields);
+            assert.commandWorked(primary.adminCommand({setParameter: 1, ttlMonitorEnabled: false}));
+
+            // "Deleted expired documents using index" must carry the ticket stats attributes.
+            assert(
+                checkLog.checkContainsOnceJson(primary, 5479200, kTicketStatsLogAttrs),
+                "TTL deletion log line missing required ticket stats attributes",
+            );
         });
 
         it("reports index build ticket stats in serverStatus and the build completion log line", function () {

@@ -331,6 +331,16 @@ public:
         MetricNameMaker::make("serverStatus.metrics.ttl.examinedKeys");
     static constexpr MetricName kTtlInvalidTtlIndexSkips =
         MetricNameMaker::make("serverStatus.metrics.ttl.invalidTTLIndexSkips");
+    static constexpr MetricName kTtlTimeQueuedForTickets =
+        MetricNameMaker::make("serverStatus.metrics.ttl.timeQueuedForTicketsMicros");
+    static constexpr MetricName kTtlTimeProcessingWithTickets =
+        MetricNameMaker::make("serverStatus.metrics.ttl.timeProcessingWithTicketsMicros");
+    static constexpr MetricName kTtlTicketAdmissions =
+        MetricNameMaker::make("serverStatus.metrics.ttl.ticketAdmissions");
+    static constexpr MetricName kTtlLowPriorityTicketAdmissions =
+        MetricNameMaker::make("serverStatus.metrics.ttl.lowPriorityTicketAdmissions");
+    static constexpr MetricName kTtlQueuedForTickets =
+        MetricNameMaker::make("serverStatus.metrics.ttl.queuedForTickets");
     static constexpr MetricName kIndexCount =
         MetricNameMaker::make("serverStatus.indexStats.count");
     static constexpr MetricName kIndexStatsMultikeyNewPathsOrdinaryInTransaction =
