@@ -81,7 +81,7 @@ public:
     StageConstraints constraints(PipelineSplitState pipeState) const final {
         auto constraints = StageConstraints{StreamType::kBlocking,
                                             PositionRequirement::kFirst,
-                                            HostTypeRequirement::kLocalOnly,
+                                            HostTypeRequirement::kReceivingHostOnly,
                                             DiskUseRequirement::kNoDiskUse,
                                             FacetRequirement::kNotAllowed,
                                             TransactionRequirement::kNotAllowed,

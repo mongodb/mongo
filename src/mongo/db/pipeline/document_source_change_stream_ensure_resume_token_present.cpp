@@ -73,7 +73,7 @@ StageConstraints DocumentSourceChangeStreamEnsureResumeTokenPresent::constraints
                                  PositionRequirement::kNone,
                                  // If this is parsed on mongos it should stay on mongos. If we're
                                  // not in a sharded cluster then it's okay to run on mongod.
-                                 HostTypeRequirement::kLocalOnly,
+                                 HostTypeRequirement::kReceivingHostOnly,
                                  DiskUseRequirement::kNoDiskUse,
                                  FacetRequirement::kNotAllowed,
                                  TransactionRequirement::kNotAllowed,

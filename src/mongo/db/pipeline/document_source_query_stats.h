@@ -127,7 +127,7 @@ public:
     StageConstraints constraints(PipelineSplitState = PipelineSplitState::kUnsplit) const override {
         StageConstraints constraints{StreamType::kStreaming,
                                      PositionRequirement::kFirst,
-                                     HostTypeRequirement::kLocalOnly,
+                                     HostTypeRequirement::kReceivingHostOnly,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
                                      TransactionRequirement::kNotAllowed,

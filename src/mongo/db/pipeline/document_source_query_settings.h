@@ -129,16 +129,16 @@ public:
                                 bool showDebugQueryShape);
 
     /**
-     * Returns the stage constraints used to override 'DocumentSourceQueue'. The 'kLocalOnly' host
-     * type requirement is needed to ensure that the reported query settings are consistent with
-     * what's present on the current node. Without this, it's possible that '$querySettings' might
-     * report configurations which are present on 'mongod' instances, but not yet present on
-     * 'mongos' ones and consequently won't be enforced.
+     * Returns the stage constraints used to override 'DocumentSourceQueue'. The
+     * 'kReceivingHostOnly' host type requirement is needed to ensure that the reported query
+     * settings are consistent with what's present on the current node. Without this, it's possible
+     * that '$querySettings' might report configurations which are present on 'mongod' instances,
+     * but not yet present on 'mongos' ones and consequently won't be enforced.
      */
     StageConstraints constraints(PipelineSplitState pipeState) const final {
         StageConstraints constraints{DocumentSource::StreamType::kStreaming,
                                      DocumentSource::PositionRequirement::kFirst,
-                                     DocumentSource::HostTypeRequirement::kLocalOnly,
+                                     DocumentSource::HostTypeRequirement::kReceivingHostOnly,
                                      DocumentSource::DiskUseRequirement::kNoDiskUse,
                                      DocumentSource::FacetRequirement::kNotAllowed,
                                      DocumentSource::TransactionRequirement::kAllowed,

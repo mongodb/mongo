@@ -948,7 +948,7 @@ public:
     StageConstraints constraints(PipelineSplitState pipeState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
-                HostTypeRequirement::kAnyShard,
+                HostTypeRequirement::kTargetedShards,
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kAllowed,
                 TransactionRequirement::kAllowed,
@@ -981,7 +981,7 @@ TEST_F(DocumentSourceFacetTest, ShouldSurfaceStrictestRequirementsOfEachConstrai
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
     ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).hostRequirement ==
-           StageConstraints::HostTypeRequirement::kAnyShard);
+           StageConstraints::HostTypeRequirement::kTargetedShards);
     ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).diskRequirement ==
            StageConstraints::DiskUseRequirement::kWritesTmpData);
     ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).transactionRequirement ==

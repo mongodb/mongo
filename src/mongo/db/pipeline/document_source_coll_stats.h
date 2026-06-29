@@ -136,8 +136,9 @@ public:
     }
 
     StageConstraints constraints(PipelineSplitState pipeState) const final {
-        HostTypeRequirement hostTypeRequirement =
-            _targetAllNodes ? HostTypeRequirement::kAllShardHosts : HostTypeRequirement::kAnyShard;
+        HostTypeRequirement hostTypeRequirement = _targetAllNodes
+            ? HostTypeRequirement::kAllShardHosts
+            : HostTypeRequirement::kTargetedShards;
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kFirst,
                                      hostTypeRequirement,

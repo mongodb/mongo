@@ -81,12 +81,12 @@ Value DocumentSourceListSearchIndexes::serialize(
     return Value(Document{{kStageName, bob.done()}});
 }
 
-// We use 'kLocalOnly' because the aggregation request can be handled by a shard or mongos depending
-// on where the user sends the request.
+// We use 'kReceivingHostOnly' because the aggregation request can be handled by a shard or mongos
+// depending on where the user sends the request.
 StageConstraints DocumentSourceListSearchIndexes::constraints(PipelineSplitState pipeState) const {
     StageConstraints constraints(StreamType::kStreaming,
                                  PositionRequirement::kFirst,
-                                 HostTypeRequirement::kLocalOnly,
+                                 HostTypeRequirement::kReceivingHostOnly,
                                  DiskUseRequirement::kNoDiskUse,
                                  FacetRequirement::kNotAllowed,
                                  TransactionRequirement::kNotAllowed,

@@ -317,8 +317,9 @@ StageConstraints DocumentSourceFacet::constraints(PipelineSplitState state) cons
     }
 
     // Clear the captured merging shard if 'host' is incompatible with merging on a shard.
-    if (!(host == HostTypeRequirement::kNone || host == HostTypeRequirement::kRunOnceAnyNode ||
-          host == HostTypeRequirement::kAnyShard)) {
+    if (!(host == HostTypeRequirement::kNone ||
+          host == HostTypeRequirement::kCollectionlessSourceRunOnceAnyNode ||
+          host == HostTypeRequirement::kTargetedShards)) {
         mergeShardId = boost::none;
     }
 

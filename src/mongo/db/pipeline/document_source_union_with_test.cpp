@@ -596,7 +596,7 @@ TEST_F(DocumentSourceUnionWithTest, ConstraintsWithoutPipelineAreCorrect) {
                   Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx()));
     StageConstraints defaultConstraints(StageConstraints::StreamType::kStreaming,
                                         StageConstraints::PositionRequirement::kNone,
-                                        StageConstraints::HostTypeRequirement::kAnyShard,
+                                        StageConstraints::HostTypeRequirement::kTargetedShards,
                                         StageConstraints::DiskUseRequirement::kNoDiskUse,
                                         StageConstraints::FacetRequirement::kAllowed,
                                         StageConstraints::TransactionRequirement::kNotAllowed,
@@ -609,7 +609,7 @@ TEST_F(DocumentSourceUnionWithTest, ConstraintsWithMixedSubPipelineAreCorrect) {
     const auto mock = DocumentSourceMock::createForTest({}, getExpCtx());
     StageConstraints stricterConstraint(StageConstraints::StreamType::kStreaming,
                                         StageConstraints::PositionRequirement::kNone,
-                                        StageConstraints::HostTypeRequirement::kAnyShard,
+                                        StageConstraints::HostTypeRequirement::kTargetedShards,
                                         StageConstraints::DiskUseRequirement::kNoDiskUse,
                                         StageConstraints::FacetRequirement::kNotAllowed,
                                         StageConstraints::TransactionRequirement::kNotAllowed,
@@ -627,7 +627,7 @@ TEST_F(DocumentSourceUnionWithTest, ConstraintsWithStrictSubPipelineAreCorrect) 
     StageConstraints constraintTmpDataFacetLookupNotAllowedNoFieldMod(
         StageConstraints::StreamType::kStreaming,
         StageConstraints::PositionRequirement::kNone,
-        StageConstraints::HostTypeRequirement::kAnyShard,
+        StageConstraints::HostTypeRequirement::kTargetedShards,
         StageConstraints::DiskUseRequirement::kWritesTmpData,
         StageConstraints::FacetRequirement::kNotAllowed,
         StageConstraints::TransactionRequirement::kAllowed,
@@ -662,7 +662,7 @@ TEST_F(DocumentSourceUnionWithTest, ConstraintsWithStrictSubPipelineAreCorrect) 
             getExpCtx()));
     StageConstraints strict(StageConstraints::StreamType::kStreaming,
                             StageConstraints::PositionRequirement::kNone,
-                            StageConstraints::HostTypeRequirement::kAnyShard,
+                            StageConstraints::HostTypeRequirement::kTargetedShards,
                             StageConstraints::DiskUseRequirement::kWritesPersistentData,
                             StageConstraints::FacetRequirement::kNotAllowed,
                             StageConstraints::TransactionRequirement::kNotAllowed,
@@ -675,7 +675,7 @@ TEST_F(DocumentSourceUnionWithTest, StricterConstraintsFromSubSubPipelineAreInhe
     const auto mock = DocumentSourceMock::createForTest({}, getExpCtx());
     StageConstraints strictConstraint(StageConstraints::StreamType::kStreaming,
                                       StageConstraints::PositionRequirement::kNone,
-                                      StageConstraints::HostTypeRequirement::kAnyShard,
+                                      StageConstraints::HostTypeRequirement::kTargetedShards,
                                       StageConstraints::DiskUseRequirement::kNoDiskUse,
                                       StageConstraints::FacetRequirement::kAllowed,
                                       StageConstraints::TransactionRequirement::kNotAllowed,
@@ -691,7 +691,7 @@ TEST_F(DocumentSourceUnionWithTest, StricterConstraintsFromSubSubPipelineAreInhe
         Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{facetStage}, getExpCtx()));
     StageConstraints expectedConstraints(StageConstraints::StreamType::kStreaming,
                                          StageConstraints::PositionRequirement::kNone,
-                                         StageConstraints::HostTypeRequirement::kAnyShard,
+                                         StageConstraints::HostTypeRequirement::kTargetedShards,
                                          StageConstraints::DiskUseRequirement::kNoDiskUse,
                                          StageConstraints::FacetRequirement::kNotAllowed,
                                          StageConstraints::TransactionRequirement::kNotAllowed,

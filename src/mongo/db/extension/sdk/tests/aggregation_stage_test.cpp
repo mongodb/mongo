@@ -362,7 +362,7 @@ TEST_F(AggStageTest, SearchLikeSourceAggStageAstNodeSucceeds) {
     auto handle = AggStageAstNodeHandle{astNode};
     auto props = handle->getProperties();
     ASSERT_EQ(props.getPosition(), MongoExtensionPositionRequirementEnum::kFirst);
-    ASSERT_EQ(props.getHostType(), MongoExtensionHostTypeRequirementEnum::kAnyShard);
+    ASSERT_EQ(props.getHostType(), MongoExtensionHostTypeRequirementEnum::kTargetedShards);
     ASSERT_FALSE(props.getRequiresInputDocSource());
     ASSERT_FALSE(props.getPreservesUpstreamMetadata());
 

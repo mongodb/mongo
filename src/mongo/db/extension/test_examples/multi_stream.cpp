@@ -268,7 +268,8 @@ public:
         extension::MongoExtensionStaticProperties properties;
         properties.setRequiresInputDocSource(false);
         properties.setPosition(extension::MongoExtensionPositionRequirementEnum::kFirst);
-        properties.setHostType(extension::MongoExtensionHostTypeRequirementEnum::kRunOnceAnyNode);
+        properties.setHostType(
+            extension::MongoExtensionHostTypeRequirementEnum::kCollectionlessSourceRunOnceAnyNode);
         properties.setProvidedMetadataFields(std::vector<std::string>{"searchScore"});
         BSONObjBuilder builder;
         properties.serialize(&builder);

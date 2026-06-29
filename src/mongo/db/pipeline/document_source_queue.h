@@ -114,7 +114,7 @@ public:
 
         StageConstraints constraints{StreamType::kStreaming,
                                      PositionRequirement::kFirst,
-                                     HostTypeRequirement::kRunOnceAnyNode,
+                                     HostTypeRequirement::kCollectionlessSourceRunOnceAnyNode,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
                                      TransactionRequirement::kAllowed,

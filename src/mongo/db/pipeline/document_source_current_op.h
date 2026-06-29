@@ -175,11 +175,11 @@ public:
             _showLocalOpsOnMongoS.value_or(kDefaultLocalOpsMode) == LocalOpsMode::kLocalMongosOps;
         HostTypeRequirement hostTypeRequirement;
         if (showLocalOps) {
-            hostTypeRequirement = HostTypeRequirement::kLocalOnly;
+            hostTypeRequirement = HostTypeRequirement::kReceivingHostOnly;
         } else if (_targetAllNodes.value_or(false)) {
             hostTypeRequirement = HostTypeRequirement::kAllShardHosts;
         } else {
-            hostTypeRequirement = HostTypeRequirement::kAnyShard;
+            hostTypeRequirement = HostTypeRequirement::kTargetedShards;
         }
         StageConstraints constraints(
             StreamType::kStreaming,

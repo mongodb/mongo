@@ -51,9 +51,9 @@ enums:
         type: string
         values:
             kNone: "none"
-            kLocalOnly: "localOnly"
-            kRunOnceAnyNode: "runOnceAnyNode"
-            kAnyShard: "anyShard"
+            kReceivingHostOnly: "receivingHostOnly"
+            kCollectionlessSourceRunOnceAnyNode: "collectionlessSourceRunOnceAnyNode"
+            kTargetedShards: "targetedShards"
             kRouter: "router"
             kAllShardHosts: "allShardHosts"
     MongoExtensionStreamType:

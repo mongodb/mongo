@@ -118,7 +118,7 @@ public:
     StageConstraints constraints(PipelineSplitState pipeState) const final {
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kCustom,
-                                     HostTypeRequirement::kAnyShard,
+                                     HostTypeRequirement::kTargetedShards,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
                                      TransactionRequirement::kAllowed,

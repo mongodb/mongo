@@ -105,7 +105,7 @@ StageConstraints DocumentSourceChangeStreamSplitLargeEvent::constraints(
     PipelineSplitState pipeState) const {
     StageConstraints constraints{StreamType::kStreaming,
                                  PositionRequirement::kCustom,
-                                 HostTypeRequirement::kAnyShard,
+                                 HostTypeRequirement::kTargetedShards,
                                  DiskUseRequirement::kNoDiskUse,
                                  FacetRequirement::kNotAllowed,
                                  TransactionRequirement::kNotAllowed,

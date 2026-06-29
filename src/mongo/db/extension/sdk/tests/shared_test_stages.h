@@ -554,7 +554,7 @@ public:
     BSONObj getProperties() const override {
         return BSON("requiresInputDocSource"
                     << false << "position" << "first" << "hostType"
-                    << "anyShard"
+                    << "targetedShards"
                     << "requiredMetadataFields" << BSON_ARRAY("score") << "providedMetadataFields"
                     << BSON_ARRAY("searchHighlights") << "preservesUpstreamMetadata" << false);
     }
@@ -573,7 +573,7 @@ public:
     BSONObj getProperties() const override {
         return BSON("requiresInputDocSource"
                     << false << "position" << "first" << "hostType"
-                    << "anyShard"
+                    << "targetedShards"
                     << "requiredMetadataFields" << BSON_ARRAY("score") << "providedMetadataFields"
                     << BSON_ARRAY("searchHighlights") << "preservesUpstreamMetadata" << true);
     }
@@ -593,7 +593,7 @@ public:
     BSONObj getProperties() const override {
         return BSON("requiresInputDocSource"
                     << false << "position" << "first" << "hostType"
-                    << "anyShard"
+                    << "targetedShards"
                     << "requiredMetadataFields" << BSON_ARRAY("customSearchScore")
                     << "providedMetadataFields" << BSON_ARRAY("searchScore" << "searchHighlights"));
     }
@@ -613,7 +613,7 @@ public:
     BSONObj getProperties() const override {
         return BSON("requiresInputDocSource"
                     << false << "position" << "first" << "hostType"
-                    << "anyShard"
+                    << "targetedShards"
                     << "requiredMetadataFields" << BSON_ARRAY("searchScore")
                     << "providedMetadataFields"
                     << BSON_ARRAY("customSearchScore" << "searchHighlights"));

@@ -77,9 +77,9 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSplitPipeline::create
             if (type == BSONType::string) {
                 auto mergeTypeString = elt.valueStringData();
                 if ("localOnly"sv == mergeTypeString) {
-                    mergeType = HostTypeRequirement::kLocalOnly;
+                    mergeType = HostTypeRequirement::kReceivingHostOnly;
                 } else if ("anyShard"sv == mergeTypeString) {
-                    mergeType = HostTypeRequirement::kAnyShard;
+                    mergeType = HostTypeRequirement::kTargetedShards;
                 } else if ("router"sv == mergeTypeString || "mongos"sv == mergeTypeString) {
                     mergeType = HostTypeRequirement::kRouter;
                 } else {
@@ -130,11 +130,11 @@ Value DocumentSourceInternalSplitPipeline::serialize(
     Document specificShardDoc;
 
     switch (_mergeType) {
-        case HostTypeRequirement::kAnyShard:
+        case HostTypeRequirement::kTargetedShards:
             mergeTypeString = "anyShard";
             break;
 
-        case HostTypeRequirement::kLocalOnly:
+        case HostTypeRequirement::kReceivingHostOnly:
             mergeTypeString = "localOnly";
             break;
 

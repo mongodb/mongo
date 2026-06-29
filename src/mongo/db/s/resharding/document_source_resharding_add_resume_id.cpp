@@ -73,7 +73,7 @@ StageConstraints DocumentSourceReshardingAddResumeId::constraints(
     PipelineSplitState pipeState) const {
     StageConstraints constraints(StreamType::kStreaming,
                                  PositionRequirement::kNone,
-                                 HostTypeRequirement::kAnyShard,
+                                 HostTypeRequirement::kTargetedShards,
                                  DiskUseRequirement::kNoDiskUse,
                                  FacetRequirement::kNotAllowed,
                                  TransactionRequirement::kNotAllowed,

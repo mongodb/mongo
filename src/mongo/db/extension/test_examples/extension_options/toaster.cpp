@@ -200,8 +200,8 @@ public:
 
         // Source stage properties.
         properties.setPosition(mongo::extension::MongoExtensionPositionRequirementEnum::kFirst);
-        properties.setHostType(
-            mongo::extension::MongoExtensionHostTypeRequirementEnum::kRunOnceAnyNode);
+        properties.setHostType(mongo::extension::MongoExtensionHostTypeRequirementEnum::
+                                   kCollectionlessSourceRunOnceAnyNode);
         properties.setRequiresInputDocSource(false);
         properties.setAllowedInFacet(false);
 

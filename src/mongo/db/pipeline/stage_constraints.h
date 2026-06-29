@@ -72,13 +72,13 @@ struct MONGO_MOD_PUBLIC StageConstraints {
         kNone,
         // Indicates that the stage must run on the host to which it was originally sent and
         // cannot be forwarded from mongoS to the shards.
-        kLocalOnly,
+        kReceivingHostOnly,
         // Indicates that the stage must run exactly once, but it is ok to forward it from the
         // router to a shard to execute if some other stage in the pipeline needs to run on a
         // shard. The stage provides its own data and is independent of any collection.
-        kRunOnceAnyNode,
-        // Indicates that the stage must run on any participating shard.
-        kAnyShard,
+        kCollectionlessSourceRunOnceAnyNode,
+        // Indicates that the stage must run on all participating shards.
+        kTargetedShards,
         // Indicates that the stage can run in a router-role context.
         kRouter,
         // Indicates that the stage should run on all data-bearing hosts, primary and secondary, for
@@ -204,7 +204,7 @@ struct MONGO_MOD_PUBLIC StageConstraints {
                 "A stage which is allowlisted for $changeStream cannot have a requirement to run "
                 "on a shard, since it needs to be able to run on mongoS in a cluster",
                 !(changeStreamRequirement == ChangeStreamRequirement::kAllowlist &&
-                  (hostRequirement == HostTypeRequirement::kAnyShard ||
+                  (hostRequirement == HostTypeRequirement::kTargetedShards ||
                    hostRequirement == HostTypeRequirement::kAllShardHosts)));
 
         tassert(11282902,
@@ -238,21 +238,22 @@ struct MONGO_MOD_PUBLIC StageConstraints {
 
     /**
      * Returns the literal HostTypeRequirement used to initialize the StageConstraints, or the
-     * effective HostTypeRequirement (kAnyShard or kRouter) if kLocalOnly was specified.
+     * effective HostTypeRequirement (kTargetedShards or kRouter) if kReceivingHostOnly was
+     * specified.
      */
     HostTypeRequirement resolvedHostTypeRequirement(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
-        return (hostRequirement != HostTypeRequirement::kLocalOnly
+        return (hostRequirement != HostTypeRequirement::kReceivingHostOnly
                     ? hostRequirement
                     : (expCtx->getInRouter() ? HostTypeRequirement::kRouter
-                                             : HostTypeRequirement::kAnyShard));
+                                             : HostTypeRequirement::kTargetedShards));
     }
 
     /**
      * True if this stage must run on the same host to which it was originally sent.
      */
     bool mustRunLocally() const {
-        return hostRequirement == HostTypeRequirement::kLocalOnly;
+        return hostRequirement == HostTypeRequirement::kReceivingHostOnly;
     }
 
     /**

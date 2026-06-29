@@ -93,7 +93,7 @@ DocumentSourceListMqlEntities::DocumentSourceListMqlEntities(
 StageConstraints DocumentSourceListMqlEntities::constraints(PipelineSplitState pipeState) const {
     auto constraints = StageConstraints{StreamType::kStreaming,
                                         PositionRequirement::kFirst,
-                                        HostTypeRequirement::kLocalOnly,
+                                        HostTypeRequirement::kReceivingHostOnly,
                                         DiskUseRequirement::kNoDiskUse,
                                         FacetRequirement::kNotAllowed,
                                         TransactionRequirement::kNotAllowed,

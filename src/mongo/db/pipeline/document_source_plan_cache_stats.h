@@ -119,7 +119,7 @@ public:
         StageConstraints constraints{StreamType::kStreaming,
                                      PositionRequirement::kFirst,
                                      _allHosts ? HostTypeRequirement::kAllShardHosts
-                                               : HostTypeRequirement::kAnyShard,
+                                               : HostTypeRequirement::kTargetedShards,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
                                      TransactionRequirement::kNotAllowed,

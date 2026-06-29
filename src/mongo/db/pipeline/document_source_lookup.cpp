@@ -700,14 +700,14 @@ StageConstraints DocumentSourceLookUp::constraints(PipelineSplitState pipeState)
         // $lookup from config.cache.chunks* namespaces is permitted to run on each individual
         // shard, rather than just a merging shard, since each shard should have an identical copy
         // of the namespace.
-        hostRequirement = HostTypeRequirement::kAnyShard;
+        hostRequirement = HostTypeRequirement::kTargetedShards;
     } else if (pipeState == PipelineSplitState::kSplitForShards) {
         // This stage will only be on the shards pipeline if $lookup on sharded foreign collections
         // is allowed.
-        hostRequirement = HostTypeRequirement::kAnyShard;
+        hostRequirement = HostTypeRequirement::kTargetedShards;
     } else if (_fromNs.isCollectionlessAggregateNS()) {
         // When the inner pipeline does not target a collection, it can run on any node.
-        hostRequirement = HostTypeRequirement::kRunOnceAnyNode;
+        hostRequirement = HostTypeRequirement::kCollectionlessSourceRunOnceAnyNode;
     } else {
         // If the pipeline is unsplit, then this $lookup can run anywhere.
         hostRequirement = HostTypeRequirement::kNone;

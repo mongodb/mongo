@@ -509,11 +509,13 @@ bool firstStageCanExecuteWithoutCursor(const Pipeline& pipeline) {
     if (constraints.requiresInputDocSource) {
         return false;
     }
-    // Here we check the hostRequirment because there is at least one stage ($indexStats) which
+    // Here we check the hostRequirement because there is at least one stage ($indexStats) which
     // does not require input data, but is still expected to fan out and contact remote shards
     // nonetheless.
-    return constraints.hostRequirement == StageConstraints::HostTypeRequirement::kLocalOnly ||
-        constraints.hostRequirement == StageConstraints::HostTypeRequirement::kRunOnceAnyNode;
+    return constraints.hostRequirement ==
+        StageConstraints::HostTypeRequirement::kReceivingHostOnly ||
+        constraints.hostRequirement ==
+        StageConstraints::HostTypeRequirement::kCollectionlessSourceRunOnceAnyNode;
 }
 
 /**

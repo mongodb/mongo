@@ -474,7 +474,7 @@ bool Pipeline::needsAllShardHosts() const {
 bool Pipeline::needsShard() const {
     return std::any_of(_sources.begin(), _sources.end(), [&](const auto& stage) {
         auto hostType = stage->constraints().resolvedHostTypeRequirement(pCtx);
-        return (hostType == HostTypeRequirement::kAnyShard ||
+        return (hostType == HostTypeRequirement::kTargetedShards ||
                 hostType == HostTypeRequirement::kAllShardHosts);
     });
 }
@@ -767,7 +767,7 @@ Status Pipeline::canRunOnRouter() const {
         auto constraints = stage->constraints(_splitState);
         auto hostRequirement = constraints.resolvedHostTypeRequirement(pCtx);
 
-        const bool needsShard = (hostRequirement == HostTypeRequirement::kAnyShard ||
+        const bool needsShard = (hostRequirement == HostTypeRequirement::kTargetedShards ||
                                  hostRequirement == HostTypeRequirement::kAllShardHosts);
 
         const bool mustWriteToDisk =

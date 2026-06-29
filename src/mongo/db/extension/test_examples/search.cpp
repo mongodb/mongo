@@ -77,7 +77,8 @@ public:
         mongo::BSONObjBuilder builder;
         properties.setRequiresInputDocSource(false);
         properties.setPosition(mongo::extension::MongoExtensionPositionRequirementEnum::kFirst);
-        properties.setHostType(mongo::extension::MongoExtensionHostTypeRequirementEnum::kAnyShard);
+        properties.setHostType(
+            mongo::extension::MongoExtensionHostTypeRequirementEnum::kTargetedShards);
         properties.serialize(&builder);
         return builder.obj();
     }
@@ -191,7 +192,8 @@ public:
         mongo::BSONObjBuilder builder;
         properties.setRequiresInputDocSource(false);
         properties.setPosition(mongo::extension::MongoExtensionPositionRequirementEnum::kFirst);
-        properties.setHostType(mongo::extension::MongoExtensionHostTypeRequirementEnum::kAnyShard);
+        properties.setHostType(
+            mongo::extension::MongoExtensionHostTypeRequirementEnum::kTargetedShards);
         properties.serialize(&builder);
         return builder.obj();
     }

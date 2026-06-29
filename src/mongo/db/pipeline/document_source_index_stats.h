@@ -113,7 +113,7 @@ public:
     static StageConstraints constraints() {
         StageConstraints constraints(DocumentSource::StreamType::kStreaming,
                                      DocumentSource::PositionRequirement::kFirst,
-                                     DocumentSource::HostTypeRequirement::kAnyShard,
+                                     DocumentSource::HostTypeRequirement::kTargetedShards,
                                      DocumentSource::DiskUseRequirement::kNoDiskUse,
                                      DocumentSource::FacetRequirement::kNotAllowed,
                                      DocumentSource::TransactionRequirement::kNotAllowed,

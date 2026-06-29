@@ -86,12 +86,12 @@ inline boost::optional<StageConstraints::PositionRequirement> toPositionRequirem
 inline boost::optional<StageConstraints::HostTypeRequirement> toHostTypeRequirement(
     MongoExtensionHostTypeRequirementEnum host) {
     switch (host) {
-        case MongoExtensionHostTypeRequirementEnum::kLocalOnly:
-            return StageConstraints::HostTypeRequirement::kLocalOnly;
-        case MongoExtensionHostTypeRequirementEnum::kRunOnceAnyNode:
-            return StageConstraints::HostTypeRequirement::kRunOnceAnyNode;
-        case MongoExtensionHostTypeRequirementEnum::kAnyShard:
-            return StageConstraints::HostTypeRequirement::kAnyShard;
+        case MongoExtensionHostTypeRequirementEnum::kReceivingHostOnly:
+            return StageConstraints::HostTypeRequirement::kReceivingHostOnly;
+        case MongoExtensionHostTypeRequirementEnum::kCollectionlessSourceRunOnceAnyNode:
+            return StageConstraints::HostTypeRequirement::kCollectionlessSourceRunOnceAnyNode;
+        case MongoExtensionHostTypeRequirementEnum::kTargetedShards:
+            return StageConstraints::HostTypeRequirement::kTargetedShards;
         case MongoExtensionHostTypeRequirementEnum::kRouter:
             return StageConstraints::HostTypeRequirement::kRouter;
         case MongoExtensionHostTypeRequirementEnum::kAllShardHosts:

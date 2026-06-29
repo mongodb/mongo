@@ -168,7 +168,7 @@ public:
         StageConstraints unionConstraints(
             StreamType::kStreaming,
             PositionRequirement::kNone,
-            HostTypeRequirement::kAnyShard,
+            HostTypeRequirement::kTargetedShards,
             DiskUseRequirement::kNoDiskUse,
             FacetRequirement::kAllowed,
             TransactionRequirement::kNotAllowed,

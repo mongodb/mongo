@@ -96,7 +96,7 @@ public:
     static StageConstraints constraints() {
         auto constraints = StageConstraints{DocumentSource::StreamType::kStreaming,
                                             DocumentSource::PositionRequirement::kFirst,
-                                            DocumentSource::HostTypeRequirement::kLocalOnly,
+                                            DocumentSource::HostTypeRequirement::kReceivingHostOnly,
                                             DocumentSource::DiskUseRequirement::kNoDiskUse,
                                             DocumentSource::FacetRequirement::kNotAllowed,
                                             DocumentSource::TransactionRequirement::kNotAllowed,

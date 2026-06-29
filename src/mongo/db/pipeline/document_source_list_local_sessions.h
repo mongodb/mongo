@@ -150,7 +150,7 @@ public:
     StageConstraints constraints(PipelineSplitState pipeState) const final {
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kFirst,
-                                     HostTypeRequirement::kLocalOnly,
+                                     HostTypeRequirement::kReceivingHostOnly,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
                                      TransactionRequirement::kNotAllowed,

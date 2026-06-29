@@ -2231,14 +2231,15 @@ TEST_F(DocumentSourceExtensionOptimizableTest, SearchLikeStageWithSourceStageSta
     const auto& staticProperties = optimizable->getStaticProperties();
     ASSERT_FALSE(staticProperties.getRequiresInputDocSource());
     ASSERT_EQ(staticProperties.getPosition(), MongoExtensionPositionRequirementEnum::kFirst);
-    ASSERT_EQ(staticProperties.getHostType(), MongoExtensionHostTypeRequirementEnum::kAnyShard);
+    ASSERT_EQ(staticProperties.getHostType(),
+              MongoExtensionHostTypeRequirementEnum::kTargetedShards);
     ASSERT_TRUE(staticProperties.getProvidedMetadataFields().has_value());
     ASSERT_TRUE(staticProperties.getRequiredMetadataFields().has_value());
 
     auto constraints = optimizable->constraints(PipelineSplitState::kUnsplit);
 
     ASSERT_EQ(constraints.requiredPosition, StageConstraints::PositionRequirement::kFirst);
-    ASSERT_EQ(constraints.hostRequirement, StageConstraints::HostTypeRequirement::kAnyShard);
+    ASSERT_EQ(constraints.hostRequirement, StageConstraints::HostTypeRequirement::kTargetedShards);
     ASSERT_FALSE(constraints.requiresInputDocSource);
     ASSERT_FALSE(constraints.consumesLogicalCollectionData);
 }

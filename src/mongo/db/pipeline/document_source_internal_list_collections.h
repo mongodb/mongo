@@ -140,7 +140,7 @@ public:
     StageConstraints constraints(PipelineSplitState pipeState) const override {
         StageConstraints constraints{StreamType::kStreaming,
                                      PositionRequirement::kFirst,
-                                     HostTypeRequirement::kRunOnceAnyNode,
+                                     HostTypeRequirement::kCollectionlessSourceRunOnceAnyNode,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
                                      TransactionRequirement::kNotAllowed,
@@ -153,8 +153,8 @@ public:
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic(
         const DistributedPlanContext* ctx) final {
-        // This stage will run once on the entire cluster since we've set `kRunOnceAnyNode` as the
-        // `HostTypeRequirement` constraint.
+        // This stage will run once on the entire cluster since we've set
+        // `kCollectionlessSourceRunOnceAnyNode` as the `HostTypeRequirement` constraint.
         return boost::none;
     }
 

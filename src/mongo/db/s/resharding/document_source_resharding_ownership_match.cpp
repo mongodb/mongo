@@ -98,7 +98,7 @@ StageConstraints DocumentSourceReshardingOwnershipMatch::constraints(
     PipelineSplitState pipeState) const {
     return StageConstraints(StreamType::kStreaming,
                             PositionRequirement::kNone,
-                            HostTypeRequirement::kAnyShard,
+                            HostTypeRequirement::kTargetedShards,
                             DiskUseRequirement::kNoDiskUse,
                             FacetRequirement::kNotAllowed,
                             TransactionRequirement::kNotAllowed,

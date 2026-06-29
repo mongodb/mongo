@@ -6237,12 +6237,12 @@ TEST_F(PipelineMustRunOnRouterTest, SplitRouterMergePipelineAssertsIfShardStageP
 TEST_F(PipelineMustRunOnRouterTest, SplittablePipelineAssertsIfRouterStageOnShardSideOfSplit) {
     setExpCtx({.inRouter = true, .allowDiskUse = false});
     auto pipeline = makePipeline(
-        {matchStage("{x: 5}"), runOnRouter(), splitStage(HostTypeRequirement::kAnyShard)});
+        {matchStage("{x: 5}"), runOnRouter(), splitStage(HostTypeRequirement::kTargetedShards)});
     pipeline_optimization::optimizePipeline(*pipeline);
 
     // The 'runOnRouter' stage comes before any splitpoint, so this entire pipeline must run on
-    // rotuer. However, the pipeline *cannot* run on router and *must* split at
-    // $_internalSplitPipeline due to the latter's 'anyShard' requirement. The rotuer stage would
+    // router. However, the pipeline *cannot* run on router and *must* split at
+    // $_internalSplitPipeline due to the latter's 'anyShard' requirement. The router stage would
     // end up on the shard side of this split, and so it asserts.
     ASSERT_TRUE(pipeline->requiredToRunOnRouter());
     ASSERT_NOT_OK(pipeline->canRunOnRouter());

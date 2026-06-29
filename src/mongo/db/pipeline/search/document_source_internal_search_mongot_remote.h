@@ -63,7 +63,7 @@ public:
     static StageConstraints getSearchDefaultConstraints() {
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kFirst,
-                                     HostTypeRequirement::kAnyShard,
+                                     HostTypeRequirement::kTargetedShards,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
                                      TransactionRequirement::kNotAllowed,
