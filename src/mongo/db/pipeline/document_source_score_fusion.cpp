@@ -87,9 +87,6 @@ REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(scoreFusion,
  */
 std::map<std::string, std::unique_ptr<Pipeline>> parseScoredSelectionPipelines(
     const ScoreFusionSpec& spec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
-    // TODO SERVER-117661: Implement support for extension $vectorSearch stages in
-    // scoreFusion pipelines.
-
     // It's important to use an ordered map here, so that we get stability in the desugaring =>
     // stability in the query shape.
     std::map<std::string, std::unique_ptr<Pipeline>> inputPipelines;
