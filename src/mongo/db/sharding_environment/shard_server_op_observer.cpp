@@ -50,6 +50,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_critical_section_document_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/collection_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
@@ -717,18 +718,40 @@ void ShardServerOpObserver::onCreateDatabaseMetadata(OperationContext* opCtx,
     auto dbMetadata = entry.getDb();
     auto dbName = dbMetadata.getDbName();
 
-    // CloneAuthoritativeMetadata can bypass the critical section when writing database metadata.
-    // On the secondary path, this operation may be represented by only a 'c' oplog entry that
-    // commits the database metadata with the "fromClone" option. Once this occurs, the secondary
-    // path must bypass metadata access checks, because CloneAuthoritativeMetadata is allowed to
-    // modify database metadata without holding the critical section.
+    // CloneAuthoritativeMetadata can bypass the critical section when writing database metadata
+    // because 1) we hold the DDL lock, which guarantees that no other conflicting DDL
+    // operations are in progress and 2) the clone serves as a refresh from the config server,
+    // which does not need to serialize with CRUD operations at the critical section level, but
+    // instead synchronizes using the DSS mutex.
     boost::optional<BypassDatabaseMetadataAccess> bypassDbMetadataAccess;
     if (entry.getFromClone()) {
         bypassDbMetadataAccess.emplace(opCtx, BypassDatabaseMetadataAccess::Type::kWriteOnly);
     }
 
-    auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
-    scopedDsr->setDbMetadata(opCtx, dbMetadata);
+    {
+        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
+        scopedDsr->setDbMetadata(opCtx, dbMetadata);
+    }
+
+    // A stale router may target this shard for a collection in the dropped database before this
+    // database incarnation is recreated, causing authoritative recovery to classify an empty
+    // local shard catalog entry as kUnowned. Once this shard becomes the DB primary, any
+    // leftover collection CSS state for the database must be recovered from the new incarnation
+    // instead.
+    if (!entry.getFromClone()) {
+        for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {
+            if (nss.dbName() != dbName) {
+                continue;
+            }
+
+            LOGV2_DEBUG(12932800,
+                        2,
+                        "Clearing collection metadata after createDatabase metadata commit",
+                        logAttrs(nss));
+            auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+            scopedCsr->clearCollectionMetadata(opCtx);
+        }
+    }
 }
 
 void ShardServerOpObserver::onDropDatabaseMetadata(OperationContext* opCtx,

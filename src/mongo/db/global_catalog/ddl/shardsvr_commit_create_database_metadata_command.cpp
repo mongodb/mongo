@@ -35,12 +35,10 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/query/write_ops/delete.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
-#include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
-#include "mongo/db/shard_role/shard_catalog/collection_sharding_state.h"
-#include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/type_oplog_catalog_metadata_gen.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/sharding_state.h"
@@ -52,25 +50,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
-
-namespace {
-
-void clearCollectionMetadataForDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
-    for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {
-        if (nss.dbName() != dbName) {
-            continue;
-        }
-
-        LOGV2_DEBUG(12932800,
-                    2,
-                    "Clearing collection metadata after createDatabase metadata commit",
-                    logAttrs(nss));
-        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-        scopedCsr->clearCollectionMetadata(opCtx);
-    }
-}
-
-}  // namespace
 
 void commitCreateDatabaseMetadataLocally(OperationContext* opCtx,
                                          const DatabaseType& dbMetadata,
@@ -102,17 +81,17 @@ void commitCreateDatabaseMetadataLocally(OperationContext* opCtx,
         write_ops::checkWriteErrors(result);
     }
 
+    repl::MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+    oplogEntry.setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
+    oplogEntry.setNss(NamespaceString::makeCommandNamespace(dbName));
+    oplogEntry.setObject(
+        CreateDatabaseMetadataOplogEntry{dbNameStr, dbMetadata, fromClone}.toBSON());
+    oplogEntry.setOpTime(OplogSlot());
+    oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
+
     // Write an oplog 'c' entry to inform secondaries on how to populate the DSS.
     {
-        repl::MutableOplogEntry oplogEntry;
-        oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
-        oplogEntry.setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
-        oplogEntry.setNss(NamespaceString::makeCommandNamespace(dbName));
-        oplogEntry.setObject(
-            CreateDatabaseMetadataOplogEntry{dbNameStr, dbMetadata, fromClone}.toBSON());
-        oplogEntry.setOpTime(OplogSlot());
-        oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
-
         writeConflictRetry(
             opCtx, "createDatabaseMetadata", NamespaceString::kRsOplogNamespace, [&] {
                 AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
@@ -128,17 +107,8 @@ void commitCreateDatabaseMetadataLocally(OperationContext* opCtx,
             });
     }
 
-    // Update DSR in primary node.
-    {
-        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
-        scopedDsr->setDbMetadata(opCtx, dbMetadata);
-    }
-
-    // A stale router may target this shard for a collection in the dropped database before this
-    // database incarnation is recreated, causing authoritative recovery to classify an empty local
-    // shard catalog entry as kUnowned. Once this shard becomes the DB primary, any leftover
-    // collection CSS state for the database must be recovered from the new incarnation instead.
-    clearCollectionMetadataForDatabase(opCtx, dbName);
+    opCtx->getServiceContext()->getOpObserver()->onCreateDatabaseMetadata(
+        opCtx, repl::OplogEntry(oplogEntry.toBSON()));
 }
 
 namespace {

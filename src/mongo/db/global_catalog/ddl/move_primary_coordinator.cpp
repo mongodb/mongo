@@ -831,19 +831,6 @@ void MovePrimaryCoordinator::dropOrphanedDataOnRecipient(
 }
 
 void MovePrimaryCoordinator::cloneAuthoritativeDatabaseMetadata(OperationContext* opCtx) const {
-    auto recoveryService = ShardingRecoveryService::get(opCtx);
-    recoveryService->acquireRecoverableCriticalSectionBlockWrites(
-        opCtx,
-        NamespaceString(_dbName),
-        _csReason,
-        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-        false /* clearShardCatalogCache */);
-    recoveryService->promoteRecoverableCriticalSectionToBlockAlsoReads(
-        opCtx,
-        NamespaceString(_dbName),
-        _csReason,
-        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
-
     auto catalogClient = Grid::get(opCtx)->catalogClient();
     auto dbMetadata =
         catalogClient->getDatabase(opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern);
@@ -859,15 +846,7 @@ void MovePrimaryCoordinator::cloneAuthoritativeDatabaseMetadata(OperationContext
                         thisShardId.toString()),
             thisShardId == dbMetadata.getPrimary());
 
-    commitCreateDatabaseMetadataLocally(opCtx, dbMetadata);
-
-    recoveryService->releaseRecoverableCriticalSection(
-        opCtx,
-        NamespaceString(_dbName),
-        _csReason,
-        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-        ShardingRecoveryService::NoCustomAction(),
-        false /* throwIfReasonDiffers */);
+    commitCreateDatabaseMetadataLocally(opCtx, dbMetadata, true /* fromClone */);
 }
 
 void MovePrimaryCoordinator::cloneAuthoritativeCollectionsMetadata(

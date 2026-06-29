@@ -130,22 +130,7 @@ void removeDatabaseMetadataFromShard(OperationContext* opCtx,
  *
  * TODO (SERVER-98118): Remove this method once v9.0 become last-lts.
  */
-void cloneAuthoritativeDatabaseMetadata(OperationContext* opCtx,
-                                        const DatabaseName& dbName,
-                                        const BSONObj& critSecReason) {
-    auto recoveryService = ShardingRecoveryService::get(opCtx);
-    recoveryService->acquireRecoverableCriticalSectionBlockWrites(
-        opCtx,
-        NamespaceString(dbName),
-        critSecReason,
-        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-        false /* clearShardCatalogCache */);
-    recoveryService->promoteRecoverableCriticalSectionToBlockAlsoReads(
-        opCtx,
-        NamespaceString(dbName),
-        critSecReason,
-        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
-
+void cloneAuthoritativeDatabaseMetadata(OperationContext* opCtx, const DatabaseName& dbName) {
     auto catalogClient = Grid::get(opCtx)->catalogClient();
     auto dbMetadata =
         catalogClient->getDatabase(opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern);
@@ -161,15 +146,7 @@ void cloneAuthoritativeDatabaseMetadata(OperationContext* opCtx,
                         thisShardId.toString()),
             thisShardId == dbMetadata.getPrimary());
 
-    commitCreateDatabaseMetadataLocally(opCtx, dbMetadata);
-
-    recoveryService->releaseRecoverableCriticalSection(
-        opCtx,
-        NamespaceString(dbName),
-        critSecReason,
-        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-        ShardingRecoveryService::NoCustomAction(),
-        false /* throwIfReasonDiffers */);
+    commitCreateDatabaseMetadataLocally(opCtx, dbMetadata, true /* fromClone */);
 }
 
 /**
@@ -455,7 +432,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
 
                 if (_doc.getAuthoritativeMetadataAccessLevel() ==
                     AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
-                    cloneAuthoritativeDatabaseMetadata(opCtx, _dbName, _critSecReason);
+                    cloneAuthoritativeDatabaseMetadata(opCtx, _dbName);
                 }
 
                 // Drop all collections under this DB
