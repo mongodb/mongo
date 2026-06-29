@@ -203,6 +203,7 @@ __wti_cache_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
 {
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
     bool now_shared, was_shared;
 
     conn = S2C(session);
@@ -214,10 +215,11 @@ __wti_cache_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
     was_shared = F_ISSET(conn, WT_CONN_CACHE_POOL);
 
     /* Cleanup if reconfiguring */
-    if (reconfig && was_shared && !now_shared)
+    if (reconfig && was_shared && !now_shared) {
+        F_SET(conn, WT_CONN_RECONFIGURING_CACHE_POOL);
         /* Remove ourselves from the pool if necessary */
-        WT_RET(__wti_conn_cache_pool_destroy(session));
-    else if (reconfig && !was_shared && now_shared)
+        WT_ERR(__wti_conn_cache_pool_destroy(session));
+    } else if (reconfig && !was_shared && now_shared)
         /*
          * Cache size will now be managed by the cache pool - the start size always needs to be zero
          * to allow the pool to manage how much memory is in-use.
@@ -227,12 +229,12 @@ __wti_cache_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
     /*
      * Always setup the local cache - it's used even if we are participating in a shared cache.
      */
-    WT_RET(__cache_config_local(session, now_shared, cfg));
+    WT_ERR(__cache_config_local(session, now_shared, cfg));
     if (now_shared) {
-        WT_RET(__wti_cache_pool_config(session, cfg));
+        WT_ERR(__wti_cache_pool_config(session, cfg));
         WT_ASSERT(session, F_ISSET(conn, WT_CONN_CACHE_POOL));
         if (!was_shared)
-            WT_RET(__wti_conn_cache_pool_open(session));
+            WT_ERR(__wti_conn_cache_pool_open(session));
     }
 
     /*
@@ -240,10 +242,12 @@ __wti_cache_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
      * part of creating the cache.
      */
     if (reconfig)
-        WT_RET(__wt_thread_group_resize(session, &conn->evict_threads, conn->evict_threads_min,
+        WT_ERR(__wt_thread_group_resize(session, &conn->evict_threads, conn->evict_threads_min,
           conn->evict_threads_max, WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL));
 
-    return (0);
+err:
+    F_CLR(conn, WT_CONN_RECONFIGURING_CACHE_POOL);
+    return (ret);
 }
 
 /*

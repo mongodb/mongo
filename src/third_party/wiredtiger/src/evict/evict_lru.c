@@ -1519,8 +1519,8 @@ __evict_walk(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue)
 retry:
     loop_count = 0;
     while (slot < max_entries && loop_count++ < conn->dhandle_count) {
-        /* We're done if shutting down or reconfiguring. */
-        if (F_ISSET(conn, WT_CONN_CLOSING) || F_ISSET(conn, WT_CONN_RECONFIGURING))
+        /* Eviction server will be suspended if cache pool is reconfiguring. */
+        if (F_ISSET(conn, WT_CONN_CLOSING) || F_ISSET(conn, WT_CONN_RECONFIGURING_CACHE_POOL))
             break;
 
         /*

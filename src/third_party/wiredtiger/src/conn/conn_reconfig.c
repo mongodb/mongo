@@ -378,7 +378,6 @@ __wti_conn_reconfig(WT_SESSION_IMPL *session, const char **cfg)
 
     /* Serialize reconfiguration. */
     __wt_spin_lock(session, &conn->reconfig_lock);
-    F_SET(conn, WT_CONN_RECONFIGURING);
 
     /*
      * The configuration argument has been checked for validity, update the previous connection
@@ -432,7 +431,6 @@ __wti_conn_reconfig(WT_SESSION_IMPL *session, const char **cfg)
     conn->cfg = p;
 
 err:
-    F_CLR(conn, WT_CONN_RECONFIGURING);
     __wt_spin_unlock(session, &conn->reconfig_lock);
 
     return (ret);
