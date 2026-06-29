@@ -1,7 +1,8 @@
 /**
  * Test the $subtype expression.
  * @tags: [
- *  requires_fcv_83
+ *  requires_fcv_83,
+ *  backport_required_multiversion, # TODO SERVER-129103: remove once backported to 8.3 and 8.0.
  * ]
  */
 import {testExpression} from "jstests/aggregation/extras/utils.js";
