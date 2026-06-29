@@ -38,7 +38,6 @@
 #include "mongo/util/timer.h"
 
 #include <algorithm>
-#include <mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -61,10 +60,32 @@ ReplicaSetAwareServiceRegistry& ReplicaSetAwareServiceRegistry::get(
 }
 
 void ReplicaSetAwareServiceRegistry::onStartup(OperationContext* opCtx) {
+    // Only start up services if we are in uninitialized state: i.e., shutdown has not been called.
+    int expected = kUninitialized;
+    if (!_state.compareAndSwap(&expected, kStartup)) {
+        LOGV2(12968800,
+              "Skipping ReplicaSetAwareServiceRegistry startup because it has already run or "
+              "shutdown has already been called",
+              "state"_attr = expected);
+        return;
+    }
+
+    // Publish the terminal startup state on exit so that a concurrent onShutdown waiting for
+    // startup to finish can make progress.
+    State exitState = kStarted;
+    ON_BLOCK_EXIT([&] {
+        invariant(_state.swap(exitState) == kStartup);
+        _state.notifyAll();
+    });
+
     for (auto* service : _services) {
-        // Make sure we do not call onStartup after onShutdown for any service.
-        std::lock_guard lk(_isShutdownMutex);
-        if (_isShutdown) {
+        // Stop starting services as soon as a shutdown has been requested so shutdown does not have
+        // to wait for the rest of the services to start.
+        if (MONGO_unlikely(_inShutdown.load())) {
+            LOGV2(12968801,
+                  "Interrupting ReplicaSetAwareServiceRegistry startup because a shutdown was "
+                  "requested");
+            exitState = kStartupAborted;
             return;
         }
         service->onStartup(opCtx);
@@ -86,10 +107,33 @@ void ReplicaSetAwareServiceRegistry::onConsistentDataAvailable(OperationContext*
 }
 
 void ReplicaSetAwareServiceRegistry::onShutdown() {
-    {
-        std::lock_guard lk(_isShutdownMutex);
-        _isShutdown = true;
+    // Record that a shutdown has been requested so that, if services are still starting up, we can
+    // stop the startup process and proceed to shutting down.
+    if (_inShutdown.swap(true)) {
+        return;
     }
+
+    // Claim the shutdown by moving to kShutdown, but only if we are not currently starting up.
+    // If we observe kStartup, wait for that startup to complete (transition to kStarted or
+    // kStartupAborted) and retry the exchange. This guarantees onShutdown never runs a service's
+    // shutdown hook before or concurrently with its onStartup.
+    while (true) {
+        auto current = _state.load();
+        if (current == kStartup) {
+            _state.wait(kStartup);
+            continue;
+        }
+
+        // We have not begun to startup, we have completed startup, or we have aborted the startup
+        // process.
+        invariant(current == kUninitialized || current == kStarted || current == kStartupAborted);
+
+        // Protect from race with uninitialized -> startup transition in onStartup.
+        if (_state.compareAndSwap(&current, kShutdown)) {
+            break;
+        }
+    }
+
     std::for_each(_services.begin(), _services.end(), [&](ReplicaSetAwareInterface* service) {
         service->onShutdown();
     });

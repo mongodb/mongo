@@ -33,9 +33,10 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/cluster_role.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/waitable_atomic.h"
 #include "mongo/util/modules.h"
 
-#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -300,8 +301,33 @@ private:
     void _registerService(ReplicaSetAwareInterface* service);
     void _unregisterService(ReplicaSetAwareInterface* service);
 
-    std::mutex _isShutdownMutex;
-    bool _isShutdown = false;  // GUARDED_BY(_isShutdownMutex)
+    /**
+     * Lifecycle states for the registry. The valid transitions are:
+     *
+     *     kUninitialized --> kStartup --> kStarted --------> kShutdown
+     *                                --> kStartupAborted --> kShutdown
+     *
+     * onStartup advances kUninitialized -> kStartup and publishes kStarted (all services started)
+     * or kStartupAborted (startup was terminated due to a concurrent shutdown request) when it
+     * returns. onShutdown waits for an in-progress startup to reach either terminal state before
+     * moving to kShutdown, so onShutdown never runs a service's onShutdown hook before or
+     * concurrently with its onStartup.
+     */
+    enum State : int {
+        kUninitialized,
+        kStartup,
+        kStarted,
+        kStartupAborted,
+        kShutdown,
+    };
+
+    // Tracks the current lifecycle state. Ensures onStartup runs at most once and lets onShutdown
+    // wait for an in-progress startup to finish.
+    WaitableAtomic<int> _state{kUninitialized};
+
+    // Set by the first onShutdown call. Lets an in-progress onStartup bail out of its loop early
+    // so shutdown does need not wait for every service to start up.
+    AtomicWord<bool> _inShutdown{false};
 
     std::vector<ReplicaSetAwareInterface*> _services;
 };
