@@ -121,51 +121,6 @@ void exitWithError(const int statusCode, const std::string& msg) {
     std::exit(statusCode);
 }
 
-// Recursively scans a BSON object for operators that require the MozJS JavaScript engine.
-// Operators checked (will be removed from this check in the future when mozjs-wasm supports them):
-// TODO SERVER-127482: Re-enable $function once mozjs regex handling is fixed.
-bool containsUnsupportedJSWasmOperators(const BSONObj& obj) {
-    for (const auto& elem : obj) {
-        const auto fieldName = elem.fieldNameStringData();
-        if (fieldName == "$function"sv) {
-            return true;
-        }
-        if (elem.type() == BSONType::object || elem.type() == BSONType::array) {
-            if (containsUnsupportedJSWasmOperators(elem.Obj())) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-// Determines if a query file should be skipped.
-bool shouldSkipFile(const QueryFile& currFile, DBClientConnection* conn) {
-    if (!conn) {
-        return false;
-    }
-
-    // If the server is running mozjs-wasm, we need to check if any queries contain MozJS
-    // operators, and if so, skip the file since those queries won't run successfully.
-    // Remove this check once all MozJS functionality is supported in mozjs-wasm mode.
-    // TODO SERVER-127482: Re-enable $function in version tests once mozjs regex handling is fixed.
-    static constexpr std::string_view kMozJsWasmEngine = "mozjs-wasm";
-    auto bob = BSONObjBuilder{};
-    bob.append("buildInfo", 1);
-    const auto buildInfo = runCommand(conn, "admin", bob.done());
-    if (buildInfo.getStringField("javascriptEngine") == kMozJsWasmEngine) {
-        for (const auto& test : currFile.getTests()) {
-            if (containsUnsupportedJSWasmOperators(test.getQuery())) {
-                std::cout << "Skipping " << currFile.getFilePath().string()
-                          << " (contains MozJS queries; server uses mozjs-wasm)" << std::endl;
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
 int runTestProgram(const std::vector<TestSpec> testsToRun,
                    const std::string& uriString,
                    const bool dropData,
@@ -199,12 +154,6 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
         // Treat data load errors as failures, too.
         try {
             currFile.readInEntireFile(mode, startRange, endRange);
-
-            // Skip files requiring MozJS when running against a mozjs-wasm server. populateAndExit
-            // mode is excluded since collection setup should proceed regardless.
-            if (!populateAndExit && shouldSkipFile(currFile, conn.get())) {
-                continue;
-            }
 
             currFile.loadCollections(conn.get(),
                                      dropData,

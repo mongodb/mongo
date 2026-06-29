@@ -335,32 +335,26 @@ Timestamp ValueWriter::toTimestamp() {
 }
 
 JSRegEx ValueWriter::toRegEx() {
-    /* TODO SERVER-127482: Replace the rfind-based implementation below with this fix once
-       mozjs regex handling is corrected. GetRegExpSource avoids the off-by-one that includes
-       the closing '/' delimiter in the extracted pattern.
-
     JS::RootedObject regExpObj(_context, _value.toObjectOrNull());
-    uassert(XXXXX, "Invalid regular expression", regExpObj);
+    uassert(12748201, "Invalid regular expression", regExpObj);
     JS::RootedString regExpSource(_context, JS::GetRegExpSource(_context, regExpObj));
-    uassert(XXXXX, "Failed to get regex source", regExpSource);
+    uassert(12748202, "Failed to get regex source", regExpSource);
     JSStringWrapper regExpSourceWrapper(_context, regExpSource);
     JS::RegExpFlags regExpFlags = JS::GetRegExpFlags(_context, regExpObj);
     std::string flags;
-    if (regExpFlags.global())     flags += 'g';
-    if (regExpFlags.ignoreCase()) flags += 'i';
-    if (regExpFlags.multiline())  flags += 'm';
-    if (regExpFlags.dotAll())     flags += 's';
-    if (regExpFlags.unicode())    flags += 'u';
-    if (regExpFlags.sticky())     flags += 'y';
+    if (regExpFlags.global())
+        flags += 'g';
+    if (regExpFlags.ignoreCase())
+        flags += 'i';
+    if (regExpFlags.multiline())
+        flags += 'm';
+    if (regExpFlags.dotAll())
+        flags += 's';
+    if (regExpFlags.unicode())
+        flags += 'u';
+    if (regExpFlags.sticky())
+        flags += 'y';
     return JSRegEx(regExpSourceWrapper.toString(), flags);
-    */
-
-    std::string regexStr = toString();
-    uassert(6123401, "Empty regular expression", regexStr.size() > 0);
-    uassert(6123402, "Invalid regular expression", regexStr[0] == '/');
-
-    return JSRegEx(regexStr.substr(1, regexStr.rfind('/')),
-                   regexStr.substr(regexStr.rfind('/') + 1));
 }
 
 void ValueWriter::writeThis(BSONObjBuilder* b,
@@ -538,10 +532,6 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
                 return;
             }
             case JSProto_RegExp: {
-                /* TODO SERVER-127482: Replace the toString()-based implementation below with
-                   GetRegExpSource/GetRegExpFlags to correctly handle patterns containing '/'
-                   and to handle RegExp.prototype via IdentifyStandardPrototype.
-
                 if (JS::IdentifyStandardPrototype(obj) == JSProto_RegExp) {
                     b->appendRegex(sd, "(?:)", "");
                     return;
@@ -553,26 +543,19 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
                 std::string r(srcWrapper.toStringData());
                 JS::RegExpFlags jsFlags = JS::GetRegExpFlags(_context, reObj);
                 std::string o;
-                if (jsFlags.global())     o += 'g';
-                if (jsFlags.ignoreCase()) o += 'i';
-                if (jsFlags.multiline())  o += 'm';
-                if (jsFlags.dotAll())     o += 's';
-                if (jsFlags.unicode())    o += 'u';
-                if (jsFlags.sticky())     o += 'y';
+                if (jsFlags.global())
+                    o += 'g';
+                if (jsFlags.ignoreCase())
+                    o += 'i';
+                if (jsFlags.multiline())
+                    o += 'm';
+                if (jsFlags.dotAll())
+                    o += 's';
+                if (jsFlags.unicode())
+                    o += 'u';
+                if (jsFlags.sticky())
+                    o += 'y';
                 b->appendRegex(sd, r, o);
-                return;
-                */
-
-                JS::RootedValue v(_context);
-                v.setObjectOrNull(obj);
-
-                std::string regex = ValueWriter(_context, v).toString();
-                regex = regex.substr(1);
-                std::string r = regex.substr(0, regex.rfind('/'));
-                std::string o = regex.substr(regex.rfind('/') + 1);
-
-                b->appendRegex(sd, r, o);
-
                 return;
             }
             case JSProto_Date: {

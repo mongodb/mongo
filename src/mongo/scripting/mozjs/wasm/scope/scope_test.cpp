@@ -1026,8 +1026,6 @@ TEST(WasmtimeScope, GetRegEx_NoFlags) {
     ASSERT_EQ(std::string(""), re.flags);
 }
 
-/* TODO SERVER-127482: Re-enable once mozjs regex handling is fixed.
-   getRegEx on a regex literal whose pattern contains a literal '/'.
 TEST(WasmtimeScope, GetRegEx_SlashInPattern) {
     WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
@@ -1037,7 +1035,6 @@ TEST(WasmtimeScope, GetRegEx_SlashInPattern) {
     ASSERT_EQ(std::string("hello\\/world"), re.pattern);
     ASSERT_EQ(std::string("gi"), re.flags);
 }
-*/
 
 // --- wasmtimeStoreMemoryLimitMB server parameter ---
 

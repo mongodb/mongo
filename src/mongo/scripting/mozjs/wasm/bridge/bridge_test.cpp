@@ -712,9 +712,9 @@ TEST_F(WasmMozJSBridgeTest, BsonArgsRegex) {
     ASSERT_EQ(std::string(reElem.regexFlags()), "i");
 }
 
-/* TODO SERVER-127482: Re-enable once mozjs regex handling is fixed.
-   Regression test: a '/' inside the regex pattern must round-trip unchanged.
 TEST_F(WasmMozJSBridgeTest, BsonArgsRegexWithSlashInPattern) {
+    // An unescaped '/' inside a BSON regex pattern must survive a $function round-trip.
+    // toString() escapes it to '\/', so the stored pattern changes; GetRegExpSource() does not.
     auto handle = createFunction(
         "function(re) {"
         "  return { val: re };"
@@ -730,7 +730,46 @@ TEST_F(WasmMozJSBridgeTest, BsonArgsRegexWithSlashInPattern) {
     ASSERT_EQ(std::string(reElem.regex()), "something/extend|SMS");
     ASSERT_EQ(std::string(reElem.regexFlags()), "i");
 }
-*/
+
+TEST_F(WasmMozJSBridgeTest, BsonArgsRegexPatternIsSingleSlash) {
+    // Pattern that is a single '/' character.
+    // toString() wraps it as /\//; rfind('/') finds the trailing delimiter correctly, but
+    // the extracted pattern is '\/' instead of '/'.
+    auto handle = createFunction(
+        "function(re) {"
+        "  return { val: re };"
+        "}");
+
+    BSONObjBuilder bob;
+    bob.appendRegex("re", "/", "");
+
+    auto result = invokeFunction(handle, bob.obj());
+
+    BSONElement reElem = result.getField("val");
+    ASSERT_EQ(reElem.type(), BSONType::regEx);
+    ASSERT_EQ(std::string(reElem.regex()), "/");
+    ASSERT_EQ(std::string(reElem.regexFlags()), "");
+}
+
+TEST_F(WasmMozJSBridgeTest, ReturnRegexWithToStringOverride) {
+    // A JS-level toString() override on a regex instance poisons the current implementation:
+    // JS::ToString() follows the prototype chain and calls the override, so the wrong pattern
+    // and flags are extracted.  GetRegExpSource/GetRegExpFlags read [[OriginalSource]] and
+    // [[OriginalFlags]] directly and are immune to the override.
+    auto handle = createFunction(
+        "function() {"
+        "  var re = /real/i;"
+        "  re.toString = function() { return '/hijacked/'; };"
+        "  return re;"
+        "}");
+
+    BSONObj wrapped = invokeFunctionGetWrapped(handle, BSONObj());
+    BSONElement retVal = wrapped.getField("__returnValue");
+    ASSERT_FALSE(retVal.eoo());
+    ASSERT_EQ(retVal.type(), BSONType::regEx);
+    ASSERT_EQ(std::string(retVal.regex()), "real");
+    ASSERT_EQ(std::string(retVal.regexFlags()), "i");
+}
 
 TEST_F(WasmMozJSBridgeTest, BsonArgsMinKeyMaxKey) {
     auto handle = createFunction(
@@ -2718,10 +2757,6 @@ TEST_F(WasmMozJSBridgeTest, ReturnTimestampFromArg) {
     ASSERT_EQ(retVal.timestamp(), Timestamp(1700000000, 42));
 }
 
-/* TODO SERVER-127482: Re-enable these tests once mozjs regex handling is fixed.
-   These tests exercise the JSProto_RegExp branch in ValueWriter::_writeObject() using
-   GetRegExpSource/GetRegExpFlags, which is currently reverted pending the fix.
-
 TEST_F(WasmMozJSBridgeTest, ReturnRegexLiteral) {
     auto handle = createFunction("function() { return /methodologies|Advanced|extend|SMS/; }");
     BSONObj wrapped = invokeFunctionGetWrapped(handle, BSONObj());
@@ -2772,7 +2807,6 @@ TEST_F(WasmMozJSBridgeTest, ReturnRegexPrototype) {
     ASSERT_EQ(std::string(retVal.regex()), "(?:)");
     ASSERT_EQ(std::string(retVal.regexFlags()), "");
 }
-*/
 
 TEST_F(WasmMozJSBridgeTest, ReturnDateFromString) {
     // A JS function that creates a Date from an ISO string and returns it.
