@@ -44,7 +44,9 @@
 #include "mongo/executor/pinned_connection_task_executor_registry.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/synchronized_value.h"
+#include "mongo/util/timer.h"
 
 #include <memory>
 #include <string_view>
@@ -137,7 +139,22 @@ void destroyTaskExecutor(synchronized_value<std::shared_ptr<TaskExecutor>>& exec
     // Tick the log sampler in advance to avoid logging immediately - only log if it's a long wait.
     _shutdownLogSampler.tick();
 
+    // Bound how long we wait for outstanding references (held by in-progress or idle search
+    // cursors) to be released; an unbounded wait can hang shutdown. If they outlive the timeout,
+    // proceed and let the executor be reclaimed once its remaining owners go away. A value of 0
+    // means wait forever.
+    const Milliseconds timeout{globalMongotParams.shutdownTimeoutMS.load()};
+    Timer timer;
+
     while (!weakReference.expired()) {
+        if (timeout > Milliseconds::zero() && timer.elapsed() >= timeout) {
+            LOGV2_WARNING(12984901,
+                          "Timed out waiting for the search task executor to be destroyed during "
+                          "shutdown; proceeding anyway. Outstanding references will be released "
+                          "when their owning operations or cursors complete.",
+                          "timeout"_attr = timeout);
+            return;
+        }
         if (_shutdownLogSampler.tick()) {
             LOGV2_INFO(11323800, "Waiting for search task executor to be destroyed.");
         }
