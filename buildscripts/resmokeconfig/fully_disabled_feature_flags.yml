@@ -37,6 +37,3 @@
 # TODO SERVER-127411: Enable in all-feature-flags after shard UUID migration is complete.
 - featureFlagUniqueShardIdentifiers
 - featureFlagUniqueShardIdentifiersDDL
-# TODO (SERVER-127746): Remove featureFlagKEKPushMode when fully implemented WiredTiger API
-# for push mode is available.
-- featureFlagKEKPushMode
