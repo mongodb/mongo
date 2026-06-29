@@ -219,6 +219,20 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
+    name = "query_cbr_persistent_samples_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/query_cbr_persistent_samples_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "blocked_in_query_alias",  # We explicitly specify this task in query alias
+        "ci-experimental",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
     name = "aggregation_repeat_queries_always_replan",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/aggregation_repeat_queries_always_replan.yml",
     shard_count = 8,

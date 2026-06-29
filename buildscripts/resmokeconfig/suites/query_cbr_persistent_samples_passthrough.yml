@@ -1,0 +1,168 @@
+# Equivalent to core, but with CBR samplingCE + persistent samples (analyze after writes).
+
+test_kind: js_test
+selector:
+  roots:
+    - jstests/core/**/*.js
+    - jstests/core_standalone/**/*.js
+  exclude_files:
+    # Transactions are not supported on MongoDB standalone nodes, so we do not run these tests in the
+    # 'core' suite. Instead we run them against a 1-node replica set in the 'core_txns' suite.
+    - jstests/core/txns/**/*.js
+    # Queryable encryption is not supported on standalone.
+    - jstests/core/query/queryable_encryption/**/*.js
+    # Query settings are not supported on standalone.
+    - jstests/core/query/query_settings/**/*.js
+
+    # TODO SERVER-116684: Enable this test, it asserts on the length of creationExecStats.
+    - jstests/core/query/plan_cache/plan_cache_list_plans.js
+
+    # CBR picks a different plan which results in different results due to SERVER-23229
+    - jstests/core/query/project/projection_dotted_paths.js
+
+    # TODO SERVER-100610
+    # CBR picks plan without blocking sort, but test asserts on specific plan chosen
+    - jstests/core/query/sort/sort_array.js
+    - jstests/core/query/sort/sortg.js
+    # CBR picks index intersection plan and test asserts on specific plan
+    - jstests/core/index/index_check2.js
+
+    # Asserts on output of allPlansExecution. CBR picks a single plan so there is no multiplanning.
+    - jstests/core/query/explain/explain_winning_plan.js
+
+    # samplingCE makes plan selection literal-dependent: CE estimates differ per literal value, so
+    # the same query shape can choose different plans for different parameter values, breaking the
+    # test's assumption that solution hashes are stable across literal substitutions.
+    - jstests/core/query/plan_cache/query_solution_hash.js
+
+    # assertResultsSameAllPlans issues bare find commands with forcedPlanSolutionHash, which CBR
+    # rejects in explain mode for rooted-$or queries (IllegalOperation). The override's extra-explain
+    # injection would trigger that rejection, so exclude the test rather than special-casing the
+    # override for this internal CBR testing parameter.
+    - jstests/core/index/wildcard/compound_wildcard_index_residual.js
+
+    # TODO SERVER-100417
+    - jstests/core/query/explain/explain_multi_plan_count.js
+
+    # TODO SERVER-92589: Fails in all feature flags variant because SBE explain not supported
+    - jstests/core/query/index_deduplication.js
+    - jstests/core/query/explain/explain_all_plans_execution_stats.js
+    - jstests/core/query/explain/explain_multi_plan.js
+
+    # TODO SERVER-99091 re-enable this test to get coverage of switching between plan ranker modes.
+    - jstests/core/query/query_knob_correctness_pbt.js
+
+    # Replica set write block is not supported on standalone.
+    - jstests/core/administrative/block_replica_set_writes.js
+
+    # The override creates system.stats.samples after inserts; breaks tests checking exact collection
+    # counts, db emptiness, or catalog state.
+    - jstests/core/catalog/db_stats.js
+    - jstests/core/catalog/list_databases.js
+    - jstests/core/catalog/views/views_drop.js
+    - jstests/core/ddl/drop_database.js
+    - jstests/core/diagnostics/dbhash.js
+
+    # The override's extra explain/analyze calls inflate op/histogram counters.
+    - jstests/core/catalog/views/views_stats.js
+    - jstests/core/diagnostics/opcounters_write_cmd.js
+    - jstests/core/query/top/top.js
+
+    # Runs validateDBMetadata and other commands that interact with the view catalog; the override's
+    # explain calls on views are incompatible with this test's command enumeration.
+    - jstests/core/catalog/views/views_all_commands.js
+
+    # system.stats.samples may precede user collections in listCollections (non-deterministic
+    # ordering), so firstBatch[0] UUID lookups get the wrong collection.
+    - jstests/core/ddl/collection_uuid_index_commands.js
+    - jstests/core/ddl/collection_uuid_coll_mod.js
+    - jstests/core/query/collection_uuid_find.js
+    - jstests/core/query/parsing/collection_uuid_write_commands.js
+
+    # mapReduce is deprecated and its output collections are not tracked by the override.
+    - jstests/core/query/map_reduce/**/*.js
+    # This test uses mapReduce for drop/CRUD interaction testing; excluded for the same reason.
+    - jstests/core/ddl/drop_collection_vs_crud_ops.js
+
+    # These tests insert documents that are individually or cumulatively too large to fit in a
+    # BSON sample (16 MB limit), causing analyze to fail with BSONObjectTooLarge, or causing the
+    # explain result (with ceSamplingMetadata from large samples) to exceed the 16 MB response limit.
+    - jstests/core/views/views_aggregation.js
+    - jstests/core/query/batch_size.js
+    - jstests/core/query/find/find9.js
+    - jstests/core/query/find/find_getmore_bsonsize.js
+    - jstests/core/query/sort/sortb.js
+    - jstests/core/query/sort/sortf.js
+    - jstests/core/query/sort/sortj.js
+    - jstests/core/query/release_memory/graph_lookup.js
+    - jstests/core/query/release_memory/sort.js
+    - jstests/core/query/single_batch.js
+
+    # renameCollection creates an unanalyzed namespace; subsequent queries fail the "unanalyzed
+    # namespace must be empty" check.
+    - jstests/core/index/fts/fts_index2.js
+    - jstests/core/ddl/rename_collection.js
+    - jstests/core/query/api/api_rename_collection.js
+    - jstests/core/index/index_many.js
+
+    # config.system.sessions is populated by internals (not tracked inserts), so the override sees
+    # it as unanalyzed non-empty.
+    - jstests/core/administrative/list_all_sessions.js
+    - jstests/core/administrative/list_sessions.js
+
+    # applyOps writes bypass override tracking, leaving unanalyzed namespaces with unexpected documents.
+    - jstests/core/administrative/apply_ops/apply_ops1.js
+
+    # analyze commands run on the same connection; fails when auth credentials change mid-test.
+    - jstests/core/administrative/auth1.js
+
+    # $out/$merge write to output collections that bypass insert tracking; subsequent reads fail the
+    # "unanalyzed namespace must be empty" check.
+    - jstests/core/query/explain/explain_agg_write_concern.js
+    - jstests/core/query/doc_validation/bypass_doc_validation.js
+    - jstests/core/query/command_let_variables_merge_only.js
+
+    # w:0 writes are unacknowledged; the override misses them, leaving an unanalyzed non-empty
+    # namespace.
+    - jstests/core/query/batch_write/batch_write_command_w0.js
+
+    # Analyze is not supported on time-series collections.
+    - jstests/core/timeseries/**/*.js
+
+  exclude_with_any_tags:
+    # Parallel shells don't load the override, so their inserts are untracked and leave non-empty
+    # unanalyzed namespaces.
+    - uses_parallel_shell
+    # Profiler entries will have different shape in CBR
+    - requires_profiling
+    # CBR can run multiplanning trials even for CBR chosen solutions in which case it will be a single solution.
+    # This can break tests that expect explain to succeed in the single solution case.
+    - does_not_support_multiplanning_single_solutions
+    # The override's transparent writes will hang if fsyncLock() is active.
+    - requires_fsync
+    # Capped collections evict documents internally (not via delete), so the persistent sample can
+    # go stale.
+    - requires_capped
+    # Analyze command is not supported on timeseries collections.
+    - requires_timeseries
+    - writes_timeseries_collection
+    # mapReduce writes to output collections that bypass tracking.
+    - uses_map_reduce_internal_merge_pipeline
+executor:
+  config:
+    shell_options:
+      crashOnInvalidBSONError: ""
+      objcheck: ""
+      eval: |
+        await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+        await import("jstests/libs/override_methods/implicit_persistent_samples.js");
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagPersistentStats: true
+        featureFlagCostBasedRanker: true
+        internalQueryCBRCEMode: "samplingCE"
+        internalQuerySamplingCEMethod: "random"
+        internalQuerySamplingBySequentialScan: true
