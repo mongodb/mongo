@@ -86,9 +86,6 @@ REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(rankFusion,
  */
 std::map<std::string, std::unique_ptr<Pipeline>> parseSelectionPipelines(
     const RankFusionSpec& spec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
-    // TODO SERVER-115791: Implement support for extension $vectorSearch stages in
-    // rankFusion pipelines.
-
     // It's important to use an ordered map here, so that we get stability in the desugaring =>
     // stability in the query shape.
     std::map<std::string, std::unique_ptr<Pipeline>> inputPipelines;
