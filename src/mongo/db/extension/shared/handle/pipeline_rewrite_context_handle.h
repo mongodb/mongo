@@ -43,7 +43,7 @@ enum PipelineRewriteRuleTags : uint32_t {
 
 class PipelineRewriteRule {
 public:
-    PipelineRewriteRule(std::string name, uint32_t tags) : name(std::move(name)), tags(tags) {};
+    PipelineRewriteRule(std::string_view name, uint32_t tags) : name(name), tags(tags) {};
 
     ::MongoExtensionPipelineRewriteRule convertToCRule() const {
         return {.name = {reinterpret_cast<const uint8_t*>(name.c_str()), name.size()},

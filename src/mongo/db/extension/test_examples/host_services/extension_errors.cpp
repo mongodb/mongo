@@ -37,6 +37,9 @@
 namespace sdk = mongo::extension::sdk;
 
 namespace {
+constexpr std::string_view kOptPrecondition = "optimization_precondition";
+constexpr std::string_view kOptTransform = "optimization_transform";
+
 void assertWithSpec(const mongo::BSONObj& obj) {
     auto assertionType = obj["assertionType"].valueStringDataSafe();
     if (assertionType != "uassert" && assertionType != "tassert") {
@@ -56,7 +59,39 @@ void assertWithSpec(const mongo::BSONObj& obj) {
 }  // namespace
 
 DEFAULT_EXEC_STAGE(Assert);
-DEFAULT_LOGICAL_STAGE(Assert);
+
+class AssertLogicalStage : public sdk::TestLogicalStage<AssertExecStage> {
+public:
+    AssertLogicalStage(std::string_view stageName, const mongo::BSONObj& arguments)
+        : sdk::TestLogicalStage<AssertExecStage>(stageName, arguments) {}
+
+    std::unique_ptr<sdk::LogicalAggStage> clone() const override {
+        return std::make_unique<AssertLogicalStage>(_name, _arguments);
+    }
+
+    bool evaluatePipelineRewriteRulePrecondition(
+        std::string_view ruleName,
+        mongo::extension::ConstPipelineRewriteContextHandle) const override {
+        auto phase = _arguments.getStringField("assertInPhase");
+        if (ruleName == kOptPrecondition && phase == kOptPrecondition) {
+            assertWithSpec(_arguments);
+            return false;
+        }
+        if (ruleName == kOptTransform && phase == kOptTransform) {
+            return true;
+        }
+        return false;
+    }
+
+    bool evaluatePipelineRewriteRuleTransform(
+        std::string_view ruleName, mongo::extension::PipelineRewriteContextHandle) override {
+        if (ruleName == kOptTransform &&
+            _arguments.getStringField("assertInPhase") == kOptTransform) {
+            assertWithSpec(_arguments);
+        }
+        return false;
+    }
+};
 
 class AssertAstNode : public sdk::TestAstNode<AssertLogicalStage> {
 public:
@@ -92,12 +127,16 @@ public:
             sdk_uassert(11569608, "invalid value for assertionType", assertionType == "error");
         }
 
-        // if we got here, assertInPhase must be empty, or ["parse", "ast"]
+        // if we got here, assertInPhase must be empty, or ["parse", "ast",
+        // "optimization_precondition", "optimization_transform"]
         auto assertInPhase = _stageBson.getStringField("assertInPhase");
         if (assertInPhase.empty() || assertInPhase == "parse") {
             assertWithSpec(_stageBson);
         }
-        sdk_uassert(11569600, "invalid value for assertInPhase", assertInPhase == "ast");
+        sdk_uassert(11569600,
+                    "invalid value for assertInPhase",
+                    assertInPhase == "ast" || assertInPhase == kOptPrecondition ||
+                        assertInPhase == kOptTransform);
     }
 
     mongo::BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
@@ -117,16 +156,16 @@ protected:
 };
 
 /**
- * $assert is a no-op stage. It will assert or error at parse time based on the specified arguments.
+ * $assert is a no-op stage that asserts or errors in a specified lifecycle phase.
  *
  * Syntax:
  * {
  *  $assert: {
  *      assertionType: "uassert|tassert|error",
- *      errmsg: string, // optional if assertionType is "error"
- *      code: number, // optional if assertionType is "error"
- *      assertInPhase: string, // optional, specifies what phase of processing to assert. If not
- *                              specified, asserts in StageDescriptor::parse().
+ *      errmsg: string,   // optional if assertionType is "error"
+ *      code: number,     // optional if assertionType is "error"
+ *      assertInPhase: "parse|ast|optimization_precondition|optimization_transform",
+ *                        // optional; defaults to StageDescriptor::parse() when omitted
  *  }
  * }
  */
@@ -152,6 +191,17 @@ private:
     }
 };
 
-DEFAULT_EXTENSION(Assert)
+class AssertExtension : public sdk::Extension {
+public:
+    void initialize(const sdk::HostPortalHandle& portal) override {
+        _registerStage<AssertStageDescriptor>(portal);
+        _registerStageRules<AssertStageDescriptor>(
+            portal,
+            {
+                {kOptPrecondition, mongo::extension::kReordering},
+                {kOptTransform, mongo::extension::kReordering},
+            });
+    }
+};
 REGISTER_EXTENSION(AssertExtension)
 DEFINE_GET_EXTENSION()
