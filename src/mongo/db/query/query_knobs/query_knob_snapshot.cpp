@@ -107,6 +107,10 @@ QueryKnobSnapshot QueryKnobSnapshotCache::getSnapshot() const {
     return _snapshot;
 }
 
+QueryKnobSnapshot QueryKnobSnapshotCache::getDefaults() const {
+    return _defaults;
+}
+
 void QueryKnobSnapshotCache::updateKnobValue(QueryKnobId id,
                                              QueryKnobValue value,
                                              KnobSource source) {

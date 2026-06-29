@@ -72,6 +72,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListQueryKnobs::createFromBso
             expCtx->getNamespaceString().isAdminDB() &&
                 expCtx->getNamespaceString().isCollectionlessAggregateNS());
 
+    const auto defaults = QueryKnobSnapshotCache::instance().getDefaults();
     std::deque<DocumentSource::GetNextResult> queue;
     for (const auto& entry : QueryKnobRegistry::instance().entries()) {
         BSONObjBuilder bob;
@@ -79,6 +80,9 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListQueryKnobs::createFromBso
         bob.append("wireName", entry.wireName);
         bob.append("pqsSettable", entry.pqsSettable);
         entry.appendType(&bob);
+        entry.appendConstraints(&bob);
+        auto defaultValue = defaults.getValue(entry.id);
+        entry.toBSON(bob, "default", defaultValue);
         queue.push_back(Document(bob.obj()));
     }
 

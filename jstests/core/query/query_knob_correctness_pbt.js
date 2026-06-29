@@ -16,7 +16,7 @@
  * ]
  */
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
-import {queryKnobsModel} from "jstests/libs/property_test_helpers/models/query_knob_models.js";
+import {buildQueryKnobsModel} from "jstests/libs/property_test_helpers/models/query_knob_models.js";
 import {getQueryAndOptionsModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
@@ -33,6 +33,36 @@ const numQueriesPerRun = 50;
 
 const controlColl = db.query_knob_correctness_pbt_control;
 const experimentColl = db.query_knob_correctness_pbt_experiment;
+
+const excludeKnobs = [
+    // Small values reject otherwise-valid multi-stage pipelines with error 7749501, which is a
+    // server-side guardrail rather than a correctness divergence.
+    "internalPipelineLengthLimit",
+    // Small values reject otherwise-valid sub-pipelines with error 232
+    // (MaxSubPipelineDepthExceeded), which is a server-side guardrail rather than a correctness
+    // divergence.
+    "internalMaxSubPipelineViewDepth",
+    /*
+     * TODO SERVER-99091 re-enable CE methods for PBT.
+     * Using the knobs below runs into "Currently index union is a top-level node."
+     * {
+     * 	"internalQueryPlannerEnableHashIntersection" : true,
+     * 	"featureFlagCostBasedRanker": true,
+     * 	"internalQueryCBRCEMode" : "automaticCE"
+     * }
+     */
+    "internalQueryCBRCEMode",
+    "automaticCEPlanRankingStrategy",
+    "internalQueryPlannerEnableHashIntersection",
+    "internalQuerySamplingCEMethod",
+];
+
+const knobSchema = db
+    .getSiblingDB("admin")
+    .aggregate([{$listQueryKnobs: {}}, {$match: {name: {$nin: excludeKnobs}}}, {$sort: {name: 1}}])
+    .toArray();
+
+const queryKnobsModel = buildQueryKnobsModel(knobSchema);
 
 function getWorkloadModel() {
     return fc

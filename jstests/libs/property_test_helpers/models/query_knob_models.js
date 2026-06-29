@@ -3,80 +3,162 @@
  */
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
-// A map from query knob to an arbitrary that covers possible values the knob takes on. This is used
-// to create an arbitrary that generates random values or no value for these query knobs.
-const knobToPossibleValues = {
-    // Multiplanner
-    internalQueryPlanEvaluationWorks: fc.integer({min: 1, max: 100000}),
-    internalQueryPlanEvaluationCollFraction: fc.double({min: 0, max: 1, noNaN: true}),
-    internalQueryPlanEvaluationMaxResults: fc.integer({min: 0, max: 500}),
-    internalQuerySBEPlanEvaluationMaxMemoryBytes: fc.nat(),
-    internalQueryPlanTieBreakingWithIndexHeuristics: fc.boolean(),
-    internalQueryForceIntersectionPlans: fc.boolean(),
-    internalQueryPlannerEnableIndexIntersection: fc.boolean(),
-    internalQueryPlannerEnableHashIntersection: fc.boolean(),
+const kInt32Min = -2147483648;
+const kInt32Max = 2147483647;
 
-    // TODO SERVER-94741 reenable index pruning testing.
-    // internalQueryPlannerEnableIndexPruning: fc.boolean()
+const clampCommon = (min, max) => (u) => Math.max(min, Math.min(max, Math.trunc(u)));
+const clampInt32 = clampCommon(kInt32Min, kInt32Max);
+const clampInt64 = clampCommon(Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER);
 
-    // Plan cache
-    internalQueryDisablePlanCache: fc.boolean(),
-    internalQueryCacheMaxEntriesPerCollection: fc.nat(),
-    internalQueryCacheEvictionRatio: fc.double({min: 0, max: 100, noNaN: true}),
-
-    // Planning and enumeration
-    internalQueryPlannerMaxIndexedSolutions: fc.nat({max: 128}),
-    internalQueryEnumerationPreferLockstepOrEnumeration: fc.boolean(),
-    internalQueryPlanOrChildrenIndependently: fc.boolean(),
-    internalQueryMaxScansToExplode: fc.nat({max: 400}),
-    internalQueryPlannerGenerateCoveredWholeIndexScans: fc.boolean(),
-
-    // Query execution
-    internalQueryExecYieldIterations: fc.nat({max: 10}),
-    internalQueryExecYieldPeriodMS: fc.nat({max: 100}),
-    internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals: fc.integer({min: 1, max: 2000}),
-    internalQueryFrameworkControl: fc.constantFrom("forceClassicEngine", "trySbeRestricted"),
-    internalQueryDisableSingleFieldExpressExecutor: fc.boolean(),
-    internalQueryAutoParameterizationMaxParameterCount: fc.nat({max: 1024}),
-    internalQueryEnableBooleanExpressionsSimplifier: fc.boolean(),
-    internalQuerySlotBasedExecutionDisableTimeSeriesPushdown: fc.boolean(),
-    /*
-     * TODO SERVER-99091 re-enable CE methods for PBT.
-     * Using the knobs below runs into "Currently index union is a top-level node."
-     * {
-     * 	"internalQueryPlannerEnableHashIntersection" : true,
-     * 	"featureFlagCostBasedRanker": true,
-     * 	"internalQueryCBRCEMode" : "automaticCE"
-     * }
-     */
-    featureFlagCostBasedRanker: fc.constant(false),
-    /* internalQueryCBRCEMode: fc.constantFrom(
-     *    'automaticCE',
-     *    'samplingCE',
-     *    'heuristicCE',
-     *  ),
-     */
-    internalQuerySamplingCEMethod: fc.constantFrom("random", "chunk"),
-};
-
-/*
- * Same as the object above, but each knob is marked as optional. When generating values, some of
- * them will be missing so not every knob is set for every run.
- * When minimizing, fast-check prefers not placing a value in the optional, so we'll get the minimal
- * set of knobs required to reproduce the issue.
- */
-const optionalKnobObject = {};
-for (const [knobName, valuesArb] of Object.entries(knobToPossibleValues)) {
-    optionalKnobObject[knobName] = fc.option(valuesArb);
-}
-
-export const queryKnobsModel = fc.record(optionalKnobObject).map((knobs) => {
-    // Remove the null values.
-    const knobsWithoutNull = {};
-    for (const [knobName, value] of Object.entries(knobs)) {
-        if (value !== null) {
-            knobsWithoutNull[knobName] = value;
+function deriveConstraintsFromBounds(knobConstraints) {
+    let min, minInclusive, max, maxInclusive;
+    for (const {kind, value} of knobConstraints) {
+        switch (kind) {
+            case "gte":
+                if (min === undefined || value > min) {
+                    min = value;
+                    minInclusive = true;
+                }
+                break;
+            case "gt":
+                if (min === undefined || value > min || (value === min && minInclusive)) {
+                    min = value;
+                    minInclusive = false;
+                }
+                break;
+            case "lte":
+                if (max === undefined || value < max) {
+                    max = value;
+                    maxInclusive = true;
+                }
+                break;
+            case "lt":
+                if (max === undefined || value < max || (value === max && maxInclusive)) {
+                    max = value;
+                    maxInclusive = false;
+                }
+                break;
         }
     }
-    return knobsWithoutNull;
-});
+    const bounds = {};
+    if (min !== undefined) {
+        bounds.min = min;
+        bounds.minInclusive = minInclusive;
+    }
+    if (max !== undefined) {
+        bounds.max = max;
+        bounds.maxInclusive = maxInclusive;
+    }
+    return bounds;
+}
+
+function makeNumericKnob(knob, constraint, alpha = 2) {
+    let {min, minInclusive = true, max, maxInclusive = true} = constraint;
+    if (!minInclusive && (knob.type === "int" || knob.type === "long long")) {
+        min = min + 1;
+        minInclusive = true;
+    }
+    if (!maxInclusive && (knob.type === "int" || knob.type === "long long")) {
+        max = max - 1;
+        maxInclusive = true;
+    }
+    let arb = min
+        ? // Generate a pareto distribution starting from the given lower bound.
+          fc
+              .double({min: Number.EPSILON, max: 1.0, noNaN: true})
+              .map((u) => min * Math.pow(u, -1.0 / alpha))
+        : // Fallback to a normal distribution if no lower bound is provided.
+          fc.double({noNaN: true, ...constraint});
+    // Clip to the upper bound if provided.
+    if (max !== undefined) {
+        arb = arb.map((u) => Math.min(u, max));
+    }
+    // Truncate to integers and clamp to the type's representable range.
+    switch (knob.type) {
+        case "int":
+            arb = arb.map(clampInt32);
+            break;
+        case "long long":
+            arb = arb.map(clampInt64);
+            break;
+    }
+
+    // The integer +1/-1 adjustment above does not apply to doubles, so the generator can still emit
+    // an exclusive bound exactly (e.g. gt: 1.0 -> 1.0 when the pareto factor is 1). Filter those out
+    // so we never produce a value the server's validator rejects.
+    if (min !== undefined && !minInclusive) {
+        arb = arb.filter((value) => value > min);
+    }
+    if (max !== undefined && !maxInclusive) {
+        arb = arb.filter((value) => value < max);
+    }
+
+    // Filter out the default value.
+    assert(knob.default !== undefined);
+    return arb.filter((value) => value !== knob.default);
+}
+
+function makeEnumKnob(knob, constraint) {
+    // Filter the default out of the allowed values.
+    let values = constraint.allowedValues ?? knob.allowedValues;
+    assert(values, "enum knob must have allowed values", {knob});
+    assert(knob.default !== undefined);
+    values = values.filter((v) => v !== knob.default);
+
+    // Do not emit the knob if there are no non-default values.
+    if (values.length === 0) {
+        return fc.constant(null);
+    }
+    // Pick enum values with uniform probability.
+    return fc.constantFrom(...values);
+}
+
+function makeBooleanKnob(knob) {
+    // The only non-default bool value is the negation of the default value.
+    assert(knob.default !== undefined);
+    return fc.constant(!knob.default);
+}
+
+function removeNullValues(obj) {
+    let buffer = {};
+    for (const [name, value] of Object.entries(obj)) {
+        if (value !== null) {
+            buffer[name] = value;
+        }
+    }
+    return buffer;
+}
+
+/**
+ * Builds a fast-check model from the result of `db.getSiblingDB("admin").aggregate([{$listQueryKnobs: {}}]).toArray()`.
+ * Each knob is optional so fast-check can shrink to the minimal reproducing set.
+ * Optional `constraints` map from knob name to bounds passed directly to the fc arbitrary (e.g.
+ * `{min, max}` for integer/double knobs).
+ */
+export function buildQueryKnobsModel(schema, probability = 0.75, alpha = 2) {
+    // Make the knobs have a 'defaultProbability' chance of being null.
+    const freq = Math.trunc(1.0 / (1.0 - probability));
+    const maybeDefault = (arb) => fc.option(arb, {freq});
+    const knobArbs = {};
+    for (const knob of schema) {
+        const constraint = deriveConstraintsFromBounds(knob.bounds ?? []);
+        let arb;
+        switch (knob.type) {
+            case "bool":
+                arb = makeBooleanKnob(knob);
+                break;
+            case "enum":
+                arb = makeEnumKnob(knob, constraint);
+                break;
+            case "double":
+            case "int":
+            case "long long":
+                arb = makeNumericKnob(knob, constraint, alpha);
+                break;
+            default:
+                assert(false, "unexpected knob type", {knob});
+        }
+        knobArbs[knob.name] = maybeDefault(arb);
+    }
+    return fc.record(knobArbs).map(removeNullValues);
+}

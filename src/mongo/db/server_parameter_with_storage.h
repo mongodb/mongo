@@ -70,7 +70,8 @@ using namespace std::literals::string_view_literals;
 namespace MONGO_MOD_PUB idl_server_parameter_bounds {
 // Predicate rules for bounds conditions
 struct GT {
-    static constexpr inline std::string_view description = "greater than"sv;
+    static constexpr inline std::string_view kind = "gt";
+    static constexpr inline std::string_view description = "greater than";
     template <typename T, typename U>
     static constexpr bool evaluate(const T& a, const U& b) {
         return a > b;
@@ -78,7 +79,8 @@ struct GT {
 };
 
 struct LT {
-    static constexpr inline std::string_view description = "less than"sv;
+    static constexpr inline std::string_view kind = "lt";
+    static constexpr inline std::string_view description = "less than";
     template <typename T, typename U>
     static constexpr bool evaluate(const T& a, const U& b) {
         return a < b;
@@ -86,7 +88,8 @@ struct LT {
 };
 
 struct GTE {
-    static constexpr inline std::string_view description = "greater than or equal to"sv;
+    static constexpr inline std::string_view kind = "gte";
+    static constexpr inline std::string_view description = "greater than or equal to";
     template <typename T, typename U>
     static constexpr bool evaluate(const T& a, const U& b) {
         return a >= b;
@@ -94,7 +97,8 @@ struct GTE {
 };
 
 struct LTE {
-    static constexpr inline std::string_view description = "less than or equal to"sv;
+    static constexpr inline std::string_view kind = "lte";
+    static constexpr inline std::string_view description = "less than or equal to";
     template <typename T, typename U>
     static constexpr bool evaluate(const T& a, const U& b) {
         return a <= b;
@@ -489,6 +493,7 @@ public:
      */
     template <class predicate>
     void addBound(const element_type& bound) {
+        _bounds.push_back({predicate::kind, bound});
         addValidator(
             [bound, spname = name()](const element_type& value, const boost::optional<TenantId>&) {
                 if (!predicate::evaluate(value, bound)) {
@@ -501,10 +506,28 @@ public:
             });
     }
 
+    void appendConstraints(BSONObjBuilder* b) const {
+        if (_bounds.empty()) {
+            return;
+        }
+        BSONArrayBuilder arr(b->subarrayStart("bounds"));
+        for (const auto& [kind, value] : _bounds) {
+            BSONObjBuilder entry(arr.subobjStart());
+            entry.append("kind", kind);
+            entry.append("value", value);
+        }
+    }
+
 private:
+    struct Bound {
+        std::string_view kind;
+        element_type value;
+    };
+
     SW _storage;
 
     std::vector<std::function<validator_t>> _validators;
+    std::vector<Bound> _bounds;
     std::function<onUpdate_t> _onUpdate;
     std::once_flag _setDefaultOnce;
 };

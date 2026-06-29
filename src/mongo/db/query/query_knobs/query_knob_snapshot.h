@@ -150,6 +150,7 @@ public:
      * Returns a copy of the current snapshot. Safe to call concurrently from any thread.
      */
     [[nodiscard]] QueryKnobSnapshot getSnapshot() const;
+    [[nodiscard]] QueryKnobSnapshot getDefaults() const;
 
     /**
      * Returns a copy of the current snapshot, cached in thread-local storage. Safe to call
