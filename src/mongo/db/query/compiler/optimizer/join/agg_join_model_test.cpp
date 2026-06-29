@@ -1674,6 +1674,28 @@ TEST_F(PipelineAnalyzerTest, ConflictingLocalFields) {
     ASSERT_EQ(swJoinModel.getStatus().reason(), "Local path could not be resolved");
 }
 
+TEST_F(PipelineAnalyzerTest, LocalFieldExactlyMatchesPriorAsField) {
+    // The second $lookup's localField "a" is *exactly* the first $lookup's "as" field (as opposed
+    // to an ancestor of it, as in ConflictingLocalFields). Resolving it reaches a different branch
+    // in PathResolver::resolve(): the embed path is a prefix of the field path (equal paths count
+    // as a prefix), so the early conflict bail is skipped and the path is stripped. This must not
+    // crash - the path refers to the bare embedded field, which is not traceable to a base
+    // collection, so the join should bail gracefully.
+    auto query = R"([
+        {$lookup: {from: "B", as: "a", localField: "x", foreignField: "y"}},
+        {$unwind: "$a"},
+        {$lookup: {from: "C", as: "c", localField: "a", foreignField: "z"}},
+        {$unwind: "$c"}
+    ])";
+
+    auto pipeline = makePipeline(query, {"B", "C"});
+    markFieldsAsScalar(*pipeline, {"x"sv, "a"sv}, {{"B", {"y"sv}}, {"C", {"z"sv}}});
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_EQ(swJoinModel.getStatus(), ErrorCodes::BadValue);
+    ASSERT_EQ(swJoinModel.getStatus().reason(), "Local path could not be resolved");
+}
+
 TEST_F(PipelineAnalyzerTest, ConflictingLocalFieldExprSyntax) {
     const auto query = R"([
     {$lookup: {from: "B", as: "foo.b", localField: "x", foreignField: "y"}},
@@ -2385,6 +2407,40 @@ TEST_F(PipelineAnalyzerTest, LeadingMatchAfterLimitPushdownBailsOut) {
     markFieldsAsScalar(*pipeline, {"x"sv}, {{"B", {"y"sv}}});
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
     ASSERT_NOT_OK(swJoinModel);
+}
+
+TEST_F(PipelineAnalyzerTest, EmbedPathShadowsResolvedPredicatePath) {
+    // The first $lookup uses "a.x" as its localField, attributing that path to the base node.
+    // A second $lookup whose "as" field is a prefix of, equal to, or a child of "a.x" must be
+    // excluded from the join graph: reordering it past the first lookup would overwrite "a.x" in
+    // the document and corrupt the first join predicate. The eligible prefix stops at 2 nodes.
+    auto getNodeCount = [&](std::string_view secondAs) -> size_t {
+        std::string q = std::string(R"([
+            {$lookup: {from: "B", localField: "a.x", foreignField: "k", as: "matched"}},
+            {$unwind: "$matched"},
+            {$lookup: {from: "C", localField: "q", foreignField: "r", as: ")") +
+            std::string(secondAs) + R"("}},
+            {$unwind: "$)" +
+            std::string(secondAs) + R"("}
+        ])";
+        auto pipeline = makePipeline(q, {"B", "C"});
+        markFieldsAsScalar(*pipeline, {"a.x", "q"}, {{"B", {"k"}}, {"C", {"r"}}});
+        ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+        auto sw = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+        ASSERT_OK(sw);
+        return sw.getValue().getGraph().numNodes();
+    };
+
+    // "a" is a prefix of the resolved "a.x" → shadow conflict → second lookup excluded (2 nodes).
+    ASSERT_EQ(2u, getNodeCount("a"));
+    // "a.x" exactly matches the resolved path → also excluded (2 nodes).
+    ASSERT_EQ(2u, getNodeCount("a.x"));
+    // "a.x.y" extends the resolved path → also excluded (2 nodes).
+    ASSERT_EQ(2u, getNodeCount("a.x.y"));
+    // "a.y" is a sibling with no overlap → second lookup included (3 nodes).
+    ASSERT_EQ(3u, getNodeCount("a.y"));
+    // "b" is unrelated → second lookup included (3 nodes).
+    ASSERT_EQ(3u, getNodeCount("b"));
 }
 
 }  // namespace

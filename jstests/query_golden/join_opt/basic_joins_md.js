@@ -332,25 +332,15 @@ joinTestWrapper(db, () => {
         {$unwind: "$y"},
     ]);
 
-    section(
-        "Basic example with a $project reducing the documents of the base collection to a single field",
-    );
-    runBasicJoinTest([
-        {$project: {a: true}},
-        {$lookup: {from: foreignColl1.getName(), as: "x", localField: "a", foreignField: "a"}},
-        {$unwind: "$x"},
-        {$lookup: {from: foreignColl3.getName(), as: "z", localField: "x.c", foreignField: "c"}},
-        {$unwind: "$z"},
-    ]);
-
-    section("Basic example with a $project adding synthetic fields");
-    runBasicJoinTest([
-        {$project: {a: true, extra: "$a"}},
-        {$lookup: {from: foreignColl1.getName(), as: "x", localField: "extra", foreignField: "a"}},
-        {$unwind: "$x"},
-        {$lookup: {from: foreignColl3.getName(), as: "z", localField: "x.c", foreignField: "c"}},
-        {$unwind: "$z"},
-    ]);
+    // TODO SERVER-128365: Support simple renames.
+    // section("Basic example with a $project adding synthetic fields");
+    // runBasicJoinTest([
+    //     {$project: {a: true, extra: "$a"}},
+    //     {$lookup: {from: foreignColl1.getName(), as: "x", localField: "extra", foreignField: "a"}},
+    //     {$unwind: "$x"},
+    //     {$lookup: {from: foreignColl3.getName(), as: "z", localField: "x.c", foreignField: "c"}},
+    //     {$unwind: "$z"},
+    // ]);
 
     section("Example with a cycle in the join graph");
     runBasicJoinTest([

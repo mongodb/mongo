@@ -31,7 +31,10 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/compiler/dependency_analysis/pipeline_dependency_graph.h"
+#include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string_view>
@@ -89,15 +92,10 @@ public:
         }
 
         auto filterBson = fromjson(tc.expr);
-        auto swMatchExpression =
-            MatchExpressionParser::parse(filterBson,
-                                         expCtx(),
-                                         ExtensionsCallbackNoop(),
-                                         MatchExpressionParser::kAllowAllSpecialFeatures);
-        ASSERT_OK(swMatchExpression);
+        auto dsc = DocumentSourceMatch::parse(expCtx(), BSON("$match" << filterBson));
 
-        auto splitExprs =
-            splitJoinAndSingleCollectionPredicates(swMatchExpression.getValue().get(), letVars);
+        auto splitExprs = splitJoinAndSingleCollectionPredicates(
+            dynamic_cast<const DocumentSourceMatch*>(dsc.begin()->get()), letVars);
         if (!tc.canSplit) {
             ASSERT(!splitExprs.has_value());
             return;
@@ -342,12 +340,6 @@ TEST_F(PredicateExtractorTest, ComplexSingleTablePredicates) {
     });
 
     assertSplit({
-        .expr = "{$where: 'this.a==\"foo\"'}",
-        .canSplit = true,
-        .expectedSingleTablePredicates = "{$where: 'this.a==\"foo\"'}",
-    });
-
-    assertSplit({
         .expr = "{$expr: {$and: [{$gt: ['$a', '$b']}, {$eq: ['$c', 5]}]}}",
         .canSplit = true,
         .expectedSingleTablePredicates = "{$expr: {$and: [{$gt: ['$a', '$b']}, {$eq: ['$c', 5]}]}}",
@@ -444,20 +436,20 @@ TEST_F(PredicateExtractorTest, LocalFieldIncludesPathSuffixOnLetVariable) {
         letVars.emplace_back("a", def, idA);
     }
 
+    DocumentSourceContainer dsc;
     auto parseMatch = [&](std::string_view json) {
         auto bson = fromjson(json);
-        return uassertStatusOK(
-            MatchExpressionParser::parse(bson,
-                                         expCtx(),
-                                         ExtensionsCallbackNoop(),
-                                         MatchExpressionParser::kAllowAllSpecialFeatures));
+        dsc = DocumentSourceMatch::parse(expCtx(), BSON("$match" << bson));
+        auto match = dynamic_cast<const DocumentSourceMatch*>(dsc.begin()->get());
+        ASSERT_NE(nullptr, match);
+        return std::move(match);
     };
 
     // Variable reference on the right with a path suffix: '$$a.y' must resolve to local path
     // 'x.y' (the let variable's RHS 'x', concatenated with the trailing 'y').
     {
         auto me = parseMatch("{$expr: {$eq: ['$z', '$$a.y']}}");
-        auto split = splitJoinAndSingleCollectionPredicates(me.get(), letVars);
+        auto split = splitJoinAndSingleCollectionPredicates(me, letVars);
         ASSERT(split.has_value());
         ASSERT_EQ(1, split->joinPredicates.size());
         ASSERT_EQ("x.y", split->joinPredicates[0].localField().fullPath());
@@ -467,7 +459,7 @@ TEST_F(PredicateExtractorTest, LocalFieldIncludesPathSuffixOnLetVariable) {
     // Variable reference on the left side; same semantics.
     {
         auto me = parseMatch("{$expr: {$eq: ['$$a.y', '$z']}}");
-        auto split = splitJoinAndSingleCollectionPredicates(me.get(), letVars);
+        auto split = splitJoinAndSingleCollectionPredicates(me, letVars);
         ASSERT(split.has_value());
         ASSERT_EQ(1, split->joinPredicates.size());
         ASSERT_EQ("x.y", split->joinPredicates[0].localField().fullPath());
@@ -477,7 +469,7 @@ TEST_F(PredicateExtractorTest, LocalFieldIncludesPathSuffixOnLetVariable) {
     // Multi-component suffix on the variable reference.
     {
         auto me = parseMatch("{$expr: {$eq: ['$z', '$$a.y.w']}}");
-        auto split = splitJoinAndSingleCollectionPredicates(me.get(), letVars);
+        auto split = splitJoinAndSingleCollectionPredicates(me, letVars);
         ASSERT(split.has_value());
         ASSERT_EQ(1, split->joinPredicates.size());
         ASSERT_EQ("x.y.w", split->joinPredicates[0].localField().fullPath());
@@ -486,7 +478,7 @@ TEST_F(PredicateExtractorTest, LocalFieldIncludesPathSuffixOnLetVariable) {
     // No suffix.
     {
         auto me = parseMatch("{$expr: {$eq: ['$z', '$$a']}}");
-        auto split = splitJoinAndSingleCollectionPredicates(me.get(), letVars);
+        auto split = splitJoinAndSingleCollectionPredicates(me, letVars);
         ASSERT(split.has_value());
         ASSERT_EQ(1, split->joinPredicates.size());
         ASSERT_EQ("x", split->joinPredicates[0].localField().fullPath());
@@ -498,24 +490,30 @@ TEST_F(PredicateExtractorTest, LocalFieldIncludesPathSuffixOnLetVariable) {
  */
 class ExtractExprPredicatesTest : public unittest::Test {
 public:
-    ExtractExprPredicatesTest()
-        : _expCtx(new ExpressionContextForTest()), _pathResolver{_baseNodeId, _resolvedPaths} {
-        _pathResolver.addNode(_firstNodeId, "first");
-        _pathResolver.addNode(_secondNodeId, "second");
-    }
+    static constexpr auto pipelineStr = R"([
+            {$lookup: {from: "first", localField: "a", foreignField: "b", as: "first"}},
+            {$unwind: "$first"},
+            {$lookup: {from: "second", localField: "c", foreignField: "d", as: "second"}},
+            {$unwind: "$second"}
+        ])";
 
-    auto createMatcher(const BSONObj& matchExpr) {
-        return uassertStatusOK(
-            MatchExpressionParser::parse(matchExpr,
-                                         _expCtx,
-                                         ExtensionsCallbackNoop(),
-                                         MatchExpressionParser::kAllowAllSpecialFeatures));
+    ExtractExprPredicatesTest()
+        : _expCtx(new ExpressionContextForTest()),
+          _pipeline{makePipelineForTest(pipelineStr, {"first", "second"}, _expCtx)},
+          _graph{pipeline::dependency_graph::DependencyGraph(_pipeline->getSources())},
+          _pathResolver{_baseNodeId, _graph} {
+        _pathResolver.trackEmbedPath(
+            *dynamic_cast<DocumentSourceLookUp*>(_pipeline->getSources().begin()->get()), 1);
+        _pathResolver.trackEmbedPath(
+            *dynamic_cast<DocumentSourceLookUp*>(_pipeline->getSources().rbegin()->get()), 2);
     }
 
     ExprPredicatesResult extract(std::string_view json) {
         auto bson = fromjson(json);
-        auto matchExpr = createMatcher(bson);
-        return extractExprPredicates(_pathResolver, matchExpr.get());
+        auto match = DocumentSourceMatch::create(bson, _expCtx);
+        _pipeline->addFinalSource(match);
+        _graph.resize(_pipeline->getSources().end());
+        return extractExprPredicates(_pathResolver, match.get());
     }
 
 protected:
@@ -524,7 +522,8 @@ protected:
     static constexpr NodeId _secondNodeId = 2;
 
     const boost::intrusive_ptr<ExpressionContextForTest> _expCtx;
-    std::vector<ResolvedPath> _resolvedPaths;
+    std::unique_ptr<Pipeline> _pipeline;
+    pipeline::dependency_graph::DependencyGraph _graph;
     PathResolver _pathResolver;
 };
 

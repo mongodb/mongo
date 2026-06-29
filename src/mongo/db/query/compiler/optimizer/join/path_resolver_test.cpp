@@ -30,314 +30,406 @@
 #include "mongo/db/query/compiler/optimizer/join/path_resolver.h"
 
 #include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/unittest/death_test.h"
+#include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/query/compiler/optimizer/join/agg_join_model_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::join_ordering {
-TEST(PathResolverTests, OverridedEmbedPaths) {
-    constexpr NodeId baseNodeId = 0;
-    std::vector<ResolvedPath> resolvedPaths;
-    PathResolver pathResolver{baseNodeId, resolvedPaths};
 
-    // At this moment all paths are resolved to the base node.
-
-    const auto pathA0 = pathResolver.resolve("a");
-    ASSERT_TRUE(pathA0.has_value());
-    ASSERT_EQ(resolvedPaths[*pathA0].nodeId, baseNodeId);
-
-    const auto pathAB0 = pathResolver.resolve("a.b");
-    ASSERT_TRUE(pathAB0.has_value());
-    ASSERT_EQ(resolvedPaths[*pathAB0].nodeId, baseNodeId);
-
-    const auto pathB0 = pathResolver.resolve("b");
-    ASSERT_TRUE(pathB0.has_value());
-    ASSERT_EQ(resolvedPaths[*pathB0].nodeId, baseNodeId);
-
-    const auto pathBC0 = pathResolver.resolve("b.c");
-    ASSERT_TRUE(pathBC0.has_value());
-    ASSERT_EQ(resolvedPaths[*pathBC0].nodeId, baseNodeId);
-
-    // Override path "b". Paths "b" and "b.c" from the base collection is not accessible any more.
-    // Paths "a", "a.b" are still the same.
-    constexpr NodeId firstNodeId = 10;  // The index of nodes does not really matter.
-    pathResolver.addNode(firstNodeId, "b");
-
-    const auto pathA1 = pathResolver.resolve("a");
-    ASSERT_TRUE(pathA1.has_value());
-    ASSERT_EQ(*pathA1, *pathA0);
-    ASSERT_EQ(resolvedPaths[*pathA0].nodeId, baseNodeId);
-
-    const auto pathAB1 = pathResolver.resolve("a.b");
-    ASSERT_TRUE(pathAB1.has_value());
-    ASSERT_EQ(*pathAB1, *pathAB0);
-    ASSERT_EQ(resolvedPaths[*pathAB0].nodeId, baseNodeId);
-
-    // Conflicts with the document prefix.
-    ASSERT_EQ(pathResolver.resolve("b"), boost::none);
-
-    const auto pathBC1 = pathResolver.resolve("b.c");
-    ASSERT_TRUE(pathBC1.has_value());
-    ASSERT_NE(*pathBC0, *pathBC1);
-    ASSERT_EQ(resolvedPaths[*pathBC1].nodeId, firstNodeId);
-
-    // Override path "a". Paths "a" and "a.b" from the base collection is not accessible any more.
-    constexpr NodeId secondNodeId = 5;
-    pathResolver.addNode(secondNodeId, "a");
-
-    // Conflicts with the document prefix.
-    ASSERT_EQ(pathResolver.resolve("a"), boost::none);
-
-    const auto pathAB2 = pathResolver.resolve("a.b");
-    ASSERT_TRUE(pathAB2.has_value());
-    ASSERT_NE(*pathAB0, *pathAB2);
-    ASSERT_EQ(resolvedPaths[*pathAB2].nodeId, secondNodeId);
-
-    const auto pathBC2 = pathResolver.resolve("b.c");
-    ASSERT_TRUE(pathBC2.has_value());
-    ASSERT_EQ(*pathBC2, *pathBC1);
-    ASSERT_EQ(resolvedPaths[*pathBC1].nodeId, firstNodeId);
-
-    // Override path "b" again.
-    constexpr NodeId thirdNodeId = 7;  // The index of nodes does not really matter.
-    pathResolver.addNode(thirdNodeId, "b");
-
-    const auto pathBC3 = pathResolver.resolve("b.c");
-    ASSERT_TRUE(pathBC3.has_value());
-    ASSERT_NE(*pathBC0, *pathBC3);
-    ASSERT_NE(*pathBC1, *pathBC3);
-    ASSERT_EQ(resolvedPaths[*pathBC3].nodeId, thirdNodeId);
+bool mainCollPathAlwaysScalar(std::string_view path) {
+    return false;
 }
 
-TEST(PathResolverTests, OverridedLongerEmbedPaths) {
-    constexpr NodeId baseNodeId = 0;
-    std::vector<ResolvedPath> resolvedPaths;
-    PathResolver pathResolver{baseNodeId, resolvedPaths};
-
-    const NodeId nodeAB = 1;
-    pathResolver.addNode(nodeAB, "a.b");
-
-    auto pathABC0 = pathResolver.resolve("a.b.c");
-    ASSERT_TRUE(pathABC0.has_value());
-    ASSERT_EQ(nodeAB, resolvedPaths.at(*pathABC0).nodeId);
-
-    const NodeId nodeA = 2;
-    pathResolver.addNode(nodeA, "a");
-    auto pathABC1 = pathResolver.resolve("a.b.c");
-    ASSERT_TRUE(pathABC1.has_value());
-    auto pathAB0 = pathResolver.resolve("a.b");
-    ASSERT_TRUE(pathAB0.has_value());
-    ASSERT_EQ(nodeA, resolvedPaths.at(*pathABC1).nodeId);
-    ASSERT_EQ(nodeA, resolvedPaths.at(*pathAB0).nodeId);
-
-    // Bring back a.b.
-    const NodeId nodeAB1 = 3;
-    pathResolver.addNode(nodeAB1, "a.b");
-    auto pathABC2 = pathResolver.resolve("a.b.c");
-    ASSERT_TRUE(pathABC2.has_value());
-    auto pathAC0 = pathResolver.resolve("a.c");
-    ASSERT_TRUE(pathAC0.has_value());
-    ASSERT_EQ(nodeAB1, resolvedPaths.at(*pathABC2).nodeId);
-    ASSERT_EQ(nodeA, resolvedPaths.at(*pathAC0).nodeId);
-
-    // Bring back a.
-    const NodeId nodeA1 = 4;
-    pathResolver.addNode(nodeA1, "a");
-    auto pathABC3 = pathResolver.resolve("a.b.c");
-    ASSERT_TRUE(pathABC3.has_value());
-    auto pathAB1 = pathResolver.resolve("a.b");
-    ASSERT_TRUE(pathAB1.has_value());
-    auto pathAC1 = pathResolver.resolve("a.c");
-    ASSERT_TRUE(pathAC1.has_value());
-    ASSERT_EQ(nodeA1, resolvedPaths.at(*pathABC3).nodeId);
-    ASSERT_EQ(nodeA1, resolvedPaths.at(*pathAB1).nodeId);
-    ASSERT_EQ(nodeA1, resolvedPaths.at(*pathAC1).nodeId);
-
-    // a.b again
-    const NodeId nodeAB2 = 5;
-    pathResolver.addNode(nodeAB2, "a.b");
-    auto pathABC4 = pathResolver.resolve("a.b.c");
-    ASSERT_TRUE(pathABC4.has_value());
-    auto pathAC2 = pathResolver.resolve("a.c");
-    ASSERT_TRUE(pathAC2.has_value());
-    ASSERT_EQ(nodeAB2, resolvedPaths.at(*pathABC4).nodeId);
-    ASSERT_EQ(nodeA1, resolvedPaths.at(*pathAC2).nodeId);
-
-    // Impossible a.b!
-    const NodeId nodeAB3 = 6;
-    pathResolver.addNode(nodeAB3, "a.b");
-    auto pathABC5 = pathResolver.resolve("a.b.c");
-    ASSERT_TRUE(pathABC5.has_value());
-    auto pathAC3 = pathResolver.resolve("a.c");
-    ASSERT_TRUE(pathAC3.has_value());
-    ASSERT_EQ(nodeAB3, resolvedPaths.at(*pathABC5).nodeId);
-    ASSERT_EQ(nodeA1, resolvedPaths.at(*pathAC3).nodeId);
+void validatePath(boost::optional<PathId> id,
+                  PathResolver& pr,
+                  const FieldPath& expectedPath,
+                  NodeId expectedNodeId) {
+    ASSERT_NE(id, boost::none);
+    ASSERT_LT(*id, pr.resolvedPaths().size());
+    const auto& path = pr.resolvedPaths()[*id];
+    ASSERT_EQ(path.nodeId, expectedNodeId);
+    ASSERT_EQ(path.fieldName.fullPath(), expectedPath);
 }
 
-#ifdef MONGO_CONFIG_DEBUG_BUILD
-DEATH_TEST(PathResolverDeathTests, OverrideExistingNode, "This node has been already added") {
-    constexpr NodeId baseNodeId = 0;
-    std::vector<ResolvedPath> resolvedPaths;
-    PathResolver pathResolver{baseNodeId, resolvedPaths};
-
-    const NodeId node = 1;
-    pathResolver.addNode(node, "a.b");
-
-    pathResolver.addNode(node, "a.b");
-}
-#endif
-
-TEST(PathResolverTests, AddPath) {
-    constexpr NodeId baseNodeId = 11;
-    std::vector<ResolvedPath> resolvedPaths;
-    PathResolver pathResolver{baseNodeId, resolvedPaths};
-
-    auto pathABC0 = pathResolver.addPath(baseNodeId, "a.b.c");
-    ASSERT_EQ(pathABC0, pathResolver.addPath(baseNodeId, "a.b.c"));
-
-    const NodeId nodeA0 = 7;
-    pathResolver.addNode(nodeA0, "a");
-    auto pathABC1 = pathResolver.addPath(nodeA0, "a.b.c");
-    ASSERT_NE(pathABC0, pathABC1);
-    ASSERT_EQ(pathABC1, pathResolver.addPath(nodeA0, "a.b.c"));
-    auto pathAABC0 = pathResolver.resolve("a.a.b.c");
-    ASSERT_TRUE(pathAABC0.has_value());
-    ASSERT_EQ(pathABC1, pathResolver.resolve("a.a.b.c"));
-
-    const NodeId nodeA1 = 10;
-    pathResolver.addNode(nodeA1, "a");
-    auto pathABC2 = pathResolver.addPath(nodeA1, "a.b.c");
-    ASSERT_NE(pathABC1, pathABC2);
-    ASSERT_NE(pathABC0, pathABC2);
-    ASSERT_EQ(pathABC2, pathResolver.addPath(nodeA1, "a.b.c"));
-    auto pathAABC1 = pathResolver.resolve("a.a.b.c");
-    ASSERT_TRUE(pathAABC1.has_value());
-    ASSERT_EQ(pathABC2, *pathAABC1);
+// Resolve, validate actual path value, then verify that a second resolution yields the same path
+// id. Ensures that the resolved path has the same field & is set to the expected node.
+void testResolve(PathResolver& pr,
+                 const FieldPath& field,
+                 const FieldPath& expectedPath,
+                 const NodeId expectedNode,
+                 const DocumentSource* at = nullptr,
+                 boost::optional<NodeId> nodeId = boost::none) {
+    auto pathId = pr.resolve(field, at, nodeId);
+    validatePath(pathId, pr, expectedPath, expectedNode);
+    ASSERT_EQ(pr.resolve(field, at, nodeId), pathId);
 }
 
-TEST(PathResolverTests, OverlappingEmbedPaths) {
-    constexpr NodeId baseNodeId = 0;
-    std::vector<ResolvedPath> resolvedPaths;
-    PathResolver pathResolver{baseNodeId, resolvedPaths};
+class PathResolverTest : public AggJoinModelFixture {
+public:
+    std::unique_ptr<Pipeline> makeBasicTestPipeline(std::string_view lf1,
+                                                    std::string_view ff1,
+                                                    std::string_view as1,
+                                                    std::string_view lf2,
+                                                    std::string_view ff2,
+                                                    std::string_view as2,
+                                                    std::string_view prefix = "") {
+        auto query =
+            std::vformat(R"([
+            {}
+            {{
+                $lookup: {{
+                    from: "foreign",
+                    localField: "{}",
+                    foreignField: "{}",
+                    as: "{}"
+                }}
+            }},
+            {{ $unwind: "${}" }},
+            {{
+                $lookup: {{
+                    from: "foreign2",
+                    localField: "{}",
+                    foreignField: "{}",
+                    as: "{}"
+                }}
+            }},
+            {{ $unwind: "${}" }}
+            ])",
+                         std::make_format_args(prefix, lf1, ff1, as1, as1, lf2, ff2, as2, as2));
+        return makePipeline(std::string_view(query), {"foreign", "foreign2"});
+    }
 
-    // At this moment all paths are resolved to the base node.
+    std::unique_ptr<Pipeline> makeSubpipelineTestPipeline(std::string_view let,
+                                                          std::string_view subpipeline,
+                                                          std::string_view as1,
+                                                          std::string_view lf2,
+                                                          std::string_view ff2,
+                                                          std::string_view as2) {
+        auto query = std::vformat(
+            R"([
+            {{
+                $lookup: {{
+                    from: "foreign",
+                    let: {},
+                    pipeline: {},
+                    as: "{}"
+                }}
+            }},
+            {{ $unwind: "${}" }},
+            {{
+                $lookup: {{
+                    from: "foreign2",
+                    localField: "{}",
+                    foreignField: "{}",
+                    as: "{}"
+                }}
+            }},
+            {{ $unwind: "${}" }}
+            ])",
+            std::make_format_args(let, subpipeline, as1, as1, lf2, ff2, as2, as2));
+        return makePipeline(std::string_view(query), {"foreign", "foreign2"});
+    }
+};
 
-    const auto pathA0 = pathResolver.resolve("a");
-    ASSERT_TRUE(pathA0.has_value());
-    ASSERT_EQ(resolvedPaths[*pathA0].nodeId, baseNodeId);
+TEST_F(PathResolverTest, Basic) {
+    auto pipeline = makeBasicTestPipeline("lf", "ff", "embed", "lf2", "ff2", "embed2");
+    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
+                                                   mainCollPathAlwaysScalar);
 
-    const auto pathAB0 = pathResolver.resolve("a.b");
-    ASSERT_TRUE(pathAB0.has_value());
-    ASSERT_EQ(resolvedPaths[*pathAB0].nodeId, baseNodeId);
+    const NodeId kBaseNode = 0;
+    const NodeId kForeignNode = 1;
 
-    const auto pathABC0 = pathResolver.resolve("a.b.c");
-    ASSERT_TRUE(pathABC0.has_value());
-    ASSERT_EQ(resolvedPaths[*pathABC0].nodeId, baseNodeId);
+    PathResolver pr(kBaseNode, dg);
 
-    const auto pathAC0 = pathResolver.resolve("a.c");
-    ASSERT_TRUE(pathAC0.has_value());
-    ASSERT_EQ(resolvedPaths[*pathAC0].nodeId, baseNodeId);
+    auto it = pipeline->getSources().begin();
+    const auto* dsLookup = it->get();
+    const auto* lookup = dynamic_cast<const DocumentSourceLookUp*>(dsLookup);
+    ASSERT(lookup);
+    ASSERT_TRUE(pr.trackEmbedPath(*lookup, kForeignNode));
 
-    // Override path "a".
-    constexpr NodeId firstNodeId = 1;  // The index of nodes does not really matter.
-    pathResolver.addNode(firstNodeId, "a");
+    // The scope of the local field is the main pipeline, so we don't specify a
+    // node.
+    testResolve(pr, "lf", "lf", kBaseNode, dsLookup);
 
-    // "b" still points to the base node
-    const auto pathB0 = pathResolver.resolve("b");
-    ASSERT_TRUE(pathB0.has_value());
-    ASSERT_EQ(resolvedPaths[*pathB0].nodeId, baseNodeId);
+    // The scope of the foreign field must be the "foreign" node. No subpipeline
+    // => we can pass nullptr.
+    testResolve(pr, "ff", "ff", kForeignNode, nullptr, /* scope */ kForeignNode);
 
-    // "a.b" and "a.c" point to the first node
-    const auto pathAB1 = pathResolver.resolve("a.b");
-    ASSERT_TRUE(pathAB1.has_value());
-    ASSERT_EQ(resolvedPaths[*pathAB1].nodeId, firstNodeId);
-    const auto pathAC1 = pathResolver.resolve("a.c");
-    ASSERT_TRUE(pathAC1.has_value());
-    ASSERT_EQ(resolvedPaths[*pathAC1].nodeId, firstNodeId);
+    // Or the same $lookup with a different node.
+    const NodeId kForeignNode2 = 2;
+    ASSERT_FALSE(pr.trackEmbedPath(*lookup, kForeignNode2));
 
-    // Override path "a.b"
-    constexpr NodeId secondNodeId = 2;  // The index of nodes does not really matter.
-    pathResolver.addNode(secondNodeId, "a.b");
+    // Or a new $lookup with an existing node.
+    const auto* dsLookup2 = (++it)->get();
+    const auto* lookup2 = dynamic_cast<const DocumentSourceLookUp*>(dsLookup2);
+    ASSERT(lookup2);
+    ASSERT_FALSE(pr.trackEmbedPath(*lookup2, kBaseNode));
+    ASSERT_FALSE(pr.trackEmbedPath(*lookup2, kForeignNode));
+    ASSERT(pr.trackEmbedPath(*lookup2, kForeignNode2));
 
-    // "b" still points to the base node
-    const auto pathB1 = pathResolver.resolve("b");
-    ASSERT_TRUE(pathB1.has_value());
-    ASSERT_EQ(resolvedPaths[*pathB1].nodeId, baseNodeId);
+    // Validate that fields not mentioned in the pipeline resolve to the same node as the scope, or
+    // base node if no scope is provided.
+    testResolve(pr, "a", "a", kForeignNode, nullptr, /* scope */ kForeignNode);
+    testResolve(pr, "b", "b", kBaseNode, nullptr, /* scope */ kBaseNode);
+    testResolve(pr, "c", "c", kBaseNode, nullptr);
 
-    // "a.b.c" point to the second node
-    const auto pathABC1 = pathResolver.resolve("a.b.c");
-    ASSERT_TRUE(pathABC1.has_value());
-    ASSERT_EQ(resolvedPaths[*pathABC1].nodeId, secondNodeId);
+    // Verify that fields from an embed field resolve to the node that provides the embedding.
+    testResolve(pr, "embed.a", "a", kForeignNode, nullptr);
+    testResolve(pr, "embed2.embed.a", "embed.a", /* scope */ kForeignNode2, nullptr);
 
-    // "a.c" still points to the first node
-    const auto pathAC2 = pathResolver.resolve("a.c");
-    ASSERT_TRUE(pathAC2.has_value());
-    ASSERT_EQ(resolvedPaths[*pathAC2].nodeId, firstNodeId);
+    // Verify that if we are within a specified scope, we don't resolve the field to an embedding.
+    testResolve(pr, "embed.a", "embed.a", kForeignNode, nullptr, /* scope */ kForeignNode);
+
+    // Validate earlier fields still resolve to same thing.
+    testResolve(pr, "lf", "lf", kBaseNode, dsLookup);
+    testResolve(pr, "ff", "ff", kForeignNode, nullptr, /* scope */ kForeignNode);
 }
 
+TEST_F(PathResolverTest, EmbedPathCollisionExact) {
+    auto pipeline = makeBasicTestPipeline("lf", "ff", "as", "lf2", "ff2", "as");
+    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
+                                                   mainCollPathAlwaysScalar);
+    PathResolver pr(0, dg);
 
-TEST(PathResolverTests, ConflictingEmbedPaths) {
-    // At this moment all paths are resolved to the base node.
-    constexpr NodeId baseNodeId = 0;
-    std::vector<ResolvedPath> resolvedPaths;
-    PathResolver pathResolver{baseNodeId, resolvedPaths};
+    // No issues embedding our first path.
+    auto it = pipeline->getSources().begin();
+    const auto* dsLookup = it->get();
+    const auto* lookup = dynamic_cast<const DocumentSourceLookUp*>(dsLookup);
+    ASSERT(lookup);
+    ASSERT_TRUE(pr.trackEmbedPath(*lookup, 1));
 
-    // At this momment all paths are resolved to the base node.
-    ASSERT_FALSE(pathResolver.pathResolvesToJoinNode("a", baseNodeId));
-    ASSERT_FALSE(pathResolver.pathResolvesToJoinNode("a.b", baseNodeId));
-    ASSERT_FALSE(pathResolver.pathResolvesToJoinNode("b", baseNodeId));
-    ASSERT_FALSE(pathResolver.pathResolvesToJoinNode("b.c", baseNodeId));
-    ASSERT_FALSE(pathResolver.pathResolvesToJoinNode("b.e", baseNodeId));
-
-    constexpr NodeId firstNodeId = 10;  // The index of nodes does not really matter.
-    pathResolver.addNode(firstNodeId, "b.c");
-
-    // These paths will no longer resolve to the base node because we have added
-    // the "b.c" prefix to the graph in firstNode.
-    ASSERT_TRUE(pathResolver.pathResolvesToJoinNode("b", baseNodeId));
-    ASSERT_TRUE(pathResolver.pathResolvesToJoinNode("b.c", baseNodeId));
-
-    // These paths will still resolve to the base node.
-    ASSERT_FALSE(pathResolver.pathResolvesToJoinNode("b.e", baseNodeId));
-    ASSERT_FALSE(pathResolver.pathResolvesToJoinNode("a", baseNodeId));
-    ASSERT_FALSE(pathResolver.pathResolvesToJoinNode("a.b", baseNodeId));
-
-    constexpr NodeId secondNodeId = 100;  // The index of nodes does not really matter.
-    pathResolver.addNode(secondNodeId, "a");
-    ASSERT_TRUE(pathResolver.pathResolvesToJoinNode("a", baseNodeId));
-    ASSERT_TRUE(pathResolver.pathResolvesToJoinNode("a.b", baseNodeId));
-
-    // This path doesn't conflict with "a" or "b.e".
-    ASSERT_FALSE(pathResolver.pathResolvesToJoinNode("b.e", baseNodeId));
+    // Second path results in a collision!
+    const auto* dsLookup2 = (++it)->get();
+    const auto* lookup2 = dynamic_cast<const DocumentSourceLookUp*>(dsLookup2);
+    ASSERT(lookup2);
+    ASSERT_FALSE(pr.trackEmbedPath(*lookup2, 2));
 }
 
-TEST(PathResolverTests, EmbedPathShadowsResolvedPredicatePath) {
-    constexpr NodeId baseNodeId = 0;
-    std::vector<ResolvedPath> resolvedPaths;
-    PathResolver pathResolver{baseNodeId, resolvedPaths};
+TEST_F(PathResolverTest, EmbedPathCollision2ndPrefixed) {
+    auto pipeline = makeBasicTestPipeline("lf", "ff", "as", "lf2", "ff2", "as.bar");
+    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
+                                                   mainCollPathAlwaysScalar);
+    PathResolver pr(0, dg);
 
-    // Simulate the first $lookup: {localField: "a.x", foreignField: "k", as: "matched"}. The
-    // localField "a.x" resolves to the base node and the foreignField "k" is added to the foreign
-    // node, mimicking how AggJoinModel processes a $lookup with a local/foreign field join.
-    auto localPath = pathResolver.resolve("a.x");
-    ASSERT_TRUE(localPath.has_value());
-    ASSERT_EQ(resolvedPaths[*localPath].nodeId, baseNodeId);
+    // No issues embedding our first path.
+    auto it = pipeline->getSources().begin();
+    const auto* dsLookup = it->get();
+    const auto* lookup = dynamic_cast<const DocumentSourceLookUp*>(dsLookup);
+    ASSERT(lookup);
+    ASSERT_TRUE(pr.trackEmbedPath(*lookup, 1));
 
-    constexpr NodeId matchedNodeId = 1;
-    pathResolver.addNode(matchedNodeId, "matched");
-    pathResolver.addPath(matchedNodeId, "k");
-
-    // A second $lookup with as: "a" embeds its results at "a", which overwrites the base field
-    // "a.x" that the first lookup uses as its localField. Reordering the second lookup ahead of
-    // the first would corrupt that predicate, so this $lookup's "as" field must be rejected even
-    // though "a" does not collide with any existing embed path.
-    ASSERT_TRUE(pathResolver.pathResolvesToJoinNode("a", baseNodeId));
-    // Overwriting the resolved path exactly is also a conflict.
-    ASSERT_TRUE(pathResolver.pathResolvesToJoinNode("a.x", baseNodeId));
-    // Overwriting a path nested under the resolved path is a conflict too.
-    ASSERT_TRUE(pathResolver.pathResolvesToJoinNode("a.x.y", baseNodeId));
-
-    // Sibling paths that don't overlap the resolved path "a.x" remain eligible.
-    ASSERT_FALSE(pathResolver.pathResolvesToJoinNode("a.y", baseNodeId));
-    ASSERT_FALSE(pathResolver.pathResolvesToJoinNode("b", baseNodeId));
+    // Second path results in a collision!
+    const auto* dsLookup2 = (++it)->get();
+    const auto* lookup2 = dynamic_cast<const DocumentSourceLookUp*>(dsLookup2);
+    ASSERT(lookup2);
+    ASSERT_FALSE(pr.trackEmbedPath(*lookup2, 2));
 }
+
+TEST_F(PathResolverTest, EmbedPathCollisions1stPrefixed) {
+    auto pipeline = makeBasicTestPipeline("lf", "ff", "as.foo", "lf2", "ff2", "as");
+    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
+                                                   mainCollPathAlwaysScalar);
+    PathResolver pr(0, dg);
+
+    // No issues embedding our first path.
+    auto it = pipeline->getSources().begin();
+    const auto* dsLookup = it->get();
+    const auto* lookup = dynamic_cast<const DocumentSourceLookUp*>(dsLookup);
+    ASSERT(lookup);
+    ASSERT_TRUE(pr.trackEmbedPath(*lookup, 1));
+
+    // Second path results in a collision!
+    const auto* dsLookup2 = (++it)->get();
+    const auto* lookup2 = dynamic_cast<const DocumentSourceLookUp*>(dsLookup2);
+    ASSERT(lookup2);
+    ASSERT_FALSE(pr.trackEmbedPath(*lookup2, 2));
+}
+
+TEST_F(PathResolverTest, EmbedPathShadowsExact) {
+    auto pipeline = makeBasicTestPipeline("lf", "ff", "as", "lf2", "ff2", "lf");
+    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
+                                                   mainCollPathAlwaysScalar);
+    PathResolver pr(0, dg);
+
+    // No issues embedding our first path.
+    auto it = pipeline->getSources().begin();
+    const auto* dsLookup = it->get();
+    const auto* lookup = dynamic_cast<const DocumentSourceLookUp*>(dsLookup);
+    ASSERT(lookup);
+    ASSERT_TRUE(pr.trackEmbedPath(*lookup, 1));
+
+    // Need to resolve some fields to detect a collision.
+    testResolve(pr, "lf", "lf", 0, dsLookup);
+    testResolve(pr, "ff", "ff", 1, nullptr, 1);
+
+    // Second path results in a collision!
+    const auto* dsLookup2 = (++it)->get();
+    const auto* lookup2 = dynamic_cast<const DocumentSourceLookUp*>(dsLookup2);
+    ASSERT(lookup2);
+    ASSERT_FALSE(pr.trackEmbedPath(*lookup2, 2));
+}
+
+TEST_F(PathResolverTest, EmbedPathShadowsPrefix) {
+    auto pipeline = makeBasicTestPipeline("lf", "ff", "as", "lf2", "ff2", "lf.as");
+    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
+                                                   mainCollPathAlwaysScalar);
+    PathResolver pr(0, dg);
+
+    // No issues embedding our first path.
+    auto it = pipeline->getSources().begin();
+    const auto* dsLookup = it->get();
+    const auto* lookup = dynamic_cast<const DocumentSourceLookUp*>(dsLookup);
+    ASSERT(lookup);
+    ASSERT_TRUE(pr.trackEmbedPath(*lookup, 1));
+
+    // Need to resolve some fields to detect a collision.
+    testResolve(pr, "lf", "lf", 0, dsLookup);
+    testResolve(pr, "ff", "ff", 1, nullptr, 1);
+
+    // Second path results in a collision!
+    const auto* dsLookup2 = (++it)->get();
+    const auto* lookup2 = dynamic_cast<const DocumentSourceLookUp*>(dsLookup2);
+    ASSERT(lookup2);
+    ASSERT_FALSE(pr.trackEmbedPath(*lookup2, 2));
+}
+
+TEST_F(PathResolverTest, EmbedPathShadowsSuffix) {
+    auto pipeline = makeBasicTestPipeline("lf", "ff", "as.x", "lf2", "ff2", "as");
+    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
+                                                   mainCollPathAlwaysScalar);
+    PathResolver pr(0, dg);
+
+    // No issues embedding our first path.
+    auto it = pipeline->getSources().begin();
+    const auto* dsLookup = it->get();
+    const auto* lookup = dynamic_cast<const DocumentSourceLookUp*>(dsLookup);
+    ASSERT(lookup);
+    ASSERT_TRUE(pr.trackEmbedPath(*lookup, 1));
+
+    // Need to resolve some fields to detect a collision.
+    testResolve(pr, "lf", "lf", 0, dsLookup);
+    testResolve(pr, "ff", "ff", 1, nullptr, 1);
+
+    // Second path results in a collision!
+    const auto* dsLookup2 = (++it)->get();
+    const auto* lookup2 = dynamic_cast<const DocumentSourceLookUp*>(dsLookup2);
+    ASSERT(lookup2);
+    ASSERT_FALSE(pr.trackEmbedPath(*lookup2, 2));
+}
+
+TEST_F(PathResolverTest, EmbedPathParallelOk) {
+    auto pipeline = makeBasicTestPipeline("lf", "ff", "as.x", "lf2", "ff2", "as.y");
+    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
+                                                   mainCollPathAlwaysScalar);
+    PathResolver pr(0, dg);
+
+    // No issues embedding our first path.
+    auto it = pipeline->getSources().begin();
+    const auto* dsLookup = it->get();
+    const auto* lookup = dynamic_cast<const DocumentSourceLookUp*>(dsLookup);
+    ASSERT(lookup);
+    ASSERT_TRUE(pr.trackEmbedPath(*lookup, 1));
+
+    // Need to resolve some fields to detect a collision.
+    testResolve(pr, "lf", "lf", 0, dsLookup);
+    testResolve(pr, "ff", "ff", 1, nullptr, 1);
+
+    // Second path also fine!
+    const auto* dsLookup2 = (++it)->get();
+    const auto* lookup2 = dynamic_cast<const DocumentSourceLookUp*>(dsLookup2);
+    ASSERT(lookup2);
+    ASSERT_TRUE(pr.trackEmbedPath(*lookup2, 2));
+}
+
+TEST_F(PathResolverTest, HandleSubpipelineProject) {
+    auto pipeline = makeSubpipelineTestPipeline(
+        R"({aaa: "$lf"})",
+        R"([{$match: {$expr: ["$$aaa", "$someField"]}}, {$project: {someField: 1, someOtherField: 1}}])",
+        "embed",
+        "lf",
+        "ff",
+        "embed2");
+    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
+                                                   mainCollPathAlwaysScalar);
+    PathResolver pr(0, dg);
+
+    // No issues embedding our first path.
+    auto it = pipeline->getSources().begin();
+    const auto* dsLookup = it->get();
+    const auto* lookup = dynamic_cast<const DocumentSourceLookUp*>(dsLookup);
+    ASSERT(lookup);
+    ASSERT_TRUE(pr.trackEmbedPath(*lookup, 1));
+
+    // Need to resolve some fields to detect a collision. NOTE: the path resolver (and dependency
+    // graph) don't know anything about variables, so we use the base collection names here.
+    testResolve(pr, "lf", "lf", 0, dsLookup);
+    ASSERT(lookup->getSubPipeline());
+    auto subPipelineIt = lookup->getSubPipeline()->begin();
+    ASSERT_NE(subPipelineIt, lookup->getSubPipeline()->end());
+    testResolve(pr, "someField", "someField", 1, subPipelineIt->get(), 1);
+
+    // Second path also fine!
+    const auto* dsLookup2 = (++it)->get();
+    const auto* lookup2 = dynamic_cast<const DocumentSourceLookUp*>(dsLookup2);
+    ASSERT(lookup2);
+    ASSERT_TRUE(pr.trackEmbedPath(*lookup2, 2));
+
+    // Resolving fields doesn't cause any issues.
+    testResolve(pr, "lf", "lf", 0, dsLookup);
+    testResolve(pr, "ff", "ff", 2, nullptr, 2);
+
+    // If we were to resolve some more fields (not in the pipeline above!), we can correctly assign
+    // each to the right node.
+    testResolve(pr, "embed.someOtherField", "someOtherField", 1, nullptr);
+    testResolve(pr, "embed.someOtherField.bar", "someOtherField.bar", 1, nullptr);
+    testResolve(pr, "embed2.someOtherField", "someOtherField", 2, nullptr);
+    testResolve(pr, "embed2.someOtherField2", "someOtherField2", 2, nullptr);
+
+    // However, we will fail to resolve a field that was dropped by the sub-pipeline $project!
+    ASSERT_FALSE(pr.resolve("embed.someDroppedField", nullptr));
+}
+
+TEST_F(PathResolverTest, HandleMainPipelineProject) {
+    auto pipeline =
+        makeBasicTestPipeline("lf",
+                              "ff",
+                              "embed",
+                              "lf2",
+                              "ff",
+                              "embed2",
+                              /* prefix */ R"({$project: {lf: 1, embed: 1, lf2: "computed"}},)");
+    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
+                                                   mainCollPathAlwaysScalar);
+    PathResolver pr(0, dg);
+
+    // No issues embedding our first path.
+    auto it = ++(pipeline->getSources().begin());
+    const auto* dsLookup = it->get();
+    const auto* lookup = dynamic_cast<const DocumentSourceLookUp*>(dsLookup);
+    ASSERT(lookup);
+    // No issue tracking embed path, even though it was dropped (modified). We embedded after
+    // modifying the path, so this effectively cancels out whatever the first modification was, in
+    // particular because unlike a projection, this does not do anything other than completely
+    // replace the field (no fancy traversal semantics here).
+    ASSERT_TRUE(pr.trackEmbedPath(*lookup, 1));
+
+    // Validate that we're able to resolve join predicates in first $lookup.
+    testResolve(pr, "lf", "lf", 0, dsLookup);
+    testResolve(pr, "ff", "ff", 1, nullptr, 1);
+    // Or a path in the embedded field.
+    testResolve(pr, "embed.bar", "bar", 1, nullptr);
+
+    // Validate that we can't resolve a path dropped by the $project.
+    ASSERT_FALSE(pr.resolve("someOtherPath", nullptr));
+
+    // Tracking second embed path fine.
+    const auto* dsLookup2 = (++it)->get();
+    const auto* lookup2 = dynamic_cast<const DocumentSourceLookUp*>(dsLookup2);
+    ASSERT(lookup2);
+    ASSERT_TRUE(pr.trackEmbedPath(*lookup2, 2));
+
+    // BUT we can't resolve the computed local field!
+    ASSERT_FALSE(pr.resolve("lf2", nullptr));
+}
+
 }  // namespace mongo::join_ordering

@@ -620,6 +620,32 @@ runTestCaseIneligibleSuffix({
     expectedNumJoinNodes: 2,
 });
 
+// Repeat, but with $expr.
+runTestCaseIneligiblePipeline({
+    pipeline: [
+        {
+            $lookup: {
+                from: coll12.getName(),
+                as: "x",
+                let: {aa: "$a"},
+                pipeline: [{$project: {a: 100}}, {$match: {$expr: {$eq: ["$a", "$$aa"]}}}],
+            },
+        },
+        {$unwind: "$x"},
+    ],
+    expectedCount: 1,
+});
+
+// We don't support computed join predicates.
+runTestCaseIneligiblePipeline({
+    pipeline: [
+        {$project: {a: "some-computed-field"}},
+        {$lookup: {from: coll12.getName(), as: "x", localField: "a", foreignField: "a"}},
+        {$unwind: "$x"},
+    ],
+    expectedCount: 0,
+});
+
 // Numeric path in join predicate falls back gracefully even when the path is indexed.
 // An index on "a.0" is not multikey (numeric components always address a single array element),
 // but the join optimizer must still fall back because numeric paths are ineligible predicates.

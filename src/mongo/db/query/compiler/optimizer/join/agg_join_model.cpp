@@ -78,6 +78,13 @@ std::unique_ptr<CanonicalQuery> makeFullScanCQ(boost::intrusive_ptr<ExpressionCo
         .expCtx = expCtx, .parsedFind = ParsedFindCommandParams{.findCommand = std::move(fcr)}});
 }
 
+DocumentSource* getFirstSubpipelineStage(const DocumentSourceLookUp& lookup) {
+    if (!lookup.getResolvedIntrospectionPipeline().empty()) {
+        return lookup.getResolvedIntrospectionPipeline().peekFront();
+    }
+    return nullptr;
+}
+
 struct Predicates {
     std::unique_ptr<CanonicalQuery> canonicalQuery;
     std::vector<JoinPredicateExpr> joinPredicates;
@@ -89,13 +96,11 @@ StatusWith<Predicates> extractPredicatesFromLookup(DocumentSourceLookUp& stage) 
     std::vector<JoinPredicateExpr> joinPredicates;
     std::unique_ptr<MatchExpression> singleTablePredicates;
 
-    if (!stage.getResolvedIntrospectionPipeline().empty()) {
-        auto ds = stage.getResolvedIntrospectionPipeline().peekFront();
-        auto match = dynamic_cast<DocumentSourceMatch*>(ds);
+    if (auto firstStage = getFirstSubpipelineStage(stage); firstStage) {
+        auto match = dynamic_cast<DocumentSourceMatch*>(firstStage);
         tassert(11317205, "expected $match stage as leading stage in subpipeline", match);
         // Attempt to split.
-        auto splitRes = splitJoinAndSingleCollectionPredicates(match->getMatchExpression(),
-                                                               stage.getLetVariables());
+        auto splitRes = splitJoinAndSingleCollectionPredicates(match, stage.getLetVariables());
         if (!splitRes.has_value()) {
             return Status(ErrorCodes::QueryFeatureNotAllowed,
                           "Encountered subpipeline with $match containing non-equijoin correlated "
@@ -195,6 +200,32 @@ bool isLookupEligible(const DocumentSourceLookUp& lookup) {
     // is combined with that $match in extractPredicatesFromLookup().
     return lookup.getResolvedIntrospectionPipeline().size() == 1 &&
         dynamic_cast<DocumentSourceMatch*>(lookup.getResolvedIntrospectionPipeline().peekFront());
+}
+
+// Insert the given join predicates into the given join graph.
+Status addExprJoinPredicates(MutableJoinGraph& graph,
+                             const DocumentSourceLookUp* lookup,
+                             const std::vector<JoinPredicateExpr>& joinPreds,
+                             PathResolver& pathResolver,
+                             NodeId foreignNodeId) {
+    for (auto&& joinPred : joinPreds) {
+        // We're not sure which collection this field came from- don't hint a node.
+        // "local" is a misnomer- it really means "as seen in top-level pipeline".
+        auto localPathId = pathResolver.resolve(joinPred.localField(), lookup);
+        if (!localPathId) {
+            return Status(ErrorCodes::BadValue, "Local path could not be resolved");
+        }
+
+        // We know this field comes from the "foreign" collection.
+        auto foreignPathId =
+            pathResolver.resolve(joinPred.foreignField(), joinPred.source(), foreignNodeId);
+        if (!foreignPathId) {
+            return Status(ErrorCodes::BadValue, "Foreign path could not be resolved");
+        }
+        auto localNodeId = pathResolver.resolvedPaths()[*localPathId].nodeId;
+        graph.addExprEqualityEdge(localNodeId, foreignNodeId, *localPathId, *foreignPathId);
+    }
+    return Status::OK();
 }
 
 bool canJoinPredicateFieldIncludeArrays(
@@ -318,8 +349,7 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
         prefix->pushBack(std::move(hint));
     }
 
-    std::vector<ResolvedPath> resolvedPaths;
-    PathResolver pathResolver{*baseNodeId, resolvedPaths};
+    PathResolver pathResolver{*baseNodeId, mainCollDeps};
 
     const auto isJoinPredicateIneligible = [&](const NamespaceString& leftNs,
                                                const FieldPath& leftField,
@@ -347,7 +377,10 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
                 break;
             }
 
-            if (pathResolver.pathResolvesToJoinNode(lookup->getAsField(), *baseNodeId)) {
+            // "Reserve" a node id we can tentatively resolve paths against until we're actually
+            // ready to modify the join graph.
+            NodeId foreignNodeIdReserved = graph.numNodes();
+            if (!pathResolver.trackEmbedPath(*lookup, foreignNodeIdReserved)) {
                 break;
             }
 
@@ -392,50 +425,34 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
 
             auto foreignNodeId = graph.addNode(
                 lookup->getFromNs(), std::move(preds.canonicalQuery), lookup->getAsField());
-
+            tassert(12835900,
+                    "Expected reserved node id to match eventual id",
+                    foreignNodeIdReserved == foreignNodeId);
             if (!foreignNodeId) {
                 return Status(ErrorCodes::BadValue, "Graph is too big: too many nodes");
             }
 
-            // Resolve all local-side join fields BEFORE adding the foreign node to the path
-            // resolver. The order is important: a local reference is evaluated against the input
-            // document before the foreign results are embedded at the "as" field, so it must
-            // resolve to the base/earlier node that owns it -- even when it is prefixed by the
-            // foreign collection's embedPath (e.g. 'let: {l: "$X.y"}' combined with 'as: "X"').
-            // Resolving it after the foreign node has been added would misattribute the local
-            // field to the foreign node and produce an illegal self-edge.
-            boost::optional<PathId> localFieldPathId;
+            // Add join predicate expressed as local/foreign field syntax to join graph.
             if (lookup->hasLocalFieldForeignFieldJoin()) {
-                localFieldPathId = pathResolver.resolve(*lookup->getLocalField());
-                if (!localFieldPathId) {
-                    return Status(ErrorCodes::BadValue, "Local path could not be resolved");
-                }
-            }
-
-            std::vector<PathId> exprLocalPathIds;
-            exprLocalPathIds.reserve(preds.joinPredicates.size());
-            for (const auto& joinPred : preds.joinPredicates) {
-                auto localPathId = pathResolver.resolve(joinPred.localField());
+                auto localPathId =
+                    pathResolver.resolve(*lookup->getLocalField(), lookup, baseNodeId);
                 if (!localPathId) {
                     return Status(ErrorCodes::BadValue, "Local path could not be resolved");
                 }
-                exprLocalPathIds.push_back(*localPathId);
-            }
 
-            // Now register the foreign node's scope. Foreign-side fields are attributed to it
-            // explicitly via addPath(), so the foreign node only needs to be in the resolver from
-            // this point on.
-            pathResolver.addNode(*foreignNodeId, lookup->getAsField());
+                // NOTE: 'foreignField' applies directly to the base collection, unless it is a
+                // view, which we explicitly disallow. See what this field looks like at the start
+                // of the subpipeline.
+                auto foreignPathId = pathResolver.resolve(
+                    *lookup->getForeignField(), getFirstSubpipelineStage(*lookup), foreignNodeId);
+                if (!foreignPathId) {
+                    return Status(ErrorCodes::BadValue, "Foreign path could not be resolved");
+                }
 
-            // Add join predicate expressed as local/foreign field syntax to join graph.
-            if (lookup->hasLocalFieldForeignFieldJoin()) {
-                auto foreignPathId =
-                    pathResolver.addPath(*foreignNodeId, *lookup->getForeignField());
-
-                auto edgeId = graph.addSimpleEqualityEdge(pathResolver[*localFieldPathId].nodeId,
+                auto edgeId = graph.addSimpleEqualityEdge(pathResolver[*localPathId].nodeId,
                                                           *foreignNodeId,
-                                                          *localFieldPathId,
-                                                          foreignPathId);
+                                                          *localPathId,
+                                                          *foreignPathId);
                 if (!edgeId) {
                     // Cannot add an edge for existing nodes.
                     return Status(ErrorCodes::BadValue, "Graph is too big: too many edges");
@@ -443,12 +460,10 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
             }
 
             // Add join predicates expressed as $expr in subpipelines to join graph.
-            for (size_t i = 0; i < preds.joinPredicates.size(); ++i) {
-                PathId foreignPathId =
-                    pathResolver.addPath(*foreignNodeId, preds.joinPredicates[i].foreignField());
-                auto localNodeId = pathResolver[exprLocalPathIds[i]].nodeId;
-                graph.addExprEqualityEdge(
-                    localNodeId, *foreignNodeId, exprLocalPathIds[i], foreignPathId);
+            auto status = addExprJoinPredicates(
+                graph, lookup, std::move(preds.joinPredicates), pathResolver, *foreignNodeId);
+            if (!status.isOK()) {
+                return status;
             }
 
             auto next = suffix->popFront();
@@ -464,7 +479,7 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
                 break;
             }
 
-            auto result = extractExprPredicates(pathResolver, match->getMatchExpression());
+            auto result = extractExprPredicates(pathResolver, match);
             bool canMatchBeEliminated = result.expressionIsFullyAbsorbed;
             for (const auto& predicate : result.predicates) {
                 auto leftNodeId = pathResolver[predicate.left].nodeId;
@@ -508,8 +523,11 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
         return Status(ErrorCodes::QueryFeatureNotAllowed, "Join reordering not allowed");
     }
 
-    auto swVec = addImplicitEdgesAndInferPredicates(
-        graph, resolvedPaths, buildParams.maxNumberNodesConsideredForImplicitEdges, expCtx);
+    auto swVec =
+        addImplicitEdgesAndInferPredicates(graph,
+                                           pathResolver.resolvedPaths(),
+                                           buildParams.maxNumberNodesConsideredForImplicitEdges,
+                                           expCtx);
     if (!swVec.isOK()) {
         return swVec.getStatus();
     }
@@ -520,7 +538,7 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
                       "Join graph must be connected as cross-products are not yet supported");
     }
     return AggJoinModel(std::move(result),
-                        std::move(resolvedPaths),
+                        pathResolver.releaseResolvedPaths(),
                         std::move(prefix),
                         std::move(suffix),
                         std::move(swVec.getValue()));

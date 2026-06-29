@@ -65,11 +65,11 @@
                     {
                         "op": "eq",
                         "left": {"$numberInt":"0"},
-                        "right": {"$numberInt":"2"}
+                        "right": {"$numberInt":"1"}
                     },
                     {
                         "op": "exprEq",
-                        "left": {"$numberInt":"1"},
+                        "left": {"$numberInt":"2"},
                         "right": {"$numberInt":"3"}
                     }
                 ],
@@ -85,7 +85,7 @@
                     },
                     {
                         "op": "exprEq",
-                        "left": {"$numberInt":"1"},
+                        "left": {"$numberInt":"2"},
                         "right": {"$numberInt":"5"}
                     }
                 ],
@@ -96,7 +96,7 @@
                 "predicates": [
                     {
                         "op": "eq",
-                        "left": {"$numberInt":"2"},
+                        "left": {"$numberInt":"1"},
                         "right": {"$numberInt":"4"}
                     },
                     {
@@ -116,12 +116,12 @@
             "fieldName": "foo"
         },
         {
-            "nodeId": {"$numberInt":"0"},
-            "fieldName": "bar"
-        },
-        {
             "nodeId": {"$numberInt":"1"},
             "fieldName": "foo"
+        },
+        {
+            "nodeId": {"$numberInt":"0"},
+            "fieldName": "bar"
         },
         {
             "nodeId": {"$numberInt":"1"},

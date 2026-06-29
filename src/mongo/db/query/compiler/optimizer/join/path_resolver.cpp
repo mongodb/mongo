@@ -29,127 +29,129 @@
 
 #include "mongo/db/query/compiler/optimizer/join/path_resolver.h"
 
+#include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/query/compiler/optimizer/join/logical_defs.h"
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo::join_ordering {
-PathResolver::PathResolver(NodeId baseNode, std::vector<ResolvedPath>& resolvedPaths)
-    : _resolvedPaths(resolvedPaths) {
-    _scopes.emplace_back(baseNode);
+PathResolver::PathResolver(NodeId baseNode,
+                           const pipeline::dependency_graph::DependencyGraph& graph)
+    : _graph(graph), _baseNodeId(baseNode) {
+    _nodeLookups.emplace(baseNode, nullptr);
 }
 
-void PathResolver::addNode(NodeId nodeId, const FieldPath& embedPath) {
-    dassert(!getScopeForNode(nodeId).has_value(), "This node has been already added");
-    _scopes.emplace_back(nodeId, embedPath);
-}
-
-PathId PathResolver::addPath(NodeId nodeId, FieldPath fieldPath) {
-    auto scope = getScopeForNode(nodeId);
-    tassert(11721300, "Unknown node id", scope.has_value());
-    auto [it, inserted] =
-        scope->paths.emplace(std::move(fieldPath), static_cast<PathId>(_resolvedPaths.size()));
-    if (inserted) {
-        _resolvedPaths.emplace_back(nodeId, it->first);
-    }
-    return it->second;
-}
-
-boost::optional<PathId> PathResolver::resolve(const FieldPath& path) {
-    if (auto resolved = resolveNodeByEmbedPath(path); resolved) {
-        auto [nodeId, pathWithoutEmbedPath] = *resolved;
-        return boost::make_optional(addPath(nodeId, std::move(pathWithoutEmbedPath)));
-    } else {
+boost::optional<PathId> PathResolver::addPathOrGetExisting(ResolvedPath path) {
+    auto it = _nodeLookups.find(path.nodeId);
+    if (it == _nodeLookups.end()) {
+        // We should know about this node already, but if we don't, just bail.
         return boost::none;
     }
+
+    auto& resolvedPaths = it->second.resolvedPaths;
+    if (auto pathIt = resolvedPaths.find(path.fieldName); pathIt != resolvedPaths.end()) {
+        // We already know this path!
+        return pathIt->second;
+    }
+    return addPath(std::move(path));
 }
 
-bool PathResolver::pathResolvesToJoinNode(const FieldPath& asField, NodeId baseNodeId) {
-    if (auto resolved = resolveNodeByEmbedPath(asField); resolved) {
-        auto [nodeId, pathWithoutEmbedPath] = *resolved;
-        if (nodeId == baseNodeId) {
-            // Signal that $lookup "as" field shadows an earlier localField.
-            if (shadowsResolvedPath(nodeId, pathWithoutEmbedPath)) {
-                return true;
-            }
-            // Hooray, this path is not owned by any join nodes in the graph so it's good to go!
+PathId PathResolver::addPath(ResolvedPath path) {
+    PathId id = _resolvedPaths.size();
+    auto it = _nodeLookups.find(path.nodeId);
+    tassert(12835901, "Expected to know of this node already", it != _nodeLookups.end());
+    it->second.resolvedPaths.try_emplace(path.fieldName, id);
+    _resolvedPaths.push_back(std::move(path));
+    return id;
+}
+
+bool PathResolver::trackEmbedPath(const DocumentSourceLookUp& lookup, NodeId nodeId) {
+    const auto& embedPath = lookup.getAsField();
+
+    if (_lookupNodes.contains(&lookup) || _nodeLookups.contains(nodeId)) {
+        // Bail- its illegal to track the same node/$lookup multiple times.
+        return false;
+    }
+
+    // First check we're not shadowing any local field paths. We only need to check the base
+    // collection paths here.
+    for (auto&& [fp, _] : _nodeLookups[_baseNodeId].resolvedPaths) {
+        if (embedPath.isPrefixOf(fp) || fp.isPrefixOf(embedPath)) {
             return false;
         }
-        // This represents the case where the path in the asField is already owned by/attributed
-        // to a previous join node in the graph. Take for example this pipeline:
-        // {$lookup: {as: x, ...}}
-        // {$lookup: {as: x.y, ...}}
-        // By the time we resolve 'x.y' we see that the prefix 'x' is already owned by the
-        // join node created from the first $lookup stage.
-        return true;
     }
-    // This is the case where the second lookup "as" field is a prefix of the first's.
-    // See code comment in resolveNodeByEmbedPath() for more details.
+
+    auto src = _graph.getPrevModifyingStage(&lookup, embedPath.fullPath());
+    if (auto lookup = dynamic_cast<const DocumentSourceLookUp*>(src.get()); lookup) {
+        // This embed path came from a prior $lookup! This means it collides with a previous "as"
+        // field, and so it is not safe to reorder in the general case. Bail.
+        tassert(12835905,
+                "Expected to know about this lookup",
+                _lookupNodes.find(lookup) != _lookupNodes.end());
+        return false;
+    }
+
+    // This may have come from the base collection, OR from a field
+    // computation/rename/modification/etc. However, we don't care! The "as" field completely
+    // replaces (no traversals) whatever field it references. This means it effectively supercedes
+    // any possible prior modification of this path on the main pipeline (which is fine, because we
+    // apply embeddings to the main collection document after we project any fields in the single
+    // table access plan).
+    _lookupNodes.emplace(&lookup, nodeId);
+    _nodeLookups.emplace(nodeId, &lookup);
     return true;
 }
 
-boost::optional<std::pair<NodeId, FieldPath>> PathResolver::resolveNodeByEmbedPath(
-    const FieldPath& fieldPath) const {
+boost::optional<PathId> PathResolver::resolve(const FieldPath& fieldPath,
+                                              const DocumentSource* at,
+                                              boost::optional<NodeId> nodeId) {
+    const pipeline::dependency_graph::DependencyGraph* graph = nullptr;
+    if (nodeId && *nodeId != _baseNodeId) {
+        if (auto it = _nodeLookups.find(*nodeId); it != _nodeLookups.end()) {
+            graph = _graph.getSubpipelineGraph(it->second.sourceLookup);
+        }
+    } else {
+        graph = &_graph;
+    }
+    tassert(12835902, "Expected to find a dependency graph", graph);
 
-    for (auto scopePos = _scopes.rbegin(); scopePos != _scopes.rend(); ++scopePos) {
-        if (!scopePos->embedPath.has_value()) {
-            // Base node case: no prefix substraction is required.
-            return boost::make_optional(std::make_pair(scopePos->nodeId, fieldPath));
-        } else if (scopePos->embedPath->isPrefixOf(fieldPath)) {
-            if (scopePos->embedPath->getPathLength() == fieldPath.getPathLength()) {
-                // The field cannot be resolved because it is the same as a previously
-                // specified/attributed prefix eg
-                return boost::none;
-            }
-            return boost::make_optional(std::make_pair(
-                scopePos->nodeId, fieldPath.subtractPrefix(scopePos->embedPath->getPathLength())));
-        } else if (fieldPath.isPrefixOf(*scopePos->embedPath)) {
-            // This field cannot be resolved, likely because it is attributable to multiple nodes in
-            // the graph. eg Considering collection A:
-            // [{a: 1, b: 2, x: { c: 2}}]
-            // and the following query:
-            // {$lookup: {as: "x.y", from: B, ...}},
-            // {$unwind: "$x.y"},
-            // {$lookup: {as: "x", from: C, ...}},
-            // {$unwind: "$x"},
-            //
-            // The first lookup produces this intermediary pipeline result for each doc in coll A:
-            //
-            //  { ...base fields from coll A..., x: { c: ..., y: [documents on B that match the
-            //  first lookup]] } }
-            //
-            // In this case, $x contains data from node A and node B so we cannot attribute to a
-            // single node when we attempt to resolve $x during the second lookup. More importantly,
-            // the second join will overwrite the x field entirely,
-            //  which we want to prevent. So in this case, we return boost::none and fallback.
+    auto src = graph->getPrevModifyingStage(at, fieldPath.fullPath());
+    if (src == nullptr) {
+        // Path originates at base of pipeline for this graph.
+        return addPathOrGetExisting({nodeId.get_value_or(_baseNodeId), fieldPath});
+
+    } else if (auto lookup = dynamic_cast<const DocumentSourceLookUp*>(src.get()); lookup) {
+        // Path comes from a $lookup!
+        tassert(
+            12835903, "Unexpected prior $lookup", _lookupNodes.find(lookup) != _lookupNodes.end());
+
+        // This comes from a previous $lookup! Strip the embedding field.
+        auto asEmbedding = lookup->getAsField();
+        // Ensure this in fact is prefixed by the "as" field.
+        if (!asEmbedding.isPrefixOf(fieldPath)) {
+            // Can happen if our path is actually an ancestor of a previous $lookup embedding field.
+            // This is a conflict.
+            return boost::none;
+        } else if (asEmbedding.getPathLength() == fieldPath.getPathLength()) {
+            // Path matches embedding path. Bail out of join opt.
             return boost::none;
         }
+
+        // One last check: did the $lookup sub-pipeline modify this field? If so, bail- only support
+        // fields coming directly from a collection.
+        auto strippedPath = fieldPath.subtractPrefix(asEmbedding.getPathLength());
+        auto subGraph = _graph.getSubpipelineGraph(src.get());
+        tassert(12835904, "Expected to find a dependency graph for lookup", subGraph);
+        // Note: nullptr here indicates "end of subpipeline".
+        if (subGraph->getPrevModifyingStage(nullptr, strippedPath.fullPath())) {
+            // This must have been modified in the $lookup subpipeline! Bail.
+            return boost::none;
+        }
+
+        return addPathOrGetExisting({_lookupNodes[lookup], std::move(strippedPath)});
     }
 
-    // Base node with empty embedPath is a prefix for every path.
-    MONGO_UNREACHABLE_TASSERT(11721301);
-}
-
-bool PathResolver::shadowsResolvedPath(NodeId nodeId, const FieldPath& path) const {
-    for (const auto& resolvedPath : _resolvedPaths) {
-        if (resolvedPath.nodeId != nodeId) {
-            continue;
-        }
-        // isPrefixOf() also returns true for equal paths, so this catches exact overwrites as well
-        // as overwrites of an ancestor or descendant of an already-resolved path.
-        if (path.isPrefixOf(resolvedPath.fieldName) || resolvedPath.fieldName.isPrefixOf(path)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-boost::optional<PathResolver::Scope&> PathResolver::getScopeForNode(NodeId node) {
-    for (auto& scope : _scopes) {
-        if (scope.nodeId == node) {
-            return scope;
-        }
-    }
+    // This comes from a rename/ field computation! Bail- we don't support this.
     return boost::none;
 }
 }  // namespace mongo::join_ordering

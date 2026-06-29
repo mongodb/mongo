@@ -42,10 +42,11 @@ namespace mongo::join_ordering {
 class JoinPredicateExpr {
 public:
     /**
-     * Note: this expects 'expr' & 'letVars' to outlive the returned instance. This doesn't take
-     * ownership of either.
+     * Note: this expects 'expr', 'letVars', & 'source' to outlive the returned instance. This
+     * doesn't take ownership of either.
      */
-    static JoinPredicateExpr make(const ExpressionCompare* expr,
+    static JoinPredicateExpr make(const DocumentSource* source,
+                                  const ExpressionCompare* expr,
                                   const std::vector<LetVariable>& letVars);
 
     const FieldPath& localField() const {
@@ -61,13 +62,27 @@ public:
         return _expr->serialize();
     }
 
+    auto source() const {
+        return _source;
+    }
+
 private:
-    JoinPredicateExpr(FieldPath localField, FieldPath foreignField, const ExpressionCompare* expr)
-        : _localField(std::move(localField)), _foreignField(std::move(foreignField)), _expr(expr) {}
+    JoinPredicateExpr(FieldPath localField,
+                      FieldPath foreignField,
+                      const ExpressionCompare* expr,
+                      const DocumentSource* source)
+        : _localField(std::move(localField)),
+          _foreignField(std::move(foreignField)),
+          _expr(expr),
+          _source{source} {}
 
     FieldPath _localField;
     FieldPath _foreignField;
+    // These track both the origin document source and the expression this was extracted from.
     const ExpressionCompare* _expr;
+    // In particular, _source is needed for dependency analysis, which operates on DocumentSource*'s
+    // in order to figure out where a field came from.
+    const DocumentSource* _source;
 };
 
 /**
@@ -95,7 +110,7 @@ struct SplitPredicatesResult {
  * This function does not modify its inputs.
  */
 boost::optional<SplitPredicatesResult> splitJoinAndSingleCollectionPredicates(
-    const MatchExpression* matchExpr, const std::vector<LetVariable>& variables);
+    const DocumentSourceMatch* match, const std::vector<LetVariable>& variables);
 
 
 struct ExprPredicatesResult {
@@ -115,5 +130,6 @@ struct ExprPredicatesResult {
  * The function returns 'ExprPredicatesResult' which contains a list of join predicates and a
  * boolean value identifying whether the 'expr' was fully absorbed.
  */
-ExprPredicatesResult extractExprPredicates(PathResolver& pathResolver, const MatchExpression* expr);
+ExprPredicatesResult extractExprPredicates(PathResolver& pathResolver,
+                                           const DocumentSourceMatch* match);
 }  // namespace mongo::join_ordering
