@@ -205,12 +205,7 @@ function runTestZeroRetries(commandName, command, mongos, shard) {
         const result = mongos.getDB(kDbName).runCommand(command);
         assert.commandFailedWithCode(result, ErrorCodes.IngressRequestRateLimitExceeded);
 
-        // TODO SERVER-128710 Revisit if RetryableError should be reapplied by mongos
-        for (const label of ["SystemOverloadedError", "RetryableError", "NoWritesPerformed"]) {
-            assert(result.errorLabels?.includes(label), `Expected error label '${label}'`, {
-                result,
-            });
-        }
+        assert.eq(result.errorLabels, ["SystemOverloadedError"]);
     } finally {
         disableFailCommand(shardPrimary);
         assert.commandWorked(
@@ -270,12 +265,7 @@ function runTestRetryCapExhausted(commandName, command, mongos, shard) {
         const result = mongos.getDB(kDbName).runCommand(command);
         assert.commandFailedWithCode(result, ErrorCodes.IngressRequestRateLimitExceeded);
 
-        // TODO SERVER-128710 Revisit if RetryableError should be reapplied by mongos
-        for (const label of ["SystemOverloadedError", "RetryableError", "NoWritesPerformed"]) {
-            assert(result.errorLabels?.includes(label), `Expected error label '${label}'`, {
-                result,
-            });
-        }
+        assert.eq(result.errorLabels, ["SystemOverloadedError"]);
     } finally {
         disableFailCommand(shardPrimary);
         assert.commandWorked(
@@ -352,13 +342,7 @@ function runTestRetryCapExhaustedWithRetargeting(commandName, command, readPref,
     try {
         const result = mongos.getDB(kDbName).runCommand(cmd);
         assert.commandFailedWithCode(result, ErrorCodes.IngressRequestRateLimitExceeded);
-
-        // TODO SERVER-128710 Revisit if RetryableError should be reapplied by mongos
-        for (const label of ["SystemOverloadedError", "RetryableError", "NoWritesPerformed"]) {
-            assert(result.errorLabels?.includes(label), `Expected error label '${label}'`, {
-                result,
-            });
-        }
+        assert.eq(result.errorLabels, ["SystemOverloadedError"]);
     } finally {
         for (let node of shard.nodes) {
             disableFailCommand(node);

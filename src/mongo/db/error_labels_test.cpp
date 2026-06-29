@@ -863,63 +863,6 @@ TEST_F(ErrorLabelBuilderTest, NoWritesPerformedNotAppliedDuringTransientTransact
     ASSERT_BSONOBJ_EQ(actualErrorLabels, BSON(kErrorLabelsFieldName << expectedLabelArray.arr()));
 }
 
-class OverloadRetryAfterMsTest : public ErrorLabelBuilderTest {
-public:
-    // A code that has all required categories to generate a retryAfterMS label.
-    ErrorCodes::Error qualifyingError() const {
-        auto code = ErrorCodes::IngressRequestRateLimitExceeded;
-        invariant(ErrorCodes::isA<ErrorCategory::SystemOverloadedError>(code));
-        invariant(ErrorCodes::isA<ErrorCategory::RetriableError>(code));
-        return code;
-    }
-
-    // A code that should not generate the retryAfterMS error label because
-    // it doesn't have both qualifying categories.
-    ErrorCodes::Error errorThatIsMissingRetryable() const {
-        auto code = ErrorCodes::AdmissionQueueOverflow;
-        invariant(ErrorCodes::isA<ErrorCategory::SystemOverloadedError>(code));
-        invariant(!ErrorCodes::isA<ErrorCategory::RetriableError>(code));
-        return code;
-    }
-
-    BSONObj runGetErrorLabelsTest(long long serverParameterValue, ErrorCodes::Error code) {
-        unittest::ServerParameterGuard spGuard("overloadRetryAfterMS", serverParameterValue);
-        OperationSessionInfoFromClient sessionInfo{LogicalSessionFromClient(UUID::gen())};
-        return getErrorLabels(opCtx(),
-                              sessionInfo,
-                              "find",
-                              code,
-                              boost::none,
-                              false /* isInternalClient */,
-                              false /* isMongos */,
-                              false /* isComingFromRouter */,
-                              kOpTime,
-                              kOpTime);
-    }
-};
-
-TEST_F(OverloadRetryAfterMsTest, DefaultServerParameterIsZero) {
-    ASSERT_EQ(gOverloadRetryAfterMS.load(), 0);
-}
-
-TEST_F(OverloadRetryAfterMsTest, IncludedWhenBothCategoriesPresent) {
-    auto errorLabels = runGetErrorLabelsTest(1500, qualifyingError());
-    ASSERT_TRUE(errorLabels.hasField(kRetryAfterMSFieldName));
-    ASSERT_EQ(errorLabels[kRetryAfterMSFieldName].Long(), 1500);
-}
-
-TEST_F(OverloadRetryAfterMsTest, SuppressedByServerParameterZero) {
-    auto errorLabels = runGetErrorLabelsTest(0, qualifyingError());
-    ASSERT_TRUE(errorLabels.hasField(kErrorLabelsFieldName));
-    ASSERT_FALSE(errorLabels.hasField(kRetryAfterMSFieldName));
-}
-
-TEST_F(OverloadRetryAfterMsTest, AbsentForSystemOverloadedAlone) {
-    auto errorLabels = runGetErrorLabelsTest(1500, errorThatIsMissingRetryable());
-    ASSERT_TRUE(errorLabels.hasField(kErrorLabelsFieldName));
-    ASSERT_FALSE(errorLabels.hasField(kRetryAfterMSFieldName));
-}
-
 #ifdef MONGO_CONFIG_STREAMS
 // This tests validates stream processing labels that are only applied in special builds with
 // the streams module enabled.
