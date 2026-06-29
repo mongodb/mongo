@@ -8,6 +8,8 @@
 
 #include "wt_internal.h"
 
+static int __disagg_accumulate_drop_size(
+  WT_SESSION_IMPL *session, WT_DISAGG_METADATA_OP *entry, uint64_t *drop_size);
 static void __disagg_shared_metadata_queue_clear(WT_SESSION_IMPL *session);
 
 /*
@@ -578,50 +580,6 @@ err:
 }
 
 /*
- * __wt_disagg_shared_metadata_queue_drop_size --
- *     Walk the metadata queue and sum the checkpoint sizes of non-deferred drop operations. This is
- *     a read-only operation on the queue.
- */
-int
-__wt_disagg_shared_metadata_queue_drop_size(
-  WT_SESSION_IMPL *session, wt_timestamp_t cur_schema_epoch, uint64_t *drop_sizep)
-{
-    WT_CONNECTION_IMPL *conn;
-    WT_DECL_RET;
-    WT_DISAGG_METADATA_OP *entry;
-
-    conn = S2C(session);
-    *drop_sizep = 0;
-
-    WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
-
-    __wt_spin_lock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
-
-    TAILQ_FOREACH (entry, &conn->disaggregated_storage.shared_metadata_qh, q) {
-        /* Skip entries that are not included in the current schema epoch. */
-        if (entry->deferred)
-            continue;
-        if (cur_schema_epoch != WT_SCHEMA_EPOCH_NONE && entry->schema_epoch > cur_schema_epoch)
-            continue;
-
-        if (entry->metadata_op == WT_SHARED_METADATA_REMOVE && entry->stable_value != NULL) {
-            uint64_t size;
-            /*
-             * A table that was created and dropped without ever being checkpointed won't have a
-             * checkpoint entry in its metadata, so WT_NOTFOUND is expected.
-             */
-            WT_ERR_NOTFOUND_OK(__wt_ckpt_last_size(session, entry->stable_value, &size), false);
-            *drop_sizep += size;
-        }
-    }
-
-err:
-    __wt_spin_unlock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
-
-    return (ret);
-}
-
-/*
  * __disagg_handle_create_remove_pairing --
  *     Handle CREATE/REMOVE pairing detection during queue processing. If the entry is a CREATE with
  *     no stable value, park it in the skipped list and return true (caller should continue). If the
@@ -684,17 +642,56 @@ __disagg_handle_create_remove_pairing(WT_SESSION_IMPL *session, WT_CONNECTION_IM
 }
 
 /*
- * __wt_disagg_shared_metadata_queue_process --
- *     Process the update metadata list.
+ * __disagg_accumulate_drop_size --
+ *     Accumulate the drop size if the entry represents a table drop operation.
  */
 int
-__wt_disagg_shared_metadata_queue_process(WT_SESSION_IMPL *session, wt_timestamp_t cur_schema_epoch)
+__disagg_accumulate_drop_size(
+  WT_SESSION_IMPL *session, WT_DISAGG_METADATA_OP *entry, uint64_t *drop_sizep)
+{
+    WT_DECL_RET;
+    char *stable_config;
+
+    stable_config = NULL;
+
+    if (!(entry->metadata_op == WT_SHARED_METADATA_REMOVE && entry->stable_value != NULL))
+        return (0);
+
+    /* The stable entry is gone only after a real drop; a rolled-back drop leaves it. */
+    WT_ERR_NOTFOUND_OK(__wt_metadata_search(session, entry->stable_uri, &stable_config), true);
+
+    if (WT_CHECK_AND_RESET(ret, WT_NOTFOUND)) {
+        uint64_t size = 0;
+        /* A table dropped before it was ever checkpointed has no checkpoint entry. */
+        WT_ERR_NOTFOUND_OK(__wt_ckpt_last_size(session, entry->stable_value, &size), true);
+        if (!WT_CHECK_AND_RESET(ret, WT_NOTFOUND)) {
+            *drop_sizep += size;
+            __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
+              "Accumulated drop size %" PRIu64 " for table \"%s\" (stable URI \"%s\")", size,
+              entry->table_name, entry->stable_uri);
+        }
+    }
+
+err:
+    __wt_free(session, stable_config);
+    return (ret);
+}
+
+/*
+ * __wt_disagg_shared_metadata_queue_process --
+ *     Process the update metadata list, returning the total checkpoint size of the tables actually
+ *     dropped so the caller can reduce the database size accordingly.
+ */
+int
+__wt_disagg_shared_metadata_queue_process(
+  WT_SESSION_IMPL *session, wt_timestamp_t cur_schema_epoch, uint64_t *drop_sizep)
 {
     struct __wt_disagg_shared_metadata_qh skipped_creates;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_DISAGG_METADATA_OP *entry, *skipped, *tmp;
 
+    WT_ASSERT(session, drop_sizep != NULL);
     conn = S2C(session);
     TAILQ_INIT(&skipped_creates);
 
@@ -741,6 +738,8 @@ __wt_disagg_shared_metadata_queue_process(WT_SESSION_IMPL *session, wt_timestamp
 
         WT_STAT_CONN_INCR(session, checkpoint_disagg_metadata_apply);
         WT_ERR(__disagg_shared_metadata_op(session, entry));
+
+        WT_ERR(__disagg_accumulate_drop_size(session, entry, drop_sizep));
 
         TAILQ_REMOVE(&conn->disaggregated_storage.shared_metadata_qh, entry, q);
         __disagg_shared_metadata_queue_free(session, &entry);
@@ -1171,6 +1170,8 @@ __disagg_step_down(WT_SESSION_IMPL *session)
     if (shared_dsk_cache->hash != NULL)
         __wt_atomic_store_uint8_release(&shared_dsk_cache->state, WT_DSK_CACHE_ACTIVE);
 
+    /* Clear the step-down timestamp after stepping down. */
+    __wt_atomic_store_uint64_relaxed(&conn->txn_global.step_down_timestamp, WT_TS_NONE);
     F_CLR_ATOMIC_32(conn, WT_CONN_RECONFIGURING_STEP_DOWN);
 }
 

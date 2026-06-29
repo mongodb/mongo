@@ -188,6 +188,9 @@ extern int __wt_block_disagg_ckpt_size(WT_SESSION_IMPL *session, const char *uri
 extern int __wt_block_disagg_debug_read_page_id(WT_BM *bm, WT_SESSION_IMPL *session,
   uint64_t page_id, uint64_t lsn, WT_PAGE_LOG_GET_ARGS *get_args, WT_ITEM *results_array,
   u_int *results_count) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_block_disagg_debug_read_page_id_raw(WT_SESSION_IMPL *session, uint64_t table_id,
+  uint64_t page_id, uint64_t lsn, WT_PAGE_LOG_GET_ARGS *get_args, WT_ITEM *results_array,
+  u_int *results_count) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_block_disagg_manager_create(WT_SESSION_IMPL *session, WT_BUCKET_STORAGE *bstorage,
   const char *filename) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_block_disagg_manager_open(WT_SESSION_IMPL *session, const char *uri,
@@ -557,6 +560,8 @@ extern int __wt_debug_cursor_tree_hs(void *cursor_arg, const char *ofile)
     WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_debug_disagg_page_id(WT_SESSION_IMPL *session, uint64_t page_id, uint64_t lsn,
   const char *ofile) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_debug_disagg_page_id_raw(WT_SESSION_IMPL *session, uint64_t table_id,
+  uint64_t page_id, uint64_t lsn) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_debug_layered_cursor_page(void *cursor_arg, const char *ofile)
   WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")))
     WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
@@ -596,11 +601,9 @@ extern int __wt_disagg_put_checkpoint_meta(WT_SESSION_IMPL *session, const char 
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_disagg_put_crypt_helper(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_disagg_shared_metadata_queue_drop_size(
+extern int __wt_disagg_shared_metadata_queue_process(
   WT_SESSION_IMPL *session, wt_timestamp_t cur_schema_epoch, uint64_t *drop_sizep)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_disagg_shared_metadata_queue_process(WT_SESSION_IMPL *session,
-  wt_timestamp_t cur_schema_epoch) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_disagg_shared_metadata_queue_publish(
   WT_SESSION_IMPL *session, const char *table_name, wt_timestamp_t schema_epoch)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));

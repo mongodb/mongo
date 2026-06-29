@@ -928,19 +928,6 @@ __checkpoint_update_disagg_database_size(WT_SESSION_IMPL *session, uint64_t drop
 }
 
 /*
- * __checkpoint_process_disagg_metadata --
- *     Compute the drop size from the shared metadata queue, then process the queue.
- */
-static int
-__checkpoint_process_disagg_metadata(
-  WT_SESSION_IMPL *session, wt_timestamp_t schema_epoch, uint64_t *drop_sizep)
-{
-    WT_RET(__wt_disagg_shared_metadata_queue_drop_size(session, schema_epoch, drop_sizep));
-    WT_RET(__wt_disagg_shared_metadata_queue_process(session, schema_epoch));
-    return (0);
-}
-
-/*
  * __checkpoint_fail_reset --
  *     Reset fields when a failure occurs.
  */
@@ -1749,8 +1736,8 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
      */
     if (__wt_conn_is_disagg(session) && conn->layered_table_manager.leader) {
         WT_WITH_SCHEMA_LOCK(session,
-          ret =
-            __checkpoint_process_disagg_metadata(session, ckpt_disagg_schema_epoch, &drop_size));
+          ret = __wt_disagg_shared_metadata_queue_process(
+            session, ckpt_disagg_schema_epoch, &drop_size));
         WT_ERR_MSG_CHK(session, ret,
           "Disaggregated storage checkpoint failed while processing shared metadata queue");
     }

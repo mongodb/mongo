@@ -91,6 +91,7 @@ __stat_tree_walk(WT_SESSION_IMPL *session)
     WT_DECL_RET;
     WT_DSRC_STATS **stats;
     WT_REF *next_walk;
+    uint32_t walk_flags;
 
     btree = S2BT(session);
     stats = btree->dhandle->stats;
@@ -108,15 +109,16 @@ __stat_tree_walk(WT_SESSION_IMPL *session)
     WT_STATP_DSRC_SET(session, stats, btree_row_leaf, 0);
 
     next_walk = NULL;
+    walk_flags = WT_READ_INTERNAL_OP | WT_READ_VISIBLE_ALL | WT_READ_WONT_NEED;
+    if (F_ISSET(session, WT_SESSION_READ_SKIP_CORRUPT))
+        FLD_SET(walk_flags, WT_READ_SKIP_CORRUPT);
 
     /*
      * Pages read for statistics aren't "useful"; don't update the read generation of pages already
      * in memory, and if a page is read, set its generation to a low value so it is evicted quickly.
      * Same as with compact.
      */
-    while ((ret = __wt_tree_walk(session, &next_walk,
-              WT_READ_INTERNAL_OP | WT_READ_VISIBLE_ALL | WT_READ_WONT_NEED)) == 0 &&
-      next_walk != NULL) {
+    while ((ret = __wt_tree_walk(session, &next_walk, walk_flags)) == 0 && next_walk != NULL) {
         WT_WITH_PAGE_INDEX(session, ret = __stat_page(session, next_walk->page, stats));
         WT_ERR(ret);
     }

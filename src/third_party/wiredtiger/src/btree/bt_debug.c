@@ -567,6 +567,50 @@ err:
 }
 
 /*
+ * __wt_debug_disagg_page_id_raw --
+ *     Fetch a page by (table_id, page_id, lsn) directly off the connection page log, without
+ *     opening the table, and dump each result as raw bytes. Used when the checkpoint is unreadable
+ *     so the table cannot be opened; without a btree the on-disk formats are unknown, so no attempt
+ *     is made to decode page contents.
+ */
+int
+__wt_debug_disagg_page_id_raw(
+  WT_SESSION_IMPL *session, uint64_t table_id, uint64_t page_id, uint64_t lsn)
+{
+    WT_DECL_RET;
+    WT_ITEM results[WT_DELTA_LIMIT + 1];
+    WT_PAGE_LOG_GET_ARGS get_args;
+    u_int count, i;
+
+    memset(results, 0, sizeof(results));
+    count = WT_ELEMENTS(results);
+
+    WT_ERR(__wt_block_disagg_debug_read_page_id_raw(
+      session, table_id, page_id, lsn, &get_args, results, &count));
+
+    WT_ERR(__wt_msg(session, "table_id: %" PRIu64, table_id));
+    WT_ERR(__wt_msg(session,
+      "disagg_meta: page_id=%" PRIu64 " lsn=%" PRIu64 " base_lsn=%" PRIu64 " backlink_lsn=%" PRIu64
+      " base_ckpt=%" PRIu64 " backlink_ckpt=%" PRIu64 " delta_count=%" PRIu64,
+      page_id, lsn, get_args.base_lsn, get_args.backlink_lsn, get_args.base_checkpoint_id,
+      get_args.backlink_checkpoint_id, get_args.delta_count));
+    WT_ERR(__wt_msg(session, "results: count=%u", count));
+
+    for (i = 0; i < count; i++)
+        if (i == 0)
+            __wt_log_data_dump(session, results[i].data, results[i].size,
+              "base of %u delta(s): page_id %" PRIu64 ", lsn %" PRIu64, count - 1, page_id, lsn);
+        else
+            __wt_log_data_dump(session, results[i].data, results[i].size,
+              "delta %u of %u: page_id %" PRIu64 ", lsn %" PRIu64, i, count - 1, page_id, lsn);
+
+err:
+    for (i = 0; i < WT_ELEMENTS(results); i++)
+        __wt_buf_free(session, &results[i]);
+    return (ret);
+}
+
+/*
  * __wt_debug_offset --
  *     Read and dump a disk page in debugging mode, using a file offset/size/checksum triplet.
  */

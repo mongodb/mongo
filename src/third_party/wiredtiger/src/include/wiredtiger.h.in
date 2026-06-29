@@ -2755,6 +2755,9 @@ struct __wt_connection {
      * specified timestamp in tables configured with \c "log=(enabled=false)". Values must be
      * monotonically increasing.  The value must not be older than the current oldest timestamp.
      * See @ref timestamp_global_api., a string; default empty.}
+     * @config{step_down_ts, the cutover timestamp for a planned step-down of disaggregated storage:
+     * committed writes after this timestamp are directed to the ingest constituent and writes at or
+     * before it to the stable constituent.  Only valid on a leader., a string; default empty.}
      * @configend
      * @errors
      */
@@ -8981,64 +8984,66 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_TXN_SET_TS_STABLE_DISAGG_EPOCH_UPD	2000
 /*! transaction: set timestamp stable updates */
 #define	WT_STAT_CONN_TXN_SET_TS_STABLE_UPD		2001
+/*! transaction: set timestamp step down updates */
+#define	WT_STAT_CONN_TXN_SET_TS_STEP_DOWN_UPD		2002
 /*! transaction: transaction begins */
-#define	WT_STAT_CONN_TXN_BEGIN				2002
+#define	WT_STAT_CONN_TXN_BEGIN				2003
 /*!
  * transaction: transaction checkpoint history store file duration
  * (usecs)
  */
-#define	WT_STAT_CONN_TXN_HS_CKPT_DURATION		2003
+#define	WT_STAT_CONN_TXN_HS_CKPT_DURATION		2004
 /*! transaction: transaction global checkpoint timestamp */
-#define	WT_STAT_CONN_TXN_GLOBAL_CHECKPOINT_TIMESTAMP	2004
+#define	WT_STAT_CONN_TXN_GLOBAL_CHECKPOINT_TIMESTAMP	2005
 /*! transaction: transaction global durable timestamp */
-#define	WT_STAT_CONN_TXN_GLOBAL_DURABLE_TIMESTAMP	2005
+#define	WT_STAT_CONN_TXN_GLOBAL_DURABLE_TIMESTAMP	2006
 /*! transaction: transaction global last running timestamp */
-#define	WT_STAT_CONN_TXN_GLOBAL_LAST_RUNNING_TIMESTAMP	2006
+#define	WT_STAT_CONN_TXN_GLOBAL_LAST_RUNNING_TIMESTAMP	2007
 /*! transaction: transaction global newest timestamp */
-#define	WT_STAT_CONN_TXN_GLOBAL_NEWEST_TIMESTAMP	2007
+#define	WT_STAT_CONN_TXN_GLOBAL_NEWEST_TIMESTAMP	2008
 /*! transaction: transaction global oldest timestamp */
-#define	WT_STAT_CONN_TXN_GLOBAL_OLDEST_TIMESTAMP	2008
+#define	WT_STAT_CONN_TXN_GLOBAL_OLDEST_TIMESTAMP	2009
 /*! transaction: transaction global pinned timestamp */
-#define	WT_STAT_CONN_TXN_GLOBAL_PINNED_TIMESTAMP	2009
+#define	WT_STAT_CONN_TXN_GLOBAL_PINNED_TIMESTAMP	2010
 /*! transaction: transaction global stable timestamp */
-#define	WT_STAT_CONN_TXN_GLOBAL_STABLE_TIMESTAMP	2010
+#define	WT_STAT_CONN_TXN_GLOBAL_STABLE_TIMESTAMP	2011
 /*! transaction: transaction global version cursor timestamp */
-#define	WT_STAT_CONN_TXN_GLOBAL_VERSION_CURSOR_TIMESTAMP	2011
+#define	WT_STAT_CONN_TXN_GLOBAL_VERSION_CURSOR_TIMESTAMP	2012
 /*!
  * transaction: transaction number of older readers older than oldest
  * timestamp
  */
-#define	WT_STAT_CONN_TXN_PINNED_READERS			2012
+#define	WT_STAT_CONN_TXN_PINNED_READERS			2013
 /*! transaction: transaction range of IDs currently pinned */
-#define	WT_STAT_CONN_TXN_PINNED_RANGE			2013
+#define	WT_STAT_CONN_TXN_PINNED_RANGE			2014
 /*! transaction: transaction range of IDs currently pinned by a checkpoint */
-#define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	2014
+#define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	2015
 /*! transaction: transaction range of timestamps currently pinned */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_LAG		2015
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_LAG		2016
 /*! transaction: transaction range of timestamps pinned by a checkpoint */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_CHECKPOINT_LAG	2016
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_CHECKPOINT_LAG	2017
 /*!
  * transaction: transaction range of timestamps pinned by the oldest
  * active read timestamp
  */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_READER_LAG	2017
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_READER_LAG	2018
 /*!
  * transaction: transaction range of timestamps pinned by the oldest
  * timestamp
  */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_OLDEST	2018
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_OLDEST	2019
 /*! transaction: transaction read timestamp of the oldest active reader */
-#define	WT_STAT_CONN_TXN_TIMESTAMP_OLDEST_ACTIVE_READ	2019
+#define	WT_STAT_CONN_TXN_TIMESTAMP_OLDEST_ACTIVE_READ	2020
 /*! transaction: transaction rollback to stable currently running */
-#define	WT_STAT_CONN_TXN_ROLLBACK_TO_STABLE_RUNNING	2020
+#define	WT_STAT_CONN_TXN_ROLLBACK_TO_STABLE_RUNNING	2021
 /*! transaction: transaction walk of concurrent sessions */
-#define	WT_STAT_CONN_TXN_WALK_SESSIONS			2021
+#define	WT_STAT_CONN_TXN_WALK_SESSIONS			2022
 /*! transaction: transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				2022
+#define	WT_STAT_CONN_TXN_COMMIT				2023
 /*! transaction: transactions rolled back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			2023
+#define	WT_STAT_CONN_TXN_ROLLBACK			2024
 /*! transaction: update conflicts */
-#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		2024
+#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		2025
 
 /*!
  * @}

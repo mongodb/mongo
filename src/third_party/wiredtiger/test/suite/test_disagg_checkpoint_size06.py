@@ -26,25 +26,25 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import re, wttest
+import wttest
 from wiredtiger import stat
-from helper_disagg import DisaggConfigMixin, disagg_test_class
+from helper_disagg import DisaggSizeTestMixin, disagg_test_class
 
 # Tests for checkpoint size calculation with delta chain scenarios.
 #
 # Tests:
 #   test_size_stable_through_delta_full_image_cycles
-#       Exercises the wrapup success path: delta chain -> full-image replacement, repeated.
+#       Exercises the reconciliation commit path: delta chain -> full-image replacement, repeated.
 #       Verifies the checkpoint size stabilizes at the baseline (no leak per cycle).
 #
 #   test_size_after_page_id_invalidation
-#       Exercises the error path directly: builds a delta chain, forces the
-#       rec_free_page_id_due_to_failed_replacement_reconciliation code path via eviction
-#       + page_id invalidation, then verifies the subsequent checkpoint size is correct.
+#       Exercises the reconciliation error path directly: builds a delta chain, forces the
+#       failed-replacement error path via eviction + page_id invalidation, then verifies
+#       the subsequent checkpoint size is correct.
 #       Checks that the stat counter is incremented and that the size is not inflated.
 
 @disagg_test_class
-class test_disagg_checkpoint_size06(wttest.WiredTigerTestCase):
+class test_disagg_checkpoint_size06(DisaggSizeTestMixin, wttest.WiredTigerTestCase):
 
     uri_base = 'test_disagg_ckpt_size06'
     # delta_pct=90: high enough that small updates produce deltas; we override to 1 when we need
@@ -56,23 +56,9 @@ class test_disagg_checkpoint_size06(wttest.WiredTigerTestCase):
     uri = 'layered:' + uri_base
     stable_uri = 'file:' + uri_base + '.wt_stable'
 
-    def conn_extensions(self, extlist):
-        extlist.skip_if_missing = True
-        DisaggConfigMixin.conn_extensions(self, extlist)
-
     # -----------------------------------------------------------------------
     # Helpers
     # -----------------------------------------------------------------------
-
-    def get_checkpoint_size(self):
-        """Read the most recent checkpoint size directly from metadata (ground truth)."""
-        mc = self.session.open_cursor('metadata:')
-        mc.set_key(self.stable_uri)
-        self.assertEqual(mc.search(), 0)
-        sizes = re.findall(r',size=(\d+),', mc.get_value())
-        mc.close()
-        self.assertGreater(len(sizes), 0, 'No size= found in checkpoint metadata')
-        return int(sizes[-1])
 
     def insert_rows(self, cursor, start, count, value_char):
         for i in range(start, start + count):
@@ -88,30 +74,22 @@ class test_disagg_checkpoint_size06(wttest.WiredTigerTestCase):
         evict.close()
         self.session.rollback_transaction()
 
-    def get_conn_stat(self, stat_key):
-        s = self.session.open_cursor('statistics:')
-        val = s[stat_key][2]
-        s.close()
-        return val
-
     # -----------------------------------------------------------------------
     # test_size_stable_through_delta_full_image_cycles
     # -----------------------------------------------------------------------
     # Sequence per cycle:
     #   1. Update a subset of rows (produces a delta at delta_pct=90).
-    #   2. Checkpoint  delta appended to chain, cumulative_size grows.
+    #   2. Checkpoint: delta appended to chain, the chain's cumulative size grows.
     #   3. Evict the leaf page from cache.
     #   4. Reconfigure to delta_pct=1 (forces next write to be a full image).
-    #   5. Update all rows  triggers a full-image reconciliation on next checkpoint.
-    #   6. Checkpoint  wrapup calls obsolete_delta_chain, cumulative_size subtracted.
+    #   5. Update all rows: triggers a full-image reconciliation on next checkpoint.
+    #   6. Checkpoint: the reconciliation commit path invokes the delta chain discard,
+    #      subtracting the chain's cumulative size from the file's running byte total.
     #   7. Restore delta_pct=90 for the next cycle.
     #
     # This test runs multiple cycles of this sequence to verify that the
     # checkpoint size stabilizes and does not grow by multiples per cycle,
-    # which would indicate a leak of the cumulative_size.
-    # At the moment the leak doesn't occur even without the WT-16864 fix,
-    # due to the workaround in place to circumvent the issue.
-    # This test is designed to validate the WT-16864 fix.
+    # which would indicate a leak of the chain's cumulative size.
     def test_size_stable_through_delta_full_image_cycles(self):
         nrows = 20
         ncycles = 5
@@ -127,7 +105,7 @@ class test_disagg_checkpoint_size06(wttest.WiredTigerTestCase):
         self.assertGreater(baseline, 0)
 
         for cycle in range(ncycles):
-            # Step 12: Partial update  delta checkpoint.
+            # Step 12: Partial update + delta checkpoint.
             c = self.session.open_cursor(self.uri)
             self.insert_rows(c, 0, nrows // 2, 'B')
             c.close()
@@ -150,11 +128,11 @@ class test_disagg_checkpoint_size06(wttest.WiredTigerTestCase):
             size_after_full = self.get_checkpoint_size()
 
             # The full-image checkpoint size should not diverge from the
-            # baseline.  Allow a 2x margin to accommodate root page and internal page
+            # baseline. Allow a 2x margin to accommodate root page and internal page
             # overhead, but the size must not grow by multiples per cycle.
             self.assertLess(size_after_full, baseline * 2,
                 f'cycle {cycle}: checkpoint size {size_after_full} is more than 2x '
-                f'baseline {baseline}  possible cumulative_size leak')
+                f'baseline {baseline}  possible running-total leak')
 
             # Restore delta mode for the next cycle.
             self.conn.reconfigure('page_delta=(delta_pct=90)')
@@ -163,20 +141,22 @@ class test_disagg_checkpoint_size06(wttest.WiredTigerTestCase):
     # test_size_after_page_id_invalidation
     # -----------------------------------------------------------------------
     # Directly exercises the scenario where page_id is invalidated during eviction
-    # (triggering the rec_free_page_id_due_to_failed_replacement_reconciliation stat)
+    # (triggering the free page ID due to failed page replacement reconciliation scenario)
     # and verifies the subsequent checkpoint size is consistent.
     #
-    # The page_id invalidation path in __rec_write_err is reached when:
-    #   - The page has disagg_info and a valid page_id.
-    #   - Reconciliation writes exactly one block (r->multi_next == 1).
+    # The reconciliation error path is reached when:
+    #   - The page has disaggregated metadata and a valid page_id.
+    #   - Reconciliation writes exactly one block (the reconciliation's multi-block
+    #     state has a single entry).
     #   - The new block's page_id matches the page's current page_id.
-    #   - An error occurs after the write but before wrapup commits the state.
+    #   - An error occurs after the write but before the reconciliation commit path
+    #     commits the state.
     #
     # We approximate this via a crash-restart after building a delta chain: the on-disk
     # state reverts to the last clean checkpoint, which gives us a page with a known
-    # baseline size.  We then build a new delta chain on top, force a full-image write,
+    # baseline size. We then build a new delta chain on top, force a full-image write,
     # and verify the checkpoint size matches the expected value (not inflated by the
-    # old chain's cumulative_size).
+    # old chain's cumulative size).
     def test_size_after_page_id_invalidation(self):
         nrows = 20
 
@@ -204,12 +184,13 @@ class test_disagg_checkpoint_size06(wttest.WiredTigerTestCase):
             'Size should grow after appending a delta to the chain')
 
         # Step 3: Evict the page so it's read back from the page service.
-        # On read-back, cumulative_size is re-established from the stored block_meta.
+        # On read-back, the chain's cumulative size is re-established from the stored
+        # block metadata.
         self.evict_page('key000000')
 
         # Step 4: Force a full-image write over the existing delta chain.
         # With delta_pct=1 and a full update of all rows, the reconciliation should
-        # produce a full image (delta_count == 0), which terminates the chain.
+        # produce a full image (delta count == 0), which terminates the chain.
         self.conn.reconfigure('page_delta=(delta_pct=1)')
         c = self.session.open_cursor(self.uri)
         self.insert_rows(c, 0, nrows, 'C')
@@ -219,25 +200,26 @@ class test_disagg_checkpoint_size06(wttest.WiredTigerTestCase):
 
         # Step 5: After a full-image write that terminates the delta chain, the
         # checkpoint size should drop back toward the baseline, not remain inflated
-        # by the cumulative_size of the old chain.
+        # by the chain's cumulative size.
         #
-        # Without the WT-16864 fix, if the error path was taken here and the
-        # cumulative_size was not subtracted, size_after_full would be approximately
-        # size_after_delta + size_baseline (double-counted).
+        # If the error path was taken here and the
+        # chain's cumulative size was not subtracted from the file's running byte
+        # total, size_after_full would be approximately size_after_delta +
+        # size_baseline (double-counted).
         self.assertLess(size_after_full, size_after_delta + size_baseline,
             f'Checkpoint size {size_after_full} after full-image write looks inflated: '
             f'baseline={size_baseline}, after_delta={size_after_delta}. '
-            f'Possible cumulative_size leak from the error path.')
+            f'Possible running-total leak from the error path.')
 
         # The full-image size should be close to the baseline (same data volume, no deltas).
         self.assertLess(size_after_full, size_baseline * 2,
             f'Full-image checkpoint size {size_after_full} is more than 2x baseline '
-            f'{size_baseline}; the old delta chain cumulative_size may have been leaked.')
+            f'{size_baseline}; the old delta chain cumulative size may have been leaked.')
 
     # -----------------------------------------------------------------------
     # test_repeated_full_image_over_delta_size_is_stable
     # -----------------------------------------------------------------------
-    # Writes a delta chain, then repeatedly replaces it with a full image.  The
+    # Writes a delta chain, then repeatedly replaces it with a full image. The
     # checkpoint size should stabilize after the first full-image replacement
     # (the chain is terminated and re-created from scratch each time).
     def test_repeated_full_image_over_delta_size_is_stable(self):
@@ -282,4 +264,4 @@ class test_disagg_checkpoint_size06(wttest.WiredTigerTestCase):
             self.assertLess(size_cycle, size_first_full * 1.5,
                 f'cycle {cycle}: size {size_cycle} has grown beyond expected bounds '
                 f'(first full-image size was {size_first_full}). '
-                f'Possible cumulative_size double-counting.')
+                f'Possible running-total double-counting.')

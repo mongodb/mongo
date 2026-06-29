@@ -349,13 +349,21 @@ struct __wt_session_impl {
 #define WT_SESSION_PREFETCH_THREAD 0x00400000u
 #define WT_SESSION_QUIET_CORRUPT_FILE 0x00800000u
 #define WT_SESSION_QUIET_OPEN_FILE 0x01000000u
-#define WT_SESSION_READ_WONT_NEED 0x02000000u
-#define WT_SESSION_RESOLVING_TXN 0x04000000u
-#define WT_SESSION_ROLLBACK_TO_STABLE 0x08000000u
-#define WT_SESSION_SAVE_ERRORS 0x10000000u
-#define WT_SESSION_SCHEMA_TXN 0x20000000u
+#define WT_SESSION_READ_SKIP_CORRUPT 0x02000000u
+#define WT_SESSION_READ_WONT_NEED 0x04000000u
+#define WT_SESSION_RESOLVING_TXN 0x08000000u
+#define WT_SESSION_ROLLBACK_TO_STABLE 0x10000000u
+#define WT_SESSION_SAVE_ERRORS 0x20000000u
+#define WT_SESSION_SCHEMA_TXN 0x40000000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
+
+/*
+ * The block managers check either flag to determine whether a corruption error on a read is
+ * acceptable.
+ */
+#define WT_SESSION_READ_CORRUPT_OK(session) \
+    F_ISSET((session), WT_SESSION_QUIET_CORRUPT_FILE | WT_SESSION_READ_SKIP_CORRUPT)
 
 /*
  * All of the following fields live at the end of the structure so it's easier to clear everything

@@ -779,6 +779,10 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
         if (!F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT))
             LF_SET(WT_READ_VISIBLE_ALL);
 
+        /* In read-corrupt mode, skip corrupt refs during the walk. */
+        if (F_ISSET(session, WT_SESSION_READ_SKIP_CORRUPT))
+            LF_SET(WT_READ_SKIP_CORRUPT);
+
         /*
          * If we are running with snapshot isolation, and not interested in returning tombstones, we
          * could potentially skip pages. The skip function looks at the aggregated timestamp

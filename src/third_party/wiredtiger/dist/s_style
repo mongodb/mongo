@@ -17,7 +17,7 @@ is_main_run && {
         -e '/test\/checksum\/power8/d' \
         -e '/bench\/workgen\/workgen_wrap.cxx/d' \
         -e '/checksum\/zseries/d' | \
-    do_in_parallel -n 5
+    do_in_parallel
     exit $?
 }
 
@@ -25,7 +25,7 @@ is_main_run && {
 
 for f in "$@"; do
     # General style correction and cleanup for a single file
-    fname=`basename $f`
+    fname="${f##*/}"
     rm -f "$t"
     t=__wt_s_style.$fname.$$
 
@@ -35,20 +35,20 @@ for f in "$@"; do
     fi
 
     # Ignore styling errors of external libraries.
-    if expr "$f" : 'src/' > /dev/null &&
-      ! expr "$f" : 'src/os_win/' > /dev/null &&
-      ! expr "$f" : 'src/docs/' > /dev/null &&
-      ! expr "$f" : 'src/tags' > /dev/null &&
-      ! expr "$f" : 'src/.*/hash_city.*' > /dev/null &&
-      ! expr "$f" : 'src/checksum.*' > /dev/null; then
+    if [[ "$f" == src/* ]] &&
+      [[ "$f" != src/os_win/* ]] &&
+      [[ "$f" != src/docs/* ]] &&
+      [[ "$f" != src/tags* ]] &&
+      [[ "$f" != src/*/hash_city* ]] &&
+      [[ "$f" != src/checksum* ]]; then
 
         # Camel case style is not allowed.
-        if grep -E -r -n '\b[a-z]+[A-Z]' $f | grep -E -v ':[     ]+\*|"|UNCHECKED_STRING'; then
+        if grep -E -n '\b[a-z]+[A-Z]' $f | grep -E -v ':[     ]+\*|"|UNCHECKED_STRING'; then
             echo "$f: Styling requires variables that use underscores to separate parts of a name instead of camel casing.";
         fi
 
         # Return values should be wrapped in parentheses.
-        grep -E -r -n '^[^*/"]*[[:space:]]*return [^(]' $f > $t;
+        grep -E -n '^[^*/"]*[[:space:]]*return [^(]' $f > $t;
         test -s $t && {
             echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
             echo 'Add parentheses to return values indicated below in file '"$f"
@@ -63,13 +63,14 @@ for f in "$@"; do
     fi
 
     # Remove non-ascii characters and substitute some expressions with accepted version.
-    tr -cd '[:alnum:][:space:][:punct:]' < $f |
-    sed -e '/for /!s/;;$/;/' \
-        -e 's/(EOPNOTSUPP)/(ENOTSUP)/' \
-        -e 's/(unsigned)/(u_int)/' \
-        -e 's/hazard reference/hazard pointer/' >$t
-
-    cmp $t $f > /dev/null 2>&1 || (echo "modifying $f" && cp $t $f)
+    if grep -Eq 'EOPNOTSUPP|\(unsigned\)|hazard reference|;;' $f 2>/dev/null; then
+        tr -cd '[:alnum:][:space:][:punct:]' < $f |
+        sed -e '/for /!s/;;$/;/' \
+            -e 's/(EOPNOTSUPP)/(ENOTSUP)/' \
+            -e 's/(unsigned)/(u_int)/' \
+            -e 's/hazard reference/hazard pointer/' >$t
+        cmp $t $f > /dev/null 2>&1 || (echo "modifying $f" && cp $t $f)
+    fi
 
     # Finding paired typos in the comments of different file types and excluding invalid edge cases.
     if [ "${fname##*.}" = "py" ]; then
@@ -103,41 +104,40 @@ for f in "$@"; do
     fi
 
     # A static assert in verify_build.h requires using sizeof explicitly.
-    if ! expr "$f" : 'src/include/verify_build.h' > /dev/null &&
+    if [[ "$f" != src/include/verify_build.h ]] &&
         grep 'sizeof(WT_UPDATE)' $f > $t; then
         echo "$f: Use WT_UPDATE_SIZE rather than sizeof(WT_UPDATE)"
         cat $t
 
     fi
 
-    if ! expr "$f" : 'examples/c/.*' > /dev/null &&
-       ! expr "$f" : 'ext/.*' > /dev/null &&
-       ! expr "$f" : 'src/include/wiredtiger_ext\.h' > /dev/null &&
-       ! expr "$f" : 'src/txn/txn_ext\.c' > /dev/null &&
+    if [[ "$f" != examples/c/* ]] &&
+       [[ "$f" != ext/* ]] &&
+       [[ "$f" != src/include/wiredtiger_ext.h ]] &&
+       [[ "$f" != src/txn/txn_ext.c ]] &&
        grep WT_TXN_ISO_ $f; then
         echo "$f: WT_TXN_ISO_XXX constants only for the extension API"
-        cat $t
     fi
 
-    if ! expr "$f" : 'src/include/queue\.h' > /dev/null &&
+    if [[ "$f" != src/include/queue.h ]] &&
         grep -E 'STAILQ_|SLIST_|\bLIST_' $f ; then
         echo "$f: use TAILQ for all lists"
     fi
 
-    if ! expr "$f" : 'src/include/extern.h' > /dev/null &&
-       ! expr "$f" : 'src/include/extern_posix.h' > /dev/null &&
-       ! expr "$f" : 'src/include/extern_win.h' > /dev/null &&
-       ! expr "$f" : 'src/include/os.h' > /dev/null &&
-       ! expr "$f" : 'src/os_common/.*' > /dev/null &&
-       ! expr "$f" : 'src/os_posix/.*' > /dev/null &&
-       ! expr "$f" : 'src/os_win/.*' > /dev/null &&
+    if [[ "$f" != src/include/extern.h ]] &&
+       [[ "$f" != src/include/extern_posix.h ]] &&
+       [[ "$f" != src/include/extern_win.h ]] &&
+       [[ "$f" != src/include/os.h ]] &&
+       [[ "$f" != src/os_common/* ]] &&
+       [[ "$f" != src/os_posix/* ]] &&
+       [[ "$f" != src/os_win/* ]] &&
         grep '__wt_errno' $f > $t; then
         echo "$f: upper-level code should not call __wt_errno"
         cat $t
     fi
 
-    if ! expr "$f" : 'examples/c/.*' > /dev/null &&
-       ! expr "$f" : 'src/include/os.h' > /dev/null &&
+    if [[ "$f" != examples/c/* ]] &&
+       [[ "$f" != src/include/os.h ]] &&
         grep -E "%[0-9]*zu" $f | grep -v 'SIZET_FMT' > $t; then
         echo "$f: %zu needs to be fixed for Windows"
         cat $t
@@ -149,55 +149,54 @@ for f in "$@"; do
         cat $t
     }
 
-    if ! expr "$f" : 'src/include/misc.h' > /dev/null &&
+    if [[ "$f" != src/include/misc.h ]] &&
         grep '[[:space:]]qsort(' $f > $t; then
         echo "$f: qsort call, use WiredTiger __wt_qsort instead"
         cat $t
     fi
 
-    if ! expr "$f" : 'src/.*/os_setvbuf.c' > /dev/null &&
+    if [[ "$f" != src/*/os_setvbuf.c ]] &&
         grep -E -w 'setvbuf' $f > $t; then
         echo "$f: setvbuf call, use WiredTiger library replacements"
         cat $t
     fi
 
-    if ! expr "$f" : 'examples/c/*' > /dev/null &&
-       ! expr "$f" : 'bench/*' > /dev/null &&
-       ! expr "$f" : '.*cxx' > /dev/null &&
-       ! expr "$f" : '.*cpp' > /dev/null &&
-       ! expr "$f" : 'ext/*' > /dev/null &&
-       ! expr "$f" : 'src/os_posix/os_snprintf.c' > /dev/null &&
+    if [[ "$f" != examples/c/* ]] &&
+       [[ "$f" != bench/* ]] &&
+       [[ "$f" != *.cxx ]] &&
+       [[ "$f" != *.cpp ]] &&
+       [[ "$f" != ext/* ]] &&
+       [[ "$f" != src/os_posix/os_snprintf.c ]] &&
         grep -E '[^a-z_]snprintf\(|[^a-z_]vsnprintf\(' $f > $t; then
         echo "$f: snprintf call, use WiredTiger library replacements"
         cat $t
     fi
 
     # If we don't have matching pack-begin and pack-end calls, we don't get
-    # an error, we just get a Windows performance regression. Using awk and
-    # not wc to ensure there's no whitespace in the assignment.
+    # an error, we just get a Windows performance regression.
     grep -E WT_PACKED_STRUCT $f > $t
-    cnt=`awk 'BEGIN { line = 0 } { ++line } END { print line }' < $t`
-    test `expr "$cnt" % 2` -ne 0 && {
+    cnt=$(grep -c -E WT_PACKED_STRUCT $t)
+    (( cnt % 2 )) && {
         echo "$f: mismatched WT_PACKED_STRUCT_BEGIN/END lines"
         cat $t
     }
 
     # Direct calls to functions we're not supposed to use in the library.
     # We don't check for all of them, just a few of the common ones.
-    if ! expr "$f" : 'bench/.*' > /dev/null &&
-       ! expr "$f" : 'dist/.*' > /dev/null &&
-       ! expr "$f" : 'examples/.*' > /dev/null &&
-       ! expr "$f" : 'ext/.*' > /dev/null &&
-       ! expr "$f" : 'test/.*' > /dev/null; then
-        if ! expr "$f" : '.*/os_alloc.c' > /dev/null &&
-           ! expr "$f" : '.*/util_misc.c' > /dev/null &&
+    if [[ "$f" != bench/* ]] &&
+       [[ "$f" != dist/* ]] &&
+       [[ "$f" != examples/* ]] &&
+       [[ "$f" != ext/* ]] &&
+       [[ "$f" != test/* ]]; then
+        if [[ "$f" != */os_alloc.c ]] &&
+           [[ "$f" != */util_misc.c ]] &&
              grep -E '[[:space:]]free[(]|[[:space:]]strdup[(]|[[:space:]]strndup[(]|[[:space:]]malloc[(]|[[:space:]]calloc[(]|[[:space:]]realloc[(]|[[:space:]]sprintf[(]' $f > $t; then
             test -s $t && {
                 echo "$f: call to illegal function"
                 cat $t
             }
         fi
-        if ! expr "$f" : '.*/os_strtouq.c' > /dev/null &&
+        if [[ "$f" != */os_strtouq.c ]] &&
              grep -E '[[:space:]]strtouq[(]' $f > $t; then
             test -s $t && {
                 echo "$f: call to illegal function"
@@ -213,10 +212,10 @@ for f in "$@"; do
     fi
 
     # Declaration of an integer return variable.
-    if ! expr "$f" : 'bench/.*' > /dev/null &&
-       ! expr "$f" : 'examples/.*' > /dev/null &&
-       ! expr "$f" : 'test/.*' > /dev/null &&
-       ! expr "$f" : 'ext/.*' > /dev/null; then
+    if [[ "$f" != bench/* ]] &&
+       [[ "$f" != examples/* ]] &&
+       [[ "$f" != test/* ]] &&
+       [[ "$f" != ext/* ]]; then
        # This regex can return false positives on functions that take ret as
        # an argument. Filter out matches that contain brackets.
         grep -E -w ret $f | grep -E 'int.*[, ]ret[,;]' | grep -E -v '[()]' > $t
@@ -227,13 +226,14 @@ for f in "$@"; do
     fi
 
     # Use of ctype functions that sign extend their arguments.
-    if ! expr "$f" : 'bench/.*' > /dev/null &&
-       ! expr "$f" : 'test/csuite/.*' > /dev/null &&
-       ! expr "$f" : 'examples/.*' > /dev/null &&
-       ! expr "$f" : 'ext/.*' > /dev/null &&
-       ! expr "$f" : '.*py' > /dev/null &&
-       ! expr "$f" : '.*cpp' > /dev/null &&
-       ! expr "$f" : 'src/include/ctype.i' > /dev/null; then
+    if [[ "$f" != bench/* ]] &&
+       [[ "$f" != test/csuite/* ]] &&
+       [[ "$f" != examples/* ]] &&
+       [[ "$f" != ext/* ]] &&
+       [[ "$f" != *.py ]] &&
+       [[ "$f" != *.cpp ]] &&
+       [[ "$f" != src/include/ctype.i ]] &&
+       [[ "$f" != src/include/ctype_inline.h ]]; then
         if grep -E '(#include.*["</]ctype.h[">]|\b(is(alnum|alpha|cntrl|digit|graph|lower|print|punct|space|upper|xdigit)|to(lower|toupper))\()' $f > $t; then
             test -s $t && {
                 echo "$f: direct use of ctype.h functions, instead of ctype.i equivalents"

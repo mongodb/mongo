@@ -19,6 +19,7 @@ extern const char *home;         /* Home directory */
 extern const char *progname;     /* Program name */
 extern const char *usage_prefix; /* Global arguments */
 extern bool verbose;             /* Verbose flag */
+extern bool read_corrupt;        /* Global -q: continue past corrupt pages in read-oriented cmds */
 
 extern WT_EVENT_HANDLER *verbose_handler;
 
