@@ -147,7 +147,22 @@ cffi = "^2.0.0"
 pypiwin32 = { version = ">=223", markers = "sys_platform == 'win32'" }
 pywin32 = { version = ">=225", markers = "sys_platform == 'win32'" }
 python-msilib = { version = "^0.5.0", markers = "sys_platform == 'win32' and python_version >= '3.13'" }
-cryptography = "^44.0.2"
+# cryptography 41+ ships a Rust extension and PyPI carries no
+# s390x / ppc64le wheels for it. On those archs we previously fell
+# through to the sdist build, which required a stable-<arch>-unknown-
+# linux-gnu Rust toolchain to be installed on every CI host that ran
+# `poetry install` (rhel83-zseries-small, rhel81-power8-small). To
+# remove that environmental dependency, we host pre-built
+# manylinux_2_28 wheels for both archs in `mdb-build-public` (see
+# `buildscripts/mongo_cryptography_builds/` for the build/upload
+# procedure) and point Poetry's multi-constraint resolution at them
+# via direct URLs. On every other arch we continue to pull the normal
+# cp37-abi3 wheel from PyPI.
+cryptography = [
+    { version = "==44.0.2", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" },
+    { url = "https://mdb-build-public.s3.amazonaws.com/cryptography_wheels/cryptography-44.0.2-cp37-abi3-manylinux_2_28_s390x.whl", markers = "platform_machine == 's390x'" },
+    { url = "https://mdb-build-public.s3.amazonaws.com/cryptography_wheels/cryptography-44.0.2-cp37-abi3-manylinux_2_28_ppc64le.whl", markers = "platform_machine == 'ppc64le'" },
+]
 
 [tool.poetry.group.testing.dependencies]
 bazel-runfiles = "^1.8.3"
