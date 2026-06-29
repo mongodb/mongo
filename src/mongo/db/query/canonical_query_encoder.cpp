@@ -134,11 +134,8 @@ using AppendChar = decltype(std::declval<BuilderType>().appendChar(std::declval<
  */
 template <typename BuilderType>
 inline constexpr auto hasAppendChar = stdx::is_detected_exact_v<void, AppendChar, BuilderType>;
+}  // namespace
 
-/**
- * Encode user-provided string. Cache key delimiters seen in the user string are escaped with a
- * backslash.
- */
 template <class BuilderType>
 void encodeUserString(std::string_view s, BuilderType* builder) {
     for (size_t i = 0; i < s.size(); ++i) {
@@ -169,6 +166,10 @@ void encodeUserString(std::string_view s, BuilderType* builder) {
     }
 }
 
+template void encodeUserString<StringBuilder>(std::string_view, StringBuilder*);
+template void encodeUserString<BufBuilder>(std::string_view, BufBuilder*);
+
+namespace {
 /**
  * String encoding of MatchExpression::MatchType.
  */
@@ -1430,6 +1431,24 @@ uint32_t computeHash(std::string_view key) {
     size_t seed = 0;
     simpleStringDataComparator.hash_combine(seed, key);
     return seed;
+}
+
+CanonicalQuery::QueryShapeString encodeCanonicalQueryForJoin(const CanonicalQuery& cq) {
+    tassert(12926101,
+            "join plan cache key: access path must not have a projection",
+            cq.getProj() == nullptr);
+    tassert(
+        12926102, "join plan cache key: access path must not have a sort", !cq.getSortPattern());
+    tassert(12926103,
+            "join plan cache key: access path must not have a collation",
+            cq.getCollator() == nullptr);
+    tassert(
+        12926104, "join plan cache key: access path must not have a distinct", !cq.getDistinct());
+
+    StringBuilder keyBuilder;
+    encodeKeyForMatch(cq.getPrimaryMatchExpression(), &keyBuilder);
+    // TODO SERVER-128364: Encode projection once they are supported in the JoinGraph.
+    return keyBuilder.str();
 }
 }  // namespace canonical_query_encoder
 }  // namespace mongo

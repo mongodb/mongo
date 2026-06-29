@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/util/modules.h"
@@ -78,6 +79,15 @@ inline constexpr char kEncodeGlobalDiscriminatorsEnd = ')';
  */
 bool isQueryNegatingEqualToNull(const mongo::MatchExpression* tree);
 
+/**
+ * Encode user-provided string. Cache key delimiters seen in the user string are escaped with a
+ * backslash.
+ */
+template <class BuilderType>
+void encodeUserString(std::string_view s, BuilderType* builder);
+
+extern template void encodeUserString<StringBuilder>(std::string_view, StringBuilder*);
+extern template void encodeUserString<BufBuilder>(std::string_view, BufBuilder*);
 
 namespace canonical_query_encoder {
 
@@ -105,6 +115,13 @@ CanonicalQuery::QueryShapeString encodeClassic(const CanonicalQuery& cq);
  */
 CanonicalQuery::QueryShapeString encodeSBE(const CanonicalQuery& cq,
                                            bool requiresSbeCompatibility = true);
+
+/**
+ * Returns the match expression shape for 'cq' as a QueryShapeString, for use in join plan cache
+ * key construction. Encodes operators and field paths but not literal values, intentionally
+ * omitting sort, projection, collation, and engine-selection flags irrelevant to join planning.
+ */
+CanonicalQuery::QueryShapeString encodeCanonicalQueryForJoin(const CanonicalQuery& cq);
 
 /**
  * Encode the given CanonicalQuery into a string representation which represents the shape of the

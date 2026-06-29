@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2025-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,42 +29,30 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/field_path.h"
-#include "mongo/util/modules.h"
+#include "mongo/db/query/compiler/optimizer/join/join_graph.h"
+#include "mongo/db/query/compiler/optimizer/join/logical_defs.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/plan_cache/join_plan_cache.h"
+
+#include <vector>
 
 namespace mongo {
 
 /**
- * The physical representation of a join predicate between two relations. This struct is used by
- * QuerySolutionNodes that implement binary joins to indicate which fields are being joined.
+ * Builds a JoinPlanCacheKey from a fully-constructed join graph.
+ *
+ * Each node's contribution is a PlanCacheKeyInfo (match expression shape +
+ * indexability discriminators for that node's collection), which ensures that
+ * the key changes if the collection's index set changes eligibility for the query.
+ *
+ * 'resolvedPaths' maps PathId values in JoinEdge predicates to their concrete
+ * FieldPath strings, this is produced by the PathResolver during join graph construction.
+ *
+ * 'collections' is used to look up the CollectionPtr for each node's collection so
+ * that indexability discriminators can be computed.
  */
-struct QSNJoinPredicate {
-    enum class ComparisonOp {
-        // Regular equality (null == missing).
-        Eq,
-        // "Strict" $expr equality (null != missing).
-        ExprEq
-    };
-
-    ComparisonOp op;
-    // The left and right fields of the equality predicate. The order of left and right fields is
-    // important as it corresponds to the children of a join node. The field may correspond directly
-    // to a collection, in which case the namespace of the field is implicit in the structure of the
-    // QSN, or to a stream of documents which themselves represent the result of a join, in which
-    // case the field will have a prefix representing the "as" field of a $lookup.
-    FieldPath leftField;
-    FieldPath rightField;
-
-    bool isEquality() const {
-        return op == ComparisonOp::Eq || op == ComparisonOp::ExprEq;
-    }
-
-    std::string toString() const;
-
-    template <typename H>
-    friend H AbslHashValue(H h, const QSNJoinPredicate& pred) {
-        return H::combine(std::move(h), pred.op, pred.leftField, pred.rightField);
-    }
-};
+JoinPlanCacheKey makeJoinPlanCacheKey(const join_ordering::JoinGraph& graph,
+                                      const std::vector<join_ordering::ResolvedPath>& resolvedPaths,
+                                      const MultipleCollectionAccessor& collections);
 
 }  // namespace mongo

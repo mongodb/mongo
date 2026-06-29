@@ -103,11 +103,13 @@ std::unique_ptr<CanonicalQuery> JoinOrderingTestFixture::makeCanonicalQuery(Name
                                                                             BSONObj filter) {
     auto expCtx = ExpressionContextBuilder{}.opCtx(operationContext()).build();
     if (!filter.isEmpty()) {
+        auto findCmd = std::make_unique<FindCommandRequest>(nss);
+        findCmd->setFilter(filter);
         auto swFindCmd = ParsedFindCommand::withExistingFilter(
             expCtx,
             nullptr,
             std::move(MatchExpressionParser::parse(filter, expCtx).getValue()),
-            std::make_unique<FindCommandRequest>(nss),
+            std::move(findCmd),
             ProjectionPolicies::aggregateProjectionPolicies());
         ASSERT_OK(swFindCmd.getStatus());
         return std::make_unique<CanonicalQuery>(

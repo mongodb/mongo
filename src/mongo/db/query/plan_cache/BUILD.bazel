@@ -29,14 +29,24 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "join_plan_cache",
-    srcs = ["join_plan_cache.cpp"],
-    hdrs = ["join_plan_cache.h"],
+    srcs = [
+        "join_plan_cache.cpp",
+        "join_plan_cache_key.cpp",
+    ],
+    hdrs = [
+        "join_plan_cache.h",
+        "join_plan_cache_key.h",
+    ],
     deps = [
         "query_plan_cache",
         "//src/mongo:base",
         "//src/mongo/db:service_context",
+        "//src/mongo/db/query:canonical_query_base",
+        "//src/mongo/db/query:collection_query_info",
         "//src/mongo/db/query/compiler/optimizer/join:join_method",
+        "//src/mongo/db/query/compiler/optimizer/join:join_ordering",
         "//src/mongo/db/query/compiler/optimizer/join:join_predicate",
+        "//src/mongo/db/query/query_settings",
     ],
 )
 
@@ -124,9 +134,15 @@ mongo_cc_unit_test(
 
 mongo_cc_unit_test(
     name = "join_plan_cache_test",
-    srcs = ["join_plan_cache_test.cpp"],
+    srcs = [
+        "join_plan_cache_key_test.cpp",
+        "join_plan_cache_test.cpp",
+    ],
     tags = ["mongo_unittest_second_group"],
     deps = [
         "join_plan_cache",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db/index_builds:index_builds_coordinator",
+        "//src/mongo/db/query/compiler/optimizer/join:unit_test_helpers",
     ],
 )
