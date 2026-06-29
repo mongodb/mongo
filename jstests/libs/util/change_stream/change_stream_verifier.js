@@ -72,7 +72,38 @@ class VerifierContext {
      * @returns {Array} Array of change event records {changeEvent, cursorClosed}
      */
     getChangeEvents(conn, instanceName) {
-        Connector.waitForDone(conn, instanceName);
+        try {
+            Connector.waitForDone(conn, instanceName);
+        } catch (e) {
+            // On a stall (no heartbeat progress), the bare timeout isn't actionable. Log the
+            // commands that should have produced this reader's events and the events it actually
+            // read so far, then rethrow the original error unchanged.
+            const commandTrace = this.getCommandTrace(instanceName);
+            jsTest.log.info("Stalled reader: commands issued", {
+                instanceName,
+                count: commandTrace.length,
+                commands: commandTrace.map(
+                    (c) => `#${c.cmdIndex} ${c.cmdName} -> [${(c.events || []).join(", ")}]`,
+                ),
+                commandsDetailed: commandTrace,
+            });
+
+            let eventsRead = [];
+            try {
+                eventsRead = Connector.readAllChangeEvents(conn, instanceName);
+            } catch (readErr) {
+                jsTest.log.info("Stalled reader: failed to read recorded events", {
+                    instanceName,
+                    error: readErr.message,
+                });
+            }
+            jsTest.log.info("Stalled reader: events read so far", {
+                instanceName,
+                count: eventsRead.length,
+                events: eventsRead.map((rec, i) => formatEventSummary(rec, i)),
+            });
+            throw e;
+        }
         return Connector.readAllChangeEvents(conn, instanceName);
     }
 
