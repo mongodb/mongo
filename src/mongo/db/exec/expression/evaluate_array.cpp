@@ -301,7 +301,7 @@ Value evaluate(const ExpressionConcatArrays& expr,
         }
 
         uassert(28664,
-                str::stream() << "$concatArrays only supports arrays, not "
+                str::stream() << expr.getOpName() << " only supports arrays, not "
                               << typeName(val.getType()),
                 val.isArray());
 
@@ -312,7 +312,7 @@ Value evaluate(const ExpressionConcatArrays& expr,
                 valuesSize += v.getApproximateSize();
             }
             token.add(static_cast<int64_t>(valuesSize));
-            ctx.tracker->assertWithinMemoryLimit("$concatArrays");
+            ctx.tracker->assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
         }
         values.insert(values.end(), subValues.begin(), subValues.end());
     }
@@ -852,15 +852,35 @@ Value evaluate(const ExpressionSetUnion& expr,
     ValueSet unionedSet = expr.getExpressionContext()->getValueComparator().makeOrderedValueSet();
     auto& children = expr.getChildren();
     const size_t n = children.size();
+
+    SimpleMemoryUsageToken token;
+    if (ctx.tracker) {
+        token = SimpleMemoryUsageToken(0, ctx.tracker);
+    }
+
     for (size_t i = 0; i < n; i++) {
         const Value newEntries = children[i]->evaluate(root, variables, ctx);
         if (newEntries.nullish()) {
             return Value(BSONNULL);
         }
+
         uassert(17043,
-                str::stream() << "All operands of $setUnion must be arrays. One argument"
-                              << " is of type: " << typeName(newEntries.getType()),
+                str::stream() << "All operands of " << expr.getOpName()
+                              << " must be arrays. One argument is of type: "
+                              << typeName(newEntries.getType()),
                 newEntries.isArray());
+
+        if (ctx.tracker) {
+            // Count all elements including duplicates already in the set, to keep the bulk insert
+            // below on the hot path. This overestimates memory for inputs with many duplicates but
+            // avoids the ~15% overhead of per-element tracking and insertion.
+            size_t newEntriesSize = 0;
+            for (const auto& v : newEntries.getArray()) {
+                newEntriesSize += v.getApproximateSize();
+            }
+            token.add(static_cast<int64_t>(newEntriesSize));
+            ctx.tracker->assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
+        }
 
         unionedSet.insert(newEntries.getArray().begin(), newEntries.getArray().end());
     }
