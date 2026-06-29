@@ -58,6 +58,23 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "storage_oplog_manager",
+    srcs = [
+        "storage_oplog_manager.cpp",
+    ],
+    hdrs = [
+        "storage_oplog_manager.h",
+    ],
+    deps = [
+        ":record_store_base",
+        ":recovery_unit_base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/storage/kv:kv_engine",
+    ],
+)
+
+mongo_cc_library(
     name = "remove_saver",
     srcs = [
         "remove_saver.cpp",

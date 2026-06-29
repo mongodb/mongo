@@ -52,6 +52,7 @@
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/kv_backup_block.h"
 #include "mongo/db/storage/storage_file_util.h"
+#include "mongo/db/storage/storage_oplog_manager.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/storage_repair_observer.h"
@@ -64,7 +65,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
@@ -706,7 +706,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
                                        bool shouldRecoverFromOplogAsStandalone,
                                        bool inStandaloneMode)
     : WiredTigerKVEngineBase(canonicalName, path, clockSource, std::move(wtConfig)),
-      _oplogManager(std::make_unique<WiredTigerOplogManager>()),
+      _oplogManager(std::make_unique<StorageOplogManager>()),
       _sizeStorerSyncTracker(clockSource,
                              gWiredTigerSizeStorerPeriodicSyncHits,
                              Milliseconds{gWiredTigerSizeStorerPeriodicSyncPeriodMillis}),

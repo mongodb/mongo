@@ -34,15 +34,12 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/rss/replicated_storage_service.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/exceptions.h"
-#include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_stats.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -60,8 +57,6 @@
 #include <wiredtiger.h>
 
 #include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
@@ -111,7 +106,7 @@ WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerConnection* sc)
     : WiredTigerRecoveryUnit(sc, sc->getKVEngine()->getOplogManager()) {}
 
 WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerConnection* connection,
-                                               WiredTigerOplogManager* oplogManager)
+                                               StorageOplogManager* oplogManager)
     : _connection(connection), _oplogManager(oplogManager) {}
 
 void WiredTigerRecoveryUnit::_ensureSession() {

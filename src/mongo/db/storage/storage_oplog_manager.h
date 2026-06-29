@@ -31,13 +31,17 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <mutex>
+#include <string>
 #include <string_view>
 
 namespace mongo {
@@ -45,26 +49,32 @@ namespace mongo {
 /**
  * Manages oplog visibility.
  *
- * On demand, queries WiredTiger's all_durable timestamp value and updates the oplog read timestamp.
- * This is done synchronously when calls to triggerOplogVisibilityUpdate() provide a timestamp
- * greater than the current visibility timestamp.
+ * On demand, queries the storage engine's allDurable timestamp value and updates the oplog read
+ * timestamp. This is done synchronously when calls to triggerOplogVisibilityUpdate() provide a
+ * timestamp greater than the current visibility timestamp.
  *
- * The WT all_durable timestamp is the in-memory timestamp behind which there are no oplog holes
- * in-memory. Note, all_durable is the timestamp that has no holes in-memory, which may NOT be
+ * The allDurable timestamp is the in-memory timestamp behind which there are no oplog holes
+ * in-memory. Note that allDurable is the timestamp that has no holes in-memory, which may NOT be
  * the case on disk, despite 'durable' in the name.
  *
  * The oplog read timestamp is used to read from the oplog with forward cursors, in order to ensure
  * readers never see 'holes' in the oplog and thereby miss data that was not yet committed when
  * scanning passed. Out-of-order primary writes allow writes with later timestamps to be committed
  * before writes assigned earlier timestamps, creating oplog 'holes'.
+ *
+ * repl::OplogVisibilityManager does something very similar to this class. It is intended to be a
+ * replacement for this class, but has not yet been enabled.
+ *
+ * TODO(SERVER-85788): If it's enabled without removing this class, update the comment to reflect
+ * the new relationship.
  */
-class WiredTigerOplogManager {
-    WiredTigerOplogManager(const WiredTigerOplogManager&) = delete;
-    WiredTigerOplogManager& operator=(const WiredTigerOplogManager&) = delete;
+class MONGO_MOD_PUBLIC StorageOplogManager {
+    StorageOplogManager(const StorageOplogManager&) = delete;
+    StorageOplogManager& operator=(const StorageOplogManager&) = delete;
 
 public:
-    WiredTigerOplogManager() = default;
-    ~WiredTigerOplogManager() = default;
+    StorageOplogManager() = default;
+    ~StorageOplogManager() = default;
 
     /**
      * Starts the oplog manager, initializing the oplog read timestamp with the highest oplog

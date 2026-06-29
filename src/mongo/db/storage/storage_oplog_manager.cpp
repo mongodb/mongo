@@ -27,12 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
+#include "mongo/db/storage/storage_oplog_manager.h"
 
 #include "mongo/db/client.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/shard_role/transaction_resources.h"
-#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -57,10 +56,10 @@ constexpr int kDelayMillis = 100;
 
 }  // namespace
 
-void WiredTigerOplogManager::start(OperationContext* opCtx,
-                                   const KVEngine& engine,
-                                   RecordStore& oplog,
-                                   bool isReplSet) {
+void StorageOplogManager::start(OperationContext* opCtx,
+                                const KVEngine& engine,
+                                RecordStore& oplog,
+                                bool isReplSet) {
     _oplogIdent = std::string{oplog.getIdent()};
 
     // Prime the oplog read timestamp.
@@ -118,7 +117,7 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
         });
 }
 
-void WiredTigerOplogManager::stop(const RecordStore* oplog) {
+void StorageOplogManager::stop(const RecordStore* oplog) {
     {
         std::lock_guard lk(_oplogVisibilityStateMutex);
         if (!_oplog) {
@@ -133,7 +132,7 @@ void WiredTigerOplogManager::stop(const RecordStore* oplog) {
         if (oplog && oplog != _oplog) {
             LOGV2_DEBUG(11996400,
                         1,
-                        "Not stopping oplog visiblity thread because oplog pointer did not match");
+                        "Not stopping oplog visibility thread because oplog pointer did not match");
             return;
         }
         _oplog = nullptr;
@@ -145,7 +144,7 @@ void WiredTigerOplogManager::stop(const RecordStore* oplog) {
     }
 }
 
-void WiredTigerOplogManager::triggerOplogVisibilityUpdate() {
+void StorageOplogManager::triggerOplogVisibilityUpdate() {
     std::lock_guard<std::mutex> lk(_oplogVisibilityStateMutex);
     if (!_triggerOplogVisibilityUpdate) {
         _triggerOplogVisibilityUpdate = true;
@@ -153,7 +152,7 @@ void WiredTigerOplogManager::triggerOplogVisibilityUpdate() {
     }
 }
 
-void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
+void StorageOplogManager::waitForAllEarlierOplogWritesToBeVisible(
     const RecordStore* oplogRecordStore, OperationContext* opCtx) {
     invariant(!shard_role_details::getRecoveryUnit(opCtx)->inUnitOfWork());
 
@@ -217,7 +216,7 @@ void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
     });
 }
 
-WiredTigerOplogManager::VisibilityUpdateResult WiredTigerOplogManager::_updateVisibility(
+StorageOplogManager::VisibilityUpdateResult StorageOplogManager::_updateVisibility(
     std::unique_lock<std::mutex>& lk, const KVEngine& engine, const RecordStore::Capped& oplog) {
     {
         MONGO_IDLE_THREAD_BLOCK;
@@ -261,16 +260,16 @@ WiredTigerOplogManager::VisibilityUpdateResult WiredTigerOplogManager::_updateVi
     return VisibilityUpdateResult::Updated;
 }
 
-std::uint64_t WiredTigerOplogManager::getOplogReadTimestamp() const {
+std::uint64_t StorageOplogManager::getOplogReadTimestamp() const {
     return _oplogReadTimestamp.load();
 }
 
-void WiredTigerOplogManager::setOplogReadTimestamp(Timestamp ts) {
+void StorageOplogManager::setOplogReadTimestamp(Timestamp ts) {
     std::lock_guard<std::mutex> lk(_oplogVisibilityStateMutex);
     _setOplogReadTimestamp(lk, ts.asULL());
 }
 
-void WiredTigerOplogManager::_setOplogReadTimestamp(WithLock, uint64_t newTimestamp) {
+void StorageOplogManager::_setOplogReadTimestamp(WithLock, uint64_t newTimestamp) {
     _oplogReadTimestamp.store(newTimestamp);
     _oplogEntriesBecameVisibleCV.notify_all();
     LOGV2_DEBUG(22374,
@@ -279,7 +278,7 @@ void WiredTigerOplogManager::_setOplogReadTimestamp(WithLock, uint64_t newTimest
                 "newOplogReadTimestamp"_attr = Timestamp(newTimestamp));
 }
 
-std::string_view WiredTigerOplogManager::getIdent() const {
+std::string_view StorageOplogManager::getIdent() const {
     return _oplogIdent;
 }
 

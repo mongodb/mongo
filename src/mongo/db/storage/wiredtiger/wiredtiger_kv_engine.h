@@ -45,11 +45,11 @@
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cache_pressure_monitor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_event_handler.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepared_transactions_iterator.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
@@ -268,10 +268,6 @@ public:
 
     ClockSource* getClockSource() const {
         return _clockSource;
-    }
-
-    virtual WiredTigerOplogManager* getOplogManager() const {
-        return nullptr;
     }
 
     size_t getCacheSizeMB() const override {
@@ -672,12 +668,12 @@ public:
 
     /*
      * Always returns a non-null pointer and is valid for the lifetime of this KVEngine. However,
-     * the WiredTigerOplogManager may not have been initialized, which happens after the oplog
+     * the StorageOplogManager may not have been initialized, which happens after the oplog
      * RecordStore is constructed.
      *
-     * See WiredTigerOplogManager for details on thread safety.
+     * See StorageOplogManager for details on thread safety.
      */
-    WiredTigerOplogManager* getOplogManager() const override {
+    StorageOplogManager* getOplogManager() const override {
         return _oplogManager.get();
     }
 
@@ -938,7 +934,7 @@ private:
 
     WiredTigerFileVersion _fileVersion;
 
-    const std::unique_ptr<WiredTigerOplogManager> _oplogManager;
+    const std::unique_ptr<StorageOplogManager> _oplogManager;
 
     // This buffer is only used when the replicated fastcount collection is not available, so
     // nullptr is expected and valid when the replicated fastcount collection is enabled.

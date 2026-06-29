@@ -34,10 +34,10 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_snapshot_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_stats.h"
@@ -75,11 +75,11 @@ public:
     /**
      * It's expected a consumer would want to call the constructor that simply takes a
      * `WiredTigerConnection`. That constructor accesses the `WiredTigerKVEngine` to find the
-     * `WiredTigerOplogManager`. However, unit tests construct `WiredTigerRecoveryUnits` with a
+     * `StorageOplogManager`. However, unit tests construct `WiredTigerRecoveryUnits` with a
      * `WiredTigerConnection` that do not have a valid `WiredTigerKVEngine`. This constructor is
      * expected to only be useful in those cases.
      */
-    WiredTigerRecoveryUnit(WiredTigerConnection* sc, WiredTigerOplogManager* oplogManager);
+    WiredTigerRecoveryUnit(WiredTigerConnection* sc, StorageOplogManager* oplogManager);
     ~WiredTigerRecoveryUnit() override;
 
     static WiredTigerRecoveryUnit& get(RecoveryUnit& ru) {
@@ -294,8 +294,8 @@ private:
      */
     void _updateMultiTimestampConstraint(Timestamp timestamp);
 
-    WiredTigerConnection* _connection;      // not owned
-    WiredTigerOplogManager* _oplogManager;  // not owned
+    WiredTigerConnection* _connection;   // not owned
+    StorageOplogManager* _oplogManager;  // not owned
     WiredTigerManagedSession _managedSession;
     WiredTigerSession* _session = nullptr;
     bool _isTimestamped = false;
@@ -339,7 +339,7 @@ private:
     std::unique_ptr<Timer> _timer;
     // The guaranteed 'no holes' point in the oplog. Forward cursor oplog reads can only read up to
     // this timestamp if they want to avoid missing any entries in the oplog that may not yet have
-    // committed ('holes'). @see WiredTigerOplogManager::getOplogReadTimestamp
+    // committed ('holes'). @see StorageOplogManager::getOplogReadTimestamp
     boost::optional<int64_t> _oplogVisibleTs = boost::none;
 
     WiredTigerStats _sessionStatsAfterLastOperation;

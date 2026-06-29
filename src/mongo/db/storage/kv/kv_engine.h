@@ -51,6 +51,7 @@ class JournalListener;
 class OperationContext;
 class RecoveryUnit;
 class SnapshotManager;
+class StorageOplogManager;
 
 /**
  * Whether a write may skip the read-before-write existence check the storage engine would
@@ -199,6 +200,13 @@ public:
      */
     virtual void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx,
                                                          RecordStore* oplogRecordStore) const = 0;
+
+    /**
+     * Gets the StorageOplogManager which updates oplog visibility.
+     */
+    virtual StorageOplogManager* getOplogManager() const {
+        return nullptr;
+    }
 
     /**
      * Waits until all commits that happened before this call are durable in the journal. Returns
