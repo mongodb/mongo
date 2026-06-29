@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/curop_metrics.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
@@ -763,6 +764,99 @@ TEST_F(InternalSearchIdLookupBuildDocumentSourceTest,
     ASSERT_EQ(subPipeline.size(), 2U);
     ASSERT_EQ(subPipeline[0].Obj().firstElementFieldNameStringData(), "$match");  // id filter
     ASSERT_EQ(subPipeline[1].Obj().firstElementFieldNameStringData(), "$match");  // from view
+}
+
+// Tests for the non-ticketed interval tracking behavior introduced to exclude mongot network I/O
+// wait time from the tracked intervals, while still tracking in-memory post-search work.
+// See internal_search_id_lookup_stage.cpp for the implementation.
+//
+// After each per-document acquire()/release() cycle, the inner local-lookup pipeline also runs
+// and its own cursor stage calls release() upon completion, leaving hasIntervalStart=true. This
+// interval covers the legitimate in-memory work period that follows the local read. The outer
+// release() interval (which would span mongot network I/O) is immediately suppressed before the
+// inner pipeline runs.
+
+TEST_F(InternalSearchIdLookupWithCatalogTest, SearchIntervalOpenAfterPerDocumentLookup) {
+    expCtx->setUUID(UUID::gen());
+    std::vector<BSONObj> docs{BSON("_id" << 0 << "x" << "a"), BSON("_id" << 1 << "x" << "b")};
+    insertDocuments(kTestNss, docs);
+
+    auto [idLookup, idLookupStage, collections] = createIdLookup();
+    auto mockLocalStage =
+        exec::agg::MockStage::createForTest({Document{{"_id", 0}}, Document{{"_id", 1}}}, expCtx);
+    exec::agg::MockStage::setSource_forTest(idLookupStage, mockLocalStage.get());
+
+    auto& tracker = getAggNonTicketedIntervalTracker(operationContext());
+    ASSERT_FALSE(tracker.hasIntervalStart);
+
+    // After each id lookup the inner cursor's release() opens an interval, so hasIntervalStart
+    // is true when getNext() returns. That interval is then closed by acquire() at the start of
+    // the next document's cycle, which suppresses any accumulated mongot network-wait time.
+    auto next = idLookupStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_TRUE(tracker.hasIntervalStart);
+
+    next = idLookupStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_TRUE(tracker.hasIntervalStart);
+
+    // After EOF the interval remains open for subsequent in-memory stages (e.g. $sort, $group).
+    ASSERT_TRUE(idLookupStage->getNext().isEOF());
+    ASSERT_TRUE(tracker.hasIntervalStart);
+
+    collections.clear();
+}
+
+// When the search source is empty (zero docs from mongot), no inner cursor ever runs, so
+// openIntervalForSubsequentWork() must explicitly open the interval at EOF to ensure that
+// subsequent in-memory aggregation stages (e.g. $sort on an empty result set) are tracked.
+TEST_F(InternalSearchIdLookupWithCatalogTest, SearchIntervalExplicitlyOpenedForEmptySource) {
+    expCtx->setUUID(UUID::gen());
+
+    auto [idLookup, idLookupStage, collections] = createIdLookup();
+    auto mockLocalStage = exec::agg::MockStage::createForTest({}, expCtx);
+    exec::agg::MockStage::setSource_forTest(idLookupStage, mockLocalStage.get());
+
+    auto& tracker = getAggNonTicketedIntervalTracker(operationContext());
+    ASSERT_FALSE(tracker.hasIntervalStart);
+
+    ASSERT_TRUE(idLookupStage->getNext().isEOF());
+    ASSERT_TRUE(tracker.hasIntervalStart);
+
+    collections.clear();
+}
+
+TEST_F(InternalSearchIdLookupWithCatalogTest, SearchIntervalOpenedAtLimitBasedEOF) {
+    expCtx->setUUID(UUID::gen());
+    std::vector<BSONObj> docs{BSON("_id" << 0 << "x" << "a"), BSON("_id" << 1 << "x" << "b")};
+    insertDocuments(kTestNss, docs);
+
+    // Build a stage with limit=1 to exercise the limit-based early EOF path.
+    auto catalogResources = createCatalogResources();
+    auto& [sharedStasher, collections] = catalogResources;
+    DocumentSourceIdLookupSpec spec;
+    spec.setLimit(1LL);
+    auto idLookup = make_intrusive<DocumentSourceInternalSearchIdLookUp>(std::move(spec), expCtx);
+    idLookup->bindCatalogInfo(collections, sharedStasher);
+    auto idLookupStage = exec::agg::buildStage(idLookup);
+
+    auto mockLocalStage =
+        exec::agg::MockStage::createForTest({Document{{"_id", 0}}, Document{{"_id", 1}}}, expCtx);
+    exec::agg::MockStage::setSource_forTest(idLookupStage, mockLocalStage.get());
+
+    auto& tracker = getAggNonTicketedIntervalTracker(operationContext());
+    ASSERT_FALSE(tracker.hasIntervalStart);
+
+    // After the first document the inner cursor's release() opened an interval.
+    auto next = idLookupStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_TRUE(tracker.hasIntervalStart);
+
+    // The next call hits the limit check; the interval remains open for subsequent in-memory work.
+    ASSERT_TRUE(idLookupStage->getNext().isEOF());
+    ASSERT_TRUE(tracker.hasIntervalStart);
+
+    collections.clear();
 }
 
 }  // namespace

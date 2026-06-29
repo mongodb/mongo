@@ -33,7 +33,9 @@ global:
 server_parameters:
     delinquentAcquisitionIntervalMillis:
         description: >-
-            The interval in milliseconds after which a ticket is considered delinquent.
+            The interval in milliseconds after which a ticket acquisition or non-ticketed
+            execution window is considered delinquent. Controls both the queues.execution
+            delinquency counters and the metrics.query.aggregation.nonTicketed counters.
         set_at: [startup]
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: gDelinquentAcquisitionIntervalMillis

@@ -61,14 +61,8 @@ public:
                 _transactionResourcesStasher);
     }
 
-    void acquire(OperationContext* opCtx) final {
-        tassert(10271302, "Expected resources to be absent", !_resources);
-        _resources.emplace(opCtx, _transactionResourcesStasher.get());
-    }
-
-    void release() final {
-        _resources.reset();
-    }
+    void acquire(OperationContext* opCtx) final;
+    void release() final;
 
     boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> getStasher() const final {
         return _transactionResourcesStasher;
@@ -83,5 +77,7 @@ private:
     boost::optional<HandleTransactionResourcesFromStasher> _resources;
     boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>
         _transactionResourcesStasher;
+    // Tracks the opCtx of the current command for non-ticketed aggregation interval timing.
+    OperationContext* _lastOpCtx{nullptr};
 };
 }  // namespace mongo

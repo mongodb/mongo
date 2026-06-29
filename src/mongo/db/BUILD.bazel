@@ -1047,7 +1047,11 @@ mongo_cc_library(
     srcs = [
         "curop_metrics.cpp",
     ],
+    hdrs = [
+        "curop_metrics.h",
+    ],
     deps = [
+        "//src/mongo/db/admission/ticketing:ticketholder",
         "//src/mongo/db/query/query_stats",
         "//src/mongo/db/stats:counters",
         "//src/mongo/db/stats:counters_sort",
@@ -3256,6 +3260,18 @@ mongo_cc_unit_test(
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
         "//src/mongo/transport:transport_layer_mock",
         "//src/third_party/asio",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "curop_metrics_test",
+    srcs = [
+        "curop_metrics_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":curop_metrics",
+        ":service_context_test_fixture",
     ],
 )
 

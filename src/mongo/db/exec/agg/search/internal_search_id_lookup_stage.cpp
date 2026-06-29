@@ -31,6 +31,7 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/curop_metrics.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
@@ -101,16 +102,30 @@ GetNextResult InternalSearchIdLookUpStage::doGetNext() {
         opDebug.searchIdLookupMetrics = _searchIdLookupMetrics;
     }
 
+    // Opens a non-ticketed interval exactly once (idempotent), to cover any subsequent in-memory
+    // aggregation work (e.g. $sort, $group) that runs after the search source is exhausted.
+    auto openIntervalForSubsequentWork = [&]() {
+        auto opCtx = pExpCtx->getOperationContext();
+        auto& tracker = getAggNonTicketedIntervalTracker(opCtx);
+        if (!tracker.hasIntervalStart) {
+            tracker.openInterval(opCtx->tickSource().getTicks());
+        }
+    };
+
     boost::optional<Document> result;
     Document inputDoc;
     if (auto limit = _spec.getLimit();
         limit && *limit != 0 && _searchIdLookupMetrics->getDocsReturnedByIdLookup() >= *limit) {
+        openIntervalForSubsequentWork();
         return GetNextResult::makeEOF();
     }
 
     while (!result) {
         auto nextInput = pSource->getNext();
         if (!nextInput.isAdvanced()) {
+            if (nextInput.isEOF()) {
+                openIntervalForSubsequentWork();
+            }
             return nextInput;
         }
 
@@ -165,6 +180,12 @@ GetNextResult InternalSearchIdLookUpStage::doGetNext() {
                                    MultipleCollectionAccessor{collection},
                                    _catalogResourceHandle);
                 _catalogResourceHandle->release();
+                // release() opened a non-ticketed interval; immediately close it to suppress it.
+                // Time between consecutive local id lookups includes mongot network I/O (not
+                // local server work) and must not be counted. The interval for subsequent
+                // in-memory stages is opened explicitly when the search source is exhausted.
+                auto opCtx = pExpCtx->getOperationContext();
+                closeAggNonTicketedIntervalIfOpen(getAggNonTicketedIntervalTracker(opCtx), opCtx);
             }
 
             auto execPipeline = buildPipeline(pipeline->freeze());

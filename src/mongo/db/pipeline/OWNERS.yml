@@ -67,7 +67,7 @@ filters:
   - "*change_stream*":
     approvers:
       - 10gen/query-execution-change-streams
-  - "catalog_resource_handle.h":
+  - "catalog_resource_handle.*":
     approvers:
       - 10gen/query-execution-classic
   - "common_sort_key_optimization_test.cpp":

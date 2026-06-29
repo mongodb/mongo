@@ -27,6 +27,9 @@
  *    it in the license file.
  */
 
+#include "mongo/db/curop_metrics.h"
+
+#include "mongo/db/admission/ticketing/ticketholder_parameters_gen.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
@@ -43,6 +46,29 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+
+// Per-opCtx decoration tracking non-ticketed execution intervals for aggregation pipelines.
+static const OperationContext::Decoration<AggNonTicketedIntervalTracker> aggNonTicketedIntervalDec =
+    OperationContext::declareDecoration<AggNonTicketedIntervalTracker>();
+
+AggNonTicketedIntervalTracker& getAggNonTicketedIntervalTracker(OperationContext* opCtx) {
+    return aggNonTicketedIntervalDec(opCtx);
+}
+
+int64_t aggNonTicketedIntervalThresholdMillis() {
+    return gDelinquentAcquisitionIntervalMillis.load();
+}
+
+void closeAggNonTicketedIntervalIfOpen(AggNonTicketedIntervalTracker& tracker,
+                                       OperationContext* opCtx) {
+    if (!tracker.hasIntervalStart)
+        return;
+    auto& ts = opCtx->tickSource();
+    tracker.closeInterval(
+        ts.ticksTo<Milliseconds>(ts.getTicks() - tracker.intervalStartTick).count(),
+        aggNonTicketedIntervalThresholdMillis());
+}
+
 namespace {
 
 /** Build a `Counter64` metric with the given `name` and `role`. */
@@ -160,9 +186,23 @@ struct InShard : InBoth {
         }
 
         _updateExternalStats(opCtx);
+        _flushAggNonTicketedStats(opCtx);
     }
 
 private:
+    /** Close any in-progress non-ticketed interval and flush to global counters. */
+    void _flushAggNonTicketedStats(OperationContext* opCtx) {
+        auto& tracker = aggNonTicketedIntervalDec(opCtx);
+        closeAggNonTicketedIntervalIfOpen(tracker, opCtx);
+        if (tracker.hadLongInterval) {
+            aggNonTicketedIntervals->incrementRelaxed(tracker.longIntervalCount);
+            aggNonTicketedTotalMillis->incrementRelaxed(tracker.longIntervalTotalMs);
+            aggNonTicketedMaxMillis->setToMax(tracker.longIntervalMaxMs);
+            aggNonTicketedQueries->increment();
+            tracker.hadLongInterval = false;  // prevent double-counting if flushed again
+        }
+    }
+
     /** A few nonmember variables also need to be updated. */
     static void _updateExternalStats(const OperationContext* opCtx) {
         auto* curOp = CurOp::get(opCtx);
@@ -194,6 +234,21 @@ public:
     Counter64* writeConflicts{makeCounter("operation.writeConflicts", role)};
     Counter64* oplogReturned{makeCounter("oplogStats.document.returned", role)};
     Counter64* oplogScannedObjects{makeCounter("oplogStats.queryExecutor.scannedObjects", role)};
+    // Aggregation pipeline non-ticketed execution interval metrics.
+    // These track periods when an aggregate command releases its execution ticket to perform
+    // in-memory work (e.g. $sort, $group) after the $cursor stage finishes reading. Intervals
+    // longer than delinquentAcquisitionIntervalMillis are counted.
+    //   nonTicketed.intervals  - total long intervals across all aggregations
+    //   nonTicketed.totalMillis - cumulative ms in those intervals
+    //   nonTicketed.maxMillis  - longest single interval ever seen
+    //   nonTicketed.queries    - distinct aggregate commands with at least one long interval
+    Counter64* aggNonTicketedIntervals{
+        makeCounter("query.aggregation.nonTicketed.intervals", role)};
+    Counter64* aggNonTicketedTotalMillis{
+        makeCounter("query.aggregation.nonTicketed.totalMillis", role)};
+    Atomic64Metric* aggNonTicketedMaxMillis{
+        &*MetricBuilder<Atomic64Metric>("query.aggregation.nonTicketed.maxMillis").setRole(role)};
+    Counter64* aggNonTicketedQueries{makeCounter("query.aggregation.nonTicketed.queries", role)};
 
 private:
     struct OtelCounters {
