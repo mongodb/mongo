@@ -209,6 +209,65 @@ export function describeWriteCmdQueryStatsShardedTests(label, bodyFn) {
 }
 
 /**
+ * Creates a standard write command query stats test suite on a sharded cluster split across two
+ * shards by _id:
+ *   - shard0: primary shard, holds documents where _id < 0
+ *   - shard1: holds documents where _id >= 0 (chunk moved here in before())
+ *
+ * beforeEach clears the collection and resets the query stats store on mongos + shards.
+ * bodyFn receives ctxFn() => {st, testDB, coll, collName}.
+ *
+ * @param {string} label - outer describe label
+ * @param {Function} bodyFn - function(ctxFn) that registers it() blocks
+ */
+export function describeWriteCmdQueryStatsCrossShardTests(label, bodyFn) {
+    describe(label, function () {
+        const collName = jsTestName() + "_cross_shard";
+        let st, testDB, coll;
+
+        before(function () {
+            st = new ShardingTest({
+                shards: 2,
+                mongosOptions: {setParameter: {internalQueryStatsWriteCmdSampleRate: 1}},
+                rsOptions: {setParameter: {internalQueryStatsWriteCmdSampleRate: 1}},
+            });
+            testDB = st.s.getDB("test");
+            coll = testDB[collName];
+            assert.commandWorked(
+                testDB.adminCommand({
+                    enableSharding: testDB.getName(),
+                    primaryShard: st.shard0.shardName,
+                }),
+            );
+            assert.commandWorked(
+                st.s.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}),
+            );
+            assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {_id: 0}}));
+            assert.commandWorked(
+                st.s.adminCommand({
+                    moveChunk: coll.getFullName(),
+                    find: {_id: 0},
+                    to: st.shard1.shardName,
+                }),
+            );
+        });
+
+        after(function () {
+            st?.stop();
+        });
+
+        beforeEach(function () {
+            assert.commandWorked(coll.deleteMany({}));
+            resetQueryStatsStore(st.s, "1MB");
+            resetQueryStatsStore(st.shard0, "1MB");
+            resetQueryStatsStore(st.shard1, "1MB");
+        });
+
+        bodyFn(() => ({st, testDB, coll, collName}));
+    });
+}
+
+/**
  * Describes the retryable write query stats tests inside the current describe block:
  * (1) retried already-executed statements should not double-count execCount,
  * (2) a failed attempt should not record stats; the successful retry should.

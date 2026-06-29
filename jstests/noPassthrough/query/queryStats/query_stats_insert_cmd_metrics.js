@@ -11,9 +11,11 @@ import {
     getQueryStatsInsertCmd,
     resetQueryStatsStore,
 } from "jstests/libs/query/query_stats_utils.js";
-import {assertWriteCmdQueryStatsSingleExec} from "jstests/libs/query/query_stats_write_cmd_utils.js";
+import {
+    assertWriteCmdQueryStatsSingleExec,
+    describeWriteCmdQueryStatsCrossShardTests,
+} from "jstests/libs/query/query_stats_write_cmd_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const kQueryStatsServerParams = {
     internalQueryStatsWriteCmdSampleRate: 1,
@@ -43,7 +45,6 @@ function testSingleDocInsert(testDB, coll, collName, shardConn = null) {
     });
 
     if (shardConn) {
-        // Verify the shard also recorded the insert in its own query stats store.
         const shardEntries = getQueryStatsInsertCmd(shardConn, {collName: collName});
         assert.eq(shardEntries.length, 1, "Expected shard to have a query stats entry", {
             shardEntries,
@@ -98,7 +99,6 @@ function testMultiDocInsert(testDB, coll, collName, shardConn = null) {
     });
 
     if (shardConn) {
-        // Verify the shard also recorded the insert in its own query stats store.
         const shardEntries = getQueryStatsInsertCmd(shardConn, {collName: collName});
         assert.eq(shardEntries.length, 1, "Expected shard to have a query stats entry", {
             shardEntries,
@@ -124,6 +124,69 @@ function testMultiDocInsert(testDB, coll, collName, shardConn = null) {
             },
         });
     }
+}
+
+function assertPartialInsertQueryStats(testDB, coll, collName, nInserted, shardConn) {
+    assertWriteCmdQueryStatsSingleExec(testDB, coll, {
+        command: "insert",
+        keysExamined: 0,
+        docsExamined: 0,
+        writes: {
+            nMatched: 0,
+            nUpserted: 0,
+            nModified: 0,
+            nDeleted: 0,
+            nInserted: nInserted,
+            nUpdateOps: 0,
+            nDeleteOps: 0,
+        },
+    });
+
+    if (shardConn) {
+        const shardEntries = getQueryStatsInsertCmd(shardConn, {collName: collName});
+        assert.eq(shardEntries.length, 1, "Expected shard to have a query stats entry", {
+            shardEntries,
+        });
+        assertAggregatedMetricsSingleExec(shardEntries[0], {
+            keysExamined: 0,
+            docsExamined: 0,
+            hasSortStage: false,
+            usedDisk: false,
+            fromMultiPlanner: false,
+            fromPlanCache: false,
+            writes: {
+                nMatched: 0,
+                nUpserted: 0,
+                nModified: 0,
+                nDeleted: 0,
+                nInserted: nInserted,
+                nUpdateOps: 0,
+                nDeleteOps: 0,
+            },
+        });
+    }
+}
+
+function testMultiDocsInsertPartialSuccess(testDB, coll, collName, shardConn = null) {
+    assert.commandWorked(coll.deleteMany({}));
+    // Pre-insert docs with explicit _ids so the second batch hits duplicate key errors on those docs.
+    assert.commandWorked(testDB.runCommand({insert: collName, documents: [{_id: 1}, {_id: 2}]}));
+
+    // Tests ordered = false, which continues past errors.
+    resetQueryStatsStore(testDB.getMongo(), "1MB");
+    if (shardConn) resetQueryStatsStore(shardConn, "1MB");
+    testDB.runCommand({
+        insert: collName,
+        documents: [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}],
+        ordered: false,
+    });
+    assertPartialInsertQueryStats(testDB, coll, collName, 3 /*nInserted*/, shardConn);
+
+    // Tests ordered = true, which halts the batch after the first failure.
+    resetQueryStatsStore(testDB.getMongo(), "1MB");
+    if (shardConn) resetQueryStatsStore(shardConn, "1MB");
+    testDB.runCommand({insert: collName, documents: [{_id: 6}, {_id: 1}, {_id: 7}], ordered: true});
+    assertPartialInsertQueryStats(testDB, coll, collName, 1 /*nInserted*/, shardConn);
 }
 
 describe("query stats insert command metrics (replica set)", function () {
@@ -164,6 +227,10 @@ describe("query stats insert command metrics (replica set)", function () {
 
         it("should record multi-doc insert metrics", function () {
             testMultiDocInsert(testDB, coll, collName);
+        });
+
+        it("should record multi-doc insert metrics for partial successes", function () {
+            testMultiDocsInsertPartialSuccess(testDB, coll, collName);
         });
     });
 
@@ -334,56 +401,24 @@ describe("query stats insert command metrics (replica set)", function () {
     });
 });
 
-describe("query stats insert command metrics (sharded)", function () {
-    const collName = jsTestName() + "_sharded";
-    let st;
-    let testDB;
-    let coll;
-
-    before(function () {
-        st = new ShardingTest({
-            shards: 2,
-            mongosOptions: {setParameter: kQueryStatsServerParams},
-            rsOptions: {setParameter: kQueryStatsServerParams},
+describeWriteCmdQueryStatsCrossShardTests(
+    "query stats insert command metrics (sharded)",
+    (ctxFn) => {
+        it("should record single-doc insert metrics for a sharded collection", function () {
+            const {testDB, coll, collName, st} = ctxFn();
+            testSingleDocInsert(testDB, coll, collName, st.shard1);
         });
-        testDB = st.s.getDB("test");
-        coll = testDB[collName];
-        // Pin shard1 as primary so routing is deterministic: negative _ids stay on shard1
-        // (primary), non-negative _ids move to shard0 (non-primary).
-        assert.commandWorked(
-            testDB.adminCommand({
-                enableSharding: testDB.getName(),
-                primaryShard: st.shard1.shardName,
-            }),
-        );
-        assert.commandWorked(
-            st.s.adminCommand({shardcollection: coll.getFullName(), key: {_id: 1}}),
-        );
-        assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {_id: 0}}));
-        assert.commandWorked(
-            st.s.adminCommand({
-                movechunk: coll.getFullName(),
-                find: {_id: 0},
-                to: st.shard0.shardName,
-            }),
-        );
-    });
 
-    after(function () {
-        st?.stop();
-    });
+        it("should record multi-doc insert metrics for a sharded collection", function () {
+            const {testDB, coll, collName, st} = ctxFn();
+            testMultiDocInsert(testDB, coll, collName, st.shard1);
+        });
 
-    beforeEach(function () {
-        resetQueryStatsStore(st.s, "1MB");
-        resetQueryStatsStore(st.shard0, "1MB");
-        resetQueryStatsStore(st.shard1, "1MB");
-    });
-
-    it("should record single-doc insert metrics for a sharded collection", function () {
-        testSingleDocInsert(testDB, coll, collName, st.shard0);
-    });
-
-    it("should record multi-doc insert metrics for a sharded collection", function () {
-        testMultiDocInsert(testDB, coll, collName, st.shard0);
-    });
-});
+        // Unlike updates and deletes, inserts always route to a single shard. No cross-shard fanout
+        // is possible, so one shard is sufficient to for both replica set and sharded cluster tests.
+        it("should record multi-doc insert metrics for partial successes for a sharded collection", function () {
+            const {testDB, coll, collName, st} = ctxFn();
+            testMultiDocsInsertPartialSuccess(testDB, coll, collName, st.shard1);
+        });
+    },
+);
