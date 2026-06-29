@@ -44,7 +44,9 @@ for (let i = 0; i < 10; i++) {
 // Ensure the plan cache deterministically contains at least one entry for $planCacheStats
 // (the query can be satisfied either by an _id scan based on timeField, or an index scan on m.tag).
 // This avoids flakiness across SBE and classic variants, which differ in plan cache behavior.
-assert.eq(9, tsColl.find({time: {$gt: startingTime}, "m.tag": "A"}).itcount());
+const populatePlanCache = () =>
+    assert.eq(9, tsColl.find({time: {$gt: startingTime}, "m.tag": "A"}).itcount());
+populatePlanCache();
 
 // Set up a 2nd collection for stages that need subpipelines.
 const otherColl = db[jsTestName() + "_other"];
@@ -204,6 +206,9 @@ const noUnpackTests = [
         stage: "$planCacheStats",
         pipeline: [{$planCacheStats: {}}],
         skipTest: !isViewlessTimeseriesOnlySuite(db),
+        // The balancer can clear the plan cache via moveCollection at any time, so repopulate it
+        // before reading $planCacheStats.
+        repopulateBeforeRead: populatePlanCache,
     },
     {
         stage: "$_unpackBucket",
@@ -338,7 +343,23 @@ const unpackTests = [
         jsTest.log.info("Skipping " + test.stage + " test on timeseries collections.");
         return;
     }
-    const result = tsColl.aggregate(test.pipeline).toArray();
+    // 'repopulateBeforeRead' retries until docs are returned, so it can't coexist with
+    // 'zeroDocsReturned'.
+    assert(
+        !(test.repopulateBeforeRead && test.zeroDocsReturned),
+        test.stage + " cannot set both 'repopulateBeforeRead' and 'zeroDocsReturned'.",
+    );
+    let result;
+    if (test.repopulateBeforeRead && TestData.runningWithBalancer) {
+        // The balancer can clear the plan cache mid-test; retry, repopulating each attempt.
+        assert.soon(() => {
+            test.repopulateBeforeRead();
+            result = tsColl.aggregate(test.pipeline).toArray();
+            return result.length > 0;
+        }, test.stage + " expected to return documents on timeseries collections.");
+    } else {
+        result = tsColl.aggregate(test.pipeline).toArray();
+    }
     if (test.zeroDocsReturned) {
         assert.eq(
             result.length,
