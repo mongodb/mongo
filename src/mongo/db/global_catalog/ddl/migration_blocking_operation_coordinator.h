@@ -62,6 +62,13 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
+    /**
+     * Opts out of the causality barrier performed by `run()` on re-execution. Unlike other
+     * coordinators, this one does not perform its work inside `_runImpl()` (which merely waits).
+     */
+    void _performCausalityBarrier(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                                  const CancellationToken& token) override {}
+
     Phase _getCurrentPhase() const;
     bool _isFirstOperation(WithLock lk) const;
     void _throwIfCleaningUp(WithLock lk);

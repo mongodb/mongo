@@ -1895,12 +1895,6 @@ void CreateCollectionCoordinator::_enterWriteCriticalSectionOnDataShardAndCheckC
         return;
     }
 
-    // TODO (SERVER-87265) Remove this call if possible.
-    if (!_firstExecution) {
-        AllShardsAndConfigCausalityBarrier barrier{**executor, token};
-        performCausalityBarrier(opCtx, barrier);
-    }
-
     _enterCriticalSectionOnShards(opCtx,
                                   executor,
                                   token,
@@ -1936,12 +1930,6 @@ void CreateCollectionCoordinator::_syncIndexesOnCoordinator(
     bool collectionExists = sharding_ddl_util::getCollectionUUID(opCtx, nss()).is_initialized();
     if (!collectionExists || *_doc.getOriginalDataShard() == ShardingState::get(opCtx)->shardId()) {
         return;
-    }
-
-    // TODO (SERVER-87265) Remove this call if possible.
-    if (!_firstExecution) {
-        AllShardsAndConfigCausalityBarrier barrier{**executor, token};
-        performCausalityBarrier(opCtx, barrier);
     }
 
     auto optUuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
@@ -2046,11 +2034,6 @@ void CreateCollectionCoordinator::_enterCriticalSection(
     OperationContext* opCtx,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
-    if (!_firstExecution) {
-        AllShardsAndConfigCausalityBarrier barrier{**executor, token};
-        performCausalityBarrier(opCtx, barrier);
-    }
-
     // Block reads and writes on all shards other than the dbPrimary.
     auto participants = *_doc.getShardIds();
     // Ensure the critical section is promoted to block reads on the data shard if the data shard is
@@ -2137,9 +2120,6 @@ void CreateCollectionCoordinator::_createCollectionOnParticipants(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
     if (!_firstExecution) {
-        AllShardsAndConfigCausalityBarrier barrier{**executor, token};
-        performCausalityBarrier(opCtx, barrier);
-
         _uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
     }
 
@@ -2237,9 +2217,6 @@ void CreateCollectionCoordinator::_commitOnGlobalCatalog(
     }
 
     if (!_firstExecution) {
-        AllShardsAndConfigCausalityBarrier barrier{**executor, token};
-        performCausalityBarrier(opCtx, barrier);
-
         // Check if a previous request already created and committed the collection.
         const auto shardKeyPattern =
             ShardKeyPattern(_doc.getTranslatedRequestParams()->getKeyPattern());
@@ -2367,9 +2344,6 @@ void CreateCollectionCoordinator::_setPostCommitMetadata(
         AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
 
     if (!_firstExecution) {
-        AllShardsAndConfigCausalityBarrier barrier{**executor, token};
-        performCausalityBarrier(opCtx, barrier);
-
         _uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
 
         // Get the shards committed to the sharding catalog.
@@ -2442,11 +2416,6 @@ void CreateCollectionCoordinator::_exitCriticalSection(
     OperationContext* opCtx,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
-    if (!_firstExecution) {
-        AllShardsAndConfigCausalityBarrier barrier{**executor, token};
-        performCausalityBarrier(opCtx, barrier);
-    }
-
     // Exit critical section on all shards other than the coordinator.
     auto participants = *_doc.getShardIds();
     // Ensure the critical section is released on the data shard if the data shard is not the

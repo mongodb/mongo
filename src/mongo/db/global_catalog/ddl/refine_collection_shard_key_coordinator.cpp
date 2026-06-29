@@ -47,7 +47,6 @@
 #include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/router_role/router_role.h"
 #include "mongo/db/s/primary_only_service_helpers/all_shards_and_config_causality_barrier.h"
-#include "mongo/db/s/primary_only_service_helpers/participant_causality_barrier.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
@@ -107,16 +106,6 @@ std::vector<ShardRef> getDataShardsAndDbPrimaryShard(OperationContext* opCtx,
         shards.push_back(primaryShardId);
     }
     return std::vector<ShardRef>(shards.cbegin(), shards.cend());
-}
-
-std::vector<ShardId> getDataShardsAndConfigServer(OperationContext* opCtx,
-                                                  const NamespaceString& nss) {
-    auto shards = getShardsWithDataForCollection(opCtx, nss);
-    const auto configShardId = Grid::get(opCtx)->shardRegistry()->getConfigShard()->getId();
-    if (std::find(shards.begin(), shards.end(), configShardId) == shards.end()) {
-        shards.push_back(configShardId);
-    }
-    return shards;
 }
 
 }  // namespace
@@ -228,12 +217,6 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kRemoteIndexValidation,
             [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
-                if (!_firstExecution) {
-                    ParticipantCausalityBarrier barrier{
-                        getDataShardsAndConfigServer(opCtx, nss()), **executor, token};
-                    performCausalityBarrier(opCtx, barrier);
-                }
-
                 // Stop migrations during most of the execution of the coordinator to guarantee a
                 // stable placement.
                 sharding_ddl_util::stopMigrations(
@@ -265,12 +248,6 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kBlockCrud,
             [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
-                if (!_firstExecution) {
-                    ParticipantCausalityBarrier barrier{
-                        getDataShardsAndConfigServer(opCtx, nss()), **executor, token};
-                    performCausalityBarrier(opCtx, barrier);
-                }
-
                 const auto shardIds = getDataShardsAndDbPrimaryShard(opCtx, nss());
                 const auto session = getNewSession(opCtx);
                 sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
@@ -305,12 +282,6 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kCommit,
             [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
-                if (!_firstExecution) {
-                    ParticipantCausalityBarrier barrier{
-                        getDataShardsAndConfigServer(opCtx, nss()), **executor, token};
-                    performCausalityBarrier(opCtx, barrier);
-                }
-
                 ConfigsvrCommitRefineCollectionShardKey commitRequest(nss());
 
                 CommitRefineCollectionShardKeyRequest cRCSreq(_doc.getNewShardKey(),
@@ -346,17 +317,10 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 // removable that was committed during the critical section.
                 VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
             }))
-        .then(_buildPhaseHandler(
-            Phase::kReleaseCritSec,
-            [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
-                if (!_firstExecution) {
-                    ParticipantCausalityBarrier barrier{
-                        getDataShardsAndConfigServer(opCtx, nss()), **executor, token};
-                    performCausalityBarrier(opCtx, barrier);
-                }
-
-                _exitCriticalSection(opCtx, executor, token);
-            }))
+        .then(_buildPhaseHandler(Phase::kReleaseCritSec,
+                                 [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
+                                     _exitCriticalSection(opCtx, executor, token);
+                                 }))
         .then(_buildPhaseHandler(
             Phase::kResumeMigrations,
             [this, token, anchor = shared_from_this(), executor](auto* opCtx) {

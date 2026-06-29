@@ -54,7 +54,6 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
-#include "mongo/db/s/primary_only_service_helpers/all_shards_and_config_causality_barrier.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_role/ddl/list_collections_filter.h"
@@ -409,11 +408,6 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kDrop,
             [this, token, dbNss, executor = executor, anchor = shared_from_this()](auto* opCtx) {
-                if (!_firstExecution) {
-                    AllShardsAndConfigCausalityBarrier barrier{**executor, token};
-                    performCausalityBarrier(opCtx, barrier);
-                }
-
                 ShardingLogging::get(opCtx)->logChange(opCtx, "dropDatabase.start", dbNss);
                 const auto primaryShardRef = ShardingState::get(opCtx)->asShardRef(opCtx);
 

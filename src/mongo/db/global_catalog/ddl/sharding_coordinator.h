@@ -288,6 +288,16 @@ protected:
 
     virtual void _releaseLocks(OperationContext* opCtx) = 0;
 
+    /**
+     * Hook invoked by `run()` at the start of every execution that is not the first one.
+     * Recoverable coordinators override this to perform a causality barrier that invalidates any
+     * retryable writes issued by previous executions. The base implementation is a no-op since
+     * non-recoverable coordinators do not persist sessions.
+     */
+    virtual void _performCausalityBarrier(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& token) {}
+
     virtual void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {}
 
     virtual BSONObjBuilder basicReportBuilder() const noexcept;
@@ -443,6 +453,9 @@ protected:
     }
 
     void _onCleanup(OperationContext* opCtx) override;
+
+    void _performCausalityBarrier(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                                  const CancellationToken& token) override;
 
 private:
     boost::optional<OperationSessionInfo> readSession(OperationContext* opCtx) const override;

@@ -48,7 +48,6 @@
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
-#include "mongo/db/s/primary_only_service_helpers/all_shards_and_config_causality_barrier.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_role/ddl/coll_mod_gen.h"
@@ -331,14 +330,9 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 staticValidateCollMod(opCtx, originalNss(), _request);
             }
         })
-        .then([this, token, executor = executor, anchor = shared_from_this()] {
+        .then([this, anchor = shared_from_this()] {
             auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-
-            if (_doc.getPhase() > Phase::kUnset) {
-                AllShardsAndConfigCausalityBarrier barrier{**executor, token};
-                performCausalityBarrier(opCtx, barrier);
-            }
 
             {
                 // Implicitly check for collection UUID mismatch - use the 'originalNss()' provided

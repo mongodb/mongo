@@ -32,7 +32,6 @@
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
-#include "mongo/db/s/primary_only_service_helpers/all_shards_and_config_causality_barrier.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
@@ -131,11 +130,6 @@ void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
     // Copy by value: the causality barrier / getNewSession() calls below reassign _doc, which
     // would leave a reference into _doc dangling.
     const auto coll = _doc.getOptCollType().get();
-
-    if (!_firstExecution) {
-        AllShardsAndConfigCausalityBarrier barrier{**executor, token};
-        performCausalityBarrier(opCtx, barrier);
-    }
 
     {
         const auto session = getNewSession(opCtx);

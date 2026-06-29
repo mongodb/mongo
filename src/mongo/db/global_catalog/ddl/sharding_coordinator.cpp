@@ -40,6 +40,7 @@
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/s/primary_only_service_helpers/all_shards_and_config_causality_barrier.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/write_concern.h"
@@ -305,8 +306,19 @@ SemiFuture<void> ShardingCoordinator::run(std::shared_ptr<executor::ScopedTaskEx
         })
         .then([this, executor, token, anchor = shared_from_this()] {
             return AsyncTry([this, executor, token] {
+                       // If the coordinator has already decided to abort, head straight to cleanup.
+                       // The causality barrier below must not run on this path: cleanup is terminal
+                       // and may need to contact participants that are unreachable (e.g. the very
+                       // shard whose unavailability caused the abort).
                        if (const auto& status = getAbortReason()) {
                            return _cleanupOnAbort(executor, token, *status);
+                       }
+
+                       if (!_firstExecution) {
+                           // On any re-execution, perform a causality barrier to invalidate any
+                           // retryable writes issued by previous executions before doing any work.
+                           // This is done implicitly here so individual coordinators don't have to.
+                           _performCausalityBarrier(executor, token);
                        }
 
                        return _runImpl(executor, token);
@@ -642,6 +654,35 @@ void RecoverableShardingCoordinator::triggerCleanup(OperationContext* opCtx, con
 
 void RecoverableShardingCoordinator::_onCleanup(OperationContext* opCtx) {
     releaseSession(opCtx);
+}
+
+void RecoverableShardingCoordinator::_performCausalityBarrier(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const CancellationToken& token) {
+    {
+        // The barrier advances the session and persists it into the state document via
+        // writeSession(), which updates an already-existing document. If the document has not been
+        // persisted yet (e.g. the coordinator hit a retriable error and is re-executing before
+        // reaching its first phase), there is no document to update and no previously-issued
+        // retryable write to invalidate, so the barrier must be skipped.
+        std::lock_guard lk{_docMutex};
+        if (!getDoc().getShardingCoordinatorMetadata().getRecoveredFromDisk()) {
+            return;
+        }
+    }
+
+    // The barrier bumps the OSI via getNextSession(). Coordinators forbid invalidating the OSI
+    // while they are in a phase whose correctness depends on a stable session, e.g. a phase that
+    // retries an idempotent retryable write and must reuse the same lsid/txnNumber on every
+    // attempt. In that case the barrier must be skipped: bumping the session here would not only
+    // trip the OSI-stability invariant but also break the idempotency the phase relies on.
+    if (!_allowedToInvalidateOSI()) {
+        return;
+    }
+
+    auto opCtxHolder = makeOperationContext();
+    auto* opCtx = opCtxHolder.get();
+    AllShardsAndConfigCausalityBarrier barrier{**executor, token};
+    performCausalityBarrier(opCtx, barrier);
 }
 
 boost::optional<OperationSessionInfo> RecoverableShardingCoordinator::readSession(

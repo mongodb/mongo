@@ -57,7 +57,6 @@
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/router_role/router_role.h"
-#include "mongo/db/s/primary_only_service_helpers/all_shards_and_config_causality_barrier.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_role/ddl/list_collections_gen.h"
@@ -928,11 +927,6 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kBlockCrudAndRename,
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
-                if (!_firstExecution) {
-                    AllShardsAndConfigCausalityBarrier barrier{**executor, token};
-                    performCausalityBarrier(opCtx, barrier);
-                }
-
                 const auto& fromNss = nss();
 
                 // On participant shards:
@@ -1027,13 +1021,6 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     sharding_ddl_util::removeQueryAnalyzerMetadata(opCtx, getCollUuidsToRemove());
                 }
 
-                // For an untracked collection the CSRS server can not verify the targetUUID.
-                // Use the session ID + txnNumber to ensure no stale requests get through.
-                if (!_firstExecution) {
-                    AllShardsAndConfigCausalityBarrier barrier{**executor, token};
-                    performCausalityBarrier(opCtx, barrier);
-                }
-
                 // Commit the collection and chunks metadata on the global catalog.
                 // (This will also have the effect of resuming migrations on the renamed namespace).
                 const auto& fromNss = nss();
@@ -1102,11 +1089,6 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kUnblockCRUD,
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
-                if (!_firstExecution) {
-                    AllShardsAndConfigCausalityBarrier barrier{**executor, token};
-                    performCausalityBarrier(opCtx, barrier);
-                }
-
                 const auto& fromNss = nss();
                 // On participant shards:
                 // - Unblock CRUD on participants for both source and destination collections
