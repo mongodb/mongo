@@ -40,7 +40,8 @@ namespace mongo::plan_shape_counters {
 namespace {
 
 using query_solution_analyzer::Range;
-using query_solution_analyzer::StateMachineRule;
+using query_solution_analyzer::StateMachine;
+using query_solution_analyzer::StateMachineMatcher;
 using query_solution_analyzer::treeSearch;
 
 // Node families collapsed by the specific plan shapes: any projection/sort variant matches the
@@ -75,10 +76,8 @@ const Range kAnyChild = Range(0, std::numeric_limits<size_t>::max());
  *
  * Each section of this function indicates the plan shapes it will encode.
  */
-StateMachineRule makePlanShapeRule() {
-    // Pass ignoreNonEssentialNodes=true to have the state machine only consider
-    // nodes that are involved in defining the plan shape.
-    StateMachineRule sm(true /* ignoreNonEssentialNodes */);
+StateMachine makePlanShapeRule() {
+    StateMachine sm;
     // Tags each match state with the shape it completes, so that the matched shape can be
     // recovered through getMatchedTag() once the machine reports a match.
     auto addMatch = [&](int state, PlanShapeCounter shape) {
@@ -138,14 +137,18 @@ const QuerySolutionNode* getFindRoot(const QuerySolution& solution) {
 }  // namespace
 
 boost::optional<PlanShapeCounter> identifyPlanShapeForCounters(const QuerySolution& qs) {
+    static const StateMachine machine = makePlanShapeRule();
+
     auto findRoot = getFindRoot(qs);
     tassert(11907601, "Expected to have a non-null find-layer QSN node", findRoot);
 
-    auto rule = makePlanShapeRule();
-    if (!treeSearch(findRoot, rule)) {
+    // Pass ignoreNonEssentialNodes=true to have the state machine only consider
+    // nodes that are involved in defining the plan shape.
+    StateMachineMatcher matcher(machine, true /* ignoreNonEssentialNodes */);
+    if (!treeSearch(findRoot, matcher)) {
         return boost::none;
     }
-    return static_cast<PlanShapeCounter>(*rule.getMatchedTag());
+    return static_cast<PlanShapeCounter>(*matcher.getMatchedTag());
 }
 
 }  // namespace mongo::plan_shape_counters

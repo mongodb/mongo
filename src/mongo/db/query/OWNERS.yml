@@ -154,6 +154,9 @@ filters:
   - "query_request*":
     approvers:
       - 10gen/query-optimization
+  - "query_solution_analyzer*":
+    approvers:
+      - 10gen/query-execution
   - "query_test_service_context.*":
     approvers:
       - 10gen/query-optimization

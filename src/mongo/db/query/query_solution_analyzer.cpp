@@ -31,19 +31,15 @@
 
 namespace mongo::query_solution_analyzer {
 
-StateMachineRule::StateMachineRule(bool ignoreNonEssentialNodes)
-    : _ignoreNonEssentialNodes(ignoreNonEssentialNodes) {
+StateMachine::StateMachine() {
     // Create the special states. User-defined states come after them.
     _states.resize(kMaxReservedState);
-
-    // Set start state.
-    _stack.push(kStart);
 }
 
-int StateMachineRule::addState(int state,
-                               StageType stage,
-                               Range allowedChildren,
-                               PredicateType predicate) {
+int StateMachine::addState(int state,
+                           StageType stage,
+                           Range allowedChildren,
+                           PredicateType predicate) {
     validateState(state);
     int nextState = allocState();
     validateState(nextState);
@@ -58,10 +54,10 @@ int StateMachineRule::addState(int state,
     return nextState;
 }
 
-int StateMachineRule::addState(int state,
-                               std::initializer_list<StageType> stages,
-                               Range allowedChildren,
-                               PredicateType predicate) {
+int StateMachine::addState(int state,
+                           std::initializer_list<StageType> stages,
+                           Range allowedChildren,
+                           PredicateType predicate) {
     validateState(state);
     int nextState = allocState();
     validateState(nextState);
@@ -76,7 +72,15 @@ int StateMachineRule::addState(int state,
     return nextState;
 }
 
-void StateMachineRule::preVisit(RuleEngine& engine, const QuerySolutionNode& node, size_t index) {
+StateMachineMatcher::StateMachineMatcher(const StateMachine& machine, bool ignoreNonEssentialNodes)
+    : _machine(machine), _ignoreNonEssentialNodes(ignoreNonEssentialNodes) {
+    // Set start state.
+    _stack.push(_machine.getStartState());
+}
+
+void StateMachineMatcher::preVisit(RuleEngine& engine,
+                                   const QuerySolutionNode& node,
+                                   size_t index) {
     if (isStageIgnoredForCounters(node)) {
         // Don't consume a state transition or push a stack frame, so this node's child is
         // matched exactly as if the node weren't present.
@@ -104,7 +108,7 @@ void StateMachineRule::preVisit(RuleEngine& engine, const QuerySolutionNode& nod
     }
 }
 
-void StateMachineRule::postVisit(RuleEngine& engine, const QuerySolutionNode& node) {
+void StateMachineMatcher::postVisit(RuleEngine& engine, const QuerySolutionNode& node) {
     if (isStageIgnoredForCounters(node)) {
         // preVisit() pushed no frame for this node, so there is nothing to unwind.
         return;
@@ -119,9 +123,9 @@ void StateMachineRule::postVisit(RuleEngine& engine, const QuerySolutionNode& no
     }
 }
 
-bool StateMachineRule::matchesPredicate(const Edge& edge,
-                                        const QuerySolutionNode& node,
-                                        size_t index) const {
+bool StateMachineMatcher::matchesPredicate(const StateMachine::Edge& edge,
+                                           const QuerySolutionNode& node,
+                                           size_t index) const {
     if (!edge.allowedChildren.contains(index)) {
         return false;
     }
@@ -139,8 +143,8 @@ bool StateMachineRule::matchesPredicate(const Edge& edge,
     MONGO_UNREACHABLE;
 }
 
-void StateMachineRule::step(const QuerySolutionNode& node, size_t index) {
-    const StateSpec& state = currentState();
+void StateMachineMatcher::step(const QuerySolutionNode& node, size_t index) {
+    const StateMachine::StateSpec& state = currentState();
 
     auto it = state.edges.find(node.getType());
     if (it != state.edges.end() && matchesPredicate(it->second, node, index)) {
@@ -150,11 +154,11 @@ void StateMachineRule::step(const QuerySolutionNode& node, size_t index) {
         // There's no match in this node or its children, so we transition to the not match
         // state. Once we reach the leaf nodes of this subtree, they will set
         // _allBranchesMatch=false.
-        _stack.push(kNotMatch);
+        _stack.push(StateMachine::kNotMatch);
     }
 }
 
-bool StateMachineRule::isStageIgnoredForCounters(const QuerySolutionNode& node) const {
+bool StateMachineMatcher::isStageIgnoredForCounters(const QuerySolutionNode& node) const {
     if (!_ignoreNonEssentialNodes) {
         return false;
     }
@@ -170,18 +174,18 @@ bool StateMachineRule::isStageIgnoredForCounters(const QuerySolutionNode& node) 
     }
 }
 
-void StateMachineRule::dumpStates() {
-    for (size_t i = 0; i < _states.size(); ++i) {
+void StateMachineMatcher::dumpStates() {
+    for (size_t i = 0; i < _machine._states.size(); ++i) {
         std::cout << "State " << i << ":";
-        if (i == kStart)
+        if (i == StateMachine::kStart)
             std::cout << " [START]";
-        if (i == kNotMatch)
+        if (i == StateMachine::kNotMatch)
             std::cout << " [NOT_MATCH]";
-        if (_states[i].isMatch)
+        if (_machine._states[i].isMatch)
             std::cout << " [MATCH]";
         std::cout << std::endl;
 
-        for (const auto& [stage, edge] : _states[i].edges) {
+        for (const auto& [stage, edge] : _machine._states[i].edges) {
             const auto& range = edge.allowedChildren;
             const auto& nextState = edge.nextState;
 

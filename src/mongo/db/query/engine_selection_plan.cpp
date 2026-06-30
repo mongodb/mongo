@@ -52,7 +52,7 @@ namespace {
 
 // Builds a state machine rule that matches the enabled local-side data access patterns for
 // $lookup-$unwind (LU), gated by the three local access-plan IFR flags.
-StateMachineRule makeLookupUnwindRule(IncrementalFeatureRolloutContext& ifrContext) {
+StateMachine makeLookupUnwindRule(IncrementalFeatureRolloutContext& ifrContext) {
     const bool collscanEnabled =
         ifrContext.getSavedFlagValue(feature_flags::gFeatureFlagSbeEqLookupUnwindLocalCollscan);
     const bool ixscanFetchEnabled =
@@ -61,7 +61,7 @@ StateMachineRule makeLookupUnwindRule(IncrementalFeatureRolloutContext& ifrConte
         feature_flags::gFeatureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans);
     static constexpr int kMaxBranchesInSbe = 100;
 
-    StateMachineRule sm;
+    StateMachine sm;
     int state = sm.getStartState();
 
     if (collscanEnabled) {
@@ -320,7 +320,9 @@ EngineSelectionResult engineSelectionForPlan(const QuerySolution* solution,
         }
     }
 
-    const bool containsLuPattern = treeMatchesAny(dataAccessNode, makeLookupUnwindRule(ifrContext));
+    // TODO SERVER-129910 statically generate LU rule.
+    const auto luRule = makeLookupUnwindRule(ifrContext);
+    const bool containsLuPattern = treeMatchesAny(dataAccessNode, StateMachineMatcher(luRule));
 
     const QuerySolutionNode* planPushdownRoot =
         treeSearch(solution->root(), PlanPushdownSelector(containsLuPattern, ifrContext));

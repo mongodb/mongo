@@ -207,14 +207,11 @@ enum class PredicateType {
 
 /**
  * This is a configurable rule that can match any tree pattern detectable by a state machine.
- *
- * To obtain a match, all the possible paths from root to leaf have to end in a matching state in
- * the state machine (similar to an all-paths NFA). This is a useful property for recognizing nodes
- * that have multiple branches.
+ * Should be immutable after being built.
  */
-class StateMachineRule {
+class StateMachine {
 public:
-    StateMachineRule(bool ignoreNonEssentialNodes = false);
+    StateMachine();
 
     int getStartState() const {
         return kStart;
@@ -255,15 +252,9 @@ public:
         _states[state].matchTag = matchTag;
     }
 
-    void preVisit(RuleEngine& engine, const QuerySolutionNode& node, size_t index);
-
-    boost::optional<int> getMatchedTag() const {
-        return _matchedTag;
-    }
-
-    void postVisit(RuleEngine& engine, const QuerySolutionNode& node);
-
 private:
+    friend class StateMachineMatcher;
+
     enum {
         kNotMatch = 0,
         kStart = 1,
@@ -296,6 +287,33 @@ private:
             12308401, "Invalid tree recognition state", state < static_cast<int>(_states.size()));
     }
 
+    // State machine description (very similar to a graph). The std::vector index provides the state
+    // numbers and each state specification (vertex) contains the configured transitions (edges).
+    std::vector<StateSpec> _states;
+};
+
+/**
+ * Matches patterns in a QuerySolution by referencing the given StateMachine rule.
+ *
+ * To obtain a match, all the possible paths from root to leaf have to end in a matching state in
+ * the state machine (similar to an all-paths NFA). This is a useful property for recognizing nodes
+ * that have multiple branches.
+ */
+class StateMachineMatcher {
+public:
+    explicit StateMachineMatcher(const StateMachine& machine, bool ignoreNonEssentialNodes = false);
+
+    StateMachineMatcher(StateMachine&&) = delete;
+
+    void preVisit(RuleEngine& engine, const QuerySolutionNode& node, size_t index);
+
+    boost::optional<int> getMatchedTag() const {
+        return _matchedTag;
+    }
+
+    void postVisit(RuleEngine& engine, const QuerySolutionNode& node);
+
+private:
     void validateStack() const {
         tassert(12308403, "Invalid engine selection stack state", !_stack.empty());
     }
@@ -304,13 +322,15 @@ private:
         return currentState().isMatch;
     }
 
-    const StateSpec& currentState() const {
+    const StateMachine::StateSpec& currentState() const {
         validateStack();
-        validateState(_stack.top());
-        return _states[_stack.top()];
+        _machine.validateState(_stack.top());
+        return _machine._states[_stack.top()];
     }
 
-    bool matchesPredicate(const Edge& edge, const QuerySolutionNode& node, size_t index) const;
+    bool matchesPredicate(const StateMachine::Edge& edge,
+                          const QuerySolutionNode& node,
+                          size_t index) const;
 
     void step(const QuerySolutionNode& node, size_t index);
 
@@ -318,12 +338,10 @@ private:
 
     void dumpStates();
 
+    const StateMachine& _machine;
     // State of each active frame in the QSN recursion. This is an useful state machine extension
     // for unwinding when exploring several branches.
     std::stack<int> _stack;
-    // State machine description (very similar to a graph). The std::vector index provides the state
-    // numbers and each state specification (vertex) contains the configured transitions (edges).
-    std::vector<StateSpec> _states;
     bool _allBranchesMatch = true;
     // The tag recorded at the first leaf that ended in a tagged match state; any later leaf ending
     // in a match state with a different tag rejects the tree.
@@ -331,7 +349,7 @@ private:
     // When true, non-plan-shape nodes are ignored during matching.
     bool _ignoreNonEssentialNodes = false;
 };
-static_assert(HasPreVisit<StateMachineRule, QuerySolutionNode>);
-static_assert(HasPostVisit<StateMachineRule, QuerySolutionNode>);
+static_assert(HasPreVisit<StateMachineMatcher, QuerySolutionNode>);
+static_assert(HasPostVisit<StateMachineMatcher, QuerySolutionNode>);
 
 }  // namespace mongo::query_solution_analyzer
