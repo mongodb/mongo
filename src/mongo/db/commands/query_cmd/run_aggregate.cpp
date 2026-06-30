@@ -1084,7 +1084,7 @@ SecondParseRequirement maybeApplyViewPipeline(const AggExState& aggExState,
         // Add the top-level namespace to the map, since its not present in the
         // `additionalResolvedNamespaces` map.
         auto resolvedNsForEntry = aggExState.getResolvedNamespace();
-        resolvedNsForEntry.uuid = aggCatalogState.getUUID();
+        resolvedNsForEntry.setCollUUID(aggCatalogState.getUUID());
         PipelineResolver::insertTopLevelViewEntry(resolvedNamespaces,
                                                   aggExState.getOriginalNss(),
                                                   std::move(resolvedNsForEntry),

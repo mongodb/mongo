@@ -267,7 +267,7 @@ RepresentativeQueryInfo createRepresentativeInfoAgg(OperationContext* opCtx,
     // adds the foreign collections.
     auto resolvedNs = ResolvedNamespace{aggregateCommandRequest.getNamespace(),
                                         aggregateCommandRequest.getPipeline()};
-    involvedNamespaces.insert(resolvedNs.ns);
+    involvedNamespaces.insert(resolvedNs.getResolvedNamespace());
 
     // When parsing the pipeline, we try to resolve the namespaces, which requires the resolved
     // namespaces to be present in the expression context.

@@ -90,7 +90,7 @@ public:
 
     // The resolved backing namespace the subpipeline targets, populated by
     // LiteParsedDocumentSourceNestedPipelines::bindResolvedNamespace at parse time. Identity
-    // (not-a-view) unless a view was stitched; check `.involvedNamespaceIsAView`.
+    // (not-a-view) unless a view was stitched; check `isInvolvedNamespaceAView()`.
     ResolvedNamespace resolvedBackingNss;
 
 private:

@@ -330,14 +330,14 @@ bool resolveInvolvedNamespacesImpl(LiteParsedPipeline* lpp,
                                    stdx::unordered_set<NamespaceString>& inProgress) {
     auto isView = [&](const NamespaceString& nss) {
         auto it = resolvedNamespaces.find(nss);
-        return it != resolvedNamespaces.end() && it->second.involvedNamespaceIsAView;
+        return it != resolvedNamespaces.end() && it->second.isInvolvedNamespaceAView();
     };
     // Build the view ResolvedNamespace to hand to handleView. If 'mainNss' is a view in the
     // map, copy it and desugar its pipeline, else pass an empty sentinel.
     bool anyViewBound = false;
     ResolvedNamespace view;
     if (auto it = resolvedNamespaces.find(mainNss);
-        it != resolvedNamespaces.end() && it->second.involvedNamespaceIsAView) {
+        it != resolvedNamespaces.end() && it->second.isInvolvedNamespaceAView()) {
         view = it->second;
         view.liteParseViewPipeline();
         view.desugarViewPipeline();
@@ -441,17 +441,17 @@ void PipelineResolver::insertTopLevelViewEntry(
     // from a prior catalog lookup. This could occur when the requested Nss is both the top-level
     // view and targeted by a subpipeline stage.
     if (auto it = resolvedNamespaces.find(requestedNss); it != resolvedNamespaces.end()) {
-        viewOptions.collUUID = it->second.uuid;
+        viewOptions.collUUID = it->second.getCollUUID();
     }
     // The resolution loop does not add the top-level view's namespace, so fall back to the
     // caller-supplied backing-collection UUID; without it, $search inside the desugared $unionWith
     // on this view fails with "a uuid is required for a search query".
     if (!viewOptions.collUUID) {
-        viewOptions.collUUID = resolvedView.uuid;
-    } else if (resolvedView.uuid) {
+        viewOptions.collUUID = resolvedView.getCollUUID();
+    } else if (resolvedView.getCollUUID()) {
         tassert(12828500,
                 "Conflicting backing-collection UUIDs for the top-level view entry",
-                *viewOptions.collUUID == *resolvedView.uuid);
+                *viewOptions.collUUID == *resolvedView.getCollUUID());
     }
     resolvedNamespaces.insert_or_assign(requestedNss,
                                         ResolvedNamespace(requestedNss,

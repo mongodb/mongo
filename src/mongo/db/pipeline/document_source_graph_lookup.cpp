@@ -344,19 +344,20 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
         ? getExpCtx()->getResolvedNamespace(getFromNs())
         : ResolvedNamespace{getFromNs(), std::vector<BSONObj>{}};
     _fromExpCtx = makeCopyForSubPipelineFromExpressionContext(
-        getExpCtx(), resolvedNamespace.ns, resolvedNamespace.uuid);
+        getExpCtx(), resolvedNamespace.getResolvedNamespace(), resolvedNamespace.getCollUUID());
     _fromExpCtx->setInLookup(true);
 
     // If fromLpp was populated by createFromStageParams (view path), keep it. Otherwise build it
     // from the resolved namespace (createFromBson / create path).
     if (!_params.fromLpp) {
-        const auto& pipeline = (!isRawDataOperation(expCtx->getOperationContext()) ||
-                                !resolvedNamespace.ns.isTimeseriesBucketsCollection())
-            ? resolvedNamespace.pipeline
+        const auto& pipeline =
+            (!isRawDataOperation(expCtx->getOperationContext()) ||
+             !resolvedNamespace.getResolvedNamespace().isTimeseriesBucketsCollection())
+            ? resolvedNamespace.getBsonPipeline()
             : std::vector<BSONObj>{};
         LiteParserOptions opts;
         opts.ifrContext = expCtx->getIfrContext();
-        _params.fromLpp.emplace(resolvedNamespace.ns, pipeline, opts);
+        _params.fromLpp.emplace(resolvedNamespace.getResolvedNamespace(), pipeline, opts);
     }
     auto& subLpp = _params.fromLpp->pipeline();
     LiteParsedDesugarer::desugar(&subLpp, _fromExpCtx->getIfrContext());
@@ -373,8 +374,9 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
     const auto resolvedNamespace = original.getExpCtx()->hasResolvedNamespace(getFromNs())
         ? original.getExpCtx()->getResolvedNamespace(getFromNs())
         : ResolvedNamespace{getFromNs(), std::vector<BSONObj>{}};
-    _fromExpCtx = makeCopyFromExpressionContext(
-        original._fromExpCtx, resolvedNamespace.ns, resolvedNamespace.uuid);
+    _fromExpCtx = makeCopyFromExpressionContext(original._fromExpCtx,
+                                                resolvedNamespace.getResolvedNamespace(),
+                                                resolvedNamespace.getCollUUID());
     if (_params.startWith) {
         // re-create startWith expression using newExpCtx.
         _params.startWith = _params.startWith->clone(*newExpCtx);

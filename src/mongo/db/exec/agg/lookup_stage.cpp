@@ -118,7 +118,7 @@ std::function<void(LiteParsedPipeline&)> makeLookupViewBinder(
     return [fromExpCtx](LiteParsedPipeline& liteParsedPipeline) {
         const auto& resolvedNamespaces = fromExpCtx->getResolvedNamespaces();
         auto it = resolvedNamespaces.find(fromExpCtx->getUserNss());
-        if (it == resolvedNamespaces.end() || !it->second.involvedNamespaceIsAView) {
+        if (it == resolvedNamespaces.end() || !it->second.isInvolvedNamespaceAView()) {
             return;
         }
         liteParsedPipeline.bindResolvedNamespaceToStages(it->second, resolvedNamespaces);

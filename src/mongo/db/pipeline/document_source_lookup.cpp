@@ -243,18 +243,18 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
     const auto resolvedNamespace = expCtx->hasResolvedNamespace(_fromNs)
         ? expCtx->getResolvedNamespace(_fromNs)
         : ResolvedNamespace{_fromNs, std::vector<BSONObj>{}};
-    _resolvedNs = resolvedNamespace.ns;
-    _fromNsIsAView = resolvedNamespace.involvedNamespaceIsAView;
+    _resolvedNs = resolvedNamespace.getResolvedNamespace();
+    _fromNsIsAView = resolvedNamespace.isInvolvedNamespaceAView();
 
     // Prevent view resolution for rawData timeseries commands.
-    if (!resolvedNamespace.involvedNamespaceIsAView ||
+    if (!resolvedNamespace.isInvolvedNamespaceAView() ||
         !isRawDataOperation(expCtx->getOperationContext()) ||
-        !resolvedNamespace.ns.isTimeseriesBucketsCollection()) {
-        _sharedState->resolvedPipeline = resolvedNamespace.pipeline;
+        !resolvedNamespace.getResolvedNamespace().isTimeseriesBucketsCollection()) {
+        _sharedState->resolvedPipeline = resolvedNamespace.getBsonPipeline();
     }
 
     _fromExpCtx = makeCopyForSubPipelineFromExpressionContext(
-        expCtx, resolvedNamespace.ns, resolvedNamespace.uuid, _fromNs);
+        expCtx, resolvedNamespace.getResolvedNamespace(), resolvedNamespace.getCollUUID(), _fromNs);
     _fromExpCtx->setInLookup(true);
     // We must use variables from the sub-pipeline's ExpressionContext, because some extra varialbes
     // might have been defined in makeCopyForSubPipelineFromExpressionContext
@@ -419,7 +419,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(
     }
     const auto& resolvedNamespaces = pExpCtx->getResolvedNamespaces();
     auto it = resolvedNamespaces.find(_fromNs);
-    if (it != resolvedNamespaces.end() && !it->second.pipeline.empty()) {
+    if (it != resolvedNamespaces.end() && !it->second.getBsonPipeline().empty()) {
         _sharedState->resolvedIntrospectionPipeline =
             parsePipelineFromStageParamsWithMaybeViewDefinition(
                 _fromExpCtx, it->second, std::move(subpipelineStageParams), userPipeline, _fromNs);

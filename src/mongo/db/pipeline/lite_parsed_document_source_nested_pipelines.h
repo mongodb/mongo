@@ -145,7 +145,7 @@ public:
         // Handle explicit user pipelines running against a view.
         for (const auto& subpipeline : _pipelines) {
             auto it = resolvedNamespaces.find(subpipeline->getOriginalParseNss());
-            if (it != resolvedNamespaces.end() && it->second.involvedNamespaceIsAView) {
+            if (it != resolvedNamespaces.end() && it->second.isInvolvedNamespaceAView()) {
                 _resolvedBackingNss = it->second;
             }
         }
@@ -153,7 +153,7 @@ public:
         // pipeline.
         if (_foreignNss && needsViewSubpipelineMaterialized()) {
             auto it = resolvedNamespaces.find(*_foreignNss);
-            if (it != resolvedNamespaces.end() && it->second.involvedNamespaceIsAView) {
+            if (it != resolvedNamespaces.end() && it->second.isInvolvedNamespaceAView()) {
                 _resolvedBackingNss = it->second;
                 materializeViewSubpipeline(it->second);
             }

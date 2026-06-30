@@ -339,13 +339,14 @@ public:
         // Assert that the resolved namespace we are adding either doesn't exist in the map or we
         // are reassigning the same value (no modification allowed). Only perform the uuid check if
         // both uuids exist.
-        uassert(9825500,
-                "Cannot overwrite an existing namespace with a different value",
-                it == _params.resolvedNamespaces.end() ||
-                    (it->second.involvedNamespaceIsAView == resolvedNs.involvedNamespaceIsAView &&
-                     it->second.ns == resolvedNs.ns &&
-                     (!it->second.uuid.has_value() || !resolvedNs.uuid.has_value() ||
-                      it->second.uuid.value() == resolvedNs.uuid.value())));
+        uassert(
+            9825500,
+            "Cannot overwrite an existing namespace with a different value",
+            it == _params.resolvedNamespaces.end() ||
+                (it->second.isInvolvedNamespaceAView() == resolvedNs.isInvolvedNamespaceAView() &&
+                 it->second.getResolvedNamespace() == resolvedNs.getResolvedNamespace() &&
+                 (!it->second.getCollUUID().has_value() || !resolvedNs.getCollUUID().has_value() ||
+                  it->second.getCollUUID().value() == resolvedNs.getCollUUID().value())));
 
         _params.resolvedNamespaces[nss] = resolvedNs;
     }

@@ -199,7 +199,7 @@ bool facetSubPipelinesTargetView(const vector<pair<string, vector<BSONObj>>>& ra
 
             if (targetNss) {
                 if (auto it = resolvedNamespaces.find(*targetNss);
-                    it != resolvedNamespaces.end() && it->second.involvedNamespaceIsAView) {
+                    it != resolvedNamespaces.end() && it->second.isInvolvedNamespaceAView()) {
                     return true;
                 }
             }

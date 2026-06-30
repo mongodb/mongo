@@ -476,7 +476,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
         auto requestCollator =
             uassertStatusOK(collatorFactory->makeFromBSON(*request.getCollation()));
         for (const auto& [nss, rn] : preResolvedNamespaces) {
-            if (!rn.involvedNamespaceIsAView) {
+            if (!rn.isInvolvedNamespaceAView()) {
                 continue;
             }
             const BSONObj& viewCollation = rn.getDefaultCollation();

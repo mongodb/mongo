@@ -47,7 +47,7 @@ namespace mongo {
 std::shared_ptr<ResolvedNamespace> tryGetPreResolvedNamespace(
     const NamespaceString& nss, const ResolvedNamespaceMap& resolvedNamespaces) {
     auto it = resolvedNamespaces.find(nss);
-    if (it != resolvedNamespaces.end() && it->second.involvedNamespaceIsAView &&
+    if (it != resolvedNamespaces.end() && it->second.isInvolvedNamespaceAView() &&
         it->second.getParsedPipeline()) {
         auto view = std::make_shared<ResolvedNamespace>(it->second);
         view->desugarViewPipeline();

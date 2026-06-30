@@ -171,11 +171,12 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
     : DocumentSource(kStageName, newExpCtx),
       _sharedState(std::make_shared<UnionWithSharedState>(
           original._sharedState->_pipeline->clone(
-              newExpCtx ? makeCopyForSubPipelineFromExpressionContext(
-                              newExpCtx,
-                              newExpCtx->getResolvedNamespace(original._userNss).ns,
-                              newExpCtx->getResolvedNamespace(original._userNss).uuid)
-                        : nullptr),
+              newExpCtx
+                  ? makeCopyForSubPipelineFromExpressionContext(
+                        newExpCtx,
+                        newExpCtx->getResolvedNamespace(original._userNss).getResolvedNamespace(),
+                        newExpCtx->getResolvedNamespace(original._userNss).getCollUUID())
+                  : nullptr),
           nullptr,
           UnionWithSharedState::ExecutionProgress::kIteratingSource)),
       _userNss(original._userNss),
@@ -260,10 +261,10 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
     // result.
     if (expCtx->getExplain() &&
         expCtx->getExplain().value() != explain::VerbosityEnum::kQueryPlanner &&
-        resolvedUnionNs.has_value() && resolvedUnionNs->involvedNamespaceIsAView) {
+        resolvedUnionNs.has_value() && resolvedUnionNs->isInvolvedNamespaceAView()) {
         _resolvedNsForView = resolvedUnionNs;
     }
-    _fromNsIsAView = resolvedUnionNs.has_value() && resolvedUnionNs->involvedNamespaceIsAView;
+    _fromNsIsAView = resolvedUnionNs.has_value() && resolvedUnionNs->isInvolvedNamespaceAView();
 
     _userNss = std::move(unionNss);
     _userPipeline = std::move(pipeline);
@@ -281,7 +282,7 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
     try {
         // A view stitched at lite-parse time arrives via resolvedBackingNss; otherwise consult the
         // ExpressionContext (covers plain collections and the $facet BSON-reparse path).
-        const bool viewStitched = resolvedBackingNss.involvedNamespaceIsAView;
+        const bool viewStitched = resolvedBackingNss.isInvolvedNamespaceAView();
         if (viewStitched) {
             resolvedUnionNs = std::move(resolvedBackingNss);
         } else {
@@ -298,7 +299,7 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
             // TODO SERVER-117260: This fallback can be removed once $facet goes through normal LP
             // view resolution, rather than reparsing from BSON.
             const bool viewNotYetStitched =
-                resolvedUnionNs->involvedNamespaceIsAView && !viewStitched;
+                resolvedUnionNs->isInvolvedNamespaceAView() && !viewStitched;
             if (viewNotYetStitched) {
                 _sharedState = std::make_shared<UnionWithSharedState>(
                     parsePipelineWithMaybeViewDefinition(
@@ -341,10 +342,10 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
 
     if (expCtx->getExplain() &&
         expCtx->getExplain().value() != explain::VerbosityEnum::kQueryPlanner &&
-        resolvedUnionNs.has_value() && resolvedUnionNs->involvedNamespaceIsAView) {
+        resolvedUnionNs.has_value() && resolvedUnionNs->isInvolvedNamespaceAView()) {
         _resolvedNsForView = resolvedUnionNs;
     }
-    _fromNsIsAView = resolvedUnionNs.has_value() && resolvedUnionNs->involvedNamespaceIsAView;
+    _fromNsIsAView = resolvedUnionNs.has_value() && resolvedUnionNs->isInvolvedNamespaceAView();
 
     _userNss = std::move(unionNss);
     _userPipeline = std::move(userPipeline);
@@ -740,7 +741,7 @@ std::unique_ptr<Pipeline> DocumentSourceUnionWith::parsePipelineWithMaybeViewDef
     opts.validator = assertAllStagesAllowedInUnionWith;
 
     boost::intrusive_ptr<ExpressionContext> subExpCtx = makeCopyForSubPipelineFromExpressionContext(
-        expCtx, resolvedNs.ns, resolvedNs.uuid, userNss);
+        expCtx, resolvedNs.getResolvedNamespace(), resolvedNs.getCollUUID(), userNss);
     subExpCtx->setInUnionWith(true);
     // The desugared mongot stage's injected 'view' field requires isHybridSearch on the
     // sub-pipeline's expCtx. 'currentPipeline' may already be desugared; those callers pass
@@ -748,7 +749,7 @@ std::unique_ptr<Pipeline> DocumentSourceUnionWith::parsePipelineWithMaybeViewDef
     if (isHybridSearch || hybrid_scoring_util::isHybridSearchPipeline(currentPipeline)) {
         subExpCtx->setIsHybridSearch();
     }
-    if (resolvedNs.ns.isTimeseriesBucketsCollection() &&
+    if (resolvedNs.getResolvedNamespace().isTimeseriesBucketsCollection() &&
         isRawDataOperation(expCtx->getOperationContext())) {
         // Raw Data operations on timeseries collections operate without the timeseries view.
         return pipeline_factory::makePipeline(currentPipeline, subExpCtx, opts);
@@ -766,7 +767,7 @@ DocumentSourceUnionWith::parsePipelineFromStageParamsWithMaybeViewDefinition(
     const std::vector<BSONObj>& rawPipeline,
     const NamespaceString& userNss) {
     boost::intrusive_ptr<ExpressionContext> subExpCtx = makeCopyForSubPipelineFromExpressionContext(
-        expCtx, resolvedNs.ns, resolvedNs.uuid, userNss);
+        expCtx, resolvedNs.getResolvedNamespace(), resolvedNs.getCollUUID(), userNss);
     subExpCtx->setInUnionWith(true);
     // The desugared mongot stage's injected 'view' field requires isHybridSearch on the
     // sub-pipeline's expCtx.

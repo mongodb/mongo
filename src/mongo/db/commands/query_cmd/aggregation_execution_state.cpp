@@ -248,14 +248,14 @@ public:
         // still
         // refers to other map entries by namespace.
         //
-        // The 'mainNss' passed to the recursive resolver is each entry's BACKING namespace
-        // (entry.ns), not the view's own key. Backing namespaces are never view entries, so the
+        // The 'mainNss' passed to the recursive resolver is each entry's BACKING namespace, not the
+        // view's own key. Backing namespaces are never view entries, so the
         // top-level binding branch in resolveInvolvedNamespacesOnLiteParsedPipeline is skipped — we
         // don't apply this view to itself, we only recurse into its subpipelines.
         for (auto& [_, entry] : resolvedNamespaces) {
             if (auto* parsed = entry.getMutableParsedPipeline()) {
                 PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(
-                    &parsed->pipeline(), entry.ns, resolvedNamespaces);
+                    &parsed->pipeline(), entry.getResolvedNamespace(), resolvedNamespaces);
             }
         }
 
@@ -910,7 +910,7 @@ void AggCatalogState::maybeProactivelyResolveInvolvedNamespaces(AggExState& aggE
                 CollatorInterface::collatorsMatch(viewCollator.get(), operationCollator.get()));
 
         ResolvedNamespaceViewOptions opts{
-            .collUUID = rn.uuid,
+            .collUUID = rn.getCollUUID(),
             .involvedNamespaceIsAView = true,
             .timeseriesMetadata = rn.getTimeseriesViewMetadata(),
         };
@@ -963,7 +963,7 @@ bool AggCatalogState::requiresExtendedRangeSupportForTimeseries(
     // range support (e.g. in the foreign coll of a $lookup), so we check for that as well.
     if (!requiresExtendedRange) {
         for (auto& [_, resolvedNs] : resolvedNamespaces) {
-            const auto& nss = resolvedNs.ns;
+            const auto& nss = resolvedNs.getResolvedNamespace();
             auto readTimestamp = shard_role_details::getRecoveryUnit(_aggExState.getOpCtx())
                                      ->getPointInTimeReadTimestamp();
             auto collPtr = CollectionPtr(getCatalog()->establishConsistentCollection(

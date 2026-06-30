@@ -472,7 +472,7 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
     stage->bindResolvedNamespace(ResolvedNamespace{}, map);
 
     auto backingNss = stage->getResolvedBackingNss();
-    ASSERT_TRUE(backingNss.involvedNamespaceIsAView);
+    ASSERT_TRUE(backingNss.isInvolvedNamespaceAView());
     ASSERT_EQ(backingNss.getNamespace(), kForeignNss);
 }
 
@@ -492,7 +492,7 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
     ResolvedNamespaceMap map;
     stage->bindResolvedNamespace(ResolvedNamespace{}, map);
 
-    ASSERT_FALSE(stage->getResolvedBackingNss().involvedNamespaceIsAView);
+    ASSERT_FALSE(stage->getResolvedBackingNss().isInvolvedNamespaceAView());
 }
 
 TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
@@ -528,7 +528,7 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
 
     // _resolvedBackingNss must be set to the view entry.
     auto backingNss = stage->getResolvedBackingNss();
-    ASSERT_TRUE(backingNss.involvedNamespaceIsAView);
+    ASSERT_TRUE(backingNss.isInvolvedNamespaceAView());
     ASSERT_EQ(backingNss.getNamespace(), kForeignNss);
 
     // The view pipeline must have been materialized into _pipelines.
@@ -577,7 +577,7 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
     stage->bindResolvedNamespace(ResolvedNamespace{}, map);
 
     auto backingNss = stage->getResolvedBackingNss();
-    ASSERT_TRUE(backingNss.involvedNamespaceIsAView);
+    ASSERT_TRUE(backingNss.isInvolvedNamespaceAView());
     ASSERT_EQ(backingNss.getNamespace(), kForeignNss);
 
     auto* subPipelines = stage->getMutableSubPipelines();
@@ -633,7 +633,7 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
 
     // _resolvedBackingNss must now reflect the view.
     auto backingNss = stage->getResolvedBackingNss();
-    ASSERT_TRUE(backingNss.involvedNamespaceIsAView);
+    ASSERT_TRUE(backingNss.isInvolvedNamespaceAView());
     ASSERT_EQ(backingNss.getNamespace(), kForeignNss);
 
     // The view pipeline must have been materialized into _pipelines.
@@ -660,7 +660,7 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
 
     // Not a view: involvedNamespaceIsAView must be false.
     auto backingNss = stage->getResolvedBackingNss();
-    ASSERT_FALSE(backingNss.involvedNamespaceIsAView);
+    ASSERT_FALSE(backingNss.isInvolvedNamespaceAView());
 
     // Identity default: namespace should equal the foreign nss.
     ASSERT_EQ(backingNss.getNamespace(), kForeignNss);

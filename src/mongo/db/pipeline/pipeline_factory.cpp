@@ -204,32 +204,32 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinition(
     const NamespaceString& originalNs) {
 
     // Update subpipeline's ExpressionContext with the resolved namespace.
-    subPipelineExpCtx->setNamespaceString(resolvedNs.ns);
+    subPipelineExpCtx->setNamespaceString(resolvedNs.getResolvedNamespace());
 
     // When the sub-pipeline targets a view, stages inside the view's definition must run under the
     // view's default collation, not the outer collection's.
     applyViewDefaultCollation(subPipelineExpCtx, resolvedNs);
 
-    if (resolvedNs.pipeline.empty()) {
+    if (resolvedNs.getBsonPipeline().empty()) {
         return makePipeline(currentPipeline, subPipelineExpCtx, opts);
     }
 
     const bool pipelineIsMongot = search_helper_bson_obj::isMongotPipeline(
         subPipelineExpCtx->getIfrContext(), currentPipeline);
     const bool viewDefinitionIsMongot = search_helper_bson_obj::isMongotPipeline(
-        subPipelineExpCtx->getIfrContext(), resolvedNs.pipeline);
+        subPipelineExpCtx->getIfrContext(), resolvedNs.getBsonPipeline());
 
     if (pipelineIsMongot) {
         subPipelineExpCtx->setView(ResolvedNamespace::makeForView(
             originalNs,
-            resolvedNs.ns,
-            resolvedNs.pipeline,
+            resolvedNs.getResolvedNamespace(),
+            resolvedNs.getBsonPipeline(),
             LiteParserOptions{.ifrContext = subPipelineExpCtx->getIfrContext()}));
     }
 
-    // Register the view's own involved namespaces before the std::move(resolvedNs.pipeline) below;
+    // Register the view's own involved namespaces before the std::move(resolvedNs) below;
     // the helper keeps its transient LiteParsedPipeline local so it cannot outlive that move.
-    addViewInvolvedNamespaces(subPipelineExpCtx, resolvedNs.pipeline);
+    addViewInvolvedNamespaces(subPipelineExpCtx, resolvedNs.getBsonPipeline());
 
     const bool isHybrid = hybrid_scoring_util::isHybridSearchPipeline(currentPipeline);
     const NamespaceString liteParseNss = ((pipelineIsMongot && !viewDefinitionIsMongot) || isHybrid)
@@ -288,15 +288,15 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinitionStageParams(
     const NamespaceString& userNss,
     const MakePipelineOptions& opts) {
 
-    if (resolvedNs.ns.isTimeseriesBucketsCollection() &&
+    if (resolvedNs.getResolvedNamespace().isTimeseriesBucketsCollection() &&
         isRawDataOperation(subPipelineExpCtx->getOperationContext())) {
         return Pipeline::parseFromStageParams(
             std::move(stageParams), subPipelineExpCtx, opts.validator);
     }
 
-    subPipelineExpCtx->setNamespaceString(resolvedNs.ns);
+    subPipelineExpCtx->setNamespaceString(resolvedNs.getResolvedNamespace());
 
-    if (resolvedNs.pipeline.empty()) {
+    if (resolvedNs.getBsonPipeline().empty()) {
         return Pipeline::parseFromStageParams(
             std::move(stageParams), subPipelineExpCtx, opts.validator);
     }
@@ -311,7 +311,7 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinitionStageParams(
     // Stage params already have the view pipeline stitched in (resolved during the LiteParsed
     // phase), so there is no need to re-apply the view. Add involved namespaces so inner stage
     // constructors can resolve them via getResolvedNamespace().
-    addViewInvolvedNamespaces(subPipelineExpCtx, resolvedNs.pipeline);
+    addViewInvolvedNamespaces(subPipelineExpCtx, resolvedNs.getBsonPipeline());
 
     return Pipeline::parseFromStageParams(
         std::move(stageParams), subPipelineExpCtx, opts.validator);

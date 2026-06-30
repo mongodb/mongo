@@ -150,7 +150,7 @@ TEST(PipelineResolverTest, RecursesIntoUnionWithSubpipeline) {
     // $unionWith stage to the view, so downstream DocumentSource construction can skip a per-stage
     // view application.
     auto resolvedBackingNss = userLpp.getStages()[0]->getResolvedBackingNss();
-    ASSERT_TRUE(resolvedBackingNss.involvedNamespaceIsAView);
+    ASSERT_TRUE(resolvedBackingNss.isInvolvedNamespaceAView());
     ASSERT_EQ(resolvedBackingNss.getNamespace(), kUnionViewNss);
 }
 
@@ -175,7 +175,7 @@ TEST(PipelineResolverTest, ResolverDoesNotBindResolvedSubpipelineViewOnNonViewTa
     // No view in the map → parent stage's resolved backing namespace stays at its identity default:
     // not a view, and pointing at the user-provided foreign namespace.
     auto resolvedBackingNss = userLpp.getStages()[0]->getResolvedBackingNss();
-    ASSERT_FALSE(resolvedBackingNss.involvedNamespaceIsAView);
+    ASSERT_FALSE(resolvedBackingNss.isInvolvedNamespaceAView());
     ASSERT_EQ(resolvedBackingNss.getNamespace(), kForeignNss);
 }
 
@@ -362,10 +362,10 @@ TEST(PipelineResolverTest, InsertTopLevelViewEntryStoresResolvedView) {
     ASSERT_EQ(entry.getBsonPipeline().size(), 1U);
 
     // Assert: involvedNamespaceIsAView is true.
-    ASSERT_TRUE(entry.involvedNamespaceIsAView);
+    ASSERT_TRUE(entry.isInvolvedNamespaceAView());
 
     // Assert: backing namespace (entry.ns) matches the ResolvedNamespace's resolved namespace.
-    ASSERT_EQ(entry.ns, resolvedView.getResolvedNamespace());
+    ASSERT_EQ(entry.getResolvedNamespace(), resolvedView.getResolvedNamespace());
 }
 
 }  // namespace
