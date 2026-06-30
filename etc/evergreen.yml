@@ -95,6 +95,7 @@ include:
   - filename: etc/evergreen_yml_components/variants/amazon/streams/streams_dev.yml
 
   - filename: src/mongo/db/modules/atlas/atlas_dev.yml
+  - filename: src/mongo/db/modules/atlas/atlas_sls_pin_bump.yml
   - filename: etc/evergreen_yml_components/copybara/copybara.yml
   - filename: etc/evergreen_yml_components/copybara/copybara_gen.yml
 
