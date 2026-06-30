@@ -32,13 +32,16 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
+#include "mongo/s/query/exec/router_exec_stage.h"
 #include "mongo/s/query/exec/router_stage_mock.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
 
 #include <utility>
@@ -48,6 +51,52 @@
 
 namespace mongo {
 namespace {
+
+/**
+ * RouterExecStage that throws a specified error code when next() is called. Models mongos-internal
+ * stages that throw rather than returning a non-OK Status (defense-in-depth path).
+ */
+class RouterStageThrowingMock final : public RouterExecStage {
+public:
+    RouterStageThrowingMock(OperationContext* opCtx, ErrorCodes::Error code)
+        : RouterExecStage(opCtx), _code(code) {}
+
+    StatusWith<ClusterQueryResult> next() final {
+        uasserted(_code, "test-induced error");
+        MONGO_UNREACHABLE;
+    }
+
+    void kill(OperationContext*) final {}
+    bool remotesExhausted() const final {
+        return false;
+    }
+
+private:
+    ErrorCodes::Error _code;
+};
+
+/**
+ * RouterExecStage that returns a non-OK StatusWith when next() is called. Models the production
+ * path where shard errors travel back to mongos as Status values via AsyncResultsMerger, not as
+ * thrown exceptions.
+ */
+class RouterStageReturningErrorMock final : public RouterExecStage {
+public:
+    RouterStageReturningErrorMock(OperationContext* opCtx, ErrorCodes::Error code)
+        : RouterExecStage(opCtx), _code(code) {}
+
+    StatusWith<ClusterQueryResult> next() final {
+        return Status(_code, "test-induced status error");
+    }
+
+    void kill(OperationContext*) final {}
+    bool remotesExhausted() const final {
+        return false;
+    }
+
+private:
+    ErrorCodes::Error _code;
+};
 
 class ClusterClientCursorImplTest : public ClockSourceMockServiceContextTest {
 protected:
@@ -603,6 +652,323 @@ TEST_F(ClusterClientCursorImplTest, UpdateCursorMetricsIgnoresNullOptime) {
     cursor.updateMetrics(csMetrics);
 
     ASSERT_FALSE(cursor.getChangeStreamMetrics().has_value());
+}
+
+// Helper used by change stream error counter tests.
+// Sets isChangeStreamQuery = true and constructs a cursor backed by a stage that throws 'code'.
+// The caller owns the cursor.
+ClusterClientCursorImpl makeThrowingChangeStreamCursor(OperationContext* opCtx,
+                                                       ErrorCodes::Error code) {
+    CurOp::get(opCtx)->debug().isChangeStreamQuery = true;
+    return ClusterClientCursorImpl(
+        opCtx,
+        std::make_unique<RouterStageThrowingMock>(opCtx, code),
+        ClusterClientCursorParams(NamespaceString::createNamespaceString_forTest("unused"),
+                                  APIParameters(),
+                                  boost::none /* ReadPreferenceSetting */,
+                                  boost::none /* repl::ReadConcernArgs */,
+                                  OperationSessionInfoFromClient()),
+        boost::none);
+}
+
+TEST_F(ClusterClientCursorImplTest, ChangeStreamNonRetriableHistoryLostCounterIncrements) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    using otel::metrics::MetricNames;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamErrorNonRetriableHistoryLost), 0);
+
+    auto cursor = makeThrowingChangeStreamCursor(_opCtx.get(), ErrorCodes::ChangeStreamHistoryLost);
+    ASSERT_THROWS_CODE(cursor.next(), DBException, ErrorCodes::ChangeStreamHistoryLost);
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamErrorNonRetriableHistoryLost), 1);
+}
+
+TEST_F(ClusterClientCursorImplTest, ChangeStreamNonRetriableFatalErrorCounterIncrements) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    using otel::metrics::MetricNames;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamErrorNonRetriableFatalError), 0);
+
+    auto cursor = makeThrowingChangeStreamCursor(_opCtx.get(), ErrorCodes::ChangeStreamFatalError);
+    ASSERT_THROWS_CODE(cursor.next(), DBException, ErrorCodes::ChangeStreamFatalError);
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamErrorNonRetriableFatalError), 1);
+}
+
+TEST_F(ClusterClientCursorImplTest, ChangeStreamNonRetriableBsonObjectTooLargeCounterIncrements) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    using otel::metrics::MetricNames;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    ASSERT_EQ(
+        capturer.readInt64Counter(MetricNames::kChangeStreamErrorNonRetriableBsonObjectTooLarge),
+        0);
+
+    auto cursor = makeThrowingChangeStreamCursor(_opCtx.get(), ErrorCodes::BSONObjectTooLarge);
+    ASSERT_THROWS_CODE(cursor.next(), DBException, ErrorCodes::BSONObjectTooLarge);
+
+    ASSERT_EQ(
+        capturer.readInt64Counter(MetricNames::kChangeStreamErrorNonRetriableBsonObjectTooLarge),
+        1);
+}
+
+TEST_F(ClusterClientCursorImplTest, ChangeStreamNonRetriableOtherCounterIncrements) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    using otel::metrics::MetricNames;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamErrorNonRetriableOther), 0);
+
+    // BadValue is a non-retriable error that is not a named change stream error.
+    auto cursor = makeThrowingChangeStreamCursor(_opCtx.get(), ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(cursor.next(), DBException, ErrorCodes::BadValue);
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamErrorNonRetriableOther), 1);
+}
+
+TEST_F(ClusterClientCursorImplTest,
+       ChangeStreamRetriableInterruptedDueToReplStateChangeCounterIncrements) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    using otel::metrics::MetricNames;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    ASSERT_EQ(capturer.readInt64Counter(
+                  MetricNames::kChangeStreamErrorRetriableInterruptedDueToReplStateChange),
+              0);
+
+    auto cursor =
+        makeThrowingChangeStreamCursor(_opCtx.get(), ErrorCodes::InterruptedDueToReplStateChange);
+    ASSERT_THROWS_CODE(cursor.next(), DBException, ErrorCodes::InterruptedDueToReplStateChange);
+
+    ASSERT_EQ(capturer.readInt64Counter(
+                  MetricNames::kChangeStreamErrorRetriableInterruptedDueToReplStateChange),
+              1);
+}
+
+TEST_F(ClusterClientCursorImplTest, ChangeStreamRetriableOtherCounterIncrements) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    using otel::metrics::MetricNames;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamErrorRetriableOther), 0);
+
+    // NetworkTimeout is a retriable error but not a named change stream error.
+    auto cursor = makeThrowingChangeStreamCursor(_opCtx.get(), ErrorCodes::NetworkTimeout);
+    ASSERT_THROWS_CODE(cursor.next(), DBException, ErrorCodes::NetworkTimeout);
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamErrorRetriableOther), 1);
+}
+
+TEST_F(ClusterClientCursorImplTest, NonChangeStreamCursorDoesNotIncrementErrorCounters) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    using otel::metrics::MetricNames;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    // isChangeStreamQuery is false by default — do NOT set it.
+    ClusterClientCursorImpl cursor(
+        _opCtx.get(),
+        std::make_unique<RouterStageThrowingMock>(_opCtx.get(), ErrorCodes::BadValue),
+        ClusterClientCursorParams(NamespaceString::createNamespaceString_forTest("unused"),
+                                  APIParameters(),
+                                  boost::none,
+                                  boost::none,
+                                  OperationSessionInfoFromClient()),
+        boost::none);
+
+    ASSERT_THROWS_CODE(cursor.next(), DBException, ErrorCodes::BadValue);
+
+    // No counter should have incremented.
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamErrorNonRetriableOther), 0);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamErrorRetriableOther), 0);
+}
+
+// --- Lifecycle event exclusion tests ---
+// CloseChangeStream and ChangeStreamInvalidated are normal cursor lifecycle transitions,
+// not errors. They must not increment any error counter.
+
+TEST_F(ClusterClientCursorImplTest, CloseChangeStreamDoesNotIncrementErrorCounters) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    using otel::metrics::MetricNames;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    const int64_t beforeNonRetriableOther =
+        capturer.readInt64Counter(MetricNames::kChangeStreamErrorNonRetriableOther);
+    const int64_t beforeRetriableOther =
+        capturer.readInt64Counter(MetricNames::kChangeStreamErrorRetriableOther);
+
+    auto cursor = makeThrowingChangeStreamCursor(_opCtx.get(), ErrorCodes::CloseChangeStream);
+    ASSERT_THROWS_CODE(cursor.next(), DBException, ErrorCodes::CloseChangeStream);
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamErrorNonRetriableOther),
+              beforeNonRetriableOther);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamErrorRetriableOther),
+              beforeRetriableOther);
+}
+
+// ChangeStreamInvalidated is not tested here because it requires ChangeStreamInvalidationInfo
+// extra data; constructing a Status without it is a fatal error in debug builds. In production
+// this exception is always thrown with proper extra info from the pipeline stages.
+
+// =============================================================================
+// Status-path tests (the production path)
+//
+// In production, shard errors return to mongos via AsyncResultsMerger as non-OK StatusWith
+// values — they are NOT thrown as exceptions. The tests above exercise the exception path
+// (defense-in-depth). The tests below exercise the StatusWith path via
+// RouterStageReturningErrorMock, which mirrors what AsyncResultsMerger::nextReady() does.
+// =============================================================================
+
+// Helper: like makeThrowingChangeStreamCursor but backed by a stage that returns a non-OK Status.
+ClusterClientCursorImpl makeReturningErrorChangeStreamCursor(OperationContext* opCtx,
+                                                             ErrorCodes::Error code) {
+    CurOp::get(opCtx)->debug().isChangeStreamQuery = true;
+    return ClusterClientCursorImpl(
+        opCtx,
+        std::make_unique<RouterStageReturningErrorMock>(opCtx, code),
+        ClusterClientCursorParams(NamespaceString::createNamespaceString_forTest("unused"),
+                                  APIParameters(),
+                                  boost::none /* ReadPreferenceSetting */,
+                                  boost::none /* repl::ReadConcernArgs */,
+                                  OperationSessionInfoFromClient()),
+        boost::none);
+}
+
+TEST_F(ClusterClientCursorImplTest, ChangeStreamHistoryLostViaStatusCounterIncrements) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    using otel::metrics::MetricNames;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamErrorNonRetriableHistoryLost), 0);
+
+    auto cursor =
+        makeReturningErrorChangeStreamCursor(_opCtx.get(), ErrorCodes::ChangeStreamHistoryLost);
+    ASSERT_NOT_OK(cursor.next());
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamErrorNonRetriableHistoryLost), 1);
+}
+
+TEST_F(ClusterClientCursorImplTest, ChangeStreamRetriableOtherViaStatusCounterIncrements) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    using otel::metrics::MetricNames;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamErrorRetriableOther), 0);
+
+    // NetworkTimeout is a retriable error not in the named switch cases.
+    auto cursor = makeReturningErrorChangeStreamCursor(_opCtx.get(), ErrorCodes::NetworkTimeout);
+    ASSERT_NOT_OK(cursor.next());
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamErrorRetriableOther), 1);
+}
+
+TEST_F(ClusterClientCursorImplTest, CloseChangeStreamViaStatusDoesNotIncrementErrorCounters) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    using otel::metrics::MetricNames;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    const int64_t beforeNonRetriableOther =
+        capturer.readInt64Counter(MetricNames::kChangeStreamErrorNonRetriableOther);
+    const int64_t beforeRetriableOther =
+        capturer.readInt64Counter(MetricNames::kChangeStreamErrorRetriableOther);
+
+    auto cursor = makeReturningErrorChangeStreamCursor(_opCtx.get(), ErrorCodes::CloseChangeStream);
+    ASSERT_NOT_OK(cursor.next());
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamErrorNonRetriableOther),
+              beforeNonRetriableOther);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamErrorRetriableOther),
+              beforeRetriableOther);
+}
+
+// ChangeStreamInvalidated via Status is not tested here because constructing
+// Status(ChangeStreamInvalidated, ...) without ChangeStreamInvalidationInfo is fatal in debug
+// builds. In production this always propagates with proper extra info from the ARM.
+
+TEST_F(ClusterClientCursorImplTest, NonChangeStreamCursorViaStatusDoesNotIncrementErrorCounters) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    using otel::metrics::MetricNames;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    // isChangeStreamQuery is false by default — do NOT set it.
+    ClusterClientCursorImpl cursor(
+        _opCtx.get(),
+        std::make_unique<RouterStageReturningErrorMock>(_opCtx.get(), ErrorCodes::BadValue),
+        ClusterClientCursorParams(NamespaceString::createNamespaceString_forTest("unused"),
+                                  APIParameters(),
+                                  boost::none,
+                                  boost::none,
+                                  OperationSessionInfoFromClient()),
+        boost::none);
+
+    ASSERT_NOT_OK(cursor.next());
+
+    // No counter should have incremented.
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamErrorNonRetriableOther), 0);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamErrorRetriableOther), 0);
+}
+
+// --- MaxTimeMSExpired exclusion tests ---
+// MaxTimeMSExpired is a routine awaitData getMore timeout that the ARM surfaces as a non-OK
+// Status. It is already tracked via _maxTimeMSExpired and must not pollute error counters.
+
+TEST_F(ClusterClientCursorImplTest, MaxTimeMSExpiredViaStatusDoesNotIncrementErrorCounters) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    using otel::metrics::MetricNames;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    const int64_t beforeNonRetriableOther =
+        capturer.readInt64Counter(MetricNames::kChangeStreamErrorNonRetriableOther);
+
+    auto cursor = makeReturningErrorChangeStreamCursor(_opCtx.get(), ErrorCodes::MaxTimeMSExpired);
+    ASSERT_NOT_OK(cursor.next());
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamErrorNonRetriableOther),
+              beforeNonRetriableOther);
+}
+
+TEST_F(ClusterClientCursorImplTest, MaxTimeMSExpiredViaExceptionDoesNotIncrementErrorCounters) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    using otel::metrics::MetricNames;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    const int64_t beforeNonRetriableOther =
+        capturer.readInt64Counter(MetricNames::kChangeStreamErrorNonRetriableOther);
+
+    auto cursor = makeThrowingChangeStreamCursor(_opCtx.get(), ErrorCodes::MaxTimeMSExpired);
+    ASSERT_THROWS_CODE(cursor.next(), DBException, ErrorCodes::MaxTimeMSExpired);
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamErrorNonRetriableOther),
+              beforeNonRetriableOther);
 }
 
 }  // namespace

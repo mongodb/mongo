@@ -10,7 +10,7 @@
  *   requires_fcv_90,
  * ]
  */
-import {after, before, describe, it} from "jstests/libs/mochalite.js";
+import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {
     assertDropAndRecreateCollection,
     assertDropCollection,
@@ -60,9 +60,12 @@ describe("change stream error counters are present in serverStatus", function ()
 });
 
 describe("non-retriable change stream error counters", function () {
-    it("nonRetriable.changeStreamFatalError increments when the pipeline removes the _id field", function () {
-        const errBefore = ServerStatusMetrics.getCsErrorMetrics(db);
+    let errBefore;
+    beforeEach(function () {
+        errBefore = ServerStatusMetrics.getCsErrorMetrics(db);
+    });
 
+    it("nonRetriable.changeStreamFatalError increments when the pipeline removes the _id field", function () {
         // Projecting out _id strips the resume token from every change event, triggering a
         // ChangeStreamFatalError on the first event observed.
         const csCursor = testColl.watch([{$project: {_id: 0}}]);
@@ -86,8 +89,6 @@ describe("non-retriable change stream error counters", function () {
     it("nonRetriable.bsonObjectTooLarge increments when a change event exceeds the BSON size limit", function () {
         const largeColl = testDB.getCollection("large_events");
         assertDropAndRecreateCollection(testDB, largeColl.getName());
-
-        const errBefore = ServerStatusMetrics.getCsErrorMetrics(db);
 
         // The internal BSON size limit (BSONObjMaxInternalSize) is 16MB + 16KB.
         // A 16MB fullDocument alone leaves the event ~16MB + ~300 bytes, which is still under
@@ -120,8 +121,6 @@ describe("non-retriable change stream error counters", function () {
     it("nonRetriable.other increments when a non-retriable unnamed error escapes the pipeline", function () {
         const csCursor = testColl.watch();
 
-        const errBefore = ServerStatusMetrics.getCsErrorMetrics(db);
-
         const fp = configureFailPoint(db, "throwErrorBeforeGetNext", {code: ErrorCodes.BadValue});
         try {
             // assert.soon is needed because hasNext() on a tailable cursor may return false
@@ -144,8 +143,6 @@ describe("non-retriable change stream error counters", function () {
         // Open a regular (non-change-stream) aggregation cursor. batchSize:0 defers result
         // delivery to the first getMore, exercising the command-layer guard.
         const cursor = testColl.aggregate([], {cursor: {batchSize: 0}});
-
-        const errBefore = ServerStatusMetrics.getCsErrorMetrics(db);
 
         const fp = configureFailPoint(db, "throwErrorBeforeGetNext", {code: ErrorCodes.BadValue});
         try {
@@ -198,10 +195,13 @@ describe("non-retriable change stream error counters", function () {
 });
 
 describe("retriable change stream error counters", function () {
+    let errBefore;
+    beforeEach(function () {
+        errBefore = ServerStatusMetrics.getCsErrorMetrics(db);
+    });
+
     it("retriable.interruptedDueToReplStateChange increments when that error escapes the pipeline", function () {
         const csCursor = testColl.watch();
-
-        const errBefore = ServerStatusMetrics.getCsErrorMetrics(db);
 
         const fp = configureFailPoint(db, "throwErrorBeforeGetNext", {
             code: ErrorCodes.InterruptedDueToReplStateChange,
@@ -226,8 +226,6 @@ describe("retriable change stream error counters", function () {
 
     it("retriable.other increments when a retriable unnamed error escapes the pipeline", function () {
         const csCursor = testColl.watch();
-
-        const errBefore = ServerStatusMetrics.getCsErrorMetrics(db);
 
         const fp = configureFailPoint(db, "throwErrorBeforeGetNext", {
             code: ErrorCodes.NetworkTimeout,

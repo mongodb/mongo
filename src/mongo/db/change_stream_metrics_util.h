@@ -231,10 +231,19 @@ inline otel::metrics::Counter<int64_t>& errorRetriableOther() {
     return counter;
 }
 
-// Increments the appropriate change-stream error counter for the given exception.
+// Returns true if 'code' represents a countable change stream error.
+// Excludes:
+//   - CloseChangeStream / ChangeStreamInvalidated: normal lifecycle transitions, not errors.
+//   - MaxTimeMSExpired: routine awaitData getMore timeout surfaced by the ARM as a non-OK
+//     Status; it is already tracked via _maxTimeMSExpired and should not pollute error counters.
+inline bool shouldCountChangeStreamError(ErrorCodes::Error code) {
+    return code != ErrorCodes::CloseChangeStream && code != ErrorCodes::ChangeStreamInvalidated &&
+        code != ErrorCodes::MaxTimeMSExpired;
+}
+
+// Increments the appropriate change-stream error counter for the given error code.
 // Must only be called when the cursor is a change stream (i.e. isChangeStreamQuery() == true).
-inline void incrementChangeStreamErrorCounters(const DBException& ex) {
-    auto code = ex.code();
+inline void incrementChangeStreamErrorCounters(ErrorCodes::Error code) {
     switch (code) {
         case ErrorCodes::ChangeStreamHistoryLost:
             errorNonRetriableHistoryLost().add(1);
@@ -256,14 +265,19 @@ inline void incrementChangeStreamErrorCounters(const DBException& ex) {
             // ShardRemovedError). Uses the generated category predicate so future additions to the
             // category are handled automatically rather than silently falling through to
             // nonRetriableOther.
-            if (ex.isA<ErrorCategory::NonResumableChangeStreamError>()) {
+            if (ErrorCodes::isA<ErrorCategory::NonResumableChangeStreamError>(code)) {
                 errorNonRetriableOther().add(1);
-            } else if (ex.isA<ErrorCategory::RetriableError>()) {
+            } else if (ErrorCodes::isA<ErrorCategory::RetriableError>(code)) {
                 errorRetriableOther().add(1);
             } else {
                 errorNonRetriableOther().add(1);
             }
     }
+}
+
+// Overload for DBException — delegates to the code-based overload above.
+inline void incrementChangeStreamErrorCounters(const DBException& ex) {
+    incrementChangeStreamErrorCounters(ex.code());
 }
 
 }  // namespace mongo::change_stream

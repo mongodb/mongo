@@ -158,7 +158,7 @@ ClusterClientCursorImpl::~ClusterClientCursorImpl() {
         mongosCursorStatsMoreThanOneBatch.increment();
 }
 
-StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next() {
+StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next() try {
     invariant(_opCtx);
     const auto interruptStatus = _opCtx->checkForInterruptNoAssert();
     if (!interruptStatus.isOK()) {
@@ -177,12 +177,28 @@ StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next() {
     }
 
     auto next = _root->next();
+    if (!next.isOK() && _isChangeStreamQuery) {
+        // Shard errors arrive here as non-OK StatusWith (not thrown), so this is the primary
+        // counting path for production change stream errors.
+        const auto code = next.getStatus().code();
+        if (change_stream::shouldCountChangeStreamError(code)) {
+            change_stream::incrementChangeStreamErrorCounters(code);
+        }
+    }
     if (next.isOK() && !next.getValue().isEOF()) {
         ++_numReturnedSoFar;
     }
     // Record if we just got a MaxTimeMSExpired error.
     _maxTimeMSExpired |= (next.getStatus().code() == ErrorCodes::MaxTimeMSExpired);
     return next;
+} catch (const DBException& ex) {
+    // Thrown exceptions are rare in production (mostly ChangeStreamInvalidated from the ARM),
+    // but this catch provides defense-in-depth for any stage that throws instead of returning
+    // a non-OK Status.
+    if (_isChangeStreamQuery && change_stream::shouldCountChangeStreamError(ex.code())) {
+        change_stream::incrementChangeStreamErrorCounters(ex);
+    }
+    throw;
 }
 
 Status ClusterClientCursorImpl::releaseMemory() {
