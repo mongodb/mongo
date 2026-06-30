@@ -174,14 +174,7 @@ MergeAllChunksOnShardResponse commitToGlobalCatalogFallback(OperationContext* op
     return MergeAllChunksOnShardResponse::parse(cmdResponse.response, kIdlParserCtx);
 }
 
-// TODO (SERVER-127444): return `CollectionType` (non-optional).
 boost::optional<CollectionType> getCollection(OperationContext* opCtx, const NamespaceString& nss) {
-    const auto csr = CollectionShardingRuntime::acquireShared(opCtx, nss);
-    if (csr->getAuthoritativeState() !=
-        CollectionShardingRuntime::AuthoritativeState::kAuthoritative) {
-        return boost::none;
-    }
-
     PersistentTaskStore<CollectionType> collStore{
         NamespaceString::kConfigShardCatalogCollectionsNamespace};
     boost::optional<CollectionType> coll;
@@ -191,10 +184,6 @@ boost::optional<CollectionType> getCollection(OperationContext* opCtx, const Nam
                           coll = parsedColl;
                           return false;
                       });
-    uassert(ErrorCodes::NamespaceNotFound,
-            fmt::format("Collection '{}' not found in local cluster catalog",
-                        nss.toStringForErrorMsg()),
-            coll);
     return coll;
 }
 
@@ -344,16 +333,15 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
                       logAttrs(nss()),
                       "shard"_attr = _request.getShard());
 
-                auto const coll = getCollection(opCtx, nss());
-
-                if (!coll.has_value()) {
-                    // boost::none means that the catalog is non-authoritative. In that case, return
-                    // early (without updating the coordinator document) and fallback later to the
-                    // legacy global catalog commit.
-                    LOGV2(12834401,
-                          "The catalog is non-authoritative, falling back to legacy commit",
+                const auto coll = getCollection(opCtx, nss());
+                if (!coll) {
+                    LOGV2(12744401,
+                          "Collection not found in local shard catalog, nothing to merge",
                           logAttrs(nss()),
                           "shard"_attr = _request.getShard());
+                    _doc.setNumMergedChunks(0);
+                    _doc.setShardVersion(ChunkVersion{});
+                    _enterPhase(Phase::kReleaseCriticalSection);
                     return;
                 }
 

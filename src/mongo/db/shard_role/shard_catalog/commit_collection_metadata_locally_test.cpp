@@ -40,6 +40,7 @@
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
@@ -611,6 +612,8 @@ TEST_F(CommitCollectionMetadataLocallyTest,
 }
 
 TEST_F(CommitCollectionMetadataLocallyTest, SetAllowChunkOperationsOplogEntryUsesCommandNamespace) {
+    unittest::ServerParameterGuard authoritativeScope("featureFlagAuthoritativeShardsCRUD", true);
+
     auto [collType, chunks] = makeCollectionMetadata(1);
     mockCatalogClient()->setCollectionMetadata(collType, chunks);
     shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss, true);
@@ -624,11 +627,8 @@ TEST_F(CommitCollectionMetadataLocallyTest, SetAllowChunkOperationsOplogEntryUse
     ScopedSetShardRole scopedSetShardRole{
         operationContext(), kTestNss, shardVersion, boost::none /* databaseVersion */};
 
-    shard_catalog_commit::commitSetAllowChunkOperationsLocally(operationContext(),
-                                                               kTestNss,
-                                                               false /* allowChunkOperations */,
-                                                               collType.getUuid(),
-                                                               true /* isPrimaryShard */);
+    shard_catalog_commit::commitSetAllowChunkOperationsLocally(
+        operationContext(), kTestNss, false /* allowChunkOperations */, collType.getUuid());
 
     auto oplogEntries =
         findLocalDocs(NamespaceString::kRsOplogNamespace,
@@ -660,12 +660,10 @@ TEST_F(CommitCollectionMetadataLocallyTest, CloneOnlyWritesDurableCatalogAndEmit
     ASSERT_EQ(countCommandOplogEntries("invalidateCollectionMetadata", kTestNss), 0);
     ASSERT_EQ(countCommandOplogEntries("setAllowChunkOperations", kTestNss), 0);
 
-    // The clone does not touch the in-memory CSR: with no prior state it stays unknown and
-    // non-authoritative, to be recovered lazily from the durable catalog when next needed.
+    // The clone does not touch the in-memory CSR: with no prior state it stays unknown, to be
+    // recovered lazily from the durable catalog when next needed.
     auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
     ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown());
-    ASSERT(scopedCsr->getAuthoritativeState() ==
-           CollectionShardingRuntime::AuthoritativeState::kNonAuthoritative);
 }
 
 // The clone must not clear an existing in-memory CSR when the shard owns no chunks and is not the

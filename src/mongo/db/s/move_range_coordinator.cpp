@@ -288,13 +288,12 @@ ExecutorFuture<void> MoveRangeCoordinator::_runImpl(
                       logv2::DynamicAttributes{getCoordinatorLogAttrs(),
                                                "commitAttempted"_attr = _doc.getCommitAttempted()});
                 hangInMoveRangeCoordinatorDetermineOutcome.pauseWhileSet(opCtx);
-
                 // On a retry or recovery, the config commit may have been issued by a previous
                 // execution whose effect this node does not yet observe. Establish a causality
                 // barrier so the placement read below reflects that commit; otherwise the outcome
                 // could be wrongly determined as aborted. (Replay protection of the commit itself
                 // is handled separately, via the session id.)
-                if (!_firstExecution) {
+                if (_mustResolveOutcomeFromConfig()) {
                     AllShardsAndConfigCausalityBarrier barrier{**executor, token};
                     performCausalityBarrier(opCtx, barrier);
                 }
@@ -599,19 +598,24 @@ void MoveRangeCoordinator::_determineAndRecordOutcome(
     _persistMigrationDecision(opCtx, doc, decision);
 }
 
-MoveRangeCoordinator::MigrationOutcome MoveRangeCoordinator::_resolveMigrationOutcome(
-    OperationContext* opCtx, const boost::optional<Status>& result) {
+bool MoveRangeCoordinator::_mustResolveOutcomeFromConfig() const {
+    const auto result = _getMigrationResult();
     const bool committedKnown = result.has_value() && result->isOK();
     const bool commitAttempted = _doc.getCommitAttempted().value_or(false);
 
     // The outcome is known locally when the commit clearly succeeded (result OK) or was never
     // attempted on this term (a clean abort during migrate). It must be resolved from the config
     // server only when the commit was attempted but its result is uncertain (a failover, or an
-    // ambiguous commit error).
-    if (committedKnown) {
+    // ambiguous commit error on this same term).
+    return !committedKnown && (commitAttempted || _recoveredFromDisk);
+}
+
+MoveRangeCoordinator::MigrationOutcome MoveRangeCoordinator::_resolveMigrationOutcome(
+    OperationContext* opCtx, const boost::optional<Status>& result) {
+    if (result.has_value() && result->isOK()) {
         return MigrationOutcome::kCommitted;
     }
-    if (!commitAttempted && !_recoveredFromDisk) {
+    if (!_mustResolveOutcomeFromConfig()) {
         tassert(12795312, "At this point migrationResult should have a value", result.has_value());
         return MigrationOutcome::kAborted;
     }

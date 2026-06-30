@@ -44,11 +44,10 @@ reshardingTest.withReshardingInBackground(
             {min: {y: 5, s: 5}, max: {y: MaxKey, s: MaxKey}, shard: recipientShardNames[1]},
         ],
     },
-    (tempNs) => {
+    () => {
         // Wait for cloning to have at least started on the recipient shards to know that the donor
         // shards have begun including the "destinedRecipient" field in their oplog entries.
-        const tempColl = mongos.getCollection(tempNs);
-        assert.soon(() => tempColl.findOne(docToUpdate) !== null);
+        reshardingTest.awaitCloneTimestampChosen();
 
         // When the updateDocumentShardKeyUsingTransactionApi feature flag is enabled, ordinary
         // updates that modify a document's shard key will complete.

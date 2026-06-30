@@ -517,8 +517,6 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(
                         opCtx.get(), _metadata.getTempReshardingNss());
                     scopedCsr->clearCollectionMetadata(opCtx.get());
-                    // TODO (SERVER-127444): Remove once all DDLs are made authoritative.
-                    scopedCsr->setNonAuthoritative();
                 }
 
                 const auto onReleaseCriticalSectionAction =

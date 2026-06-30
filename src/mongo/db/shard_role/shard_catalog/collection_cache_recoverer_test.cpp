@@ -31,8 +31,12 @@
 
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_catalog/type_collection.h"
+#include "mongo/db/read_concern_mongod_gen.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -190,6 +194,54 @@ TEST_F(RecovererFixture, CacheRecovererCanRecoverFromDisk) {
     const auto shardVersionExpected = chunks.back().getVersion();
 
     ASSERT_EQ(collMetadata->getCollPlacementVersion(), shardVersionExpected);
+}
+
+TEST_F(RecovererFixture, QueryableBackupModeRecoversFromLocalCatalogWithoutExecutor) {
+    OperationContext* opCtx = operationContext();
+    const auto originalQueryableBackupMode = storageGlobalParams.queryableBackupMode;
+    ON_BLOCK_EXIT([&] { storageGlobalParams.queryableBackupMode = originalQueryableBackupMode; });
+    storageGlobalParams.queryableBackupMode = true;
+
+    int numChunks = 20;
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, numChunks, kShard);
+    seedShardCatalogOnDisk(opCtx, collType, chunks);
+
+    CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
+
+    auto roundId = recoverer.start(opCtx, nullptr /* executor */);
+    ASSERT_OK(recoverer.waitForInitialPass(opCtx, roundId));
+    auto collMetadata = recoverer.drainAndApply(opCtx, roundId);
+
+    ASSERT_TRUE(collMetadata);
+    ASSERT_TRUE(collMetadata->isSharded());
+    ASSERT_EQ(collMetadata->getChunkManager()->numChunks(), numChunks);
+    ASSERT_EQ(collMetadata->getCollPlacementVersion(), chunks.back().getVersion());
+    ASSERT_TRUE(repl::ReadConcernArgs::get(opCtx).isEmpty());
+}
+
+TEST_F(RecovererFixture,
+       TestingSnapshotBehaviorInIsolationRecoversFromLocalCatalogWithoutExecutor) {
+    OperationContext* opCtx = operationContext();
+    const auto originalTestingSnapshotBehaviorInIsolation = gTestingSnapshotBehaviorInIsolation;
+    ON_BLOCK_EXIT(
+        [&] { gTestingSnapshotBehaviorInIsolation = originalTestingSnapshotBehaviorInIsolation; });
+    gTestingSnapshotBehaviorInIsolation = true;
+
+    int numChunks = 20;
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, numChunks, kShard);
+    seedShardCatalogOnDisk(opCtx, collType, chunks);
+
+    CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
+
+    auto roundId = recoverer.start(opCtx, nullptr /* executor */);
+    ASSERT_OK(recoverer.waitForInitialPass(opCtx, roundId));
+    auto collMetadata = recoverer.drainAndApply(opCtx, roundId);
+
+    ASSERT_TRUE(collMetadata);
+    ASSERT_TRUE(collMetadata->isSharded());
+    ASSERT_EQ(collMetadata->getChunkManager()->numChunks(), numChunks);
+    ASSERT_EQ(collMetadata->getCollPlacementVersion(), chunks.back().getVersion());
+    ASSERT_TRUE(repl::ReadConcernArgs::get(opCtx).isEmpty());
 }
 
 TEST_F(RecovererFixture, CacheRecovererRecoversAllChunksRegardlessOfDiskInsertionOrder) {

@@ -20,6 +20,10 @@ import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_
 // TODO (SERVER-129689): check reports from secondary nodes.
 const st = new ShardingTest({config: [{}]});
 const mongos = st.s;
+const isAuthoritativeShardsCRUDEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    mongos,
+    "AuthoritativeShardsCRUD",
+);
 
 // Use retryWrites when writing to the configsvr because mongos does not automatically retry those.
 const mongosSession = mongos.startSession({retryWrites: true});
@@ -644,8 +648,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 
     // Cluster level mode command
     let inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
-    // TODO (SERVER-98118): Leave a single assert.eq(3, inconsistencies.length) once v9.0 branches out
-    assert.between(2, inconsistencies.length, 3, tojson(inconsistencies));
+    assert.gte(inconsistencies.length, 2, tojson(inconsistencies));
     assert(
         inconsistencies.some((object) => object.type === "MissingRoutingTable"),
         tojson(inconsistencies),
@@ -794,12 +797,18 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     assert.commandWorked(configDB.collections.update({_id: kNss}, {$set: {unsplittable: true}}));
 
     let inconsistencies_key = db.checkMetadataConsistency().toArray();
-    assert.eq(2, inconsistencies_key.length);
+    assert.eq(isAuthoritativeShardsCRUDEnabled ? 3 : 2, inconsistencies_key.length);
     assert.contains(
         "TrackedUnshardedCollectionHasInvalidKey",
         inconsistencies_key.map((x) => x.type),
         tojson(inconsistencies_key),
     );
+    if (isAuthoritativeShardsCRUDEnabled) {
+        assertOnlyExpectedInconsistencyTypes(inconsistencies_key, [
+            "TrackedUnshardedCollectionHasInvalidKey",
+            "InconsistentShardCatalogCollectionMetadata",
+        ]);
+    }
 
     // Clean up the database to pass the hooks that detect inconsistencies
     db.dropDatabase();
@@ -963,11 +972,17 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     );
 
     const inconsistencies = db.checkMetadataConsistency().toArray();
-    assert.eq(2, inconsistencies.length);
+    assert.eq(isAuthoritativeShardsCRUDEnabled ? 3 : 2, inconsistencies.length);
     assertCollectionOptionsMismatch(inconsistencies, [
         {shards: [primaryShard.shardName], options: {defaultCollation: localCollation}},
         {shards: ["config"], options: {defaultCollation: {}}},
     ]);
+    if (isAuthoritativeShardsCRUDEnabled) {
+        assertOnlyExpectedInconsistencyTypes(inconsistencies, [
+            "CollectionOptionsMismatch",
+            "InconsistentShardCatalogCollectionMetadata",
+        ]);
+    }
 
     // Clean up the database to pass the hooks that detect inconsistencies.
     db.dropDatabase();

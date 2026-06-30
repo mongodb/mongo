@@ -35,7 +35,6 @@
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/generic_argument_util.h"
@@ -72,6 +71,7 @@
 #include "mongo/db/sharding_environment/sharding_api_d_params_gen.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
@@ -417,17 +417,8 @@ Status FilteringMetadataCache::onShardVersionMismatch(
     const NamespaceString& nss,
     boost::optional<ChunkVersion> chunkVersionReceived) noexcept try {
     while (true) {
-        // Force non-authoritative if the CSR isn't authoritative; otherwise decide the kind of
-        // refresh based on the Authoritative Shards CRUD feature flag.
-        const auto forcedKind = [&]() -> boost::optional<FilteringMetadataRefreshKind> {
-            auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss);
-            if (scopedCsr->getAuthoritativeState() !=
-                CollectionShardingRuntime::AuthoritativeState::kAuthoritative)
-                return FilteringMetadataRefreshKind::kNonAuthoritative;
-            return boost::none;
-        }();
-        const auto refresh =
-            FilteringMetadataRefreshTracker::get(opCtx)->acquire(opCtx, forcedKind);
+        // The kind of refresh is decided based on the Authoritative Shards CRUD feature flag.
+        const auto refresh = FilteringMetadataRefreshTracker::get(opCtx)->acquire(opCtx);
         const bool isAuthoritative = (refresh.kind == FilteringMetadataRefreshKind::kAuthoritative);
 
         invariant(!shard_role_details::getLocker(opCtx)->isLocked());
@@ -439,14 +430,15 @@ Status FilteringMetadataCache::onShardVersionMismatch(
             CurOp::get(opCtx)->debug().placementVersionRefreshMillis += Milliseconds(t.millis());
         });
 
-        // This check can flip by the time the function returns meaning a CSR has changed from
-        // authoritative to non-authoritative and viceversa. However, it's not an issue since any of
-        // the two state transitions will lead to the correct result once the function returns:
+        // The refresh kind is selected based on the Authoritative Shards CRUD feature flag, which
+        // can flip due to an FCV transition while the refresh is in flight. However, it's not an
+        // issue since any of the two transitions will lead to the correct result once the function
+        // returns:
         // - Start non-authoritative and end up becoming authoritative: The end result is that the
         //   collection will contain the correct shard filtering information/version so the query
         //   will produce the correct results.
         // - Start authoritative and end up non-authoritative: The check that occurs at the end of
-        //   the authoritative recovery will notice that the CSS is now non-authoritative and
+        //   the authoritative recovery will notice that the feature is no longer enabled and
         //   perform an early return so that we retry the entire operation again.
         const bool shouldRetry = runRefreshInChildOperationContext(
             opCtx, refresh.cancellationToken, [&](OperationContext* refreshOpCtx) {
@@ -481,12 +473,6 @@ void FilteringMetadataCache::forceCollectionMetadataRefresh_DEPRECATED(Operation
 
     if (MONGO_unlikely(skipShardFilteringMetadataRefresh.shouldFail())) {
         uasserted(ErrorCodes::InternalError, "skipShardFilteringMetadataRefresh failpoint");
-    }
-
-    {
-        // TODO (SERVER-127444): Remove this and tassert with the feature flag.
-        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-        scopedCsr->setNonAuthoritative();
     }
 
     const auto catalogCache = [&]() {
@@ -644,12 +630,6 @@ void FilteringMetadataCache::_recoverMigrationCoordinations(OperationContext* op
                                                             NamespaceString nss,
                                                             CancellationToken cancellationToken) {
     LOGV2_DEBUG(4798501, 2, "Starting migration recovery", logAttrs(nss));
-
-    {
-        // TODO (SERVER-127444): Remove this and tassert with the feature flag.
-        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-        scopedCsr->setNonAuthoritative();
-    }
 
     unsigned migrationRecoveryCount = 0;
 
@@ -830,8 +810,18 @@ Status FilteringMetadataCache::_refreshDbMetadata(OperationContext* opCtx,
         Date_t::max(),
         Lock::DBLockSkipOptions{
             false, false, false, rss::consensus::IntentRegistry::Intent::LocalWrite});
+
     auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, dbName);
+
     if (!cancellationToken.isCanceled()) {
+        // Before committing, make sure the feature flag hasn't changed.
+        uassert(ErrorCodes::MetadataRefreshCanceledDueToFCVTransition,
+                "Non-authoritative database metadata refresh can't proceed: FCV has changed",
+                sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
+                    kVersionContextIgnored_UNSAFE,
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) !=
+                    AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed);
+
         if (swDbMetadata.isOK()) {
             // Set the refreshed database metadata in the local catalog.
             scopedDsr->setDbInfo_DEPRECATED(opCtx, *swDbMetadata.getValue());
@@ -1318,19 +1308,17 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
                 ? CollectionShardingRuntime::NoRoutingTableAs::kUntracked
                 : CollectionShardingRuntime::NoRoutingTableAs::kUnowned;
 
-            // Before committing, make sure the feature flag hasn't changed.
-            FixedFCVRegion guard{opCtx};
-            uassert(ErrorCodes::MetadataRefreshCanceledDueToFCVTransition,
-                    "Authoritative collection metadata refresh can't proceed: FCV has changed",
-                    sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
-                        kVersionContextIgnored_UNSAFE, guard->acquireFCVSnapshot()) ==
-                        AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed);
-
             // cancellationToken needs to be checked under the CSR lock before overwriting the
             // filtering metadata to serialize with other threads calling 'clearCollectionMetadata'.
-            if (!cancellationToken.isCanceled() &&
-                scopedCsr->getAuthoritativeState() ==
-                    CollectionShardingRuntime::AuthoritativeState::kAuthoritative) {
+            if (!cancellationToken.isCanceled()) {
+                // Before committing, make sure the feature flag hasn't changed.
+                uassert(ErrorCodes::MetadataRefreshCanceledDueToFCVTransition,
+                        "Authoritative collection metadata refresh can't proceed: FCV has changed",
+                        sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
+                            kVersionContextIgnored_UNSAFE,
+                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ==
+                            AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed);
+
                 scopedCsr->setCollectionMetadata(opCtx, *metadata, noRoutingTableAs);
                 ShardingStatistics::get(opCtx)
                     .authoritativeCollectionMetadataStatistics.registerDiskRecovery();
@@ -1351,6 +1339,15 @@ FilteringMetadataCache::WasWaitInterrupted
 FilteringMetadataCache::_waitForConfigTimeOrChunkVersionChange(OperationContext* opCtx,
                                                                const NamespaceString& nss,
                                                                const ChunkVersion& chunkVersion) {
+    if (storageGlobalParams.queryableBackupMode) {
+        LOGV2_DEBUG(
+            12744400,
+            2,
+            "Authoritative metadata recovery: skipping configTime wait in queryable backup mode",
+            logAttrs(nss),
+            "shardVersionReceived"_attr = chunkVersion);
+        return WasWaitInterrupted::kNo;
+    }
 
     // Use configTime as the upper bound for the wait. Once configTime is reached with majority
     // read concern, all DDL critical sections that could have changed the shard version have been
@@ -1509,6 +1506,10 @@ void FilteringMetadataCache::_onShardVersionMismatchAuthoritative(
     OperationContext* opCtx,
     const NamespaceString& nss,
     boost::optional<ChunkVersion> receivedShardVersion) {
+    if (MONGO_unlikely(skipShardFilteringMetadataRefresh.shouldFail())) {
+        uasserted(ErrorCodes::InternalError, "skipShardFilteringMetadataRefresh failpoint");
+    }
+
     if (nss.isNamespaceAlwaysUntracked()) {
         return;
     }
@@ -1668,6 +1669,15 @@ SharedSemiFuture<void> FilteringMetadataCache::_recoverRefreshCollectionPlacemen
                 // filtering metadata to serialize with other threads calling
                 // 'clearCollectionMetadata'.
                 if (!cancellationToken.isCanceled()) {
+                    // Before committing, make sure the feature flag hasn't changed.
+                    uassert(ErrorCodes::MetadataRefreshCanceledDueToFCVTransition,
+                            "Non-authoritative collection metadata refresh can't proceed: FCV has "
+                            "changed",
+                            sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
+                                kVersionContextIgnored_UNSAFE,
+                                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) !=
+                                AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed);
+
                     // Atomically set the new filtering metadata and check if there is a migration
                     // that must be aborted.
                     scopedCsr->setCollectionMetadata(opCtx, currentMetadata);
@@ -1713,12 +1723,6 @@ void FilteringMetadataCache::_onShardVersionMismatch(
 
     if (nss.isNamespaceAlwaysUntracked()) {
         return;
-    }
-
-    {
-        // TODO (SERVER-127444): Remove this and tassert with the feature flag.
-        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-        scopedCsr->setNonAuthoritative();
     }
 
     LOGV2_DEBUG(22061,

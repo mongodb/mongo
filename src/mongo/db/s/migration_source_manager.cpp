@@ -771,11 +771,6 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
             withChangelogErrMsg("Failed to acquire exclusive lock", [&] {
                 auto scopedCsr = CollectionShardingRuntime::acquireExclusive(_opCtx, nss());
                 scopedCsr->clearCollectionMetadata(_opCtx);
-                // TODO (SERVER-127444): Remove this `setNonAuthoritative` to assert with the
-                // feature flag. Migrations are a non-authoritative path, so the CSR must be reset
-                // to non-authoritative to avoid a stale authoritative state forcing the recovery
-                // refresh onto the authoritative path.
-                scopedCsr->setNonAuthoritative();
             });
         }
         scopedGuard.dismiss();
@@ -821,11 +816,6 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
             withChangelogErrMsg("Failed to acquire exclusive lock", [&] {
                 auto scopedCsr = CollectionShardingRuntime::acquireExclusive(_opCtx, nss());
                 scopedCsr->clearCollectionMetadata(_opCtx);
-                // TODO (SERVER-127444): Remove this `setNonAuthoritative` to assert with the
-                // feature flag. Migrations are a non-authoritative path, so the CSR must be reset
-                // to non-authoritative to avoid a stale authoritative state forcing the recovery
-                // refresh onto the authoritative path.
-                scopedCsr->setNonAuthoritative();
             });
         }
         scopedGuard.dismiss();
@@ -1267,11 +1257,6 @@ Status MigrationSourceManager::_cleanup(bool completeMigration) {
             // let the next op to recover.
             auto scopedCsr = CollectionShardingRuntime::acquireExclusive(_opCtx, nss());
             scopedCsr->clearCollectionMetadata(_opCtx);
-            // TODO (SERVER-127444): Remove this `setNonAuthoritative` to assert with the feature
-            // flag. Migrations are a non-authoritative path, so the CSR must be reset to
-            // non-authoritative to avoid a stale authoritative state forcing the recovery refresh
-            // onto the authoritative path.
-            scopedCsr->setNonAuthoritative();
         }
         cleanupResult = ex.toStatus();
     }

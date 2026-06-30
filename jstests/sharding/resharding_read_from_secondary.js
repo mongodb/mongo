@@ -7,6 +7,7 @@
  * ]
  */
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
@@ -30,6 +31,10 @@ function triggerShardVersionRefreshOnSecondary(collection) {
 }
 
 const mongos = sourceCollection.getMongo();
+const isAuthoritativeShardsDDLEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    mongos,
+    "AuthoritativeShardsDDL",
+);
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 const configPrimary = new Mongo(topology.configsvr.primary);
 const fp = configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeCloning");
@@ -46,8 +51,16 @@ reshardingTest.withReshardingInBackground(
 
         triggerShardVersionRefreshOnSecondary(sourceCollection);
 
-        const tempColl = mongos.getCollection(tempNs);
-        triggerShardVersionRefreshOnSecondary(tempColl);
+        if (!isAuthoritativeShardsDDLEnabled) {
+            const tempColl = mongos.getCollection(tempNs);
+            triggerShardVersionRefreshOnSecondary(tempColl);
+        } else {
+            jsTestLog(
+                "Skipping secondary read from temporary resharding collection because " +
+                    "authoritative shard-local metadata is not installed for the temporary " +
+                    "namespace at this point in resharding.",
+            );
+        }
 
         fp.off();
     },

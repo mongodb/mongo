@@ -98,8 +98,7 @@ public:
             OperationContext* opCtx,
             const NamespaceString& nss,
             bool allowChunkOperations,
-            const boost::optional<UUID>& uuid,
-            bool isPrimaryShard) {
+            const boost::optional<UUID>& uuid) {
 
             // Holding this acquisition guarantees serialization with the critical section (both the
             // blocking writes CS and the blocking reads CS), so it is guaranteed that no chunk
@@ -115,7 +114,7 @@ public:
                                   MODE_IX);
 
             shard_catalog_commit::commitSetAllowChunkOperationsLocally(
-                opCtx, nss, allowChunkOperations, uuid, isPrimaryShard);
+                opCtx, nss, allowChunkOperations, uuid);
 
             if (allowChunkOperations) {
                 return boost::none;
@@ -179,12 +178,8 @@ public:
                 // is disabled and WriteConflictException would otherwise propagate.
                 waitForMigrationAbort =
                     writeConflictRetry(newOpCtx, "ShardsvrSetAllowChunkOperations", nss, [&] {
-                        return setAllowChunkOperations(newOpCtx,
-                                                       nss,
-                                                       allowChunkOperations,
-                                                       collectionUUID,
-                                                       ShardingState::get(newOpCtx)->shardId() ==
-                                                           request().getPrimaryShardId());
+                        return setAllowChunkOperations(
+                            newOpCtx, nss, allowChunkOperations, collectionUUID);
                     });
             }
 

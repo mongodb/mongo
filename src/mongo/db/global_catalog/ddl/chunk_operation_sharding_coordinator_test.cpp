@@ -160,7 +160,6 @@ protected:
         auto scopedCSR = CollectionShardingRuntime::acquireExclusive(_opCtx, kTestNs);
         scopedCSR->setCollectionMetadata(
             _opCtx, collectionMetadata, CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
-        scopedCSR->setAuthoritative();
     }
 
     MergeChunksCoordinatorDocument makeMergeChunksCoordinatorDoc(std::vector<BSONObj> bounds,

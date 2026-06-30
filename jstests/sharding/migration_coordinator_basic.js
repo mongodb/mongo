@@ -6,6 +6,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
@@ -37,6 +38,11 @@ var st = new ShardingTest({shards: 2});
 
 assert.commandWorked(
     st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
+
+const usesMoveRangeCoordinatorPath = FeatureFlagUtil.isPresentAndEnabled(
+    st.s.getDB("admin"),
+    "AuthoritativeShardsDDL",
 );
 
 function getCollectionUuidAndEpoch(ns) {
@@ -259,17 +265,20 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
     // assertions.
     let step4Failpoint = configureFailPoint(st.shard0, "moveChunkHangAtStep4");
     let step5Failpoint = configureFailPoint(st.shard0, "moveChunkHangAtStep5");
+    const expectedMigrationCommitFailureCodes = usesMoveRangeCoordinatorPath
+        ? [ErrorCodes.StaleEpoch, ErrorCodes.OperationFailed]
+        : [ErrorCodes.StaleEpoch];
     const awaitResult = startParallelShell(
         funWithArgs(
-            function (ns, toShardName) {
-                // Expect StaleEpoch because of the failpoint that will make the migration commit fail.
+            function (ns, toShardName, expectedMigrationCommitFailureCodes) {
                 assert.commandFailedWithCode(
                     db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}),
-                    ErrorCodes.StaleEpoch,
+                    expectedMigrationCommitFailureCodes,
                 );
             },
             ns,
             st.shard1.shardName,
+            expectedMigrationCommitFailureCodes,
         ),
         st.s.port,
     );

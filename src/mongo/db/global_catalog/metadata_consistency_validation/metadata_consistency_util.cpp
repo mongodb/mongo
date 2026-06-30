@@ -722,7 +722,6 @@ void checkCollectionMetadataInShardCatalog(
     boost::optional<CollectionMetadata> inMemoryShardCatalogMetadata;
     ChunkVersion collectionPlacementVersion;
     bool csrIsUnowned = false;
-    bool csrIsAuthoritative = false;
 
     const bool authoritativeShardsCRUDEnabled = feature_flags::gAuthoritativeShardsCRUD.isEnabled(
         VersionContext::getDecoration(opCtx),
@@ -758,15 +757,12 @@ void checkCollectionMetadataInShardCatalog(
 
             collectionPlacementVersion = inMemoryShardCatalogMetadata->getCollPlacementVersion();
         }
-
-        csrIsAuthoritative = scopedCsr->getAuthoritativeState() ==
-            CollectionShardingRuntime::AuthoritativeState::kAuthoritative;
     }
 
     if (!inMemoryShardCatalogMetadata) {
         // Even when in-memory metadata is unknown, authoritative shards must not have orphan
         // durable entries (for untracked collections)
-        if (authoritativeShardsCRUDEnabled && csrIsAuthoritative) {
+        if (authoritativeShardsCRUDEnabled) {
             if (!collectionInGlobalCatalog) {
                 validateNoDurableShardCatalogEntries(
                     opCtx, nss, localCollectionPtr->uuid(), inconsistencies);
@@ -785,8 +781,8 @@ void checkCollectionMetadataInShardCatalog(
 
     // The corner-case when for tracked collection CSR is authoritative has no routing table.
     // This condition will be checked later.
-    const bool isPrimaryWithNoRoutingTable = expectTracked && !csrHasRoutingTable && isPrimary &&
-        csrIsAuthoritative && authoritativeShardsCRUDEnabled;
+    const bool isPrimaryWithNoRoutingTable =
+        expectTracked && !csrHasRoutingTable && isPrimary && authoritativeShardsCRUDEnabled;
     if (!csrIsUnowned && !isPrimaryWithNoRoutingTable &&
         ((!expectTracked && csrHasRoutingTable) || (expectTracked && !csrHasRoutingTable))) {
         inconsistencies.emplace_back(makeInconsistency(
@@ -800,7 +796,10 @@ void checkCollectionMetadataInShardCatalog(
         return;
     }
 
-    if (csrIsUnowned && isPrimary) {
+    // Unowned is a token only of the authoritative shards. Without authoritative shards, a shard
+    // can keep a leftover unowned state from a previous state, but it is harmless even if used. If
+    // the cluster upgrades again, the clone DDL will clean it up.
+    if (authoritativeShardsCRUDEnabled && csrIsUnowned && isPrimary) {
         inconsistencies.emplace_back(makeInconsistency(
             MetadataInconsistencyTypeEnum::kInconsistentShardCatalogCollectionMetadata,
             InconsistentShardCatalogCollectionMetadataDetails{
@@ -815,7 +814,7 @@ void checkCollectionMetadataInShardCatalog(
 
     // If the collection is not tracked in the global catalog, we can stop the checks.
     if (!expectTracked) {
-        if (authoritativeShardsCRUDEnabled && csrIsAuthoritative) {
+        if (authoritativeShardsCRUDEnabled) {
             validateNoDurableShardCatalogEntries(
                 opCtx, nss, localCollectionPtr->uuid(), inconsistencies);
         }
@@ -881,11 +880,6 @@ void checkCollectionMetadataInShardCatalog(
     }
 
     if (!authoritativeShardsCRUDEnabled) {
-        return;
-    }
-
-    if (scopedCsr->getAuthoritativeState() ==
-        CollectionShardingRuntime::AuthoritativeState::kNonAuthoritative) {
         return;
     }
 
@@ -1246,6 +1240,12 @@ std::vector<BSONObj> _runExhaustiveAggregation(OperationContext* opCtx,
         // routing information cache may fail.
         // When this happens, ignore the error: the problem will still be reported to the user
         // thanks  to the consistency checks performed on the config server.
+        logMetadataInconsistency(nss, e);
+    } catch (const ExceptionFor<ErrorCodes::StaleConfig>& e) {
+        // ClusterAggregate has already retried stale routing errors through CollectionRouter. If
+        // StaleConfig reaches this helper, the routing refresh failed to make progress.
+        // Authoritative shard metadata can cause this when the shard rejects the router's
+        // global-catalog view because it cannot recover matching shard-local metadata.
         logMetadataInconsistency(nss, e);
     } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& e) {
         // This is for backward compatibility reasons.

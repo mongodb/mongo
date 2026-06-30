@@ -2330,6 +2330,12 @@ void CreateCollectionCoordinator::_commitOnShardCatalog(
     // The DB primary shard must always know that a collection is tracked, even when it does not
     // own any chunks.
     involvedShards.emplace(ShardingState::get(opCtx)->shardId());
+    // The original data shard may no longer own chunks after applying the final placement (for
+    // example, due to zones), but it still needs the shard catalog commit to clear the previous
+    // unsplittable collection metadata.
+    if (_doc.getOriginalDataShard()) {
+        involvedShards.emplace(*_doc.getOriginalDataShard());
+    }
 
     const auto session = getNewSession(opCtx);
     sharding_ddl_util::commitCreateCollectionMetadataToShardCatalog(

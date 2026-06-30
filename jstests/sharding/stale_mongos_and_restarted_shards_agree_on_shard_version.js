@@ -67,6 +67,15 @@ function setupCollectionForTest(collName) {
 
 const freshMongoS = st.s0;
 const staleMongoS = st.s1;
+const isAuthoritativeShardsCRUDEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    st.shard0,
+    "AuthoritativeShardsCRUD",
+);
+
+function getCollectionShardingMetadataRecoveryStats(shard) {
+    return shard.getDB("admin").serverStatus().shardingStatistics
+        .collectionShardingMetadataRecoveryStatistics;
+}
 
 {
     jsTest.log("Testing: Insert with sharded collection unknown on a stale mongos");
@@ -197,7 +206,7 @@ withRetryOnTransientTxnError(
     // affecting the actual number of refreshing threads and sharding statistics. In sharded
     // clusters, the logical session collection is sharded and any operations on it require the
     // cached metadata to be updated, causing a refresh if necessary.
-    if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
+    if (!isAuthoritativeShardsCRUDEnabled) {
         st.shard0.adminCommand({_flushRoutingTableCacheUpdates: "config.system.sessions"});
     }
 
@@ -218,6 +227,9 @@ withRetryOnTransientTxnError(
     };
 
     let updateShells = [];
+    const recoveryStatsBefore = isAuthoritativeShardsCRUDEnabled
+        ? getCollectionShardingMetadataRecoveryStats(st.shard0)
+        : undefined;
 
     for (let i = 1; i <= kNumThreadsForConvoyTest; ++i) {
         updateShells.push(
@@ -244,16 +256,26 @@ withRetryOnTransientTxnError(
         return kNumThreadsForConvoyTest === matchingOps.length && matchingOps[0].opid != null;
     }, "Failed to find operations");
 
-    let shardOps = st.shard0
-        .getDB("admin")
-        .aggregate([
-            {$currentOp: {"allUsers": true, "idleConnections": true}},
-            {$match: {desc: {$regex: "RecoverRefreshThread"}}},
-        ])
-        .toArray();
+    if (isAuthoritativeShardsCRUDEnabled) {
+        const recoveryStatsAfter = getCollectionShardingMetadataRecoveryStats(st.shard0);
 
-    // There must be only one thread refreshing.
-    assert.eq(1, shardOps.length);
+        // Authoritative recovery runs in the operation that won the race to create the recoverer.
+        assert.eq(recoveryStatsBefore.recoverersCreated + 1, recoveryStatsAfter.recoverersCreated, {
+            recoveryStatsBefore,
+            recoveryStatsAfter,
+        });
+    } else {
+        let shardOps = st.shard0
+            .getDB("admin")
+            .aggregate([
+                {$currentOp: {"allUsers": true, "idleConnections": true}},
+                {$match: {desc: {$regex: "RecoverRefreshThread"}}},
+            ])
+            .toArray();
+
+        // There must be only one thread refreshing.
+        assert.eq(1, shardOps.length, {shardOps});
+    }
 
     failPoint.off();
 

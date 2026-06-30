@@ -358,7 +358,6 @@ TEST_F(CollectionShardingRuntimeTest, CheckShardVersionThrowsStaleConfigAfterDon
         {ChunkHistory(*changedChunk.getOnCurrentShardSince(), changedChunk.getShard())});
     auto updatedMetadata = metadata.makeUpdated({changedChunk}, kThisShardHandle);
 
-    csr.setAuthoritative();
     csr.setCollectionMetadata(
         opCtx, updatedMetadata, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
@@ -433,11 +432,8 @@ TEST_F(CollectionShardingRuntimeTest,
     ASSERT_TRUE(csr.getCurrentMetadataIfKnown());
 
     csr.clearCollectionMetadata(opCtx);
-    csr.setAuthoritative();
 
     ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
-    ASSERT_EQ(csr.getAuthoritativeState(),
-              CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
 }
 
 TEST_F(CollectionShardingRuntimeTest,
@@ -448,11 +444,8 @@ TEST_F(CollectionShardingRuntimeTest,
     ASSERT_TRUE(csr.getCurrentMetadataIfKnown());
 
     csr.clearCollectionMetadata(opCtx);
-    csr.setAuthoritative();
 
     ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
-    ASSERT_EQ(csr.getAuthoritativeState(),
-              CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
 }
 
 TEST_F(CollectionShardingRuntimeTest,
@@ -462,81 +455,7 @@ TEST_F(CollectionShardingRuntimeTest,
     ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
 
     csr.clearCollectionMetadata(opCtx);
-    csr.setAuthoritative();
 
-    ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
-    ASSERT_EQ(csr.getAuthoritativeState(),
-              CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
-}
-
-TEST_F(CollectionShardingRuntimeTest, SetCollectionMetadataKeepsNonAuthoritativeState) {
-    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
-    OperationContext* opCtx = operationContext();
-    auto metadata = makeShardedMetadata(opCtx);
-
-    ASSERT_EQ(csr.getAuthoritativeState(),
-              CollectionShardingRuntime::AuthoritativeState::kNonAuthoritative);
-
-    csr.setCollectionMetadata(opCtx, metadata);
-
-    ASSERT_TRUE(csr.getCurrentMetadataIfKnown());
-    ASSERT_EQ(csr.getAuthoritativeState(),
-              CollectionShardingRuntime::AuthoritativeState::kNonAuthoritative);
-}
-
-TEST_F(CollectionShardingRuntimeTest, SetCollectionMetadataKeepsAuthoritativeState) {
-    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
-    OperationContext* opCtx = operationContext();
-    auto metadata = makeShardedMetadata(opCtx);
-
-    csr.clearCollectionMetadata(opCtx);
-    csr.setAuthoritative();
-    ASSERT_EQ(csr.getAuthoritativeState(),
-              CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
-
-    csr.setCollectionMetadata(opCtx, metadata);
-
-    ASSERT_TRUE(csr.getCurrentMetadataIfKnown());
-    ASSERT_EQ(csr.getAuthoritativeState(),
-              CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
-}
-
-TEST_F(CollectionShardingRuntimeTest, ClearCollectionMetadataKeepsNonAuthoritativeState) {
-    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
-    OperationContext* opCtx = operationContext();
-    csr.setCollectionMetadata(opCtx, makeShardedMetadata(opCtx));
-
-    csr.clearCollectionMetadata(opCtx);
-
-    ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
-    ASSERT_EQ(csr.getAuthoritativeState(),
-              CollectionShardingRuntime::AuthoritativeState::kNonAuthoritative);
-}
-
-TEST_F(CollectionShardingRuntimeTest, ClearCollectionMetadataKeepsAuthoritativeState) {
-    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
-    OperationContext* opCtx = operationContext();
-    csr.setCollectionMetadata(
-        opCtx, makeShardedMetadata(opCtx), CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
-    csr.setAuthoritative();
-
-    csr.clearCollectionMetadata(opCtx);
-
-    ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
-    ASSERT_EQ(csr.getAuthoritativeState(),
-              CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
-}
-
-TEST_F(CollectionShardingRuntimeTest, SetAuthoritativeUpdatesAuthoritativeStateOnly) {
-    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
-    ASSERT_EQ(csr.getAuthoritativeState(),
-              CollectionShardingRuntime::AuthoritativeState::kNonAuthoritative);
-    ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
-
-    csr.setAuthoritative();
-
-    ASSERT_EQ(csr.getAuthoritativeState(),
-              CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
     ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
 }
 
@@ -1044,8 +963,6 @@ TEST_F(CollectionShardingRuntimeTest, WaiterIsWokenForMatchingUntrackedAuthorita
     csr.setCollectionMetadata(opCtx,
                               CollectionMetadata::UNTRACKED(),
                               CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
-    csr.setAuthoritative();
-
     ASSERT_TRUE(future.isReady());
     future.get();
 }
@@ -1069,8 +986,6 @@ TEST_F(CollectionShardingRuntimeTest, WaiterIsWokenForMatchingTrackedZeroChunksA
 
     csr.setCollectionMetadata(
         opCtx, metadata, CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
-    csr.setAuthoritative();
-
     ASSERT_TRUE(future.isReady());
     future.get();
 }
@@ -1084,7 +999,6 @@ TEST_F(CollectionShardingRuntimeTest, AuthoritativeEmptyCsrReceivesFirstChunks) 
 
     // Start authoritative with zero owned chunks: every key is a gap.
     auto metadata = makeGappedShardedMetadata(opCtx, uuid, {}, kThisShardHandle);
-    csr.setAuthoritative();
     csr.setCollectionMetadata(
         opCtx, metadata, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
@@ -1098,7 +1012,6 @@ TEST_F(CollectionShardingRuntimeTest, AuthoritativeEmptyCsrReceivesFirstChunks) 
     auto updated = metadata.makeUpdated(
         makeChangedChunks(opCtx, metadata, {{0, 10, kThisShardHandle}, {20, 30, kThisShardHandle}}),
         kThisShardHandle);
-    csr.setAuthoritative();
     csr.setCollectionMetadata(
         opCtx, updated, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
@@ -1120,13 +1033,11 @@ TEST_F(CollectionShardingRuntimeTest, AuthoritativeCsrReceivesChunksForAnotherSh
 
     auto metadata =
         makeGappedShardedMetadata(opCtx, uuid, {{0, 10, kThisShardHandle}}, kThisShardHandle);
-    csr.setAuthoritative();
     csr.setCollectionMetadata(
         opCtx, metadata, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
     auto updated = metadata.makeUpdated(
         makeChangedChunks(opCtx, metadata, {{20, 30, kOtherShardHandle}}), kThisShardHandle);
-    csr.setAuthoritative();
     csr.setCollectionMetadata(
         opCtx, updated, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
@@ -1147,13 +1058,11 @@ TEST_F(CollectionShardingRuntimeTest, AuthoritativeCsrReceivesChunksForCurrentSh
 
     auto metadata =
         makeGappedShardedMetadata(opCtx, uuid, {{0, 10, kThisShardHandle}}, kThisShardHandle);
-    csr.setAuthoritative();
     csr.setCollectionMetadata(
         opCtx, metadata, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
     auto updated = metadata.makeUpdated(
         makeChangedChunks(opCtx, metadata, {{20, 30, kThisShardHandle}}), kThisShardHandle);
-    csr.setAuthoritative();
     csr.setCollectionMetadata(
         opCtx, updated, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
@@ -1174,7 +1083,6 @@ TEST_F(CollectionShardingRuntimeTest, AuthoritativeSingleChunkCsrDonatesItsOnlyC
 
     auto metadata =
         makeGappedShardedMetadata(opCtx, uuid, {{0, 10, kThisShardHandle}}, kThisShardHandle);
-    csr.setAuthoritative();
     csr.setCollectionMetadata(
         opCtx, metadata, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
@@ -1187,7 +1095,6 @@ TEST_F(CollectionShardingRuntimeTest, AuthoritativeSingleChunkCsrDonatesItsOnlyC
     // The same range is re-tagged to another shard, so this shard owns nothing afterwards.
     auto updated = metadata.makeUpdated(
         makeChangedChunks(opCtx, metadata, {{0, 10, kOtherShardHandle}}), kThisShardHandle);
-    csr.setAuthoritative();
     csr.setCollectionMetadata(
         opCtx, updated, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
@@ -1206,7 +1113,6 @@ TEST_F(CollectionShardingRuntimeTest, AuthoritativeCsrReceivesMixedChunkDelta) {
     const auto uuid = UUID::gen();
 
     auto metadata = makeGappedShardedMetadata(opCtx, uuid, {}, kThisShardHandle);
-    csr.setAuthoritative();
     csr.setCollectionMetadata(
         opCtx, metadata, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
@@ -1214,7 +1120,6 @@ TEST_F(CollectionShardingRuntimeTest, AuthoritativeCsrReceivesMixedChunkDelta) {
         makeChangedChunks(
             opCtx, metadata, {{0, 10, kThisShardHandle}, {20, 30, kOtherShardHandle}}),
         kThisShardHandle);
-    csr.setAuthoritative();
     csr.setCollectionMetadata(
         opCtx, updated, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
@@ -1743,7 +1648,6 @@ TEST_F(CollectionShardingRuntimeTest, OnInvalidateCollectionMetadataClearsCSRWit
         scopedCsr->setCollectionMetadata(opCtx,
                                          makeShardedMetadata(opCtx, collUuid),
                                          CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
-        scopedCsr->setAuthoritative();
     }
 
     {
@@ -1758,8 +1662,6 @@ TEST_F(CollectionShardingRuntimeTest, OnInvalidateCollectionMetadataClearsCSRWit
     {
         auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
         ASSERT_FALSE(csr->getCurrentMetadataIfKnown());
-        ASSERT_EQ(csr->getAuthoritativeState(),
-                  CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
     }
 }
 
@@ -1790,8 +1692,6 @@ TEST_F(CollectionShardingRuntimeTest, OnApplyCollectionShardingStateDeltaCSRWith
         auto metadata = csr->getCurrentMetadataIfKnown();
         ASSERT_TRUE(metadata);
         ASSERT_EQ(metadata->getCollPlacementVersion(), newVersion);
-        ASSERT_EQ(csr->getAuthoritativeState(),
-                  CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
     }
 }
 
@@ -1819,13 +1719,11 @@ TEST_F(CollectionShardingRuntimeTest, OnApplyCollectionShardingStateDeltaWithout
     ShardServerOpObserver observer;
     observer.onApplyCollectionShardingStateDelta(opCtx, oplogEntry);
 
-    // The delta is dropped and the collection stays in an authoritative-but-unknown state, forcing
-    // the next user to perform a full recovery from disk.
+    // The delta is dropped and the collection stays unknown, forcing the next user to perform a
+    // full recovery from disk.
     {
         auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
         ASSERT_FALSE(csr->getCurrentMetadataIfKnown());
-        ASSERT_EQ(csr->getAuthoritativeState(),
-                  CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
     }
 }
 

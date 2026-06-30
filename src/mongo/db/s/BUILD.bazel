@@ -513,6 +513,7 @@ mongo_cc_library(
         "//src/mongo/db:index_key_validate",
         "//src/mongo/db:internal_transactions_feature_flag",
         "//src/mongo/db:keys_collection_client_direct",
+        "//src/mongo/db:read_concern_mongod_idl",
         "//src/mongo/db:rs_local_client",
         "//src/mongo/db:rw_concern_d",
         "//src/mongo/db:server_base",

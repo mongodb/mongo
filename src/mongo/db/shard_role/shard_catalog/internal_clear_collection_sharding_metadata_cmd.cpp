@@ -72,18 +72,10 @@ public:
             const NamespaceString& nss = ns();
 
             auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-            auto previousState = scopedCsr->getAuthoritativeState();
             if (cmd.getIsAuthoritative()) {
-                LOGV2_INFO(12170301,
-                           "Clearing metadata authoritatively",
-                           "previousAuthoritativeState"_attr = previousState);
-                scopedCsr->setAuthoritative();
-
+                LOGV2_INFO(12170301, "Clearing metadata authoritatively");
             } else {
-                LOGV2_INFO(12170300,
-                           "Clearing metadata non-authoritatively",
-                           "previousAuthoritativeState"_attr = previousState);
-                scopedCsr->setNonAuthoritative();
+                LOGV2_INFO(12170300, "Clearing metadata non-authoritatively");
             }
             scopedCsr->clearCollectionMetadata(opCtx);
         }

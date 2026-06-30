@@ -217,7 +217,6 @@ TEST_F(AuthoritativeRefreshFixture, UntrackedIsCorrectlyRecoveredFromDisk) {
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, untrackedNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     auto status = onShardVersionMismatch(opCtx, untrackedNss, boost::none);
@@ -236,7 +235,6 @@ TEST_F(AuthoritativeRefreshFixture, NoChunkVersionTriggersRecoveryFromDisk) {
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     auto status = onShardVersionMismatch(opCtx, kTestNss, boost::none);
@@ -259,7 +257,6 @@ TEST_F(AuthoritativeRefreshFixture, ChunkVersionMatchReturnsEarly) {
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     auto status = onShardVersionMismatch(opCtx, kTestNss, matchingVersion);
@@ -284,7 +281,6 @@ TEST_F(AuthoritativeRefreshFixture, RefreshUsesGlobalFCVRatherThanOperationFCV) 
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     // Set OFCV=kUpgrading, so refreshes should still be non-authoritative according to OFCV.
@@ -311,7 +307,6 @@ TEST_F(AuthoritativeRefreshFixture,
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     ASSERT_OK(onShardVersionMismatch(opCtx, kTestNss, boost::none));
@@ -339,7 +334,6 @@ TEST_F(AuthoritativeRefreshFixture,
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     auto status = onShardVersionMismatch(opCtx, kTestNss, ChunkVersion::IGNORED());
@@ -370,7 +364,6 @@ TEST_F(AuthoritativeRefreshFixture, HigherRouterVersionTriggersRecoveryThenConfi
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     auto status = onShardVersionMismatch(opCtx, kTestNss, higherVersion);
@@ -396,7 +389,6 @@ TEST_F(AuthoritativeRefreshFixture, ConfigTimeReachedWithEmptyCSRTriggersFullRec
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     auto status = onShardVersionMismatch(opCtx, kTestNss, dummyVersion);
@@ -411,49 +403,6 @@ TEST_F(AuthoritativeRefreshFixture, ConfigTimeReachedWithEmptyCSRTriggersFullRec
     ASSERT_EQ(stats.getIntField("recoverersCreated"), 1);
 }
 
-TEST_F(AuthoritativeRefreshFixture, NonAuthoritativeTransitionDuringRecoveryReturnsEarly) {
-    auto* opCtx = operationContext();
-
-    auto dummyVersion = ChunkVersion({OID::gen(), Timestamp(50, 1)}, {1, 0});
-
-    {
-        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
-        csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
-        csr->enterCriticalSectionCatchUpPhase(opCtx, BSONObj());
-        csr->enterCriticalSectionCommitPhase(opCtx, BSONObj());
-    }
-
-    auto* fp = globalFailPointRegistry().find("hangBeforePlacementVersionCriticalSectionWait");
-    auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
-
-    stdx::thread recoveryThread([&] {
-        auto bgClient = getGlobalServiceContext()->getService()->makeClient("bgFlip");
-        auto bgOpCtx = bgClient->makeOperationContext();
-        auto bgStatus = onShardVersionMismatch(bgOpCtx.get(), kTestNss, dummyVersion);
-        ASSERT_OK(bgStatus);
-    });
-
-    fp->waitForTimesEntered(initialTimesEntered + 1);
-
-    {
-        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
-        csr->setCollectionMetadata(opCtx, CollectionMetadata::UNTRACKED());
-        csr->setNonAuthoritative();
-        csr->exitCriticalSection(opCtx, BSONObj());
-    }
-
-    advanceCommittedSnapshot(opCtx);
-
-    fp->setMode(FailPoint::off);
-
-    recoveryThread.join();
-
-    auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
-    ASSERT_EQ(csr->getAuthoritativeState(),
-              CollectionShardingRuntime::AuthoritativeState::kNonAuthoritative);
-}
-
 TEST_F(AuthoritativeRefreshFixture, CriticalSectionBlocksRecoveryThenProceeds) {
     auto* opCtx = operationContext();
 
@@ -465,7 +414,6 @@ TEST_F(AuthoritativeRefreshFixture, CriticalSectionBlocksRecoveryThenProceeds) {
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
         csr->enterCriticalSectionCatchUpPhase(opCtx, BSONObj());
         csr->enterCriticalSectionCommitPhase(opCtx, BSONObj());
     }
@@ -509,7 +457,6 @@ TEST_F(AuthoritativeRefreshFixture, CollectionCriticalSectionWaitDoesNotCountAsN
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
         csr->enterCriticalSectionCatchUpPhase(opCtx, BSONObj());
         csr->enterCriticalSectionCommitPhase(opCtx, BSONObj());
     }
@@ -552,7 +499,6 @@ DEATH_TEST_REGEX_F(AuthoritativeRefreshFixtureDeathTest,
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     uassertStatusOK(onShardVersionMismatch(opCtx, kTestNss, boost::none));
@@ -567,7 +513,6 @@ TEST_F(AuthoritativeRefreshFixture, ClearFilteringMetadataDuringPostRecoveryWait
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     // Force the recovery thread to ignore the majority waiter since it's an immediately fulfilled
@@ -591,7 +536,6 @@ TEST_F(AuthoritativeRefreshFixture, ClearFilteringMetadataDuringPostRecoveryWait
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     fp->setMode(FailPoint::off);
@@ -621,7 +565,6 @@ TEST_F(AuthoritativeRefreshFixture, RecoveryCreatesExactlyOneRecoverer) {
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     auto status = onShardVersionMismatch(opCtx, kTestNss, dummyVersion);
@@ -645,7 +588,6 @@ TEST_F(AuthoritativeRefreshFixture, RecovererCleanedUpAfterRecovery) {
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     auto status = onShardVersionMismatch(opCtx, kTestNss, boost::none);
@@ -667,7 +609,6 @@ TEST_F(AuthoritativeRefreshFixture, ThreeConcurrentCallersAllSucceed) {
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     Notification<void> ready1, ready2, ready3;
@@ -709,7 +650,6 @@ TEST_F(AuthoritativeRefreshFixture, RecoveryWithSingleChunkVerifiesExactMetadata
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     auto status = onShardVersionMismatch(opCtx, kTestNss, boost::none);
@@ -732,7 +672,6 @@ TEST_F(AuthoritativeRefreshFixture, RecoveryWithManyChunksVerifiesVersionSorting
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     auto status = onShardVersionMismatch(opCtx, kTestNss, boost::none);
@@ -757,7 +696,6 @@ TEST_F(AuthoritativeRefreshFixture,
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     auto status = onShardVersionMismatch(opCtx, kTestNss, boost::none);
@@ -802,7 +740,6 @@ TEST_F(AuthoritativeRefreshFixture, PartialRangeDiskCatalogRecoversWithoutChunkM
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     auto status = onShardVersionMismatch(opCtx, kTestNss, boost::none);
@@ -830,7 +767,6 @@ TEST_F(AuthoritativeRefreshFixture, SequentialCallsAreIdempotent) {
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     // First call: recovers from disk.
@@ -866,7 +802,6 @@ TEST_F(AuthoritativeRefreshFixture, RecoveredVersionMatchSkipsRecoveryLoopOnNext
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     // First call: recover from disk using boost::none (no version match possible).
@@ -903,7 +838,6 @@ TEST_F(AuthoritativeRefreshFixture, OngoingRecoverySatisfiesVersionSkipsDiskReco
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     // Pause the background recovery thread so Thread A's disk recovery is in-flight when Thread B
@@ -961,7 +895,6 @@ TEST_F(AuthoritativeRefreshFixture, ReRecoveryAfterMetadataCleared) {
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     // First recovery.
@@ -981,7 +914,6 @@ TEST_F(AuthoritativeRefreshFixture, ReRecoveryAfterMetadataCleared) {
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
         DBDirectClient client(opCtx);
         client.remove(NamespaceString::kConfigShardCatalogCollectionsNamespace, BSONObj{});
         client.remove(NamespaceString::kConfigShardCatalogChunksNamespace, BSONObj{});
@@ -1014,7 +946,6 @@ TEST_F(AuthoritativeRefreshFixture, CriticalSectionExitedWithExternalMetadataSki
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
         csr->enterCriticalSectionCatchUpPhase(opCtx, BSONObj());
         csr->enterCriticalSectionCommitPhase(opCtx, BSONObj());
     }
@@ -1040,7 +971,6 @@ TEST_F(AuthoritativeRefreshFixture, CriticalSectionExitedWithExternalMetadataSki
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->setCollectionMetadata(
             opCtx, externalMetadata, CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
-        csr->setAuthoritative();
         csr->exitCriticalSection(opCtx, BSONObj());
     }
 
@@ -1068,7 +998,6 @@ TEST_F(AuthoritativeRefreshFixture, UnownedRecoveryAcceptsTrackedWithNoChunksVer
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     const auto trackedZeroChunksVersion =
@@ -1103,7 +1032,6 @@ TEST_F(AuthoritativeRefreshFixture, UnownedShardVersionCheckAcceptsTrackedWithNo
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     ASSERT_OK(onShardVersionMismatch(opCtx, kTestNss, boost::none));
@@ -1133,7 +1061,6 @@ TEST_F(AuthoritativeRefreshFixture, UnownedShardVersionCheckRejectsTrackedVersio
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     ASSERT_OK(onShardVersionMismatch(opCtx, kTestNss, boost::none));
@@ -1167,7 +1094,6 @@ TEST_F(AuthoritativeRefreshFixture, TrackedCollectionWithNoChunksOnDiskRecovered
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     auto status = onShardVersionMismatch(opCtx, kTestNss, boost::none);
@@ -1225,7 +1151,6 @@ TEST_F(AuthoritativeRefreshFixture, TransientPrimaryAbaForcesModeBRetry) {
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     runRecoveryAndInjectInModeB(opCtx, kTestNss, [&] {
@@ -1261,7 +1186,6 @@ TEST_F(AuthoritativeRefreshFixture, DbPrimaryShardInstallsUntrackedOnEmptyDisk) 
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     ASSERT_OK(onShardVersionMismatch(opCtx, kTestNss, boost::none));
@@ -1293,7 +1217,6 @@ TEST_F(AuthoritativeRefreshFixture, RetainedNonAuthoritativeDsrEntryInstallsUnow
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     ASSERT_OK(onShardVersionMismatch(opCtx, kTestNss, boost::none));
@@ -1317,7 +1240,6 @@ TEST_F(AuthoritativeRefreshFixture, ConfigSystemSessionsEmptyDiskRecoversAsUnown
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     ASSERT_OK(onShardVersionMismatch(opCtx, nss, boost::none));
@@ -1342,7 +1264,6 @@ TEST_F(AuthoritativeRefreshFixture, PrimaryChangeDuringRecoveryForcesModeBRetry)
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     runRecoveryAndInjectInModeB(opCtx, kTestNss, [&] {
@@ -1366,6 +1287,12 @@ TEST_F(AuthoritativeRefreshFixture, PrimaryChangeDuringRecoveryForcesModeBRetry)
 
 class RefreshCancellationFixture : public ShardServerTestFixtureWithCatalogCacheLoaderMock {
 protected:
+    // The individual tests toggle 'featureFlagAuthoritativeShardsCRUD' to switch between the
+    // authoritative and non-authoritative refresh paths. The authoritative CRUD flag is only valid
+    // when the authoritative DDL flag is also enabled, so keep DDL enabled for the lifetime of the
+    // fixture.
+    unittest::ServerParameterGuard ddlFeatureFlag{"featureFlagAuthoritativeShardsDDL", true};
+
     // Cancel incompatible refreshes off-thread (interrupt blocks on drain), then unhang `fp`.
     void interruptRefreshesThenUnhangFailpoint(FailPoint* fp) {
         stdx::thread interruptThread([&] {
@@ -1468,7 +1395,6 @@ TEST_F(RefreshCancellationFixture, CancelAuthCollectionRefreshRetriesAsNonAuthor
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     auto sharedMetadata =
@@ -1489,12 +1415,11 @@ TEST_F(RefreshCancellationFixture, CancelAuthCollectionRefreshRetriesAsNonAuthor
 
     fp->waitForTimesEntered(initialTimesEntered + 1);
 
-    // Transition the CSR to non-auth with matching metadata so the retry's non-auth handler
-    // observes that the cached version satisfies receivedShardVersion and returns immediately.
+    // Install matching metadata so the retry's non-auth handler observes that the cached version
+    // satisfies receivedShardVersion and returns immediately.
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->setCollectionMetadata(opCtx, sharedMetadata);
-        csr->setNonAuthoritative();
     }
 
     // Flip the flag before cancelling so the outer retry dispatches to the non-auth path.
@@ -1535,13 +1460,12 @@ TEST_F(RefreshCancellationFixture, CancelNonAuthCollectionRefreshRetriesAsAuthor
 
     fp->waitForTimesEntered(initialTimesEntered + 1);
 
-    // Promote the CSR to authoritative with matching metadata so the retry's auth path sees the
-    // version as already sufficient and returns without performing full disk recovery.
+    // Install matching metadata so the retry's auth path sees the version as already sufficient
+    // and returns without performing full disk recovery.
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->setCollectionMetadata(
             opCtx, sharedMetadata, CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
-        csr->setAuthoritative();
     }
 
     // Flip the flag before cancelling so the outer retry dispatches to the auth path.
@@ -1566,7 +1490,6 @@ TEST_F(RefreshCancellationFixture, MaxTimeMsOnOperationContextInterruptsRefresh)
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
-        csr->setAuthoritative();
     }
 
     auto sharedMetadata =

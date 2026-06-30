@@ -98,8 +98,6 @@ public:
         // Force subsequent uses of the namespace to refresh the filtering metadata so they can
         // synchronize with any work happening on the primary (e.g., migration critical section).
         auto scopedCss = CollectionShardingRuntime::acquireExclusive(opCtx, _nss);
-        // TODO (SERVER-127444): Remove this `setNonAuthoritative` to assert with the feature flag.
-        scopedCss->setNonAuthoritative();
         scopedCss->clearCollectionMetadata(opCtx, _droppingCollection);
     }
 
@@ -320,9 +318,6 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
             // can synchronize with any work happening on the primary (e.g., migration critical
             // section).
             auto scopedCss = CollectionShardingRuntime::acquireExclusive(opCtx, updatedNss);
-            // TODO (SERVER-127444): Remove this `setNonAuthoritative` to assert with the feature
-            // flag.
-            scopedCss->setNonAuthoritative();
             scopedCss->clearCollectionMetadata(opCtx);
         }
     }
@@ -607,24 +602,6 @@ repl::OpTime ShardServerOpObserver::onDropCollection(OperationContext* opCtx,
         ShardIdentityRollbackNotifier::get(opCtx)->recordThatRollbackHappened();
     }
 
-    // Clear the CSR authoritative state once we drop shard.catalog.collections on FCV downgrade.
-    // Otherwise, a follow up FCV upgrade can see Auth. Shards enabled & an authoritative CSR,
-    // but the corresponding persisted authoritative metadata would already be gone from disk.
-    // TODO (SERVER-127444): Remove once the authoritativeState flag is removed from the CSR.
-    if (collectionName == NamespaceString::kConfigShardCatalogCollectionsNamespace) {
-        for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {
-            auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-            if (scopedCsr->getAuthoritativeState() ==
-                CollectionShardingRuntime::AuthoritativeState::kAuthoritative) {
-                LOGV2(12494600,
-                      "Clearing CSR authoritative state on shard.catalog.collections drop",
-                      logAttrs(nss));
-                scopedCsr->clearCollectionMetadata(opCtx);
-                scopedCsr->setNonAuthoritative();
-            }
-        }
-    }
-
     return {};
 }
 
@@ -738,17 +715,18 @@ void ShardServerOpObserver::onCreateDatabaseMetadata(OperationContext* opCtx,
     // local shard catalog entry as kUnowned. Once this shard becomes the DB primary, any
     // leftover collection CSS state for the database must be recovered from the new incarnation
     // instead.
-    if (!entry.getFromClone()) {
-        for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {
-            if (nss.dbName() != dbName) {
-                continue;
-            }
+    for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {
+        if (nss.dbName() != dbName) {
+            continue;
+        }
 
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+        if (scopedCsr->getCurrentMetadataIfKnown() && scopedCsr->isUnowned()) {
             LOGV2_DEBUG(12932800,
                         2,
                         "Clearing collection metadata after createDatabase metadata commit",
                         logAttrs(nss));
-            auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+
             scopedCsr->clearCollectionMetadata(opCtx);
         }
     }
@@ -798,12 +776,6 @@ void ShardServerOpObserver::onInvalidateCollectionMetadata(OperationContext* opC
     if (auto recoverer = scopedCsr->getCollectionCacheRecoverer()) {
         recoverer->onOplogEntry(op.getTimestamp(), entry);
     } else {
-        // TODO (SERVER-127444): Remove this `setNonAuthoritative` and `getNonAuth`.
-        if (entry.getNonAuth())
-            scopedCsr->setNonAuthoritative();
-        else
-            scopedCsr->setAuthoritative();
-
         scopedCsr->clearCollectionMetadata(opCtx, entry.getForDroppedCollection());
     }
 }
@@ -840,7 +812,6 @@ void ShardServerOpObserver::onApplyCollectionShardingStateDelta(OperationContext
     const auto collectionUuid = *op.getUuid();
     auto currentMetadata = scopedCsr->getCurrentMetadataIfKnown();
     if (!currentMetadata) {
-        scopedCsr->setAuthoritative();
         scopedCsr->clearCollectionMetadata(opCtx);
         return;
     }
@@ -860,7 +831,6 @@ void ShardServerOpObserver::onApplyCollectionShardingStateDelta(OperationContext
 
     const auto collPlacementVersion = currentMetadata->getCollPlacementVersion();
 
-    scopedCsr->setAuthoritative();
     scopedCsr->setCollectionMetadata(
         opCtx,
         currentMetadata->makeUpdated(

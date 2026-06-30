@@ -116,8 +116,6 @@ void ReshardingRecipientService::RecipientStateMachineExternalState::
         auto scopedCsr =
             CollectionShardingRuntime::acquireExclusive(opCtx, metadata.getTempReshardingNss());
         scopedCsr->clearCollectionMetadata(opCtx);
-        // TODO (SERVER-127444): Remove once all DDLs are made authoritative.
-        scopedCsr->setNonAuthoritative();
     }
 }
 

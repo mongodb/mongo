@@ -211,31 +211,25 @@ checkIfCollectionAlreadyTrackedWithOptions(OperationContext* opCtx,
  * Stops ongoing migrations and prevents future ones to start for the given nss.
  * If expectedCollectionUUID is set and doesn't match that of that collection, then this is a no-op.
  * If expectedCollectionUUID is not set, no UUID check will be performed before stopping migrations.
- *
- * TODO (SERVER-127444): remove `primaryShardId`.
  */
 MONGO_MOD_NEEDS_REPLACEMENT void stopMigrations(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const boost::optional<UUID>& expectedCollectionUUID,
     std::function<OperationSessionInfo()> osiGenerator,
-    AuthoritativeMetadataAccessLevelEnum authoritativeState,
-    boost::optional<ShardId> primaryShardId = boost::none);
+    AuthoritativeMetadataAccessLevelEnum authoritativeState);
 
 /**
  * Resume migrations and balancing rounds for the given nss.
  * If expectedCollectionUUID is set and doesn't match that of the collection, then this is a no-op.
  * If expectedCollectionUUID is not set, no UUID check will be performed before resuming migrations.
- *
- * TODO (SERVER-127444): remove `primaryShardId`.
  */
 MONGO_MOD_NEEDS_REPLACEMENT void resumeMigrations(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const boost::optional<UUID>& expectedCollectionUUID,
     std::function<OperationSessionInfo()> osiGenerator,
-    AuthoritativeMetadataAccessLevelEnum authoritativeState,
-    boost::optional<ShardId> primaryShardId = boost::none);
+    AuthoritativeMetadataAccessLevelEnum authoritativeState);
 
 /**
  * Calls to the config server primary to get the collection document for the given nss.

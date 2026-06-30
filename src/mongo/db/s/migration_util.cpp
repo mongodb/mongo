@@ -412,12 +412,6 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx, long long ter
 
             const auto& nss = doc.getNss();
 
-            // TODO (SERVER-127444): Remove this and tassert with the feature flag.
-            {
-                auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-                scopedCsr->setNonAuthoritative();
-            }
-
             recoveryFutures.emplace_back(
                 asyncRecoverMigrationUntilSuccessOrStepDown(opCtx, nss).thenRunOn(executor));
 

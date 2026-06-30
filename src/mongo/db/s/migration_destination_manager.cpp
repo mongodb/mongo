@@ -333,23 +333,14 @@ bool migrationRecipientRecoveryDocumentExists(OperationContext* opCtx,
 
 bool isFirstMigration(OperationContext* opCtx, const NamespaceString& nss) {
     const auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss);
-    if (scopedCsr->getAuthoritativeState() ==
-        CollectionShardingRuntime::AuthoritativeState::kAuthoritative) {
-        if (scopedCsr->isUnowned()) {
-            return true;
-        }
-        if (const auto optMetadata = scopedCsr->getCurrentMetadataIfKnown()) {
-            const auto& metadata = *optMetadata;
-            return metadata.hasRoutingTable() && !metadata.currentShardHasAnyChunks();
-        }
+    if (scopedCsr->isUnowned()) {
         return true;
-    } else {
-        if (const auto optMetadata = scopedCsr->getCurrentMetadataIfKnown()) {
-            const auto& metadata = *optMetadata;
-            return metadata.isSharded() && !metadata.currentShardHasAnyChunks();
-        }
-        return false;
     }
+    if (const auto optMetadata = scopedCsr->getCurrentMetadataIfKnown()) {
+        const auto& metadata = *optMetadata;
+        return metadata.hasRoutingTable() && !metadata.currentShardHasAnyChunks();
+    }
+    return true;
 }
 
 // Throws if this configShard is currently draining.
@@ -2261,11 +2252,6 @@ void MigrationDestinationManager::awaitCriticalSectionReleaseSignalAndCompleteMi
         if (refreshFailed) {
             auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, _nss);
             scopedCsr->clearCollectionMetadata(opCtx);
-            // TODO (SERVER-127444): Remove this `setNonAuthoritative` to assert with the feature
-            // flag. Migrations are a non-authoritative path, so the CSR must be reset to
-            // non-authoritative to avoid a stale authoritative state forcing the recovery refresh
-            // onto the authoritative path.
-            scopedCsr->setNonAuthoritative();
         }
     }
 

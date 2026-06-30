@@ -1065,6 +1065,16 @@ idl_generator(
 )
 
 mongo_cc_library(
+    name = "read_concern_mongod_idl",
+    srcs = [
+        ":read_concern_mongod_gen",
+    ],
+    deps = [
+        ":server_base",
+    ],
+)
+
+mongo_cc_library(
     name = "rw_concern_d",
     srcs = [
         "read_concern.cpp",
@@ -2272,9 +2282,9 @@ mongo_cc_library(
     name = "read_concern_d_impl",
     srcs = [
         "read_concern_mongod.cpp",
-        ":read_concern_mongod_gen",
     ],
     deps = [
+        ":read_concern_mongod_idl",
         ":server_base",
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/repl:speculative_majority_read_info",

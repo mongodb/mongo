@@ -101,6 +101,14 @@ private:
     MigrationOutcome _resolveMigrationOutcome(OperationContext* opCtx,
                                               const boost::optional<Status>& result);
 
+    // Returns true when the migration outcome cannot be known locally and must be read from the
+    // authoritative placement on the config server. This is the case whenever the commit was
+    // attempted but its success is not recorded on this node: either a failover into this phase
+    // (_recoveredFromDisk) or, on the same term, an ambiguous commit error whose reply was lost
+    // (e.g. a config primary stepdown). When this returns true a causality barrier must precede the
+    // config read so the donor observes the possibly-already-durable commit.
+    bool _mustResolveOutcomeFromConfig() const;
+
     // Sets the decision on the coordinator document (if it still exists) and persists it. No-op
     // when the document was never persisted.
     void _persistMigrationDecision(OperationContext* opCtx,

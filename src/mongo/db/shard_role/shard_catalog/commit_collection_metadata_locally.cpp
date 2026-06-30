@@ -47,6 +47,8 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/logv2/log.h"
 
@@ -246,8 +248,7 @@ void deleteAllCollectionMetadataLocally(OperationContext* opCtx,
 void invalidateCollectionMetadata(OperationContext* opCtx,
                                   const NamespaceString& nss,
                                   const UUID& uuid,
-                                  bool forDroppedCollection,
-                                  bool authoritative = true) {
+                                  bool forDroppedCollection) {
     repl::MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
     oplogEntry.setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
@@ -255,7 +256,6 @@ void invalidateCollectionMetadata(OperationContext* opCtx,
     oplogEntry.setUuid(uuid);
     auto entry = InvalidateCollectionMetadataOplogEntry{std::string(nss.coll())};
     entry.setForDroppedCollection(forDroppedCollection);
-    entry.setNonAuth(!authoritative);
     oplogEntry.setObject(entry.toBSON());
     oplogEntry.setOpTime(OplogSlot());
     oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
@@ -344,7 +344,6 @@ void updateShardCatalogCache(OperationContext* opCtx,
     CollectionMetadata ownedMetadata(CurrentChunkManager(std::move(rtHandle)), thisShardHandle);
 
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-    scopedCsr->setAuthoritative();
     scopedCsr->setCollectionMetadata(opCtx, std::move(ownedMetadata));
 
     // Update allowChunkOperations and write an oplog 'c' entry to send the new allowChunkOperations
@@ -476,22 +475,8 @@ void commitRenameOfCollectionMetadata(OperationContext* opCtx,
 
 void commitCollectionMetadataLocally(OperationContext* opCtx,
                                      const NamespaceString& nss,
-                                     bool isDbPrimaryShard,
-                                     const boost::optional<UUID>& uuid,
-                                     boost::optional<bool> expectedAllowChunkOperations) {
+                                     bool isDbPrimaryShard) {
     auto coll = fetchCollection(opCtx, nss);
-
-    uassert(ErrorCodes::InvalidUUID,
-            fmt::format(
-                "Collection uuid {} in the request does not match the current uuid {} for ns {}",
-                uuid->toString(),
-                coll.getUuid().toString(),
-                nss.toStringForErrorMsg()),
-            !uuid || uuid == coll.getUuid());
-    tassert(12120907,
-            "Retrieved allowChunkOperations from CSRS doesn't match",
-            !expectedAllowChunkOperations ||
-                coll.getAllowChunkOperations() == *expectedAllowChunkOperations);
 
     const auto ownedChunks = fetchOwnedChunks(opCtx, nss, coll);
 
@@ -573,35 +558,32 @@ void commitChunklessCollectionMetadataLocally(OperationContext* opCtx, const Nam
 void commitSetAllowChunkOperationsLocally(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           bool allowChunkOperations,
-                                          const boost::optional<UUID>& uuid,
-                                          bool isPrimaryShard) {
-    const auto [metadata, isAuthoritative, isUnowned] = [&] {
+                                          const boost::optional<UUID>& uuid) {
+    const auto [metadata, isUnowned] = [&] {
         const auto csr = CollectionShardingRuntime::acquireShared(opCtx, nss);
-        return std::make_tuple(csr->getCurrentMetadataIfKnown(),
-                               csr->getAuthoritativeState() ==
-                                   CollectionShardingRuntime::AuthoritativeState::kAuthoritative,
-                               csr->isUnowned());
+        return std::make_tuple(csr->getCurrentMetadataIfKnown(), csr->isUnowned());
     }();
 
-    if (isAuthoritative) {
-        // The in-memory metadata could be unknown, throwing this StaleConfig forces a refresh.
-        uassert(StaleConfigInfo(nss,
-                                *OperationShardingState::get(opCtx).getShardVersion(nss),
-                                boost::none /* wantedVersion */,
-                                ShardingState::get(opCtx)->asShardRef(opCtx)),
-                fmt::format("commitSetAllowChunkOperationsLocally: collection metadata for {} is "
-                            "not currently known and needs to be recovered",
-                            nss.toStringForErrorMsg()),
-                metadata);
+    // The in-memory metadata could be unknown, throwing this StaleConfig forces a refresh.
+    uassert(StaleConfigInfo(nss,
+                            OperationShardingState::get(opCtx).getShardVersion(nss).value_or(
+                                ShardVersionFactory::make(ChunkVersion::IGNORED())),
+                            boost::none /* wantedVersion */,
+                            ShardingState::get(opCtx)->asShardRef(opCtx)),
+            fmt::format("commitSetAllowChunkOperationsLocally: collection metadata for {} is "
+                        "not currently known and needs to be recovered",
+                        nss.toStringForErrorMsg()),
+            metadata);
 
-        if (isUnowned || !metadata->hasRoutingTable()) {
-            // If the collection is unowned, we know that we don't own metadata for this collection
-            // at all, so just do nothing.
-            // If the collection doesn't have a routing table, then it's either untracked or
-            // unsplittable, in any case just return.
-            return;
-        }
+    if (isUnowned || !metadata->hasRoutingTable()) {
+        // If the collection is unowned, we know that we don't own metadata for this collection
+        // at all, so just do nothing.
+        // If the collection doesn't have a routing table, then it's either untracked or
+        // unsplittable, in any case just return.
+        return;
+    }
 
+    if (uuid) {
         uassert(
             ErrorCodes::InvalidUUID,
             fmt::format(
@@ -609,27 +591,21 @@ void commitSetAllowChunkOperationsLocally(OperationContext* opCtx,
                 uuid->toString(),
                 metadata->getUUID().toString(),
                 nss.toStringForErrorMsg()),
-            !uuid || uuid == metadata->getUUID());
-
-        writeCollectionAllowChunkOperationsLocally(opCtx, nss, allowChunkOperations);
-
-        // Write an oplog 'c' entry to send the new value to secondaries.
-        setAllowChunkOperationsOnSecondaries(opCtx, nss, metadata->getUUID(), allowChunkOperations);
-
-        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-        scopedCsr->setAllowChunkOperations(allowChunkOperations);
-
-        LOGV2(12120905,
-              "commitSetAllowChunkOperationsLocally authoritatively",
-              "nss"_attr = nss,
-              "allowChunkOperations"_attr = allowChunkOperations);
-    } else {
-        commitCollectionMetadataLocally(opCtx, nss, isPrimaryShard, uuid, allowChunkOperations);
-        LOGV2(12120906,
-              "commitSetAllowChunkOperationsLocally non-authoritatively",
-              "nss"_attr = nss,
-              "allowChunkOperations"_attr = allowChunkOperations);
+            *uuid == metadata->getUUID());
     }
+
+    writeCollectionAllowChunkOperationsLocally(opCtx, nss, allowChunkOperations);
+
+    // Write an oplog 'c' entry to send the new value to secondaries.
+    setAllowChunkOperationsOnSecondaries(opCtx, nss, metadata->getUUID(), allowChunkOperations);
+
+    auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+    scopedCsr->setAllowChunkOperations(allowChunkOperations);
+
+    LOGV2(12120905,
+          "commitSetAllowChunkOperationsLocally authoritatively",
+          "nss"_attr = nss,
+          "allowChunkOperations"_attr = allowChunkOperations);
 }
 
 }  // namespace shard_catalog_commit

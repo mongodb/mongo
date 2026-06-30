@@ -6,6 +6,11 @@
  *
  * @tags: [
  *    does_not_support_stepdowns,
+ *    # TODO (SERVER-98118): Remove this test once 9.0 becomes last LTS.
+ *    # The test asserts legacy shard-local filtering cache version bumps after
+ *    # _configsvrSetAllowMigrations. With authoritative shard DDL metadata, that cache/version
+ *    # bump is no longer the contract under test.
+ *    featureFlagAuthoritativeShardsDDL_incompatible,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

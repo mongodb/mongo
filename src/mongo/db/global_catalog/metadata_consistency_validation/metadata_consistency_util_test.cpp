@@ -1323,7 +1323,6 @@ protected:
         scopedCSR->setCollectionMetadata(operationContext(),
                                          collectionMetadata,
                                          CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
-        scopedCSR->setAuthoritative();
     }
 
     void setShardCatalogMetadata(const UUID& uuid,
@@ -1424,16 +1423,13 @@ protected:
                 operationContext(),
                 *metadata,
                 CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
-            scopedCSR->setAuthoritative();
         } else {
             scopedCSR->clearCollectionMetadata(operationContext());
-            scopedCSR->setAuthoritative();
         }
     }
 
     void setCSRUnowned() {
         auto scopedCSR = CollectionShardingRuntime::acquireExclusive(operationContext(), _nss);
-        scopedCSR->setAuthoritative();
         scopedCSR->setCollectionMetadata(operationContext(),
                                          CollectionMetadata::UNTRACKED(),
                                          CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
@@ -2223,6 +2219,9 @@ TEST_F(MetadataConsistencyShardCatalogTest, UnownedCSR_NonPrimaryWithNoOwnedChun
 
 TEST_F(MetadataConsistencyShardCatalogTest,
        UnownedCSR_PrimaryIsReportedWhenGlobalCatalogUntracked) {
+    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                         true);
+
     setUpLocalCollection();
 
     setCSRUnowned();
@@ -2333,28 +2332,6 @@ TEST_F(MetadataConsistencyShardCatalogTest,
         false /*optionalCheckIndexes*/);
 
     ASSERT_EQ(1, countInconsistenciesWithReasonField(inconsistencies));
-}
-
-TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_SkippedWhenNonAuthoritative) {
-    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
-                                                         true);
-
-    const auto localUuid = setUpLocalCollection();
-    auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
-    auto chunk = generateChunk(
-        localUuid, _shardId, _keyPattern.globalMin(), _keyPattern.globalMax(), kShard0History);
-
-    setShardCatalogMetadata(localUuid, _keyPattern, {chunk});
-    _catalogClient->setChunksToReturn({chunk});
-
-    // Durable catalog is empty. If the durable path ran, it would report inconsistencies.
-    // With non-authoritative state, the durable path should be skipped entirely.
-    const auto inconsistencies = checkConsistency(globalCatalogColl);
-
-    ASSERT_EQ(0,
-              countInconsistenciesWithDetailFieldAndSource(
-                  inconsistencies, "uuid"sv, "durableShardCatalog"sv));
-    ASSERT_EQ(0, countInconsistenciesWithReasonField(inconsistencies));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest,

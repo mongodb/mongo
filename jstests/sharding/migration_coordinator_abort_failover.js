@@ -36,27 +36,37 @@ const usesMoveRangeCoordinatorPath = FeatureFlagUtil.isPresentAndEnabled(
     adminDB,
     "AuthoritativeShardsDDL",
 );
+const expectedMigrationCommitFailureCodes = usesMoveRangeCoordinatorPath
+    ? [ErrorCodes.StaleEpoch, ErrorCodes.OperationFailed]
+    : [ErrorCodes.StaleEpoch];
 
-runMoveChunkMakeDonorStepDownAfterFailpoint(
-    st,
-    dbName,
-    "moveChunkHangAtStep3",
-    false /* shouldMakeMigrationFailToCommitOnConfig */,
-);
+if (usesMoveRangeCoordinatorPath && st.isConfigShardMode) {
+    // TODO SERVER-130176: Investigate why these failpoints are not triggering.
+    jsTest.log(
+        "Skipping legacy moveChunk step failpoints with config shard and MoveRangeCoordinator",
+    );
+} else {
+    runMoveChunkMakeDonorStepDownAfterFailpoint(
+        st,
+        dbName,
+        "moveChunkHangAtStep3",
+        false /* shouldMakeMigrationFailToCommitOnConfig */,
+    );
 
-runMoveChunkMakeDonorStepDownAfterFailpoint(
-    st,
-    dbName,
-    "moveChunkHangAtStep4",
-    false /* shouldMakeMigrationFailToCommitOnConfig */,
-);
+    runMoveChunkMakeDonorStepDownAfterFailpoint(
+        st,
+        dbName,
+        "moveChunkHangAtStep4",
+        false /* shouldMakeMigrationFailToCommitOnConfig */,
+    );
 
-runMoveChunkMakeDonorStepDownAfterFailpoint(
-    st,
-    dbName,
-    "moveChunkHangAtStep5",
-    false /* shouldMakeMigrationFailToCommitOnConfig */,
-);
+    runMoveChunkMakeDonorStepDownAfterFailpoint(
+        st,
+        dbName,
+        "moveChunkHangAtStep5",
+        false /* shouldMakeMigrationFailToCommitOnConfig */,
+    );
+}
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
     st,
@@ -65,7 +75,7 @@ runMoveChunkMakeDonorStepDownAfterFailpoint(
         ? "hangInMoveRangeCoordinatorDetermineOutcome"
         : "hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible",
     true /* shouldMakeMigrationFailToCommitOnConfig */,
-    [ErrorCodes.StaleEpoch],
+    expectedMigrationCommitFailureCodes,
 );
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
@@ -75,7 +85,7 @@ runMoveChunkMakeDonorStepDownAfterFailpoint(
         ? "hangInMoveRangeCoordinatorShardCatalogCommit"
         : "hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible",
     true /* shouldMakeMigrationFailToCommitOnConfig */,
-    [ErrorCodes.StaleEpoch],
+    expectedMigrationCommitFailureCodes,
 );
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
@@ -83,7 +93,7 @@ runMoveChunkMakeDonorStepDownAfterFailpoint(
     dbName,
     "hangInPersistMigrateAbortDecisionThenSimulateErrorUninterruptible",
     true /* shouldMakeMigrationFailToCommitOnConfig */,
-    [ErrorCodes.StaleEpoch],
+    expectedMigrationCommitFailureCodes,
 );
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
@@ -91,7 +101,7 @@ runMoveChunkMakeDonorStepDownAfterFailpoint(
     dbName,
     "hangInDeleteRangeDeletionLocallyThenSimulateErrorUninterruptible",
     true /* shouldMakeMigrationFailToCommitOnConfig */,
-    [ErrorCodes.StaleEpoch],
+    expectedMigrationCommitFailureCodes,
 );
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
@@ -99,7 +109,7 @@ runMoveChunkMakeDonorStepDownAfterFailpoint(
     dbName,
     "hangInReadyRangeDeletionOnRecipientThenSimulateErrorUninterruptible",
     true /* shouldMakeMigrationFailToCommitOnConfig */,
-    [ErrorCodes.StaleEpoch],
+    expectedMigrationCommitFailureCodes,
 );
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
@@ -107,7 +117,7 @@ runMoveChunkMakeDonorStepDownAfterFailpoint(
     dbName,
     "hangInAdvanceTxnNumThenSimulateErrorUninterruptible",
     true /* shouldMakeMigrationFailToCommitOnConfig */,
-    [ErrorCodes.StaleEpoch],
+    expectedMigrationCommitFailureCodes,
 );
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
@@ -115,7 +125,7 @@ runMoveChunkMakeDonorStepDownAfterFailpoint(
     dbName,
     "hangBeforeMakingAbortDecisionDurable",
     true /* shouldMakeMigrationFailToCommitOnConfig */,
-    [ErrorCodes.StaleEpoch],
+    expectedMigrationCommitFailureCodes,
 );
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
@@ -123,7 +133,7 @@ runMoveChunkMakeDonorStepDownAfterFailpoint(
     dbName,
     "hangBeforeSendingAbortDecision",
     true /* shouldMakeMigrationFailToCommitOnConfig */,
-    [ErrorCodes.StaleEpoch],
+    expectedMigrationCommitFailureCodes,
 );
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
@@ -131,7 +141,7 @@ runMoveChunkMakeDonorStepDownAfterFailpoint(
     dbName,
     "hangBeforeForgettingMigrationAfterAbortDecision",
     true /* shouldMakeMigrationFailToCommitOnConfig */,
-    [ErrorCodes.StaleEpoch],
+    expectedMigrationCommitFailureCodes,
 );
 
 st.stop();

@@ -175,18 +175,6 @@ Status splitChunk_nonAuth(OperationContext* opCtx,
         }
     }
 
-    // Because this is a non-authoritative update, we must mark the CSR metadata as
-    // kNonAuthoritative so that the following refresh will fetch the metadata from the
-    // config server. Leaving it kAuthoritative would short-circuit the refresh against the
-    // durable shard catalog and keep the CSR pinned to the pre-split version.
-    // This must be done before starting the operation to ensure the CSR is left as
-    // kNonAuthoritative in case of an unexpected failure.
-    // TODO (SERVER-127444): Remove this and tassert with the feature flag.
-    {
-        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-        scopedCsr->setNonAuthoritative();
-    }
-
     // Commit the split to the config server.
     auto request = SplitChunkRequest(nss,
                                      shardName,

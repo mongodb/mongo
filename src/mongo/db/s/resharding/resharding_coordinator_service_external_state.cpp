@@ -677,17 +677,8 @@ void ReshardingCoordinatorExternalStateImpl::stopMigrations(
     const UUID& expectedCollectionUUID,
     ReshardingAuthoritativeMetadataAccessLevelEnum authoritativeMetadataLevel,
     std::function<OperationSessionInfo()> osiGenerator) {
-    const auto dbPrimaryShard =
-        Grid::get(opCtx)
-            ->catalogClient()
-            ->getDatabase(opCtx, nss.dbName(), repl::ReadConcernLevel::kMajorityReadConcern)
-            .getPrimary();
-    sharding_ddl_util::stopMigrations(opCtx,
-                                      nss,
-                                      expectedCollectionUUID,
-                                      osiGenerator,
-                                      convert(authoritativeMetadataLevel),
-                                      ShardId{dbPrimaryShard});
+    sharding_ddl_util::stopMigrations(
+        opCtx, nss, expectedCollectionUUID, osiGenerator, convert(authoritativeMetadataLevel));
 }
 
 void ReshardingCoordinatorExternalStateImpl::resumeMigrations(
@@ -696,17 +687,8 @@ void ReshardingCoordinatorExternalStateImpl::resumeMigrations(
     const UUID& expectedCollectionUUID,
     ReshardingAuthoritativeMetadataAccessLevelEnum authoritativeMetadataLevel,
     std::function<OperationSessionInfo()> osiGenerator) {
-    const auto dbPrimaryShard =
-        Grid::get(opCtx)
-            ->catalogClient()
-            ->getDatabase(opCtx, nss.dbName(), repl::ReadConcernLevel::kMajorityReadConcern)
-            .getPrimary();
-    sharding_ddl_util::resumeMigrations(opCtx,
-                                        nss,
-                                        expectedCollectionUUID,
-                                        osiGenerator,
-                                        convert(authoritativeMetadataLevel),
-                                        ShardId{dbPrimaryShard});
+    sharding_ddl_util::resumeMigrations(
+        opCtx, nss, expectedCollectionUUID, osiGenerator, convert(authoritativeMetadataLevel));
 }
 
 std::unique_ptr<CausalityBarrier> ReshardingCoordinatorExternalStateImpl::buildCausalityBarrier(

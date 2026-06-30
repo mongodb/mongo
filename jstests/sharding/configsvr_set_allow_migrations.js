@@ -1,4 +1,8 @@
+/**
+ * Tests the idempotency of the _configsvrSetAllowMigrations command.
+ */
 import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runConfigsvrSetAllowMigrationsWithRetries(st, ns, lsid, txnNumber, allowMigrations) {
@@ -29,6 +33,15 @@ function runConfigsvrSetAllowMigrationsWithRetries(st, ns, lsid, txnNumber, allo
 }
 
 const st = new ShardingTest({shards: 1});
+
+if (FeatureFlagUtil.isPresentAndEnabled(st.s, "AuthoritativeShardsDDL")) {
+    // This test intentionally calls the configsvr command directly to validate its idempotency. The
+    // normal setAllowMigrations coordinator follows that global catalog commit with a shard catalog
+    // commit; bypassing the coordinator leaves authoritative shard-local metadata without the
+    // allowMigrations field.
+    TestData.skipCheckMetadataConsistency = true;
+    TestData.skipCheckShardFilteringMetadata = true;
+}
 
 const dbName = "test";
 const collName = "foo";

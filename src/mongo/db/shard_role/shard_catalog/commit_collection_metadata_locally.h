@@ -80,15 +80,10 @@ void commitRenameOfCollectionMetadata(OperationContext* opCtx,
  *   4. Writes an oplog entry to invalidate collection metadata on secondaries.
  *   5. Updates the in-memory CollectionShardingRuntime (CSR) to reflect the new filtering
  * information.
- *
- * TODO (SERVER-127444): remove `uuid` and `expectedAllowChunkOperations` parameters.
  */
-void commitCollectionMetadataLocally(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    bool isDbPrimaryShard = false,
-    const boost::optional<UUID>& uuid = boost::none,
-    boost::optional<bool> expectedAllowChunkOperations = boost::none);
+void commitCollectionMetadataLocally(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     bool isDbPrimaryShard = false);
 
 /**
  * Persists collection and chunk metadata into the durable shard catalog during the setFCV
@@ -105,15 +100,12 @@ void commitChunklessCollectionMetadataLocally(OperationContext* opCtx, const Nam
 
 /**
  * Commits the allowChunkOperations flag to the shard catalog (config.shard.catalog.collections).
- * Does nothing if the current shard is not a data-bearing shard and not the primary.
- *
- * TODO (SERVER-127444): remove `isPrimaryShard`.
+ * Does nothing if the current shard has no tracked routing table for the collection.
  */
 void commitSetAllowChunkOperationsLocally(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           bool allowChunkOperations,
-                                          const boost::optional<UUID>& uuid,
-                                          bool isPrimaryShard);
+                                          const boost::optional<UUID>& uuid);
 
 }  // namespace MONGO_MOD_PARENT_PRIVATE shard_catalog_commit
 

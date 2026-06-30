@@ -164,16 +164,7 @@ public:
                 criticalSectionSignal->get(opCtx);
 
             if (Base::request().getSyncFromConfig()) {
-                {
-                    const auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, ns());
-                    if (scopedCsr->getAuthoritativeState() ==
-                        CollectionShardingRuntime::AuthoritativeState::kAuthoritative) {
-                        // This command is used as part of non-authoritative DDLs which means we're
-                        // flipping from authoritative to non-authoritative.
-                        // TODO (SERVER-127444): Remove this and tassert with the feature flag.
-                        scopedCsr->setNonAuthoritative();
-                    }
-                }
+                // TODO (SERVER-97985): Fail once the authoritative shards feature flag is enabled.
                 LOGV2_DEBUG(21982, 1, "Forcing remote routing table refresh", logAttrs(ns()));
                 uassertStatusOK(FilteringMetadataCache::get(opCtx)->onShardVersionMismatch(
                     opCtx, ns(), boost::none));

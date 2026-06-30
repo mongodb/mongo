@@ -772,19 +772,6 @@ SharedSemiFuture<void> CollectionShardingRuntime::registerWaiterForChunkVersion(
     return versionFut;
 }
 
-CollectionShardingRuntime::AuthoritativeState CollectionShardingRuntime::getAuthoritativeState()
-    const {
-    return _authoritativeState;
-}
-
-void CollectionShardingRuntime::setNonAuthoritative() {
-    _authoritativeState = AuthoritativeState::kNonAuthoritative;
-}
-
-void CollectionShardingRuntime::setAuthoritative() {
-    _authoritativeState = AuthoritativeState::kAuthoritative;
-}
-
 bool CollectionShardingRuntime::allowChunkOperations() const {
     return _allowChunkOperations;
 }

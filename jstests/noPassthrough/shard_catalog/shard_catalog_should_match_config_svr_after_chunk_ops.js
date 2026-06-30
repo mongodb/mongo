@@ -65,59 +65,6 @@ function resetHistoryWindowInSecs(st) {
     configureFailPointForRS(st.rs1.nodes, "overrideHistoryWindowInSecs", {}, "off");
 }
 
-// Forces the CSR for `ns` on `shardConn` into the kNonAuthoritative state by clearing
-// the in-memory filtering metadata via the test-only internal command. The CSR will be
-// repopulated by the next versioned operation; if the authoritative-collection-metadata
-// feature flag is on, that subsequent refresh may flip the CSR back to kAuthoritative —
-// so this only guarantees the starting state immediately before the next op.
-function forceCsrNonAuthoritative(shardConn, ns) {
-    assert.commandWorked(
-        shardConn.adminCommand({
-            _internalClearCollectionShardingMetadata: ns,
-            isAuthoritative: false,
-        }),
-    );
-}
-
-// Forces the CSR for `ns` on `shardConn` into the kAuthoritative state by running
-// _shardsvrFetchCollMetadata, which fetches the latest metadata from the config server
-// and installs it authoritatively on the shard. _shardsvrFetchCollMetadata requires
-// migrations to be disabled, so we toggle setAllowMigrations off, run the command, then
-// toggle migrations back on. Each toggle bumps the placement minor version; the chunk
-// op under test triggers a refresh that brings the CSR back in sync with config, so the
-// transient bumps don't affect the post-op assertion.
-function forceCsrAuthoritative(st, shardConn, ns) {
-    const setAllowMigrations = (allow) => {
-        assert.commandWorked(
-            st.configRS.getPrimary().adminCommand({
-                _configsvrSetAllowMigrations: ns,
-                allowMigrations: allow,
-                writeConcern: {w: "majority"},
-            }),
-        );
-    };
-
-    const dbName = st.s.getCollection(ns).getDB().getName();
-    const primaryShardId = st.getPrimaryShardIdForDatabase(dbName);
-
-    setAllowMigrations(false);
-    const session = shardConn.startSession({retryWrites: true});
-    try {
-        assert.commandWorked(
-            session.getDatabase("admin").runCommand({
-                _shardsvrFetchCollMetadata: ns,
-                primaryShardId: primaryShardId,
-                writeConcern: {w: "majority"},
-                lsid: session.getSessionId(),
-                txnNumber: NumberLong(1),
-            }),
-        );
-    } finally {
-        session.endSession();
-    }
-    setAllowMigrations(true);
-}
-
 // Reads the shard's CSR placement version directly via getShardVersion against the shard
 // primary (no router-injected shard version, so this read does not trigger an implicit
 // stale-config refresh) and compares it — exact (major, minor) — to the highest
@@ -200,100 +147,73 @@ describe("CSR health after chunk ops", function () {
         assert.commandWorked(this.st.s.getDB(this.dbName).dropDatabase());
     });
 
-    // Each chunk op runs twice: once with the shard's CSR forced into kAuthoritative via
-    // _shardsvrFetchCollMetadata, and once with the CSR cleared to kNonAuthoritative via
-    // the test-only _internalClearCollectionShardingMetadata command. Both starting states
-    // must end with the CSR matching config after the chunk op.
-    for (const startingState of ["Authoritative", "NonAuthoritative"]) {
-        const forceShardCsrStartingState = (shardConn, ns) => {
-            if (startingState === "Authoritative") {
-                forceCsrAuthoritative(this.st, shardConn, ns);
-            } else if (startingState === "NonAuthoritative") {
-                forceCsrNonAuthoritative(shardConn, ns);
-            }
-        };
+    it("split leaves donor CSR matching config", () => {
+        // Single chunk (-inf, +inf) on shard0. Splitting at x=50 bumps the minor
+        // version on shard0.
+        assert.commandWorked(this.st.s.adminCommand({split: this.ns, middle: {x: 50}}));
 
-        it(`split leaves donor CSR matching config [${startingState}]`, () => {
-            forceShardCsrStartingState(this.shard0Primary, this.ns);
+        assertCsrMatchesConfig(this.st, this.ns, this.shard0Primary, this.shard0Name);
+    });
 
-            // Single chunk (-inf, +inf) on shard0. Splitting at x=50 bumps the minor
-            // version on shard0.
-            assert.commandWorked(this.st.s.adminCommand({split: this.ns, middle: {x: 50}}));
+    it("mergeChunks leaves donor CSR matching config", () => {
+        // Set up two adjacent chunks on shard0 around x=50, then merge them back.
+        assert.commandWorked(this.st.s.adminCommand({split: this.ns, middle: {x: 50}}));
 
-            assertCsrMatchesConfig(this.st, this.ns, this.shard0Primary, this.shard0Name);
-        });
+        assert.commandWorked(
+            this.st.s.adminCommand({
+                mergeChunks: this.ns,
+                bounds: [{x: MinKey}, {x: MaxKey}],
+            }),
+        );
 
-        it(`mergeChunks leaves donor CSR matching config [${startingState}]`, () => {
-            // Set up two adjacent chunks on shard0 around x=50, then merge them back.
-            assert.commandWorked(this.st.s.adminCommand({split: this.ns, middle: {x: 50}}));
+        assertCsrMatchesConfig(this.st, this.ns, this.shard0Primary, this.shard0Name);
+    });
 
-            forceShardCsrStartingState(this.shard0Primary, this.ns);
+    it("mergeAllChunks leaves shard CSR matching config", () => {
+        // Set up several adjacent chunks on shard0.
+        for (const middle of [10, 20, 30, 40, 50]) {
+            assert.commandWorked(this.st.s.adminCommand({split: this.ns, middle: {x: middle}}));
+        }
+
+        // mergeAllChunksOnShard skips chunks inside the snapshot history window.
+        // Push the window negative and rewrite onCurrentShardSince so every chunk
+        // is eligible.
+        setHistoryWindowInSecs(this.st, -10 * 60);
+        try {
+            setOnCurrentShardSince(
+                this.st.s,
+                this.coll,
+                {shard: this.shard0Name},
+                new Timestamp(100, 0),
+                0,
+            );
 
             assert.commandWorked(
                 this.st.s.adminCommand({
-                    mergeChunks: this.ns,
-                    bounds: [{x: MinKey}, {x: MaxKey}],
+                    mergeAllChunksOnShard: this.ns,
+                    shard: this.shard0Name,
                 }),
             );
 
             assertCsrMatchesConfig(this.st, this.ns, this.shard0Primary, this.shard0Name);
-        });
+        } finally {
+            resetHistoryWindowInSecs(this.st);
+        }
+    });
 
-        it(`mergeAllChunks leaves shard CSR matching config [${startingState}]`, () => {
-            // Set up several adjacent chunks on shard0.
-            for (const middle of [10, 20, 30, 40, 50]) {
-                assert.commandWorked(this.st.s.adminCommand({split: this.ns, middle: {x: middle}}));
-            }
+    it("moveRange leaves donor and recipient CSRs matching config", () => {
+        assert.commandWorked(
+            this.st.s.adminCommand({
+                moveRange: this.ns,
+                min: {x: 50},
+                toShard: this.shard1Name,
+                // Wait for orphan range deletion so the donor's post-cleanup CSR is
+                // observable rather than a transient pre-cleanup snapshot.
+                _waitForDelete: true,
+            }),
+        );
 
-            // mergeAllChunksOnShard skips chunks inside the snapshot history window.
-            // Push the window negative and rewrite onCurrentShardSince so every chunk
-            // is eligible.
-            setHistoryWindowInSecs(this.st, -10 * 60);
-            try {
-                setOnCurrentShardSince(
-                    this.st.s,
-                    this.coll,
-                    {shard: this.shard0Name},
-                    new Timestamp(100, 0),
-                    0,
-                );
-
-                forceShardCsrStartingState(this.shard0Primary, this.ns);
-
-                assert.commandWorked(
-                    this.st.s.adminCommand({
-                        mergeAllChunksOnShard: this.ns,
-                        shard: this.shard0Name,
-                    }),
-                );
-
-                assertCsrMatchesConfig(this.st, this.ns, this.shard0Primary, this.shard0Name);
-            } finally {
-                resetHistoryWindowInSecs(this.st);
-            }
-        });
-
-        it(`moveRange leaves donor and recipient CSRs matching config [${startingState}]`, () => {
-            // Only flip the donor: the recipient owns no chunks for this collection yet,
-            // so its CSR has nothing to install or clear. (For 'Authoritative',
-            // _shardsvrFetchCollMetadata would tassert on the recipient since there are
-            // no owned chunks to persist.) The recipient's CSR is installed by the
-            // migration itself on commit.
-            forceShardCsrStartingState(this.shard0Primary, this.ns);
-
-            assert.commandWorked(
-                this.st.s.adminCommand({
-                    moveRange: this.ns,
-                    min: {x: 50},
-                    toShard: this.shard1Name,
-                    // Wait for orphan range deletion so the donor's post-cleanup CSR is
-                    // observable rather than a transient pre-cleanup snapshot.
-                    _waitForDelete: true,
-                }),
-            );
-
-            assertCsrMatchesConfig(this.st, this.ns, this.shard0Primary, this.shard0Name);
-            assertCsrMatchesConfig(this.st, this.ns, this.shard1Primary, this.shard1Name);
-        });
-    }
+        assertCsrMatchesConfig(this.st, this.ns, this.shard0Primary, this.shard0Name);
+        assertCsrMatchesConfig(this.st, this.ns, this.shard1Primary, this.shard1Name);
+    });
 });

@@ -38,6 +38,8 @@
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/read_concern_mongod_gen.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/util/assert_util.h"
@@ -48,12 +50,18 @@ namespace mongo {
 namespace {
 
 CollectionMetadata recoverCollectionFromDisk(OperationContext* opCtx,
-                                             repl::OpTime timestampToReadAt,
+                                             boost::optional<repl::OpTime> timestampToReadAt,
                                              const NamespaceString& nss) {
-    // Setup the snapshot timestamp on the opCtx.
-    repl::ReadConcernArgs::get(opCtx) =
-        repl::ReadConcernArgs{LogicalTime{timestampToReadAt.getTimestamp()},
-                              repl::ReadConcernLevel::kSnapshotReadConcern};
+    if (timestampToReadAt) {
+        // Setup the snapshot timestamp on the opCtx.
+        repl::ReadConcernArgs::get(opCtx) =
+            repl::ReadConcernArgs{LogicalTime{timestampToReadAt->getTimestamp()},
+                                  repl::ReadConcernLevel::kSnapshotReadConcern};
+    } else {
+        // Queryable backup mode is a frozen standalone snapshot. There is no live replication
+        // timestamp to wait for, so recover from the local catalog as it exists on disk.
+        repl::ReadConcernArgs::get(opCtx) = repl::ReadConcernArgs{};
+    }
 
     // TODO (SERVER-128431): Investigate if we can avoid the full refresh by passing the current sv.
     auto aggRequest =
@@ -178,6 +186,16 @@ CollectionCacheRecoverer::RecoveryRoundId CollectionCacheRecoverer::start(Operat
                "Recovering collection sharding metadata from disk",
                "nss"_attr = _nss,
                "recoveryTimestamp"_attr = _timestampToReadAt);
+
+    if (storageGlobalParams.queryableBackupMode || gTestingSnapshotBehaviorInIsolation) {
+        // Queryable backup mode and testingSnapshotBehaviorInIsolation do not advance the
+        // replication committed snapshot, so recover from the local catalog as it exists on disk.
+        _collMetadata = SemiFuture<CollectionMetadata>::makeReady(
+                            recoverCollectionFromDisk(opCtx, boost::none, _nss))
+                            .share();
+        return {_timestampToReadAt};
+    }
+
     _collMetadata =
         repl::ReplicationCoordinator::get(opCtx)
             ->registerWaiterForMajorityReadOpTime(opCtx, _timestampToReadAt)

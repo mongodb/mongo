@@ -208,8 +208,7 @@ public:
     };
 
     /**
-     * Updates the collection's filtering metadata without changing whether the CSR is currently
-     * authoritative or non-authoritative.
+     * Updates the collection's filtering metadata.
      */
     void setCollectionMetadata(OperationContext* opCtx,
                                CollectionMetadata newMetadata,
@@ -321,22 +320,6 @@ public:
     SharedSemiFuture<void> registerWaiterForChunkVersion(OperationContext* opCtx,
                                                          const ShardVersion& expectedVersion) const;
 
-    enum class AuthoritativeState {
-        /*
-         * The CSS is non-authoritative, meaning refreshes have to undergo the legacy protocol
-         * requiring interactions with the CSRS and or primary node in the replset.
-         */
-        kNonAuthoritative,
-        /*
-         * The CSS's latest state is authoritative, meaning any ownership/versioning decisions can
-         * be made solely by information present on the node without any external communication.
-         */
-        kAuthoritative
-    };
-    AuthoritativeState getAuthoritativeState() const;
-    void setNonAuthoritative();
-    void setAuthoritative();
-
     void setCollectionRecoverer(std::shared_ptr<CollectionCacheRecoverer> recoverer);
     std::shared_ptr<CollectionCacheRecoverer> getCollectionCacheRecoverer() const;
 
@@ -401,8 +384,6 @@ private:
                      // DB primary; if tracked, this shard holds no chunks for the collection
         kTracked     // metadata for this collection is registered in the sharding catalog
     } _metadataType;
-
-    AuthoritativeState _authoritativeState = AuthoritativeState::kNonAuthoritative;
 
     // If the collection state is known and is untracked or unowned, this will be nullptr.
     //
