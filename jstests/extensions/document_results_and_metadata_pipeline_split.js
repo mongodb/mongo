@@ -12,10 +12,7 @@
  */
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {before, describe, it} from "jstests/libs/mochalite.js";
-
-const expectedMeta = {
-    count: {lowerBound: 42},
-};
+import {kSimpleExpectedMeta} from "jstests/extensions/libs/document_results_and_metadata_utils.js";
 
 function stageNames(part) {
     return (part || []).map((s) => Object.keys(s)[0]);
@@ -39,7 +36,7 @@ describe("$_internalDocumentResultsAndMetadata pipeline split", function () {
 
     it("$match without $$SEARCH_META reference moves to router", function () {
         const split = getSplit([
-            {$extensionMultiStream: {numDocs: 5, meta: expectedMeta}},
+            {$extensionMultiStream: {numDocs: 5, meta: kSimpleExpectedMeta}},
             {$match: {score: {$gt: 3}}},
         ]);
         assert(split, "expected a split pipeline");
@@ -52,7 +49,7 @@ describe("$_internalDocumentResultsAndMetadata pipeline split", function () {
         // router (via the metadata merge pipeline). Downstream stages that reference $$SEARCH_META
         // cannot run on shards and must stay on the router side of the split.
         const split = getSplit([
-            {$extensionMultiStream: {numDocs: 5, meta: expectedMeta}},
+            {$extensionMultiStream: {numDocs: 5, meta: kSimpleExpectedMeta}},
             {$project: {name: 1, meta: "$$SEARCH_META"}},
         ]);
         assert(split, "expected a split pipeline");
@@ -62,7 +59,7 @@ describe("$_internalDocumentResultsAndMetadata pipeline split", function () {
 
     it("$sort moves to router for global ordering", function () {
         const split = getSplit([
-            {$extensionMultiStream: {numDocs: 5, meta: expectedMeta}},
+            {$extensionMultiStream: {numDocs: 5, meta: kSimpleExpectedMeta}},
             {$sort: {name: 1}},
         ]);
         assert(split, "expected a split pipeline");
@@ -71,7 +68,7 @@ describe("$_internalDocumentResultsAndMetadata pipeline split", function () {
 
     it("$limit pushes down to shards", function () {
         const split = getSplit([
-            {$extensionMultiStream: {numDocs: 5, meta: expectedMeta}},
+            {$extensionMultiStream: {numDocs: 5, meta: kSimpleExpectedMeta}},
             {$limit: 5},
         ]);
         assert(split, "expected a split pipeline");
@@ -80,7 +77,7 @@ describe("$_internalDocumentResultsAndMetadata pipeline split", function () {
 
     it("$project without $$SEARCH_META reference moves to router with shard-side dependency projection", function () {
         const split = getSplit([
-            {$extensionMultiStream: {numDocs: 5, meta: expectedMeta}},
+            {$extensionMultiStream: {numDocs: 5, meta: kSimpleExpectedMeta}},
             {$project: {name: 1}},
         ]);
         assert(split, "expected a split pipeline");

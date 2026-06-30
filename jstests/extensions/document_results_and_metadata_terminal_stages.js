@@ -8,29 +8,25 @@
  * ]
  */
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
-
-const expectedMeta = {count: {lowerBound: 42}};
+import {
+    expandPerShard,
+    getDrmShardInfo,
+    kSimpleExpectedMeta,
+    setupDrmCollection,
+} from "jstests/extensions/libs/document_results_and_metadata_utils.js";
 
 describe("$_internalDocumentResultsAndMetadata with terminal stages", function () {
     let coll;
     let target;
     let nShards;
+    let isSharded;
 
     before(function () {
         coll = db[jsTestName()];
         target = db[jsTestName() + "_target"];
-        assertDropCollection(db, coll.getName());
-        if (FixtureHelpers.isMongos(db)) {
-            assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-            assert.commandWorked(
-                db.adminCommand({shardCollection: coll.getFullName(), key: {_id: "hashed"}}),
-            );
-        } else {
-            assert.commandWorked(coll.insertOne({_id: 0}));
-        }
-        nShards = FixtureHelpers.numberOfShardsForCollection(coll);
+        setupDrmCollection(db, coll);
+        ({nShards, isSharded} = getDrmShardInfo(db, coll));
     });
 
     beforeEach(function () {
@@ -44,7 +40,7 @@ describe("$_internalDocumentResultsAndMetadata with terminal stages", function (
             db.runCommand({
                 aggregate: coll.getName(),
                 pipeline: [
-                    {$extensionMultiStream: {numDocs, meta: expectedMeta}},
+                    {$extensionMultiStream: {numDocs, meta: kSimpleExpectedMeta}},
                     {$project: {_id: 0, name: 1, meta: "$$SEARCH_META"}},
                     {$out: target.getName()},
                 ],
@@ -54,11 +50,11 @@ describe("$_internalDocumentResultsAndMetadata with terminal stages", function (
 
         const written = target.find({}, {_id: 0}).toArray();
         const perShardDocs = [
-            {name: "doc_0", meta: expectedMeta},
-            {name: "doc_1", meta: expectedMeta},
-            {name: "doc_2", meta: expectedMeta},
+            {name: "doc_0", meta: kSimpleExpectedMeta},
+            {name: "doc_1", meta: kSimpleExpectedMeta},
+            {name: "doc_2", meta: kSimpleExpectedMeta},
         ];
-        const expected = Array(nShards).fill(perShardDocs).flat();
+        const expected = expandPerShard(nShards, perShardDocs);
         assert.sameMembers(written, expected, {written, nShards});
     });
 
@@ -70,7 +66,7 @@ describe("$_internalDocumentResultsAndMetadata with terminal stages", function (
             db.runCommand({
                 aggregate: coll.getName(),
                 pipeline: [
-                    {$extensionMultiStream: {numDocs, meta: expectedMeta}},
+                    {$extensionMultiStream: {numDocs, meta: kSimpleExpectedMeta}},
                     {$project: {_id: 0, name: 1, meta: "$$SEARCH_META"}},
                     {
                         $merge: {
@@ -89,21 +85,21 @@ describe("$_internalDocumentResultsAndMetadata with terminal stages", function (
         // emits the same set; $merge collapses them via the unique `name` key.
         const written = target.find({}, {_id: 0}).toArray();
         const expected = [
-            {name: "doc_0", meta: expectedMeta},
-            {name: "doc_1", meta: expectedMeta},
-            {name: "doc_2", meta: expectedMeta},
+            {name: "doc_0", meta: kSimpleExpectedMeta},
+            {name: "doc_1", meta: kSimpleExpectedMeta},
+            {name: "doc_2", meta: kSimpleExpectedMeta},
         ];
         assert.sameMembers(written, expected, {written});
     });
 
     it("[sharded] $out target reflects pipeline-split DRM output", function () {
-        if (!FixtureHelpers.isMongos(db)) return;
+        if (!isSharded) return;
         const numDocs = 4;
         assert.commandWorked(
             db.runCommand({
                 aggregate: coll.getName(),
                 pipeline: [
-                    {$extensionMultiStream: {numDocs, meta: expectedMeta}},
+                    {$extensionMultiStream: {numDocs, meta: kSimpleExpectedMeta}},
                     {$project: {_id: 0, name: 1, score: 1, meta: "$$SEARCH_META"}},
                     {$out: target.getName()},
                 ],
@@ -113,12 +109,12 @@ describe("$_internalDocumentResultsAndMetadata with terminal stages", function (
 
         const written = target.find({}, {_id: 0}).toArray();
         const perShardDocs = [
-            {name: "doc_0", score: 4, meta: expectedMeta},
-            {name: "doc_1", score: 3, meta: expectedMeta},
-            {name: "doc_2", score: 2, meta: expectedMeta},
-            {name: "doc_3", score: 1, meta: expectedMeta},
+            {name: "doc_0", score: 4, meta: kSimpleExpectedMeta},
+            {name: "doc_1", score: 3, meta: kSimpleExpectedMeta},
+            {name: "doc_2", score: 2, meta: kSimpleExpectedMeta},
+            {name: "doc_3", score: 1, meta: kSimpleExpectedMeta},
         ];
-        const expected = Array(nShards).fill(perShardDocs).flat();
+        const expected = expandPerShard(nShards, perShardDocs);
         assert.sameMembers(written, expected, {written, nShards});
     });
 });

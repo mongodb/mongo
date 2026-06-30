@@ -6,8 +6,6 @@
  *  featureFlagExtensionsInsideHybridSearch,
  * ]
  */
-import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {before, describe, it} from "jstests/libs/mochalite.js";
 import {
     getAggPlanStages,
@@ -16,17 +14,18 @@ import {
     getUnionWithStage,
     hasMergeCursors,
 } from "jstests/libs/query/analyze_plan.js";
+import {
+    getDrmShardInfo,
+    kSimpleExpectedMeta,
+    setupDrmCollection,
+} from "jstests/extensions/libs/document_results_and_metadata_utils.js";
 
 const kDrmStage = "$_internalDocumentResultsAndMetadata";
 const kReplaceRootStage = "$replaceRoot";
 const kSetVarStage = "$setVariableFromSubPipeline";
 
-const expectedMeta = {
-    count: {lowerBound: 42},
-};
-
 const kSourceNoMeta = {$_multiStreamSource: {numDocs: 3}};
-const kSourceWithMeta = {$_multiStreamSource: {numDocs: 3, meta: expectedMeta}};
+const kSourceWithMeta = {$_multiStreamSource: {numDocs: 3, meta: kSimpleExpectedMeta}};
 const kDrmSpecNoMeta = {source: kSourceNoMeta, returnCursor: false};
 const kDrmSpecWithMeta = {
     source: kSourceWithMeta,
@@ -50,22 +49,12 @@ function hasSetVarInMerger(explain) {
 
 describe("$_internalDocumentResultsAndMetadata explain", function () {
     let coll;
-    let isSharded;
-    let nShards;
+    let nShards, isSharded;
 
     before(function () {
         coll = db[jsTestName()];
-        assertDropCollection(db, coll.getName());
-        if (FixtureHelpers.isMongos(db)) {
-            assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-            assert.commandWorked(
-                db.adminCommand({shardCollection: coll.getFullName(), key: {_id: "hashed"}}),
-            );
-        } else {
-            assert.commandWorked(coll.insertOne({_id: 0}));
-        }
-        isSharded = FixtureHelpers.isSharded(coll);
-        nShards = FixtureHelpers.numberOfShardsForCollection(coll);
+        setupDrmCollection(db, coll);
+        ({nShards, isSharded} = getDrmShardInfo(db, coll));
     });
 
     describe("no metadata configured", function () {
@@ -101,7 +90,7 @@ describe("$_internalDocumentResultsAndMetadata explain", function () {
             const explain = coll
                 .explain("queryPlanner")
                 .aggregate([
-                    {$extensionMultiStream: {numDocs: 3, meta: expectedMeta}},
+                    {$extensionMultiStream: {numDocs: 3, meta: kSimpleExpectedMeta}},
                     {$project: {name: 1, meta: "$$SEARCH_META"}},
                 ]);
             const drmSpecs = getDrmSpecs(explain);
@@ -114,7 +103,7 @@ describe("$_internalDocumentResultsAndMetadata explain", function () {
             const explain = coll
                 .explain("queryPlanner")
                 .aggregate([
-                    {$extensionMultiStream: {numDocs: 3, meta: expectedMeta}},
+                    {$extensionMultiStream: {numDocs: 3, meta: kSimpleExpectedMeta}},
                     {$project: {name: 1, meta: "$$SEARCH_META"}},
                 ]);
             assert(explain.splitPipeline, {explain});
@@ -134,7 +123,7 @@ describe("$_internalDocumentResultsAndMetadata explain", function () {
             const explain = coll
                 .explain("executionStats")
                 .aggregate([
-                    {$extensionMultiStream: {numDocs: 3, meta: expectedMeta}},
+                    {$extensionMultiStream: {numDocs: 3, meta: kSimpleExpectedMeta}},
                     {$project: {name: 1, meta: "$$SEARCH_META"}},
                 ]);
             assert(explain.shards, {explain});
@@ -156,7 +145,7 @@ describe("$_internalDocumentResultsAndMetadata explain", function () {
             const explain = coll
                 .explain("queryPlanner")
                 .aggregate([
-                    {$extensionMultiStream: {numDocs: 3, meta: expectedMeta}},
+                    {$extensionMultiStream: {numDocs: 3, meta: kSimpleExpectedMeta}},
                     {$project: {name: 1}},
                 ]);
             const drmSpecs = getDrmSpecs(explain);
@@ -169,7 +158,7 @@ describe("$_internalDocumentResultsAndMetadata explain", function () {
             const explain = coll
                 .explain("queryPlanner")
                 .aggregate([
-                    {$extensionMultiStream: {numDocs: 3, meta: expectedMeta}},
+                    {$extensionMultiStream: {numDocs: 3, meta: kSimpleExpectedMeta}},
                     {$project: {name: 1}},
                 ]);
             assert(explain.splitPipeline, {explain});
@@ -192,7 +181,7 @@ describe("$_internalDocumentResultsAndMetadata explain", function () {
                     $unionWith: {
                         coll: coll.getName(),
                         pipeline: [
-                            {$extensionMultiStream: {numDocs: 3, meta: expectedMeta}},
+                            {$extensionMultiStream: {numDocs: 3, meta: kSimpleExpectedMeta}},
                             {$project: {name: 1, meta: "$$SEARCH_META"}},
                         ],
                     },

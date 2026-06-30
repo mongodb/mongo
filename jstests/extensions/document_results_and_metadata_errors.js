@@ -8,8 +8,7 @@
  */
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {before, describe, it} from "jstests/libs/mochalite.js";
-
-const expectedMeta = {count: {lowerBound: 42}};
+import {kSimpleExpectedMeta} from "jstests/extensions/libs/document_results_and_metadata_utils.js";
 
 const errorCases = [
     {
@@ -37,7 +36,7 @@ const errorCases = [
         // $setVariableFromSubPipeline requires exactly one metadata document.
         name: "errors when source produces no metadata documents",
         pipeline: [
-            {$extensionMultiStream: {numDocs: 3, meta: expectedMeta, numMeta: 0}},
+            {$extensionMultiStream: {numDocs: 3, meta: kSimpleExpectedMeta, numMeta: 0}},
             {$project: {name: 1, meta: "$$SEARCH_META"}},
         ],
         code: 625296,
@@ -52,7 +51,7 @@ const errorCases = [
             {
                 $extensionMultiStream: {
                     numDocs: 1,
-                    meta: expectedMeta,
+                    meta: kSimpleExpectedMeta,
                     numMeta: 2,
                     mergePipeline: [{$match: {}}],
                 },

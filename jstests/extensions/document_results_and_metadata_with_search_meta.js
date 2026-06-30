@@ -9,9 +9,14 @@
  *  featureFlagExtensionsInsideHybridSearch,
  * ]
  */
-import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {before, describe, it} from "jstests/libs/mochalite.js";
+import {
+    expandEachPerShard,
+    expandPerShard,
+    getDrmShardInfo,
+    makeCountMergeSetup,
+    setupDrmCollection,
+} from "jstests/extensions/libs/document_results_and_metadata_utils.js";
 
 const expectedMeta = {
     count: {lowerBound: 42},
@@ -34,22 +39,8 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
 
     before(function () {
         coll = db[jsTestName()];
-        assertDropCollection(db, coll.getName());
-        if (FixtureHelpers.isMongos(db)) {
-            // Explicitly shard with a hashed key so both shards receive initial chunks and the
-            // DRM pipeline is sent to each shard. assertDropCollection bypasses the
-            // DBCollection.prototype.drop override that would otherwise re-shard after drop, so
-            // without explicit setup the collection stays unsharded and isSharded is always false.
-            assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-            assert.commandWorked(
-                db.adminCommand({shardCollection: coll.getFullName(), key: {_id: "hashed"}}),
-            );
-        } else {
-            assert.commandWorked(coll.insertOne({placeholder: true}));
-        }
-        nShards = FixtureHelpers.numberOfShardsForCollection(coll);
-        shardIds = FixtureHelpers.getShardsOwningDataForCollection(coll).slice().sort();
-        isSharded = FixtureHelpers.isSharded(coll);
+        setupDrmCollection(db, coll);
+        ({nShards, shardIds, isSharded} = getDrmShardInfo(db, coll));
     });
 
     it("returns docs and correct faceted metadata via $$SEARCH_META", function () {
@@ -64,7 +55,7 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
             {_id: 1, name: "doc_1", meta: expectedMeta},
             {_id: 2, name: "doc_2", meta: expectedMeta},
         ];
-        const expected = Array(nShards).fill(perShardDocs).flat();
+        const expected = expandPerShard(nShards, perShardDocs);
         assert.sameMembers(result, expected, {result, nShards});
     });
 
@@ -87,7 +78,7 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
             {_id: 1, name: "doc_1", lowerBound: 42, categories},
             {_id: 2, name: "doc_2", lowerBound: 42, categories},
         ];
-        const expected = Array(nShards).fill(perShardDocs).flat();
+        const expected = expandPerShard(nShards, perShardDocs);
         assert.sameMembers(result, expected, {result, nShards});
     });
 
@@ -104,7 +95,7 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
             {_id: 1, name: "doc_1", meta: expectedMeta},
             {_id: 2, name: "doc_2", meta: expectedMeta},
         ];
-        const expected = Array(nShards).fill(perShardDocs).flat();
+        const expected = expandPerShard(nShards, perShardDocs);
         assert.sameMembers(result, expected, {result, nShards});
     });
 
@@ -126,7 +117,7 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
             ])
             .toArray();
         const perShardDocs = Array(3).fill({meta: expectedMeta});
-        const expected = Array(nShards).fill(perShardDocs).flat();
+        const expected = expandPerShard(nShards, perShardDocs);
         assert.sameMembers(result, expected, {result, nShards});
     });
 
@@ -143,7 +134,7 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
             name: `doc_${i}`,
             meta: expectedMeta,
         }));
-        const expected = Array(nShards).fill(perShardDocs).flat();
+        const expected = expandPerShard(nShards, perShardDocs);
         assert.sameMembers(result, expected, {result, nShards});
     });
 
@@ -164,7 +155,7 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
         ];
         // The source already emits docs in descending score order on each shard, so the global
         // merge by score yields each per-shard doc nShards consecutive times.
-        const expected = perShardDocs.flatMap((d) => Array(nShards).fill(d));
+        const expected = expandEachPerShard(nShards, perShardDocs);
         assert.eq(result, expected, {result, nShards});
     });
 
@@ -223,7 +214,7 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
             {name: "doc_4", meta: expectedMeta},
         ];
         // After global $sort name:1, every per-shard doc appears nShards consecutive times.
-        const expected = perShardDocs.flatMap((d) => Array(nShards).fill(d));
+        const expected = expandEachPerShard(nShards, perShardDocs);
         assert.eq(result, expected, {result, nShards});
     });
 
@@ -247,13 +238,7 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
         if (nShards < 2) return;
         // Each shard emits a different per-shard metadata document. The merge pipeline groups them
         // into a single summed-count metadata document for $$SEARCH_META.
-        const metaA = {count: {lowerBound: 10}};
-        const metaB = {count: {lowerBound: 32}};
-        const byShard = {[shardIds[0]]: {meta: metaA}, [shardIds[1]]: {meta: metaB}};
-        const mergePipeline = [
-            {$group: {_id: null, count: {$sum: "$count.lowerBound"}}},
-            {$project: {_id: 0, count: {lowerBound: "$count"}}},
-        ];
+        const {byShard, mergePipeline, expectedMeta: mergedMeta} = makeCountMergeSetup(shardIds);
         const result = coll
             .aggregate([
                 {
@@ -269,13 +254,12 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
                 {$project: {_id: 0, name: 1, meta: "$$SEARCH_META"}},
             ])
             .toArray();
-        const mergedMeta = {count: {lowerBound: 42}};
         const perShardDocs = [
             {name: "doc_0", meta: mergedMeta},
             {name: "doc_1", meta: mergedMeta},
             {name: "doc_2", meta: mergedMeta},
         ];
-        const expected = Array(nShards).fill(perShardDocs).flat();
+        const expected = expandPerShard(nShards, perShardDocs);
         assert.sameMembers(result, expected, {result, nShards});
     });
 
@@ -317,7 +301,7 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
             name: `doc_${i}`,
             meta: mergedMeta,
         }));
-        const expected = Array(nShards).fill(perShardDocs).flat();
+        const expected = expandPerShard(nShards, perShardDocs);
         assert.sameMembers(result, expected, {result, nShards});
     });
 
@@ -341,7 +325,7 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
             name: `doc_${i}`,
             meta: expectedMeta,
         }));
-        const expected = Array(nShards).fill(perShardDocs).flat();
+        const expected = expandPerShard(nShards, perShardDocs);
         assert.sameMembers(result, expected, {result, nShards});
     });
 
@@ -362,7 +346,7 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
             {_id: 1, name: "doc_1"},
             {_id: 2, name: "doc_2"},
         ];
-        const expectedDocs = Array(nShards).fill(perShardDocs).flat();
+        const expectedDocs = expandPerShard(nShards, perShardDocs);
         assert.eq(result.length, 1, {result});
         assert.docEq(result[0].meta, [expectedMeta], {result});
         assert.sameMembers(result[0].docs, expectedDocs, {result, nShards});
