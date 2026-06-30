@@ -149,7 +149,6 @@ public:
                 return;
             }
 
-            _executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
             const auto& nss = ns();
             const auto* const replCoord = repl::ReplicationCoordinator::get(opCtx);
             const auto replSetConfig = replCoord->getConfig();
@@ -164,11 +163,18 @@ public:
             // view. We achieve this by reading at majority timestamp.
             // TODO (SERVER-129223): investigate whether we can run this command on lagged
             // secondaries without a readConcern.
+            const auto snapshotTimestamp = replCoord->getCurrentCommittedSnapshotOpTime();
+            if (snapshotTimestamp.isNull()) {
+                LOGV2_WARNING(13017701,
+                              "The majority committed timestamp is null. Skipping calling "
+                              "checkMetadataConsistency on secondary nodes");
+                return;
+            }
             repl::ReadConcernArgs snapshotReadConcern{repl::ReadConcernLevel::kSnapshotReadConcern};
-            snapshotReadConcern.setArgsAtClusterTimeForSnapshot(
-                replCoord->getCurrentCommittedSnapshotOpTime().getTimestamp());
+            snapshotReadConcern.setArgsAtClusterTimeForSnapshot(snapshotTimestamp.getTimestamp());
             command.setReadConcern(std::move(snapshotReadConcern));
 
+            _executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
             const auto commandBSON = command.toBSON();
 
             for (const auto& member : members) {
@@ -241,17 +247,28 @@ public:
                 }
 
                 auto cursorWithStatus = CursorResponse::parseFromBSON(response->data);
-                if (!cursorWithStatus.isOK() &&
-                    cursorWithStatus.getStatus() == ErrorCodes::NotYetInitialized) {
-                    // The secondary has not completed replica set initialization yet.
-                    LOGV2_WARNING(12922003,
-                                  "Secondary node hasn't completed replica set initialization",
-                                  "hostAndPort"_attr = hostAndPort,
-                                  "error"_attr = cursorWithStatus.getStatus());
-                    continue;
-                }
+                CursorResponse cursor;
+                switch (cursorWithStatus.getStatus().code()) {
+                    case ErrorCodes::NotYetInitialized:
+                        // The secondary has not completed replica set initialization yet.
+                        LOGV2_WARNING(12922003,
+                                      "Secondary node hasn't completed replica set initialization",
+                                      "hostAndPort"_attr = hostAndPort,
+                                      "error"_attr = cursorWithStatus.getStatus());
+                        continue;
 
-                auto cursor = uassertStatusOK(std::move(cursorWithStatus));
+                    case ErrorCodes::SnapshotTooOld:
+                        // The secondary can't serve the snapshot read, probably it had just
+                        // completed initial sync.
+                        LOGV2_WARNING(13017700,
+                                      "Secondary node can't read at the requested timestamp",
+                                      "hostAndPort"_attr = hostAndPort,
+                                      "error"_attr = cursorWithStatus.getStatus());
+                        continue;
+
+                    default:
+                        cursor = uassertStatusOK(std::move(cursorWithStatus));
+                }
 
                 // All other members belong to this same shard, so they share its shardId.
                 remoteCursors.emplace_back(shardId.toString(), response->target, std::move(cursor));
