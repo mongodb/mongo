@@ -684,7 +684,7 @@ TEST_F(ExtractExprPredicatesTest, EqualityAgainstSystemVariableWithSubfield) {
 }
 
 /**
- * An expression that constains non-expr $eq predicate cannot be fully absorbed.
+ * An expression that contains non-expr $eq predicate cannot be fully absorbed.
  */
 TEST_F(ExtractExprPredicatesTest, MatchNonExprEquality) {
     static constexpr std::string_view json = R"(

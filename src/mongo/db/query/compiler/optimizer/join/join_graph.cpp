@@ -30,7 +30,9 @@
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/query/util/bitset_util.h"
 
+#include <string>
 #include <string_view>
 
 namespace mongo::join_ordering {
@@ -63,6 +65,16 @@ static void swapPredicateSides(JoinEdge::PredicateList& predicates) {
 
 std::string nodeSetToString(const NodeSet& set, size_t numNodesToPrint) {
     return set.to_string().substr(kHardMaxNodesInJoin - numNodesToPrint, numNodesToPrint);
+}
+
+std::vector<std::string> subsetCollectionNames(const NodeSet& set, const JoinGraph& graph) {
+    std::vector<std::string> names;
+    names.reserve(set.count());
+    for (auto nodeIdx : iterable(set, graph.numNodes())) {
+        names.emplace_back(
+            redactTenant(graph.getNode(static_cast<NodeId>(nodeIdx)).collectionName));
+    }
+    return names;
 }
 
 BSONObj JoinNode::toBSON() const {

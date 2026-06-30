@@ -230,6 +230,7 @@ cost_based_ranker::CardinalityEstimate JoinCardinalityEstimator::getOrEstimateSu
                 5,
                 "Estimating cardinality for subset",
                 "subset"_attr = nodeSetToString(nodes, _ctx.joinGraph.numNodes()),
+                "subsetCollectionNames"_attr = subsetCollectionNames(nodes, _ctx.joinGraph),
                 "cardinalityEstimate"_attr = ce);
 
     _subsetCardinalities.emplace(nodes, ce);

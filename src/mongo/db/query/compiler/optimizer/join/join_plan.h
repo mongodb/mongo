@@ -28,6 +28,7 @@
  */
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/compiler/optimizer/join/join_estimates.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
@@ -238,6 +239,7 @@ public:
                                      std::string indentStr = "") const;
 
     BSONObj joinPlanNodeToBSON(JoinPlanNodeId node,
+                               const JoinGraph& graph,
                                size_t numNodesToPrint = kHardMaxNodesInJoin) const;
 
 private:

@@ -106,8 +106,8 @@ void PlanEnumeratorContext::addPlanToSubset(JoinMethod method,
     LOGV2_DEBUG(11336912,
                 5,
                 "Enumerating plan for join subset",
-                "plan"_attr =
-                    _registry.joinPlanNodeToBSON(subset.plans.back(), _ctx.joinGraph.numNodes()),
+                "plan"_attr = _registry.joinPlanNodeToBSON(
+                    subset.plans.back(), _ctx.joinGraph, _ctx.joinGraph.numNodes()),
                 "isBestPlan"_attr = isBestPlan);
 }
 
@@ -222,6 +222,8 @@ void PlanEnumeratorContext::addJoinPlan(JoinMethod method,
                     5,
                     "Applying hint for subset",
                     "subset"_attr = subset.toString(_ctx.joinGraph.numNodes()),
+                    "subsetCollectionNames"_attr =
+                        subsetCollectionNames(subset.subset, _ctx.joinGraph),
                     "hint"_attr = _mode.hint().toBSON());
     }
 

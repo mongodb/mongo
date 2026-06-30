@@ -97,6 +97,7 @@ mongo_cc_unit_test(
         "join_cost_estimator_test.cpp",
         "join_graph_test.cpp",
         "join_hint_test.cpp",
+        "join_plan_test.cpp",
         "path_resolver_test.cpp",
         "plan_enumerator_test.cpp",
         "predicate_extractor_test.cpp",

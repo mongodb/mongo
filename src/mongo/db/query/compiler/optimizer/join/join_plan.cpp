@@ -37,6 +37,7 @@
 
 namespace mongo::join_ordering {
 namespace {
+
 std::string joinNodeStringPrefix(const JoinPlanNode& node,
                                  size_t numNodesToPrint,
                                  std::string indentStr) {
@@ -150,28 +151,37 @@ JoinCostEstimate JoinPlanNodeRegistry::getCost(JoinPlanNodeId nodeId) const {
 }
 
 BSONObj JoinPlanNodeRegistry::joinPlanNodeToBSON(JoinPlanNodeId nodeId,
+                                                 const JoinGraph& graph,
                                                  size_t numNodesToPrint) const {
+    const NodeSet bitset = getBitset(nodeId);
     BSONObjBuilder bob;
-    bob << "subset" << nodeSetToString(getBitset(nodeId), numNodesToPrint);
+    bob << "subset" << nodeSetToString(bitset, numNodesToPrint);
+    {
+        BSONArrayBuilder namesBob(bob.subarrayStart("subsetCollectionNames"));
+        for (const auto& name : subsetCollectionNames(bitset, graph)) {
+            namesBob << name;
+        }
+    }
     if (!isOfType<INLJRHSNode>(nodeId)) {
         // INLJRHSNodes don't have their own associated cost.
         bob << "cost" << getCost(nodeId).toBSON();
     }
-    std::visit(
-        OverloadedVisitor{[this, numNodesToPrint, &bob](const JoiningNode& join) {
-                              bob << "method" << joinMethodToString(join.method);
-                              bob << "left" << joinPlanNodeToBSON(join.left, numNodesToPrint);
-                              bob << "right" << joinPlanNodeToBSON(join.right, numNodesToPrint);
-                          },
-                          [&bob](const INLJRHSNode& ip) {
-                              bob << "accessPath"
-                                  << (str::stream()
-                                      << "INDEX_PROBE " << ip.entry->descriptor()->keyPattern());
-                          },
-                          [&bob](const BaseNode& base) {
-                              bob << "accessPath" << base.soln->summaryString();
-                          }},
-        get(nodeId));
+    std::visit(OverloadedVisitor{[this, &graph, numNodesToPrint, &bob](const JoiningNode& join) {
+                                     bob << "method" << joinMethodToString(join.method);
+                                     bob << "left"
+                                         << joinPlanNodeToBSON(join.left, graph, numNodesToPrint);
+                                     bob << "right"
+                                         << joinPlanNodeToBSON(join.right, graph, numNodesToPrint);
+                                 },
+                                 [&bob](const INLJRHSNode& ip) {
+                                     bob << "accessPath"
+                                         << (str::stream() << "INDEX_PROBE "
+                                                           << ip.entry->descriptor()->keyPattern());
+                                 },
+                                 [&bob](const BaseNode& base) {
+                                     bob << "accessPath" << base.soln->summaryString();
+                                 }},
+               get(nodeId));
     return bob.obj();
 }
 

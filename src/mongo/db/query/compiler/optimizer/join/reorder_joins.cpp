@@ -320,8 +320,8 @@ ReorderedJoinSolution makeReorderedJoinSoln(const JoinReorderingContext& ctx,
     LOGV2_DEBUG(11179802,
                 5,
                 "Winning join plan",
-                "plan"_attr =
-                    registry.joinPlanNodeToBSON(bestPlanNodeId, ctx.joinGraph.numNodes()));
+                "plan"_attr = registry.joinPlanNodeToBSON(
+                    bestPlanNodeId, ctx.joinGraph, ctx.joinGraph.numNodes()));
 
     // Build QSN based on best plan.
     auto ret = std::make_unique<QuerySolution>();

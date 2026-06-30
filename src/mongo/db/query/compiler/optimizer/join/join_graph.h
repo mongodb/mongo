@@ -29,16 +29,20 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/optimizer/join/logical_defs.h"
 #include "mongo/util/modules.h"
 
 #include <algorithm>
+#include <string>
+#include <vector>
 
 /** This file introduces the join optimizer's logical model. It defines classes representing a join
  * graph and its components.
  */
 namespace mongo::join_ordering {
+
 /** The maximum number of nodes which can participate in one join.
  */
 constexpr size_t kHardMaxNodesInJoin = 64;
@@ -442,5 +446,11 @@ private:
     // Maps a pair of nodeIds to the edge that connects them.
     absl::flat_hash_map<NodeSet, EdgeId> _edgeMap;
 };
+
+/**
+ * Returns the redacted collection names for the nodes in 'set', in ascending 'NodeId' order. Used
+ * alongside 'nodeSetToString' to make the opaque subset bitset readable in debug logs.
+ */
+std::vector<std::string> subsetCollectionNames(const NodeSet& set, const JoinGraph& graph);
 
 }  // namespace mongo::join_ordering
