@@ -428,9 +428,8 @@ ExecutorFuture<void> ReshardingCoordinator::_initializeCoordinator(
                        // stale OSI-stamped commands from the previous primary before re-sending
                        // them.
                        auto opCtx = _makeOperationContext();
-                       auto useOSI = resharding::gFeatureFlagReshardingInitNoRefresh.isEnabled(
-                           VersionContext::getDecoration(opCtx.get()),
-                           serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+                       auto useOSI = resharding::isEnabledWithPinnedVersion(
+                           _forwardableOpMetadata, resharding::gFeatureFlagReshardingInitNoRefresh);
 
                        if (useOSI && _isRecovery) {
                            auto barrier =
@@ -527,9 +526,9 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                                _startSpan(telemetryCtx,
                                           otel::traces::span_names::
                                               kReshardingCoordinatorAwaitAllRecipientsCloning);
-                           if (resharding::gFeatureFlagReshardingCloneNoRefresh.isEnabled(
-                                   resharding::getVersionContextOrDefault(_forwardableOpMetadata),
-                                   serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                           if (resharding::isEnabledWithPinnedVersion(
+                                   _forwardableOpMetadata,
+                                   resharding::gFeatureFlagReshardingCloneNoRefresh)) {
                                _tellAllRecipientsToClone(executor);
                            } else {
                                _tellAllRecipientsToRefresh(executor);
@@ -549,11 +548,10 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                            auto span = _startSpan(telemetryCtx,
                                                   otel::traces::span_names::
                                                       kReshardingCoordinatorTellAllDonorsToRefresh);
-                           if (resharding::gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites
-                                   .isEnabled(resharding::getVersionContextOrDefault(
-                                                  _forwardableOpMetadata),
-                                              serverGlobalParams.featureCompatibility
-                                                  .acquireFCVSnapshot())) {
+                           if (resharding::isEnabledWithPinnedVersion(
+                                   _forwardableOpMetadata,
+                                   resharding::
+                                       gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites)) {
                                _notifyDonorsCloningComplete(executor);
                            } else {
                                _tellAllDonorsToRefresh(executor);
@@ -573,20 +571,18 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                                telemetryCtx,
                                otel::traces::span_names::
                                    kReshardingCoordinatorTellAllParticipantsReshardingReadyToCommit);
-                           if (resharding::gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites
-                                   .isEnabled(resharding::getVersionContextOrDefault(
-                                                  _forwardableOpMetadata),
-                                              serverGlobalParams.featureCompatibility
-                                                  .acquireFCVSnapshot())) {
+                           if (resharding::isEnabledWithPinnedVersion(
+                                   _forwardableOpMetadata,
+                                   resharding::
+                                       gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites)) {
                                _notifyDonorsCriticalSectionStarted(executor);
                            } else {
                                _tellAllDonorsToRefresh(executor);
                            }
-                           if (resharding::gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable
-                                   .isEnabled(resharding::getVersionContextOrDefault(
-                                                  _forwardableOpMetadata),
-                                              serverGlobalParams.featureCompatibility
-                                                  .acquireFCVSnapshot())) {
+                           if (resharding::isEnabledWithPinnedVersion(
+                                   _forwardableOpMetadata,
+                                   resharding::
+                                       gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable)) {
                                _tellAllRecipientsCriticalSectionStarted(executor);
                            } else {
                                _tellAllRecipientsToRefresh(executor);
@@ -657,9 +653,9 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
                return ExecutorFuture<void>(**executor)
                    .then([this, executor] {
                        auto opCtx = _makeOperationContext();
-                       if (feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabled(
-                               VersionContext::getDecoration(opCtx.get()),
-                               serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                       if (resharding::isEnabledWithPinnedVersion(
+                               _forwardableOpMetadata,
+                               feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting)) {
                            // V2 change stream readers expect to see an op entry concerning the
                            // commit before this materializes into the global catalog (multiple
                            // copies of this event notification are acceptable).
@@ -720,10 +716,10 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
                            .thenRunOn(**executor)
                            .then([this, executor] {
                                auto opCtx = _makeOperationContext();
-                               if (feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting
-                                       .isEnabled(VersionContext::getDecoration(opCtx.get()),
-                                                  serverGlobalParams.featureCompatibility
-                                                      .acquireFCVSnapshot())) {
+                               if (resharding::isEnabledWithPinnedVersion(
+                                       _forwardableOpMetadata,
+                                       feature_flags::
+                                           gFeatureFlagChangeStreamPreciseShardTargeting)) {
                                    // V2 change stream readers expect to see an op entry concerning
                                    // on the placement change caused by the commit after this has
                                    // been majority written on the global catalog.
@@ -757,12 +753,10 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
                                _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
                                                    resharding::getCurrentTime());
 
-                               if (resharding::
-                                       gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites
-                                           .isEnabled(resharding::getVersionContextOrDefault(
-                                                          _forwardableOpMetadata),
-                                                      serverGlobalParams.featureCompatibility
-                                                          .acquireFCVSnapshot())) {
+                               if (resharding::isEnabledWithPinnedVersion(
+                                       _forwardableOpMetadata,
+                                       resharding::
+                                           gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites)) {
                                    return;
                                }
 
@@ -2189,9 +2183,8 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllParticipantShardsDone(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     auto coordinatorDocFuture = [&]() -> ExecutorFuture<ReshardingCoordinatorDocument> {
         if (_coordinatorDoc.getAbortReason() &&
-            resharding::gFeatureFlagReshardingInitNoRefresh.isEnabled(
-                resharding::getVersionContextOrDefault(_forwardableOpMetadata),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            resharding::isEnabledWithPinnedVersion(
+                _forwardableOpMetadata, resharding::gFeatureFlagReshardingInitNoRefresh)) {
             // Under featureFlagReshardingInitNoRefresh, all participants are guaranteed to be done
             // at this point. AbortReshardCollection ensures that all initialized participants have
             // completed, and since the command carries a higher txnNumber (via OSI), no new
@@ -2326,9 +2319,8 @@ void ReshardingCoordinator::_initializeAllDonors(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     invariant(_coordinatorDoc.getState() == CoordinatorStateEnum::kPreparingToDonate);
     auto opCtx = _makeOperationContext();
-    if (resharding::gFeatureFlagReshardingInitNoRefresh.isEnabled(
-            VersionContext::getDecoration(opCtx.get()),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    if (resharding::isEnabledWithPinnedVersion(_forwardableOpMetadata,
+                                               resharding::gFeatureFlagReshardingInitNoRefresh)) {
         resharding::tellAllDonorsToInitialize(opCtx.get(),
                                               _getNewSession(opCtx.get()),
                                               _coordinatorDoc,
@@ -2348,9 +2340,8 @@ void ReshardingCoordinator::_initializeAllRecipients(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     invariant(_coordinatorDoc.getState() == CoordinatorStateEnum::kPreparingToDonate);
     auto opCtx = _makeOperationContext();
-    if (resharding::gFeatureFlagReshardingInitNoRefresh.isEnabled(
-            VersionContext::getDecoration(opCtx.get()),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    if (resharding::isEnabledWithPinnedVersion(_forwardableOpMetadata,
+                                               resharding::gFeatureFlagReshardingInitNoRefresh)) {
         resharding::tellAllRecipientsToInitialize(opCtx.get(),
                                                   _getNewSession(opCtx.get()),
                                                   _coordinatorDoc,

@@ -677,6 +677,13 @@ CancelableOperationContext makeReshardingOperationContext(
 VersionContext getVersionContextOrDefault(const boost::optional<ForwardableOperationMetadata>& fom);
 
 /**
+ * Returns true if 'flag' is enabled for the FCV pinned in 'fom'. When 'fom' is absent or carries
+ * no VersionContext, falls back to default defined in getVersionContextOrDefault.
+ */
+bool isEnabledWithPinnedVersion(const boost::optional<ForwardableOperationMetadata>& fom,
+                                const FCVGatedFeatureFlag& flag);
+
+/**
  * Chooses the index hint for the covered clone-count aggregation run against a donor's source
  * collection.
  */

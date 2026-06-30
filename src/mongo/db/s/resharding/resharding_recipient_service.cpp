@@ -827,9 +827,8 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
 
     std::lock_guard<std::mutex> lk(_mutex);
     auto coordinatorState = reshardingFields.getState();
-    auto driveCloneViaRefresh = !resharding::gFeatureFlagReshardingCloneNoRefresh.isEnabled(
-        resharding::getVersionContextOrDefault(_forwardableOpMetadata),
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    auto driveCloneViaRefresh = !resharding::isEnabledWithPinnedVersion(
+        _forwardableOpMetadata, resharding::gFeatureFlagReshardingCloneNoRefresh);
 
     boost::optional<CloneDetails> cloneDetails;
     if (driveCloneViaRefresh && coordinatorState >= CoordinatorStateEnum::kCloning) {
@@ -1342,8 +1341,9 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                                serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
                            const auto isPrimaryDrivenIndexBuild =
                                fcvSnapshot.isVersionInitialized() &&
-                               feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
-                                   VersionContext::getDecoration(opCtx.get()), fcvSnapshot);
+                               resharding::isEnabledWithPinnedVersion(
+                                   _forwardableOpMetadata,
+                                   feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds);
                            IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions{
                                // TODO(SERVER-109664): Set this to IndexBuildMethodEnum::kHybrid
                                .indexBuildMethod =

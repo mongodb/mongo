@@ -992,6 +992,12 @@ VersionContext getVersionContextOrDefault(
     }
 }
 
+bool isEnabledWithPinnedVersion(const boost::optional<ForwardableOperationMetadata>& fom,
+                                const FCVGatedFeatureFlag& flag) {
+    return flag.isEnabled(getVersionContextOrDefault(fom),
+                          serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+}
+
 boost::optional<BSONObj> determineCloneCountHint(OperationContext* opCtx,
                                                  const CollectionPtr& collection,
                                                  const boost::optional<BSONObj>& shardKeyPattern) {

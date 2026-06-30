@@ -240,10 +240,13 @@ public:
         }
     }
 
-    void abortUnpreparedTransactionIfNecessary(OperationContext* opCtx) override {
-        if (resharding::gFeatureFlagReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites
-                .isEnabled(VersionContext::getDecoration(opCtx),
-                           serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+    void abortUnpreparedTransactionIfNecessary(
+        OperationContext* opCtx,
+        const boost::optional<ForwardableOperationMetadata>& forwardableMetadata) override {
+        if (resharding::isEnabledWithPinnedVersion(
+                forwardableMetadata,
+                resharding::
+                    gFeatureFlagReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites) &&
             resharding::gReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites.load()) {
             // Unless explicitly opted out, abort any unprepared transactions that may be running on
             // the donor shard. This helps prevent the donor from not being to acquire the critical
@@ -929,7 +932,7 @@ void ReshardingDonorService::DonorStateMachine::
 
     {
         auto opCtx = _makeOperationContext(factory);
-        _externalState->abortUnpreparedTransactionIfNecessary(opCtx.get());
+        _externalState->abortUnpreparedTransactionIfNecessary(opCtx.get(), _forwardableOpMetadata);
 
         const bool mustClearMetadata = _metadata.getAuthoritativeMetadataAccessLevel() ==
             ReshardingAuthoritativeMetadataAccessLevelEnum::kNone;

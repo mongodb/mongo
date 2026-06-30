@@ -468,7 +468,8 @@ public:
     virtual void refreshCollectionPlacementInfo(OperationContext* opCtx,
                                                 const NamespaceString& sourceNss) = 0;
 
-    virtual void abortUnpreparedTransactionIfNecessary(OperationContext* opCtx) = 0;
+    virtual void abortUnpreparedTransactionIfNecessary(
+        OperationContext* opCtx, const boost::optional<ForwardableOperationMetadata>& metadata) = 0;
 };
 
 }  // namespace mongo

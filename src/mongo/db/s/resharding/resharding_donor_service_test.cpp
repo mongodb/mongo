@@ -125,7 +125,9 @@ public:
         return std::make_unique<ShardingRecoveryService::NoCustomAction>();
     }
 
-    void abortUnpreparedTransactionIfNecessary(OperationContext* opCtx) {
+    void abortUnpreparedTransactionIfNecessary(
+        OperationContext* opCtx,
+        const boost::optional<ForwardableOperationMetadata> forwardableMetadata) {
         _maybeThrowErrorForFunction(opCtx,
                                     ExternalFunction::kAbortUnpreparedTransactionIfNecessary);
     }
@@ -188,8 +190,10 @@ public:
         return _impl->getOnReleaseCriticalSectionCustomAction(mustClearMetadata);
     }
 
-    void abortUnpreparedTransactionIfNecessary(OperationContext* opCtx) override {
-        _impl->abortUnpreparedTransactionIfNecessary(opCtx);
+    void abortUnpreparedTransactionIfNecessary(
+        OperationContext* opCtx,
+        const boost::optional<ForwardableOperationMetadata>& metadata) override {
+        _impl->abortUnpreparedTransactionIfNecessary(opCtx, metadata);
     }
 
 private:
