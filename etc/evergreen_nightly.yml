@@ -78,3 +78,7 @@ patch_aliases:
     description: "Runs release smoke tests"
     variant: ".*"
     task: "^(crypt_create_lib|package|test_packages|jscore)$"
+  - alias: blocking-emergency-atlas-release-tasks
+    description: "Run variants that would potentially block an emergency release"
+    variant_tags: ["emergency_release"]
+    task: ".*"

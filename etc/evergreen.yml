@@ -205,10 +205,6 @@ patch_aliases:
   - alias: cluster_scalability
     variant_tags: ["cluster_scalability_only"]
     task_tags: ["cluster_scalability_only"]
-  - alias: blocking-emergency-atlas-release-tasks
-    description: "Run variants that would potentially block an emergency release"
-    variant_tags: ["emergency_release"]
-    task: ".*"
   - alias: streams
     description: "Runs all streams variants"
     variant: "^(enterprise-amazon2023-streams|enterprise-rhel8-streams-tsan|enterprise-rhel8-streams-aubsan)$"
