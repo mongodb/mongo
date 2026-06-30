@@ -160,7 +160,7 @@ function runTestSuite(conn, prefix) {
 }
 
 {
-    const prefix = `${MongoRunner.dataPath}${jsTestName()}_mongod`;
+    const prefix = `${MongoRunner.dataPath}_mongod`;
     mkdir(prefix);
     const mongod = MongoRunner.runMongod({
         proxyUnixSocketPrefix: prefix,
@@ -171,7 +171,7 @@ function runTestSuite(conn, prefix) {
 }
 
 {
-    const prefix = `${MongoRunner.dataPath}${jsTestName()}_mongos`;
+    const prefix = `${MongoRunner.dataPath}_mongos`;
     mkdir(prefix);
     const st = new ShardingTest({
         shards: 1,

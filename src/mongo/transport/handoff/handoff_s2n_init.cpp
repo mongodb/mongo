@@ -29,7 +29,11 @@
 
 #include "mongo/transport/handoff/handoff_s2n_init.h"
 
+#include "mongo/util/static_immortal.h"
+
 #include <s2n.h>
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {
@@ -45,25 +49,28 @@ namespace {
  * `s2n_disable_atexit()`, which is harmless because s2n-tls's atexit support is disabled by
  * default, will fail if `s2n_init` has been called previously. So, we can use `s2n_disable_atexit`
  * to check whether the library has been initialized.
+ * This technically violates the "`s2n_init()` must be called before any of the library's
+ * facilities" contract, but works.
  */
 struct S2NInitOnce {
-    S2NInitOnce() : errorMessage(nullptr) {
+    S2NInitOnce() : status(Status::OK()) {
         if (s2n_disable_atexit() != S2N_SUCCESS) {
             return;  // already initialized
         }
         if (s2n_init() != S2N_SUCCESS) {
-            errorMessage = s2n_strerror(s2n_errno, "EN");
+            status = Status(ErrorCodes::InternalError,
+                            fmt::format("s2n_init failed: {}", s2n_strerror(s2n_errno, "EN")));
         }
     }
 
-    const char* errorMessage;
+    Status status;
 };
 
 }  // namespace
 
-const char* s2nInitOnce() {
-    static const S2NInitOnce instance;
-    return instance.errorMessage;
+Status s2nInitOnce() {
+    static const StaticImmortal<S2NInitOnce> instance;
+    return instance->status;
 }
 
 }  // namespace mongo

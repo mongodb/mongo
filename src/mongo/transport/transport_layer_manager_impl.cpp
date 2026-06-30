@@ -46,12 +46,19 @@
 #include "mongo/transport/asio/asio_session_manager.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/version.h"
 
 #ifdef MONGO_CONFIG_GRPC
 #include "mongo/transport/grpc/grpc_feature_flag_gen.h"
 #include "mongo/transport/grpc/grpc_transport_layer_impl.h"
+#endif
+
+#ifdef MONGO_CONFIG_CONNECTION_HANDOFF
+#include "mongo/transport/handoff/handoff_feature_flag_gen.h"
+#include "mongo/transport/handoff/handoff_session_manager.h"
+#include "mongo/transport/handoff/handoff_transport_layer.h"
 #endif
 
 #ifdef MONGO_CONFIG_SSL
@@ -295,6 +302,35 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::createWithConf
         auto tl = std::make_unique<AsioTransportLayer>(opts, std::move(sm));
         retVector.push_back(std::move(tl));
     }
+
+#ifdef MONGO_CONFIG_CONNECTION_HANDOFF
+    // TODO(SERVER-130054): s2n-tls cannot initialize against an OpenSSL 1.x FIPS-capable libcrypto
+    // when FIPS is active (s2n_fips.c only supports OpenSSL 3.x FIPS). Skip HandoffTransportLayer
+    // entirely in that configuration.
+    bool inFIPSMode = false;
+#if defined(OPENSSL_FIPS)
+    inFIPSMode = sslGlobalParams.sslFIPSMode;
+#endif
+    if (feature_flags::gFeatureFlagTLSConnectionHandoff.isEnabled()) {
+        if (!inFIPSMode) {
+            retVector.push_back(
+                std::make_unique<HandoffTransportLayer>(HandoffTransportLayer::Params{
+                    .socketPrefix = config->proxySocketPrefix.empty() ? config->socket
+                                                                      : config->proxySocketPrefix,
+                    .port = config->port,
+                    .socketGroupID = config->proxySocketGid,
+                    .listenBacklog = serverGlobalParams.listenBacklog
+                        ? *serverGlobalParams.listenBacklog
+                        : ProcessInfo::getDefaultListenBacklog(),
+                    .sessionManager = std::make_unique<HandoffSessionManager>(svcCtx),
+                }));
+        } else {
+            LOGV2_WARNING(
+                12995201,
+                "TLS connection handoff disabled: Session handoff is not supported in FIPS mode");
+        }
+    }
+#endif
 
 #ifdef MONGO_CONFIG_GRPC
     using GRPCTL = grpc::GRPCTransportLayerImpl;

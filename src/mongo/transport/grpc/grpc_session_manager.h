@@ -53,7 +53,7 @@ public:
 
 protected:
     std::string getClientThreadName(const Session&) const override;
-    void configureServiceExecutorContext(mongo::Client* client,
+    void configureServiceExecutorContext(mongo::Client& client,
                                          bool isPrivilegedSession) const override;
 
     AtomicWord<std::size_t> _successfulSessions{0};

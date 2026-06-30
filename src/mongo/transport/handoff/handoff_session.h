@@ -39,6 +39,7 @@
 #include "mongo/util/net/sockaddr.h"
 
 #include <cstdint>
+#include <span>
 
 #include <s2n.h>
 
@@ -283,6 +284,14 @@ private:
     State _state;
     /** Indicates whether end() has been called on this session. */
     bool _isShutDown;
+    /**
+     * Cleartext from the downstream client that the pre-auth process sent as part of the OP_HANDOFF
+     * message. `sourceMessage()` will use this data first before receiving from `_fd`.
+     * `_unconsumedBytes` refers to the range of data in `_unconsumedBuffer` that remains to be
+     * used.
+     */
+    std::vector<char> _unconsumedBuffer;
+    std::span<char> _unconsumedBytes;
     /**
      * The remote and local addresses associated with the connection _fd. This changes during
      * OP_HANDOFF.

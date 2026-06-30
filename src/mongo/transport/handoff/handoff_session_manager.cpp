@@ -27,19 +27,30 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/transport/handoff/handoff_session_manager.h"
 
-#include "mongo/base/status.h"
+#include "mongo/transport/service_executor.h"
+#include "mongo/transport/session.h"
 
-namespace mongo {
+#include <fmt/format.h>
 
-/**
- * Initializes the s2n-tls library via `s2n_init()`, but only if `s2n_init()` has not been called
- * previously.
- * Returns `Status::OK()` on success, or on failure returns an `InternalError` with a message
- * describing the failure.
- * `s2nInitOnce` must be called from the process's main thread.
- */
-Status s2nInitOnce();
+namespace mongo::transport {
 
-}  // namespace mongo
+std::string HandoffSessionManager::getClientThreadName(const Session& session) const {
+    return fmt::format("conn{}", session.id());
+}
+
+void HandoffSessionManager::configureServiceExecutorContext(Client& client,
+                                                            bool isPrivilegedSession) const {
+    auto seCtx = std::make_unique<ServiceExecutorContext>();
+    seCtx->setThreadModel(ServiceExecutorContext::kSynchronous);
+    seCtx->setCanUseReserved(isPrivilegedSession);
+    std::lock_guard lk(client);
+    ServiceExecutorContext::set(&client, std::move(seCtx));
+}
+
+bool HandoffSessionManager::isPrivileged(const Session& session) const {
+    return session.isConnectedToPriorityPort();
+}
+
+}  // namespace mongo::transport

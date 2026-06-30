@@ -42,3 +42,7 @@ structs:
             s2nState:
                 type: bindata_generic
                 description: "Serialized s2n connection state produced by s2n_connection_serialize."
+            extraCleartext:
+                type: bindata_generic
+                optional: true
+                description: "Data received and decrypted from the client following the last pre-auth message."

@@ -174,7 +174,7 @@ function runTest(conn, prefix) {
 }
 
 function runMongodTest() {
-    const prefix = `${MongoRunner.dataPath}${jsTestName()}_mongod`;
+    const prefix = `${MongoRunner.dataPath}_mongod`;
     mkdir(prefix);
 
     const mongod = MongoRunner.runMongod({
@@ -194,7 +194,7 @@ function runMongodTest() {
 }
 
 function runMongosTest() {
-    const prefix = `${MongoRunner.dataPath}${jsTestName()}_mongos`;
+    const prefix = `${MongoRunner.dataPath}_mongos`;
     mkdir(prefix);
 
     const st = new ShardingTest({

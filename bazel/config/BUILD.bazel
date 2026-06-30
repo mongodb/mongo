@@ -1412,6 +1412,33 @@ selects.config_setting_group(
 )
 
 # --------------------------------------
+# connection handoff options
+# --------------------------------------
+
+# s2n-tls, on which we depend, supports Linux and Darwin, but we are targeting Linux only.
+# Additionally, restrict the compatible targets to Amazon Linux 2023, since there are linkage issues
+# related to the version of OpenSSL used by s2n-tls versus deployed to production machines on some
+# other build variants. See, for example, BF-44238.
+# We also include Ubuntu targets for compatibility with typical developer workstations.
+selects.config_setting_group(
+    name = "build_connection_handoff_distros",
+    match_any = [
+        "//bazel/platforms:amazon_linux_2023",
+        "//bazel/platforms:amazon_linux_2023_3",
+        "//bazel/platforms:ubuntu22",
+        "//bazel/platforms:ubuntu24",
+    ],
+)
+
+selects.config_setting_group(
+    name = "build_connection_handoff_enabled",
+    match_all = [
+        ":build_connection_handoff_distros",
+        ":linux_aarch64_or_x86_64",
+    ],
+)
+
+# --------------------------------------
 # linkstatic options
 # --------------------------------------
 

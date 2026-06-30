@@ -9,12 +9,18 @@ exports_files(
     ]),
 )
 
-# s2n-tls, on which we depend, supports Linux and Darwin, but we are targeting Linux only.
 HANDOFF_TARGET_COMPATIBLE_WITH = select({
-    "//bazel/config:linux_aarch64": [],
-    "//bazel/config:linux_x86_64": [],
+    "//bazel/config:build_connection_handoff_enabled": [],
     "//conditions:default": ["@platforms//:incompatible"],
 })
+
+idl_generator(
+    name = "handoff_feature_flag_gen",
+    src = "handoff_feature_flag.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
 
 idl_generator(
     name = "session_handoff_message_gen",
@@ -64,10 +70,87 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(
+    name = "handoff_session_manager",
+    srcs = ["handoff_session_manager.cpp"],
+    hdrs = ["handoff_session_manager.h"],
+    target_compatible_with = HANDOFF_TARGET_COMPATIBLE_WITH,
+    deps = [
+        "//src/mongo/transport:session_manager",
+    ],
+)
+
+mongo_cc_library(
     name = "handoff_posix_interface",
     srcs = ["handoff_posix_interface.cpp"],
     hdrs = ["handoff_posix_interface.h"],
     target_compatible_with = HANDOFF_TARGET_COMPATIBLE_WITH,
+)
+
+mongo_cc_library(
+    name = "handoff_test_util",
+    testonly = True,
+    hdrs = ["handoff_test_util.h"],
+    target_compatible_with = HANDOFF_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":handoff_posix_interface",
+        "//src/mongo:base",
+        "//src/mongo/transport:session_manager",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_library(
+    name = "handoff_listener_thread",
+    srcs = ["handoff_listener_thread.cpp"],
+    hdrs = ["handoff_listener_thread.h"],
+    target_compatible_with = HANDOFF_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":handoff_posix_interface",
+        ":handoff_session",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "handoff_listener_thread_test",
+    srcs = ["handoff_listener_thread_test.cpp"],
+    tags = ["mongo_unittest_third_group"],
+    target_compatible_with = HANDOFF_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":handoff_listener_thread",
+        ":handoff_test_util",
+        "//src/mongo/util:processinfo",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "handoff_transport_layer_test",
+    srcs = ["handoff_transport_layer_test.cpp"],
+    tags = ["mongo_unittest_first_group"],
+    target_compatible_with = HANDOFF_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":handoff_test_util",
+        ":handoff_transport_layer",
+    ],
+)
+
+mongo_cc_library(
+    name = "handoff_transport_layer",
+    srcs = [
+        "handoff_transport_layer.cpp",
+    ],
+    hdrs = ["handoff_transport_layer.h"],
+    target_compatible_with = HANDOFF_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":handoff_listener_thread",
+        ":handoff_posix_interface",
+        ":handoff_s2n_init",
+        ":handoff_session",
+        "//src/mongo/db:server_base",
+        "//src/mongo/transport:transport_layer_common",
+        "//src/mongo/util/net:network",
+        "//src/third_party/s2n:s2n-tls",
+    ],
 )
 
 mongo_cc_library(
@@ -80,6 +163,7 @@ mongo_cc_library(
     ],
     target_compatible_with = HANDOFF_TARGET_COMPATIBLE_WITH,
     deps = [
+        "//src/mongo:base",
         "//src/third_party/s2n:s2n-tls",
     ],
 )
