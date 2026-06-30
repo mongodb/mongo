@@ -367,7 +367,8 @@ feature_flags:
     featureFlagQESubstringSearch:
         description: "Queryable Encryption encrypted substring search support"
         cpp_varname: gFeatureFlagQESubstringSearch
-        default: false
+        default: true
+        version: 9.0
         fcv_gated: true
     # TODO (SERVER-76345): Remove this feature flag once parallel validation is the permanent default.
     featureFlagParallelCollectionValidation:

@@ -1,5 +1,5 @@
 /**
- * Test downgrade to incompatible versions is blocked if "suffix" or "prefix" query types
+ * Test downgrade to incompatible versions is blocked if non-preview string query types
  * are being used in a FLE2 collection.
  */
 import "jstests/multiVersion/libs/multi_rs.js";
@@ -9,10 +9,12 @@ import {
     PrefixField,
     SuffixAndPrefixField,
     SuffixField,
+    SubstringField,
 } from "jstests/fle2/libs/qe_text_search_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const dbName = "qe_prefix_suffix_downgrade_test";
+const dbName = "qe_string_downgrade_test";
+const substringField = new SubstringField(10, 2, 5, true, false, 1);
 const suffixField = new SuffixField(2, 5, true, false, 1);
 const prefixField = new PrefixField(2, 5, false, true, 1);
 const comboField = new SuffixAndPrefixField(2, 5, 2, 5, false, false, 1);
@@ -21,7 +23,12 @@ function testBinaryDowngrade(queryTypeConfig) {
     jsTest.log.info("Testing downgrade from latest to last-lts");
     const rst = new ReplSetTest({
         nodes: 2,
-        nodeOptions: {setParameter: {featureFlagQEPrefixSuffixSearch: true}},
+        nodeOptions: {
+            setParameter: {
+                featureFlagQEPrefixSuffixSearch: true,
+                featureFlagQESubstringSearch: true,
+            },
+        },
     });
     rst.startSet();
     rst.initiate();
@@ -92,3 +99,4 @@ function testBinaryDowngrade(queryTypeConfig) {
 testBinaryDowngrade(suffixField);
 testBinaryDowngrade(prefixField);
 testBinaryDowngrade(comboField);
+testBinaryDowngrade(substringField);

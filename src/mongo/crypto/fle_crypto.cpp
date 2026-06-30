@@ -3626,6 +3626,14 @@ EncryptedFieldConfig EncryptionInformationHelpers::getAndValidateSchema(
                 "recreate the collection with the 'suffix' query type.",
                 !hasQueryType(efc, QueryTypeEnum::SuffixPreviewDeprecated));
     }
+    if (gFeatureFlagQESubstringSearch.isEnabledUseLastLTSFCVWhenUninitialized(
+            kVersionContextIgnored_UNSAFE,
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        uassert(12915801,
+                "Collection contains the 'substringPreview' query type which is deprecated. Please "
+                "recreate the collection with the 'substring' query type.",
+                !hasQueryType(efc, QueryTypeEnum::SubstringPreviewDeprecated));
+    }
     return efc;
 }
 

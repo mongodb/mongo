@@ -277,8 +277,11 @@ public:
                         ">= 9.0)",
                         !hasQueryType(cmd.getEncryptedFields().get(), QueryTypeEnum::Substring));
                 } else {
-                    // TODO SERVER-129158 Block SubstringPreviewDeprecated here once libmongocrypt
-                    // supports the "substring" query type name.
+                    uassert(12915800,
+                            "Cannot create a collection with an encrypted field with query "
+                            "type substringPreview, as it is deprecated",
+                            !hasQueryType(cmd.getEncryptedFields().get(),
+                                          QueryTypeEnum::SubstringPreviewDeprecated));
                     EncryptionInformationHelpers::checkSubstringParameterLimitsNotExceeded(
                         cmd.getEncryptedFields().get());
                 }

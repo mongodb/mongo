@@ -1,11 +1,12 @@
 /**
- * Tests operations on existing suffixPreview and prefixPreview collections are blocked
- * after upgrade to a version that supports the "suffix" and "prefix" GA query types.
+ * Tests operations on existing string preview collections are blocked
+ * after upgrade to a version that supports the GA string query types.
  */
 import "jstests/multiVersion/libs/multi_rs.js";
 
 import {EncryptedClient} from "jstests/fle2/libs/encrypted_client_util.js";
 import {
+    SubstringField,
     PrefixField,
     SuffixAndPrefixField,
     SuffixField,
@@ -14,9 +15,11 @@ import {
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const forcePreview = true;
+const substringPreviewField = new SubstringField(10, 2, 5, true, false, 1, forcePreview);
 const suffixPreviewField = new SuffixField(2, 5, true, false, 1, forcePreview);
 const prefixPreviewField = new PrefixField(2, 5, false, true, 1, forcePreview);
 const comboPreviewField = new SuffixAndPrefixField(2, 5, 2, 5, false, false, 1, forcePreview);
+const substringField = new SubstringField(10, 2, 5, true, false, 1);
 const suffixField = new SuffixField(2, 5, true, false, 1);
 const prefixField = new PrefixField(2, 5, false, true, 1);
 const comboField = new SuffixAndPrefixField(2, 5, 2, 5, false, false, 1);
@@ -29,7 +32,13 @@ function testPreviewDeprecationOnUpgrade(
 ) {
     const rst = new ReplSetTest({
         nodes: 2,
-        nodeOptions: {binVersion: "latest", setParameter: {featureFlagQEPrefixSuffixSearch: false}},
+        nodeOptions: {
+            binVersion: "latest",
+            setParameter: {
+                featureFlagQEPrefixSuffixSearch: false,
+                featureFlagQESubstringSearch: false,
+            },
+        },
     });
     rst.startSet();
     rst.initiate();
@@ -37,8 +46,8 @@ function testPreviewDeprecationOnUpgrade(
     let client = new EncryptedClient(rst.getPrimary(), "dbTest");
 
     // GA types disabled:
-    // - creating a new "suffixPreview" or "prefixPreview" collection succeeds.
-    // - creating "prefix" or "suffix" collection fails
+    // - creating a new "{substring, suffix, prefix}Preview" collection succeeds.
+    // - creating "substring", "prefix" or "suffix" collection fails
     const previewEFC = {
         encryptedFields: {
             "fields": [
@@ -65,13 +74,16 @@ function testPreviewDeprecationOnUpgrade(
     assert.commandWorked(client.createEncryptionCollection("coll1", previewEFC));
     assert.commandFailedWithCode(
         client.getDB().createCollection("coll2", gaEFC),
-        [11632900, 11632901],
+        [11632900, 11632901, 12860000],
     );
 
     assert.commandWorked(client.getDB().coll1.einsert({field1: "hello"}));
 
     // The upgrade enables GA types; but we should be able to start up with the preview collection
-    rst.upgradeSet({binVersion: "latest", setParameter: {featureFlagQEPrefixSuffixSearch: true}});
+    rst.upgradeSet({
+        binVersion: "latest",
+        setParameter: {featureFlagQEPrefixSuffixSearch: true, featureFlagQESubstringSearch: true},
+    });
     client = new EncryptedClient(rst.getPrimary(), "dbTest");
 
     // The upgrade enables GA types; we can no longer do CRUD ops on the preview collection
@@ -118,3 +130,4 @@ function testPreviewDeprecationOnUpgrade(
 testPreviewDeprecationOnUpgrade(suffixPreviewField, suffixField, 12341601, 12341603);
 testPreviewDeprecationOnUpgrade(prefixPreviewField, prefixField, 12341600, 12341602);
 testPreviewDeprecationOnUpgrade(comboPreviewField, comboField, 12341600, 12341602);
+testPreviewDeprecationOnUpgrade(substringPreviewField, substringField, 12915800, 12915801);
