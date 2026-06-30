@@ -30,9 +30,6 @@ filters:
   - "mixed_replica_set_with_latest_primary.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
-  - "register_query_feature_flag.js":
-    approvers:
-      - 10gen/query
   - "remove_invalid_index_options.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog

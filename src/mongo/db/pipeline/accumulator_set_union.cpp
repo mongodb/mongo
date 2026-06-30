@@ -32,16 +32,9 @@
 
 namespace mongo {
 
-REGISTER_ACCUMULATOR_WITH_FEATURE_FLAG(setUnion,
-                                       genericParseSingleExpressionAccumulator<AccumulatorSetUnion>,
-                                       &feature_flags::gFeatureFlagArrayAccumulators);
+REGISTER_ACCUMULATOR(setUnion, genericParseSingleExpressionAccumulator<AccumulatorSetUnion>);
 
-REGISTER_WINDOW_FUNCTION_WITH_FEATURE_FLAG(
-    setUnion,
-    (mongo::window_function::ExpressionRemovable<AccumulatorSetUnion,
-                                                 WindowFunctionSetUnion>::parse),
-    &feature_flags::gFeatureFlagArrayAccumulators,
-    AllowedWithApiStrict::kAlways);
+REGISTER_STABLE_REMOVABLE_WINDOW_FUNCTION(setUnion, AccumulatorSetUnion, WindowFunctionSetUnion);
 
 AccumulatorSetUnion::AccumulatorSetUnion(ExpressionContext* const expCtx,
                                          boost::optional<int> maxMemoryUsageBytes)

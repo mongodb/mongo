@@ -32,17 +32,13 @@
 
 namespace mongo {
 
-REGISTER_ACCUMULATOR_WITH_FEATURE_FLAG(
-    concatArrays,
-    genericParseSingleExpressionAccumulator<AccumulatorConcatArrays>,
-    &feature_flags::gFeatureFlagArrayAccumulators);
+REGISTER_ACCUMULATOR(concatArrays,
+                     genericParseSingleExpressionAccumulator<AccumulatorConcatArrays>);
 
-REGISTER_WINDOW_FUNCTION_WITH_FEATURE_FLAG(
-    concatArrays,
-    (mongo::window_function::ExpressionRemovable<AccumulatorConcatArrays,
-                                                 WindowFunctionConcatArrays>::parse),
-    &feature_flags::gFeatureFlagArrayAccumulators,
-    AllowedWithApiStrict::kAlways);
+REGISTER_STABLE_REMOVABLE_WINDOW_FUNCTION(concatArrays,
+                                          AccumulatorConcatArrays,
+                                          WindowFunctionConcatArrays);
+
 
 AccumulatorConcatArrays::AccumulatorConcatArrays(ExpressionContext* const expCtx,
                                                  boost::optional<int> maxMemoryUsageBytes)

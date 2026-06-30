@@ -147,13 +147,6 @@ feature_flags:
         version: 8.2
         fcv_gated: true
 
-    featureFlagArrayAccumulators:
-        description: "Feature flag to enable the $concatArrays and $setUnion accumulators."
-        cpp_varname: gFeatureFlagArrayAccumulators
-        default: true
-        version: 8.1
-        fcv_gated: true
-
     featureFlagQueryStatsCountDistinct:
         description: "Feature flag to enable query stats for the count and distinct commands."
         cpp_varname: gFeatureFlagQueryStatsCountDistinct
