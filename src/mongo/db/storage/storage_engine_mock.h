@@ -342,7 +342,7 @@ public:
     }
 
 private:
-    uint64_t _lastSetMaterializedLsn;
+    uint64_t _lastSetMaterializedLsn = 0;
     std::vector<std::string> _droppedSpillIdents;
     Timestamp _lastSetOldestTimestamp;
     bool _lastSetOldestTimestampForce = false;
