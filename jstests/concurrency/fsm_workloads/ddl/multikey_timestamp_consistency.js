@@ -100,12 +100,22 @@ export const $config = (function () {
     //   QueryPlanKilled: an in-flight plan executor (e.g. EXPRESS_UPDATE) was killed when the
     //     collection was dropped underneath it.
     function isCollDropError(e) {
-        return (
-            e.code === ErrorCodes.NamespaceNotFound ||
-            e.code === ErrorCodes.CollectionUUIDMismatch ||
-            e.code === ErrorCodes.OperationNotSupportedInTransaction ||
-            e.code === ErrorCodes.QueryPlanKilled
-        );
+        const tolerated = [
+            ErrorCodes.NamespaceNotFound,
+            ErrorCodes.CollectionUUIDMismatch,
+            ErrorCodes.OperationNotSupportedInTransaction,
+            ErrorCodes.QueryPlanKilled,
+        ];
+        // A non-txn write that races a drop returns ok:1 at the command level with the real
+        // failure nested in writeErrors (e.g. QueryPlanKilled when the plan executor is killed
+        // mid-update), so e.code is undefined and only the writeError carries the code. When
+        // writeErrors are present they are the authoritative source: tolerate iff every nested
+        // write error is a coll-drop race (a single non-tolerated error makes the whole thing
+        // non-tolerable). Only when there are no writeErrors do we check the top-level e.code.
+        if (Array.isArray(e.writeErrors) && e.writeErrors.length > 0) {
+            return e.writeErrors.every((we) => tolerated.includes(we.code));
+        }
+        return tolerated.includes(e.code);
     }
 
     // Returns true and best-effort aborts any leftover transaction on the session if `e` is a
