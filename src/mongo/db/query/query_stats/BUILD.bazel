@@ -162,6 +162,18 @@ mongo_cc_benchmark(
 )
 
 mongo_cc_benchmark(
+    name = "plan_shape_counters_bm",
+    srcs = [
+        "plan_shape_counters_bm.cpp",
+    ],
+    tags = ["query_bm"],
+    deps = [
+        ":plan_shape_counters",
+        "//src/mongo/db/query/compiler/physical_model/query_solution:query_solution_test_util",
+    ],
+)
+
+mongo_cc_benchmark(
     name = "shapifying_bm",
     srcs = [
         "shapifying_bm.cpp",
