@@ -16,13 +16,164 @@ load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 load("//jstests/suites/query-execution:common.bzl", "CORE_DATA")
 
 resmoke_suite_test(
+    name = "concurrency_replication_execution_control_with_prioritization",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/concurrency_replication_execution_control_with_prioritization.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+        "common",
+        "concurrency",
+        "execution_control_with_prioritization",
+        "repl",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "core_ingress_request_rate_limiter",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/core_ingress_request_rate_limiter.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+        "jscore",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "multi_shard_multi_stmt_txn_jscore_passthrough_rate_limited",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/multi_shard_multi_stmt_txn_jscore_passthrough_rate_limited.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+        "common",
+        "ingress_request_rate_limited",
+        "multi_shard",
+        "multi_stmt",
+        "requires_replicated_fast_count_recovery",
+        "resources:cpu:2",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "replica_sets_jscore_passthrough_execution_control_with_prioritization",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/replica_sets_jscore_passthrough_execution_control_with_prioritization.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+        "common",
+        "execution_control_with_prioritization",
+        "large",
+        "replica_sets",
+        "san",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "replica_sets_jscore_passthrough_rate_limited",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/replica_sets_jscore_passthrough_rate_limited.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+        "ingress_request_rate_limited",
+        "replica_sets",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "replica_sets_jscore_passthrough_with_dynamic_execution_control",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/replica_sets_jscore_passthrough_with_dynamic_execution_control.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+        "common",
+        "execution_control_with_prioritization",
+        "large",
+        "replica_sets",
+        "san",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_jscore_passthrough_execution_control_with_prioritization",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_jscore_passthrough_execution_control_with_prioritization.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+        "common",
+        "execution_control_with_prioritization",
+        "jscore",
+        "sharding",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_jscore_passthrough_with_dynamic_execution_control",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_jscore_passthrough_with_dynamic_execution_control.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+        "execution_control_with_prioritization",
+        "jscore",
+        "sharding",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
     name = "sharded_collections_jscore_passthrough_rate_limited",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharded_collections_jscore_passthrough_rate_limited.yml",
     data = [
         "//jstests/sharding/analyze_shard_key/libs:all_subpackage_javascript_files",
         "//jstests/sharding/libs:all_subpackage_javascript_files",
     ] + CORE_DATA,
-    shard_count = 20,
+    shard_count = 40,
     tags = [
         "ci-release-critical",
         "jscore",
@@ -46,7 +197,7 @@ resmoke_suite_test(
         "//jstests/sharding/analyze_shard_key/libs:all_subpackage_javascript_files",
         "//jstests/sharding/libs:all_subpackage_javascript_files",
     ] + CORE_DATA,
-    shard_count = 20,
+    shard_count = 40,
     tags = [
         "ci-release-critical",
         "common",
