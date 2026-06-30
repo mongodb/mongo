@@ -176,9 +176,13 @@ function forceInterruptedUpgradeOrDowngrade(conn, targetVersion) {
                         : isSymmetricPhase
                           ? lastLTSFCV
                           : undefined;
+                // Under symmetric FCV, the enable_target_features/commit_added_features writes flip
+                // the on-disk 'version' to the target. This is observable only for upgrades; for
+                // downgrades the target is already lastLTSFCV.
+                const expectedVersion = isSymmetricPhase ? targetVersion : lastLTSFCV;
                 checkFCV(
                     conn.getDB("admin"),
-                    lastLTSFCV,
+                    expectedVersion,
                     targetVersion,
                     true /*isCleaningServerMetadata*/,
                     expectedPreviousVersion,

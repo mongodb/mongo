@@ -231,12 +231,10 @@ StatusWith<FCV> FeatureCompatibilityVersionParser::parse(
 
             auto upgradingOrDowngradingShapes = {
                 // version, targetVersion, previousVersion (upgrading)
-                // TODO: SERVER-128765: version and targetVersion should be the same in upgrade
-                // after the kEnableTargetFeatures phase
-                std::tuple{GenericFCV::kLastLTS, GenericFCV::kLatest, GenericFCV::kLastLTS},
+                std::tuple{GenericFCV::kLatest, GenericFCV::kLatest, GenericFCV::kLastLTS},
+                std::tuple{GenericFCV::kLatest, GenericFCV::kLatest, GenericFCV::kLastContinuous},
                 std::tuple{
-                    GenericFCV::kLastContinuous, GenericFCV::kLatest, GenericFCV::kLastContinuous},
-                std::tuple{GenericFCV::kLastLTS, GenericFCV::kLastContinuous, GenericFCV::kLastLTS},
+                    GenericFCV::kLastContinuous, GenericFCV::kLastContinuous, GenericFCV::kLastLTS},
                 // (downgrading)
                 std::tuple{GenericFCV::kLastLTS, GenericFCV::kLastLTS, GenericFCV::kLatest},
                 std::tuple{

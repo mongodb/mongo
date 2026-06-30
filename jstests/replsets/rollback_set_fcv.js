@@ -169,6 +169,13 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
         fromFCV === lastLTSFCV || FeatureFlagUtil.isPresentAndEnabled(primary, "SymmetricFCV")
             ? toFCV
             : undefined;
+    // With featureFlagSymmetricFCV, the kEnableTargetFeatures and kCommitAddedFeatures writes flip
+    // the on-disk 'version' (and 'targetVersion') to the transition target, which is fromFCV in this
+    // test. Without symmetric FCV, the 'version' field stays at lastLTSFCV throughout the transition
+    // (only 'targetVersion' moves to fromFCV).
+    const expectedVersion = FeatureFlagUtil.isPresentAndEnabled(primary, "SymmetricFCV")
+        ? fromFCV
+        : lastLTSFCV;
     if (
         fromFCV == lastLTSFCV ||
         FeatureFlagUtil.isPresentAndEnabled(primary, "UpgradingToDowngrading")
@@ -176,13 +183,13 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
         // When downgrading, the secondary should still be in isCleaningServerMetadata.
         checkFCV(
             secondaryAdminDB,
-            lastLTSFCV,
+            expectedVersion,
             fromFCV,
             true /* isCleaningServerMetadata */,
             expectedPreviousVersion,
         );
     } else {
-        checkFCV(secondaryAdminDB, lastLTSFCV, fromFCV);
+        checkFCV(secondaryAdminDB, expectedVersion, fromFCV);
     }
 
     const topologyVersionBeforeRollback = getTopologyVersion(primary);
@@ -215,21 +222,21 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
         // Rolling back from downgraded to isCleaningServerMetadata state.
         checkFCV(
             primaryAdminDB,
-            lastLTSFCV,
+            expectedVersion,
             fromFCV,
             true /* isCleaningServerMetadata */,
             expectedPreviousVersion,
         );
         checkFCV(
             secondaryAdminDB,
-            lastLTSFCV,
+            expectedVersion,
             fromFCV,
             true /* isCleaningServerMetadata */,
             expectedPreviousVersion,
         );
     } else {
-        checkFCV(primaryAdminDB, lastLTSFCV, fromFCV);
-        checkFCV(secondaryAdminDB, lastLTSFCV, fromFCV);
+        checkFCV(primaryAdminDB, expectedVersion, fromFCV);
+        checkFCV(secondaryAdminDB, expectedVersion, fromFCV);
     }
 
     let newPrimary = rollbackTest.getPrimary();

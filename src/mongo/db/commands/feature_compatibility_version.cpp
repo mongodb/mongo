@@ -460,8 +460,7 @@ ResolvedFCVTransition FeatureCompatibilityVersion::validateSetFeatureCompatibili
             "could not be retrieved. Retry the setFCV request."));
     }
 
-    auto fcvDoc = FeatureCompatibilityVersionDocument::parse(
-        fcvObj.getValue(), IDLParserContext("featureCompatibilityVersionDocument"));
+    auto fcvDoc = FeatureCompatibilityVersionDocument::parse(fcvObj.getValue());
 
     auto resolvedTransition = fcvTransitions.resolveTransition(
         opCtx->getServiceContext(), fcvDoc, newVersion, isFromConfigServer);
@@ -590,7 +589,10 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
 
     if (phase.has_value() && phase > SetFCVPhaseEnum::kComplete &&
         ServerGlobalParams::FCVSnapshot::isUpgradingOrDowngrading(version)) {
-        newFCVDoc.setPreviousVersion(getTransitionFCVInfo(version).from);
+        auto transitionInfo = getTransitionFCVInfo(version);
+        newFCVDoc.setVersion(transitionInfo.to);
+        newFCVDoc.setTargetVersion(transitionInfo.to);
+        newFCVDoc.setPreviousVersion(transitionInfo.from);
     }
 
     // The setIsCleaningServerMetadata parameter can either be true, false, or boost::none.
@@ -626,8 +628,7 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                 "could not be retrieved. Retry the setFCV request."));
         }
 
-        auto currentFCVDoc = FeatureCompatibilityVersionDocument::parse(
-            currentFCVObj.getValue(), IDLParserContext("featureCompatibilityVersionDocument"));
+        auto currentFCVDoc = FeatureCompatibilityVersionDocument::parse(currentFCVObj.getValue());
 
         auto currentIsCleaningServerMetadata = currentFCVDoc.getIsCleaningServerMetadata();
         if (currentIsCleaningServerMetadata.is_initialized() && *currentIsCleaningServerMetadata) {
@@ -926,10 +927,21 @@ void FeatureCompatibilityVersionParameter::append(OperationContext* opCtx,
             str::stream() << name << " is not yet known.",
             fcvSnapshot.isVersionInitialized());
 
+    // Report version/targetVersion/previousVersion from the on-disk document, falling back to the
+    // in-memory one when only it is present (e.g. during initial sync).
+    FeatureCompatibilityVersionDocument fcvDoc;
+    auto onDiskFcvObj = FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(opCtx);
+    if (onDiskFcvObj.isOK()) {
+        auto onDiskFcvDoc = FeatureCompatibilityVersionDocument::parse(onDiskFcvObj.getValue());
+        fcvDoc.setVersion(onDiskFcvDoc.getVersion());
+        fcvDoc.setTargetVersion(onDiskFcvDoc.getTargetVersion());
+        fcvDoc.setPreviousVersion(onDiskFcvDoc.getPreviousVersion());
+    } else {
+        fcvDoc = fcvTransitions.getFCVDocument(fcvSnapshot.getVersion());
+    }
     BSONObjBuilder featureCompatibilityVersionBuilder(b->subobjStart(name));
-    auto version = fcvSnapshot.getVersion();
-    FeatureCompatibilityVersionDocument fcvDoc = fcvTransitions.getFCVDocument(version);
     featureCompatibilityVersionBuilder.appendElements(fcvDoc.toBSON().removeField("_id"));
+
     if (!fcvDoc.getTargetVersion()) {
         // If the FCV has been recently set to the fully upgraded FCV but is not part of the
         // majority snapshot, then if we do a binary upgrade, we may see the old FCV at startup.
