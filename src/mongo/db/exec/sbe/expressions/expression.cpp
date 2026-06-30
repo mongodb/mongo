@@ -125,14 +125,14 @@ std::string EExpression::toString() const {
 }
 
 std::unique_ptr<EExpression> EConstant::clone() const {
-    auto [tag, val] = value::copyValue(_tag, _val);
+    auto [tag, val] = value::copyValue(_val.tag(), _val.value());
     return std::make_unique<EConstant>(tag, val);
 }
 
 vm::CodeFragment EConstant::compileDirect(CompileCtx& ctx) const {
     vm::CodeFragment code;
 
-    code.appendConstVal(_tag, _val);
+    code.appendConstVal(_val.tag(), _val.value());
 
     return code;
 }
@@ -142,7 +142,7 @@ std::vector<DebugPrinter::Block> EConstant::debugPrint() const {
     std::stringstream ss;
     value::ValuePrinters::make(ss,
                                PrintOptions().useTagForAmbiguousValues(true).normalizeOutput(true))
-        .writeValueToStream(_tag, _val);
+        .writeValueToStream(_val.tag(), _val.value());
 
     ret.emplace_back(ss.str());
 
@@ -151,7 +151,7 @@ std::vector<DebugPrinter::Block> EConstant::debugPrint() const {
 
 size_t EConstant::estimateSize() const {
     size_t size = sizeof(*this);
-    size += size_estimator::estimate(_tag, _val);
+    size += size_estimator::estimate(_val.tag(), _val.value());
     size += size_estimator::estimate(_nodes);
     return size;
 }
@@ -1841,7 +1841,7 @@ size_t ELocalLambda::estimateSize() const {
 
 
 std::unique_ptr<EExpression> EFail::clone() const {
-    return std::make_unique<EFail>(_code, getStringView(_messageTag, _messageVal));
+    return std::make_unique<EFail>(_code, getStringView(_message.tag(), _message.value()));
 }
 
 vm::CodeFragment EFail::compileDirect(CompileCtx& ctx) const {
@@ -1850,7 +1850,7 @@ vm::CodeFragment EFail::compileDirect(CompileCtx& ctx) const {
     code.appendConstVal(value::TypeTags::NumberInt64,
                         value::bitcastFrom<int64_t>(static_cast<int64_t>(_code)));
 
-    code.appendConstVal(_messageTag, _messageVal);
+    code.appendConstVal(_message.tag(), _message.value());
 
     code.appendFail();
 
@@ -1866,7 +1866,7 @@ std::vector<DebugPrinter::Block> EFail::debugPrint() const {
     ret.emplace_back(std::to_string(_code));
     ret.emplace_back("`,");
     ret.emplace_back("\"`");
-    ret.emplace_back(getStringView(_messageTag, _messageVal));
+    ret.emplace_back(getStringView(_message.tag(), _message.value()));
     ret.emplace_back("`\"`");
 
     ret.emplace_back("`)");
@@ -1875,7 +1875,7 @@ std::vector<DebugPrinter::Block> EFail::debugPrint() const {
 }
 
 size_t EFail::estimateSize() const {
-    return sizeof(*this) + size_estimator::estimate(_messageTag, _messageVal) +
+    return sizeof(*this) + size_estimator::estimate(_message.tag(), _message.value()) +
         size_estimator::estimate(_nodes);
 }
 

@@ -1149,6 +1149,18 @@ private:
     }
 
     MONGO_COMPILER_ALWAYS_INLINE_OPT
+    value::TagValueMaybeOwned getMaybeOwnedFromStack(size_t offset) {
+        auto [owned, tag, val] = getFromStack(offset);
+        return {owned, tag, val};
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE_OPT
+    value::TagValueMaybeOwned getMaybeOwnedFromStack(size_t offset, bool pop) {
+        auto [owned, tag, val] = getFromStack(offset, pop);
+        return {owned && pop, tag, val};
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE_OPT
     value::TagValueView viewFromStack(size_t offset) const {
         auto ret = readTuple(_argStackTop - offset * sizeOfElement);
         return value::rawToView({ret.b, ret.c});
@@ -1248,11 +1260,7 @@ private:
 
     MONGO_COMPILER_ALWAYS_INLINE_OPT
     void popAndReleaseStack() {
-        auto [owned, tag, val] = getFromStack(0);
-        if (owned) {
-            value::releaseValue(tag, val);
-        }
-
+        auto ret = getMaybeOwnedFromStack(0);
         popStack();
     }
 

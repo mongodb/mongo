@@ -338,14 +338,9 @@ void ByteCode::traverseF(const CodeFragment* code,
 
 bool ByteCode::runLambdaPredicate(const CodeFragment* code, int64_t position) {
     runLambdaInternal(code, position);
-    auto [retOwn, retTag, retVal] = getFromStack(0);
+    auto ret = getMaybeOwnedFromStack(0);
     popStack();
-
-    bool isTrue = (retTag == value::TypeTags::Boolean) && value::bitcastTo<bool>(retVal);
-    if (retOwn) {
-        value::releaseValue(retTag, retVal);
-    }
-    return isTrue;
+    return (ret.tag() == value::TypeTags::Boolean) && value::bitcastTo<bool>(ret.value());
 }
 
 void ByteCode::traverseFInArray(const CodeFragment* code,

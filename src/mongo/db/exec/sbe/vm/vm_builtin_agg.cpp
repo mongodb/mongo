@@ -2187,9 +2187,8 @@ void ByteCode::aggRemovableSumImpl(value::Array* state,
             negInfinityCount += sign;
         } else {
             if constexpr (sign == -1) {
-                auto [negDecTag, negDecVal] = value::makeCopyDecimal(value.negate());
-                value::ValueGuard guard{negDecTag, negDecVal};
-                aggDoubleDoubleSumImpl(sumAcc, negDecTag, negDecVal);
+                auto negDec = value::TagValueOwned{value::makeCopyDecimal(value.negate())};
+                aggDoubleDoubleSumImpl(sumAcc, negDec.tag(), negDec.value());
             } else {
                 aggDoubleDoubleSumImpl(sumAcc, rhsTag, rhsVal);
             }

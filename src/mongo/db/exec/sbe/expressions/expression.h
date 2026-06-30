@@ -265,15 +265,8 @@ auto makeAggExprVector(Ts&&... pack) {
  */
 class EConstant final : public EExpression {
 public:
-    EConstant(value::TypeTags tag, value::Value val) : _tag(tag), _val(val) {}
-    EConstant(std::string_view str) {
-        // Views are non-owning so we have to make a copy.
-        std::tie(_tag, _val) = value::makeNewString(str);
-    }
-
-    ~EConstant() override {
-        value::releaseValue(_tag, _val);
-    }
+    EConstant(value::TypeTags tag, value::Value val) : _val(tag, val) {}
+    EConstant(std::string_view str) : _val(value::makeNewString(str)) {}
 
     std::unique_ptr<EExpression> clone() const override;
 
@@ -282,12 +275,11 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const override;
     size_t estimateSize() const final;
     std::pair<value::TypeTags, value::Value> getConstant() const {
-        return {_tag, _val};
+        return _val.raw();
     }
 
 private:
-    value::TypeTags _tag;
-    value::Value _val;
+    value::TagValueOwned _val;
 };
 
 /**
@@ -642,13 +634,8 @@ private:
  */
 class EFail final : public EExpression {
 public:
-    EFail(ErrorCodes::Error code, std::string_view message) : _code(code) {
-        std::tie(_messageTag, _messageVal) = value::makeNewString(message);
-    }
-
-    ~EFail() override {
-        value::releaseValue(_messageTag, _messageVal);
-    }
+    EFail(ErrorCodes::Error code, std::string_view message)
+        : _code(code), _message(value::makeNewString(message)) {}
 
     std::unique_ptr<EExpression> clone() const override;
 
@@ -660,8 +647,7 @@ public:
 
 private:
     ErrorCodes::Error _code;
-    value::TypeTags _messageTag;
-    value::Value _messageVal;
+    value::TagValueOwned _message;
 };
 
 /**
