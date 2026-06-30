@@ -636,7 +636,11 @@ transport::ParserResults HandoffSession::_parseProxyProtocolHeader() {
     }
     ON_BLOCK_EXIT([this] {
         struct timeval tv = {0, 0};
-        _posix.setsockopt(_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+        // There are no reasonable errors that could happen with this socket operation that wouldn't
+        // have happened when setting this socket option earlier. In the interest of not throwing an
+        // exception in a scope guard destructor, ignore the error.
+        (void)_posix.setsockopt(_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
     });
 
     int timeoutMs = static_cast<int>(
