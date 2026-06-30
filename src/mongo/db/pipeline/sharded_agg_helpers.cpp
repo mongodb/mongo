@@ -38,6 +38,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/field_ref.h"
@@ -91,6 +92,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/idl/generic_argument_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -136,6 +138,13 @@ using namespace std::literals::string_view_literals;
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(shardedAggregateHangBeforeEstablishingShardCursors);
+
+// Counts how many times an attempted local read for a pipeline was abandoned and the operation fell
+// back to remote shard-targeted execution.
+auto& localReadFallbacks = *MetricBuilder<Counter64>{"query.localReadFallbacks"};
+
+logv2::KeyedSeveritySuppressor<int> localReadFallbackSeverity{
+    Seconds{1}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
 
 struct TargetingResults {
     BSONObj shardQuery;
@@ -581,16 +590,21 @@ std::unique_ptr<Pipeline> tryAttachCursorSourceForLocalRead(
     const auto& nss = expCtx->getNamespaceString();
     const auto& targetingCri = routingCtx.getCollectionRoutingInfo(nss);
 
+    const bool inMultiDocumentTransaction = opCtx->inMultiDocumentTransaction();
+    boost::optional<LogicalTime> optOriginalPlacementConflictTime;
+    ShardVersion shardVersion;
+    boost::optional<DatabaseVersion> dbVersion;
+
     try {
         // TODO (SERVER-115178): Remove the TransactionRouter access once v9.0 branches out.
         boost::optional<LogicalTime> optOriginalPlacementConflictTime;
         if (auto txnRouter = TransactionRouter::get(opCtx);
-            txnRouter && opCtx->inMultiDocumentTransaction()) {
+            txnRouter && inMultiDocumentTransaction) {
             optOriginalPlacementConflictTime = txnRouter.getPlacementConflictTime();
         }
 
         // TODO (SERVER-128786): Remove getShardId once getShardVersion uses ShardRef.
-        auto [shardVersion, dbVersion] = resolveShardRoleVersions(
+        std::tie(shardVersion, dbVersion) = resolveShardRoleVersions(
             opCtx, targetingCri, localShardRef.getShardId(), optOriginalPlacementConflictTime);
         ScopedSetShardRole shardRole{opCtx, nss, shardVersion, dbVersion};
 
@@ -620,14 +634,44 @@ std::unique_ptr<Pipeline> tryAttachCursorSourceForLocalRead(
                     "comment"_attr = expCtx->getOperationContext()->getComment());
 
         return pipelineWithCursor;
-    } catch (ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
-        // The current node may be trying to run a pipeline on a namespace which is an
-        // unresolved view, proceed with shard targeting,
-    } catch (ExceptionFor<ErrorCodes::IllegalChangeToExpectedShardVersion>&) {
-    } catch (ExceptionFor<ErrorCodes::IllegalChangeToExpectedDatabaseVersion>&) {
-        // The current node's shard or database version of target namespace was updated
-        // mid-operation. Proceed with remote request to re-initialize operation
-        // context.
+    } catch (const ExceptionFor<ErrorCodes::CommandNotSupportedOnView>& ex) {
+        // The current node may be trying to run a pipeline on a namespace which is an unresolved
+        // view, proceed with shard targeting.
+        localReadFallbacks.increment();
+        LOGV2_DEBUG(12386400,
+                    localReadFallbackSeverity(static_cast<int>(ex.code())).toInt(),
+                    "Local read for aggregation abandoned because the namespace resolved to a "
+                    "view; falling back to remote shard targeting",
+                    logAttrs(nss),
+                    "shardVersion"_attr = shardVersion,
+                    "dbVersion"_attr = dbVersion,
+                    "inMultiDocumentTransaction"_attr = inMultiDocumentTransaction,
+                    "placementConflictTime"_attr = optOriginalPlacementConflictTime,
+                    "error"_attr = redact(ex));
+    } catch (const ExceptionFor<ErrorCodes::IllegalChangeToExpectedShardVersion>& ex) {
+        localReadFallbacks.increment();
+        LOGV2_DEBUG(12386401,
+                    localReadFallbackSeverity(static_cast<int>(ex.code())).toInt(),
+                    "Local read for aggregation abandoned because the shard version changed "
+                    "mid-operation; falling back to remote shard targeting",
+                    logAttrs(nss),
+                    "shardVersion"_attr = shardVersion,
+                    "dbVersion"_attr = dbVersion,
+                    "inMultiDocumentTransaction"_attr = inMultiDocumentTransaction,
+                    "placementConflictTime"_attr = optOriginalPlacementConflictTime,
+                    "error"_attr = redact(ex));
+    } catch (const ExceptionFor<ErrorCodes::IllegalChangeToExpectedDatabaseVersion>& ex) {
+        localReadFallbacks.increment();
+        LOGV2_DEBUG(12386402,
+                    localReadFallbackSeverity(static_cast<int>(ex.code())).toInt(),
+                    "Local read for aggregation abandoned because the database version changed "
+                    "mid-operation; falling back to remote shard targeting",
+                    logAttrs(nss),
+                    "shardVersion"_attr = shardVersion,
+                    "dbVersion"_attr = dbVersion,
+                    "inMultiDocumentTransaction"_attr = inMultiDocumentTransaction,
+                    "placementConflictTime"_attr = optOriginalPlacementConflictTime,
+                    "error"_attr = redact(ex));
     }
     return nullptr;
 }
