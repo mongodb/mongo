@@ -40,6 +40,7 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/expression/evaluate_test_helpers.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -82,6 +83,85 @@ static const Decimal128 kDoubleOverflow = Decimal128("1e309");
 static const Decimal128 kDoubleNegativeOverflow = Decimal128("-1e309");
 
 using EvaluateConvertTest = AggregationContextFixture;
+
+// Builds a packed-bit vector-subtype BinData (dtype byte 0x10, padding byte 0x00, then 2 data bytes
+// -> 16 boolean elements).
+Value makeVectorBinData() {
+    std::string vec(1, '\x10');  // dtype: packed-bit
+    vec.push_back('\x00');       // padding
+    vec.append(2, '\xff');       // 2 data bytes -> 16 boolean elements
+    return Value{BSONBinData(vec.data(), static_cast<int>(vec.size()), BinDataType::Vector)};
+}
+
+TEST_F(EvaluateConvertTest, TracksOutputMemoryAndReleasesAfterEvaluation) {
+    unittest::ServerParameterGuard convertFlag{"featureFlagConvertBinDataVectors", true};
+    auto expCtx = getExpCtx();
+    auto spec = BSON("$convert" << BSON("input" << makeVectorBinData() << "to"
+                                                << "array"));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    SimpleMemoryUsageTracker tracker{1024};
+    EvaluationContext ctx{.tracker = &tracker};
+
+    auto result = convertExp->evaluate({}, &expCtx->variables, ctx);
+    ASSERT_EQ(result.getType(), BSONType::array);
+
+    // Transient output memory is released once evaluation completes.
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(tracker.peakTrackedMemoryBytes(), 0);
+}
+
+TEST_F(EvaluateConvertTest, ThrowsExceededMemoryLimitWhenOutputTooLarge) {
+    unittest::ServerParameterGuard convertFlag{"featureFlagConvertBinDataVectors", true};
+    auto expCtx = getExpCtx();
+    auto spec = BSON("$convert" << BSON("input" << makeVectorBinData() << "to"
+                                                << "array"));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    // A tracker limit smaller than the size of the converted array forces the limit to be hit.
+    SimpleMemoryUsageTracker tracker{4};
+    EvaluationContext ctx{.tracker = &tracker};
+
+    ASSERT_THROWS_CODE(convertExp->evaluate({}, &expCtx->variables, ctx),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
+
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
+}
+
+TEST_F(EvaluateConvertTest, ThrowsExceededMemoryLimitWhenQueryLimitExceeded) {
+    unittest::ServerParameterGuard convertFlag{"featureFlagConvertBinDataVectors", true};
+    auto expCtx = getExpCtx();
+    auto spec = BSON("$convert" << BSON("input" << makeVectorBinData() << "to"
+                                                << "array"));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    // The operation-wide (root) tracker holds the small cap; the stage tracker reporting into it
+    // has a generous local limit, so the throw must come from the per-operation cap via the base
+    // chain rollup, not the local stage limit.
+    SimpleMemoryUsageTracker operationTracker{4};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, 100 * 1024 * 1024};
+    EvaluationContext ctx{.tracker = &stageTracker};
+
+    try {
+        convertExp->evaluate({}, &expCtx->variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$convert");
+    }
+}
+
+TEST_F(EvaluateConvertTest, NoTrackerDoesNotThrow) {
+    unittest::ServerParameterGuard convertFlag{"featureFlagConvertBinDataVectors", true};
+    auto expCtx = getExpCtx();
+    auto spec = BSON("$convert" << BSON("input" << makeVectorBinData() << "to"
+                                                << "array"));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    // No tracker, must evaluate normally regardless of output size.
+    ASSERT_DOES_NOT_THROW(convertExp->evaluate({}, &expCtx->variables));
+}
 
 TEST_F(EvaluateConvertTest, ConvertToBinDataWithNonNumericSubtypeFails) {
     auto expCtx = getExpCtx();

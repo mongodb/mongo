@@ -32,6 +32,7 @@
 #include "mongo/db/exec/convert_utils.h"
 #include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/util/str_escape.h"
 #include "mongo/util/text.h"
 
@@ -1343,7 +1344,8 @@ Value performConversion(const ExpressionConvert& expr,
                         Value inputValue,
                         boost::optional<ConversionBase> base,
                         boost::optional<BinDataFormat> format,
-                        boost::optional<ConvertByteOrderType> byteOrder) {
+                        boost::optional<ConvertByteOrderType> byteOrder,
+                        const EvaluationContext& ctx) {
     tassert(11103504,
             fmt::format("Expected inputValue to not be nullish, but found {}",
                         typeName(inputValue.getType())),
@@ -1367,6 +1369,30 @@ Value performConversion(const ExpressionConvert& expr,
                 << feature_compatibility_version_documentation::compatibilityLink() << ".",
             expr.getAllowBinDataConvertNumeric() ||
                 !requestingConvertBinDataNumeric(targetTypeInfo, inputType));
+
+    // BinData -> array can have significant memory blow-up of any conversion. Each element
+    // converts to a bool/int/double, which Value stores inline, so getApproximateSize() is
+    // exactly sizeof(Value) and the output size is elementCount * sizeof(Value), which we account
+    // against the operation-wide memory tracker before building the array, so
+    // an oversized conversion fails with ExceededMemoryLimit without ever materializing it.
+    SimpleMemoryUsageToken memToken;
+    if (ctx.tracker && targetTypeInfo.type == BSONType::array && inputType == BSONType::binData) {
+        auto binData = inputValue.getBinData();
+        if (binData.type == BinDataType::Vector) {
+            if (auto view = convert_utils::parseBinDataVector(binData)) {
+                // The size calculation relies on each element being stored inline in Value; assert
+                // the element type so any future dtype that heap-allocates revisits this
+                // accounting.
+                tassert(12901600,
+                        "BinData vector to array conversion expects bool/int/double elements",
+                        view->dtype == convert_utils::dType::PACKED_BIT ||
+                            view->dtype == convert_utils::dType::INT8 ||
+                            view->dtype == convert_utils::dType::FLOAT32);
+                memToken = SimpleMemoryUsageToken(view->elementCount * sizeof(Value), ctx.tracker);
+                ctx.tracker->assertWithinMemoryLimit("$convert", ctx.stageName);
+            }
+        }
+    }
 
     return table.findConversionFunc(
         inputType,
@@ -1563,7 +1589,7 @@ Value evaluate(const ExpressionConvert& expr,
     auto byteOrder = parseByteOrder(byteOrderValue);
 
     try {
-        return performConversion(expr, *targetTypeInfo, inputValue, base, format, byteOrder);
+        return performConversion(expr, *targetTypeInfo, inputValue, base, format, byteOrder, ctx);
     } catch (const ExceptionFor<ErrorCodes::ConversionFailure>&) {
         if (expr.getOnError()) {
             return expr.getOnError()->evaluate(root, variables, ctx);
