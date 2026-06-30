@@ -45,10 +45,13 @@
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/fail_point.h"
 
 #include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
+MONGO_FAIL_POINT_DEFINE(graphLookupStageKickbackFailpoint);
 
 namespace mongo {
 
@@ -648,9 +651,14 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
                 "pipeline"_attr =
                     mongo::Pipeline::serializePipelineForLogging(e->getBsonPipeline()),
                 "new_pipe"_attr = mongo::Pipeline::serializePipelineForLogging(resolvedViewPipe));
+
+            if (MONGO_unlikely(graphLookupStageKickbackFailpoint.shouldFail())) {
+                graphLookupStageKickbackFailpoint.pauseWhileSet();
+            }
         }
     }
-    MONGO_UNREACHABLE_TASSERT(12511900);
+    uasserted(ErrorCodes::CollectionBecameView,
+              "view configuration changed too many times during $graphLookup execution");
 }
 
 }  // namespace exec::agg

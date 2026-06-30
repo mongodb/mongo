@@ -36,6 +36,8 @@
 
 #include <vector>
 
+#include <boost/optional/optional.hpp>
+
 namespace mongo {
 
 /**
@@ -89,6 +91,19 @@ public:
         return _pipeline;
     }
 
+    // The view NSS this pipeline was materialized from, if any. Set only for sub-pipelines created
+    // by materializeViewSubpipeline() (e.g. the view pipeline materialized into a $graphLookup
+    // stage), where the pipeline is parsed under the backing-collection NSS rather than the view's.
+    // The current consumer is resolveInvolvedNamespacesImpl's cycle detection, which needs the view
+    // NSS because the backing-collection NSS stored in _originalParseNss is not a view.
+    const boost::optional<NamespaceString>& getViewNss() const {
+        return _viewNss;
+    }
+
+    void setViewNss(NamespaceString nss) {
+        _viewNss = std::move(nss);
+    }
+
 private:
     static std::vector<BSONObj> _makeStagesOwned(const std::vector<BSONObj>& pipelineStages);
 
@@ -96,6 +111,7 @@ private:
     // so the owned copies must exist before '_pipeline' parses them.
     std::vector<BSONObj> _ownedStages;
     LiteParsedPipeline _pipeline;
+    boost::optional<NamespaceString> _viewNss;
 };
 
 }  // namespace mongo

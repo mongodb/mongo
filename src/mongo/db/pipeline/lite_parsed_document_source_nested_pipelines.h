@@ -184,6 +184,11 @@ protected:
         copy.liteParseViewPipeline();
         copy.desugarViewPipeline();
         _pipelines.push_back(std::move(*copy.getMutableParsedPipeline()));
+        // Tag the materialized pipeline with the VIEW's NSS so that resolveInvolvedNamespacesImpl
+        // can use it for cycle detection. The pipeline itself is stored with the backing-collection
+        // NSS (ResolvedNamespace::ns), which is not a view and would bypass the inProgress guard
+        // without this tag.
+        _pipelines.back().setViewNss(viewEntry.getNamespace());
     }
 
     /**
