@@ -213,6 +213,8 @@ last-lts:
       ticket: SERVER-94156
     - test_file: jstests/concurrency/fsm_workloads/query/yield/repl_set_resize_oplog.js
       ticket: SERVER-94787
+    - test_file: jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_multi_update_delete_paused_migrations.js
+      ticket: SERVER-97297
     - test_file: jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_with_maxkey_docs.js
       ticket: SERVER-121533
     - test_file: jstests/concurrency/fsm_workloads/random_update_delete_with_move_collection.js
