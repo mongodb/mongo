@@ -278,10 +278,11 @@ TEST(HostAstNodeDplTest, DplCallbackGetOrInvokeParsesSortAndMergePipeline) {
 
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     const auto& result = owner.getOrInvoke(expCtx.get());
-    ASSERT_EQ(result.resultsSortPattern.woCompare(BSON("score" << -1)), 0);
-    ASSERT_EQ(result.metaMergePipeline.size(), 2u);
-    ASSERT_EQ(result.metaMergePipeline[0].woCompare(BSON("$limit" << 1)), 0);
-    ASSERT_EQ(result.metaMergePipeline[1].woCompare(BSON("$skip" << 2)), 0);
+    ASSERT_EQ(result.getResultsSortPattern().woCompare(BSON("score" << -1)), 0);
+    ASSERT_TRUE(result.getMetaMergePipeline().has_value());
+    ASSERT_EQ(result.getMetaMergePipeline()->size(), 2u);
+    ASSERT_EQ((*result.getMetaMergePipeline())[0].woCompare(BSON("$limit" << 1)), 0);
+    ASSERT_EQ((*result.getMetaMergePipeline())[1].woCompare(BSON("$skip" << 2)), 0);
 }
 
 TEST(HostAstNodeDplTest, DplCallbackGetOrInvokeHandlesNullMergePipeline) {
@@ -289,8 +290,8 @@ TEST(HostAstNodeDplTest, DplCallbackGetOrInvokeHandlesNullMergePipeline) {
 
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     const auto& result = owner.getOrInvoke(expCtx.get());
-    ASSERT_EQ(result.resultsSortPattern.woCompare(BSON("score" << -1)), 0);
-    ASSERT_TRUE(result.metaMergePipeline.empty());
+    ASSERT_EQ(result.getResultsSortPattern().woCompare(BSON("score" << -1)), 0);
+    ASSERT_FALSE(result.getMetaMergePipeline().has_value());
 }
 
 // The extension callback consumes single-use output buffers, but the planner queries

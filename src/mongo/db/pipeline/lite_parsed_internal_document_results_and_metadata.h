@@ -38,24 +38,21 @@
 
 #include <functional>
 #include <memory>
+#include <variant>
 #include <vector>
 
 namespace mongo {
 
 class ExpressionContext;
 
-/**
- * Sort pattern for merge-sorting the document results stream across shards, and the merge pipeline
- * for the metadata stream on the router. Provided by the extension source via a callback that
- * survives the LiteParsed -> StageParams -> DocumentSource handoff.
- */
-struct DocResultsShardedPlanSpec {
-    BSONObj resultsSortPattern;
-    std::vector<BSONObj> metaMergePipeline;
-};
+using DocResultsShardedPlanProvider = std::function<const ShardedPlanSpec&(ExpressionContext*)>;
 
-using DocResultsShardedPlanProvider =
-    std::function<const DocResultsShardedPlanSpec&(ExpressionContext*)>;
+// The sharded distributed-plan info comes from exactly one of two mutually exclusive sources:
+//   * DocResultsShardedPlanProvider — live callback from the extension AST node, attached during
+//     in-process construction.
+//   * ShardedPlanSpec — values the router cached into the IDL spec so a shard re-parsing this
+//     stage inside a subpipeline can reconstruct DPL without the callback.
+using ShardedPlanSource = std::variant<DocResultsShardedPlanProvider, ShardedPlanSpec>;
 
 /**
  * Stage params produced by InternalDocumentResultsAndMetadataLiteParsed and consumed by
@@ -66,11 +63,11 @@ public:
     InternalDocumentResultsAndMetadataStageParams(boost::optional<MetadataBindSpec> metadata,
                                                   bool returnCursor,
                                                   OwnedLiteParsedPipeline sourcePipeline,
-                                                  DocResultsShardedPlanProvider shardedPlanProvider)
+                                                  boost::optional<ShardedPlanSource> shardedPlan)
         : _metadata(std::move(metadata)),
           _returnCursor(returnCursor),
           _sourcePipeline(std::move(sourcePipeline)),
-          _shardedPlanProvider(std::move(shardedPlanProvider)) {}
+          _shardedPlan(std::move(shardedPlan)) {}
 
     static const Id& id;
     Id getId() const final {
@@ -89,8 +86,8 @@ public:
         return _sourcePipeline;
     }
 
-    const DocResultsShardedPlanProvider& getShardedPlanProvider() const {
-        return _shardedPlanProvider;
+    const boost::optional<ShardedPlanSource>& getShardedPlan() const {
+        return _shardedPlan;
     }
 
 private:
@@ -99,7 +96,7 @@ private:
     OwnedLiteParsedPipeline _sourcePipeline;
     // Carries the extension's DPL callback through the LiteParsed -> StageParams handoff so the
     // resulting DocumentSource can wire up its sharded plan logic. Null on non-extension paths.
-    DocResultsShardedPlanProvider _shardedPlanProvider;
+    boost::optional<ShardedPlanSource> _shardedPlan;
 };
 
 /**
@@ -132,14 +129,11 @@ public:
         // Clone the inner sub-pipeline so any view info bound onto it via bindResolvedNamespace()
         // travels with the StageParams to DocumentSource construction.
         return std::make_unique<InternalDocumentResultsAndMetadataStageParams>(
-            _metadata,
-            _returnCursor,
-            OwnedLiteParsedPipeline(_pipelines.front()),
-            _shardedPlanProvider);
+            _metadata, _returnCursor, OwnedLiteParsedPipeline(_pipelines.front()), _shardedPlan);
     }
 
-    void setShardedPlanProvider(DocResultsShardedPlanProvider provider) {
-        _shardedPlanProvider = std::move(provider);
+    void setShardedPlan(ShardedPlanSource source) {
+        _shardedPlan = std::move(source);
     }
 
     FirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy() const override {
@@ -174,7 +168,7 @@ private:
     // extension's distributed-plan callback. Threaded through getStageParams() to the resulting
     // DocumentSource so distributedPlanLogic() can produce a merge-sort pattern and metadata
     // merge pipeline. Null when constructed via the BSON parse path.
-    DocResultsShardedPlanProvider _shardedPlanProvider;
+    boost::optional<ShardedPlanSource> _shardedPlan;
 };
 
 }  // namespace mongo

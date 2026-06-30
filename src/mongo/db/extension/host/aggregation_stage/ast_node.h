@@ -174,7 +174,7 @@ private:
  * would require nss and parsed pipelines not available at construction time).
  *
  * On expansion, if a DPL callback is present, expandToDocumentSource() wraps it into the stage's
- * sharded-plan provider (setShardedPlanProvider) so distributedPlanLogic() can produce the sharded
+ * sharded-plan source (setShardedPlan) so distributedPlanLogic() can produce the sharded
  * merge sort pattern / metadata merge pipeline.
  */
 class DocumentResultsAndMetadataAstNode final : public AggStageAstNode {
@@ -194,9 +194,9 @@ public:
 private:
     BSONObj buildStageBson() const override;
 
-    // Wraps the shared DPL callback owner into a ShardedPlanProvider closure. Shared by both
-    // expansion paths so the wrapping logic (capture-by-shared-owner, getOrInvoke) lives in one
-    // place.
+    // Wraps the shared DPL callback owner into a DocResultsShardedPlanProvider closure. Shared by
+    // both expansion paths so the wrapping logic (capture-by-shared-owner, getOrInvoke) lives in
+    // one place.
     DocResultsShardedPlanProvider makeShardedPlanProvider() const;
 
     std::string _stageName;

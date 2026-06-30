@@ -47,6 +47,29 @@ structs:
                 stability: internal
                 query_shape: anonymize
 
+    ShardedPlanSpec:
+        description: >-
+            Merge-sort pattern and optional metadata merge pipeline cached by the router when
+            serializing $_internalDocumentResultsAndMetadata into a subpipeline. The shard uses
+            this to reconstruct distributedPlanLogic() when the live callback is unavailable after
+            a BSON round-trip.
+        strict: true
+        query_shape_component: true
+        fields:
+            resultsSortPattern:
+                description: Merge-sort pattern for the document results stream.
+                type: object_owned
+                stability: internal
+                query_shape: parameter
+            metaMergePipeline:
+                description: >-
+                    Merge pipeline for the metadata stream; absent when no metadata binding is
+                    configured.
+                type: array<object_owned>
+                optional: true
+                stability: internal
+                query_shape: parameter
+
     DocumentSourceResultsAndMetadataSpec:
         description: >-
             Internal specification for $_internalDocumentResultsAndMetadata, a container
@@ -80,3 +103,11 @@ structs:
                 default: false
                 stability: internal
                 query_shape: parameter
+            shardedPlanSpec:
+                description: >-
+                    Merge plan cached by the router when serializing this stage into a subpipeline;
+                    used by the shard when the DPL callback is unavailable after re-parse.
+                type: ShardedPlanSpec
+                optional: true
+                stability: internal
+                query_shape: literal

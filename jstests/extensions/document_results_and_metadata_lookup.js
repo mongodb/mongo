@@ -15,13 +15,17 @@ const expectedMeta = {count: {lowerBound: 42}};
 describe("$_internalDocumentResultsAndMetadata with $lookup", function () {
     let coll;
     let foreignColl;
+    let unshardedOuter;
     let nShards;
+    let shardIds;
 
     before(function () {
         coll = db[jsTestName()];
         foreignColl = db[jsTestName() + "_foreign"];
+        unshardedOuter = db[jsTestName() + "_unsharded_outer"];
         assertDropCollection(db, coll.getName());
         assertDropCollection(db, foreignColl.getName());
+        assertDropCollection(db, unshardedOuter.getName());
         if (FixtureHelpers.isMongos(db)) {
             assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
             assert.commandWorked(
@@ -29,6 +33,7 @@ describe("$_internalDocumentResultsAndMetadata with $lookup", function () {
             );
         }
         assert.commandWorked(coll.insertOne({_id: 0}));
+        assert.commandWorked(unshardedOuter.insertOne({_id: 0}));
         assert.commandWorked(
             foreignColl.insertMany([
                 {_id: "f0", name: "doc_0", extra: "x0"},
@@ -37,6 +42,9 @@ describe("$_internalDocumentResultsAndMetadata with $lookup", function () {
             ]),
         );
         nShards = FixtureHelpers.numberOfShardsForCollection(coll);
+        shardIds = FixtureHelpers.isMongos(db)
+            ? FixtureHelpers.getShardsOwningDataForCollection(coll).sort()
+            : [];
     });
 
     it("attaches lookup results while preserving $$SEARCH_META projected onto each doc", function () {
@@ -116,6 +124,59 @@ describe("$_internalDocumentResultsAndMetadata with $lookup", function () {
             ],
             {result},
         );
+    });
+
+    // Asserts that each shard emits a different per-shard metadata value and every joined doc
+    // carries the globally merged $$SEARCH_META.
+    function assertLookupSubpipelineMergesMetadata(outerColl) {
+        const numDocs = 3;
+        const metaA = {count: {lowerBound: 10}};
+        const metaB = {count: {lowerBound: 32}};
+        const byShard = {[shardIds[0]]: {meta: metaA}, [shardIds[1]]: {meta: metaB}};
+        // Sums per-shard count.lowerBound into a single merged metadata document.
+        const mergePipeline = [
+            {$group: {_id: null, count: {$sum: "$count.lowerBound"}}},
+            {$project: {_id: 0, count: {lowerBound: "$count"}}},
+        ];
+        const result = outerColl
+            .aggregate([
+                {
+                    $lookup: {
+                        from: coll.getName(),
+                        pipeline: [
+                            {
+                                $extensionMultiStream: {
+                                    numDocs,
+                                    // Top-level meta configures DRM with metadata; per-shard
+                                    // overrides supply the actual values returned from each shard.
+                                    meta: {count: {lowerBound: 0}},
+                                    byShard,
+                                    mergePipeline,
+                                },
+                            },
+                            {$project: {_id: 0, name: 1, meta: "$$SEARCH_META"}},
+                        ],
+                        as: "joined",
+                    },
+                },
+            ])
+            .toArray();
+
+        const mergedMeta = {count: {lowerBound: 42}};
+        assert.eq(result.length, 1, {result});
+        assert.gt(result[0].joined.length, 0, {result});
+        // Every produced inner doc must carry the merged metadata. A doc carrying one shard's
+        // local meta (10 or 32) instead of the merged 42 indicates the merge plan was lost.
+        for (const doc of result[0].joined) {
+            assert.docEq(doc.meta, mergedMeta, {doc, byShard, outer: outerColl.getName()});
+            assert(doc.hasOwnProperty("name"), {doc});
+        }
+    }
+
+    it("[sharded] merges metadata across a $lookup DRM subpipeline for both outer topologies", function () {
+        if (!FixtureHelpers.isMongos(db) || shardIds.length < 2) return;
+        assertLookupSubpipelineMergesMetadata(unshardedOuter); // $lookup on single merging node
+        assertLookupSubpipelineMergesMetadata(coll); // $lookup per-shard in parallel
     });
 
     it("rejects $$SEARCH_META reference in top-level after a $lookup that had no DRM source", function () {

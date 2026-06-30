@@ -51,7 +51,7 @@ InternalDocumentResultsAndMetadataLiteParsed::parse(const NamespaceString& nss,
                           << typeName(spec.type()),
             spec.type() == BSONType::object);
 
-    auto parsedSpec = DocumentSourceResultsAndMetadataSpec::parseOwned(
+    auto parsedSpec = DocumentSourceResultsAndMetadataSpec::parse(
         spec.embeddedObject(), IDLParserContext("$_internalDocumentResultsAndMetadata"));
 
     auto sourceElem = spec.embeddedObject()["source"];
@@ -65,8 +65,14 @@ InternalDocumentResultsAndMetadataLiteParsed::parse(const NamespaceString& nss,
     OwnedLiteParsedPipeline sourcePipeline(nss, {sourceElem.embeddedObject()}, options);
     LiteParsedDesugarer::desugar(&*sourcePipeline, options.ifrContext);
 
-    return std::make_unique<InternalDocumentResultsAndMetadataLiteParsed>(
+    auto liteParsed = std::make_unique<InternalDocumentResultsAndMetadataLiteParsed>(
         spec, parsedSpec.getMetadata(), parsedSpec.getReturnCursor(), std::move(sourcePipeline));
+
+    if (const auto& planSpec = parsedSpec.getShardedPlanSpec()) {
+        liteParsed->setShardedPlan(*planSpec);
+    }
+
+    return liteParsed;
 }
 
 }  // namespace mongo

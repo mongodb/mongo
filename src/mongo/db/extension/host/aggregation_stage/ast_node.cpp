@@ -102,16 +102,18 @@ DPLCallbackOwner::getOrInvoke(ExpressionContext* expCtx) const {
     };
 
     if (rawSort) {
-        state.result.resultsSortPattern = ownedValidatedBson(sortHandle->getByteView());
+        state.result.setResultsSortPattern(ownedValidatedBson(sortHandle->getByteView()));
     }
     if (rawMerge) {
         BSONObj arr = ownedValidatedBson(mergeHandle->getByteView());
+        std::vector<BSONObj> pipeline;
         for (auto&& elem : arr) {
             uassert(12728601,
                     "DPL metaMergePipeline elements must be objects",
                     elem.type() == BSONType::object);
-            state.result.metaMergePipeline.push_back(elem.Obj().getOwned());
+            pipeline.push_back(elem.Obj().getOwned());
         }
+        state.result.setMetaMergePipeline(std::move(pipeline));
     }
     return state.result;
 }
@@ -190,7 +192,7 @@ std::unique_ptr<LiteParsedDocumentSource> DocumentResultsAndMetadataAstNode::exp
     tassert(12878900,
             "Expected InternalDocumentResultsAndMetadataLiteParsed from AggStageAstNode expansion",
             drmLp != nullptr);
-    drmLp->setShardedPlanProvider(std::move(provider));
+    drmLp->setShardedPlan(std::move(provider));
     return lpds;
 }
 
@@ -213,7 +215,7 @@ DocumentResultsAndMetadataAstNode::expandToDocumentSource(
     tassert(12728603,
             "expanded $_internalDocumentResultsAndMetadata stage has unexpected type",
             drm != nullptr);
-    drm->setShardedPlanProvider(std::move(provider));
+    drm->setShardedPlan(std::move(provider));
     return stages;
 }
 

@@ -42,6 +42,7 @@
 #include <functional>
 #include <set>
 #include <string_view>
+#include <variant>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -82,12 +83,8 @@ class DocumentSourceInternalDocumentResultsAndMetadata final : public DocumentSo
 public:
     static constexpr std::string_view kStageName = "$_internalDocumentResultsAndMetadata"sv;
 
-    // Sort pattern for merge-sorting the document results stream across shards, and the
-    // merge pipeline for the metadata stream on the router. Provided by the configured
-    // source stage via the merge plan provider callback. The type lives in the LiteParsed
-    // header so both layers can carry the provider through the desugar handoff.
-    using ShardedPlanSpec = DocResultsShardedPlanSpec;
-    using ShardedPlanProvider = DocResultsShardedPlanProvider;
+    using ShardedPlanSpec = mongo::ShardedPlanSpec;
+    using ShardedPlanSource = mongo::ShardedPlanSource;
 
     /**
      * Creates a DocumentSource from StageParams produced by the LiteParsed layer.
@@ -161,8 +158,8 @@ public:
         return _returnCursor;
     }
 
-    void setShardedPlanProvider(ShardedPlanProvider provider) {
-        _shardedPlanProvider = std::move(provider);
+    void setShardedPlan(ShardedPlanSource source) {
+        _shardedPlan = std::move(source);
     }
 
     void stashAdditionalCursorPipeline(std::unique_ptr<Pipeline> pipeline) {
@@ -194,7 +191,10 @@ private:
     // Stashed by the exec translation function when returnCursor is true. run_aggregate.cpp takes
     // it via takeAdditionalCursorPipeline() to register as a secondary SearchMetaResult executor.
     std::unique_ptr<Pipeline> _additionalCursorPipeline;
-    ShardedPlanProvider _shardedPlanProvider;
+    // Source of the sharded distributed-plan info, if it exists: either a live callback from the
+    // extension AST node, or the spec the router cached into the IDL when serializing this stage
+    // into a subpipeline
+    boost::optional<ShardedPlanSource> _shardedPlan;
 };
 
 }  // namespace mongo

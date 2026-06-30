@@ -46,6 +46,8 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
+#include <variant>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -55,6 +57,16 @@ using boost::intrusive_ptr;
 namespace {
 
 constexpr int kMetaResultStreamType = 1;
+
+// Resolves a ShardedPlanSource down to the concrete spec: invokes the live callback for the
+// provider alternative, or returns the router-cached spec directly.
+const ShardedPlanSpec& resolveShardedPlanSpec(const ShardedPlanSource& source,
+                                              ExpressionContext* expCtx) {
+    if (auto* provider = std::get_if<DocResultsShardedPlanProvider>(&source)) {
+        return (*provider)(expCtx);
+    }
+    return std::get<ShardedPlanSpec>(source);
+}
 
 boost::intrusive_ptr<DocumentSource> makeReplaceRootDs(
     const boost::intrusive_ptr<ExpressionContext>& ctx) {
@@ -216,10 +228,8 @@ DocumentSourceContainer DocumentSourceInternalDocumentResultsAndMetadata::create
 
     auto stage = make_intrusive<DocumentSourceInternalDocumentResultsAndMetadata>(
         expCtx, std::move(sourceStage), std::move(metadata), params.getReturnCursor());
-    // The extension's distributed-plan callback is carried through the LiteParsed -> StageParams
-    // handoff and attached here so distributedPlanLogic() can produce a sharded merge plan.
-    if (const auto& provider = params.getShardedPlanProvider()) {
-        stage->setShardedPlanProvider(provider);
+    if (const auto& plan = params.getShardedPlan()) {
+        stage->setShardedPlan(*plan);
     }
     return {std::move(stage)};
 }
@@ -247,6 +257,16 @@ Value DocumentSourceInternalDocumentResultsAndMetadata::serialize(
     spec.setSource(_sourceStage->serialize(opts).getDocument().toBson());
     spec.setMetadata(_metadata);
     spec.setReturnCursor(_returnCursor);
+
+    // Serialize the merge plan into the IDL spec so a shard that re-parses this stage inside a
+    // subpipeline can reconstruct distributedPlanLogic() without the live callback.
+    const bool serializingForExecutionElsewhere =
+        (opts.isSerializingForRemoteDispatch || getExpCtx()->getInRouter()) &&
+        !opts.isSerializingForQueryStats() && !opts.isSerializingForExplain();
+    if (serializingForExecutionElsewhere && _shardedPlan) {
+        spec.setShardedPlanSpec(resolveShardedPlanSpec(*_shardedPlan, getExpCtx().get()));
+    }
+
     return Value(Document{{getSourceName(), spec.toBSON(opts)}});
 }
 
@@ -284,9 +304,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalDocumentResultsAndMet
     const intrusive_ptr<ExpressionContext>& expCtx) const {
     auto cloned = DocumentSourceInternalDocumentResultsAndMetadata::create(
         expCtx, _sourceStage->clone(expCtx), _metadata, _returnCursor);
-    if (_shardedPlanProvider) {
-        cloned->setShardedPlanProvider(_shardedPlanProvider);
-    }
+    cloned->_shardedPlan = _shardedPlan;
     return cloned;
 }
 
@@ -316,23 +334,24 @@ DocumentSourceContainer::iterator DocumentSourceInternalDocumentResultsAndMetada
 boost::optional<DocumentSource::DistributedPlanLogic>
 DocumentSourceInternalDocumentResultsAndMetadata::distributedPlanLogic(
     const DistributedPlanContext* ctx) {
-    // This stage acts as transport layer, DPL info is provided by configured source stage via the
-    // callback. Without it, this stage has no distributed plan logic to provide.
-    if (!_shardedPlanProvider) {
+    // This stage acts as transport layer; the configured source stage supplies the DPL info via
+    // a callback. On the shard re-parse path inside a subpipeline the callback cannot survive
+    // BSON serialization, so we fall back to the cached spec the router stamped into the BSON.
+    const auto& expCtx = getExpCtx();
+    if (!_shardedPlan) {
         return boost::none;
     }
+    const ShardedPlanSpec& dplResult = resolveShardedPlanSpec(*_shardedPlan, expCtx.get());
 
     DistributedPlanLogic logic;
     logic.shardsStage = this;
     logic.needsSplit = false;
     logic.canMovePast = canMovePastDuringSplit;
 
-    const auto& expCtx = getExpCtx();
-    const auto& dplResult = _shardedPlanProvider(expCtx.get());
     tassert(12625501,
             str::stream() << kStageName << " DPL callback must return a non-empty sort pattern",
-            !dplResult.resultsSortPattern.isEmpty());
-    logic.mergeSortPattern = dplResult.resultsSortPattern.getOwned();
+            !dplResult.getResultsSortPattern().isEmpty());
+    logic.mergeSortPattern = dplResult.getResultsSortPattern().getOwned();
 
     // No metadata: only merge-sort is needed, no merging pipeline for metadata stream.
     if (!_metadata) {
@@ -349,15 +368,16 @@ DocumentSourceInternalDocumentResultsAndMetadata::distributedPlanLogic(
 
     // Wrap the merge pipeline in $setVariableFromSubPipeline to bind
     // $$SEARCH_META on the router.
+    const auto& mergeOpt = dplResult.getMetaMergePipeline();
     tassert(12625502,
             str::stream() << kStageName
                           << " DPL callback must return a non-empty merge pipeline when "
                              "metadata is present",
-            !dplResult.metaMergePipeline.empty());
+            mergeOpt && !mergeOpt->empty());
+    const auto& mergePipeline = *mergeOpt;
     logic.mergingStages = {DocumentSourceSetVariableFromSubPipeline::create(
         expCtx,
-        pipeline_factory::makePipeline(
-            dplResult.metaMergePipeline, expCtx, pipeline_factory::kOptionsMinimal),
+        pipeline_factory::makePipeline(mergePipeline, expCtx, pipeline_factory::kOptionsMinimal),
         Variables::kSearchMetaId)};
 
     return logic;

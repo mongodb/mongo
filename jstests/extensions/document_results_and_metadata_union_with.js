@@ -16,6 +16,7 @@ const innerMeta = {count: {lowerBound: 7}, scope: "inner"};
 describe("$_internalDocumentResultsAndMetadata in $unionWith", function () {
     let coll;
     let nShards;
+    let shardIds;
 
     before(function () {
         coll = db[jsTestName()];
@@ -29,6 +30,9 @@ describe("$_internalDocumentResultsAndMetadata in $unionWith", function () {
             assert.commandWorked(coll.insertOne({_id: 0}));
         }
         nShards = FixtureHelpers.numberOfShardsForCollection(coll);
+        shardIds = FixtureHelpers.isMongos(db)
+            ? FixtureHelpers.getShardsOwningDataForCollection(coll).sort()
+            : [];
     });
 
     it("unions outer collection scan with DRM subpipeline binding $$SEARCH_META", function () {
@@ -108,6 +112,45 @@ describe("$_internalDocumentResultsAndMetadata in $unionWith", function () {
             }),
             6347902,
         );
+    });
+
+    it("[sharded] merges differing per-shard metadata in a $unionWith DRM subpipeline", function () {
+        if (!FixtureHelpers.isMongos(db) || shardIds.length < 2) return;
+        const metaA = {count: {lowerBound: 10}};
+        const metaB = {count: {lowerBound: 32}};
+        const byShard = {[shardIds[0]]: {meta: metaA}, [shardIds[1]]: {meta: metaB}};
+        const mergePipeline = [
+            {$group: {_id: null, count: {$sum: "$count.lowerBound"}}},
+            {$project: {_id: 0, count: {lowerBound: "$count"}}},
+        ];
+        const result = coll
+            .aggregate([
+                {
+                    $unionWith: {
+                        coll: coll.getName(),
+                        pipeline: [
+                            {
+                                $extensionMultiStream: {
+                                    numDocs: 3,
+                                    meta: {count: {lowerBound: 0}},
+                                    byShard,
+                                    mergePipeline,
+                                },
+                            },
+                            {$project: {_id: 0, name: 1, meta: "$$SEARCH_META"}},
+                        ],
+                    },
+                },
+            ])
+            .toArray();
+
+        const mergedMeta = {count: {lowerBound: 42}};
+        const subDocs = result.filter((d) => d.hasOwnProperty("meta"));
+        assert.gt(subDocs.length, 0, {result, byShard});
+        for (const doc of subDocs) {
+            assert.docEq(doc.meta, mergedMeta, {doc, byShard});
+            assert(doc.hasOwnProperty("name"), {doc});
+        }
     });
 
     it("[sharded] propagates DRM subpipeline metadata correctly across shards", function () {

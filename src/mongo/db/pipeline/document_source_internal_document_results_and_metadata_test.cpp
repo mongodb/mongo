@@ -436,6 +436,17 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
     ASSERT_FALSE(dsRef->hasAdditionalCursorPipeline());
 }
 
+// Builds a shared ShardedPlanSpec with the given sort pattern and optional merge pipeline,
+// ready for passing to setShardedPlan().
+auto makeSharedPlanSpec(BSONObj sortPattern, std::vector<BSONObj> mergePipeline = {}) {
+    ShardedPlanSpec ps;
+    ps.setResultsSortPattern(std::move(sortPattern));
+    if (!mergePipeline.empty()) {
+        ps.setMetaMergePipeline(std::move(mergePipeline));
+    }
+    return std::make_shared<ShardedPlanSpec>(std::move(ps));
+}
+
 // DPL tests
 TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
        DistributedPlanLogicWithoutCallbackReturnsNone) {
@@ -482,9 +493,8 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
     auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
         expCtx, queueStage, /*metadata=*/boost::none, /*returnCursor=*/false);
 
-    auto spec = std::make_shared<DocumentSourceInternalDocumentResultsAndMetadata::ShardedPlanSpec>(
-        BSON("score" << 1), std::vector<BSONObj>{});
-    ds->setShardedPlanProvider([spec](ExpressionContext*) -> const auto& { return *spec; });
+    auto spec = makeSharedPlanSpec(BSON("score" << 1));
+    ds->setShardedPlan([spec](ExpressionContext*) -> const auto& { return *spec; });
 
     auto dpl = ds->distributedPlanLogic(nullptr);
     ASSERT_TRUE(dpl.has_value());
@@ -502,9 +512,10 @@ DEATH_TEST_F(DocumentSourceInternalDocumentResultsAndMetadataDeathTest,
     auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
         expCtx, queueStage, meta, /*returnCursor=*/false);
 
-    auto spec = std::make_shared<DocumentSourceInternalDocumentResultsAndMetadata::ShardedPlanSpec>(
-        BSONObj{}, std::vector<BSONObj>{});
-    ds->setShardedPlanProvider([spec](ExpressionContext*) -> const auto& { return *spec; });
+    // Empty sort pattern, resultsSortPattern left unset.
+    auto spec =
+        std::make_shared<DocumentSourceInternalDocumentResultsAndMetadata::ShardedPlanSpec>();
+    ds->setShardedPlan([spec](ExpressionContext*) -> const auto& { return *spec; });
 
     ds->distributedPlanLogic(nullptr);
 }
@@ -518,9 +529,9 @@ DEATH_TEST_F(DocumentSourceInternalDocumentResultsAndMetadataDeathTest,
     auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
         expCtx, queueStage, meta, /*returnCursor=*/false);
 
-    auto spec = std::make_shared<DocumentSourceInternalDocumentResultsAndMetadata::ShardedPlanSpec>(
-        BSON("score" << 1), std::vector<BSONObj>{});
-    ds->setShardedPlanProvider([spec](ExpressionContext*) -> const auto& { return *spec; });
+    // metaMergePipeline intentionally absent — should tassert when metadata is configured.
+    auto spec = makeSharedPlanSpec(BSON("score" << 1));
+    ds->setShardedPlan([spec](ExpressionContext*) -> const auto& { return *spec; });
 
     ds->distributedPlanLogic(nullptr);
 }
@@ -533,16 +544,44 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
     auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
         expCtx, queueStage, meta, /*returnCursor=*/false);
 
-    auto spec = std::make_shared<DocumentSourceInternalDocumentResultsAndMetadata::ShardedPlanSpec>(
-        BSON("score" << 1),
-        std::vector<BSONObj>{BSON(
-            "$group" << BSON("_id" << BSONNULL << "meta" << BSON("$mergeObjects" << "$payload")))});
-    ds->setShardedPlanProvider([spec](ExpressionContext*) -> const auto& { return *spec; });
+    auto spec =
+        makeSharedPlanSpec(BSON("score" << 1),
+                           {BSON("$group" << BSON("_id" << BSONNULL << "meta"
+                                                        << BSON("$mergeObjects" << "$payload")))});
+    ds->setShardedPlan([spec](ExpressionContext*) -> const auto& { return *spec; });
 
     auto dpl = ds->distributedPlanLogic(nullptr);
     ASSERT_TRUE(dpl.has_value());
     ASSERT_TRUE(dpl->mergeSortPattern.has_value());
     ASSERT_BSONOBJ_EQ(*dpl->mergeSortPattern, BSON("score" << 1));
+    ASSERT_EQ(dpl->mergingStages.size(), 1u);
+    ASSERT_EQ(std::string_view(dpl->mergingStages.front()->getSourceName()),
+              "$setVariableFromSubPipeline"sv);
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       ShardedPlanSurvivesBsonRoundTripAndDrivesDistributedPlanLogic) {
+    // Router side: stage carries a live provider supplied by the extension AST node.
+    auto* original = parse(BSON(kStageName << kSourceWithMeta));
+    auto spec =
+        makeSharedPlanSpec(BSON("score" << -1),
+                           {BSON("$group" << BSON("_id" << BSONNULL << "meta"
+                                                        << BSON("$mergeObjects" << "$payload")))});
+    original->setShardedPlan([spec](ExpressionContext*) -> const auto& { return *spec; });
+
+    // Serialize as if shipping into a subpipeline on a shard; the callback can't cross BSON.
+    query_shape::SerializationOptions opts;
+    opts.isSerializingForRemoteDispatch = true;
+    const auto roundTripped = original->serialize(opts).getDocument().toBson();
+
+    // Shard side: re-parse the serialized BSON. No provider is attached; only the cached spec the
+    // router stamped survives.
+    auto* reparsed = parse(roundTripped);
+
+    auto dpl = reparsed->distributedPlanLogic(nullptr);
+    ASSERT_TRUE(dpl.has_value());
+    ASSERT_TRUE(dpl->mergeSortPattern.has_value());
+    ASSERT_BSONOBJ_EQ(*dpl->mergeSortPattern, BSON("score" << -1));
     ASSERT_EQ(dpl->mergingStages.size(), 1u);
     ASSERT_EQ(std::string_view(dpl->mergingStages.front()->getSourceName()),
               "$setVariableFromSubPipeline"sv);
