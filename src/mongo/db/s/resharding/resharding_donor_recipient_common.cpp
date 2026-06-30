@@ -42,6 +42,7 @@
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/resharding/resharding_donor_service.h"
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
+#include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
@@ -157,6 +158,10 @@ template void createReshardingStateMachine<ReshardingRecipientService,
                                            RecipientStateMachine,
                                            ReshardingRecipientDocument>(
     OperationContext*, const ReshardingRecipientDocument&, bool);
+
+void waitForStateDocumentMajorityCommitted(OperationContext* opCtx) {
+    waitForMajority(opCtx, opCtx->getCancellationToken()).get(opCtx);
+}
 
 namespace {
 /*

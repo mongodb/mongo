@@ -74,43 +74,44 @@ public:
                     "_shardsvrReshardDonorInitialize can only be run on shard servers",
                     serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
-            if (resharding::tryGetReshardingStateMachine<ReshardingDonorService,
+            if (!resharding::tryGetReshardingStateMachine<ReshardingDonorService,
+                                                          ReshardingDonorService::DonorStateMachine,
+                                                          ReshardingDonorDocument>(opCtx, uuid())) {
+                const auto& req = request();
+
+                DonorShardContext donorCtx;
+                donorCtx.setState(DonorStateEnum::kPreparingToDonate);
+
+                ReshardingDonorDocument donorDoc{std::move(donorCtx), req.getRecipientShards()};
+                donorDoc.setCommonReshardingMetadata(req.getCommonReshardingMetadata());
+
+                // We clear the routing information for the temporary resharding namespace to ensure
+                // this donor shard primary will refresh from the config server and see the chunk
+                // distribution for the new resharding operation. We also invalidate the source
+                // namespace since the coordinator's metadata write bumps its placement version,
+                // matching the old refresh path where the donor flush updated it.
+                auto* catalogCache = Grid::get(opCtx)->catalogCache();
+                catalogCache->invalidateCollectionEntry_LINEARIZABLE(
+                    req.getCommonReshardingMetadata().getTempReshardingNss());
+                catalogCache->invalidateCollectionEntry_LINEARIZABLE(
+                    req.getCommonReshardingMetadata().getSourceNss());
+
+                resharding::createReshardingStateMachine<ReshardingDonorService,
                                                          ReshardingDonorService::DonorStateMachine,
-                                                         ReshardingDonorDocument>(opCtx, uuid())) {
+                                                         ReshardingDonorDocument>(
+                    opCtx, donorDoc, true);
+
+                LOGV2(12092601,
+                      "Initialized resharding donor state machine via "
+                      "_shardsvrReshardDonorInitialize command",
+                      "reshardingUUID"_attr = uuid());
+            } else {
                 LOGV2(12092600,
                       "Donor state machine already exists for resharding operation",
                       "reshardingUUID"_attr = uuid());
-                return;
             }
 
-            const auto& req = request();
-
-            DonorShardContext donorCtx;
-            donorCtx.setState(DonorStateEnum::kPreparingToDonate);
-
-            ReshardingDonorDocument donorDoc{std::move(donorCtx), req.getRecipientShards()};
-            donorDoc.setCommonReshardingMetadata(req.getCommonReshardingMetadata());
-
-            // We clear the routing information for the temporary resharding namespace to ensure
-            // this donor shard primary will refresh from the config server and see the chunk
-            // distribution for the new resharding operation. We also invalidate the source
-            // namespace since the coordinator's metadata write bumps its placement version,
-            // matching the old refresh path where the donor flush updated it.
-            auto* catalogCache = Grid::get(opCtx)->catalogCache();
-            catalogCache->invalidateCollectionEntry_LINEARIZABLE(
-                req.getCommonReshardingMetadata().getTempReshardingNss());
-            catalogCache->invalidateCollectionEntry_LINEARIZABLE(
-                req.getCommonReshardingMetadata().getSourceNss());
-
-            resharding::createReshardingStateMachine<ReshardingDonorService,
-                                                     ReshardingDonorService::DonorStateMachine,
-                                                     ReshardingDonorDocument>(
-                opCtx, donorDoc, true);
-
-            LOGV2(12092601,
-                  "Initialized resharding donor state machine via "
-                  "_shardsvrReshardDonorInitialize command",
-                  "reshardingUUID"_attr = uuid());
+            resharding::waitForStateDocumentMajorityCommitted(opCtx);
         }
 
     private:

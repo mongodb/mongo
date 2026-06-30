@@ -110,6 +110,17 @@ void createReshardingStateMachine(OperationContext* opCtx,
                                   bool throwOnNotPrimaryError = false);
 
 /**
+ * Waits for this node's most recent write (the system's last op time) to be majority committed.
+ *
+ * Resharding participant initialization commands use this to guarantee the participant's state
+ * document is durable before returning success, even on paths that performed no write on the
+ * current operation context (e.g. the state machine already existed in memory, or an insert was
+ * deduplicated). This ensures the coordinator can rely on the participant not forgetting its role
+ * after a rollback.
+ */
+void waitForStateDocumentMajorityCommitted(OperationContext* opCtx);
+
+/**
  * The following functions construct a ReshardingDocument from the given 'reshardingFields'.
  */
 ReshardingDonorDocument constructDonorDocumentFromReshardingFields(

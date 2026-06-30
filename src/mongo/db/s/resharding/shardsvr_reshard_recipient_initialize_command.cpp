@@ -77,73 +77,74 @@ public:
                     "_shardsvrReshardRecipientInitialize can only be run on shard servers",
                     serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
-            if (resharding::tryGetReshardingStateMachine<
+            if (!resharding::tryGetReshardingStateMachine<
                     ReshardingRecipientService,
                     ReshardingRecipientService::RecipientStateMachine,
                     ReshardingRecipientDocument>(opCtx, uuid())) {
+                const auto& req = request();
+
+                RecipientShardContext recipientCtx;
+                recipientCtx.setState(RecipientStateEnum::kAwaitingFetchTimestamp);
+
+                ReshardingRecipientDocument recipientDoc{std::move(recipientCtx)};
+                recipientDoc.setCommonReshardingMetadata(req.getCommonReshardingMetadata());
+                recipientDoc.setReshardingRecipientOptions(req.getRecipientOptions());
+
+                // We clear the routing information for the temporary resharding namespace to ensure
+                // this recipient shard primary will refresh from the config server and see the
+                // chunk distribution for the new resharding operation.
+                auto tempNss = req.getCommonReshardingMetadata().getTempReshardingNss();
+                auto* catalogCache = Grid::get(opCtx)->catalogCache();
+                catalogCache->invalidateCollectionEntry_LINEARIZABLE(tempNss);
+
+                // Refresh routing info for the temp namespace and check whether this shard owns
+                // any chunks. This determines whether we can skip cloning/applying phases.
+                auto cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, tempNss));
+                bool noChunksOnThisShard = false;
+                if (cri.hasRoutingTable()) {
+                    std::set<ShardId> shards;
+                    cri.getCurrentChunkManager().getAllShardIds(&shards);
+                    noChunksOnThisShard =
+                        shards.find(ShardingState::get(opCtx)->shardId()) == shards.end();
+                }
+
+                const auto& vCtx = VersionContext::getDecoration(opCtx);
+                auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+                if (noChunksOnThisShard) {
+                    if (resharding::gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable
+                            .isEnabled(vCtx, fcvSnapshot)) {
+                        recipientDoc.setSkipCloningAndApplying(true);
+                    }
+                    if (resharding::gFeatureFlagReshardingSkipCloningIfApplicable.isEnabled(
+                            vCtx, fcvSnapshot)) {
+                        recipientDoc.setSkipCloning(true);
+                    }
+                    if (resharding::gFeatureFlagReshardingSkipBuildingIndexesIfApplicable.isEnabled(
+                            vCtx, fcvSnapshot)) {
+                        recipientDoc.setSkipBuildingIndexes(true);
+                    }
+                }
+                if (resharding::gFeatureFlagReshardingStoreOplogFetcherProgress.isEnabled(
+                        vCtx, fcvSnapshot)) {
+                    recipientDoc.setStoreOplogFetcherProgress(true);
+                }
+
+                resharding::createReshardingStateMachine<
+                    ReshardingRecipientService,
+                    ReshardingRecipientService::RecipientStateMachine,
+                    ReshardingRecipientDocument>(opCtx, recipientDoc, true);
+
+                LOGV2(12092603,
+                      "Initialized resharding recipient state machine via "
+                      "_shardsvrReshardRecipientInitialize command",
+                      "reshardingUUID"_attr = uuid());
+            } else {
                 LOGV2(12092602,
                       "Recipient state machine already exists for resharding operation",
                       "reshardingUUID"_attr = uuid());
-                return;
             }
 
-            const auto& req = request();
-
-            RecipientShardContext recipientCtx;
-            recipientCtx.setState(RecipientStateEnum::kAwaitingFetchTimestamp);
-
-            ReshardingRecipientDocument recipientDoc{std::move(recipientCtx)};
-            recipientDoc.setCommonReshardingMetadata(req.getCommonReshardingMetadata());
-            recipientDoc.setReshardingRecipientOptions(req.getRecipientOptions());
-
-            // We clear the routing information for the temporary resharding namespace to ensure
-            // this recipient shard primary will refresh from the config server and see the chunk
-            // distribution for the new resharding operation.
-            auto tempNss = req.getCommonReshardingMetadata().getTempReshardingNss();
-            auto* catalogCache = Grid::get(opCtx)->catalogCache();
-            catalogCache->invalidateCollectionEntry_LINEARIZABLE(tempNss);
-
-            // Refresh routing info for the temp namespace and check whether this shard owns
-            // any chunks. This determines whether we can skip cloning/applying phases.
-            auto cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, tempNss));
-            bool noChunksOnThisShard = false;
-            if (cri.hasRoutingTable()) {
-                std::set<ShardId> shards;
-                cri.getCurrentChunkManager().getAllShardIds(&shards);
-                noChunksOnThisShard =
-                    shards.find(ShardingState::get(opCtx)->shardId()) == shards.end();
-            }
-
-            const auto& vCtx = VersionContext::getDecoration(opCtx);
-            auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-            if (noChunksOnThisShard) {
-                if (resharding::gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable.isEnabled(
-                        vCtx, fcvSnapshot)) {
-                    recipientDoc.setSkipCloningAndApplying(true);
-                }
-                if (resharding::gFeatureFlagReshardingSkipCloningIfApplicable.isEnabled(
-                        vCtx, fcvSnapshot)) {
-                    recipientDoc.setSkipCloning(true);
-                }
-                if (resharding::gFeatureFlagReshardingSkipBuildingIndexesIfApplicable.isEnabled(
-                        vCtx, fcvSnapshot)) {
-                    recipientDoc.setSkipBuildingIndexes(true);
-                }
-            }
-            if (resharding::gFeatureFlagReshardingStoreOplogFetcherProgress.isEnabled(
-                    vCtx, fcvSnapshot)) {
-                recipientDoc.setStoreOplogFetcherProgress(true);
-            }
-
-            resharding::createReshardingStateMachine<
-                ReshardingRecipientService,
-                ReshardingRecipientService::RecipientStateMachine,
-                ReshardingRecipientDocument>(opCtx, recipientDoc, true);
-
-            LOGV2(12092603,
-                  "Initialized resharding recipient state machine via "
-                  "_shardsvrReshardRecipientInitialize command",
-                  "reshardingUUID"_attr = uuid());
+            resharding::waitForStateDocumentMajorityCommitted(opCtx);
         }
 
     private:
