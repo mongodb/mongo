@@ -58,6 +58,10 @@ public:
     ValueReader(JSContext* cx, JS::MutableHandleValue value);
 
     void fromBSONElement(const BSONElement& elem, const BSONObj& parent, bool readOnly);
+    // Wraps elem without a parent, making the resulting BSONHolder unowned.
+    // Unowned holders always check the generation counter in uassertValid(), so
+    // any holder created here becomes stale after the next reset()/advanceGeneration().
+    void fromBSONElementUnowned(const BSONElement& elem, bool readOnly);
     void fromBSON(const BSONObj& obj, const BSONObj* parent, bool readOnly);
     void fromBSONArray(const BSONObj& obj, const BSONObj* parent, bool readOnly);
     void fromDouble(double d);

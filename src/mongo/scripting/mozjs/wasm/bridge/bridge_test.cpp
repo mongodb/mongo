@@ -3162,6 +3162,63 @@ TEST_F(WasmMozJSBridgeTest, ThrowAfterTrap_NoOpCtx_FallsBackToInterrupted) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// BSON-holder generation tests
+// ---------------------------------------------------------------------------
+//
+// The engine increments its internal generation counter at the start of every invocation
+// (invokeFunction, invokePredicate, invokeMap). Any unowned BSONHolder created in a prior
+// invocation becomes stale: accessing a field on it from JS throws ErrorCodes::BadValue.
+
+// The key behavioral guarantee: a BSON arg stored by JS in a global from invocation N is
+// stale in invocation N+1 because invokeFunction auto-increments the generation counter.
+TEST_F(WasmMozJSBridgeTest, InvokeFunction_StalesBsonArgFromPriorInvocation) {
+    // Invocation 1: store the BSON document arg in a global.
+    auto store = createFunction("function(doc) { globalThis.__saved__ = doc; return 1; }");
+    auto r1 = invokeFunction(store, BSON("arg0" << BSON("x" << 42)));
+    ASSERT_EQ(r1["__value"].numberInt(), 1);
+
+    // Invocation 2: invokeFunction auto-increments generation, making __saved__ stale.
+    auto read = createFunction("function() { return globalThis.__saved__.x; }");
+    ASSERT_THROWS_CODE(invokeFunction(read, BSONObj()), DBException, ErrorCodes::BadValue);
+}
+
+TEST_F(WasmMozJSBridgeTest, InvokeFunction_FreshArgInNewInvocationIsValid) {
+    // Args passed in the current invocation receive the post-increment generation and are valid.
+    auto handle = createFunction("function(doc) { return doc.a + doc.b; }");
+    auto result = invokeFunction(handle, BSON("arg0" << BSON("a" << 10 << "b" << 32)));
+    ASSERT_EQ(result["__value"].numberInt(), 42);
+}
+
+TEST_F(WasmMozJSBridgeTest, InvokeFunction_SameInvocationArgIsNotStale) {
+    // An arg stored to globalThis within a single invocation and read back in the same
+    // invocation has the current generation and is not stale.
+    auto handle = createFunction(
+        "function(doc) {"
+        "  globalThis.__cur__ = doc;"
+        "  return globalThis.__cur__.x;"
+        "}");
+    auto result = invokeFunction(handle, BSON("arg0" << BSON("x" << 99)));
+    ASSERT_EQ(result["__value"].numberInt(), 99);
+}
+
+TEST_F(WasmMozJSBridgeTest, InvokeFunction_GenerationsStackAcrossMultipleInvocations) {
+    // Each invocation advances the generation. A wrapper saved two invocations ago is stale
+    // even if it was overwritten by a newer wrapper in between.
+    auto store = createFunction("function(doc) { globalThis.__saved__ = doc; return 1; }");
+
+    // Invocation 1 → generation G: save a wrapper with generation G.
+    auto r1 = invokeFunction(store, BSON("arg0" << BSON("v" << 1)));
+    ASSERT_EQ(r1["__value"].numberInt(), 1);
+
+    // Invocation 2 → generation G+1: __saved__ is overwritten with a G+1 wrapper.
+    auto r2 = invokeFunction(store, BSON("arg0" << BSON("v" << 2)));
+    ASSERT_EQ(r2["__value"].numberInt(), 1);
+
+    // Invocation 3 → generation G+2: __saved__ holds a G+1 wrapper, now stale.
+    auto read = createFunction("function() { return globalThis.__saved__.v; }");
+    ASSERT_THROWS_CODE(invokeFunction(read, BSONObj()), DBException, ErrorCodes::BadValue);
+}
 
 /**
  * Tests exposed javascript functions.

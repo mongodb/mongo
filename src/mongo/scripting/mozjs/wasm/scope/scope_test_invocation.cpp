@@ -388,3 +388,30 @@ TEST(WasmtimeScope, MapReduceReducePattern) {
     ASSERT_EQ(0, scope->invoke(reduceFn, &args, nullptr, 0));
     ASSERT_EQ(scope->getNumber("__returnValue"), 425.0);
 }
+
+// ---------------------------------------------------------------------------
+// BSON-holder generation tests (scope-level)
+// ---------------------------------------------------------------------------
+//
+// The engine increments its generation counter at the start of every invocation.
+// A BSONHolder retained from invocation N is stale in invocation N+1 and throws BadValue.
+
+// Verify that invoke() stales BSONHolders from a prior invocation automatically —
+// no explicit advanceGeneration() call is needed.
+TEST(WasmtimeScopeGeneration, StalesRetainedBsonArgOnNextInvocation) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    ASSERT(scope);
+
+    // Invocation 1: store the BSON arg in a global.
+    ScriptingFunction store =
+        scope->createFunction("function(doc) { globalThis.__saved__ = doc; return 1; }");
+    BSONObj storeArgs = BSON("arg0" << BSON("x" << 42));
+    ASSERT_EQ(0, scope->invoke(store, &storeArgs, nullptr, 0));
+
+    // Invocation 2: the auto-increment at the start of invoke() stales __saved__.
+    ScriptingFunction read = scope->createFunction("function() { return globalThis.__saved__.x; }");
+    BSONObj readArgs;
+    ASSERT_THROWS_CODE(
+        scope->invoke(read, &readArgs, nullptr, 0), DBException, ErrorCodes::BadValue);
+}

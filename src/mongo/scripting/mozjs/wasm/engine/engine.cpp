@@ -919,6 +919,10 @@ err_code_t MozJSScriptEngine::invokeFunction(uint64_t handle,
 
     ExecutionCheck chk(_cx, err);
 
+    // Advance the generation before wrapping args so any stale BSON-backed JS objects retained
+    // from a prior invocation are detected when accessed during this one.
+    ++_generation;
+
     const int nargs = argsObject.nFields();
 
     JS::RootedValueVector args(_cx);
@@ -936,7 +940,7 @@ err_code_t MozJSScriptEngine::invokeFunction(uint64_t handle,
             BSONElement next = it.next();
 
             JS::RootedValue value(_cx);
-            ValueReader(_cx, &value).fromBSONElement(next, argsObject, false /*readOnlyArgs*/);
+            ValueReader(_cx, &value).fromBSONElementUnowned(next, false /*readOnlyArgs*/);
 
             if (!args.append(value)) {
                 if (err) {
@@ -1065,6 +1069,10 @@ err_code_t MozJSScriptEngine::invokePredicate(uint64_t handle,
     JSAutoRealm ar(_cx, _global);
     ExecutionCheck chk(_cx, err);
 
+    // Advance generation so any unowned BSONHolder retained from a prior invokeFunction call
+    // is detected as stale if accessed during this predicate.
+    ++_generation;
+
     JS::RootedValue smrecv(_cx);
     if (!document.isEmpty())
         ValueReader(_cx, &smrecv).fromBSON(document, nullptr, false);
@@ -1113,6 +1121,10 @@ err_code_t MozJSScriptEngine::invokeMap(uint64_t handle,
 
     JSAutoRealm ar(_cx, _global);
     ExecutionCheck chk(_cx, err);
+
+    // Advance generation so any unowned BSONHolder retained from a prior invokeFunction call
+    // is detected as stale if accessed during this map invocation.
+    ++_generation;
 
     JS::RootedValue smrecv(_cx);
     if (!document.isEmpty())
@@ -1404,6 +1416,7 @@ err_code_t MozJSScriptEngine::reset(wasm_mozjs_error_t* err) {
         _pinnedHostBytesSinceGc = 0;
     }
 
+    ++_generation;
     return SM_OK;
 }
 
@@ -1531,7 +1544,7 @@ void MozJSScriptEngine::sleep(Milliseconds ms) {
 }
 
 std::size_t MozJSScriptEngine::getGeneration() const {
-    return 1;
+    return _generation;
 }
 
 JS::HandleId MozJSScriptEngine::getInternedStringId(InternedString name) {

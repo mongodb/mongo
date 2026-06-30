@@ -238,6 +238,22 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
     _value.setUndefined();
 }
 
+void ValueReader::fromBSONElementUnowned(const BSONElement& elem, bool readOnly) {
+    switch (elem.type()) {
+        case BSONType::array:
+            fromBSONArray(elem.embeddedObject(), nullptr, readOnly);
+            return;
+        case BSONType::object:
+            fromBSON(elem.embeddedObject(), nullptr, readOnly);
+            return;
+        default:
+            // For all non-object types (scalars, OIDs, dates, etc.) no BSONHolder is
+            // created, so parent ownership is irrelevant — delegate to the regular path.
+            fromBSONElement(elem, BSONObj::kEmptyObject, readOnly);
+            return;
+    }
+}
+
 void ValueReader::fromBSON(const BSONObj& obj, const BSONObj* parent, bool readOnly) {
     JS::RootedObject child(_context);
 

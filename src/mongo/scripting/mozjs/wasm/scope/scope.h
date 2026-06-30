@@ -103,9 +103,13 @@ public:
     // and the per-invocation deadline monitor, since epoch interruption already covers us.
     bool execPredicate(ScriptingFunction func, const BSONObj& doc, int timeoutMs) override;
 
-    // The following methods are not meaningful for Wasmtime.
-    void advanceGeneration() override {}
     void requireOwnedObjects() override {}
+
+    // generation is auto-advanced by the engine at each invocation entry; no scope-level
+    // call is needed (and the scope has no generation counter of its own).
+    void advanceGeneration() override {}
+
+    // The following methods are not meaningful for Wasmtime.
 
     bool exec(std::string_view code,
               const std::string& name,

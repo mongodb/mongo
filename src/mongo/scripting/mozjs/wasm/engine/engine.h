@@ -375,6 +375,13 @@ private:
     bool _initialized = false;
     bool _javascriptProtection = false;
 
+    // Monotonically increasing generation counter. Incremented at the start of every
+    // invocation (invokeFunction, invokePredicate, invokeMap) and inside reset(). Any
+    // unowned BSONHolder created in a prior invocation is detected as stale when accessed
+    // in a subsequent one via uassertValid().
+    std::size_t _generation{1};
+
+
     // JS_Init() / JS_ShutDown() are once-per-runtime-lifetime calls. After the first
     // init(), subsequent shutdown()+init() cycles must skip them and only do
     // JS_DestroyContext / JS_NewContext so the SM runtime is not repeatedly torn down.

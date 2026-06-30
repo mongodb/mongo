@@ -3,10 +3,9 @@
  *
  * @tags: [
  *   requires_scripting,
- *   # TODO SERVER-127997: The mozjs-wasm engine is incompatible with ASAN/TSAN: libwasmtime_engine.so
- *   # initialization takes >5 minutes under memory pressure, exceeding the 300s await_ready()
- *   # timeout, and the Wasmtime rayon thread pool triggers TSAN CHECK failures.
- *   mozjs_wasm_unsupported,
+ *   # TODO SERVER-128404: Re-enable on TSAN once the Wasmtime rayon thread pool no longer
+ *   # bypasses TSAN's pthread_create interception.
+ *   tsan_incompatible,
  * ]
  */
 import {describe, it} from "jstests/libs/mochalite.js";
