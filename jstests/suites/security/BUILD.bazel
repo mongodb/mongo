@@ -122,7 +122,7 @@ resmoke_suite_test(
     data = CORE_DATA + [
         "//jstests/libs:authTestsKey",
     ],
-    shard_count = 4,
+    shard_count = 10,
     tags = [
         "auth",
         "ci-release-critical",
@@ -313,6 +313,91 @@ resmoke_suite_test(
     deps = [
         "//src/mongo/db:mongod",
         "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "aggregation_ese",
+    config = "//buildscripts/resmokeconfig:suites/aggregation_ese.yml",
+    shard_count = 50,
+    tags = [
+        "aggregation",
+        "ci-release-critical",
+        "encrypt",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "aggregation_ese_gcm",
+    config = "//buildscripts/resmokeconfig:suites/aggregation_ese_gcm.yml",
+    shard_count = 50,
+    tags = [
+        "aggregation",
+        "ci-release-critical",
+        "encrypt",
+        "gcm",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "core_ese",
+    config = "//buildscripts/resmokeconfig:suites/core_ese.yml",
+    shard_count = 50,
+    tags = [
+        "ci-release-critical",
+        "encrypt",
+        "jscore",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "core_min_batch_repeat_queries_multiplan_single_solutions_ese_gcm",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/core_min_batch_repeat_queries_multiplan_single_solutions_ese_gcm.yml",
+    shard_count = 50,
+    tags = [
+        "ci-release-critical",
+        "encrypt",
+        "gcm",
+        "jscore",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
         "//src/mongo/shell:mongo",
     ],
 )

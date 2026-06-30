@@ -3,7 +3,7 @@
 # IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
 # AND REGENERATE THE MATRIX SUITES.
 #
-# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/core_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm.yml
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/core_min_batch_repeat_queries_multiplan_single_solutions_ese_gcm.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
 ##########################################################
 description:

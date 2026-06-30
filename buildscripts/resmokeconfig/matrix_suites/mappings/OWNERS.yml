@@ -43,7 +43,7 @@ filters:
   - "core_minimum_batch_size.yml":
     approvers:
       - 10gen/query-execution
-  - "core_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm.yml":
+  - "core_min_batch_repeat_queries_multiplan_single_solutions_ese_gcm.yml":
     approvers:
       - 10gen/query-optimization
   - "core_repeat_queries.yml":
