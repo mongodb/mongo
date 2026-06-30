@@ -871,6 +871,13 @@ const internalCommandsMap = {
             primaryShardId: "",
         },
     },
+    _shardsvrCommitChunkOperationsMetadata: {
+        testname: "_shardsvrCommitChunkOperationsMetadata",
+        command: {
+            _shardsvrCommitChunkOperationsMetadata: "test.x",
+            newChunks: [],
+        },
+    },
     _shardsvrCommitDropCollectionMetadata: {
         testname: "_shardsvrCommitDropCollectionMetadata",
         command: {_shardsvrCommitDropCollectionMetadata: "test.x", collectionUUID: UUID()},

@@ -29,15 +29,17 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/util/modules.h"
 
+#include <vector>
+
 namespace mongo {
 
 namespace MONGO_MOD_PARENT_PRIVATE shard_catalog_commit {
-
 
 /**
  * Deletes the collection and chunk metadata from the shard catalog
@@ -106,6 +108,18 @@ void commitSetAllowChunkOperationsLocally(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           bool allowChunkOperations,
                                           const boost::optional<UUID>& uuid);
+
+/**
+ * Commits an incremental chunk delta to the shard catalog given only the list of new chunk
+ * documents. The shard reconciles overlaps with its pre-existing durable chunks
+ * (config.shard.catalog.chunks) locally: any pre-existing chunk that overlaps a new chunk is
+ * removed so the collection stays non-overlapping once the new chunks are inserted. After
+ * persisting the delta, both the in-memory CollectionShardingRuntime and the secondaries (via an
+ * oplog 'c' entry) are updated with the new chunks.
+ */
+void commitChunkOperationsMetadataLocally(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          const std::vector<BSONObj>& newChunks);
 
 }  // namespace MONGO_MOD_PARENT_PRIVATE shard_catalog_commit
 
