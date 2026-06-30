@@ -1296,5 +1296,12 @@ error_codes:
       categories: [SystemOverloadedError, RetriableError],
     }
 
+  # A retryable user error from the stream processor's target Atlas cluster.
+  - {
+      code: 513,
+      name: StreamProcessorAtlasRetryableUserError,
+      categories: [StreamProcessorUserError, StreamProcessorRetryableError],
+    }
+
   # ^^^^
   # Add new codes, sequentially numbered, above.
