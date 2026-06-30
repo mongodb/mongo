@@ -31,9 +31,7 @@
 #   - 'release': rollout complete; retained here as a historical record.
 
 rollout:
-  featureFlagExtractFieldPathsSbeStage: {}
   featureFlagGetExecutorDeferredEngineChoice: {}
-  featureFlagSbeAccumulators: {}
   featureFlagSbeEqLookupUnwind: {}
   featureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin: {}
   featureFlagSbeEqLookupUnwindHashJoin: {}
@@ -43,10 +41,12 @@ rollout:
   featureFlagSbeEqLookupUnwindLocalIxscanFetch: {}
   featureFlagSbeEqLookupUnwindNestedLoopJoin: {}
   featureFlagSbeNonLeadingMatch: {}
-  featureFlagSbeUpgradeBinaryTrees: {}
   featureFlagUnifiedWriteExecutor: {}
 
 release:
   featureFlagCostBasedRanker: {}
+  featureFlagExtractFieldPathsSbeStage: {}
   featureFlagImprovedDepsAnalysis: {}
   featureFlagMultiPlanLimiter: {}
+  featureFlagSbeAccumulators: {}
+  featureFlagSbeUpgradeBinaryTrees: {}

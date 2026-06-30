@@ -43,7 +43,7 @@ feature_flags:
         cpp_varname: gFeatureFlagSbeAccumulators
         default: true
         fcv_gated: false
-        incremental_rollout_phase: rollout
+        incremental_rollout_phase: release
 
     featureFlagSbeFull:
         description:
@@ -239,7 +239,7 @@ feature_flags:
         cpp_varname: gFeatureFlagSbeUpgradeBinaryTrees
         default: true
         fcv_gated: false
-        incremental_rollout_phase: rollout
+        incremental_rollout_phase: release
 
     featureFlagUUIDExpression:
         description: "Feature flag to enable $createUUID expression"
@@ -354,7 +354,7 @@ feature_flags:
         cpp_varname: gFeatureFlagExtractFieldPathsSbeStage
         fcv_gated: false
         default: true
-        incremental_rollout_phase: rollout
+        incremental_rollout_phase: release
 
     featureFlagPathArrayness:
         description: "Feature flag to enable tracking of path arrayness."
