@@ -29,10 +29,15 @@
 
 #include "mongo/db/replicated_fast_count/size_count_checkpoint_buffer.h"
 
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
 namespace mongo::replicated_fast_count {
 
-SizeCountCheckpointBuffer::SizeCountCheckpointBuffer(UUID oplogUuid)
-    : _accumulatorOptions{.isCheckpoint = true, .oplogUuid = oplogUuid} {
+SizeCountCheckpointBuffer::SizeCountCheckpointBuffer(UUID oplogUuid,
+                                                     boost::optional<RecordId> lastBufferedRid)
+    : _accumulatorOptions{.isCheckpoint = true, .oplogUuid = oplogUuid},
+      _lastBufferedRid(lastBufferedRid) {
     _pending.emplace(_accumulatorOptions);
 }
 
@@ -58,21 +63,23 @@ boost::optional<OplogScanResult> SizeCountCheckpointBuffer::checkoutForFlush() {
     return _inFlight;
 }
 
-boost::optional<RecordId> SizeCountCheckpointBuffer::scanToNoHolesEOF(
-    SeekableRecordCursor& cursor) {
+void SizeCountCheckpointBuffer::scanToNoHolesEOF(SeekableRecordCursor& cursor) {
     std::lock_guard lk(_mutex);
+    // The boost::none state means we have not buffered any oplog entries yet.
+    if (_lastBufferedRid.has_value()) {
+        tassert(12101812,
+                str::stream() << "Unable to find oplog start point for next size count checkpoint"
+                              << ", lastBufferedRid: "
+                              << _lastBufferedRid.value().toStringHumanReadable(),
+                cursor.seekExact(_lastBufferedRid.value()));
+    }
 
-    boost::optional<RecordId> lastSeenRid;
+    // We advance lastBufferedRid on each iteration so that if cursor.next() throws a
+    // WriteConflictException, the caller can resume scanning after the last consumed record.
     while (const auto rec = cursor.next()) {
         _pending->consumeRecord(*rec);
-        lastSeenRid = rec->id;
+        _lastBufferedRid = rec->id;
     }
-    return lastSeenRid;
-}
-
-void SizeCountCheckpointBuffer::accumulate(const Record& rec) {
-    std::lock_guard lk(_mutex);
-    _pending->consumeRecord(rec);
 }
 
 void SizeCountCheckpointBuffer::acknowledgeFlushSuccess() {

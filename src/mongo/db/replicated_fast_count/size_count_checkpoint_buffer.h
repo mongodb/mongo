@@ -51,8 +51,11 @@ public:
     /**
      * `oplogUuid` is the UUID of the oplog collection being tailed. We assume the oplog UUID does
      * not change during the lifetime of the buffer.
+     *
+     * The first `scanToNoHolesEOF()` call seeks to strictly after `lastBufferedRid`. If
+     * `lastBufferedRid` is `boost::none`, the scan starts at the beginning of the oplog.
      */
-    explicit SizeCountCheckpointBuffer(UUID oplogUuid);
+    SizeCountCheckpointBuffer(UUID oplogUuid, boost::optional<RecordId> lastBufferedRid);
 
     /**
      * Consumer side. Cuts everything accumulated since the last successful flush into an in-flight
@@ -64,20 +67,17 @@ public:
     boost::optional<OplogScanResult> checkoutForFlush();
 
     /**
-     * Producer side. Scans `cursor` forward to the no-holes EOF, accumulating every record into the
-     * long-lived pending accumulator. Returns the RecordId of the last record seen, or boost::none
-     * if no records were scanned.
+     * Producer side. Seeks `cursor` forward to immediately after the last buffered record, then
+     * scans `cursor` to the no-holes EOF, accumulating every record into the long-lived pending
+     * accumulator.
      *
      * Holds the buffer mutex for the duration of the scan so that a concurrent `checkoutForFlush()`
      * cannot observe a partially-applied scan.
+     *
+     * If `cursor.next()` throws a WriteConflictException mid-scan, the next call to
+     * `scanToNoHolesEOF()` resumes strictly after the last accumulated record.
      */
-    boost::optional<RecordId> scanToNoHolesEOF(SeekableRecordCursor& cursor);
-
-    /**
-     * Producer side. Accumulates a single, already-fetched record into the pending accumulator.
-     * Useful when a record must be consumed without a cursor.
-     */
-    void accumulate(const Record& rec);
+    void scanToNoHolesEOF(SeekableRecordCursor& cursor);
 
     /**
      * Acknowledges that the _inFlight result has been persisted and is safe to clear.
@@ -97,6 +97,10 @@ public:
 private:
     // The options used to build every pending accumulator.
     const StreamingOplogDeltaAccumulator::Options _accumulatorOptions;
+
+    // The record ID of the last record consumed into _pending. The boost::none state means we have
+    // not buffered any oplog entries yet.
+    boost::optional<RecordId> _lastBufferedRid = boost::none;
 
     mutable std::mutex _mutex;
     // Accumulated size/count deltas buffered but not checked out. See checkoutForFlush().

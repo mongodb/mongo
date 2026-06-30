@@ -33,61 +33,21 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/replicated_fast_count/size_count_checkpoint_buffer.h"
-#include "mongo/db/storage/record_store.h"
 
-#include <memory>
+#include <boost/optional/optional.hpp>
 
-namespace mongo::replicated_fast_count {
+namespace mongo::replicated_fast_count::oplog_tailer {
+
 /**
- * Tails the oplog to buffer size/count deltas incrementally, enabling faster checkpoints.
+ * Scans and buffers newly visible entries into `buffer`.
  */
-class SizeCountCheckpointOplogTailer {
-public:
-    /**
-     * Reuses a cursor across iterations to avoid open/close overhead.
-     * Tracks lastBufferedRid so the main loop can always use seekExact (faster than seek).
-     */
-    struct TailerState {
-        std::unique_ptr<SeekableRecordCursor> cursor;
-        RecordId lastBufferedRid;
-    };
+void bufferNewOplogEntries(OperationContext* opCtx, SizeCountCheckpointBuffer& buffer);
 
-    /**
-     * Tails the oplog for size/count deltas since startAfter (exclusive), appending to buffer.
-     */
-    void run(OperationContext* opCtx, Timestamp startAfter, SizeCountCheckpointBuffer& buffer);
+/**
+ * Tails the oplog for size/count deltas in a loop until interrupted.
+ *
+ * New size/count deltas are written to `buffer`.
+ */
+void run(OperationContext* opCtx, SizeCountCheckpointBuffer& buffer);
 
-    /**
-     * Returns boost::none if the oplog is empty or doesn't exist.
-     */
-    boost::optional<TailerState> bootstrap_ForTest(OperationContext* opCtx,
-                                                   Timestamp startAfter,
-                                                   SizeCountCheckpointBuffer& buffer) {
-        return _bootstrap(opCtx, startAfter, buffer);
-    }
-
-    /**
-     * Non-blocking single iteration: drains entries up to the no-holes point.
-     * Returns true if buffer was updated.
-     */
-    bool runOneIteration_ForTest(OperationContext* opCtx,
-                                 boost::optional<TailerState>& state,
-                                 SizeCountCheckpointBuffer& buffer);
-
-private:
-    /**
-     * Returns none if the oplog is empty. Otherwise, `lastBufferedRid` refers to an
-     * already processed record so the main loop can always seekExact to it.
-     *
-     * Timestamp::min() means start from the beginning: since it never refers to a real entry,
-     * the first record is processed immediately to establish the invariant.
-     * Otherwise, size and count is checkpointed up to the oplog entry with timestamp `startAfter`,
-     * and it should not be double processed.
-     */
-    boost::optional<TailerState> _bootstrap(OperationContext* opCtx,
-                                            Timestamp startAfter,
-                                            SizeCountCheckpointBuffer& buffer);
-};
-}  // namespace mongo::replicated_fast_count
-
-
+}  // namespace mongo::replicated_fast_count::oplog_tailer

@@ -67,7 +67,7 @@ protected:
         ASSERT_OK(createReplicatedFastCountTimestampCollection(storageInterface(), _opCtx));
 
         _coordinator = std::make_unique<SizeCountCheckpointCoordinator>(
-            _sizeCountStore, _timestampStore, oplogUuid());
+            _sizeCountStore, _timestampStore, oplogUuid(), Timestamp::min());
     }
 
     UUID oplogUuid() const {
@@ -94,8 +94,8 @@ protected:
 };
 
 TEST_F(SizeCountCheckpointCoordinatorTest, StartupAndShutdownAreIdempotent) {
-    _coordinator->startup(getServiceContext(), Timestamp::min());
-    _coordinator->startup(getServiceContext(), Timestamp::min());
+    _coordinator->startup(getServiceContext());
+    _coordinator->startup(getServiceContext());
 
     ASSERT_TRUE(_coordinator->isRunning_ForTest());
 
@@ -114,8 +114,7 @@ TEST_F(SizeCountCheckpointCoordinatorTest,
         FailPointEnableBlock startupPause(
             "hangAfterSizeCountCheckpointCoordinatorStartupPublishesThreads");
 
-        starter =
-            stdx::thread([&] { _coordinator->startup(getServiceContext(), Timestamp::min()); });
+        starter = stdx::thread([&] { _coordinator->startup(getServiceContext()); });
 
         startupPause->waitForTimesEntered(startupPause.initialTimesEntered() + 1);
 
@@ -131,7 +130,7 @@ TEST_F(SizeCountCheckpointCoordinatorTest,
 }
 
 TEST_F(SizeCountCheckpointCoordinatorTest, StartupIsNoOpWhileShutdownIsJoiningWorkers) {
-    _coordinator->startup(getServiceContext(), Timestamp::min());
+    _coordinator->startup(getServiceContext());
     ASSERT_TRUE(_coordinator->isRunning_ForTest());
 
     stdx::thread stopper;
@@ -145,7 +144,7 @@ TEST_F(SizeCountCheckpointCoordinatorTest, StartupIsNoOpWhileShutdownIsJoiningWo
 
         // While shutdown is in `kStopping`, confirm startup doesn't create new threads and start
         // running again.
-        _coordinator->startup(getServiceContext(), Timestamp::min());
+        _coordinator->startup(getServiceContext());
         ASSERT_FALSE(_coordinator->isRunning_ForTest());
     }
 
@@ -155,14 +154,14 @@ TEST_F(SizeCountCheckpointCoordinatorTest, StartupIsNoOpWhileShutdownIsJoiningWo
 }
 
 TEST_F(SizeCountCheckpointCoordinatorTest, StartupAfterShutdownIsAlwaysRejected) {
-    _coordinator->startup(getServiceContext(), Timestamp::min());
+    _coordinator->startup(getServiceContext());
     ASSERT_TRUE(_coordinator->isRunning_ForTest());
 
     _coordinator->shutdown();
     ASSERT_FALSE(_coordinator->isRunning_ForTest());
 
     // kShutdown is terminal: startup() must be a no-op even after a clean shutdown.
-    _coordinator->startup(getServiceContext(), Timestamp::min());
+    _coordinator->startup(getServiceContext());
     ASSERT_FALSE(_coordinator->isRunning_ForTest());
 }
 
@@ -174,7 +173,7 @@ TEST_F(SizeCountCheckpointCoordinatorTest, ShutdownOnNeverStartedCoordinatorSets
     ASSERT_FALSE(_coordinator->isRunning_ForTest());
 
     // Terminal: any subsequent startup() must be rejected.
-    _coordinator->startup(getServiceContext(), Timestamp::min());
+    _coordinator->startup(getServiceContext());
     ASSERT_FALSE(_coordinator->isRunning_ForTest());
 }
 
@@ -228,7 +227,7 @@ TEST_F(SizeCountCheckpointCoordinatorWithOplogTest,
     writeInsert(persistedTs);
 
     auto coordinator = std::make_unique<SizeCountCheckpointCoordinator>(
-        _sizeCountStore, _timestampStore, oplogUuid());
+        _sizeCountStore, _timestampStore, oplogUuid(), persistedTs);
     coordinator->flushSync_ForTest(_opCtx);
 
     ASSERT_EQ(readTimestampStore(), boost::optional<Timestamp>(persistedTs));
@@ -252,7 +251,7 @@ TEST_F(SizeCountCheckpointCoordinatorTest, FlushFailureIncrementsFlushFailureCou
     // The failure metric is incremented by the flush thread's run() loop, which the synchronous
     // flushSync_ForTest path does not exercise, so drive the real flush thread.
     FailPointEnableBlock failFp("failDuringFlush");
-    _coordinator->startup(getServiceContext(), Timestamp::min());
+    _coordinator->startup(getServiceContext());
     _coordinator->requestFlush();
 
     // Wait until the flush has reached the failpoint, so shutdown() cannot preempt the flush
@@ -272,7 +271,7 @@ TEST_F(SizeCountCheckpointCoordinatorTest, FlushFailureIncrementsFlushFailureCou
 
 TEST_F(SizeCountCheckpointCoordinatorTest, BufferHasNoPendingWorkBeforeAnyTailCycle) {
     ASSERT_FALSE(_coordinator->getBuffer_ForTest()->hasPendingWork());
-    _coordinator->startup(getServiceContext(), Timestamp::min());
+    _coordinator->startup(getServiceContext());
     // No oplog data, so the tailer produces no scans and the buffer stays empty.
     ASSERT_FALSE(_coordinator->getBuffer_ForTest()->hasPendingWork());
     _coordinator->shutdown();
@@ -283,10 +282,7 @@ TEST_F(SizeCountCheckpointCoordinatorWithOplogTest,
        BufferHasPendingWorkAfterTailerProcessesOplogEntry) {
     writeInsert(Timestamp(10, 1));
 
-    SizeCountCheckpointOplogTailer tailer;
-    auto tailerState =
-        tailer.bootstrap_ForTest(_opCtx, Timestamp{}, *_coordinator->getBuffer_ForTest());
-    tailer.runOneIteration_ForTest(_opCtx, tailerState, *_coordinator->getBuffer_ForTest());
+    oplog_tailer::bufferNewOplogEntries(_opCtx, *_coordinator->getBuffer_ForTest());
 
     ASSERT_TRUE(_coordinator->getBuffer_ForTest()->hasPendingWork());
 
@@ -298,8 +294,8 @@ TEST_F(SizeCountCheckpointCoordinatorTest,
        DestructorJoinsBackgroundThreadsWithoutExplicitShutdown) {
     {
         auto localCoord = std::make_unique<SizeCountCheckpointCoordinator>(
-            _sizeCountStore, _timestampStore, oplogUuid());
-        localCoord->startup(getServiceContext(), Timestamp::min());
+            _sizeCountStore, _timestampStore, oplogUuid(), Timestamp::min());
+        localCoord->startup(getServiceContext());
         // Destructor calls shutdown() and joins the worker threads.
     }
     // Reaching here without a hang or crash confirms the destructor joined successfully.
@@ -307,7 +303,7 @@ TEST_F(SizeCountCheckpointCoordinatorTest,
 
 TEST_F(SizeCountCheckpointCoordinatorTest, ShutdownDuringFlushCycleInterruptsAndCompletes) {
     OtelMetricsCapturer capturer;
-    _coordinator->startup(getServiceContext(), Timestamp::min());
+    _coordinator->startup(getServiceContext());
 
     stdx::thread stopper;
     {
@@ -337,7 +333,7 @@ TEST_F(SizeCountCheckpointCoordinatorTest, ShutdownDuringFlushCycleInterruptsAnd
 
 TEST_F(SizeCountCheckpointCoordinatorTest, RepeatedConcurrentStartupShutdownLeavesStoppedState) {
     for (int i = 0; i < 50; ++i) {
-        stdx::thread starter([&] { _coordinator->startup(getServiceContext(), Timestamp::min()); });
+        stdx::thread starter([&] { _coordinator->startup(getServiceContext()); });
 
         stdx::thread stopper([&] { _coordinator->shutdown(); });
 
@@ -351,8 +347,8 @@ TEST_F(SizeCountCheckpointCoordinatorTest, RepeatedConcurrentStartupShutdownLeav
 TEST_F(SizeCountCheckpointCoordinatorTest, ConcurrentRequestFlushAndShutdownNeverDeadlocks) {
     for (int i = 0; i < 50; ++i) {
         auto coordinator = std::make_unique<SizeCountCheckpointCoordinator>(
-            _sizeCountStore, _timestampStore, oplogUuid());
-        coordinator->startup(getServiceContext(), Timestamp::min());
+            _sizeCountStore, _timestampStore, oplogUuid(), Timestamp::min());
+        coordinator->startup(getServiceContext());
 
         stdx::thread flusher([&] {
             for (int j = 0; j < 5; ++j) {

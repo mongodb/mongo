@@ -82,16 +82,16 @@ void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
                 acquireFastCountCollectionForRead(opCtx).has_value());
     }
 
-    const Timestamp lastPersistedCheckpointTS = [&] {
-        Lock::GlobalLock readLock(opCtx, MODE_IS, {.skipRSTLLock = opCtx->isLockFreeReadsOp()});
-        return _timestampStore->read(opCtx).value_or(Timestamp{});
-    }();
-
     const UUID oplogUuid = [&] {
         AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
         const auto& oplogColl = oplogRead.getCollection();
         massert(12912600, "oplog collection not found", oplogColl);
         return oplogColl->uuid();
+    }();
+
+    const Timestamp lastPersistedCheckpointTS = [&] {
+        Lock::GlobalLock readLock(opCtx, MODE_IS, {.skipRSTLLock = opCtx->isLockFreeReadsOp()});
+        return _timestampStore->read(opCtx).value_or(Timestamp{});
     }();
 
     std::lock_guard lock(_checkpointerMutex);
@@ -103,9 +103,9 @@ void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
 
     LOGV2(12051100, "Starting up ReplicatedFastCountManager checkpoint coordinator");
     _checkpointer = std::make_unique<SizeCountCheckpointCoordinator>(
-        *_sizeCountStore, *_timestampStore, oplogUuid);
+        *_sizeCountStore, *_timestampStore, oplogUuid, lastPersistedCheckpointTS);
     if (!_isUnderTest) {
-        _checkpointer->startup(opCtx->getServiceContext(), lastPersistedCheckpointTS);
+        _checkpointer->startup(opCtx->getServiceContext());
     }
 
     setIsRunning(true);

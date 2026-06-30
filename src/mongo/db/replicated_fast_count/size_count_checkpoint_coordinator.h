@@ -55,7 +55,8 @@ class SizeCountCheckpointCoordinator {
 public:
     SizeCountCheckpointCoordinator(SizeCountStore& sizeCountStore,
                                    SizeCountTimestampStore& timestampStore,
-                                   UUID oplogUuid);
+                                   UUID oplogUuid,
+                                   Timestamp startCheckpointingAfterTS);
 
     ~SizeCountCheckpointCoordinator();
 
@@ -63,10 +64,9 @@ public:
     SizeCountCheckpointCoordinator& operator=(const SizeCountCheckpointCoordinator&) = delete;
 
     /**
-     * Spawns background threads for tailing and flushing. `startCheckpointingAfterTS` is an
-     * exclusive lower bound on which oplog entries to process for size and count checkpoints.
+     * Spawns background threads for tailing and flushing.
      */
-    void startup(ServiceContext* service, Timestamp startCheckpointingAfterTS);
+    void startup(ServiceContext* service);
     void shutdown();
 
     /**
@@ -75,10 +75,7 @@ public:
     void requestFlush();
 
     /**
-     * Performs a synchronous oplog tailing iteration then flush iteration. Utilizes the value
-     * stored in `_timestampStore` to bootstrap the `_tailerState_ForTest` if the tailer state
-     * doesn't already exist. Necessary for tests which never create the tailer thread to initialize
-     * the tailing state.
+     * Performs a synchronous oplog tailing iteration then flush iteration.
      */
     void flushSync_ForTest(OperationContext* opCtx);
     bool isRunning_ForTest() const;
@@ -90,7 +87,7 @@ private:
      * Continuously tails new oplog entries and populates the buffer with their accumulated size and
      * count deltas.
      */
-    void _runTailerThread(ServiceContext* service, Timestamp startCheckpointingAfterTS);
+    void _runTailerThread(ServiceContext* service);
 
     /**
      * When signaled, snapshots the accumulated size and count deltas in the buffer and flushes them
@@ -100,7 +97,6 @@ private:
 
     void _handleWorkerFailure(Status status, std::string_view message);
 
-    std::unique_ptr<SizeCountCheckpointOplogTailer> _oplogTailer;
     std::unique_ptr<SizeCountCheckpointFlusher> _flusher;
 
     /**
@@ -112,10 +108,6 @@ private:
     std::unique_ptr<SizeCountCheckpointBuffer> _buffer;
     SizeCountStore& _sizeCountStore;
     SizeCountTimestampStore& _timestampStore;
-
-    // Persistent tailer state for flushSync_ForTest so successive calls resume from where the
-    // previous call left off, mirroring how the production run() loop advances its cursor.
-    boost::optional<SizeCountCheckpointOplogTailer::TailerState> _tailerState_ForTest;
 
     mutable std::mutex _mutex;
 

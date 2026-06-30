@@ -60,6 +60,8 @@ struct TxnChainState {
 struct OplogScanResult {
     SizeCountDeltas deltas;
     boost::optional<Timestamp> lastTimestamp;
+
+    bool operator==(const OplogScanResult&) const = default;
 };
 
 /**

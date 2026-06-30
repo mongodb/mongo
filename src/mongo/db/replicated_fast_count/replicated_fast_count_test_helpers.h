@@ -247,6 +247,11 @@ void deleteDocsByIDRange(OperationContext* opCtx,
 class OplogCursorMock : public SeekableRecordCursor {
 public:
     OplogCursorMock(std::list<repl::OplogEntry> entries);
+    /**
+     * `throwWriteConflictOnNthCall` causes the `n`-th call to next() (1-indexed) to throw a
+     * `WriteConflictException` exactly once, before consuming or returning that record.
+     */
+    OplogCursorMock(std::list<repl::OplogEntry> entries, int throwWriteConflictOnNthCall);
 
     ~OplogCursorMock() override {}
 
@@ -268,6 +273,8 @@ private:
     bool _initialized = false;
     std::list<std::pair<RecordId, BSONObj>> _records;
     std::list<std::pair<RecordId, BSONObj>>::const_iterator _it;
+    boost::optional<int> _throwOnNthCall = boost::none;
+    int _nextCallCount = 0;
 };
 
 /**

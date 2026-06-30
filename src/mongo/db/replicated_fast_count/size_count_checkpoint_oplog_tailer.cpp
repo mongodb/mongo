@@ -30,31 +30,18 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/record_id_helpers.h"
+#include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
-#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
-#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-namespace mongo::replicated_fast_count {
+namespace mongo::replicated_fast_count::oplog_tailer {
 namespace {
-
-using TailerState = SizeCountCheckpointOplogTailer::TailerState;
-
-RecordId makeStartRecordId(Timestamp startAfter) {
-    return massertStatusOK(record_id_helpers::keyForOptime(startAfter, KeyFormat::Long));
-}
-
-AutoGetCollection acquireOplogForRead(OperationContext* opCtx) {
-    AutoGetCollection coll(opCtx, NamespaceString::kRsOplogNamespace, MODE_IS);
-    tassert(12101803, "oplog collection not found", coll);
-    return coll;
-}
 
 std::shared_ptr<CappedInsertNotifier> acquireInsertNotifier(OperationContext* opCtx) {
     AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
@@ -62,178 +49,51 @@ std::shared_ptr<CappedInsertNotifier> acquireInsertNotifier(OperationContext* op
     tassert(12101805, "oplog collection not found", oplogColl);
     return oplogColl->getRecordStore()->capped()->getInsertNotifier();
 }
-
-void ensureCursor(OperationContext* opCtx,
-                  RecoveryUnit* ru,
-                  const CollectionPtr& oplogColl,
-                  TailerState& state) {
-    if (!state.cursor) {
-        // Starting with a new cursor.
-        state.cursor = oplogColl->getRecordStore()->getCursor(opCtx, *ru);
-        return;
-    }
-    // The cursor must have started in a saved state. Time to restore.
-    if (!state.cursor->restore(*ru, /*tolerateCappedRepositioning=*/false)) {
-        // Aside from after an initial bootstrap, the cursor should always successfully restore
-        // given it was previously exhausted to EOF.
-        // If it cannot restore, reset the cursor. Restore is always followed by a seekExact, which
-        // maintains correctness that the last digested oplog entry still exists on the oplog.
-        LOGV2_WARNING(12101813,
-                      "Unexpectedly could not restore cursor for tailing oplog size and count. "
-                      "last Scanned Oplog recordId",
-                      "lastBufferedRid"_attr = state.lastBufferedRid);
-        state.cursor.reset();
-        state.cursor = oplogColl->getRecordStore()->getCursor(opCtx, *ru);
-    }
-}
-
-// Resumes scanning for new oplog entries after 'lastBufferedRid'. Verifies `lastBufferedRid` is
-// still present in the oplog to ensure all size count deltas are accounted.
-bool runOneIteration(OperationContext* opCtx,
-                     TailerState& state,
-                     SizeCountCheckpointBuffer& buffer) {
-    auto oplogRead = acquireOplogForRead(opCtx);
-    const CollectionPtr& coll = *oplogRead;
-
-    auto* ru = shard_role_details::getRecoveryUnit(opCtx);
-    ensureCursor(opCtx, ru, coll, state);
-    invariant(state.cursor);
-    tassert(12101812,
-            str::stream() << "Unable to find oplog start point for next size count checkpoint"
-                          << ", lastBufferedRid: " << state.lastBufferedRid.toStringHumanReadable(),
-            state.cursor->seekExact(state.lastBufferedRid));
-
-    const boost::optional<RecordId> lastSeenRid = buffer.scanToNoHolesEOF(*state.cursor);
-
-    const bool madeProgress = lastSeenRid.has_value();
-    if (madeProgress) {
-        state.lastBufferedRid = *lastSeenRid;
-    }
-
-    state.cursor->save();
-    ru->abandonSnapshot();
-    return madeProgress;
-}
-
 }  // namespace
-void SizeCountCheckpointOplogTailer::run(OperationContext* opCtx,
-                                         Timestamp startAfter,
-                                         SizeCountCheckpointBuffer& buffer) {
-    std::shared_ptr<CappedInsertNotifier> notifier;
-    boost::optional<TailerState> state = boost::none;
 
-    while (!state) {
+void bufferNewOplogEntries(OperationContext* opCtx, SizeCountCheckpointBuffer& buffer) {
+    RecoveryUnit* ru(shard_role_details::getRecoveryUnit(opCtx));
+
+    writeConflictRetry(
+        opCtx, *ru, "sizeCountOplogTailerScan", NamespaceString::kRsOplogNamespace, [&] {
+            const AutoGetCollection oplog(opCtx, NamespaceString::kRsOplogNamespace, MODE_IS);
+            tassert(12101803, "oplog collection not found", oplog);
+            const auto cursor = oplog->getRecordStore()->getCursor(opCtx, *ru);
+            buffer.scanToNoHolesEOF(*cursor);
+        });
+
+    ru->abandonSnapshot();
+}
+
+void run(OperationContext* opCtx, SizeCountCheckpointBuffer& buffer) {
+    std::shared_ptr<CappedInsertNotifier> notifier;
+
+    while (true) {
         try {
             if (!notifier) {
                 notifier = acquireInsertNotifier(opCtx);
             }
             opCtx->checkForInterrupt();
-            auto waitVersion = notifier->getVersion();
-            state = _bootstrap(opCtx, startAfter, buffer);
-            if (!state) {
-                // The oplog is still empty.
-                notifier->waitUntil(opCtx, waitVersion, Date_t::now() + Seconds(1));
-            }
-        } catch (const DBException& ex) {
-            if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange) {
-                LOGV2_DEBUG(12917800,
-                            2,
-                            "SizeCountCheckpointOplogTailer interrupted due to replication state",
-                            "error"_attr = ex.toStatus());
-                return;
-            } else {
-                // The `state` is necessarily none here, so nothing to discard.
-                LOGV2_WARNING(12917801,
-                              "Exception handled in SizeCountCheckpointOplogTailer::run()",
-                              "error"_attr = ex.toStatus());
-            }
-        }
-    }
+            const uint64_t waitVersion = notifier->getVersion();
 
-    while (true) {
-        try {
-            opCtx->checkForInterrupt();
-            auto waitVersion = notifier->getVersion();
-            bool madeProgress = runOneIteration(opCtx, *state, buffer);
-            if (!madeProgress) {
-                state->cursor.reset();
-            }
+            bufferNewOplogEntries(opCtx, buffer);
+
+            // Block until the next oplog insert. The version is captured before the scan, so any
+            // insert before or during the scan causes waitUntil() to return immediately.
             notifier->waitUntil(opCtx, waitVersion, Date_t::max());
         } catch (const DBException& ex) {
-            if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange) {
+            if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange ||
+                ErrorCodes::isShutdownError(ex.code())) {
                 LOGV2_DEBUG(12917802,
                             2,
-                            "SizeCountCheckpointOplogTailer interrupted due to replication state",
+                            "SizeCountCheckpointOplogTailer interrupted",
                             "error"_attr = ex.toStatus());
                 return;
-            } else {
-                LOGV2_WARNING(12917803,
-                              "Exception handled in SizeCountCheckpointOplogTailer::run()",
-                              "error"_attr = ex.toStatus());
-                state->cursor.reset();
             }
+            LOGV2_WARNING(12917803,
+                          "Unexpected exception handled in SizeCountCheckpointOplogTailer::run()",
+                          "error"_attr = ex.toStatus());
         }
     }
 }
-
-boost::optional<TailerState> SizeCountCheckpointOplogTailer::_bootstrap(
-    OperationContext* opCtx, Timestamp startAfter, SizeCountCheckpointBuffer& buffer) {
-    auto oplogRead = acquireOplogForRead(opCtx);
-    const CollectionPtr& coll = *oplogRead;
-    auto* ru = shard_role_details::getRecoveryUnit(opCtx);
-    auto cursor = coll->getRecordStore()->getCursor(opCtx, *ru);
-    invariant(cursor);
-
-    RecordId lastBufferedRid;
-    if (startAfter == Timestamp::min()) {
-        // Flags the special case where the tailer should start at the beginning of the oplog.
-        auto first = cursor->next();
-        if (!first) {
-            // Oplog is empty.
-            return boost::none;
-        }
-
-        // Since the tailer is starting at the beginning of the oplog, ensure the first record is
-        // accounted for in the buffer since there's no true oplog entry to start after.
-        buffer.accumulate(*first);
-
-        lastBufferedRid = first->id;
-    } else {
-        // Resume from the last oplog entry included in the most recent size/count checkpoint.
-        //
-        // TODO SERVER-129451: Enforce that this entry is still present in the oplog before
-        // resuming. Until then, we temporarily allow startup to proceed even if it has been
-        // truncated, which can cause size and count to be inaccurate after oplog rollover.
-        lastBufferedRid = makeStartRecordId(startAfter);
-        const auto seekResult =
-            cursor->seek(lastBufferedRid, SeekableRecordCursor::BoundInclusion::kInclude);
-        if (!seekResult) {
-            // No new oplog entries since the previous size count checkpoint.
-            return boost::none;
-        }
-        if (seekResult->id != lastBufferedRid) {
-            LOGV2_WARNING(12880600,
-                          "Expected already-processed oplog entry at timestamp to exist, "
-                          "seeking to next available entry",
-                          "startAfter"_attr = startAfter,
-                          "expectedRid"_attr = lastBufferedRid,
-                          "foundRid"_attr = seekResult->id);
-        }
-        lastBufferedRid = seekResult->id;
-    }
-
-    cursor->save();
-    ru->abandonSnapshot();
-
-    return TailerState{.cursor = std::move(cursor), .lastBufferedRid = std::move(lastBufferedRid)};
-}
-
-bool SizeCountCheckpointOplogTailer::runOneIteration_ForTest(OperationContext* opCtx,
-                                                             boost::optional<TailerState>& state,
-                                                             SizeCountCheckpointBuffer& buffer) {
-    if (!state) {
-        return false;
-    }
-    return runOneIteration(opCtx, *state, buffer);
-}
-}  // namespace mongo::replicated_fast_count
+}  // namespace mongo::replicated_fast_count::oplog_tailer

@@ -44,7 +44,7 @@ using test_helpers::NsAndUUID;
 using test_helpers::OplogCursorMock;
 
 TEST(SizeCountCheckpointBufferTest, EmptyBufferStartsWithoutWork) {
-    SizeCountCheckpointBuffer buffer(UUID::gen());
+    SizeCountCheckpointBuffer buffer(UUID::gen(), boost::none);
 
     EXPECT_FALSE(buffer.hasInFlightWork());
     EXPECT_FALSE(buffer.checkoutForFlush().has_value());
@@ -55,12 +55,11 @@ TEST(SizeCountCheckpointBufferTest, CheckoutGetsScannedDeltas) {
     const NsAndUUID coll{.nss = NamespaceString::createNamespaceString_forTest("collA"),
                          .uuid = UUID::gen()};
 
-    SizeCountCheckpointBuffer buffer(oplogUuid);
+    SizeCountCheckpointBuffer buffer(oplogUuid, boost::none);
     OplogCursorMock cursor(
         {makeOplogEntry(Timestamp(3, 3), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/25)});
 
-    const boost::optional<RecordId> rid = buffer.scanToNoHolesEOF(cursor);
-    ASSERT_TRUE(rid.has_value());
+    buffer.scanToNoHolesEOF(cursor);
     EXPECT_FALSE(buffer.hasInFlightWork());
 
     const boost::optional<OplogScanResult> batch = buffer.checkoutForFlush();
@@ -82,19 +81,18 @@ TEST(SizeCountCheckpointBufferTest, MultipleScansAccumulateIntoOneCheckout) {
     const NsAndUUID coll{.nss = NamespaceString::createNamespaceString_forTest("collA"),
                          .uuid = UUID::gen()};
 
-    SizeCountCheckpointBuffer buffer(oplogUuid);
+    SizeCountCheckpointBuffer buffer(oplogUuid, boost::none);
     {
         OplogCursorMock cursor(
             {makeOplogEntry(Timestamp(2, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10)});
-        const boost::optional<RecordId> rid = buffer.scanToNoHolesEOF(cursor);
-        ASSERT_TRUE(rid.has_value());
+        buffer.scanToNoHolesEOF(cursor);
         EXPECT_FALSE(buffer.hasInFlightWork());
     }
     {
         OplogCursorMock cursor(
-            {makeOplogEntry(Timestamp(2, 2), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20)});
-        const boost::optional<RecordId> rid = buffer.scanToNoHolesEOF(cursor);
-        ASSERT_TRUE(rid.has_value());
+            {makeOplogEntry(Timestamp(2, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10),
+             makeOplogEntry(Timestamp(2, 2), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20)});
+        buffer.scanToNoHolesEOF(cursor);
         EXPECT_FALSE(buffer.hasInFlightWork());
     }
 
@@ -115,15 +113,14 @@ TEST(SizeCountCheckpointBufferTest, InFlightBatchIsRetriedUntilAcknowledged) {
     const NsAndUUID coll{.nss = NamespaceString::createNamespaceString_forTest("collA"),
                          .uuid = UUID::gen()};
 
-    SizeCountCheckpointBuffer buffer(oplogUuid);
+    SizeCountCheckpointBuffer buffer(oplogUuid, boost::none);
     OplogCursorMock cursor(
         {makeOplogEntry(Timestamp(6, 6), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/40)});
 
     EXPECT_FALSE(buffer.hasInFlightWork());
 
-    const boost::optional<RecordId> rid = buffer.scanToNoHolesEOF(cursor);
+    buffer.scanToNoHolesEOF(cursor);
     const boost::optional<OplogScanResult> first = buffer.checkoutForFlush();
-    ASSERT_TRUE(first.has_value());
     EXPECT_TRUE(buffer.hasInFlightWork());
 
     const boost::optional<OplogScanResult> retried = buffer.checkoutForFlush();
@@ -141,11 +138,10 @@ TEST(SizeCountCheckpointBufferTest, AcknowledgeFlushSuccessClearsInFlight) {
     const NsAndUUID coll{.nss = NamespaceString::createNamespaceString_forTest("collA"),
                          .uuid = UUID::gen()};
 
-    SizeCountCheckpointBuffer buffer(oplogUuid);
+    SizeCountCheckpointBuffer buffer(oplogUuid, boost::none);
     OplogCursorMock cursor(
         {makeOplogEntry(Timestamp(2, 2), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10)});
-    const boost::optional<RecordId> rid = buffer.scanToNoHolesEOF(cursor);
-    ASSERT_TRUE(rid.has_value());
+    buffer.scanToNoHolesEOF(cursor);
     EXPECT_FALSE(buffer.hasInFlightWork());
 
     ASSERT_TRUE(buffer.checkoutForFlush().has_value());
@@ -163,14 +159,13 @@ TEST(SizeCountCheckpointBufferTest, ScanAfterAcknowledgementIsIndependent) {
     const NsAndUUID coll{.nss = NamespaceString::createNamespaceString_forTest("collA"),
                          .uuid = UUID::gen()};
 
-    SizeCountCheckpointBuffer buffer(oplogUuid);
+    SizeCountCheckpointBuffer buffer(oplogUuid, boost::none);
 
     // First scan.
     {
         OplogCursorMock cursor(
             {makeOplogEntry(Timestamp(2, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10)});
-        const boost::optional<RecordId> rid = buffer.scanToNoHolesEOF(cursor);
-        ASSERT_TRUE(rid.has_value());
+        buffer.scanToNoHolesEOF(cursor);
         const boost::optional<OplogScanResult> first = buffer.checkoutForFlush();
         ASSERT_TRUE(first.has_value());
         EXPECT_EQ(*first->lastTimestamp, Timestamp(2, 1));
@@ -186,9 +181,9 @@ TEST(SizeCountCheckpointBufferTest, ScanAfterAcknowledgementIsIndependent) {
     // Second scan.
     {
         OplogCursorMock cursor(
-            {makeOplogEntry(Timestamp(3, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20)});
-        const boost::optional<RecordId> rid = buffer.scanToNoHolesEOF(cursor);
-        ASSERT_TRUE(rid.has_value());
+            {makeOplogEntry(Timestamp(2, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10),
+             makeOplogEntry(Timestamp(3, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20)});
+        buffer.scanToNoHolesEOF(cursor);
         const boost::optional<OplogScanResult> second = buffer.checkoutForFlush();
         ASSERT_TRUE(second.has_value());
         ASSERT_TRUE(second->lastTimestamp.has_value());
@@ -207,13 +202,12 @@ TEST(SizeCountCheckpointBufferTest, InternalOnlyScanProducesNoFlushableWork) {
                                      NamespaceString::kReplicatedFastCountStore),
                                  .uuid = UUID::gen()};
 
-    SizeCountCheckpointBuffer buffer(oplogUuid);
+    SizeCountCheckpointBuffer buffer(oplogUuid, boost::none);
     // The record is physically scanned (rid returned), but it targets an internal fast-count
     // collection, so it advances no checkpoint and its oplog self-size bytes are dropped.
     OplogCursorMock cursor({makeOplogEntry(
         Timestamp(2, 1), internalColl, repl::OpTypeEnum::kInsert, /*sizeDelta=*/9)});
-    const boost::optional<RecordId> rid = buffer.scanToNoHolesEOF(cursor);
-    ASSERT_TRUE(rid.has_value());
+    buffer.scanToNoHolesEOF(cursor);
 
     EXPECT_FALSE(buffer.checkoutForFlush().has_value());
     EXPECT_FALSE(buffer.hasInFlightWork());
@@ -224,18 +218,17 @@ TEST(SizeCountCheckpointBufferTest, DropThenImportAcrossScansYieldsDroppedAndRec
     const NsAndUUID coll{.nss = NamespaceString::createNamespaceString_forTest("test", "collA"),
                          .uuid = UUID::gen()};
 
-    SizeCountCheckpointBuffer buffer(oplogUuid);
+    SizeCountCheckpointBuffer buffer(oplogUuid, boost::none);
     {
         OplogCursorMock cursor({test_helpers::makeDropOplogEntry(Timestamp(2, 1), coll)});
-        const boost::optional<RecordId> rid = buffer.scanToNoHolesEOF(cursor);
-        ASSERT_TRUE(rid.has_value());
+        buffer.scanToNoHolesEOF(cursor);
         EXPECT_FALSE(buffer.hasInFlightWork());
     }
     {
-        OplogCursorMock cursor({test_helpers::makeImportCollectionOplogEntry(
-            Timestamp(2, 2), coll, /*numRecords=*/3, /*dataSize=*/90)});
-        const boost::optional<RecordId> rid = buffer.scanToNoHolesEOF(cursor);
-        ASSERT_TRUE(rid.has_value());
+        OplogCursorMock cursor({test_helpers::makeDropOplogEntry(Timestamp(2, 1), coll),
+                                test_helpers::makeImportCollectionOplogEntry(
+                                    Timestamp(2, 2), coll, /*numRecords=*/3, /*dataSize=*/90)});
+        buffer.scanToNoHolesEOF(cursor);
         EXPECT_FALSE(buffer.hasInFlightWork());
     }
 
@@ -254,19 +247,11 @@ TEST(SizeCountCheckpointBufferTest, CreateThenDropWithinScanCancelsOut) {
     const NsAndUUID coll{.nss = NamespaceString::createNamespaceString_forTest("test", "collA"),
                          .uuid = UUID::gen()};
 
-    SizeCountCheckpointBuffer buffer(oplogUuid);
-    {
-        OplogCursorMock cursor({test_helpers::makeCreateOplogEntry(Timestamp(2, 1), coll)});
-        const boost::optional<RecordId> rid = buffer.scanToNoHolesEOF(cursor);
-        ASSERT_TRUE(rid.has_value());
-        EXPECT_FALSE(buffer.hasInFlightWork());
-    }
-    {
-        OplogCursorMock cursor({test_helpers::makeDropOplogEntry(Timestamp(2, 2), coll)});
-        const boost::optional<RecordId> rid = buffer.scanToNoHolesEOF(cursor);
-        ASSERT_TRUE(rid.has_value());
-        EXPECT_FALSE(buffer.hasInFlightWork());
-    }
+    SizeCountCheckpointBuffer buffer(oplogUuid, boost::none);
+    OplogCursorMock cursor({test_helpers::makeCreateOplogEntry(Timestamp(2, 1), coll),
+                            test_helpers::makeDropOplogEntry(Timestamp(2, 2), coll)});
+    buffer.scanToNoHolesEOF(cursor);
+    EXPECT_FALSE(buffer.hasInFlightWork());
 
     const boost::optional<OplogScanResult> batch = buffer.checkoutForFlush();
     // The drop is a real (non-internal) entry, so the interval has work and a batch is cut.
@@ -275,6 +260,47 @@ TEST(SizeCountCheckpointBufferTest, CreateThenDropWithinScanCancelsOut) {
     EXPECT_FALSE(batch->deltas.contains(coll.uuid));
     ASSERT_TRUE(batch->lastTimestamp.has_value());
     EXPECT_EQ(*batch->lastTimestamp, Timestamp(2, 2));
+}
+
+TEST(SizeCountCheckpointBufferTest, PartialScanThenWriteConflictDoesNotDoubleCount) {
+    const UUID oplogUuid = UUID::gen();
+    const NsAndUUID coll{.nss = NamespaceString::createNamespaceString_forTest("collA"),
+                         .uuid = UUID::gen()};
+
+    const std::list<repl::OplogEntry> entries{
+        makeOplogEntry(Timestamp(2, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10),
+        makeOplogEntry(Timestamp(2, 2), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20),
+        makeOplogEntry(Timestamp(2, 3), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/30),
+    };
+
+    CollectionSizeCount expectedOplogSelfSize;
+    for (const auto& entry : entries) {
+        expectedOplogSelfSize.size += entry.getEntry().toBSON().objsize();
+        expectedOplogSelfSize.count += 1;
+    }
+
+    SizeCountCheckpointBuffer buffer(oplogUuid, boost::none);
+
+    // The first scan fails after consuming one entry.
+    {
+        OplogCursorMock cursor(entries, /*throwWriteConflictOnNthCall=*/2);
+        ASSERT_THROWS_CODE(buffer.scanToNoHolesEOF(cursor), DBException, ErrorCodes::WriteConflict);
+    }
+
+    // The second scan reads the rest of the entries and succeeds.
+    {
+        OplogCursorMock cursor(entries);
+        buffer.scanToNoHolesEOF(cursor);
+    }
+
+    const boost::optional<OplogScanResult> checkedOutBuffer = buffer.checkoutForFlush();
+    const OplogScanResult expectedCheckedOutBuffer{
+        .deltas = SizeCountDeltas{{coll.uuid,
+                                   SizeCountDelta{.sizeCount =
+                                                      CollectionSizeCount{.size = 60, .count = 3}}},
+                                  {oplogUuid, SizeCountDelta{.sizeCount = expectedOplogSelfSize}}},
+        .lastTimestamp = Timestamp(2, 3)};
+    EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
 }
 }  // namespace
 }  // namespace mongo::replicated_fast_count

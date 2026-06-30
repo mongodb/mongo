@@ -47,6 +47,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_role.h"
+#include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
@@ -276,7 +277,17 @@ OplogCursorMock::OplogCursorMock(std::list<repl::OplogEntry> entries) {
     }
 }
 
+OplogCursorMock::OplogCursorMock(std::list<repl::OplogEntry> entries,
+                                 int throwWriteConflictOnNthCall)
+    : OplogCursorMock(std::move(entries)) {
+    _throwOnNthCall = throwWriteConflictOnNthCall;
+}
+
 boost::optional<Record> OplogCursorMock::next() {
+    if (++_nextCallCount == _throwOnNthCall) {
+        throwWriteConflictException("OplogCursorMock injected WriteConflictException");
+    }
+
     if (_records.empty()) {
         return boost::none;
     }

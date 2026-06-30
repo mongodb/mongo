@@ -32,6 +32,7 @@
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/logv2/log.h"
@@ -46,18 +47,26 @@ MONGO_FAIL_POINT_DEFINE(hangAfterSizeCountCheckpointCoordinatorStartupPublishesT
 MONGO_FAIL_POINT_DEFINE(hangBeforeSizeCountCheckpointCoordinatorShutdownJoins);
 
 SizeCountCheckpointCoordinator::SizeCountCheckpointCoordinator(
-    SizeCountStore& sizeCountStore, SizeCountTimestampStore& timestampStore, UUID oplogUuid)
-    : _oplogTailer(std::make_unique<SizeCountCheckpointOplogTailer>()),
-      _flusher(std::make_unique<SizeCountCheckpointFlusher>(&sizeCountStore, &timestampStore)),
-      _buffer(std::make_unique<SizeCountCheckpointBuffer>(oplogUuid)),
+    SizeCountStore& sizeCountStore,
+    SizeCountTimestampStore& timestampStore,
+    UUID oplogUuid,
+    Timestamp startCheckpointingAfterTS)
+    : _flusher(std::make_unique<SizeCountCheckpointFlusher>(&sizeCountStore, &timestampStore)),
+      _buffer([&]() {
+          const boost::optional<RecordId> lastBufferedRid =
+              startCheckpointingAfterTS == Timestamp::min()
+              ? boost::optional<RecordId>{}
+              : massertStatusOK(
+                    record_id_helpers::keyForOptime(startCheckpointingAfterTS, KeyFormat::Long));
+          return std::make_unique<SizeCountCheckpointBuffer>(oplogUuid, lastBufferedRid);
+      }()),
       _sizeCountStore(sizeCountStore),
       _timestampStore(timestampStore) {}
 
 SizeCountCheckpointCoordinator::~SizeCountCheckpointCoordinator() {
     shutdown();
 }
-void SizeCountCheckpointCoordinator::startup(ServiceContext* service,
-                                             Timestamp startCheckpointingAfterTS) {
+void SizeCountCheckpointCoordinator::startup(ServiceContext* service) {
     {
         std::lock_guard lk(_mutex);
         if (_started || _shutdownRequested) {
@@ -65,9 +74,7 @@ void SizeCountCheckpointCoordinator::startup(ServiceContext* service,
         }
         _started = true;
 
-        _tailerThread = stdx::thread([this, startCheckpointingAfterTS, service] {
-            _runTailerThread(service, startCheckpointingAfterTS);
-        });
+        _tailerThread = stdx::thread([this, service] { _runTailerThread(service); });
         _flushThread = stdx::thread([this, service] { _runFlushThread(service); });
     }
 
@@ -119,22 +126,8 @@ void SizeCountCheckpointCoordinator::requestFlush() {
 }
 
 void SizeCountCheckpointCoordinator::flushSync_ForTest(OperationContext* opCtx) {
-    if (!_tailerState_ForTest) {
-        // The timestamp store requires the caller to hold the global lock for the read; see
-        // SizeCountTimestampStore.
-        const auto startAfterTS = [&] {
-            Lock::GlobalLock readLock(opCtx, MODE_IS);
-            return _timestampStore.read(opCtx).value_or(Timestamp{});
-        }();
-        _tailerState_ForTest = _oplogTailer->bootstrap_ForTest(opCtx, startAfterTS, *_buffer);
-    }
-    _oplogTailer->runOneIteration_ForTest(opCtx, _tailerState_ForTest, *_buffer);
+    oplog_tailer::bufferNewOplogEntries(opCtx, *_buffer);
     _flusher->runOneFlushCycle_ForTest(opCtx, *_buffer);
-    // Close the WT cursor so it doesn't outlive the caller's opCtx. The next call recreates it
-    // via ensureCursor(), which seeks to `lastBufferedRid` to resume where it left off.
-    if (_tailerState_ForTest) {
-        _tailerState_ForTest->cursor.reset();
-    }
 }
 
 bool SizeCountCheckpointCoordinator::isFlushRequested_ForTest() const {
@@ -146,8 +139,7 @@ SizeCountCheckpointBuffer* SizeCountCheckpointCoordinator::getBuffer_ForTest() c
     return _buffer.get();
 }
 
-void SizeCountCheckpointCoordinator::_runTailerThread(ServiceContext* service,
-                                                      Timestamp startCheckpointingAfterTS) {
+void SizeCountCheckpointCoordinator::_runTailerThread(ServiceContext* service) {
     ThreadClient tc("SizeCountCheckpointOplogTailer", service->getService());
     AuthorizationSession::get(cc())->grantInternalAuthorization();
 
@@ -166,7 +158,7 @@ void SizeCountCheckpointCoordinator::_runTailerThread(ServiceContext* service,
         opCtxHolder->opCtx(), AdmissionContext::Priority::kExempt);
 
     // Run until no longer a primary.
-    _oplogTailer->run(opCtxHolder->opCtx(), startCheckpointingAfterTS, *_buffer);
+    oplog_tailer::run(opCtxHolder->opCtx(), *_buffer);
 }
 
 void SizeCountCheckpointCoordinator::_runFlushThread(ServiceContext* service) {

@@ -100,6 +100,8 @@ struct SizeCountDelta {
     CollectionSizeCount sizeCount{0, 0};
     DDLState state{DDLState::kNone};
 
+    bool operator==(const SizeCountDelta&) const = default;
+
     std::string toString() const {
         auto stateStr = [&] {
             switch (state) {
