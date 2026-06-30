@@ -1614,11 +1614,15 @@ describe("Authoritative collection metadata vs DDLs", function () {
             const ns = `${db.getName()}.coll`;
 
             assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
-            // TODO SERVER-128550: Uncomment these lines such that the test exercises a more interesting layout once chunk migration is authoritative.
-            // assert.commandWorked(db.adminCommand({split: ns, middle: {x: 0}}));
-            // assert.commandWorked(
-            //     db.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
-            // );
+            assert.commandWorked(db.adminCommand({split: ns, middle: {x: 0}}));
+            assert.commandWorked(
+                db.adminCommand({
+                    moveChunk: ns,
+                    find: {x: 0},
+                    to: st.shard1.shardName,
+                    _waitForDelete: true,
+                }),
+            );
             assert.commandWorked(
                 db.coll.insert([
                     {x: -1, y: -1},

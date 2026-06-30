@@ -510,10 +510,9 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                 const bool mustClearMetadata = _metadata.getAuthoritativeMetadataAccessLevel() ==
                     ReshardingAuthoritativeMetadataAccessLevelEnum::kNone;
 
-                // Clear filtering metadata for the temp resharding namespace;
-                // We force a refresh to make sure that the placement information is updated
-                // in cache after abort decision before the donor state document is deleted.
-                if (mustClearMetadata) {
+                // Clear filtering metadata for the temp resharding namespace, since the collection
+                // will no longer exist.
+                {
                     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(
                         opCtx.get(), _metadata.getTempReshardingNss());
                     scopedCsr->clearCollectionMetadata(opCtx.get());
