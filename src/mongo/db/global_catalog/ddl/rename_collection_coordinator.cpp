@@ -308,7 +308,7 @@ void persistPlacementChangeForCollectionBeingRenamed(
             nss,
             uuidUponRename,
             timeAtNewPlacementForTargetCollection,
-            std::move(shardRefs),
+            shardRefs,
             stmtId);
 
         return SemiFuture<void>::makeReady();

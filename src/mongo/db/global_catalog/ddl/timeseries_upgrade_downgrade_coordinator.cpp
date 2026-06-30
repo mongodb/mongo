@@ -473,12 +473,7 @@ ExecutorFuture<void> TimeseriesUpgradeDowngradeCoordinator::_runImpl(
                     sharding_ddl_util::upsertPlacementHistoryDocInTransaction(
                         txnClient, oldTrackedNss, collUuid, newTimestamp, {}, stmtId++);
                     sharding_ddl_util::upsertPlacementHistoryDocInTransaction(
-                        txnClient,
-                        newTrackedNss,
-                        collUuid,
-                        newTimestamp,
-                        std::move(currentShards),
-                        stmtId++);
+                        txnClient, newTrackedNss, collUuid, newTimestamp, currentShards, stmtId++);
 
                     return SemiFuture<void>::makeReady();
                 };

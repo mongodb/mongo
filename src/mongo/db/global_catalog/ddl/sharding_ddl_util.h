@@ -559,7 +559,7 @@ MONGO_MOD_PRIVATE void upsertPlacementHistoryDocInTransaction(
     const NamespaceString& nss,
     const boost::optional<UUID>& uuid,
     const Timestamp& timestamp,
-    std::vector<ShardRef>&& shards,
+    const std::vector<ShardRef>& shards,
     int stmtId);
 
 /**

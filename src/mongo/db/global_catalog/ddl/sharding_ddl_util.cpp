@@ -1249,12 +1249,12 @@ void upsertPlacementHistoryDocInTransaction(const txn_api::TransactionClient& tx
                                             const NamespaceString& nss,
                                             const boost::optional<UUID>& uuid,
                                             const Timestamp& timestamp,
-                                            std::vector<ShardRef>&& shards,
+                                            const std::vector<ShardRef>& shards,
                                             int stmtId) {
     write_ops::UpdateCommandRequest upsertPlacementChangeRequest(
         NamespaceString::kConfigsvrPlacementHistoryNamespace);
     upsertPlacementChangeRequest.setUpdates({[&] {
-        NamespacePlacementType placementInfo(nss, timestamp, std::move(shards));
+        NamespacePlacementType placementInfo(nss, timestamp, shards);
         placementInfo.setUuid(uuid);
 
         write_ops::UpdateOpEntry entry;
