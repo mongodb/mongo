@@ -64,15 +64,15 @@ resmoke_suite_test(
     name = "concurrency_replication_causal_consistency",
     config = "//buildscripts/resmokeconfig:suites/concurrency_replication_causal_consistency.yml",
     data = CONCURRENCY_DATA,
-    shard_count = 30,
+    shard_count = 8,
     tags = [
         "ci-release-critical",
         "concurrency",
         "cpu:2",
-        "incompatible_with_bazel_remote_test",  # Some tests require more memory than any remote executor has.
         "large",
         "non_live_record",
         "repl",
+        "resources:memory:14336",
     ],
     target_compatible_with = select({
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
@@ -90,15 +90,15 @@ resmoke_suite_test(
     name = "concurrency_replication_maintenance",
     config = "//buildscripts/resmokeconfig:suites/concurrency_replication_maintenance.yml",
     data = CONCURRENCY_DATA,
-    shard_count = 30,
+    shard_count = 8,
     tags = [
         "ci-release-critical",
         "concurrency",
         "cpu:2",
-        "incompatible_with_bazel_remote_test",  # Some tests require more memory than any remote executor has.
         "large",
         "non_live_record",
         "repl",
+        "resources:memory:14336",
     ],
     target_compatible_with = select({
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
@@ -156,9 +156,10 @@ resmoke_suite_test(
     shard_count = 40,
     tags = [
         "ci-release-critical",
-        "incompatible_with_bazel_remote_test",  # Some tests require more memory than any remote executor has.
+        "incompatible_with_bazel_remote_test",  # Requires KMIP server infrastructure not available in remote executors.
         "large",
         "replica_sets",
+        "resources:memory:14336",
         "san",
     ],
     target_compatible_with = select({

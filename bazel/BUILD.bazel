@@ -1,5 +1,6 @@
 load("@poetry//:dependencies.bzl", "dependency")
 load("@rules_python//python:defs.bzl", "py_binary")
+load(":test_exec_properties_test.bzl", "test_exec_properties_test_suite")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -46,3 +47,6 @@ filegroup(
     name = "test_wrapper",
     srcs = ["test_wrapper.sh"],
 )
+
+# TODO(SERVER-129799): add these tests to CI.
+test_exec_properties_test_suite(name = "test_exec_properties_tests")

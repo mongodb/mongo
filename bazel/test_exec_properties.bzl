@@ -33,7 +33,7 @@ POOLS_ARM = {
         "cpus": 2,
         "memory_gb": 7,
     },
-    "high_memory_2core_arm64": {
+    "high_mem_2core_arm64": {
         "cpus": 2,
         "memory_gb": 14,
     },
@@ -47,30 +47,44 @@ def _parse_cpu_tag(tags):
             return int(value)
     return None
 
-def _choose_pool(pools, cpus):
+def _parse_memory_tag(tags):
+    for tag in tags:
+        # Bazel documents 'resources:memory:<megabytes>' as an integer number of megabytes.
+        # Accepts the full form 'resources:memory:7168' or the short form 'memory:7168'.
+        resource, _, value = tag.removeprefix("resources:").rpartition(":")
+        if resource == "memory" and value.isdigit():
+            return int(value)
+    return None
+
+def _choose_pool(pools, cpus, memory_mb):
     for pool, resources in pools.items():
-        if cpus <= resources["cpus"]:
+        if cpus <= resources["cpus"] and memory_mb <= resources["memory_gb"] * 1024:
             return pool
-    fail("Requested {cpus} CPUs by tag 'cpu:{cpus}', but there is no remote execution pool that can satisfy this.".format(cpus = cpus))
+    fail("No remote execution pool can satisfy the requested resources: {cpus} CPUs, {memory_mb} MB memory.".format(cpus = cpus, memory_mb = memory_mb))
 
 def test_exec_properties(tags):
-    """Returns execution properties for selecting the appropriate remote execution pool based on CPU requirements.
+    """Returns execution properties for selecting the appropriate remote execution pool based on CPU and memory requirements.
 
     Args:
-        tags: A list of tags that may include CPU resource requirements (e.g., 'cpu:2').
+        tags: A list of tags that may include CPU and/or memory resource requirements
+              (e.g., 'cpu:2', 'resources:memory:7168').
 
     Returns:
         A select() statement that maps platform configurations to execution properties,
-        or an empty dict if no CPU tags are found.
+        or an empty dict if no resource tags are found.
 
     Tags themselves are not modified.
     """
     cpus = _parse_cpu_tag(tags)
-    if not cpus:
+    memory_mb = _parse_memory_tag(tags)
+    if not cpus and not memory_mb:
         return {}
 
-    pool_arm = _choose_pool(POOLS_ARM, cpus)
-    pool_x86 = _choose_pool(POOLS_X86, cpus)
+    cpus = cpus or 1
+    memory_mb = memory_mb or 0
+
+    pool_arm = _choose_pool(POOLS_ARM, cpus, memory_mb)
+    pool_x86 = _choose_pool(POOLS_X86, cpus, memory_mb)
 
     return select({
         "@platforms//cpu:x86_64": {
@@ -81,3 +95,10 @@ def test_exec_properties(tags):
         },
         "//conditions:default": {},
     })
+
+# Exported for testing only — not part of the public API.
+testonly_helpers = struct(
+    parse_cpu_tag = _parse_cpu_tag,
+    parse_memory_tag = _parse_memory_tag,
+    choose_pool = _choose_pool,
+)
