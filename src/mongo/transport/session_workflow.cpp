@@ -909,12 +909,12 @@ Future<DbResponse> SessionWorkflow::Impl::_dispatchWork() {
 
     _work->decompressRequest();
 
+    globalNetworkCounter().hitLogicalIn(NetworkCounter::ConnectionType::kIngress,
+                                        _work->in().size());
+
     if (const auto admitted = _rateLimit(); !admitted) {
         return makeDbResponseErrorForRateLimiting(_work->in());
     }
-
-    globalNetworkCounter().hitLogicalIn(NetworkCounter::ConnectionType::kIngress,
-                                        _work->in().size());
 
     // Pass sourced Message to handler to generate response.
     _work->initOperation();

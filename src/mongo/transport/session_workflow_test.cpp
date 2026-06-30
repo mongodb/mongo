@@ -1093,6 +1093,46 @@ TEST_F(IngressRequestRateLimiterTest, QueueDepthExceededRejectionHasExpectedErro
     ASSERT_EQ(stats.addedToQueue, 1);
 }
 
+// Verifies that logical input bytes are counted even when the rate limiter immediately rejects a
+// request, i.e. hitLogicalIn runs before the admission decision.
+TEST_F(IngressRequestRateLimiterTest, RejectedRequestCountsLogicalBytesIn) {
+    enableRateOverrideBehaviorWithSpecifiedBurstSize(1.0);
+
+    startSession();
+
+    // Iter 1: consume the burst with a fire-and-forget to avoid sinking a response.
+    expect<Event::sessionSourceMessage>(setMoreToCome(makeOpMsg()));
+    runSepHandleRequest([](OperationContext*, const Message&) { return makeResponse(Message{}); });
+
+    // Snapshot after iter 1 so the diff captures only the rejected iter 2 request.
+    auto before = test::NetworkConnectionStats::get(NetworkCounter::ConnectionType::kIngress);
+
+    // Iter 2: burst exhausted; rate limiter rejects immediately without dispatching to SEP.
+    auto rejectedMsg = makeOpMsg();
+    expect<Event::sessionSourceMessage>(rejectedMsg);
+    BSONObj body;
+    expect<Event::sessionSinkMessage>([&](const Message& m) {
+        body = OpMsg::parse(m).body.getOwned();
+        return Status::OK();
+    });
+
+    expect<Event::sessionSourceMessage>(kClosedSessionError);
+    expect<Event::sepEndSession>();
+    joinSessions();
+
+    // Verify the sunk response was a rate-limit rejection so the byte-count assertion below is
+    // actually exercising the rejected-request path.
+    ASSERT_EQ(getStatusFromCommandResult(body).code(), ErrorCodes::IngressRequestRateLimitExceeded);
+    ASSERT_TRUE(hasErrorLabels(body,
+                               {ErrorLabel::kSystemOverloadedError,
+                                ErrorLabel::kRetryableError,
+                                ErrorLabel::kNoWritesPerformed}));
+
+    auto diff = test::NetworkConnectionStats::get(NetworkCounter::ConnectionType::kIngress)
+                    .getDifference(before);
+    ASSERT_EQ(diff.logicalBytesIn, rejectedMsg.size());
+}
+
 class RateLimitRejectionResponseTest : public unittest::Test {
 protected:
     /** Build a real OP_MSG input with a non-trivial body and the given requestId. */
