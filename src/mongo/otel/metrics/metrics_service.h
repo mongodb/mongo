@@ -434,7 +434,6 @@ private:
      * serverStatus metric trees based on the specified dotted path and role. Currently, the
      * registration is not thread-safe at runtime as the metric trees are not guarded by a mutex.
      * Therefore, `serverStatusOptions` must not be specified when creating a metric at runtime.
-     * TODO (SERVER-123241): Make this thread-safe.
      */
     void _registerServerStatusTree(WithLock,
                                    Metric* metricPtr,
