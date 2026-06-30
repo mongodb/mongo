@@ -54,7 +54,6 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/rss/replicated_storage_service.h"
-#include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/scoped_read_concern.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -738,20 +737,6 @@ void checkCollectionMetadataInShardCatalog(
 
         if (inMemoryShardCatalogMetadata) {
             if (scopedCsr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite)) {
-                return;
-            }
-
-            // TODO SERVER-127550: This should not be needed once migrations are adapted to be
-            // authoritative.
-            if (auto mdm = MigrationDestinationManager::get(opCtx); mdm && mdm->isActiveOn(nss) &&
-                feature_flags::gAuthoritativeShardsDDL.isEnabled(
-                    VersionContext::getDecoration(opCtx),
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                // A migration is being received, this might race with the recovery that happens at
-                // the beginning and is potentially wrong if the shard is authoritative for the
-                // collection and its commit, which is when it becomes valid due to the forced
-                // legacy refresh. As such we temporarily accept this inconsistency since routers
-                // shouldn't be targeting this shard.
                 return;
             }
 
