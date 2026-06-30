@@ -71,6 +71,7 @@
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
+#include <functional>
 #include <iterator>
 #include <memory>
 #include <set>
@@ -562,13 +563,17 @@ void verifyIndexSpecsMatch(InputIterator1 sourceIndexSpecsBegin,
     }
 }
 
+using CollSizeEstimator =
+    std::function<boost::optional<long long>(OperationContext*, const NamespaceString&)>;
+
 ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     OperationContext* opCtx,
     const ConfigsvrReshardCollection& request,
     const CollectionType& collEntry,
     const ShardId& dbPrimary,
     const NamespaceString& nss,
-    const bool& setProvenance);
+    const bool& setProvenance,
+    CollSizeEstimator collSizeEstimator = nullptr);
 
 inline Status validateReshardBlockingWritesO2FieldType(const std::string& value) {
     if (value != kReshardFinalOpLogType) {

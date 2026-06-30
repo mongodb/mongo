@@ -49,6 +49,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_find_and_modify_image_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
@@ -72,6 +73,7 @@
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
+#include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/stdx/unordered_set.h"
@@ -98,6 +100,40 @@ namespace resharding {
 using namespace std::literals::string_view_literals;
 
 namespace {
+
+// Runs a $collStats aggregation to get the total estimated collection size across all shards that
+// own chunks. Returns boost::none if the aggregation fails.
+boost::optional<long long> estimateCollectionSizeBytes(OperationContext* opCtx,
+                                                       const NamespaceString& nss) {
+    std::vector<BSONObj> pipeline = {
+        BSON("$collStats" << BSON("storageStats" << BSONObj())),
+        BSON("$group" << BSON("_id" << BSONNULL << "totalSize"
+                                    << BSON("$sum" << "$storageStats.size")))};
+    AggregateCommandRequest aggRequest(nss, pipeline);
+
+    BSONObjBuilder resultBuilder;
+    try {
+        uassertStatusOK(ClusterAggregate::runAggregate(opCtx,
+                                                       ClusterAggregate::Namespaces{nss, nss},
+                                                       aggRequest,
+                                                       PrivilegeVector(),
+                                                       boost::none,
+                                                       &resultBuilder));
+        BSONObj result = resultBuilder.obj();
+        auto resultArr = result["cursor"]["firstBatch"].Array();
+        if (resultArr.empty()) {
+            return boost::none;
+        }
+        return resultArr[0]["totalSize"].safeNumberLong();
+    } catch (const DBException& ex) {
+        LOGV2_WARNING(12752703,
+                      "Failed to estimate collection size for resharding validation",
+                      "nss"_attr = nss,
+                      "error"_attr = ex.toStatus());
+        return boost::none;
+    }
+}
+
 /**
  * Given a constant rate of time per unit of work:
  *    totalTime / totalWork == elapsedTime / elapsedWork
@@ -613,8 +649,8 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     const CollectionType& collEntry,
     const ShardId& dbPrimary,
     const NamespaceString& nss,
-    const bool& setProvenance) {
-
+    const bool& setProvenance,
+    CollSizeEstimator collSizeEstimator) {
     auto coordinatorDoc = ReshardingCoordinatorDocument(
         std::move(CoordinatorStateEnum::kUnused), {} /* donorShards */, {} /* recipientShards */);
 
@@ -681,6 +717,31 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
             VersionContext::getDecoration(opCtx), fcv) &&
         resharding::gReshardingDocumentVerification.load()) {
         performVerification = true;
+    }
+    if (performVerification.value_or(false)) {
+        const auto threshold =
+            resharding::gReshardingDocumentValidationMaxCollectionSizeBytes.load();
+        if (threshold < std::numeric_limits<long long>::max()) {
+            const auto collSizeBytes = collSizeEstimator ? collSizeEstimator(opCtx, nss)
+                                                         : estimateCollectionSizeBytes(opCtx, nss);
+            if (!collSizeBytes) {
+                LOGV2_WARNING(
+                    12752701,
+                    "Skipping resharding validation because collection size could not be estimated",
+                    "nss"_attr = nss,
+                    "reshardingUUID"_attr = coordinatorDoc.getReshardingUUID());
+                performVerification = false;
+            } else if (*collSizeBytes > threshold) {
+                LOGV2_WARNING(12752702,
+                              "Skipping resharding validation because estimated collection "
+                              "size exceeds the configured threshold",
+                              "nss"_attr = nss,
+                              "reshardingUUID"_attr = coordinatorDoc.getReshardingUUID(),
+                              "collectionSizeBytes"_attr = *collSizeBytes,
+                              "threshold"_attr = threshold);
+                performVerification = false;
+            }
+        }
     }
     coordinatorDoc.setPerformVerification(performVerification);
 
