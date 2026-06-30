@@ -1373,9 +1373,6 @@ protected:
     DocumentComparator _documentComparator;
     ValueComparator _valueComparator;
 
-    // A map from namespace to the resolved namespace, in case any views are involved.
-    ResolvedNamespaceMap _resolvedNamespaces;
-
 private:
     std::unique_ptr<ExpressionCounters> _expressionCounters;
     bool _gotTemporarilyUnavailableException = false;
