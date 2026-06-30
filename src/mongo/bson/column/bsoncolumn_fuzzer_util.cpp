@@ -382,15 +382,8 @@ bool createFuzzedElement(const char*& ptr,
             return true;
         }
         case BSONType::codeWScope: {
-            if (depth >= kRecursionLimit)
-                return false;
-            if (!generateBuf(ptr, end, &buf[0], len))
-                return false;
-            BSONObj obj;
-            if (!createFuzzedObj(ptr, end, elementMemory, obj, depth))
-                return false;
-            result = createCodeWScope(std::string_view(buf, len), obj, elementMemory);
-            return true;
+            // CodeWScope is not a valid BSONColumn element type; skip this input.
+            return false;
         }
         case BSONType::dbRef: {
             if (!generateBuf(ptr, end, &buf[0], len))
