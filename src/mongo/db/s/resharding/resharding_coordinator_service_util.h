@@ -226,6 +226,13 @@ boost::optional<UUID> tryRetrieveReshardingUUID(OperationContext* opCtx, const N
 UUID retrieveReshardingUUID(OperationContext* opCtx, const NamespaceString& ns);
 
 /**
+ * Translates a user-facing timeseries namespace to its bucket namespace, since resharding metadata
+ * is keyed by the bucket namespace. Returns the namespace unchanged if it is not a tracked
+ * timeseries collection.
+ */
+NamespaceString resolveReshardingSourceNss(OperationContext* opCtx, const NamespaceString& ns);
+
+/**
  * Returns the deadline the coordinator uses to bound how long it waits for the donor and recipient
  * deltas during pre-commit verification before giving up and proceeding to commit.
  * 'reachedStrictConsistencyTime' is the time all recipients reached strict consistency; the

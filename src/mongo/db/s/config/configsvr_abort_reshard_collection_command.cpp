@@ -132,11 +132,12 @@ public:
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
 
-            const auto reshardingUUID = resharding::retrieveReshardingUUID(opCtx, ns());
+            const auto sourceNss = resharding::resolveReshardingSourceNss(opCtx, ns());
+            const auto reshardingUUID = resharding::retrieveReshardingUUID(opCtx, sourceNss);
 
             LOGV2(5403501,
                   "Aborting resharding operation",
-                  logAttrs(ns()),
+                  logAttrs(sourceNss),
                   "reshardingUUID"_attr = reshardingUUID);
 
             assertExistsReshardingDocument(opCtx, reshardingUUID);

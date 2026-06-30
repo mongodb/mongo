@@ -46,6 +46,7 @@
 #include "mongo/db/global_catalog/ddl/drop_collection_if_uuid_not_matching_gen.h"
 #include "mongo/db/global_catalog/ddl/notify_sharding_event_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
+#include "mongo/db/global_catalog/ddl/sharding_util.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/global_catalog/type_chunk.h"
@@ -1299,6 +1300,18 @@ UUID retrieveReshardingUUID(OperationContext* opCtx, const NamespaceString& ns) 
             "Could not find resharding-related metadata that matches the given namespace",
             reshardingUUID);
     return *reshardingUUID;
+}
+
+NamespaceString resolveReshardingSourceNss(OperationContext* opCtx, const NamespaceString& ns) {
+    if (ns.isTimeseriesBucketsCollection()) {
+        return ns;
+    }
+
+    auto bucketNss = ns.makeTimeseriesBucketsNamespace();
+    if (sharding_util::isTrackedTimeseries(opCtx, bucketNss)) {
+        return bucketNss;
+    }
+    return ns;
 }
 
 Date_t computeVerificationDeadline(const ReshardingCoordinatorDocument& coordinatorDoc,

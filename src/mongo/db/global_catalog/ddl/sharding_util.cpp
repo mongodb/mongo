@@ -36,8 +36,11 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/generic_argument_util.h"
+#include "mongo/db/global_catalog/sharding_catalog_client.h"
+#include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/index_builds/index_builds_manager.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/shard_role/ddl/list_databases_gen.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
@@ -398,6 +401,17 @@ ShardId selectLeastLoadedNonDrainingShard(OperationContext* opCtx) {
     }
 
     return candidateShardId;
+}
+
+bool isTrackedTimeseries(OperationContext* opCtx, const NamespaceString& bucketNss) {
+    try {
+        const auto bucketColl = Grid::get(opCtx)->catalogClient()->getCollection(
+            opCtx, bucketNss, repl::ReadConcernLevel::kMajorityReadConcern);
+        return bucketColl.getTimeseriesFields().has_value();
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // If we don't find the bucket nss it means the collection is not tracked.
+        return false;
+    }
 }
 
 }  // namespace sharding_util

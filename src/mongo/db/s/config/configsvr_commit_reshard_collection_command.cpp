@@ -86,7 +86,8 @@ public:
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
 
-            UUID reshardingUUID = resharding::retrieveReshardingUUID(opCtx, ns());
+            const auto sourceNss = resharding::resolveReshardingSourceNss(opCtx, ns());
+            UUID reshardingUUID = resharding::retrieveReshardingUUID(opCtx, sourceNss);
 
             auto machine = resharding::tryGetReshardingStateMachineAndThrowIfShuttingDown<
                 ReshardingCoordinatorService,

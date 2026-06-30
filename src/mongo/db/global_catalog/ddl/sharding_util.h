@@ -143,5 +143,12 @@ MONGO_MOD_NEEDS_REPLACEMENT void retryIdempotentWorkAsPrimaryUntilSuccessOrStepd
  * if no shard is found.
  */
 MONGO_MOD_NEEDS_REPLACEMENT ShardId selectLeastLoadedNonDrainingShard(OperationContext* opCtx);
+
+/**
+ * Returns true if 'bucketNss' is a tracked timeseries buckets collection, i.e. it has a sharding
+ * catalog entry with timeseries fields. Returns false if the namespace is not tracked.
+ */
+MONGO_MOD_PUBLIC bool isTrackedTimeseries(OperationContext* opCtx,
+                                          const NamespaceString& bucketNss);
 }  // namespace sharding_util
 }  // namespace mongo

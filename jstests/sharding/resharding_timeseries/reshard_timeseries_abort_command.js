@@ -227,12 +227,18 @@ const runAbortWithFailpoint = (
         expectedReshardingErrorCode = ErrorCodes.OK;
     }
 
-    // abortReshardCollection does not translate user-facing ns to bucket ns like reshardCollection
-    // does, so in legacy timeseries (FCV < 9.0) we must pass the bucket namespace explicitly.
-    const abortNs = getTimeseriesCollForDDLOps(
-        mongos.getDB("reshardingDb"),
-        mongos.getDB("reshardingDb").getCollection("coll"),
-    ).getFullName();
+    // The server translates the user-facing namespace to the bucket namespace in 9.0+, but
+    // an older config server in a multiversion cluster won't, so use the bucket namespace there.
+    const isMultiversion =
+        Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+        Boolean(TestData.multiversionBinVersion);
+    let abortNs = originalCollectionNs;
+    if (isMultiversion) {
+        abortNs = getTimeseriesCollForDDLOps(
+            mongos.getDB("reshardingDb"),
+            mongos.getDB("reshardingDb").getCollection("coll"),
+        ).getFullName();
+    }
     const abortThread = generateAbortThread(
         topology.mongos.nodes[0],
         abortNs,
