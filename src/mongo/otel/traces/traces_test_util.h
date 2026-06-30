@@ -62,6 +62,7 @@ struct CapturedSpanData {
     bool isError = false;
     opentelemetry::trace::SpanId spanId;
     opentelemetry::trace::SpanId parentSpanId;
+    opentelemetry::trace::TraceId traceId;
     CapturedSpanData* parent = nullptr;
     std::vector<CapturedSpanData*> children;
 };
@@ -98,6 +99,15 @@ public:
 
     std::optional<CapturedSpan> parent() const;
     std::vector<CapturedSpan> children() const;
+
+    /**
+     * Returns the hex-encoded parent span ID (16 lowercase hex chars), or empty string if there is
+     * no parent span ID set. A non-empty value with no parent() indicates a remote parent.
+     */
+    std::string parentSpanIdHex() const;
+
+    /** Returns the hex-encoded trace ID (32 lowercase hex chars), or empty string if not set. */
+    std::string traceIdHex() const;
 
 private:
     friend class OtelTracesCapturer;

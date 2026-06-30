@@ -173,7 +173,7 @@ Span Span::start(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName name)
     return startImpl(telemetryCtx, name.getName());
 }
 
-Span Span::startImpl(OperationContext* opCtx, std::string_view name, bool createIfMissing) {
+Span Span::startImpl(OperationContext* opCtx, std::string_view name) {
     if (opCtx == nullptr) {
         return Span{};
     }
@@ -182,9 +182,6 @@ Span Span::startImpl(OperationContext* opCtx, std::string_view name, bool create
     auto telemetryCtx = telemetryCtxHolder.getTelemetryContext();
 
     if (!telemetryCtx) {
-        if (!createIfMissing) {
-            return Span{};
-        }
         telemetryCtx = std::make_shared<SpanTelemetryContextImpl>();
         telemetryCtxHolder.setTelemetryContext(telemetryCtx);
     }
@@ -193,11 +190,7 @@ Span Span::startImpl(OperationContext* opCtx, std::string_view name, bool create
 }
 
 Span Span::start(OperationContext* opCtx, SpanName name) {
-    return startImpl(opCtx, name.getName(), /*createIfMissing=*/true);
-}
-
-Span Span::startIfExistingTraceParent(OperationContext* opCtx, SpanName name) {
-    return startImpl(opCtx, name.getName(), /*createIfMissing=*/false);
+    return startImpl(opCtx, name.getName());
 }
 
 std::shared_ptr<TelemetryContext> Span::createTelemetryContext() {

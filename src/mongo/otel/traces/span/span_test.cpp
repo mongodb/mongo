@@ -247,28 +247,6 @@ TEST_F(SpanTest, StartWithTelemetryContextDoesNotCrash) {
     ASSERT_TRUE(isEmpty());
 }
 
-TEST_F(SpanTest, StartIfExistingTraceParentNoTraceParent) {
-    auto opCtx = makeOperationContext();
-    {
-        auto span = Span::startIfExistingTraceParent(opCtx.get(), span_names::kTest1);
-        TRACING_SPAN_ATTR(span, "test", 1);
-        ASSERT_TRUE(isEmpty());
-    }
-    ASSERT_TRUE(isEmpty());
-}
-
-TEST_F(SpanTest, StartIfExistingTraceParentIfTraceParent) {
-    auto opCtx = makeOperationContext();
-    auto& telemetryCtxHolder = TelemetryContextHolder::getDecoration(opCtx.get());
-    telemetryCtxHolder.setTelemetryContext(Span::createTelemetryContext());
-    {
-        auto span = Span::startIfExistingTraceParent(opCtx.get(), span_names::kTest1);
-        TRACING_SPAN_ATTR(span, "test", 1);
-        ASSERT_TRUE(isEmpty());
-    }
-    ASSERT_FALSE(isEmpty());
-}
-
 TEST_F(SpanTest, SamplingFlagDisabledDropsRootSpan) {
     auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return true; });
     unittest::ServerParameterGuard flagController("featureFlagOtelTraceSampling", false);

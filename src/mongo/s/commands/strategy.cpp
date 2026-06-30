@@ -523,6 +523,7 @@ void ParseAndRunCommand::_parseCommand() {
         opCtx->setComment(commentField->getElement().wrap());
     }
 
+    // TODO(SERVER-107128): Remove this in favor of the context on OP_MSG
     if (auto& traceCtx = _invocation->getGenericArguments().getTraceCtx()) {
         auto telemetryCtx = otel::traces::TelemetryContextSerializer::fromBSON(*traceCtx);
         if (telemetryCtx) {
@@ -1127,11 +1128,8 @@ void ParseAndRunCommand::RunAndRetry::_onCannotImplicitlyCreateCollection(Status
 }
 
 void ParseAndRunCommand::RunAndRetry::run() {
-    // We do not want to create a span for every incoming command, we only want a span when
-    // $traceCtx is specified on the command so we call Span::startIfExistingTraceParent instead of
-    // Span::start.
-    auto otelSpan = otel::traces::Span::startIfExistingTraceParent(
-        _parc->_rec->getOpCtx(), _parc->_rec->getCommand()->getTraceSpanName());
+    auto otelSpan = otel::traces::Span::start(_parc->_rec->getOpCtx(),
+                                              _parc->_rec->getCommand()->getTraceSpanName());
     do {
         try {
             // Try gMaxNumStaleVersionRetries times. On the last try, exceptions are

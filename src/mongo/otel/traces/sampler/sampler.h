@@ -142,11 +142,11 @@ private:
 };
 
 /** Interface for overriding the global sampler, for use in tests. */
-class MONGO_MOD_PUBLIC SamplerOverride {
+class SamplerOverride {
 public:
     virtual ~SamplerOverride() = default;
 };
-using ScopedSamplerOverride = std::unique_ptr<SamplerOverride>;
+using ScopedSamplerOverride MONGO_MOD_PUBLIC = std::unique_ptr<SamplerOverride>;
 
 /**
  * Replaces the global sampler with one that calls fn for `shouldSample`, for testing purposes.

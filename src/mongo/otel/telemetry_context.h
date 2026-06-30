@@ -47,6 +47,9 @@ public:
     virtual std::string_view type() const {
         return "TelemetryContext";
     };
+    virtual bool hasActiveTrace() const {
+        return false;
+    }
     virtual std::shared_ptr<TelemetryContext> clone() const {
         return std::make_shared<TelemetryContext>(TelemetryContext());
     }

@@ -520,16 +520,13 @@ TEST_F(ServiceEntryPointShardServerTest, QueuedAdmissionWithLargeMaxTimeMSSuccee
     ASSERT_EQ(limiterForDeferredToken.stats().successfulAdmissions(), 2);
 }
 
-#ifdef MONGO_CONFIG_OTEL
-TEST_F(ServiceEntryPointShardServerTest, TelemetryContextDeserializedFromRequest) {
-    testTelemetryContextDeserializedFromRequest();
+TEST_F(ServiceEntryPointShardServerTest, SpanCreatedWhenTelemetryContextDeserializedFromRequest) {
+    testSpanCreatedWhenTelemetryContextDeserializedFromRequest();
 }
 
-TEST_F(ServiceEntryPointShardServerTest, TelemetryContextNotSetWhenNotInRequest) {
-    testTelemetryContextNotSetWhenNotInRequest();
+TEST_F(ServiceEntryPointShardServerTest, SpanNotCreatedWhenTelemetryContextNotSetInRequest) {
+    testSpanNotCreatedWhenTelemetryContextNotSetInRequest();
 }
-#endif
-
 
 class ServiceEntryPointReplicaSetTest : public virtual service_context_test::ReplicaSetRoleOverride,
                                         public ServiceEntryPointShardRoleTest {};
@@ -644,15 +641,13 @@ TEST_F(ServiceEntryPointReplicaSetTest, TestWriteConcernClientUnspecifiedWithDef
     testWriteConcernClientUnspecifiedWithDefault();
 }
 
-#ifdef MONGO_CONFIG_OTEL
-TEST_F(ServiceEntryPointReplicaSetTest, TelemetryContextDeserializedFromRequest) {
-    testTelemetryContextDeserializedFromRequest();
+TEST_F(ServiceEntryPointReplicaSetTest, SpanCreatedWhenTelemetryContextDeserializedFromRequest) {
+    testSpanCreatedWhenTelemetryContextDeserializedFromRequest();
 }
 
-TEST_F(ServiceEntryPointReplicaSetTest, TelemetryContextNotSetWhenNotInRequest) {
-    testTelemetryContextNotSetWhenNotInRequest();
+TEST_F(ServiceEntryPointReplicaSetTest, SpanNotCreatedWhenTelemetryContextNotSetInRequest) {
+    testSpanNotCreatedWhenTelemetryContextNotSetInRequest();
 }
-#endif
 
 // Test command that returns the opCtx deadline in its response (used as the child command).
 class TestCmdReportDeadline : public TestCmdBase {

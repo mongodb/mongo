@@ -54,10 +54,9 @@ namespace MONGO_MOD_PUBLIC traces {
     } while (0)
 
 /**
- * Span class is an RAII utility to create and save OpenTelemetry spans. A Span that has a
- * non-null _impl field is considered as valid and will generate a new OpenTelemetry's span upon
- * destruction. A Span that has an empty _impl field is a no-op Span and will not generate an
- * OpenTelemetry Span.
+ * Span class is an RAII utility to create and save OpenTelemetry spans. Whether or not the span
+ * is used within an exported OpenTelemetry trace is determined by a combination of whether its
+ * parent is in a trace and the sampling decision made by the `TracingSampler`.
  *
  * Spans should be created by calling the Span::start free function defined below to ensure new
  * Spans have a valid parent-child relationships with other Spans in the Trace.
@@ -79,14 +78,6 @@ public:
      * TelemetryContext.
      */
     static Span start(OperationContext* opCtx, SpanName name);
-
-    /**
-     * Similar to `start`, but only starts and returns a Span if there is an existing Span in the
-     * provided `opCtx`'s TelemetryContext. If there is no existing Span, a no-op Span is returned.
-     *
-     * TODO: SERVER-127463 Remove this once sampling decides whether we start a trace.
-     */
-    static Span startIfExistingTraceParent(OperationContext* opCtx, SpanName name);
 
     static std::shared_ptr<TelemetryContext> createTelemetryContext();
 
@@ -124,18 +115,17 @@ private:
     static Span startImpl(std::shared_ptr<TelemetryContext>& telemetryCtx, std::string_view name);
 
     /**
-     * Starts a new Span assuming we are in an environment where this is possible. When there is no
-     * TelemetryContext on `opCtx`, `createIfMissing` determines whether one is created or a noop
-     * span is returned.
+     * Starts a new Span assuming we are in an environment where this is possible. Creates a
+     * TelemetryContext on `opCtx` if none exists.
      */
-    static Span startImpl(OperationContext* opCtx, std::string_view name, bool createIfMissing);
+    static Span startImpl(OperationContext* opCtx, std::string_view name);
 
-    std::unique_ptr<SpanImpl> _impl;
-    /**
-     * Construction of Spans should be done through Span::start(traceable, name).
-     */
+    /** Construction of Spans should be done through Span::start(traceable, name). */
     Span();
     Span(std::unique_ptr<SpanImpl> impl);
+
+    /** The actual span implementation. Null if this Span will not be part of an exported trace. */
+    std::unique_ptr<SpanImpl> _impl;
 };
 
 #else
@@ -154,10 +144,6 @@ public:
         return Span{};
     }
     static Span start(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName) {
-        return Span{};
-    }
-    // TODO: SERVER-127463 Remove this once sampling decides whether we start a trace.
-    static Span startIfExistingTraceParent(OperationContext* opCtx, SpanName) {
         return Span{};
     }
 

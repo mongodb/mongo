@@ -1683,6 +1683,7 @@ void ExecCommandDatabase::_initiateCommand() {
                 _isInternalClient());
     }
 
+    // TODO(SERVER-107128): Remove this in favor of the context on OP_MSG
     if (auto& traceCtx = genericArgs.getTraceCtx()) {
         auto telemetryCtx = otel::traces::TelemetryContextSerializer::fromBSON(*traceCtx);
         if (telemetryCtx) {
@@ -2010,11 +2011,7 @@ void ExecCommandDatabase::_initiateCommand() {
 void ExecCommandDatabase::_commandExec() {
     auto opCtx = _execContext.getOpCtx();
 
-    // We do not want to create a span for every incoming command, we only want a span when
-    // $traceCtx is specified on the command so we call Span::startIfExistingTraceParent instead of
-    // Span::start.
-    auto otelSpan = otel::traces::Span::startIfExistingTraceParent(
-        opCtx, _execContext.getCommand()->getTraceSpanName());
+    auto otelSpan = otel::traces::Span::start(opCtx, _execContext.getCommand()->getTraceSpanName());
 
     // If this command should start a new transaction, waitForReadConcern will be invoked
     // after invoking the TransactionParticipant, which will determine whether a transaction

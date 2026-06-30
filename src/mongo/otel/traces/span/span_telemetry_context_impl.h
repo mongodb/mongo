@@ -68,6 +68,10 @@ public:
      */
     double getSamplingValue();
 
+    bool hasActiveTrace() const override {
+        return getSpan()->GetContext().IsValid();
+    }
+
     /**
      * Sets the provided span as the current span on this context.
      */
@@ -78,7 +82,7 @@ public:
     /**
      * Returns the current span on this context.
      */
-    ScopedSpan getSpan() {
+    ScopedSpan getSpan() const {
         return opentelemetry::trace::GetSpan(_ctx);
     }
 

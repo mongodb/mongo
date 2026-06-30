@@ -70,6 +70,7 @@
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/span/span.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
+#include "mongo/otel/traces/traces_test_util.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -633,6 +634,12 @@ TEST_F(ReshardingUtilTest, GetMajorityReplicationLag_LastAppliedEqualToLastCommi
 }
 
 TEST_F(ReshardingUtilTest, ReshardingCoordinatorDocContainsTelemetryContextFromOpCtx) {
+    otel::traces::OtelTracesCapturer capturer;
+    if (!capturer.canReadSpans())
+        GTEST_SKIP() << "OTel not configured";
+
+    auto span = otel::traces::Span::start(operationContext(), otel::traces::span_names::kTest1);
+
     const CollectionType collEntry(nss(),
                                    OID::gen(),
                                    Timestamp(static_cast<unsigned int>(std::time(nullptr)), 1),
@@ -643,10 +650,8 @@ TEST_F(ReshardingUtilTest, ReshardingCoordinatorDocContainsTelemetryContextFromO
     ConfigsvrReshardCollection configsvrReshardCollection(nss(), BSON(shardKey() << 1));
     configsvrReshardCollection.setDbName(nss().dbName());
 
-    auto telemetryCtx = otel::traces::Span::createTelemetryContext();
-    auto& telemetryCtxHolder = otel::TelemetryContextHolder::getDecoration(operationContext());
-
-    telemetryCtxHolder.setTelemetryContext(telemetryCtx);
+    auto& telemetryCtx =
+        otel::TelemetryContextHolder::getDecoration(operationContext()).getTelemetryContext();
 
     ReshardingCoordinatorDocument coordinatorDoc = createReshardingCoordinatorDoc(
         operationContext(), configsvrReshardCollection, collEntry, primaryShardId(), nss(), true);
@@ -655,7 +660,11 @@ TEST_F(ReshardingUtilTest, ReshardingCoordinatorDocContainsTelemetryContextFromO
                       otel::traces::TelemetryContextSerializer::toBSON(telemetryCtx));
 }
 
-TEST_F(ReshardingUtilTest, ReshardingCoordinatorDocDoesNotContainTelemetryContextWhenNotSet) {
+TEST_F(ReshardingUtilTest,
+       ReshardingCoordinatorDocDoesNotContainTelemetryContextWhenNoTraceActive) {
+    if (!otel::traces::OtelTracesCapturer::canReadSpans())
+        GTEST_SKIP() << "OTel not configured";
+
     const CollectionType collEntry(nss(),
                                    OID::gen(),
                                    Timestamp(static_cast<unsigned int>(std::time(nullptr)), 1),

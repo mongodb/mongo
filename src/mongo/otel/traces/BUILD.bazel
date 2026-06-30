@@ -318,6 +318,7 @@ mongo_cc_unit_test(
         "tracing_test",
     ],
     deps = [
+        ":telemetry_context_serialization",
         ":traces_test_util",
         ":tracing",
         "//src/mongo/otel/traces/span:span_names",

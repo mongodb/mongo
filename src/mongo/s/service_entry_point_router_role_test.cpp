@@ -370,15 +370,13 @@ TEST_F(ServiceEntryPointRouterRoleTest, TestWriteConcernClientUnspecifiedWithDef
     testWriteConcernClientUnspecifiedWithDefault();
 }
 
-#ifdef MONGO_CONFIG_OTEL
-TEST_F(ServiceEntryPointRouterRoleTest, TelemetryContextDeserializedFromRequest) {
-    testTelemetryContextDeserializedFromRequest();
+TEST_F(ServiceEntryPointRouterRoleTest, SpanCreatedWhenTelemetryContextDeserializedFromRequest) {
+    testSpanCreatedWhenTelemetryContextDeserializedFromRequest();
 }
 
-TEST_F(ServiceEntryPointRouterRoleTest, TelemetryContextNotSetWhenNotInRequest) {
-    testTelemetryContextNotSetWhenNotInRequest();
+TEST_F(ServiceEntryPointRouterRoleTest, SpanNotCreatedWhenTelemetryContextNotSetInRequest) {
+    testSpanNotCreatedWhenTelemetryContextNotSetInRequest();
 }
-#endif
 
 }  // namespace
 }  // namespace mongo

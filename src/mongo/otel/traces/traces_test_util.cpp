@@ -93,6 +93,28 @@ bool CapturedSpan::isError() const {
     return false;
 }
 
+std::string CapturedSpan::parentSpanIdHex() const {
+#ifdef MONGO_CONFIG_OTEL
+    if (_data && _data->parentSpanId.IsValid()) {
+        char buf[16];
+        _data->parentSpanId.ToLowerBase16(buf);
+        return std::string(buf, sizeof(buf));
+    }
+#endif
+    return {};
+}
+
+std::string CapturedSpan::traceIdHex() const {
+#ifdef MONGO_CONFIG_OTEL
+    if (_data && _data->traceId.IsValid()) {
+        char buf[32];
+        _data->traceId.ToLowerBase16(buf);
+        return std::string(buf, sizeof(buf));
+    }
+#endif
+    return {};
+}
+
 std::optional<CapturedSpan> CapturedSpan::parent() const {
 #ifdef MONGO_CONFIG_OTEL
     if (_data && _data->parent)
@@ -157,11 +179,13 @@ void OtelTracesCapturer::_rebuild() const {
     // Only process spans that were exported since the last _rebuild.
     for (size_t i = processed; i < exported.size(); ++i) {
         const MockRecordable* rec = exported[i].get();
-        auto data = std::make_unique<CapturedSpanData>(
-            CapturedSpanData{.name = rec->name,
-                             .isError = (rec->status == opentelemetry::trace::StatusCode::kError),
-                             .spanId = rec->context.span_id(),
-                             .parentSpanId = rec->parentId});
+        auto data = std::make_unique<CapturedSpanData>(CapturedSpanData{
+            .name = rec->name,
+            .isError = (rec->status == opentelemetry::trace::StatusCode::kError),
+            .spanId = rec->context.span_id(),
+            .parentSpanId = rec->parentId,
+            .traceId = rec->context.trace_id(),
+        });
         for (auto& [k, v] : rec->attributes)
             data->attributes[k] = attributeValueToString(v);
         _spans.push_back(std::move(data));

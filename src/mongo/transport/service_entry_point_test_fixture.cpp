@@ -43,7 +43,9 @@
 #include "mongo/db/storage/storage_engine_mock.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/otel/telemetry_context_holder.h"
+#include "mongo/otel/traces/sampler/sampler.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
+#include "mongo/otel/traces/traces_test_util.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/legacy_reply.h"
 #include "mongo/rpc/message.h"
@@ -55,6 +57,10 @@
 #endif
 
 namespace mongo {
+
+using otel::traces::CapturedSpan;
+using ::testing::IsEmpty;
+using ::testing::Property;
 
 MONGO_REGISTER_COMMAND(TestCmdSucceeds).testOnly().forRouter().forShard();
 MONGO_REGISTER_COMMAND(TestCmdFailsRunInvocationWithResponse).testOnly().forRouter().forShard();
@@ -572,14 +578,22 @@ void ServiceEntryPointTestFixture::runWriteConcernTestExpectClusterDefault(
     ASSERT_EQ(logs.countTextContaining("Applying default writeConcern"), 1);
 }
 
-#ifdef MONGO_CONFIG_OTEL
-void ServiceEntryPointTestFixture::testTelemetryContextDeserializedFromRequest() {
+void ServiceEntryPointTestFixture::testSpanCreatedWhenTelemetryContextDeserializedFromRequest() {
+    if (!otel::traces::OtelTracesCapturer::canReadSpans())
+        GTEST_SKIP() << "OTel not configured";
+
+    otel::traces::OtelTracesCapturer capturer;
+    // We want the sampler to return false so that the only reason the span would be kept is that
+    // the telemetry context is set to include a parent span.
+    otel::traces::ScopedSamplerOverride samplerGuard =
+        otel::traces::setTraceSamplingFnForTest([](std::string_view, double) { return false; });
+
     auto opCtx = makeOperationContext();
 
     // "traceparent" format: version-traceid-spanid-traceflags. "tracestate" can be any string.
     BSONObjBuilder traceCtxBuilder;
     traceCtxBuilder.append("traceparent",
-                           "00-11111111111111111111111111111111-1111111111111111-01");
+                           "00-11111111111111111111111111111111-2222222222222222-01");
     traceCtxBuilder.append("tracestate", "dummystring");
 
     BSONObjBuilder cmdBuilder;
@@ -588,25 +602,27 @@ void ServiceEntryPointTestFixture::testTelemetryContextDeserializedFromRequest()
 
     runCommandTestWithResponse(cmdBuilder.obj(), opCtx.get());
 
-    auto& holder = otel::TelemetryContextHolder::getDecoration(opCtx.get());
-    auto retrievedCtx = holder.getTelemetryContext();
-    ASSERT_NE(retrievedCtx, nullptr);
-
-    auto spanCtx = std::dynamic_pointer_cast<otel::traces::SpanTelemetryContextImpl>(retrievedCtx);
-    ASSERT_NE(spanCtx, nullptr);
-    auto span = spanCtx->getSpan();
-    ASSERT_TRUE(span->GetContext().IsValid());
+    EXPECT_THAT(
+        capturer.getSpans(TestCmdSucceeds::kCommandName),
+        ElementsAre(AllOf(
+            Property("parentSpanIdHex", &CapturedSpan::parentSpanIdHex, "2222222222222222"),
+            Property(
+                "traceIdHex", &CapturedSpan::traceIdHex, "11111111111111111111111111111111"))));
 }
 
-void ServiceEntryPointTestFixture::testTelemetryContextNotSetWhenNotInRequest() {
-    auto opCtx = makeOperationContext();
+void ServiceEntryPointTestFixture::testSpanNotCreatedWhenTelemetryContextNotSetInRequest() {
+    if (!otel::traces::OtelTracesCapturer::canReadSpans())
+        GTEST_SKIP() << "OTel not configured";
+    otel::traces::OtelTracesCapturer capturer;
+    // We want the sampler to return false so that the only reason the span would be kept is that
+    // the telemetry context is set to include a parent span.
+    otel::traces::ScopedSamplerOverride samplerGuard =
+        otel::traces::setTraceSamplingFnForTest([](std::string_view, double) { return false; });
 
+    auto opCtx = makeOperationContext();
     runCommandTestWithResponse(BSON(TestCmdSucceeds::kCommandName << 1), opCtx.get());
 
-    auto& holder = otel::TelemetryContextHolder::getDecoration(opCtx.get());
-    auto retrievedCtx = holder.getTelemetryContext();
-    ASSERT_EQ(retrievedCtx, nullptr);
+    EXPECT_THAT(capturer.getSpans(TestCmdSucceeds::kCommandName), IsEmpty());
 }
-#endif  // MONGO_CONFIG_OTEL
 
 }  // namespace mongo
