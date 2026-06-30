@@ -1,6 +1,6 @@
 /**
  * Verifies that query stats for inserts behaves correctly in FCV upgrade/downgrade scenarios.
- * featureFlagQueryStatsInsert is FCV-gated, so we expect insert stats to be present only when
+ * Query stats for inserts is FCV-gated, so we expect insert stats to be present only when
  * fully upgraded.
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
@@ -25,7 +25,7 @@ function setupCollection(primaryConnection, shardingTest = null) {
     const coll = assertDropAndRecreateCollection(db, collName);
 
     // No documents are being inserted initially. The collection is sharded across 2 shards,
-    // allowing inserts in upcoming tests to be distributed deterministially:
+    // allowing inserts in upcoming tests to be distributed deterministically:
     // shard0: [MinKey, 0) -> _id < 0
     // shard1: [0, MaxKey] -> _id >= 0
     if (shardingTest) {
@@ -116,11 +116,9 @@ function assertInsertCommandRecordedOnShardsExceptRouter(primaryConnection) {
 
 describe("Query Stats metrics should only be recorded when FCV is bumped", function () {
     it("Should only appear in a fully upgraded replica set", function () {
-        // TODO(SERVER-87492): Remove feature flag param to test that FCV bump enables feature.
         testPerformUpgradeReplSet({
             upgradeNodeOptions: {
                 setParameter: {
-                    featureFlagQueryStatsInsert: true,
                     internalQueryStatsSampleRate: 1,
                     internalQueryStatsWriteCmdSampleRate: 1,
                 },
@@ -134,17 +132,15 @@ describe("Query Stats metrics should only be recorded when FCV is bumped", funct
     });
 
     /**
-     * featureFlagQueryStatsInsert is FCV-gated, but mongos pins itself to the latest FCV
+     * Query stats for inserts is FCV-gated, but mongos pins itself to the latest FCV
      * meaning that when mongos is on the latest binary and has been restarted, it will record query
      * stats even if the cluster's FCV is last-LTS. This means that a full FCV downgrade to
      * last-LTS and mongos restart will result in query stats being recorded, contrary to expectation.
      */
     it("Should appear in a fully upgraded cluster, or when binaries are latest", function () {
-        // TODO(SERVER-87492): Remove feature flag param to test that FCV bump enables feature.
         testPerformUpgradeSharded({
             upgradeNodeOptions: {
                 setParameter: {
-                    featureFlagQueryStatsInsert: true,
                     internalQueryStatsSampleRate: 1,
                     internalQueryStatsWriteCmdSampleRate: 1,
                 },
