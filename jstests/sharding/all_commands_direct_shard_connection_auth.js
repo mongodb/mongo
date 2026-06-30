@@ -154,7 +154,6 @@ const allCommands = {
     _shardsvrRefineCollectionShardKey: {skip: isAnInternalCommand},
     _shardsvrCommitRefineCollectionShardKey: {skip: isAnInternalCommand},
     _shardsvrCommitCollModCollectionMetadata: {skip: isAnInternalCommand},
-    _shardsvrCommitChunkOperationsMetadata: {skip: isAnInternalCommand},
     _shardsvrCommitDropCollectionMetadata: {skip: isAnInternalCommand},
     _shardsvrCommitCreateCollectionMetadata: {skip: isAnInternalCommand},
     _shardsvrCommitCreateCollectionChunklessMetadata: {skip: isAnInternalCommand},
