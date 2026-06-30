@@ -6,10 +6,6 @@
  * @tags: [
  *   featureFlagExtensionsAPI,
  *   featureFlagExtensionsInsideHybridSearch,
- *   featureFlagRankFusionFull,
- *   featureFlagSearchHybridScoringFull,
- *   featureFlagVectorSimilarityExpressions,
- *   requires_fcv_82,
  * ]
  */
 import {orderedArrayEq} from "jstests/aggregation/extras/utils.js";

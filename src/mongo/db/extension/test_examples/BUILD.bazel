@@ -57,6 +57,7 @@ extensions_with_config(
         ":interrupt_mongo_extension_signed_lib",
         ":match_topN_mongo_extension_signed_lib",
         ":native_vector_search_mongo_extension_signed_lib",
+        ":selection_optimization_mongo_extension_signed_lib",
         ":metrics_mongo_extension_signed_lib",
         ":other_metrics_mongo_extension_signed_lib",
         ":sleep_mongo_extension_signed_lib",
@@ -161,6 +162,7 @@ pkg_name = "//" + package_name() + "/"
         "limit",
         "match_topN",
         "native_vector_search",
+        "selection_optimization",
         "vector_search_optimization",
         "add_fields_match",
     ]
