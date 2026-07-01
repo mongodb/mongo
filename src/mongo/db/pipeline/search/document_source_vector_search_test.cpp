@@ -165,6 +165,81 @@ TEST_F(DocumentSourceVectorSearchTest, UnexpectedArgumentIsSerialized) {
         !vec[0].getDocument().getField("$vectorSearch").getDocument().getField("extra").missing());
 }
 
+TEST_F(DocumentSourceVectorSearchTest, RejectsUserInjectedViewName) {
+    auto spec = fromjson(R"({
+        $vectorSearch: {
+            queryVector: [1.0, 2.0],
+            path: "x",
+            numCandidates: 100,
+            limit: 10,
+            viewName: "someView"
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceVectorSearch::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       12961800);
+}
+
+TEST_F(DocumentSourceVectorSearchTest, RejectsUserInjectedCollectionUUID) {
+    auto spec = fromjson(R"({
+        $vectorSearch: {
+            queryVector: [1.0, 2.0],
+            path: "x",
+            numCandidates: 100,
+            limit: 10,
+            collectionUUID: "deadbeef-dead-beef-dead-beefdeadbeef"
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceVectorSearch::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       12961800);
+}
+
+TEST_F(DocumentSourceVectorSearchTest, RejectsUserInjectedVectorSearchCommandName) {
+    auto spec = fromjson(R"({
+        $vectorSearch: {
+            queryVector: [1.0, 2.0],
+            path: "x",
+            numCandidates: 100,
+            limit: 10,
+            vectorSearch: "someCollection"
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceVectorSearch::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       12961800);
+}
+
+TEST_F(DocumentSourceVectorSearchTest, CleanSpecWithoutTrustedFieldsParses) {
+    // Positive control: a spec without any injected trusted field parses successfully, including a
+    // field ('explain') that is mongod-owned but intentionally not rejected at parse time.
+    auto spec = fromjson(R"({
+        $vectorSearch: {
+            queryVector: [1.0, 2.0],
+            path: "x",
+            numCandidates: 100,
+            limit: 10
+        }
+    })");
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceVectorSearch::createFromBson(spec.firstElement(), getExpCtx()));
+
+    spec = fromjson(R"({
+        $vectorSearch: {
+            queryVector: [1.0, 2.0],
+            path: "x",
+            numCandidates: 100,
+            limit: 10,
+            explain: {verbosity: "queryPlanner"}
+        }
+    })");
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceVectorSearch::createFromBson(spec.firstElement(), getExpCtx()));
+}
+
 TEST_F(DocumentSourceVectorSearchTest, EOFWhenCollDoesNotExist) {
     auto expCtx = getExpCtx();
 

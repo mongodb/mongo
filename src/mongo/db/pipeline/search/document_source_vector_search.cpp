@@ -195,6 +195,10 @@ intrusive_ptr<DocumentSource> DocumentSourceVectorSearch::createFromBson(
 
     auto spec = elem.embeddedObject();
 
+    // Reject any user attempt to inject the security-trusted, mongod-owned fields (the mongot
+    // command name, collection UUID, and authorized view name) into the $vectorSearch spec.
+    search_helpers::validateUserSpecDoesNotOverrideTrustedFields(spec);
+
     // Validate the source of the view if it exists on the spec, otherwise check expCtx for the
     // view.
     boost::optional<SearchQueryViewSpec> view = search_helpers::getViewFromBSONObj(spec);
