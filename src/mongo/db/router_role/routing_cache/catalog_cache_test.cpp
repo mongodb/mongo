@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/client.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
@@ -568,5 +569,123 @@ TEST_F(CatalogCacheTest, AdvanceCollectionTimeInStore) {
                   .getCollectionVersion());
 }
 
+TEST_F(CatalogCacheTest,
+       LookupDatabaseCalledOnceOnSeveralGetDatabaseWithStaleDatabaseVersionException) {
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
+    loadDatabases({DatabaseType(kNss.dbName(), kShards[0], dbVersion)});
+
+    // Receiving StaleDbVersion on catalog cache
+    _catalogCache->onStaleDatabaseVersion(kNss.dbName(), boost::none);
+
+    _catalogCacheLoader->setDatabaseRefreshReturnValue(
+        DatabaseType(kNss.dbName(), kShards[0], dbVersion));
+
+    // Capture baseline for stats (loadDatabases should have increased them already)
+    BSONObjBuilder baselineBuilder;
+    _catalogCache->report(&baselineBuilder);
+    const auto countBefore = baselineBuilder.obj()["catalogCache"]
+                                 .Obj()["countDatabaseFullRefreshesStarted"]
+                                 .numberLong();
+
+    // Spawn 10 threads each of which is trying to get database (leading to refresh)
+    constexpr size_t kNumThreads = 10;
+    std::vector<StatusWith<CachedDatabaseInfo>> results(
+        kNumThreads, Status(ErrorCodes::InternalError, "Unknown"));
+    std::vector<stdx::thread> threads;
+    threads.reserve(kNumThreads);
+
+    {
+        FailPointEnableBlock failPoint("blockDatabaseCacheLookup");
+
+        for (size_t i = 0; i < kNumThreads; ++i) {
+            threads.emplace_back([this, &results, i] {
+                ThreadClient tc("getDatabase-" + std::to_string(i),
+                                getGlobalServiceContext()->getService());
+                auto opCtx = tc->makeOperationContext();
+                results[i] = _catalogCache->getDatabase(opCtx.get(), kNss.dbName());
+            });
+        }
+    }
+
+    for (auto& t : threads) {
+        t.join();
+    }
+
+    // All 10 getDatabase calls must have succeeded with the correct database info
+    for (size_t i = 0; i < kNumThreads; ++i) {
+        ASSERT_OK(results[i].getStatus());
+        ASSERT_EQ(results[i].getValue()->getPrimary(), kShards[0]);
+        ASSERT_EQ(results[i].getValue()->getVersion().getUuid(), dbVersion.getUuid());
+        ASSERT_EQ(results[i].getValue()->getVersion().getLastMod(), dbVersion.getLastMod());
+    }
+
+    // Despite 10 concurrent callers all seeing a stale cache, only one full refresh
+    // was made to the config server
+    BSONObjBuilder builder;
+    _catalogCache->report(&builder);
+    const auto report = builder.obj();
+    const auto stats = report["catalogCache"].Obj();
+    ASSERT_EQ(1, stats["countDatabaseFullRefreshesStarted"].numberLong() - countBefore);
+}
+
+TEST_F(CatalogCacheTest,
+       LookupCollectionCalledOnceOnSeveralGetCollectionWithStaleDatabaseVersionException) {
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
+    const auto gen = CollectionGeneration(OID::gen(), Timestamp(1, 1));
+    const auto collVersion = ShardVersionFactory::make(ChunkVersion(gen, {1, 0}));
+    loadDatabases({DatabaseType(kNss.dbName(), kShards[0], dbVersion)});
+    loadCollection(collVersion);
+
+    // Receiving StaleCollectionVersion on catalog cache
+    _catalogCache->onStaleCollectionVersion(kNss, boost::none);
+
+    _catalogCacheLoader->setCollectionRefreshReturnValue(makeCollectionType(collVersion));
+    _catalogCacheLoader->setChunkRefreshReturnValue(makeChunks(collVersion.placementVersion()));
+
+    // Capture baseline for stats (loadCollection should have increased them already)
+    BSONObjBuilder baselineBuilder;
+    _catalogCache->report(&baselineBuilder);
+    const auto countBefore = baselineBuilder.obj()["catalogCache"]
+                                 .Obj()["countIncrementalRefreshesStarted"]
+                                 .numberLong();
+
+    // Spawn 10 threads each of which is trying to get collection routing info (leading to refresh)
+    constexpr size_t kNumThreads = 10;
+    std::vector<StatusWith<CollectionRoutingInfo>> results(
+        kNumThreads, Status(ErrorCodes::InternalError, "Unknown"));
+    std::vector<stdx::thread> threads;
+    threads.reserve(kNumThreads);
+
+    {
+        FailPointEnableBlock failPoint("blockCollectionCacheLookup");
+
+        for (size_t i = 0; i < kNumThreads; ++i) {
+            threads.emplace_back([this, &results, i] {
+                ThreadClient tc("getCollection-" + std::to_string(i),
+                                getGlobalServiceContext()->getService());
+                auto opCtx = tc->makeOperationContext();
+                results[i] = _catalogCache->getCollectionRoutingInfo(opCtx.get(), kNss);
+            });
+        }
+    }
+
+    for (auto& t : threads) {
+        t.join();
+    }
+
+    // All 10 getCollectionRoutingInfo calls must have succeeded with the correct collection info
+    for (size_t i = 0; i < kNumThreads; ++i) {
+        ASSERT_OK(results[i].getStatus());
+        ASSERT_EQ(results[i].getValue().getCollectionVersion(), collVersion);
+    }
+
+    // Despite 10 concurrent callers all seeing a stale cache, only one full refresh
+    // was made to the config server
+    BSONObjBuilder builder;
+    _catalogCache->report(&builder);
+    const auto report = builder.obj();
+    const auto stats = report["catalogCache"].Obj();
+    ASSERT_EQ(1, stats["countIncrementalRefreshesStarted"].numberLong() - countBefore);
+}
 }  // namespace
 }  // namespace mongo

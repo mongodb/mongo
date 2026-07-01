@@ -504,6 +504,7 @@ private:
                       ThreadPoolInterface& threadPool,
                       std::shared_ptr<CatalogCacheLoader> catalogCacheLoader);
 
+        void reportStats(BSONObjBuilder* builder) const;
         void shutDown() {
             _catalogCacheLoader->shutDown();
         }
@@ -516,6 +517,27 @@ private:
 
         std::shared_ptr<CatalogCacheLoader> _catalogCacheLoader;
         ObservableMutex<std::mutex> _mutex;
+
+        // TODO (SERVER-34164): Potentially rework database refreshes stats
+        struct Stats {
+            // Tracks how many full refreshes are waiting to complete currently
+            AtomicWord<long long> numActiveDatabaseFullRefreshes{0};
+
+            // Cumulative, always-increasing counter of how many full refreshes have been kicked off
+            AtomicWord<long long> countDatabaseFullRefreshesStarted{0};
+
+            // Cumulative, always-increasing counter of how many full or incremental refreshes
+            // failed for whatever reason
+            AtomicWord<long long> countFailedDatabaseRefreshes{0};
+
+            /**
+             * Reports the accumulated statistics for serverStatus.
+             */
+            void report(BSONObjBuilder* builder) const;
+
+        } _stats;
+
+        void _updateRefreshesStats(bool add);
     };
 
     class CollectionCache : public RoutingTableHistoryCache {

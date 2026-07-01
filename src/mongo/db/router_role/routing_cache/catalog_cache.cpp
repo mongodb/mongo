@@ -676,6 +676,7 @@ void CatalogCache::report(BSONObjBuilder* builder) const {
 
     _stats.report(&cacheStatsBuilder);
     _collectionCache.reportStats(&cacheStatsBuilder);
+    _databaseCache.reportStats(&cacheStatsBuilder);
 }
 
 void CatalogCache::invalidateDatabaseEntry_LINEARIZABLE(const DatabaseName& dbName) {
@@ -736,7 +737,7 @@ CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDa
         LOGV2(8023400, "Hanging before refreshing cached database entry");
         blockDatabaseCacheLookup.pauseWhileSet();
     }
-    // TODO (SERVER-34164): Track and increment stats for database refreshes
+    _updateRefreshesStats(true);
 
     LOGV2_FOR_CATALOG_REFRESH(24102, 2, "Refreshing cached database entry", "db"_attr = dbName);
 
@@ -760,8 +761,11 @@ CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDa
                                   "newDbVersion"_attr = newDbVersion,
                                   "oldDbVersion"_attr = previousDbVersion,
                                   "duration"_attr = Milliseconds(t.millis()));
+        _updateRefreshesStats(false);
         return CatalogCache::DatabaseCache::LookupResult(std::move(newDb), std::move(newDbVersion));
     } catch (const DBException& ex) {
+        _stats.countFailedDatabaseRefreshes.addAndFetch(1);
+        _updateRefreshesStats(false);
         LOGV2_FOR_CATALOG_REFRESH(24100,
                                   1,
                                   "Error refreshing cached database entry",
@@ -773,6 +777,26 @@ CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDa
         }
         throw;
     }
+}
+
+void CatalogCache::DatabaseCache::reportStats(BSONObjBuilder* builder) const {
+    _stats.report(builder);
+}
+
+void CatalogCache::DatabaseCache::_updateRefreshesStats(const bool add) {
+    if (add) {
+        _stats.numActiveDatabaseFullRefreshes.addAndFetch(1);
+        _stats.countDatabaseFullRefreshesStarted.addAndFetch(1);
+    } else {
+        _stats.numActiveDatabaseFullRefreshes.subtractAndFetch(1);
+    }
+}
+
+void CatalogCache::DatabaseCache::Stats::report(BSONObjBuilder* builder) const {
+    builder->append("numActiveFullDatabaseRefreshes", numActiveDatabaseFullRefreshes.load());
+    builder->append("countDatabaseFullRefreshesStarted", countDatabaseFullRefreshesStarted.load());
+
+    builder->append("countFailedDatabaseRefreshes", countFailedDatabaseRefreshes.load());
 }
 
 CatalogCache::CollectionCache::CollectionCache(
