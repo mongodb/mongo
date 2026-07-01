@@ -651,6 +651,7 @@ mongo_cc_unit_test(
     name = "db_storage_test",
     srcs = [
         "checkpoint_schedule_policy_test.cpp",
+        "checkpointer_test.cpp",
         "collection_truncate_markers_test.cpp",
         "disk_space_monitor_test.cpp",
         "index_entry_comparison_test.cpp",
@@ -672,6 +673,7 @@ mongo_cc_unit_test(
     ],
     deps = [
         ":checkpoint_schedule_policy",
+        ":checkpointer",
         ":disk_space_monitor",
         ":record_store_base",
         ":spill_table",

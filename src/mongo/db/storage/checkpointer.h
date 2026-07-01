@@ -90,6 +90,22 @@ public:
      */
     void shutdown(const Status& reason);
 
+    /**
+     * Blocks the checkpointer thread from running until the first checkpoint has been explicitly
+     * taken on step-up.
+     */
+    void pauseCheckpointing();
+
+    /**
+     * Once the first checkpoint has been taken, re-allow checkpointer thread activity.
+     */
+    void resumeCheckpointing();
+
+    /**
+     * Returns whether a pauseCheckpointing() request is currently in effect.
+     */
+    bool isPauseRequested();
+
 private:
     // Protects the state below.
     std::mutex _mutex;
@@ -107,6 +123,14 @@ private:
 
     // This flag allows the checkpoint thread to wake up early when _sleepCV is signaled.
     bool _triggerCheckpoint;
+
+    stdx::condition_variable _waitForPauseCV;
+
+    // These flags signal that we are waiting for the first checkpoint to be explicitly taken on
+    // first step-up.
+    bool _isPaused{false};
+
+    bool _pauseRequested{false};
 
     // Policy that governs when the checkpoint thread wakes to take a checkpoint.
     std::unique_ptr<CheckpointSchedulePolicy> _policy;
