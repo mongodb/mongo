@@ -200,6 +200,16 @@ public:
         MetricNameMaker::make("change_streams.cursor.open.total");
     static constexpr MetricName kChangeStreamCursorsOpenPinned =
         MetricNameMaker::make("change_streams.cursor.open.pinned");
+    static constexpr MetricName kChangeStreamCursorsOpenOptimeMin =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.cursor.open.optime.min");
+    static constexpr MetricName kChangeStreamCursorsOpenOptimeMax =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.cursor.open.optime.max");
+    static constexpr MetricName kChangeStreamBatchExecMicrosSum =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.batch.execMicros.sum");
+    static constexpr MetricName kChangeStreamBatchShardLatencyMicrosSum =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.batch.shardLatencyMicros.sum");
+    static constexpr MetricName kChangeStreamBatchConfigLatencyMicrosSum =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.batch.configLatencyMicros.sum");
     static constexpr MetricName kChangeStreamErrorNonRetriableHistoryLost = MetricNameMaker::make(
         "serverStatus.metrics.changeStreams.error.nonRetriable.changeStreamHistoryLost");
     static constexpr MetricName kChangeStreamErrorNonRetriableFatalError = MetricNameMaker::make(
@@ -252,6 +262,10 @@ public:
         MetricNameMaker::make("serverStatus.metrics.changeStreams.scope.db");
     static constexpr MetricName kChangeStreamScopeCollection =
         MetricNameMaker::make("serverStatus.metrics.changeStreams.scope.collection");
+    static constexpr MetricName kChangeStreamOptionCursorBatchSize =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.option.cursor.batchSize");
+    static constexpr MetricName kChangeStreamOptionCursorMaxTimeMS =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.option.cursor.maxTimeMS");
 
     // Storage Execution Team Metrics
     static constexpr MetricName kIndexBuildsActive = MetricNameMaker::make("index_builds.active");
