@@ -470,6 +470,13 @@ public:
     }
 
     /**
+     * Returns true if this is a $currentOp stage.
+     */
+    virtual bool isCurrentOpStage() const {
+        return false;
+    }
+
+    /**
      * Returns true if this is a search stage ($search, $vectorSearch, $rankFusion, etc.)
      */
     virtual bool isSearchStage() const {

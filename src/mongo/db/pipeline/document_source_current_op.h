@@ -132,6 +132,10 @@ public:
             return true;
         }
 
+        bool isCurrentOpStage() const final {
+            return true;
+        }
+
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
                                                      bool isImplicitDefault) const override {
             return onlyReadConcernLocalSupported(kStageName, level, isImplicitDefault);

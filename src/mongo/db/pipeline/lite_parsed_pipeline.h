@@ -239,6 +239,13 @@ public:
     }
 
     /**
+     * Returns true if the pipeline starts with a $currentOp stage.
+     */
+    bool startsWithCurrentOpStage() const {
+        return !_stageSpecs.empty() && _stageSpecs.front()->isCurrentOpStage();
+    }
+
+    /**
      * Returns true iff the pipeline has a $score stage.
      */
     bool hasScoreStage() const {

@@ -190,14 +190,20 @@ describe("Execution control deprioritization exemptions", function () {
                         .toArray();
                     return ops.length > 0;
                 });
-                assert.eq(getTotalMarkedNonDeprioritizableCount(primary), initialMarkedNonDeprioritizable);
+                assert.eq(
+                    getTotalMarkedNonDeprioritizableCount(primary),
+                    initialMarkedNonDeprioritizable + 1, // The +1 comes from the aggregate with the $currentOp
+                );
 
                 // Add exemption mid-operation.
                 setExecutionControlDeprioritizationExemptions(primary, [kExemptApp, appName]);
             } finally {
                 assert.commandWorked(primary.adminCommand({configureFailPoint: kFailPoint, mode: "off"}));
                 if (waitForShell) waitForShell();
-                assert.gt(getTotalMarkedNonDeprioritizableCount(primary), initialMarkedNonDeprioritizable);
+                assert.gt(
+                    getTotalMarkedNonDeprioritizableCount(primary),
+                    initialMarkedNonDeprioritizable + 1, // The +1 comes from the aggregate with the $currentOp
+                );
             }
         });
 
@@ -255,7 +261,10 @@ describe("Execution control deprioritization exemptions", function () {
             // After removing exemption, subsequent yields should deprioritize.
             assert.gt(getLowPriorityReadCount(primary), midOpLowPriority);
             // Since we were exempt before, the operation will be considered marked non-deprioritizable.
-            assert.gt(getTotalMarkedNonDeprioritizableCount(primary), initialMarkedNonDeprioritizable);
+            assert.gt(
+                getTotalMarkedNonDeprioritizableCount(primary),
+                initialMarkedNonDeprioritizable + 1, // The +1 comes from the aggregate with the $currentOp
+            );
         });
 
         it("should exempt operations matching app name prefix", function () {
