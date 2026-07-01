@@ -308,12 +308,23 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalDocumentResultsAndMet
     return cloned;
 }
 
+void DocumentSourceInternalDocumentResultsAndMetadata::elideMetadata() {
+    _metadata = boost::none;
+    _sourceStage->skipMetadataStream();
+}
+
 DocumentSourceContainer::iterator DocumentSourceInternalDocumentResultsAndMetadata::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     tassert(12615007, "Expecting DocumentSource iterator pointing to this stage.", *itr == this);
+    // If metadata was already elided (e.g. by the router before serializing to shards),
+    // propagate that to the source stage so it stops producing the metadata stream.
+    if (!_metadata) {
+        elideMetadata();
+        return std::next(itr);
+    }
     // Shards only see their local pipeline view, so $$SEARCH_META refs in the merge
     // pipeline are invisible to them. Only the router runs metadata elision.
-    if (getExpCtx()->getNeedsMerge() || !_metadata) {
+    if (getExpCtx()->getNeedsMerge()) {
         return std::next(itr);
     }
 
@@ -325,8 +336,7 @@ DocumentSourceContainer::iterator DocumentSourceInternalDocumentResultsAndMetada
         LOGV2_DEBUG(12615008,
                     4,
                     "Eliding metadata stream as no downstream stage references $$SEARCH_META.");
-        _metadata = boost::none;
-        _sourceStage->skipMetadataStream();
+        elideMetadata();
     }
     return std::next(itr);
 }

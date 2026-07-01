@@ -291,7 +291,31 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
 }
 
 TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
-       OptimizeSerializesWithoutMetadataAfterElision) {
+       OptimizeSkipsMetadataStreamWhenMetadataAlreadyAbsent) {
+    auto sourceStage = DocumentSourceMockSkipMetadataStream::create(getExpCtx());
+    auto* sourcePtr = sourceStage.get();
+    auto stage = DocumentSourceInternalDocumentResultsAndMetadata::create(
+        getExpCtx(), std::move(sourceStage), /*metadata=*/boost::none);
+    auto* ds = dynamic_cast<DocumentSourceInternalDocumentResultsAndMetadata*>(stage.get());
+    ASSERT(ds);
+    ASSERT_FALSE(ds->getMetadata().has_value());
+
+    auto downstreamStage =
+        DocumentSource::parse(getExpCtx(), BSON("$project" << BSON("x" << 1))).front();
+    DocumentSourceContainer pipeline;
+    pipeline.push_back(stage);
+    pipeline.push_back(downstreamStage);
+    ds->optimizeAt(pipeline.begin(), &pipeline);
+
+    ASSERT_FALSE(ds->getMetadata().has_value());
+    ASSERT_TRUE(sourcePtr->isMetadataStreamSkipped());
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       SerializedElidedStageRoundTripsWithoutMetadata) {
+    // Build the stage with metadata, then elide it via
+    // optimizeAt because no downstream stage references $$SEARCH_META. The serialized result
+    // is exactly the BSON a router ships to its shards.
     auto sourceStage = DocumentSource::parse(getExpCtx(), BSON("$collStats" << BSONObj())).front();
     auto stage = DocumentSourceInternalDocumentResultsAndMetadata::create(
         getExpCtx(), std::move(sourceStage), MetadataBindSpec("SEARCH_META"));
@@ -305,27 +329,15 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
     pipeline.push_back(stage);
     pipeline.push_back(downstreamStage);
     ds->optimizeAt(pipeline.begin(), &pipeline);
-
-    auto serialized = ds->serialize(query_shape::SerializationOptions{});
-    auto bson = serialized.getDocument().toBson();
-    auto inner = bson.getObjectField(kStageName);
-    ASSERT_FALSE(inner.hasField("metadata"));
-}
-
-TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
-       OptimizeNoOpWhenMetadataAlreadyAbsent) {
-    auto* ds = parse(BSON(kStageName << kSourceOnly));
     ASSERT_FALSE(ds->getMetadata().has_value());
 
-    auto downstreamStage =
-        DocumentSource::parse(getExpCtx(), BSON("$project" << BSON("x" << 1))).front();
-    DocumentSourceContainer pipeline;
-    pipeline.push_back(ds);
-    pipeline.push_back(downstreamStage);
-    ds->optimizeAt(pipeline.begin(), &pipeline);
+    auto serialized = ds->serialize().getDocument().toBson();
+    ASSERT_FALSE(serialized.getObjectField(kStageName).hasField("metadata"));
 
-    ASSERT_FALSE(ds->getMetadata().has_value());
-    ASSERT_EQ(pipeline.size(), 2u);
+    // Shard side - rebuilt stage must come back with metadata absent,
+    // proving the elision survives serialize -> parse.
+    auto* roundTripped = parse(serialized);
+    ASSERT_FALSE(roundTripped->getMetadata().has_value());
 }
 
 TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,

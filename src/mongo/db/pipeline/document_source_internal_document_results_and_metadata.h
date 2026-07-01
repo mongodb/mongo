@@ -185,6 +185,8 @@ public:
         bool returnCursor);
 
 private:
+    void elideMetadata();
+
     boost::intrusive_ptr<DocumentSource> _sourceStage;
     boost::optional<MetadataBindSpec> _metadata;
     bool _returnCursor;
