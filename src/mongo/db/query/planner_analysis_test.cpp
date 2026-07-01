@@ -56,14 +56,16 @@ using namespace std::literals::string_view_literals;
 /**
  * Make a minimal IndexEntry from just a key pattern. A dummy name will be added.
  */
-IndexEntry buildSimpleIndexEntry(const BSONObj& kp, WildcardProjection* wcProjection = nullptr) {
+IndexEntry buildSimpleIndexEntry(const BSONObj& kp,
+                                 WildcardProjection* wcProjection = nullptr,
+                                 bool sparse = false) {
     return {kp,
             IndexNames::nameToType(IndexNames::findPluginName(kp)),
             IndexConfig::kLatestIndexVersion,
             false,
             {},
             {},
-            false,
+            sparse,
             false,
             CoreIndexInfo::Identifier("test_foo"),
             {},
@@ -114,6 +116,14 @@ TEST(QueryPlannerAnalysis, CanUseIndexForRightSideOfLookupOnlyInClassic) {
     // A single index that can be used in SBE.
     indexList.clear();
     indexList.push_back(sbeIndex);
+    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(foreignField,
+                                                                                    indexList));
+
+    // A sparse (non-partial) index on the foreign field can now be used in SBE via the dynamic
+    // indexed loop join, so it must NOT force the $lookup into the classic engine.
+    auto sparseIndex = buildSimpleIndexEntry(BSON("b" << 1), nullptr, true /* sparse */);
+    indexList.clear();
+    indexList.push_back(sparseIndex);
     ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(foreignField,
                                                                                     indexList));
 }

@@ -24,6 +24,16 @@ export const JoinAlgorithm = {
     INLJ_Asc: {name: "INLJ_Asc", indexType: 1, strategy: "IndexedLoopJoin"},
     INLJ_Dec: {name: "INLJ_Dec", indexType: -1, strategy: "IndexedLoopJoin"},
     INLJ_Hashed: {name: "INLJ_Hashed", indexType: "hashed", strategy: "IndexedLoopJoin"},
+    // A sparse index forces the dynamic indexed loop join (DILJ): the index is seeked for non-null
+    // local keys and a collection scan is used for null/missing keys. Note: for
+    // DILJ to be chosen over a hash join on the small test collections, callers must disable the
+    // hash join strategy (see lookup_equijoin_semantics_sparse.js).
+    DILJ_Asc: {
+        name: "DILJ_Asc",
+        indexType: 1,
+        sparse: true,
+        strategy: "DynamicIndexedLoopJoin",
+    },
 };
 
 export function setupCollections(testConfig, localRecords, foreignRecords, foreignField) {
@@ -35,7 +45,8 @@ export function setupCollections(testConfig, localRecords, foreignRecords, forei
     assert.commandWorked(foreignColl.insert(foreignRecords));
     if (currentJoinAlgorithm.indexType) {
         const indexSpec = {[foreignField]: currentJoinAlgorithm.indexType};
-        assert.commandWorked(foreignColl.createIndex(indexSpec));
+        const indexOptions = currentJoinAlgorithm.sparse ? {sparse: true} : {};
+        assert.commandWorked(foreignColl.createIndex(indexSpec, indexOptions));
     }
     // For NLJ and HJ do not create an index.
 }
@@ -1006,9 +1017,13 @@ export function runTests(testConfig) {
             foreignField: "b",
             idsExpectedToMatch: [0, 1, 2, 3, 4, 5],
         });
-        // SERVER-64221/SERVER-27442: matching to null isn't consistent.
+        // Matching to null is inconsistent between collection-scan-based joins (NLJ/HJ), which
+        // match [10, 11], and index-based joins (INLJ), which do not. DILJ_Asc falls back to a
+        // collection scan for null/missing local keys, so it matches the scan-based result.
         const S64221 =
-            currentJoinAlgorithm == JoinAlgorithm.NLJ || currentJoinAlgorithm == JoinAlgorithm.HJ
+            currentJoinAlgorithm == JoinAlgorithm.NLJ ||
+            currentJoinAlgorithm == JoinAlgorithm.HJ ||
+            currentJoinAlgorithm == JoinAlgorithm.DILJ_Asc
                 ? [10, 11]
                 : [];
         runTest_SingleLocalRecord(testConfig, {

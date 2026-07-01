@@ -28,3 +28,9 @@ filters:
   - "lookup_unwind_sbe_pushdown.js":
     approvers:
       - 10gen/query-execution
+  - "lookup_equijoin_semantics_sparse.js":
+    approvers:
+      - 10gen/query-execution
+  - "lookup_equijoin_semantics_lib.js":
+    approvers:
+      - 10gen/query-execution

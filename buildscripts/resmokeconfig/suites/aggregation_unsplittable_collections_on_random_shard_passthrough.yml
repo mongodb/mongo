@@ -21,6 +21,7 @@ selector:
     - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_inlj.js
     - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_nlj.js
     - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_hj.js
+    - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_sparse.js
 
     # Includes expectations on failpoints being hit on specific shards.
     - jstests/aggregation/sources/indexStats/verify_index_stats_output.js

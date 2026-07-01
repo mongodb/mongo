@@ -1245,6 +1245,8 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
     const CollectionPtr& foreignColl,
     const FieldPath& foreignFieldName,
     const IndexBoundsEvaluationInfo& indexBoundsEvaluationInfo,
+    bool collationCompatibleForDilj,
+    bool indexIsSparse,
     const PlanNodeId nodeId,
     boost::optional<UnwindNode::UnwindSpec> unwindSpec,
     boost::optional<sbe::value::SlotId> indexSlot) {
@@ -1274,19 +1276,39 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
     auto indexLookupBranchForeignFieldTopLevelSlot =
         indexSlots.get(std::make_pair(PlanStageSlots::SlotType::kField, foreignFieldName.front()));
 
-    // Build the typeMatch filter expression
-    sbe::FrameId frameId = state.frameId();
-    auto lambdaArg = SbExpr{SbVar{frameId, 0}};
-    SbExpr typeMatchLambdaFilter = b.makeFunction(
-        sbe::EFn::kTypeMatch,
-        lambdaArg.clone(),
-        b.makeInt32Constant(getBSONTypeMask(BSONType::string) | getBSONTypeMask(BSONType::array) |
-                            getBSONTypeMask(BSONType::object)));
-    auto typeMatchLambdaFunction = b.makeLocalLambda(frameId, std::move(typeMatchLambdaFilter));
-    auto filter = b.makeNot(b.makeFunction(sbe::EFn::kTraverseF,
-                                           SbExpr{localKeysSetSlot},
-                                           std::move(typeMatchLambdaFunction),
-                                           b.makeBoolConstant(false) /*compareArray*/));
+    // Build the filter that selects the index branch; when it evaluates to false the branch stage
+    // falls back to the collection scan. The index branch may only be taken for local keys that the
+    // foreign index can answer completely and with correct ordering:
+    //   - Incompatible collation: collation-sensitive types (string/array/object) must use the
+    //     scan, since their equality/ordering depends on the query collation.
+    //   - Sparse index: a null or missing local key (both encoded as 'null' in the local key set
+    //     by buildKeySetForLocal) must use the scan, since a sparse index omits foreign documents
+    //     that are missing the field.
+    // 'traverseF' returns true if any key in the set matches the type mask, so the guard is the
+    // negation: "no local key matches the disallowed types".
+    auto makeNoLocalKeyMatchesGuard = [&](uint32_t typeMask) {
+        sbe::FrameId frameId = state.frameId();
+        auto lambda = b.makeLocalLambda(frameId,
+                                        b.makeFunction(sbe::EFn::kTypeMatch,
+                                                       SbExpr{SbVar{frameId, 0}},
+                                                       b.makeInt32Constant(typeMask)));
+        return b.makeNot(b.makeFunction(sbe::EFn::kTraverseF,
+                                        SbExpr{localKeysSetSlot},
+                                        std::move(lambda),
+                                        b.makeBoolConstant(false) /*compareArray*/));
+    };
+
+    uint32_t typeMask = 0;
+    if (!collationCompatibleForDilj) {
+        typeMask |= getBSONTypeMask(BSONType::string) | getBSONTypeMask(BSONType::array) |
+            getBSONTypeMask(BSONType::object);
+    }
+    if (indexIsSparse) {
+        typeMask |= getBSONTypeMask(BSONType::null);
+    }
+    // DILJ is only chosen when at least one of the above reasons holds; if neither does, default to
+    // always taking the index branch.
+    auto filter = typeMask ? makeNoLocalKeyMatchesGuard(typeMask) : b.makeBoolConstant(true);
 
     auto nestedLoopFallbackRecordSlot = nestedLoopFallbackSlots.getResultObj();
     auto nestedLoopFallbackFieldNameSlot = nestedLoopFallbackSlots.get(
@@ -1611,20 +1633,23 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildEqLookup(
                               reqs.copyForChild().setResultObj().setFields(std::vector<std::string>{
                                   std::string(eqLookupNode->joinFieldForeign.front())}));
 
-                    return buildDynamicIndexedLoopJoinLookupStage(_state,
-                                                                  std::move(localStage),
-                                                                  localOutputs,
-                                                                  std::move(indexStage),
-                                                                  indexSlots,
-                                                                  std::move(fallbackStage),
-                                                                  fallbackSlots,
-                                                                  eqLookupNode->joinFieldLocal,
-                                                                  foreignColl,
-                                                                  eqLookupNode->joinFieldForeign,
-                                                                  indexInfo,
-                                                                  eqLookupNode->nodeId(),
-                                                                  eqLookupNode->unwindSpec,
-                                                                  indexSlotId);
+                    return buildDynamicIndexedLoopJoinLookupStage(
+                        _state,
+                        std::move(localStage),
+                        localOutputs,
+                        std::move(indexStage),
+                        indexSlots,
+                        std::move(fallbackStage),
+                        fallbackSlots,
+                        eqLookupNode->joinFieldLocal,
+                        foreignColl,
+                        eqLookupNode->joinFieldForeign,
+                        indexInfo,
+                        eqLookupNode->collationCompatibleForDilj,
+                        indexScan->index.sparse,
+                        eqLookupNode->nodeId(),
+                        eqLookupNode->unwindSpec,
+                        indexSlotId);
                 }
             }
             case EqLookupNode::LookupStrategy::kNestedLoopJoin: {

@@ -1829,12 +1829,14 @@ struct EqLookupNode : public QuerySolutionNode {
                  const FieldPath& joinFieldForeign,
                  const FieldPath& joinField,
                  EqLookupNode::LookupStrategy lookupStrategy,
-                 bool shouldProduceBson)
+                 bool shouldProduceBson,
+                 bool collationCompatibleForDilj = true)
         : foreignCollection(foreignCollection),
           joinFieldLocal(joinFieldLocal),
           joinFieldForeign(joinFieldForeign),
           joinField(joinField),
           lookupStrategy(lookupStrategy),
+          collationCompatibleForDilj(collationCompatibleForDilj),
           shouldProduceBson(shouldProduceBson) {
         tassert(11801400, "EqLookupNode needs at least two input streams", children.size() > 1);
         tassert(11801401,
@@ -1862,14 +1864,16 @@ struct EqLookupNode : public QuerySolutionNode {
                  EqLookupNode::LookupStrategy lookupStrategy,
                  bool shouldProduceBson,
                  bool preserveNullAndEmptyArrays,
-                 const boost::optional<FieldPath>& indexPath)
+                 const boost::optional<FieldPath>& indexPath,
+                 bool collationCompatibleForDilj = true)
         : EqLookupNode(std::move(children),
                        foreignCollection,
                        joinFieldLocal,
                        joinFieldForeign,
                        joinField,
                        lookupStrategy,
-                       shouldProduceBson) {
+                       shouldProduceBson,
+                       collationCompatibleForDilj) {
         unwindSpec.emplace(
             UnwindNode::UnwindSpec{joinField, preserveNullAndEmptyArrays, indexPath});
     }
@@ -1932,6 +1936,14 @@ struct EqLookupNode : public QuerySolutionNode {
      * as it's applicable independent of collection sizes or the availability of indexes.
      */
     LookupStrategy lookupStrategy = LookupStrategy::kNestedLoopJoin;
+
+    /**
+     * Only meaningful when 'lookupStrategy' is kDynamicIndexedLoopJoin. True if the chosen index
+     * has a collation compatible with the query (no run-time type check needed for collation).
+     * False if the collation is incompatible and the type check is required. (The other reason for
+     * DILJ -- a sparse index -- is derived at lowering directly from the index's 'sparse' flag.)
+     */
+    bool collationCompatibleForDilj = true;
 
     /**
      * If set to true, generated SBE plan will produce result as BSON object. If false,

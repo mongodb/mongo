@@ -1907,7 +1907,7 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
 
         auto lookupStage = dynamic_cast<DocumentSourceLookUp*>(innerStage);
         if (lookupStage) {
-            auto [strategy, idxEntry, scanDirection] =
+            auto [strategy, idxEntry, scanDirection, collationCompatibleForDilj] =
                 QueryPlannerAnalysis::determineLookupStrategy(
                     lookupStage->getFromNs(),
                     lookupStage->getForeignField()->fullPath(),
@@ -1961,7 +1961,8 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
                                                    lookupStage->getForeignField()->fullPath(),
                                                    lookupStage->getAsField().fullPath(),
                                                    strategy,
-                                                   isLastSource /* shouldProduceBson */);
+                                                   isLastSource /* shouldProduceBson */,
+                                                   collationCompatibleForDilj);
             } else {
                 const boost::intrusive_ptr<DocumentSourceUnwind>& unwindSrc =
                     lookupStage->getUnwindSource();
@@ -1976,7 +1977,8 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
                                                    isLastSource /* shouldProduceBson */,
                                                    // $unwind-specific data members.
                                                    unwindSrc->preserveNullAndEmptyArrays(),
-                                                   unwindSrc->indexPath());
+                                                   unwindSrc->indexPath(),
+                                                   collationCompatibleForDilj);
             }
             continue;
         }

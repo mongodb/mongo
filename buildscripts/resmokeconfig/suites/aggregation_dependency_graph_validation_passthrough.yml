@@ -26,6 +26,9 @@ selector:
     - jstests/aggregation/sources/group/groupMissing.js
     # TODO SERVER-127292
     - jstests/aggregation/sbe/sbe_pushdown_replan_reason.js
+    # Numeric field names in the lookup join keys trigger a pre-existing bug in dependency graph
+    # validation (canPathBeArray() false-negative), unrelated to this test's logic (SERVER-127302).
+    - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_sparse.js
     # TODO SERVER-127292: $_internalAssertDataAssumptions blocks SBE pushdown, causing $lookup to
     # fall back to the classic engine which does a full foreign collection scan per local document,
     # making scannedObjects counts diverge from the SBE-optimized values this test asserts.

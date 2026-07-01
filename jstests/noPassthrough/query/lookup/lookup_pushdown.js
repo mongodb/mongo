@@ -27,6 +27,7 @@ const JoinAlgorithm = {
     INLJ: 2,
     HJ: 3,
     NonExistentForeignCollection: 4,
+    DILJ: 5,
 };
 
 // Standalone cases.
@@ -113,6 +114,8 @@ function getJoinAlgorithmStrategyName(joinAlgorithm) {
             return "IndexedLoopJoin";
         case JoinAlgorithm.HJ:
             return "HashJoin";
+        case JoinAlgorithm.DILJ:
+            return "DynamicIndexedLoopJoin";
         case JoinAlgorithm.NonExistentForeignCollection:
             return "NonExistentForeignCollection";
         case JoinAlgorithm.Classic:
@@ -624,22 +627,36 @@ function setLookupPushdownDisabled(value) {
     assert.commandWorked(foreignColl.dropIndexes());
 })();
 
-// Build a sparse index on the foreign collection that matches the foreignField. In this case, we
-// should use classic.
-(function testSparseIndexesNotUsedForPushDown() {
+// Build a sparse index on the foreign collection that matches the foreignField. SBE can use a
+// sparse index via the dynamic indexed loop join (DILJ), which decides per local key whether the
+// sparse index is safe to seek or a collection scan is required; a hash join is used instead when
+// disk use is allowed and the foreign collection is small.
+(function testSparseIndexUsedForPushDown() {
     assert.commandWorked(foreignColl.dropIndexes());
     assert.commandWorked(foreignColl.createIndex({b: 1}, {sparse: true}));
+    const pipeline = [
+        {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
+    ];
+
+    // With disk use allowed and a small foreign collection, a hash join is chosen.
+    runTest(coll, pipeline, JoinAlgorithm.HJ /* expectedJoinAlgorithm */);
+
+    // With hash join disabled, the dynamic indexed loop join is used so the sparse index can still
+    // be leveraged for non-null local keys.
     runTest(
         coll,
-        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-        JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
+        pipeline,
+        JoinAlgorithm.DILJ /* expectedJoinAlgorithm */,
+        null /* indexKeyPattern */,
+        {allowDiskUse: false} /* aggOptions */,
     );
 
-    // If we add an index that is not a sparse index, we should then use INLJ.
+    // If we add a non-sparse index, it is preferred and we use INLJ (no regression from making
+    // sparse indexes eligible).
     assert.commandWorked(foreignColl.createIndex({b: 1, a: 1}));
     runTest(
         coll,
-        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+        pipeline,
         JoinAlgorithm.INLJ /* expectedJoinAlgorithm */,
         {b: 1, a: 1} /* indexKeyPattern */,
     );

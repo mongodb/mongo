@@ -159,6 +159,10 @@ public:
         EqLookupNode::LookupStrategy strategy;
         boost::optional<IndexEntry> indexEntry;
         NaturalOrderHint::Direction scanDirection = NaturalOrderHint::Direction::kForward;
+        // Only meaningful for kDynamicIndexedLoopJoin: true if the chosen index has a collation
+        // compatible with the query (no run-time type check needed for collation). (Sparseness, the
+        // other reason for DILJ, is derived at lowering from the index itself.)
+        bool collationCompatibleForDilj = true;
     };
     /**
      * For the provided 'foreignCollName' and 'foreignFieldName' corresponding to an EqLookupNode,

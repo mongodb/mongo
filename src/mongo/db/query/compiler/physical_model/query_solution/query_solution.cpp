@@ -1961,7 +1961,8 @@ std::unique_ptr<QuerySolutionNode> EqLookupNode::clone() const {
                                               lookupStrategy,
                                               shouldProduceBson,
                                               unwindSpec->preserveNullAndEmptyArrays,
-                                              unwindSpec->indexPath);
+                                              unwindSpec->indexPath,
+                                              collationCompatibleForDilj);
     }
     return std::make_unique<EqLookupNode>(std::move(childrenClone),
                                           foreignCollection,
@@ -1969,7 +1970,8 @@ std::unique_ptr<QuerySolutionNode> EqLookupNode::clone() const {
                                           joinFieldForeign,
                                           joinField,
                                           lookupStrategy,
-                                          shouldProduceBson);
+                                          shouldProduceBson,
+                                          collationCompatibleForDilj);
 }
 
 /**
