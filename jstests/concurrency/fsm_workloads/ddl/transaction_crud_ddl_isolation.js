@@ -36,7 +36,6 @@
 
 import {withTxnAndAutoRetry} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
-import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 export const $config = (function () {
     const kMetaDocId = "meta";
@@ -235,9 +234,6 @@ export const $config = (function () {
 
     // Create N databases, each with M collections, randomly sharded or unsharded.
     var setup = function (db, collName, cluster) {
-        // TODO SERVER-130089: re-enable this test.
-        skipTestIfAuthoritativeShardsEnabled(db);
-
         this.isShardedCluster = cluster.isSharded();
 
         // Create collections across multiple databases
