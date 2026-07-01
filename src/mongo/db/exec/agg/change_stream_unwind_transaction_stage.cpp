@@ -422,6 +422,9 @@ void ChangeStreamUnwindTransactionStage::TransactionOpIterator::_addAffectedName
         return;
     }
 
+    // The only supported DDL commands inside transactions are "create" and "createIndexes".
+    // Creating databases, dropping collections, databases or indexes are not supported. Neither are
+    // renaming nor collMod operations.
     constexpr std::array<std::string_view, 2> kCollectionField = {"create"sv, "createIndexes"sv};
     const Document& object = doc["o"sv].getDocument();
     for (const auto& fieldName : kCollectionField) {

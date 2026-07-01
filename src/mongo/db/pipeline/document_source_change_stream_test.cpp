@@ -3269,6 +3269,57 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsWithCreateOperation) {
     ASSERT_EQ(ResumeToken::parse(nextDoc["_id"].getDocument()).getData().txnOpIndex, 3);
 }
 
+// Helper class for testing that an unexpected command type is unwound inside a transactional
+// applyOps oplog entry throws an expected assertion.
+class ChangeStreamUnwindTransactionApplyOpsDeathTest : public ChangeStreamStageTestDeathTest {
+public:
+    void assertThrowsUnexpectedOpInApplyOpsAssertion(const Document& commandDoc) {
+        unittest::ServerParameterGuard controller("featureFlagEndOfTransactionChangeEvent", true);
+
+        Document applyOpsDoc{{"applyOps", Value{std::vector<Document>{commandDoc}}}};
+
+        LogicalSessionFromClient lsid = testLsid();
+        ASSERT_THROWS_CODE(getApplyOpsResults(applyOpsDoc, lsid, kShowExpandedEventsSpec),
+                           AssertionException,
+                           7694300);
+    }
+};
+
+DEATH_TEST_REGEX_F(ChangeStreamUnwindTransactionApplyOpsDeathTest,
+                   TransformApplyOpsWithCollModOperation,
+                   "Tripwire assertion.*7694300") {
+    assertThrowsUnexpectedOpInApplyOpsAssertion(
+        Document{{"op", "c"sv},
+                 {"ns", std::string(nss.db_forTest()) + ".$cmd"},
+                 {"ui", testUuid()},
+                 {"o", Value{Document{{"collMod", nss.coll()}}}},
+                 // collMod handler reads o2 for stateBeforeChange (collectionOptions_old,
+                 // indexOptions_old); provide an empty document to avoid a crash on missing o2.
+                 {"o2", Value{Document{}}}});
+}
+
+DEATH_TEST_REGEX_F(ChangeStreamUnwindTransactionApplyOpsDeathTest,
+                   TransformApplyOpsWithDropOperation,
+                   "Tripwire assertion.*7694300") {
+    assertThrowsUnexpectedOpInApplyOpsAssertion(
+        Document{{"op", "c"sv},
+                 {"ns", std::string(nss.db_forTest()) + ".$cmd"},
+                 {"ui", testUuid()},
+                 {"o", Value{Document{{"drop", nss.coll()}}}}});
+}
+
+DEATH_TEST_REGEX_F(ChangeStreamUnwindTransactionApplyOpsDeathTest,
+                   TransformApplyOpsWithDropIndexesOperation,
+                   "Tripwire assertion.*7694300") {
+    assertThrowsUnexpectedOpInApplyOpsAssertion(
+        Document{{"op", "c"sv},
+                 {"ns", std::string(nss.db_forTest()) + ".$cmd"},
+                 {"ui", testUuid()},
+                 {"o", Value{Document{{"dropIndexes", nss.coll()}, {"index", "x_1"sv}}}},
+                 // dropIndexes handler reads o2 as the index spec for operationDescription.
+                 {"o2", Value{Document{{"key", Document{{"x", 1}}}, {"name", "x_1"sv}}}}});
+}
+
 TEST_F(ChangeStreamStageTest, ClusterTimeMatchesOplogEntry) {
     const Timestamp ts(3, 45);
     const long long term = 4;
