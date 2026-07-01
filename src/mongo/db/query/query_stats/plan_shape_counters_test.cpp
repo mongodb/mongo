@@ -39,6 +39,7 @@
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
+#include <bitset>
 #include <functional>
 #include <memory>
 #include <string>
@@ -248,18 +249,75 @@ public:
         // name.
         // COLLSCAN access path.
         add(makeCollScan(), PlanShapeCounter::kCollscan);
+        add(makeProjection(makeCollScan()), PlanShapeCounter::kCollscanProject);
+        add(makeSort(makeProjection(makeCollScan())), PlanShapeCounter::kCollscanProjectSort);
+        add(makeProjection(makeSort(makeProjection(makeCollScan()))),
+            PlanShapeCounter::kCollscanProjectSortProject);
+        add(makeSort(makeCollScan()), PlanShapeCounter::kCollscanSort);
+        add(makeProjection(makeSort(makeCollScan())), PlanShapeCounter::kCollscanSortProject);
+        add(makeSort(makeProjection(makeSort(makeCollScan()))),
+            PlanShapeCounter::kCollscanSortProjectSort);
 
         // Linear shapes rooted in IXSCAN-FETCH.
         add(makeFetch(makeIxScan()), PlanShapeCounter::kIxscanFetch);
+        add(makeProjection(makeFetch(makeIxScan())), PlanShapeCounter::kIxscanFetchProject);
+        add(makeSort(makeProjection(makeFetch(makeIxScan()))),
+            PlanShapeCounter::kIxscanFetchProjectSort);
+        add(makeProjection(makeSort(makeProjection(makeFetch(makeIxScan())))),
+            PlanShapeCounter::kIxscanFetchProjectSortProject);
+        add(makeSort(makeFetch(makeIxScan())), PlanShapeCounter::kIxscanFetchSort);
+        add(makeProjection(makeSort(makeFetch(makeIxScan()))),
+            PlanShapeCounter::kIxscanFetchSortProject);
+        add(makeSort(makeProjection(makeSort(makeFetch(makeIxScan())))),
+            PlanShapeCounter::kIxscanFetchSortProjectSort);
+
+        // FETCH(IXSCAN) branches under an OR.
+        add(makeFetchOr(), PlanShapeCounter::kIxscanFetchOr);
+        add(makeProjection(makeFetchOr()), PlanShapeCounter::kIxscanFetchOrProject);
+        add(makeSort(makeProjection(makeFetchOr())), PlanShapeCounter::kIxscanFetchOrProjectSort);
+        add(makeSort(makeFetchOr()), PlanShapeCounter::kIxscanFetchOrSort);
+        add(makeProjection(makeSort(makeFetchOr())), PlanShapeCounter::kIxscanFetchOrSortProject);
 
         // Fetched OR over IXSCAN branches.
         add(makeOrFetch(), PlanShapeCounter::kIxscanOrFetch);
+        add(makeProjection(makeOrFetch()), PlanShapeCounter::kIxscanOrFetchProject);
+        add(makeSort(makeProjection(makeOrFetch())), PlanShapeCounter::kIxscanOrFetchProjectSort);
+        add(makeSort(makeOrFetch()), PlanShapeCounter::kIxscanOrFetchSort);
+        add(makeProjection(makeSort(makeOrFetch())), PlanShapeCounter::kIxscanOrFetchSortProject);
+
+        // Covered OR shapes (no fetch above the OR).
+        add(makeProjection(makeCoveredOr()), PlanShapeCounter::kIxscanOrProject);
+        add(makeSort(makeProjection(makeCoveredOr())), PlanShapeCounter::kIxscanOrProjectSort);
+
+        // Covered single-index shapes.
+        add(makeProjection(makeIxScan()), PlanShapeCounter::kIxscanProject);
+        add(makeSort(makeProjection(makeIxScan())), PlanShapeCounter::kIxscanProjectSort);
+        add(makeProjection(makeSort(makeProjection(makeIxScan()))),
+            PlanShapeCounter::kIxscanProjectSortProject);
 
         // Shapes that sort index keys before fetching.
         add(makeFetch(makeSort(makeIxScan())), PlanShapeCounter::kIxscanSortFetch);
+        add(makeProjection(makeFetch(makeSort(makeIxScan()))),
+            PlanShapeCounter::kIxscanSortFetchProject);
 
         // SORT_MERGE shapes.
+        add(makeFetchSortMerge(), PlanShapeCounter::kIxscanFetchSortMerge);
+        add(makeProjection(makeFetchSortMerge()), PlanShapeCounter::kIxscanFetchSortMergeProject);
         add(makeSortMergeFetch(), PlanShapeCounter::kIxscanSortMergeFetch);
+        add(makeProjection(makeSortMergeFetch()), PlanShapeCounter::kIxscanSortMergeFetchProject);
+        add(makeProjection(makeCoveredSortMerge()), PlanShapeCounter::kIxscanSortMergeProject);
+
+        // Vary the specific type of projection, both should match.
+        add(std::make_unique<ProjectionNodeSimple>(makeCollScan(), nullptr, parseProjection()),
+            PlanShapeCounter::kCollscanProject);
+        add(std::make_unique<ProjectionNodeCovered>(
+                makeIxScan(), nullptr, parseProjection(), BSON("a" << 1)),
+            PlanShapeCounter::kIxscanProject);
+        add(std::make_unique<SortNodeSimple>(
+                makeCollScan(), BSON("a" << 1), 0, LimitSkipParameterization::Disabled),
+            PlanShapeCounter::kCollscanSort);
+        // A sort with an absorbed limit (top-N sort) is still a "SORT".
+        add(makeSort(makeCollScan(), 5 /* limit */), PlanShapeCounter::kCollscanSort);
 
         // The shapes intentionally don't distinguish nodes with and without filters.
         {
@@ -272,6 +330,11 @@ public:
             fetch->filter = trivialFilter();
             add(std::move(fetch), PlanShapeCounter::kIxscanFetch);
         }
+
+        // Plan shape analysis ignored skip and limit, so we should still match `kCollscanSort`
+        add(makeLimit(makeSkip(makeSort(makeCollScan()))), PlanShapeCounter::kCollscanSort);
+        add(makeProjection(makeLimit(makeSort(makeSkip(makeFetch(makeIxScan()))))),
+            PlanShapeCounter::kIxscanFetchSortProject);
 
         // Plans that should match no shape.
         // Without extension information (a plain solution whose root is a MATCH), the MATCH is
@@ -348,6 +411,21 @@ TEST_F(PlanShapeCountersTest, ExpectedShapeCounters) {
     for (size_t i = 0; i < cases.size(); ++i) {
         const auto& [solution, expected] = cases[i];
         assertShape(*solution, expected, str::stream() << "expected " << counterToStr(expected));
+    }
+}
+
+// This test will fail in case our plan shape counters are added to, but the new shape is not
+// tested.
+TEST_F(PlanShapeCountersTest, TestCasesCoverEveryShape) {
+    std::bitset<kNumPlanShapeCounters> covered;
+    for (auto&& testCase : makeShapeTestCases()) {
+        if (testCase.expected) {
+            covered.set(static_cast<size_t>(*testCase.expected));
+        }
+    }
+    for (size_t i = 0; i < kNumPlanShapeCounters; ++i) {
+        ASSERT(covered.test(i)) << "no test case expects shape "
+                                << toStringData(static_cast<PlanShapeCounter>(i));
     }
 }
 

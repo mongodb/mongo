@@ -29,7 +29,10 @@
 
 #pragma once
 
+#include "mongo/db/exec/container_size_helper.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+
+#include <span>
 
 /**
  * Framework for matching patterns in QuerySolutions.
@@ -193,6 +196,8 @@ struct Range {
     Range(size_t index) : min(index), max(index + 1) {}
     explicit Range(size_t amin, size_t amax) : min(amin), max(amax) {}
 
+    bool operator==(const Range&) const = default;
+
     bool contains(size_t childIndex) const {
         return childIndex >= min && childIndex < max;
     }
@@ -232,14 +237,15 @@ public:
                  PredicateType predicate = PredicateType::kNone);
 
     /**
-     * Like 'addState' above, but transitions to a single new state when the machine receives a node
-     * of any of the types in 'stages'. Useful for matching a family of related node types (e.g. all
-     * projection or sort variants) as one logical step in a pattern.
+     * Like 'addState' above, but if 'state' already has a transition for this stage (because an
+     * earlier pattern that shares this prefix added it), returns that existing destination state
+     * instead of adding a conflicting duplicate. This lets several patterns be assembled into one
+     * shared trie by simply walking each pattern's path step by step.
      */
-    int addState(int state,
-                 std::initializer_list<StageType> stages,
-                 Range allowedChildren,
-                 PredicateType predicate = PredicateType::kNone);
+    int addOrGetState(int state,
+                      StageType stage,
+                      Range allowedChildren,
+                      PredicateType predicate = PredicateType::kNone);
 
     void addMatch(int state) {
         validateState(state);
@@ -250,6 +256,23 @@ public:
         validateState(state);
         _states[state].isMatch = true;
         _states[state].matchTag = matchTag;
+    }
+
+    void shrinkToFit() {
+        _states.shrink_to_fit();
+    }
+
+    /**
+     * Estimate memory usage in bytes of this object.
+     */
+    size_t sizeInBytes() const {
+        return sizeof(*this) +
+            container_size_helper::estimateObjectSizeInBytes(
+                   _states,
+                   [](const StateSpec& state) {
+                       return container_size_helper::estimateObjectSizeInBytes(state.edges);
+                   },
+                   true /* includeShallowSize */);
     }
 
 private:

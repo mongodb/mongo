@@ -54,22 +54,21 @@ int StateMachine::addState(int state,
     return nextState;
 }
 
-int StateMachine::addState(int state,
-                           std::initializer_list<StageType> stages,
-                           Range allowedChildren,
-                           PredicateType predicate) {
+int StateMachine::addOrGetState(int state,
+                                StageType stage,
+                                Range allowedChildren,
+                                PredicateType predicate) {
     validateState(state);
-    int nextState = allocState();
-    validateState(nextState);
-
-    StateSpec& spec = _states[state];
-    for (const StageType stage : stages) {
-        auto res = spec.edges.emplace(stage, Edge{predicate, allowedChildren, nextState});
-        tassert(
-            11907600, "Engine selection state machine doesn't have unique transitions", res.second);
+    const auto& edges = _states[state].edges;
+    if (auto it = edges.find(stage); it != edges.end()) {
+        const Edge& existingEdge = it->second;
+        tassert(11907605,
+                "addOrGetState found an existing transition with conflicting constraints",
+                existingEdge.allowedChildren == allowedChildren &&
+                    existingEdge.predicate == predicate);
+        return existingEdge.nextState;
     }
-
-    return nextState;
+    return addState(state, stage, allowedChildren, predicate);
 }
 
 StateMachineMatcher::StateMachineMatcher(const StateMachine& machine, bool ignoreNonEssentialNodes)
