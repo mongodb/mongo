@@ -34,14 +34,10 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_ranking/cbr_plan_ranking.h"
-#include "mongo/db/query/plan_ranking/cost_based_plan_ranking.h"
 #include "mongo/db/query/plan_ranking/plan_ranker_method.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/logv2/log.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryCE
 
 namespace mongo {
 namespace plan_ranking {
@@ -100,28 +96,15 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
         return out;
     }
 
-    // Determine collection size.
-    const auto& mainColl = collections.getMainCollection();
-    const size_t collSize = mainColl ? static_cast<size_t>(mainColl->numRecords(opCtx)) : 0;
-    const size_t planEvaluationWorks = static_cast<size_t>(internalQueryPlanEvaluationWorks.load());
-    const bool isSmallCollection = collSize > 0 && collSize < planEvaluationWorks;
-
-    // Compute CBR cost before solutions are moved to the multi-planner. CBR cost comparison is only
-    // relevant for small collections and no early exit of MP capped trial.
-    boost::optional<cost_based_ranker::CostEstimate> cbrCost;
-    if (isSmallCollection) {
-        cbrCost = estimateCBRCost(query, solutions);
-    }
-
     auto solutionsSize = solutions.size();  // Caching the value before moving it.
     _multiPlanner.emplace(std::move(plannerData), std::move(solutions), PlanExplainerData{});
     // Cap the number of works per plan during this first trials phase so that the total works
-    // across all plans does not exceed planEvaluationWorks.
+    // across all plans does not exceed internalQueryPlanEvaluationWorks.
     auto trialsConfig = _multiPlanner->getTrialPhaseConfig();
-    auto cappedTrialsConfig =
-        trial_period::TrialPhaseConfig{.maxNumWorksPerPlan = planEvaluationWorks / solutionsSize,
-                                       .targetNumResults = trialsConfig.targetNumResults,
-                                       .isCappedTrialPhase = true};
+    auto cappedTrialsConfig = trial_period::TrialPhaseConfig{
+        .maxNumWorksPerPlan = internalQueryPlanEvaluationWorks.load() / solutionsSize,
+        .targetNumResults = trialsConfig.targetNumResults,
+        .isCappedTrialPhase = true};
     auto mpTrialsStatus = _multiPlanner->runTrials(cappedTrialsConfig);
     if (!mpTrialsStatus.isOK()) {
         return mpTrialsStatus;
@@ -129,44 +112,15 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
     auto stats = _multiPlanner->getSpecificStats();
     bool isExplain = query.getExplain().has_value();
 
-    // For small collections where no results were found, compare the estimated remaining MP
-    // cost against the CBR cost to decide whether to finish with the multiplanner.
-    bool finishWithMultiplanner = false;
-    if (isSmallCollection && !stats->earlyExit && stats->numResultsFound == 0) {
-        const size_t cappedWorksPerPlan = cappedTrialsConfig.maxNumWorksPerPlan;
-        auto estResWithStatus = _multiPlanner->estimateAllPlans();
-        if (estResWithStatus.isOK()) {
-            const auto& estRes = estResWithStatus.getValue();
-            const size_t maxNumWorksPerPlan = std::min(collSize, trialsConfig.maxNumWorksPerPlan);
-            tassert(11571401,
-                    "expected maxNumWorksPerPlan to exceed cappedWorksPerPlan",
-                    cappedWorksPerPlan <= maxNumWorksPerPlan);
-            const size_t remWorksPerPlan = maxNumWorksPerPlan - cappedWorksPerPlan;
-            auto totalCostPerEstWork = estRes.totalCost * (1.0 / cappedWorksPerPlan);
-            auto remMPCost = remWorksPerPlan * totalCostPerEstWork;
-            finishWithMultiplanner = approxLtEq(remMPCost, *cbrCost);
-            LOGV2_DEBUG(11571402,
-                        2,
-                        "CBRForNoMPResults: comparing remaining MP cost with CBR cost",
-                        "collSize"_attr = collSize,
-                        "cappedWorksPerPlan"_attr = cappedWorksPerPlan,
-                        "remWorksPerPlan"_attr = remWorksPerPlan,
-                        "remMPCost"_attr = remMPCost.toString(),
-                        "cbrCost"_attr = cbrCost->toString(),
-                        "finishWithMultiplanner"_attr = finishWithMultiplanner);
-        }
-    }
-
     // We're using CBR to pick a plan only if multiplanner did not produce any results during the
     // trials phase and did not exit early either.
     //
     // Specifically applied as follows:
     // 1. Try multiplanner first: If it produced any results during trials phase or exited early,
-    //    pick best plan from it. Also stay with multiplanner if the expected cost to finish MP
-    //    is smaller than the cost to switch to CBR (small collections).
+    //    pick best plan from it.
     // 2. Otherwise, try CBR: If CBR picks a single best plan, return that.
     // 3. Otherwise, resume multiplanner to completion and pick best plan from it.
-    if (stats->earlyExit || stats->numResultsFound > 0 || finishWithMultiplanner) {
+    if (stats->earlyExit || stats->numResultsFound > 0) {
         auto remainingMultiPlannerWorksPerPlan =
             trialsConfig.maxNumWorksPerPlan - cappedTrialsConfig.maxNumWorksPerPlan;
         // The best plan, once chosen by the multiplanner, will be inserted into the plan cache by

@@ -51,7 +51,7 @@ assert.commandWorked(
 );
 
 // Insert enough documents for sampling to work.
-const kNumDocs = 2000;
+const kNumDocs = 1000;
 const docs = [];
 for (let i = 0; i < kNumDocs; i++) {
     docs.push({a: i, b: i, c: i % 10});
@@ -127,8 +127,7 @@ assert.commandWorked(coll.createIndex({b: 1}));
 
 // ---------------------------------------------------------------------------
 // CBR wins: very low plan productivity (case 3).
-// The query matches no documents, and with 2000 - 384 = 1616 remaining works
-// the cost of CBR is smaller than the cost of finishing with MP.
+// The query matches no documents, so the cost model picks CBR.
 // ---------------------------------------------------------------------------
 {
     coll.getPlanCache().clear();

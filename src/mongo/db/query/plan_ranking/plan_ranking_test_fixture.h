@@ -27,11 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/base/status_with.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/runtime_planners/planner_interface.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/plan_ranking/plan_ranker.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/util/modules.h"
 
@@ -60,9 +58,6 @@ protected:
         std::function<void(FindCommandRequest&)> modifyFindCmd = [](FindCommandRequest&) {});
 
     MultipleCollectionAccessor getCollsAccessor();
-
-    StatusWith<PlanRankingResult> planAndRank(PlanRankingStrategy& strategy,
-                                              PlannerData& plannerData);
 
     std::unique_ptr<DBDirectClient> client;
     boost::intrusive_ptr<ExpressionContext> expCtx;

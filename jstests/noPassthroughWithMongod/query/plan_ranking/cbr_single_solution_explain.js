@@ -37,7 +37,7 @@ describe("CBR single-solution early exit", function () {
         savedConfig = getCBRConfig(db);
         coll.drop();
         const docs = [];
-        for (let i = 0; i < 5000; i++) {
+        for (let i = 0; i < 1000; i++) {
             docs.push({a: i, b: i});
         }
         assert.commandWorked(coll.insertMany(docs));
@@ -63,7 +63,7 @@ describe("CBR single-solution early exit", function () {
 
             it("returns correct results for a single-solution query without explain", function () {
                 // 'c' has no index, so there is exactly one candidate plan (COLLSCAN).
-                assert.eq(coll.find({c: {$exists: false}}).itcount(), 5000, {config});
+                assert.eq(coll.find({c: {$exists: false}}).itcount(), 1000, {config});
                 assert.eq(coll.find({c: 999}).itcount(), 0, {config});
             });
 

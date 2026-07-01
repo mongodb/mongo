@@ -50,6 +50,7 @@ namespace plan_ranking {
 
 using namespace cost_based_ranker;
 
+// TODO SERVER-115642 Implement a complete cost model for sampling CE
 CostEstimate estimateCBRCost(const CanonicalQuery& query,
                              const std::vector<std::unique_ptr<QuerySolution>>& solutions) {
     const auto& qkc = query.getExpCtx()->getQueryKnobConfiguration();
@@ -184,12 +185,6 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
     const auto numWorksPerPlanMP = trialConfig.maxNumWorksPerPlan;
     const auto numResultsMP = trialConfig.targetNumResults;
 
-    // A plan cannot do more works than the number of documents in the collection.
-    const auto& mainColl = collections.getMainCollection();
-    const size_t collSize = mainColl ? static_cast<size_t>(mainColl->numRecords(opCtx)) : 0;
-    const size_t maxNumWorksPerPlan =
-        (collSize > 0 && collSize < numWorksPerPlanMP) ? collSize : numWorksPerPlanMP;
-
     // Number of works that each plan should do in order to collect enough execution stats.
     size_t numWorksPerPlanEst = internalQueryNumWorksPerPlanForMPEstimation.load();
     // TODO SERVER-115645 use the child of LIMIT/SORT nodes to estimate plan productivity
@@ -200,9 +195,9 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
         size_t extraSkipWorks = std::min(skipCount / guessedProductivity, 5.0 * numWorksPerPlanEst);
         numWorksPerPlanEst += extraSkipWorks;
     }
-    // Typically (numWorksPerPlanEst << maxNumWorksPerPlan), but some tests may set the number of
-    // works to a very small value, or process a small collection.
-    numWorksPerPlanEst = std::min(numWorksPerPlanEst, maxNumWorksPerPlan);
+    // Typically (numWorksPerPlanEst << numWorksPerPlanMP), but some tests may set the number of
+    // works to a very small value.
+    numWorksPerPlanEst = std::min(numWorksPerPlanEst, numWorksPerPlanMP);
 
     // Run a brief MP trial phase to collect execution stats.
     trialConfig.maxNumWorksPerPlan = numWorksPerPlanEst;
@@ -241,13 +236,11 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
     auto estRes = estResWithStatus.getValue();
     tassert(11306805,
             "The MP estimation phase should not have filled a full batch",
-            numResultsMP == 0 || numResultsMP > estRes.bestPlanNumResults);
+            numResultsMP > estRes.bestPlanNumResults);
 
     LOGV2_INFO(11093900,
                "AutomaticCE begin: ",
                "numWorksPerPlanMP"_attr = numWorksPerPlanMP,
-               "maxNumWorksPerPlan"_attr = maxNumWorksPerPlan,
-               "collSize"_attr = collSize,
                "numResultsMP"_attr = numResultsMP,
                "numWorksPerPlanEst"_attr = numWorksPerPlanEst,
                "cbrCost"_attr = cbrCost.toString(),
@@ -255,17 +248,38 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
                "estRes.bestPlanProductivity"_attr = estRes.bestPlanProductivity,
                "estRes.bestPlanNumResults"_attr = estRes.bestPlanNumResults);
 
+    // If productivity is worse than this ratio, it is guaranteed that MP can not fill a batch
+    // within numWorksPerPlanMP works (default 10k). Choose CBR in this case.
+    const double minProductivityForMP = static_cast<double>(numResultsMP) / numWorksPerPlanMP;
+    if (estRes.bestPlanProductivity <= minProductivityForMP) {
+        LOGV2_INFO(11306804,
+                   "AutomaticCE chooses CBR (3)",
+                   "Reason"_attr = "very low productivity",
+                   "Condition"_attr = "estRes.bestPlanProductivity < minProductivityForMP",
+                   "minProductivityForMPAdjusted"_attr = minProductivityForMP,
+                   "minProductivityForMP"_attr =
+                       static_cast<double>(numResultsMP) / numWorksPerPlanMP);
+        mp.emitAccumulatedStats();
+        return getBestCBRPlan(opCtx,
+                              query,
+                              plannerParams,
+                              yieldPolicy,
+                              collections,
+                              std::move(rctx.topLevelSampleFieldNames),
+                              rctx.hasRelevantMultikeyIndex);
+    }
+
     // Remaining number of documents to fill a batch, that is, to end MP.
     size_t numDocsRem = numResultsMP - estRes.bestPlanNumResults;
     // Estimate the number of works needed to fill a batch.
-    const double maxRemNumWorks = static_cast<double>(maxNumWorksPerPlan - numWorksPerPlanEst);
     double remNumWorks = estRes.bestPlanProductivity > 0.0
-        ? std::min(numDocsRem / estRes.bestPlanProductivity, maxRemNumWorks)
-        : maxRemNumWorks;
-    // Total cost per one unit of MP work based on the estimation trial.
+        ? numDocsRem / estRes.bestPlanProductivity
+        : numWorksPerPlanMP - numWorksPerPlanEst;
+    // Total estimated MP cost until a full batch, including the work done during the estimation
+    // trial (estRes.totalCost).
     auto totalCostPerEstWork = estRes.totalCost * (1.0 / numWorksPerPlanEst);
-    // The cost that will be incurred by MP if run until it fills a batch, reaches EOF, or reaches
-    // the budget limit, starting where the previous run stopped.
+    // The cost that will be incurred by MP if run until it fills a batch, starting where the
+    // previous run stopped.
     auto remMPCost = remNumWorks * totalCostPerEstWork;
 
     double minRequiredImprovementRatio =
@@ -278,9 +292,9 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
                "maxAchievableImprovementRatio"_attr = maxAchievableImprovementRatio,
                "minRequiredImprovementRatio"_attr = minRequiredImprovementRatio);
 
-    if (maxAchievableImprovementRatio < minRequiredImprovementRatio && numResultsMP > 0) {
+    if (maxAchievableImprovementRatio < minRequiredImprovementRatio) {
         LOGV2_INFO(11306802,
-                   "AutomaticCE chooses MP (3)",
+                   "AutomaticCE chooses MP (4)",
                    "Reason"_attr = "the required improvement is not achievable",
                    "Condition"_attr =
                        "maxAchievableImprovementRatio < minRequiredImprovementRatio");
@@ -291,9 +305,8 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
                                  .targetNumResults = numResultsMP});
     }
 
-    // CBR is substantially more efficient than the remaining MP, choose the best plan using CBR.
-    // Also use CBR when numResultsMP == 0 (query with effective limit 0): MP cannot fill a batch.
-    LOGV2_INFO(11306800, "AutomaticCE chooses CBR (4)", "Reason"_attr = "it is cheaper than MP");
+    // CBR is substantially more efficient than the remaining MP, choose the best plan using CBR
+    LOGV2_INFO(11306800, "AutomaticCE chooses CBR (5)", "Reason"_attr = "it is cheaper than MP");
     mp.emitAccumulatedStats();
     return getBestCBRPlan(opCtx,
                           query,
