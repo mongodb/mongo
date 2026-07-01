@@ -141,7 +141,8 @@ Status getStatusFromReleaseMemoryCommandResponse(const AsyncRequestsSender::Resp
     return Status::OK();
 }
 
-Shard::OwnerRetryStrategy buildRetryStrategy(OperationContext* opCtx, const ShardId& shardId) {
+unique_function<Shard::OwnerRetryStrategy()> buildRetryStrategyFactory(OperationContext* opCtx,
+                                                                       const ShardId& shardId) {
     auto connType = std::invoke([&]() -> ConnectionString::ConnectionType {
         auto shState = ShardingState::get(opCtx);
         if (shState->enabled() && shState->shardId() == shardId) {
@@ -156,10 +157,12 @@ Shard::OwnerRetryStrategy buildRetryStrategy(OperationContext* opCtx, const Shar
         ? Shard::RetryStrategy::RequestStartTransactionState::kStartingTransaction
         : Shard::RetryStrategy::RequestStartTransactionState::kNotStartingTransaction;
 
-    return Shard::OwnerRetryStrategy(connType,
-                                     ShardSharedStateCache::get(opCtx).getShardState(shardId),
-                                     Shard::RetryPolicy::kStrictlyNotIdempotent,
-                                     isStartTransaction);
+    auto shardState = ShardSharedStateCache::get(opCtx).getShardState(shardId);
+
+    return [connType, shardState = std::move(shardState), isStartTransaction]() {
+        return Shard::OwnerRetryStrategy(
+            connType, shardState, Shard::RetryPolicy::kStrictlyNotIdempotent, isStartTransaction);
+    };
 }
 
 }  // namespace
@@ -602,7 +605,7 @@ AsyncResultsMerger::RemoteCursorPtr AsyncResultsMerger::_buildRemote(WithLock lk
                                          shardId,
                                          tag,
                                          rc.getCursorResponse().getPartialResultsReturned(),
-                                         buildRetryStrategy(_opCtx, shardId));
+                                         buildRetryStrategyFactory(_opCtx, shardId));
 
     // We don't check the return value of _addBatchToBuffer here; if there was an error, it will be
     // stored in the remote and the first call to ready() will return true.
@@ -1379,6 +1382,11 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
         if (parsedResponse.isOK()) {
             retryStrategy.recordSuccess(remote->shardHostAndPort);
             _processBatchResults(lk, parsedResponse.getValue(), remote);
+            if (!remote->exhausted()) {
+                // Reset the retryStrategy so it doesn't leak state across getMores. Note this must
+                // come after recordSuccess() above to fulfill the RetryStrategy usage contract.
+                remote->retryStrategy = remote->retryStrategyFactory();
+            }
         } else if (retryStrategy.recordFailureAndEvaluateShouldRetry(
                        parsedResponse.getStatus(),
                        remote->shardHostAndPort,
@@ -1745,7 +1753,7 @@ AsyncResultsMerger::RemoteCursorData::RemoteCursorData(
     ShardId shardId,
     const ShardTag& tag,
     bool partialResultsReturned,
-    Shard::OwnerRetryStrategy retryStrategy)
+    unique_function<Shard::OwnerRetryStrategy()> retryStrategyFactoryArg)
     : id(id),
       cursorId(establishedCursorId),
       cursorNss(std::move(cursorNss)),
@@ -1753,7 +1761,8 @@ AsyncResultsMerger::RemoteCursorData::RemoteCursorData(
       shardId(std::move(shardId)),
       tag(tag),
       partialResultsReturned(partialResultsReturned),
-      retryStrategy(std::move(retryStrategy)) {
+      retryStrategyFactory(std::move(retryStrategyFactoryArg)),
+      retryStrategy(retryStrategyFactory()) {
     // If the 'partialResultsReturned' flag is set, the cursorId must be zero (closed).
     tassert(11103800,
             "expecting partialResultsFlag to be set only for cursorId == 0",

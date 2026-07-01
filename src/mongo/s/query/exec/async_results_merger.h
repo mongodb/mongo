@@ -51,6 +51,7 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/modules.h"
@@ -483,7 +484,7 @@ private:
                          ShardId shardId,
                          const ShardTag& tag,
                          bool partialResultsReturned,
-                         Shard::OwnerRetryStrategy retryStrategy);
+                         unique_function<Shard::OwnerRetryStrategy()> retryStrategyFactory);
 
         /**
          * Returns the resolved host and port on which the remote cursor resides.
@@ -566,6 +567,10 @@ private:
         // Set to an error status if there is an error retrieving a response from this remote or if
         // the command result contained an error.
         Status status = Status::OK();
+
+        // Factory to build the retry strategy so a new strategy can be used for each distinct
+        // client getMore request.
+        unique_function<Shard::OwnerRetryStrategy()> retryStrategyFactory;
 
         // Holds the retry strategy responsible for retrying failed requests.
         Shard::OwnerRetryStrategy retryStrategy;
