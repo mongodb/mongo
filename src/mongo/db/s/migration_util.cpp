@@ -608,6 +608,14 @@ void drainMigrationsPendingRecovery(OperationContext* opCtx) {
     while (store.count(opCtx)) {
         store.forEach(opCtx, BSONObj(), [opCtx](const MigrationCoordinatorDocument& doc) {
             try {
+                // Clear the in-memory filtering metadata so the refresh triggered below runs full
+                // recovery (_recoverMigrationCoordinations), which completes/forgets this
+                // migrationCoordinators document.
+                {
+                    auto scopedCsr =
+                        CollectionShardingRuntime::acquireExclusive(opCtx, doc.getNss());
+                    scopedCsr->clearCollectionMetadata(opCtx);
+                }
                 uassertStatusOK(FilteringMetadataCache::get(opCtx)->onShardVersionMismatch(
                     opCtx, doc.getNss(), boost::none));
             } catch (DBException& ex) {
@@ -647,6 +655,13 @@ SemiFuture<void> asyncRecoverMigrationUntilSuccessOrStepDown(OperationContext* o
             auto opCtx{uniqueOpCtx.get()};
 
             try {
+                // Clear the in-memory filtering metadata so the refresh below runs full recovery
+                // (_recoverMigrationCoordinations), which completes/forgets any pending
+                // migrationCoordinators document for this namespace.
+                {
+                    auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+                    scopedCsr->clearCollectionMetadata(opCtx);
+                }
                 refreshFilteringMetadataUntilSuccess(opCtx, nss);
             } catch (const DBException& ex) {
                 // This is expected in the event of a stepdown.

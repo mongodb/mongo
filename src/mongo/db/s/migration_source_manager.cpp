@@ -208,8 +208,11 @@ std::unique_ptr<MigrationSourceManager> MigrationSourceManager::createMigrationS
     uassertStatusOK(
         FilteringMetadataCache::get(opCtx)->onShardVersionMismatch(opCtx, nss, boost::none));
 
-    // Complete any unfinished migration pending recovery
-    {
+    // Only the legacy path needs to drain migrations.
+    // On the authoritative path, migrations are already blocked and are drained during the setFCV
+    // upgrade.
+    if (managementMode == ManagementModeEnum::kStandalone) {
+        // Complete any unfinished migration pending recovery
         migrationutil::drainMigrationsPendingRecovery(opCtx);
 
         // Since the moveChunk command is holding the ActiveMigrationRegistry and we just drained
