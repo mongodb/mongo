@@ -124,6 +124,20 @@ public:
         return _impl->get().isUniqueShardKey();
     }
 
+    template <typename Callable>
+    void forEachChunk(Callable&& handler) const {
+        return _impl->get().getChunkManager()->forEachChunk(std::forward<Callable>(handler));
+    }
+
+    template <typename Callable>
+    void forEachOverlappingChunk(const BSONObj& min,
+                                 const BSONObj& max,
+                                 bool isMaxInclusive,
+                                 Callable&& handler) const {
+        return _impl->get().getChunkManager()->forEachOverlappingChunk(
+            min, max, isMaxInclusive, std::forward<Callable>(handler));
+    }
+
 protected:
     std::shared_ptr<Impl> _impl;
 };
