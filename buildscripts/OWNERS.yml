@@ -68,3 +68,6 @@ filters:
   - "sbom_linter.py":
     approvers:
       - 10gen/code-review-team-ssdlc
+  - "benchmark_profiler.py":
+    approvers:
+      - 10gen/performance

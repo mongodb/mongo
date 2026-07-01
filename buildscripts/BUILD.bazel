@@ -642,6 +642,12 @@ py_binary(
 )
 
 py_library(
+    name = "benchmark_profiler",
+    srcs = ["benchmark_profiler.py"],
+    visibility = ["//visibility:public"],
+)
+
+py_library(
     name = "check_for_noexcept",
     srcs = ["check_for_noexcept.py"],
     visibility = ["//visibility:public"],

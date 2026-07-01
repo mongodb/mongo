@@ -66,6 +66,15 @@ py_test(
 )
 
 py_test(
+    name = "test_benchmark_profiler",
+    srcs = ["test_benchmark_profiler.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:benchmark_profiler",
+    ],
+)
+
+py_test(
     name = "test_check_for_noexcept",
     srcs = ["test_check_for_noexcept.py"],
     visibility = ["//visibility:public"],

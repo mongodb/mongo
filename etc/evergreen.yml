@@ -108,6 +108,8 @@ parameters:
     description: "path to this file"
   - key: test_selection_strategies_array
     description: "Array of test selection strategies"
+  - key: runtime_params_json
+    description: 'JSON of runtime params (e.g. {"enable_linux_perf":true}) to enable on-CPU profiling on benchmark tasks.'
   - key: message_filter_plugin_release_version
     description: "Dev release version string of the message filter plugin artifact to promote to GA. Used by promote_message_filter_plugin to locate the existing dev tarball in origin-message-filter-plugin-dev and re-import it via URP at the GA artifact name. No rebuild is performed."
   # Note: the `urp_input_bucket_override` parameter is already declared by the merged
