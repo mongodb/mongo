@@ -33,6 +33,7 @@
 
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/unittest/unittest.h"
@@ -195,10 +196,13 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
     auto differentFieldIndex = buildSimpleIndexEntry(fromjson("{'geometry.blah': '2dsphere'}"));
     auto compoundIndex = buildSimpleIndexEntry(fromjson("{'geometry.field': '2dsphere', 'a': -1}"));
     auto unsupportedIndex = buildSimpleIndexEntry(fromjson("{'geometry.field': '2dsphere'}"));
+    auto partialIndex = buildSimpleIndexEntry(fromjson("{'geometry.field': '2dsphere'}"));
 
     relevantIndex.infoObj = irrelevantIndex.infoObj = differentFieldIndex.infoObj =
-        compoundIndex.infoObj = supportedVersion;
+        compoundIndex.infoObj = partialIndex.infoObj = supportedVersion;
     unsupportedIndex.infoObj = unsupportedVersion;
+    auto partialFilter = std::make_unique<AndMatchExpression>();
+    partialIndex.filterExpr = partialFilter.get();
 
     QueryPlannerParams params;
 
@@ -277,6 +281,30 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
     // Reset the test.
     expr->setCanSkipValidation(false);
 
+    QueryPlannerAnalysis::analyzeGeo(params, &orNode);
+    ASSERT_EQ(expr->getCanSkipValidation(), true);
+
+    // We should not skip validation if the only relevant 2dsphere index is a partial index.
+    params.indices.clear();
+    params.indices.push_back(partialIndex);
+
+    expr->setCanSkipValidation(false);
+    QueryPlannerAnalysis::analyzeGeo(params, fetchNode);
+    ASSERT_EQ(expr->getCanSkipValidation(), false);
+
+    expr->setCanSkipValidation(false);
+    QueryPlannerAnalysis::analyzeGeo(params, &orNode);
+    ASSERT_EQ(expr->getCanSkipValidation(), false);
+
+    // A non-partial relevant 2dsphere index still enables skip validation even when a partial
+    // index on the same field is also present.
+    params.indices.push_back(relevantIndex);
+
+    expr->setCanSkipValidation(false);
+    QueryPlannerAnalysis::analyzeGeo(params, fetchNode);
+    ASSERT_EQ(expr->getCanSkipValidation(), true);
+
+    expr->setCanSkipValidation(false);
     QueryPlannerAnalysis::analyzeGeo(params, &orNode);
     ASSERT_EQ(expr->getCanSkipValidation(), true);
 }
