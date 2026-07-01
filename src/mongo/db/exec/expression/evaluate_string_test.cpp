@@ -35,6 +35,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/expression/evaluate_test_helpers.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
@@ -810,6 +811,75 @@ TEST(ExpressionTrimTest, ShouldReturnNullIfBothCharsAndCharsAreNullish) {
                         "$ltrim", Document{{"input", "$missingField"sv}, {"chars", BSONNULL}}),
                     Value(BSONNULL));
 }
+
+namespace concat {
+
+intrusive_ptr<Expression> parseConcat(ExpressionContextForTest* expCtx, const BSONObj& spec) {
+    VariablesParseState vps = expCtx->variablesParseState;
+    return Expression::parseExpression(expCtx, spec, vps);
+}
+
+TEST(ExpressionConcatTest, TracksOutputMemoryAndReleasesAfterEvaluation) {
+    auto expCtx = ExpressionContextForTest{};
+    auto expr = parseConcat(&expCtx, BSON("$concat" << BSON_ARRAY("$a"sv << "$b"sv)));
+
+    SimpleMemoryUsageTracker tracker{1024};
+    EvaluationContext ctx{.tracker = &tracker};
+
+    Document doc{{"a", "hello"sv}, {"b", "world"sv}};
+    ASSERT_VALUE_EQ(expr->evaluate(doc, &expCtx.variables, ctx), Value("helloworld"sv));
+
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_GTE(tracker.peakTrackedMemoryBytes(), 10);
+}
+
+TEST(ExpressionConcatTest, ThrowsExceededMemoryLimitWhenOverLimit) {
+    auto expCtx = ExpressionContextForTest{};
+    auto expr = parseConcat(&expCtx, BSON("$concat" << BSON_ARRAY("$a"sv << "$b"sv)));
+
+    SimpleMemoryUsageTracker tracker{8};
+    EvaluationContext ctx{.tracker = &tracker};
+
+    Document doc{{"a", std::string(10, 'x')}, {"b", std::string(10, 'y')}};
+    try {
+        expr->evaluate(doc, &expCtx.variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$concat");
+    }
+
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
+}
+
+TEST(ExpressionConcatTest, NoTrackerDoesNotThrow) {
+    auto expCtx = ExpressionContextForTest{};
+    auto expr = parseConcat(&expCtx, BSON("$concat" << BSON_ARRAY("$a"sv << "$b"sv)));
+
+    Document doc{{"a", std::string(10, 'x')}, {"b", std::string(10, 'y')}};
+    ASSERT_VALUE_EQ(expr->evaluate(doc, &expCtx.variables),
+                    Value(std::string(10, 'x') + std::string(10, 'y')));
+}
+
+TEST(ExpressionConcatTest, ThrowsExceededMemoryLimitWhenQueryLimitExceeded) {
+    auto expCtx = ExpressionContextForTest{};
+    auto expr = parseConcat(&expCtx, BSON("$concat" << BSON_ARRAY("$a"sv << "$b"sv)));
+
+    SimpleMemoryUsageTracker operationTracker{8};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, 100 * 1024 * 1024};
+    EvaluationContext ctx{.tracker = &stageTracker};
+
+    Document doc{{"a", std::string(10, 'x')}, {"b", std::string(10, 'y')}};
+    try {
+        expr->evaluate(doc, &expCtx.variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$concat");
+    }
+}
+
+}  // namespace concat
 
 }  // namespace expression_evaluation_test
 }  // namespace mongo

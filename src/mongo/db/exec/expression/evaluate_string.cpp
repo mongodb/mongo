@@ -31,6 +31,7 @@
 #include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/db/exec/str_trim_utils.h"
 #include "mongo/db/exec/substr_utils.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 
 #include <string_view>
 
@@ -48,6 +49,12 @@ Value evaluate(const ExpressionConcat& expr,
     const size_t n = children.size();
 
     StringBuilder result;
+
+    SimpleMemoryUsageToken memToken;
+    if (ctx.tracker) {
+        memToken = SimpleMemoryUsageToken(0, ctx.tracker);
+    }
+
     for (size_t i = 0; i < n; ++i) {
         Value val = children[i]->evaluate(root, variables, ctx);
         if (val.nullish()) {
@@ -55,10 +62,17 @@ Value evaluate(const ExpressionConcat& expr,
         }
 
         uassert(16702,
-                str::stream() << "$concat only supports strings, not " << typeName(val.getType()),
+                str::stream() << expr.getOpName() << " only supports strings, not "
+                              << typeName(val.getType()),
                 val.getType() == BSONType::string);
 
-        result << val.coerceToString();
+        std::string_view str = val.getStringData();
+        if (ctx.tracker) {
+            memToken.add(static_cast<int64_t>(str.size()));
+            ctx.tracker->assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
+        }
+
+        result << str;
     }
 
     return Value(result.stringData());
