@@ -35,6 +35,10 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/util/uuid.h"
 
+#include <algorithm>
+#include <utility>
+#include <vector>
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo::replicated_fast_count {
@@ -62,7 +66,25 @@ struct OplogScanResult {
     boost::optional<Timestamp> lastTimestamp;
 
     bool operator==(const OplogScanResult&) const = default;
+
+    std::string toString() const {
+        std::vector<std::pair<UUID, SizeCountDelta>> sorted(deltas.begin(), deltas.end());
+        std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
+            return a.first < b.first;
+        });
+        std::string deltaStr;
+        for (const auto& [uuid, delta] : sorted) {
+            deltaStr += fmt::format("\n    {}: {{{}}}", uuid.toString(), delta.toString());
+        }
+        return fmt::format("OplogScanResult{{lastTimestamp: {}, deltas: [{}]}}",
+                           lastTimestamp ? lastTimestamp->toString() : "none",
+                           deltaStr);
+    }
 };
+
+inline std::ostream& operator<<(std::ostream& s, const OplogScanResult& result) {
+    return s << result.toString();
+}
 
 /**
  * Buffers size/count deltas for chained applyOps sequences, making them visible only when the

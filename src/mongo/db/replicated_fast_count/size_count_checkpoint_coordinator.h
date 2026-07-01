@@ -80,7 +80,6 @@ public:
     void flushSync_ForTest(OperationContext* opCtx);
     bool isRunning_ForTest() const;
     bool isFlushRequested_ForTest() const;
-    SizeCountCheckpointBuffer* getBuffer_ForTest() const;
 
 private:
     /**

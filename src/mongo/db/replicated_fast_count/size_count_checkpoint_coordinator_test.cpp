@@ -269,27 +269,6 @@ TEST_F(SizeCountCheckpointCoordinatorTest, FlushFailureIncrementsFlushFailureCou
     EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushedDocsTotal), 0);
 }
 
-TEST_F(SizeCountCheckpointCoordinatorTest, BufferHasNoPendingWorkBeforeAnyTailCycle) {
-    ASSERT_FALSE(_coordinator->getBuffer_ForTest()->hasPendingWork());
-    _coordinator->startup(getServiceContext());
-    // No oplog data, so the tailer produces no scans and the buffer stays empty.
-    ASSERT_FALSE(_coordinator->getBuffer_ForTest()->hasPendingWork());
-    _coordinator->shutdown();
-    ASSERT_FALSE(_coordinator->getBuffer_ForTest()->hasPendingWork());
-}
-
-TEST_F(SizeCountCheckpointCoordinatorWithOplogTest,
-       BufferHasPendingWorkAfterTailerProcessesOplogEntry) {
-    writeInsert(Timestamp(10, 1));
-
-    oplog_tailer::bufferNewOplogEntries(_opCtx, *_coordinator->getBuffer_ForTest());
-
-    ASSERT_TRUE(_coordinator->getBuffer_ForTest()->hasPendingWork());
-
-    _coordinator->shutdown();
-    // shutdown() does not drain the buffer.
-    ASSERT_TRUE(_coordinator->getBuffer_ForTest()->hasPendingWork());
-}
 TEST_F(SizeCountCheckpointCoordinatorTest,
        DestructorJoinsBackgroundThreadsWithoutExplicitShutdown) {
     {

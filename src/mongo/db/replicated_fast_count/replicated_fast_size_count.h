@@ -120,6 +120,10 @@ struct SizeCountDelta {
     }
 };
 
+inline std::ostream& operator<<(std::ostream& s, const SizeCountDelta& delta) {
+    return (s << delta.toString());
+}
+
 namespace replicated_fast_count {
 
 /**

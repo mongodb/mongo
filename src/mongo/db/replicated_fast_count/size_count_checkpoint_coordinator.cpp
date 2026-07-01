@@ -134,11 +134,6 @@ bool SizeCountCheckpointCoordinator::isFlushRequested_ForTest() const {
     return _flusher->isFlushRequested_ForTest();
 }
 
-SizeCountCheckpointBuffer* SizeCountCheckpointCoordinator::getBuffer_ForTest() const {
-    std::lock_guard lk(_mutex);
-    return _buffer.get();
-}
-
 void SizeCountCheckpointCoordinator::_runTailerThread(ServiceContext* service) {
     ThreadClient tc("SizeCountCheckpointOplogTailer", service->getService());
     AuthorizationSession::get(cc())->grantInternalAuthorization();

@@ -87,14 +87,4 @@ void SizeCountCheckpointBuffer::scanToNoHolesEOF(SeekableRecordCursor& cursor) {
 void SizeCountCheckpointBuffer::acknowledgeFlushSuccess() {
     _inFlight.reset();
 }
-
-bool SizeCountCheckpointBuffer::hasInFlightWork() const {
-    return _inFlight.has_value();
-}
-
-bool SizeCountCheckpointBuffer::hasPendingWork() const {
-    std::lock_guard lk(_mutex);
-    return _pending->hasPendingWork();
-}
-
 }  // namespace mongo::replicated_fast_count

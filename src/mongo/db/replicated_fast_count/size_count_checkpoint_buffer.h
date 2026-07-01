@@ -84,16 +84,6 @@ public:
      */
     void acknowledgeFlushSuccess();
 
-    /**
-     * There is an outstanding result that hasn't been flushed yet.
-     */
-    bool hasInFlightWork() const;
-
-    /**
-     * Returns whether there are new scan results to be retrieved via checkoutForFlush().
-     */
-    bool hasPendingWork() const;
-
 private:
     // The options used to build every pending accumulator.
     const StreamingOplogDeltaAccumulator::Options _accumulatorOptions;
