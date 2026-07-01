@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/util/represent_as_util.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/util/modules.h"
 
@@ -38,6 +39,21 @@
 
 #include <boost/optional/optional.hpp>
 namespace mongo {
+
+// Computes the 0-based rank for discrete percentile 'p' on a dataset of 'n' values.
+//
+// We define "percentile" as: value 'P' such that at least ceil(p*n) samples are _less or equal_
+// to 'P' and no more than ceil(p*n) samples are strictly _less_ than 'P'. Thus p=0 maps to the
+// min and p=1 maps to the max. Ambiguity (e.g. D={1,2,...,10}, P(0.1) in [1,2]) is resolved
+// towards the lower rank.
+//
+// Used by both DiscretePercentile and TDigest, which share this definition.
+inline int computeDiscreteRank(int n, double p) {
+    if (p >= 1.0) {
+        return n - 1;
+    }
+    return std::max(0, representAsChecked<int>(std::ceil(n * p)) - 1);
+}
 
 /**
  * Eventually we'll be supporting multiple types of percentiles (discrete, continuous, approximate)

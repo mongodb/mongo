@@ -13,6 +13,7 @@ import {
     assertResultCloseToVal,
     assertResultEqToVal,
     runSetWindowStage,
+    testError,
 } from "jstests/aggregation/sources/setWindowFields/percentiles/percentile_util.js";
 
 const coll = db[jsTestName()];
@@ -144,3 +145,9 @@ for (let paramValue of paramValues) {
         assert.eq(median, results[index].runningMedian);
     }
 }
+
+// A non-finite percentile must be rejected; see approximate_percentiles.js for context.
+testError(coll, {$percentile: {p: [NaN], input: "$price", method: "continuous"}}, 7750303);
+testError(coll, {$percentile: {p: [0.5, NaN], input: "$price", method: "continuous"}}, 7750303);
+testError(coll, {$percentile: {p: [Infinity], input: "$price", method: "continuous"}}, 7750303);
+testError(coll, {$percentile: {p: [-Infinity], input: "$price", method: "continuous"}}, 7750303);

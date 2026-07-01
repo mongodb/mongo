@@ -29,7 +29,22 @@
 
 #include "mongo/db/pipeline/window_function/window_function_percentile.h"
 
+#include "mongo/db/query/util/represent_as_util.h"
+
+#include <cmath>
+
 namespace mongo {
+namespace {
+// Defense-in-depth bounds check: asserts 'index' is a valid 0-based position into a collection of
+// 'size' values. Both paths through computePercentile() guarantee this by construction (see call
+// sites), so this tassert should never fire.
+int assertRankIndex(int index, size_t size) {
+    tassert(12961700,
+            "percentile rank is not a valid in-bounds index into the window's values",
+            index >= 0 && static_cast<size_t>(index) < size);
+    return index;
+}
+}  // namespace
 
 void WindowFunctionPercentileCommon::add(Value value) {
     // Only add numeric values.
@@ -67,17 +82,24 @@ Value WindowFunctionPercentileCommon::computePercentile(double p) const {
     // boost::container::flat_multiset has random-access iterators, so std::advance has an
     // expected runtime of O(1).
     if (_method != PercentileMethodEnum::kContinuous) {
-        const double rank = DiscretePercentile::computeTrueRank(n, p);
+        const int rank = DiscretePercentile::computeTrueRank(n, p);
+        // computeTrueRank() guarantees rank is in [0, n-1]: when p >= 1.0 it returns n-1,
+        // otherwise max(0, ceil(n*p)-1). Since p < 1.0 implies n*p < n and n is an integer,
+        // the result always fits in int and is a valid index.
+        assertRankIndex(rank, _values.size());
         auto it = _values.begin();
-        std::advance(it, static_cast<int>(rank));
+        std::advance(it, rank);
         return Value(*it);
     } else {
         const double rank = ContinuousPercentile::computeTrueRank(n, p);
-        const int ceil_rank = std::ceil(rank);
-        const int floor_rank = std::floor(rank);
-        if (ceil_rank == rank && rank == floor_rank) {
+        // representAsChecked<int>() tasserts if rank is non-finite or out of int range.
+        const int ceil_rank =
+            assertRankIndex(representAsChecked<int>(std::ceil(rank)), _values.size());
+        const int floor_rank =
+            assertRankIndex(representAsChecked<int>(std::floor(rank)), _values.size());
+        if (ceil_rank == floor_rank) {  // rank is an exact integer; no interpolation needed
             auto it = _values.begin();
-            std::advance(it, static_cast<int>(rank));
+            std::advance(it, ceil_rank);
             return Value(*it);
         } else {
             auto it_ceil_rank = _values.begin();

@@ -12,6 +12,7 @@ import {seedWithTickerData, testAccumAgainstGroup} from "jstests/aggregation/ext
 import {
     assertResultEqToVal,
     runSetWindowStage,
+    testError,
 } from "jstests/aggregation/sources/setWindowFields/percentiles/percentile_util.js";
 
 const coll = db[jsTestName()];
@@ -121,3 +122,9 @@ try {
 } finally {
     db.adminCommand({setParameter: 1, internalQueryPercentileExprSelectToSortThreshold: origParamValue});
 }
+
+// A non-finite percentile must be rejected; see approximate_percentiles.js for context.
+testError(coll, {$percentile: {p: [NaN], input: "$price", method: "discrete"}}, 7750303);
+testError(coll, {$percentile: {p: [0.5, NaN], input: "$price", method: "discrete"}}, 7750303);
+testError(coll, {$percentile: {p: [Infinity], input: "$price", method: "discrete"}}, 7750303);
+testError(coll, {$percentile: {p: [-Infinity], input: "$price", method: "discrete"}}, 7750303);

@@ -21,12 +21,16 @@
 #
 last-continuous:
   all:
+    - test_file: jstests/aggregation/accumulators/percentiles_syntax.js
+      ticket: SERVER-129617
     - test_file: jstests/aggregation/expressions/const_literal_bsoncolumn.js
       ticket: SERVER-129103
     - test_file: jstests/aggregation/expressions/convert_bindata.js
       ticket: SERVER-129103
     - test_file: jstests/aggregation/expressions/convert_bindata_bsoncolumn.js
       ticket: SERVER-129103
+    - test_file: jstests/aggregation/expressions/percentile_expression_syntax.js
+      ticket: SERVER-129617
     - test_file: jstests/aggregation/expressions/subtype.js
       ticket: SERVER-129103
     - test_file: jstests/core/administrative/filemd5.js
@@ -202,12 +206,16 @@ last-continuous:
   suites: null
 last-lts:
   all:
+    - test_file: jstests/aggregation/accumulators/percentiles_syntax.js
+      ticket: SERVER-129617
     - test_file: jstests/aggregation/expressions/const_literal_bsoncolumn.js
       ticket: SERVER-129103
     - test_file: jstests/aggregation/expressions/convert_bindata.js
       ticket: SERVER-129103
     - test_file: jstests/aggregation/expressions/convert_bindata_bsoncolumn.js
       ticket: SERVER-129103
+    - test_file: jstests/aggregation/expressions/percentile_expression_syntax.js
+      ticket: SERVER-129617
     - test_file: jstests/aggregation/expressions/subtype.js
       ticket: SERVER-129103
     - test_file: jstests/core/administrative/filemd5.js

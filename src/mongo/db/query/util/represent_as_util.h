@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,35 +29,19 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/percentile_algo_accurate.h"
-#include "mongo/util/modules.h"
-
-#include <boost/optional/optional.hpp>
+#include "mongo/util/assert_util.h"
+#include "mongo/util/represent_as.h"
 
 namespace mongo {
 
-/**
- * 'DiscretePercentile' algorithm for computing percentiles is accurate and doesn't require
- * specifying a percentile in advance but is only suitable for small datasets. It accumulats all
- * data sent to it and sorts it all when a percentile is requested. Requesting more percentiles
- * after the first one without incorporating more data is fast as it doesn't need to sort again.
- */
-class DiscretePercentile : public AccuratePercentile {
-public:
-    DiscretePercentile(ExpressionContext* expCtx);
-
-    static int computeTrueRank(int n, double p) {
-        return computeDiscreteRank(n, p);
-    }
-
-    boost::optional<double> computePercentile(double p) final;
-
-    void reset() final;
-
-private:
-    // Only used if we spilled to disk.
-    boost::optional<double> computeSpilledPercentile(double p) final;
-    boost::optional<double> _previousValue = boost::none;
-};
+// Converts 'v' to type 'To' via representAs<To>, tassert-ing if the value cannot be exactly
+// represented (e.g. NaN, Inf, or out-of-range). Backport version: omits type-name demangling
+// in the error message since mongo/util/demangle.h is not available in these branches.
+template <typename To, typename From>
+To representAsChecked(From v) {
+    auto result = representAs<To>(v);
+    tassert(12961701, "cannot represent value as target type", result.has_value());
+    return *result;
+}
 
 }  // namespace mongo

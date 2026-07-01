@@ -145,6 +145,21 @@ testError(
 );
 testError(coll, {$median: {p: [0.1, 0.6], input: "$str", method: "approximate"}}, ErrorCodes.IDLUnknownField);
 
+// A non-finite percentile must be rejected. IEEE-754 ordered comparisons against NaN are all false,
+// so a range check of the form `p < 0 || p > 1` accepts NaN; the validation in parseP() must be
+// written to reject all non-finite values.
+testError(coll, {$percentile: {p: [NaN], input: "$price", method: "approximate"}}, 7750303);
+testError(coll, {$percentile: {p: [0.5, NaN], input: "$price", method: "approximate"}}, 7750303);
+testError(coll, {$percentile: {p: [Infinity], input: "$price", method: "approximate"}}, 7750303);
+testError(coll, {$percentile: {p: [-Infinity], input: "$price", method: "approximate"}}, 7750303);
+// Verify rejection also fires for a bounded (removable) window, which uses a different executor
+// path than the unbounded case above.
+testError(
+    coll,
+    {$percentile: {p: [NaN], input: "$price", method: "approximate"}, window: {documents: [-1, 0]}},
+    7750303,
+);
+
 if (!FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
     testError(coll, {$percentile: {p: [0.1, 0.6], input: "$str", method: "discrete"}}, ErrorCodes.BadValue);
     testError(coll, {$median: {input: "$str", method: "discrete"}}, ErrorCodes.BadValue);
