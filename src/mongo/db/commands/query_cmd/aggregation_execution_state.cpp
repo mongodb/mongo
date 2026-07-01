@@ -397,6 +397,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    bool isCollectionlessAggregation() const override {
+        return true;
+    }
+
     query_shape::CollectionType getMainCollectionType() const override {
         MONGO_UNREACHABLE;
     }
@@ -884,6 +888,9 @@ void AggCatalogState::validate() const {
             !(_aggExState.getRequest().getIsMapReduceCommand() && isTimeseriesQuery));
 
     if (_aggExState.getRequest().getResumeAfter() || _aggExState.getRequest().getStartAt()) {
+        uassert(12848201,
+                "$_resumeAfter is not supported for collectionless aggregations",
+                !isCollectionlessAggregation());
         const auto& collectionOrView = getMainCollectionOrView();
         uassert(ErrorCodes::InvalidPipelineOperator,
                 "$_resumeAfter is not supported on timeseries collections",

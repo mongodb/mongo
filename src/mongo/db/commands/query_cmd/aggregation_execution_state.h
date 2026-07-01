@@ -470,6 +470,10 @@ public:
      */
     virtual const CollectionOrViewAcquisition& getMainCollectionOrView() const = 0;
 
+    virtual bool isCollectionlessAggregation() const {
+        return false;
+    }
+
     /**
      * Collectionless pipelines may need an 'AutoStatsTracker' to track stats. This method will
      * emplace one if so, and is a no-op otherwise.
