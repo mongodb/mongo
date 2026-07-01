@@ -131,9 +131,14 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         // Create entry for this collection in ownedIds
         this.ownedIds[collName] = [];
 
-        // Search the collection to find the _ids of docs assigned to this thread.
-        const docsOwnedByThread = findFirstBatch(db, collName, {tid: this.tid}, 1000);
-        assert.neq(0, docsOwnedByThread.size);
+        // Search the collection to find the _ids of docs assigned to this thread. A thread can own
+        // up to every document in the collection, so request the full count in a single batch.
+        // findFirstBatch never issues getMore, so a batchSize smaller than the result set would
+        // abandon a live cursor. That idle cursor pins range deletions on the shard, blocking
+        // waitForDelete migrations and hanging the test.
+        const maxOwnedDocs = this.partitionSize * this.threadCount;
+        const docsOwnedByThread = findFirstBatch(db, collName, {tid: this.tid}, maxOwnedDocs);
+        assert.neq(0, docsOwnedByThread.length);
         docsOwnedByThread.forEach((doc) => {
             this.ownedIds[collName].push(doc._id);
         });

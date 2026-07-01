@@ -44,6 +44,13 @@ export function runWithManualRetries(fn) {
 // stepdown/kill/terminate. This will find only one batch to avoid calling getMore; ensure that
 // the batchSize is large enough for the number of documents expected to be returned.
 export function findFirstBatch(db, collName, filter, batchSize) {
-    return assert.commandWorked(db.runCommand({find: collName, filter, batchSize})).cursor
-        .firstBatch;
+    const cursor = assert.commandWorked(db.runCommand({find: collName, filter, batchSize})).cursor;
+    // The helper deliberately reads a single batch to avoid a non-retryable getMore. If results
+    // remain the server returns a non-zero cursor id; kill it so the test never leaks an idle
+    // cursor, which can pin range deletions and hang migrations. Best-effort: killCursors is
+    // allowed in stepdown suites and a failure here is harmless.
+    if (cursor.id != 0) {
+        db.runCommand({killCursors: collName, cursors: [cursor.id]});
+    }
+    return cursor.firstBatch;
 }
