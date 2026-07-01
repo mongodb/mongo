@@ -323,5 +323,79 @@ TEST_P(TicketingSystemTest, GateClosedFallsBackLowToNormal) {
     assertOnlyHolderUsed(normalHolder());
 }
 
+TEST_P(TicketingSystemTest, QueueWaitTimeHistogramSeparatesQueuesAndAccumulatesPerOp) {
+    using Priority = AdmissionContext::Priority;
+    using QueueType = ExecutionAdmissionContext::QueueType;
+    auto [client, opCtx] = makeClientAndOpCtx();
+    auto& admCtx = ExecutionAdmissionContext::get(opCtx.get());
+    admCtx.setOperationType(opType());
+
+    admCtx.recordExecutionWaitedAcquisition(Milliseconds{500}, QueueType::kNormal);
+    admCtx.recordExecutionWaitedAcquisition(Milliseconds{300}, QueueType::kNormal);
+    admCtx.recordExecutionAcquisition(Priority::kNormal, QueueType::kNormal);
+    admCtx.recordExecutionWaitedAcquisition(Milliseconds{200}, QueueType::kLow);
+    admCtx.recordExecutionAcquisition(Priority::kLow, QueueType::kLow);
+
+    ticketingSystem()->finalizeOperationStats(opCtx.get(), 0 /* elapsed */, 0 /* cpu */);
+
+    BSONObjBuilder b;
+    ticketingSystem()->appendStats(b);
+    auto stats = b.obj();
+
+    // Returns the count for the bucket whose lower bound matches, or -1 if no such bucket exists.
+    auto bucketCount = [](BSONElement histElem, int64_t lowerBound) -> int64_t {
+        for (auto&& el : histElem.Array()) {
+            BSONObj bucket = el.Obj();
+            if (bucket["lowerBound"].Long() == lowerBound) {
+                return bucket["count"].Long();
+            }
+        }
+        return -1;
+    };
+
+    const std::string opName = opType() == OperationType::kRead ? "read" : "write";
+    auto normalHist = stats[opName].Obj()["normalPriority"].Obj()["queueWaitTimeMicros"];
+    auto lowHist = stats[opName].Obj()["lowPriority"].Obj()["queueWaitTimeMicros"];
+
+    // Normal queue: total wait 800ms falls in the [500000us, 1000000us) bucket.
+    ASSERT_EQ(bucketCount(normalHist, 500'000), 1);
+    ASSERT_EQ(bucketCount(normalHist, 100'000), 0);
+    // Low queue: total wait 200ms falls in the [100000us, 250000us) bucket.
+    ASSERT_EQ(bucketCount(lowHist, 100'000), 1);
+    ASSERT_EQ(bucketCount(lowHist, 500'000), 0);
+}
+
+TEST_P(TicketingSystemTest, QueueWaitTimeHistogramRecordsNonWaitingOpsInZeroBucket) {
+    using Priority = AdmissionContext::Priority;
+    using QueueType = ExecutionAdmissionContext::QueueType;
+    auto [client, opCtx] = makeClientAndOpCtx();
+    auto& admCtx = ExecutionAdmissionContext::get(opCtx.get());
+    admCtx.setOperationType(opType());
+
+    admCtx.recordExecutionAcquisition(Priority::kNormal, QueueType::kNormal);
+
+    ticketingSystem()->finalizeOperationStats(opCtx.get(), 0 /* elapsed */, 0 /* cpu */);
+
+    BSONObjBuilder b;
+    ticketingSystem()->appendStats(b);
+    auto stats = b.obj();
+
+    const std::string opName = opType() == OperationType::kRead ? "read" : "write";
+    auto normalHist = stats[opName].Obj()["normalPriority"].Obj()["queueWaitTimeMicros"];
+
+    // The single non-waiting acquisition lands in the [0us, 1us) "did not wait" bucket.
+    for (auto&& el : normalHist.Array()) {
+        BSONObj bucket = el.Obj();
+        const int64_t expected = bucket["lowerBound"].Long() == 0 ? 1 : 0;
+        ASSERT_EQ(bucket["count"].Long(), expected)
+            << "unexpected count in bucket " << bucket["lowerBound"].Long();
+    }
+
+    auto lowHist = stats[opName].Obj()["lowPriority"].Obj()["queueWaitTimeMicros"];
+    for (auto&& el : lowHist.Array()) {
+        ASSERT_EQ(el.Obj()["count"].Long(), 0);
+    }
+}
+
 }  // namespace
 }  // namespace mongo::admission::execution_control

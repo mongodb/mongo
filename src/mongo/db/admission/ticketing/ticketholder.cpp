@@ -237,6 +237,9 @@ void TicketHolder::appendExemptStats(BSONObjBuilder& b) const {
 void TicketHolder::appendHolderStats(BSONObjBuilder& b) const {
     _appendQueueStats(b, _holderStats);
     _delinquencyStats.appendStats(b);
+    BSONArrayBuilder histogramBuilder(b.subarrayStart("queueWaitTimeMicros"));
+    _queueWaitTimeHistogram.appendStats(histogramBuilder);
+    histogramBuilder.done();
 }
 
 void TicketHolder::appendTicketStats(BSONObjBuilder& b) const {
@@ -363,6 +366,10 @@ void TicketHolder::setPeakUsed_forTest(int used) {
 void TicketHolder::incrementDelinquencyStats(
     const admission::execution_control::DelinquencyStats& newStats) {
     _delinquencyStats += newStats;
+}
+
+void TicketHolder::recordQueueWaitTime(Microseconds queueWaitTime) {
+    _queueWaitTimeHistogram.record(queueWaitTime);
 }
 
 }  // namespace mongo

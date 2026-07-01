@@ -465,12 +465,16 @@ TEST_F(TicketAdmissionStatsTest, RecorderAccumulatesAndForwardsEvents) {
     // While queued, startedQueueing - finishedQueueing is 1.
     ASSERT_EQ(recorder.stats().startedQueueing - recorder.stats().finishedQueueing, 1);
 
-    admCtx.recordExecutionWaitedAcquisition(Microseconds{100});
-    admCtx.recordExecutionAcquisition(AdmissionContext::Priority::kNormal);
+    admCtx.recordExecutionWaitedAcquisition(Microseconds{100},
+                                            ExecutionAdmissionContext::QueueType::kNormal);
+    admCtx.recordExecutionAcquisition(AdmissionContext::Priority::kNormal,
+                                      ExecutionAdmissionContext::QueueType::kNormal);
     admCtx.recordExecutionRelease(Microseconds{50});
     admCtx.recordExecutionStartQueueing();
-    admCtx.recordExecutionWaitedAcquisition(Microseconds{30});
-    admCtx.recordExecutionAcquisition(AdmissionContext::Priority::kLow);
+    admCtx.recordExecutionWaitedAcquisition(Microseconds{30},
+                                            ExecutionAdmissionContext::QueueType::kLow);
+    admCtx.recordExecutionAcquisition(AdmissionContext::Priority::kLow,
+                                      ExecutionAdmissionContext::QueueType::kLow);
     admCtx.recordExecutionRelease(Microseconds{20});
 
     ASSERT_EQ(updates, 8);
@@ -498,18 +502,21 @@ TEST_F(TicketAdmissionStatsTest, RecorderDeregistersOnDestruction) {
     {
         ScopedTicketAdmissionStatsRecorder recorder(
             opCtx.get(), [&](const TicketAdmissionStats&) { ++updates; });
-        admCtx.recordExecutionAcquisition(AdmissionContext::Priority::kNormal);
+        admCtx.recordExecutionAcquisition(AdmissionContext::Priority::kNormal,
+                                          ExecutionAdmissionContext::QueueType::kNormal);
         ASSERT_EQ(updates, 1);
     }
 
     ASSERT_EQ(admCtx.getTicketStatsRecorder(), nullptr);
-    admCtx.recordExecutionAcquisition(AdmissionContext::Priority::kNormal);
+    admCtx.recordExecutionAcquisition(AdmissionContext::Priority::kNormal,
+                                      ExecutionAdmissionContext::QueueType::kNormal);
     ASSERT_EQ(updates, 1);
 
     // A new recorder can be registered afterwards and starts from zero.
     ScopedTicketAdmissionStatsRecorder recorder(opCtx.get(), nullptr);
     ASSERT_EQ(recorder.stats().admissions, 0);
-    admCtx.recordExecutionAcquisition(AdmissionContext::Priority::kLow);
+    admCtx.recordExecutionAcquisition(AdmissionContext::Priority::kLow,
+                                      ExecutionAdmissionContext::QueueType::kLow);
     ASSERT_EQ(recorder.stats().admissions, 1);
     ASSERT_EQ(recorder.stats().lowPriorityAdmissions, 1);
 }
@@ -523,8 +530,10 @@ TEST_F(TicketAdmissionStatsTest, RecorderIgnoresExemptAdmissions) {
     ScopedAdmissionPriority<ExecutionAdmissionContext> exemptPriority(
         opCtx.get(), AdmissionContext::Priority::kExempt);
     admCtx.recordExecutionStartQueueing();
-    admCtx.recordExecutionAcquisition(AdmissionContext::Priority::kExempt);
-    admCtx.recordExecutionWaitedAcquisition(Microseconds{100});
+    admCtx.recordExecutionAcquisition(AdmissionContext::Priority::kExempt,
+                                      ExecutionAdmissionContext::QueueType::kNormal);
+    admCtx.recordExecutionWaitedAcquisition(Microseconds{100},
+                                            ExecutionAdmissionContext::QueueType::kNormal);
     admCtx.recordExecutionRelease(Microseconds{50});
 
     ASSERT_EQ(recorder.stats().admissions, 0);

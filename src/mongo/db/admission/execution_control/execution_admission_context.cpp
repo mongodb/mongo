@@ -58,6 +58,7 @@ ExecutionAdmissionContext::ExecutionAdmissionContext(const ExecutionAdmissionCon
     : AdmissionContext(other),
       _readDelinquencyStats(other._readDelinquencyStats),
       _writeDelinquencyStats(other._writeDelinquencyStats),
+      _queueWaitStats(other._queueWaitStats),
       _readNonDeprioritizableStats(other._readNonDeprioritizableStats),
       _readDeprioritizableStats(other._readDeprioritizableStats),
       _writeNonDeprioritizableStats(other._writeNonDeprioritizableStats),
@@ -80,6 +81,7 @@ ExecutionAdmissionContext& ExecutionAdmissionContext::operator=(
     AdmissionContext::operator=(other);
     _readDelinquencyStats = other._readDelinquencyStats;
     _writeDelinquencyStats = other._writeDelinquencyStats;
+    _queueWaitStats = other._queueWaitStats;
     _readNonDeprioritizableStats = other._readNonDeprioritizableStats;
     _readDeprioritizableStats = other._readDeprioritizableStats;
     _writeNonDeprioritizableStats = other._writeNonDeprioritizableStats;
@@ -226,6 +228,17 @@ boost::optional<ExecutionAdmissionContext::FinalizedStats> ExecutionAdmissionCon
     result.wasMarkedNonDeprioritizable = getMarkedNonDeprioritizable();
     result.wasInMultiDocTxn = _wasInMultiDocTxn.loadRelaxed();
 
+    for (size_t opTypeIdx = 0;
+         opTypeIdx < static_cast<size_t>(ec::OperationType::kNumOperationTypes);
+         ++opTypeIdx) {
+        for (size_t queueIdx = 0; queueIdx < static_cast<size_t>(QueueType::kNumQueueTypes);
+             ++queueIdx) {
+            const auto& cell = _queueWaitStats[opTypeIdx][queueIdx];
+            result.queueWaitSamples[opTypeIdx][queueIdx] = {cell.totalQueuedMicros.loadRelaxed(),
+                                                            cell.touched.loadRelaxed()};
+        }
+    }
+
     return result;
 }
 
@@ -263,7 +276,8 @@ void ExecutionAdmissionContext::setTaskType(OperationContext* opCtx, TaskType ne
                 "newValue"_attr = to_string(newType));
 }
 
-void ExecutionAdmissionContext::recordExecutionAcquisition(AdmissionContext::Priority priority) {
+void ExecutionAdmissionContext::recordExecutionAcquisition(
+    AdmissionContext::Priority priority, ExecutionAdmissionContext::QueueType queue) {
     if (!_shouldRecordStats()) {
         return;
     }
@@ -280,6 +294,10 @@ void ExecutionAdmissionContext::recordExecutionAcquisition(AdmissionContext::Pri
     if (_statsRecorder) {
         _statsRecorder->_record({.admissions = 1, .lowPriorityAdmissions = isLowPriority ? 1 : 0});
     }
+
+    // Mark the queue as touched so this operation contributes a sample (0us if it never waited) to
+    // the queue's wait-time histogram at finalization.
+    _getQueueWaitStats(queue).touched.storeRelaxed(true);
 }
 
 void ExecutionAdmissionContext::recordExecutionStartQueueing() {
@@ -292,7 +310,8 @@ void ExecutionAdmissionContext::recordExecutionStartQueueing() {
     }
 }
 
-void ExecutionAdmissionContext::recordExecutionWaitedAcquisition(Microseconds queueTimeMicros) {
+void ExecutionAdmissionContext::recordExecutionWaitedAcquisition(
+    Microseconds queueTimeMicros, ExecutionAdmissionContext::QueueType queue) {
     if (!_shouldRecordStats()) {
         return;
     }
@@ -304,6 +323,27 @@ void ExecutionAdmissionContext::recordExecutionWaitedAcquisition(Microseconds qu
         _statsRecorder->_record(
             {.finishedQueueing = 1, .timeQueuedMicros = queueTimeMicros.count()});
     }
+
+    auto& queueStats = _getQueueWaitStats(queue);
+    queueStats.totalQueuedMicros.fetchAndAddRelaxed(queueTimeMicros.count());
+    queueStats.touched.storeRelaxed(true);
+}
+
+size_t ExecutionAdmissionContext::_queueIndex(QueueType queue) {
+    switch (queue) {
+        case ExecutionAdmissionContext::QueueType::kNormal:
+            return 0;
+        case ExecutionAdmissionContext::QueueType::kLow:
+            return 1;
+        default:
+            MONGO_UNREACHABLE_TASSERT(12919200);
+    }
+    MONGO_UNREACHABLE;
+}
+
+ExecutionAdmissionContext::PerQueueWaitStats& ExecutionAdmissionContext::_getQueueWaitStats(
+    QueueType queue) {
+    return _queueWaitStats[static_cast<size_t>(getOperationType())][_queueIndex(queue)];
 }
 
 void ExecutionAdmissionContext::recordExecutionRelease(Microseconds processedTimeMicros) {
@@ -377,6 +417,9 @@ ec::OperationExecutionStats& ExecutionAdmissionContext::_getOperationExecutionSt
 
         case ec::OperationType::kWrite:
             return isDeprioritizable ? _writeDeprioritizableStats : _writeNonDeprioritizableStats;
+
+        default:
+            MONGO_UNREACHABLE;
     }
 
     MONGO_UNREACHABLE;

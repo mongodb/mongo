@@ -44,6 +44,8 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/processinfo.h"
 
+#include <array>
+#include <cstddef>
 #include <mutex>
 #include <string_view>
 #include <utility>
@@ -722,6 +724,30 @@ void TicketingSystem::finalizeOperationStats(OperationContext* opCtx,
     }
     if (finalizedStats.wasMarkedNonDeprioritizable) {
         _opsMarkedNonDeprioritizable.fetchAndAddRelaxed(1);
+    }
+
+    // Record one per-operation wait-time sample into the histogram of each queue the operation
+    // used. Operations that acquired a ticket without ever waiting contribute a 0us sample.
+    {
+        using Priority = AdmissionContext::Priority;
+        static constexpr std::array<OperationType,
+                                    static_cast<size_t>(
+                                        execution_control::OperationType::kNumOperationTypes)>
+            kOpTypes = {OperationType::kRead, OperationType::kWrite};
+        static constexpr std::array<Priority,
+                                    static_cast<size_t>(
+                                        ExecutionAdmissionContext::QueueType::kNumQueueTypes)>
+            kQueues = {Priority::kNormal, Priority::kLow};
+        for (size_t opTypeIdx = 0; opTypeIdx < kOpTypes.size(); ++opTypeIdx) {
+            for (size_t queueIdx = 0; queueIdx < kQueues.size(); ++queueIdx) {
+                const auto& sample = finalizedStats.queueWaitSamples[opTypeIdx][queueIdx];
+                if (!sample.touched) {
+                    continue;
+                }
+                _getHolder(kQueues[queueIdx], kOpTypes[opTypeIdx])
+                    ->recordQueueWaitTime(Microseconds{sample.totalQueuedMicros});
+            }
+        }
     }
 
     auto admissions = ExecutionAdmissionContext::get(opCtx).getAdmissions();

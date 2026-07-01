@@ -222,6 +222,14 @@ public:
      */
     void incrementDelinquencyStats(const admission::execution_control::DelinquencyStats& newStats);
 
+    /**
+     * Records a single per-operation sample into this queue's wait-time histogram, equal to the
+     * total time the operation spent waiting in this queue across all of its acquisitions (0 if it
+     * acquired without ever waiting). Intended to be called once per operation, per queue it used,
+     * when the operation completes.
+     */
+    void recordQueueWaitTime(Microseconds queueWaitTime);
+
 private:
     /**
      * Statistics for queueing mechanisms in the TicketHolder implementations. The term "Queue" is a
@@ -294,6 +302,8 @@ private:
     ReleaseCallback _reportReleaseOpCallback{nullptr};
     StartQueueingCallback _reportStartQueueingOpCallback{nullptr};
     mongo::admission::execution_control::DelinquencyStats _delinquencyStats;
+
+    mongo::admission::execution_control::QueueWaitTimeHistogram _queueWaitTimeHistogram;
 
     // Synchronization mechanism for waiters.
     std::unique_ptr<TicketSemaphore> _semaphore;

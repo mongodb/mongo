@@ -41,6 +41,51 @@ describe("Execution control statistics and observability", function () {
         return coll.find().hint({$natural: 1}).comment(comment).batchSize(3).toArray();
     }
 
+    // Lower bounds (microseconds) for the per-queue wait-time histogram buckets, matching
+    // QueueWaitTimeHistogram::partitions() in execution_control_stats.h. The implicit leading 0
+    // bucket counts operations that did not wait.
+    const kQueueWaitTimeHistogramLowerBounds = [
+        0, 1, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000, 250000,
+        500000, 1000000, 2500000, 5000000, 10000000,
+    ];
+
+    function assertQueueWaitTimeHistogramSchema(queueStats, label) {
+        assert(
+            queueStats.hasOwnProperty("queueWaitTimeMicros"),
+            `Missing queueWaitTimeMicros in ${label}`,
+            {queueStats},
+        );
+        const histogram = queueStats.queueWaitTimeMicros;
+        assert(Array.isArray(histogram), `queueWaitTimeMicros should be an array in ${label}`, {
+            histogram,
+        });
+        assert.eq(
+            histogram.length,
+            kQueueWaitTimeHistogramLowerBounds.length,
+            `Unexpected number of histogram buckets in ${label}`,
+            {histogram},
+        );
+        histogram.forEach((bucket, i) => {
+            assert(
+                bucket.hasOwnProperty("lowerBound") && bucket.hasOwnProperty("count"),
+                `Bucket ${i} missing lowerBound/count in ${label}`,
+                {bucket},
+            );
+            assert.eq(
+                bucket.lowerBound,
+                kQueueWaitTimeHistogramLowerBounds[i],
+                `Unexpected lowerBound for bucket ${i} in ${label}`,
+                {bucket},
+            );
+        });
+    }
+
+    // Returns the total number of samples recorded across all buckets of a queue's wait-time
+    // histogram. Bucket counts are monotonically increasing, so this is safe to diff over time.
+    function sumQueueWaitTimeHistogram(queueStats) {
+        return queueStats.queueWaitTimeMicros.reduce((total, bucket) => total + bucket.count, 0);
+    }
+
     describe("Execution control algorithm and prioritization reporting in serverStatus", function () {
         let replTest, mongod, db;
         const kNumReadTickets = 5;
@@ -336,6 +381,38 @@ describe("Execution control statistics and observability", function () {
             assert.gte(
                 afterLowStats.totalTickets,
                 afterLowStats.normalPriority.totalTickets + afterLowStats.lowPriority.totalTickets,
+            );
+        });
+
+        it("should record per-operation queue wait times into the per-queue histograms", function () {
+            // A non-deprioritized read acquires a normal-priority ticket and therefore contributes
+            // one sample to the normal-priority read queue histogram.
+            const beforeNormal = sumQueueWaitTimeHistogram(
+                getExecutionControlStats(mongod).read.normalPriority,
+            );
+            runNonDeprioritizedFind(coll);
+            const afterNormal = sumQueueWaitTimeHistogram(
+                getExecutionControlStats(mongod).read.normalPriority,
+            );
+            assert.gt(
+                afterNormal,
+                beforeNormal,
+                "Non-deprioritized read should add a sample to the normal-priority queue histogram",
+            );
+
+            // A deprioritized read is routed to the low-priority pool and therefore contributes at
+            // least one sample to the low-priority read queue histogram.
+            const beforeLow = sumQueueWaitTimeHistogram(
+                getExecutionControlStats(mongod).read.lowPriority,
+            );
+            runDeprioritizedFind(coll, findComment + "_histogram");
+            const afterLow = sumQueueWaitTimeHistogram(
+                getExecutionControlStats(mongod).read.lowPriority,
+            );
+            assert.gt(
+                afterLow,
+                beforeLow,
+                "Deprioritized read should add a sample to the low-priority queue histogram",
             );
         });
 
@@ -841,6 +918,18 @@ describe("Execution control statistics and observability", function () {
                     `Missing histogram bucket ${bucket}: ` + tojson(histogram),
                 );
             }
+        });
+
+        it("should report per-queue wait time histograms in serverStatus", function () {
+            const executionStats = db.serverStatus().queues.execution;
+            ["read", "write"].forEach((opType) => {
+                ["normalPriority", "lowPriority"].forEach((priority) => {
+                    assertQueueWaitTimeHistogramSchema(
+                        executionStats[opType][priority],
+                        `${opType}.${priority}`,
+                    );
+                });
+            });
         });
 
         function configureExecutionControlState(enableDeprioritization, shedding) {

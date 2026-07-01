@@ -121,6 +121,47 @@ TEST(AdmissionsHistogramTest, AppendStatsOutputsAllBuckets) {
     }
 }
 
+TEST(QueueWaitTimeHistogramTest, ClampsNonPositiveWaitToDidNotWaitBucket) {
+    QueueWaitTimeHistogram histogram;
+
+    histogram.record(Microseconds{0});
+    histogram.record(Microseconds{-5});
+
+    BSONArrayBuilder arrBuilder;
+    histogram.appendStats(arrBuilder);
+    BSONArray arr = arrBuilder.arr();
+
+    for (auto&& el : arr) {
+        BSONObj bucket = el.Obj();
+        const int64_t lowerBound = bucket["lowerBound"].Long();
+        const int64_t count = bucket["count"].Long();
+        const int64_t expected = lowerBound == 0 ? 2 : 0;
+        ASSERT_EQ(count, expected) << "unexpected count in bucket " << lowerBound;
+    }
+}
+
+TEST(QueueWaitTimeHistogramTest, AppendStatsOutputsAllBuckets) {
+    QueueWaitTimeHistogram histogram;
+
+    BSONArrayBuilder arrBuilder;
+    histogram.appendStats(arrBuilder);
+    BSONArray arr = arrBuilder.arr();
+
+    // One bucket per partition, plus the implicit "did not wait" bucket below the first partition.
+    std::vector<int64_t> expectedLowerBounds = {0};
+    for (int64_t p : QueueWaitTimeHistogram::partitions()) {
+        expectedLowerBounds.push_back(p);
+    }
+
+    ASSERT_EQ(static_cast<size_t>(arr.nFields()), expectedLowerBounds.size());
+
+    size_t i = 0;
+    for (auto&& el : arr) {
+        ASSERT_EQ(el.Obj()["lowerBound"].Long(), expectedLowerBounds[i]) << "bucket index " << i;
+        ++i;
+    }
+}
+
 }  // namespace
 }  // namespace mongo::admission::execution_control
 

@@ -33,6 +33,8 @@
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/util/modules.h"
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 
@@ -43,7 +45,7 @@ namespace mongo {
 class OperationContext;
 
 namespace admission::execution_control {
-enum class MONGO_MOD_PUBLIC OperationType { kRead = 0, kWrite };
+enum class MONGO_MOD_PUBLIC OperationType { kRead = 0, kWrite, kNumOperationTypes };
 class ScopedTaskTypeModifierBase;
 class ScopedTicketAdmissionStatsRecorder;
 };  // namespace admission::execution_control
@@ -65,6 +67,16 @@ public:
                              // waits for a ticket)
         Background,          // The task is considered as a background task, e.g. index builds,
                              // range deletions, and TTL deletions.
+    };
+
+    /**
+     * Queue type to distinguish between Normal and Low priority execution queue
+     */
+    enum class QueueType {
+        kNormal = 0,
+        kLow,
+
+        kNumQueueTypes
     };
 
     ExecutionAdmissionContext() = default;
@@ -186,9 +198,13 @@ public:
 
     /**
      * Records that a ticket was acquired. Increments the appropriate admission counter
-     * (normal or low priority) for the current bucket based on the provided priority.
+     * (normal or low priority) for the current bucket based on the provided ticket 'priority'.
+     *
+     * 'queue' identifies which ticket queue (normal- or low-priority) actually served the
+     * acquisition; it is used to mark the queue as touched so the operation contributes a sample
+     * (possibly 0us, if it never waited there) to that queue's wait-time histogram at finalization.
      */
-    void recordExecutionAcquisition(AdmissionContext::Priority priority);
+    void recordExecutionAcquisition(AdmissionContext::Priority priority, QueueType queue);
 
     /**
      * Records that the operation started waiting in a ticket queue. The matching end of the wait
@@ -198,9 +214,10 @@ public:
     void recordExecutionStartQueueing();
 
     /**
-     * Records the time spent waiting in queue before acquiring a ticket.
+     * Records the time spent waiting in queue before acquiring a ticket. 'queue' identifies which
+     * ticket queue (normal- or low-priority) the wait occurred in.
      */
-    void recordExecutionWaitedAcquisition(Microseconds queueTimeMicros);
+    void recordExecutionWaitedAcquisition(Microseconds queueTimeMicros, QueueType queue);
 
     /**
      * Records the time spent processing while holding a ticket.
@@ -211,6 +228,34 @@ public:
      * Records that a ticket was held past the delinquency threshold.
      */
     void recordDelinquentAcquisition(Milliseconds delay);
+
+    /**
+     * Per-operation accumulation of time spent waiting in a single ticket queue. 'touched' is set
+     * once the operation either waits in or acquires a ticket from the queue, so that operations
+     * which never waited still contribute a 0us sample to the histogram.
+     */
+    struct PerQueueWaitStats {
+        PerQueueWaitStats() = default;
+        PerQueueWaitStats(const PerQueueWaitStats& other) {
+            *this = other;
+        }
+        PerQueueWaitStats& operator=(const PerQueueWaitStats& other) {
+            totalQueuedMicros.store(other.totalQueuedMicros.loadRelaxed());
+            touched.store(other.touched.loadRelaxed());
+            return *this;
+        }
+
+        AtomicWord<int64_t> totalQueuedMicros{0};
+        AtomicWord<bool> touched{false};
+    };
+
+    /**
+     * Plain snapshot of PerQueueWaitStats taken at finalization time.
+     */
+    struct QueueWaitSample {
+        int64_t totalQueuedMicros = 0;
+        bool touched = false;
+    };
 
     /**
      * Represents the finalized stats from an operation, ready to be accumulated into global stats.
@@ -242,6 +287,13 @@ public:
 
         // Whether this operation was in a multi-document transaction.
         bool wasInMultiDocTxn = false;
+
+        // Per-operation total queue wait time, indexed by [operation type][queue], to be recorded
+        // into each queue's wait-time histogram. Only entries with 'touched == true' should be
+        // recorded.
+        std::array<std::array<QueueWaitSample, static_cast<size_t>(QueueType::kNumQueueTypes)>,
+                   static_cast<size_t>(ec::OperationType::kNumOperationTypes)>
+            queueWaitSamples;
 
         void clearDelinquencyStats() {
             readDelinquency = ec::DelinquencyStats{};
@@ -299,9 +351,26 @@ private:
      */
     bool _shouldRecordStats();
 
+    /**
+     * Maps a tracked queue priority (normal or low) to its index in '_queueWaitStats'.
+     */
+    static size_t _queueIndex(QueueType queue);
+
+    /**
+     * Returns the per-queue wait stats cell for the current operation type and the given queue.
+     */
+    PerQueueWaitStats& _getQueueWaitStats(QueueType queue);
+
     // Delinquency stats by operation type.
     ec::DelinquencyStats _readDelinquencyStats;
     ec::DelinquencyStats _writeDelinquencyStats;
+
+    // Per-operation queue wait time accumulators, indexed by [operation type][queue]. These feed
+    // the per-queue wait-time histograms at finalization. The operation type index matches
+    // ec::OperationType (kRead = 0, kWrite = 1); the queue index is given by '_queueIndex'.
+    std::array<std::array<PerQueueWaitStats, static_cast<size_t>(QueueType::kNumQueueTypes)>,
+               static_cast<size_t>(ec::OperationType::kNumOperationTypes)>
+        _queueWaitStats;
 
     /**
      * Stats for read and write deprioritizable/non-deprioritizable operations. Whether they're

@@ -31,12 +31,15 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/histogram.h"
 #include "mongo/util/modules.h"
 
 #include <array>
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 
 MONGO_MOD_PUBLIC;
@@ -99,6 +102,31 @@ private:
     size_t _getBucketIndex(int32_t admissions);
 
     std::array<AtomicWord<int64_t>, kNumBuckets> _buckets{};
+};
+
+/**
+ * Histogram tracking the distribution of per-operation queue wait times for a single ticket queue.
+ *
+ * It's a wrapper around the Histogram<t> for a convenient use of appendStats and a sanitization
+ * point for recording a new datapoint.
+ */
+class QueueWaitTimeHistogram {
+public:
+    // Lower-bound partitions (microseconds). The implicit first bucket below the smallest
+    // partition captures the "did not wait" (0us) samples.
+    static std::vector<int64_t> partitions() {
+        return {1,       10,      25,        50,        100,       250,       500,
+                1'000,   2'500,   5'000,     10'000,    25'000,    50'000,    100'000,
+                250'000, 500'000, 1'000'000, 2'500'000, 5'000'000, 10'000'000};
+    }
+
+    QueueWaitTimeHistogram() : _hist(partitions()) {}
+
+    void record(Microseconds queueWaitTime);
+    void appendStats(BSONArrayBuilder& arr) const;
+
+private:
+    Histogram<int64_t> _hist;
 };
 
 /**

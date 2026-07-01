@@ -31,9 +31,25 @@
 
 #include "mongo/logv2/log.h"
 
+#include <algorithm>
+#include <iterator>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo::admission::execution_control {
+
+void QueueWaitTimeHistogram::record(Microseconds queueWaitTime) {
+    _hist.increment(std::max<int64_t>(0, queueWaitTime.count()));
+}
+
+void QueueWaitTimeHistogram::appendStats(BSONArrayBuilder& arr) const {
+    for (auto&& bucket : _hist) {
+        // The lowermost bucket has no finite lower bound; wait time is non-negative so report 0.
+        BSONObjBuilder bob(arr.subobjStart());
+        bob.append("lowerBound", bucket.lower ? *bucket.lower : int64_t{0});
+        bob.append("count", bucket.count);
+    }
+}
 
 void AdmissionsHistogram::record(int32_t admissions) {
     if (admissions <= 0) {

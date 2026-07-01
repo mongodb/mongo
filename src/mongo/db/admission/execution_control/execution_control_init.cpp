@@ -50,13 +50,23 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
         static_cast<ExecutionAdmissionContext*>(admCtx)->recordDelinquentAcquisition(delta);
     };
 
-    auto acquisitionCb = [](AdmissionContext* admCtx, AdmissionContext::Priority priority) {
-        static_cast<ExecutionAdmissionContext*>(admCtx)->recordExecutionAcquisition(priority);
+    // The acquisition and waited-acquisition callbacks need to know which ticket queue (normal- or
+    // low-priority) actually served the operation. We bind that identity here, where each holder is
+    // constructed, rather than reading it from the AdmissionContext: when prioritization is
+    // disabled a low-priority operation runs in the normal pool, so its live priority would not
+    // reflect the queue it actually used.
+    auto makeAcquisitionCb = [](ExecutionAdmissionContext::QueueType queue) {
+        return [queue](AdmissionContext* admCtx, AdmissionContext::Priority priority) {
+            static_cast<ExecutionAdmissionContext*>(admCtx)->recordExecutionAcquisition(priority,
+                                                                                        queue);
+        };
     };
 
-    auto waitedAcquisitionCb = [](AdmissionContext* admCtx, Microseconds timeQueued) {
-        static_cast<ExecutionAdmissionContext*>(admCtx)->recordExecutionWaitedAcquisition(
-            timeQueued);
+    auto makeWaitedAcquisitionCb = [](ExecutionAdmissionContext::QueueType queue) {
+        return [queue](AdmissionContext* admCtx, Microseconds timeQueued) {
+            static_cast<ExecutionAdmissionContext*>(admCtx)->recordExecutionWaitedAcquisition(
+                timeQueued, queue);
+        };
     };
 
     auto releaseCb = [](AdmissionContext* admCtx, Microseconds timeProcessed) {
@@ -70,24 +80,26 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
     return std::make_unique<TicketingSystem>(
         svcCtx,
         TicketingSystem::RWTicketHolder{
-            std::make_unique<TicketHolder>(svcCtx,
-                                           gConcurrentReadTransactions.load(),
-                                           true /* trackPeakUsed */,
-                                           gReadMaxQueueDepth.load(),
-                                           delinquentCb,
-                                           acquisitionCb,
-                                           waitedAcquisitionCb,
-                                           releaseCb,
-                                           startQueueingCb),
-            std::make_unique<TicketHolder>(svcCtx,
-                                           gConcurrentWriteTransactions.load(),
-                                           true /* trackPeakUsed */,
-                                           gWriteMaxQueueDepth.load(),
-                                           delinquentCb,
-                                           acquisitionCb,
-                                           waitedAcquisitionCb,
-                                           releaseCb,
-                                           startQueueingCb)},
+            std::make_unique<TicketHolder>(
+                svcCtx,
+                gConcurrentReadTransactions.load(),
+                true /* trackPeakUsed */,
+                gReadMaxQueueDepth.load(),
+                delinquentCb,
+                makeAcquisitionCb(ExecutionAdmissionContext::QueueType::kNormal),
+                makeWaitedAcquisitionCb(ExecutionAdmissionContext::QueueType::kNormal),
+                releaseCb,
+                startQueueingCb),
+            std::make_unique<TicketHolder>(
+                svcCtx,
+                gConcurrentWriteTransactions.load(),
+                true /* trackPeakUsed */,
+                gWriteMaxQueueDepth.load(),
+                delinquentCb,
+                makeAcquisitionCb(ExecutionAdmissionContext::QueueType::kNormal),
+                makeWaitedAcquisitionCb(ExecutionAdmissionContext::QueueType::kNormal),
+                releaseCb,
+                startQueueingCb)},
         TicketingSystem::RWTicketHolder{
             std::make_unique<TicketHolder>(
                 svcCtx,
@@ -95,8 +107,8 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
                 false /* trackPeakUsed */,
                 gReadLowPriorityMaxQueueDepth.load(),
                 delinquentCb,
-                acquisitionCb,
-                waitedAcquisitionCb,
+                makeAcquisitionCb(ExecutionAdmissionContext::QueueType::kLow),
+                makeWaitedAcquisitionCb(ExecutionAdmissionContext::QueueType::kLow),
                 releaseCb,
                 startQueueingCb,
                 TicketHolder::ResizePolicy::kGradual,
@@ -107,8 +119,8 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
                 false /* trackPeakUsed */,
                 gWriteLowPriorityMaxQueueDepth.load(),
                 delinquentCb,
-                acquisitionCb,
-                waitedAcquisitionCb,
+                makeAcquisitionCb(ExecutionAdmissionContext::QueueType::kLow),
+                makeWaitedAcquisitionCb(ExecutionAdmissionContext::QueueType::kLow),
                 releaseCb,
                 startQueueingCb,
                 TicketHolder::ResizePolicy::kGradual,
