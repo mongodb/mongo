@@ -55,32 +55,15 @@ function assertCollectionDropped(ns, uuid = null) {
         );
     }
 
-    // TODO (SERVER-123313): When AuthoritativeShardsDDL is enabled, the authoritative
-    // DropCollection and DropDatabase DDL commands do not clean up config.cache collection entries,
-    // unlike their non-authoritative counterparts. This is by design: the authoritative CRUD path
-    // does not use these collections, so they are expected not to exist after a drop.
-    //
-    // However, since not all DDLs are authoritative yet, the CRUD path may still fall back to the
-    // non-authoritative recovery logic, which recreates these collections. As a result, the
-    // assertions below would fail under authoritative metadata mode.
-    //
-    // Once all DDLs are fully authoritative, this escape can be removed, as config.cache
-    // collections will no longer be created after a drop.
-    const isAuthoritativeCollMetadata = FeatureFlagUtil.isPresentAndEnabled(
-        st.s,
-        "AuthoritativeShardsDDL",
-    );
-    if (!isAuthoritativeCollMetadata) {
-        // Verify that persisted cached metadata was removed as part of the dropCollection
-        const chunksCollName = "cache.chunks." + ns;
-        for (let configDb of [st.shard0.getDB("config"), st.shard1.getDB("config")]) {
-            assert.eq(
-                configDb["cache.collections"].countDocuments({_id: ns}),
-                0,
-                "Found collection entry in 'config.cache.collections' after drop.",
-            );
-            assert(!configDb[chunksCollName].exists());
-        }
+    // Verify that persisted cached metadata was removed as part of the dropCollection
+    const chunksCollName = "cache.chunks." + ns;
+    for (let configDb of [st.shard0.getDB("config"), st.shard1.getDB("config")]) {
+        assert.eq(
+            configDb["cache.collections"].countDocuments({_id: ns}),
+            0,
+            "Found collection entry in 'config.cache.collections' after drop.",
+        );
+        assert(!configDb[chunksCollName].exists());
     }
 }
 

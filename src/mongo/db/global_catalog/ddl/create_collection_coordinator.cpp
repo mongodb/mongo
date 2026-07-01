@@ -1631,19 +1631,24 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
             auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
 
-            auto involvedShards = *_doc.getShardIds();
-            auto addIfNotPresent = [&](const ShardId& shard) {
-                if (std::find(involvedShards.begin(), involvedShards.end(), shard) ==
-                    involvedShards.end())
-                    involvedShards.push_back(shard);
-            };
+            const bool isAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
+                AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
+            if (!isAuthoritative) {
+                auto involvedShards = *_doc.getShardIds();
+                auto addIfNotPresent = [&](const ShardId& shard) {
+                    if (std::find(involvedShards.begin(), involvedShards.end(), shard) ==
+                        involvedShards.end())
+                        involvedShards.push_back(shard);
+                };
 
-            // The filtering information has been cleared on all participant shards. Here we issue a
-            // best effort refresh on all shards involved in the operation to install the correct
-            // filtering information.
-            addIfNotPresent(ShardingState::get(opCtx)->shardId());
-            addIfNotPresent(*_doc.getOriginalDataShard());
-            sharding_util::triggerFireAndForgetShardRefreshes(opCtx, involvedShards, nss());
+                // The filtering information has been cleared on all participant shards. Here we
+                // issue a best effort refresh on all shards involved in the operation to install
+                // the correct filtering information. In authoritative mode, the commit phase
+                // already updates the shard catalog and installs the in-memory metadata.
+                addIfNotPresent(ShardingState::get(opCtx)->shardId());
+                addIfNotPresent(*_doc.getOriginalDataShard());
+                sharding_util::triggerFireAndForgetShardRefreshes(opCtx, involvedShards, nss());
+            }
 
             if (_firstExecution) {
                 const auto& placementVersion = _initialChunks->chunks.back().getVersion();
