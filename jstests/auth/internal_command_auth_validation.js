@@ -62,12 +62,6 @@ const internalCommandsMap = {
             },
         },
     },
-    _internalClearCollectionShardingMetadata: {
-        testname: "_internalClearCollectionShardingMetadata",
-        command: {
-            _internalClearCollectionShardingMetadata: "test.x",
-        },
-    },
     _clusterWriteWithoutShardKey: {
         testname: "_clusterWriteWithoutShardKey",
         command: {_clusterWriteWithoutShardKey: 1, writeCmd: {}, shardId: "", targetDocId: {}},

@@ -89,7 +89,6 @@ export const commandsAddedToMongodSinceLastLTS = [
     "_shardsvrCommitCollModCollectionMetadata",
     "_shardsvrCommitCreateCollectionMetadata",
     "_shardsvrCommitCreateCollectionChunklessMetadata",
-    "_internalClearCollectionShardingMetadata",
     "_shardsvrCommitDropCollectionMetadata",
     "_shardsvrCommitRenameCollectionMetadata",
     "_shardsvrSplitChunk",

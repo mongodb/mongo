@@ -23,7 +23,6 @@ const isDeprecated = "deprecated command";
 
 const allCommands = {
     _addShard: {skip: isPrimaryOnly},
-    _internalClearCollectionShardingMetadata: {skip: isAnInternalCommand},
     _cloneCollectionOptionsFromPrimaryShard: {skip: isPrimaryOnly},
     _clusterQueryWithoutShardKey: {skip: isAnInternalCommand},
     _clusterWriteWithoutShardKey: {skip: isAnInternalCommand},
