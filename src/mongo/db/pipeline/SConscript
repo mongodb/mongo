@@ -747,6 +747,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/s/is_mongos',
         '$BUILD_DIR/mongo/s/query/router_exec_stage',
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
+        '$BUILD_DIR/mongo/transport/transport_layer_mock',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'abt_translation',
         'accumulator',
