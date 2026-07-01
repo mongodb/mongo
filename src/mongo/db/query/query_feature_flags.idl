@@ -209,7 +209,7 @@ feature_flags:
             "Feature flag to enable expression-level memory usage tracking during query
             execution. Only takes effect when featureFlagQueryMemoryTracking is also enabled."
         cpp_varname: gFeatureFlagExpressionMemoryTracking
-        default: false
+        default: true
         fcv_gated: false
 
     featureFlagMongotIndexedViews:
