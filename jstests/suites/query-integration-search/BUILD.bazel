@@ -15,6 +15,87 @@
 load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 
 resmoke_suite_test(
+    name = "search",
+    config = "//buildscripts/resmokeconfig:suites/search.yml",
+    data = [
+        "//jstests/with_mongot/mongotmock/lib",
+    ],
+    shard_count = 50,
+    tags = [
+        "ci-release-critical",
+        "incompatible_with_bazel_remote_test",  # Mongotmock fails to establish a connection in remote executors.
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/query/search/mongotmock",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "search_auth",
+    config = "//buildscripts/resmokeconfig:suites/search_auth.yml",
+    data = [
+        "//jstests/with_mongot/mongotmock/lib",
+    ],
+    shard_count = 50,
+    tags = [
+        "ci-release-critical",
+        "incompatible_with_bazel_remote_test",  # Mongotmock fails to establish a connection in remote executors.
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/query/search/mongotmock",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "search_ssl",
+    config = "//buildscripts/resmokeconfig:suites/search_ssl.yml",
+    data = [
+        "//jstests/with_mongot/mongotmock/lib",
+    ],
+    shard_count = 50,
+    tags = [
+        "ci-release-critical",
+        "incompatible_with_bazel_remote_test",  # Mongotmock fails to establish a connection in remote executors.
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/query/search/mongotmock",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
     name = "search_community",
     config = "//buildscripts/resmokeconfig:suites/search_community.yml",
     data = [
