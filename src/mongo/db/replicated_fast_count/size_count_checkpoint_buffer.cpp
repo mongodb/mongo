@@ -42,16 +42,18 @@ SizeCountCheckpointBuffer::SizeCountCheckpointBuffer(UUID oplogUuid,
 }
 
 boost::optional<OplogScanResult> SizeCountCheckpointBuffer::checkoutForFlush() {
-    std::lock_guard lk(_mutex);
-
     if (_inFlight) {
         // A previous flush has not been acknowledged yet. Retry the same batch.
         return _inFlight;
     }
 
-    // Cut the _pending accumulator into a flushable batch and reset _pending.
-    OplogScanResult result = _pending->finish();
-    _pending.emplace(_accumulatorOptions);
+    OplogScanResult result;
+    {
+        std::lock_guard lk(_mutex);
+        // Cut the _pending accumulator into a flushable batch and reset _pending.
+        result = _pending->finish();
+        _pending.emplace(_accumulatorOptions);
+    }
 
     if (!result.lastTimestamp) {
         // finish() leaves lastTimestamp unset when no size/count entries were accumulated. We
@@ -83,12 +85,10 @@ void SizeCountCheckpointBuffer::scanToNoHolesEOF(SeekableRecordCursor& cursor) {
 }
 
 void SizeCountCheckpointBuffer::acknowledgeFlushSuccess() {
-    std::lock_guard lk(_mutex);
     _inFlight.reset();
 }
 
 bool SizeCountCheckpointBuffer::hasInFlightWork() const {
-    std::lock_guard lk(_mutex);
     return _inFlight.has_value();
 }
 

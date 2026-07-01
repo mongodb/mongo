@@ -98,6 +98,8 @@ private:
     // The options used to build every pending accumulator.
     const StreamingOplogDeltaAccumulator::Options _accumulatorOptions;
 
+    // Accumulated size/count deltas currently being flushed.
+    boost::optional<OplogScanResult> _inFlight;
     // The record ID of the last record consumed into _pending. The boost::none state means we have
     // not buffered any oplog entries yet.
     boost::optional<RecordId> _lastBufferedRid = boost::none;
@@ -105,8 +107,6 @@ private:
     mutable std::mutex _mutex;
     // Accumulated size/count deltas buffered but not checked out. See checkoutForFlush().
     boost::optional<StreamingOplogDeltaAccumulator> _pending;
-    // Accumulated size/count deltas currently being flushed.
-    boost::optional<OplogScanResult> _inFlight;
 };
 
 }  // namespace mongo::replicated_fast_count
