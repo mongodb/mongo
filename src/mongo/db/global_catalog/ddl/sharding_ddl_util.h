@@ -518,6 +518,27 @@ MONGO_MOD_PRIVATE void commitRenameCollectionMetadataToShardCatalog(
     const CancellationToken& token);
 
 /**
+ * Commits chunk operation metadata to the shard catalog by sending
+ * `_shardsvrCommitChunkOperationsMetadata` to each given shard.
+ *
+ * Each shard receives the new chunks and reconciles any overlaps with its existing durable chunks
+ * locally.
+ *
+ * The caller is responsible for ensuring that `newChunks` contains the relevant chunks that must be
+ * sent to the specified shards. This method does not assert that every chunk in `newChunks` is
+ * currently owned by a target shard, because unowned chunks may still need to be sent to preserve
+ * history for point-in-time reads.
+ */
+MONGO_MOD_PRIVATE void commitChunkOperationsMetadataToShardCatalog(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const std::vector<ChunkType>& newChunks,
+    const std::vector<ShardRef>& shardRefs,
+    const OperationSessionInfo& osi,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token);
+
+/**
  * Based on the FCV, get whether the DDL needs to act according to the database
  * or collection metadata authoritativeness.
  */
