@@ -139,6 +139,8 @@ function assertPartialInsertQueryStats(testDB, coll, collName, nInserted, shardC
             nInserted: nInserted,
             nUpdateOps: 0,
             nDeleteOps: 0,
+            keysInserted: nInserted,
+            keysDeleted: 0,
         },
     });
 
@@ -162,6 +164,8 @@ function assertPartialInsertQueryStats(testDB, coll, collName, nInserted, shardC
                 nInserted: nInserted,
                 nUpdateOps: 0,
                 nDeleteOps: 0,
+                keysInserted: nInserted,
+                keysDeleted: 0,
             },
         });
     }

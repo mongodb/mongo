@@ -243,6 +243,8 @@ function testUpdateNoMatches(testDB, coll, collName) {
             nInserted: 0,
             nUpdateOps: 1,
             nDeleteOps: 0,
+            keysInserted: 0,
+            keysDeleted: 0,
         },
     });
 }
@@ -273,6 +275,8 @@ function testMultiUpdatePartialSuccess(testDB, coll, collName, conn) {
             nInserted: 0,
             nUpdateOps: 3,
             nDeleteOps: 0,
+            keysInserted: 0,
+            keysDeleted: 0,
         },
     });
 }
@@ -441,6 +445,8 @@ describeWriteCmdQueryStatsCrossShardTests(
                     nInserted: 0,
                     nUpdateOps: 1,
                     nDeleteOps: 0,
+                    keysInserted: 0,
+                    keysDeleted: 0,
                 },
             });
 
@@ -467,6 +473,8 @@ describeWriteCmdQueryStatsCrossShardTests(
                     nInserted: 0,
                     nUpdateOps: 1,
                     nDeleteOps: 0,
+                    keysInserted: 0,
+                    keysDeleted: 0,
                 },
             });
         });
