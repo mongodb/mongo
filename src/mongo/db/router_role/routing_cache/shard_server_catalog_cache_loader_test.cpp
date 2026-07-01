@@ -52,6 +52,7 @@
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -167,6 +168,9 @@ public:
 private:
     void setUp() override;
     void tearDown() override;
+
+    // The SSCCL refuses to persist any data once Authoritative Shards is enabled.
+    unittest::ServerParameterGuard _disableAuthShards{"featureFlagAuthoritativeShardsCRUD", false};
 };
 
 void ShardServerCatalogCacheLoaderTest::setUp() {

@@ -62,6 +62,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_catalog_helper.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options_gen.h"
 #include "mongo/db/shard_role/shard_catalog/drop_collection.h"
+#include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
@@ -75,6 +76,7 @@
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/migration_blocking_operation/migration_blocking_operation_feature_flags_gen.h"
 #include "mongo/util/fail_point.h"
 
@@ -286,6 +288,36 @@ void dropAuthoritativeShardCatalogCollectionsOnShards(OperationContext* opCtx) {
             }
 
             uassertStatusOK(status);
+        }
+    }
+}
+
+// TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+// Drops this shard's legacy non-authoritative cache collections (config.cache.databases,
+// config.cache.collections and config.cache.chunks.*).
+void dropLegacyShardCacheCollections(OperationContext* opCtx) {
+    // Wait for the SSCCL to finish any already-queued flush tasks before dropping the collections.
+    FilteringMetadataCache::get(opCtx)->waitForAllFlushes(opCtx);
+
+    DBDirectClient client(opCtx);
+
+    const auto dropCacheCollection = [&](const NamespaceString& nss) {
+        BSONObj result;
+        if (!client.dropCollection(nss, defaultMajorityWriteConcern(), &result)) {
+            const auto status = getStatusFromCommandResult(result);
+            if (status != ErrorCodes::NamespaceNotFound) {
+                uassertStatusOK(status);
+            }
+        }
+    };
+
+    // Drop 'cache.databases', 'cache.collections' + all 'config.cache.chunks.*' collections.
+    dropCacheCollection(NamespaceString::kConfigCacheDatabasesNamespace);
+    dropCacheCollection(NamespaceString::kShardConfigCollectionsNamespace);
+    for (const auto& collInfo : client.getCollectionInfos(DatabaseName::kConfig)) {
+        const auto name = collInfo["name"].str();
+        if (name.starts_with("cache.chunks.")) {
+            dropCacheCollection(NamespaceStringUtil::deserialize(DatabaseName::kConfig, name));
         }
     }
 }
@@ -518,6 +550,14 @@ private:
             query_settings::QuerySettingsService::get(opCtx).upgradeQuerySettings(opCtx,
                                                                                   requestedVersion);
         }
+
+        // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+        if (role && role->has(ClusterRole::ShardServer) &&
+            feature_flags::gAuthoritativeShardsCRUD.isEnabledOnVersion(requestedVersion)) {
+            // CRUD operations now read the authoritative shard catalog (config.shard.catalog.*)
+            // and the legacy cache collections are no longer read from, so they can be dropped.
+            dropLegacyShardCacheCollections(opCtx);
+        }
     }
 
     // TODO (SERVER-98118): Remove once v9.0 become last-lts.
@@ -660,6 +700,19 @@ private:
             // kUpgrading, since authoritative metadata writes can begin as soon as this shard
             // enters kUpgrading and those writes do not create the required indexes themselves.
             uassertStatusOK(ensureShardLocalCatalogIndexes(opCtx));
+        }
+
+        // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+        if (role && role->has(ClusterRole::ShardServer) &&
+            feature_flags::gAuthoritativeShardsCRUD.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
+                requestedVersion, originalVersion) &&
+            !serverGlobalParams.featureCompatibility.acquireFCVSnapshot()
+                 .isUpgradingOrDowngrading()) {
+            // As a precaution, clean any leftover data in nonauthoritative cache collections before
+            // entering kDowngrading. This is safe, since on the upgraded FCV, the nonauthoritative
+            // caches aren't read/writen from (refreshes still use the authoritative shard catalog).
+            // Once we enter kDowngrading, the ShardServerCatalogCacheLoader uses them again.
+            dropLegacyShardCacheCollections(opCtx);
         }
     }
 

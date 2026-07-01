@@ -64,9 +64,11 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
@@ -109,6 +111,15 @@ MONGO_FAIL_POINT_DEFINE(hangDatabaseFlush);
 MONGO_FAIL_POINT_DEFINE(noCacheMetadataTassert);
 
 AtomicWord<unsigned long long> taskIdGenerator{0};
+
+// TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+void uassertAuthoritativeShardsDisabled(OperationContext* opCtx) {
+    uassert(ErrorCodes::MetadataRefreshCanceledDueToFCVTransition,
+            "Non-authoritative config.cache.* update can't proceed: FCV has changed",
+            !feature_flags::gAuthoritativeShardsCRUD.isEnabled(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+}
 
 /**
  * Drops all chunks from the persisted metadata whether the collection's epoch has changed.
@@ -635,6 +646,32 @@ SemiFuture<DatabaseType> ShardServerCatalogCacheLoaderImpl::getDatabase(
         .semi();
 }
 
+void ShardServerCatalogCacheLoaderImpl::waitForAllFlushes(OperationContext* opCtx) {
+    std::vector<NamespaceString> collNssToFlush;
+    std::vector<DatabaseName> dbNamesToFlush;
+    {
+        std::lock_guard<std::mutex> lg(_mutex);
+        tassert(12797901,
+                "Expected waitForAllFlushes to be called after Authoritative Shards is enabled",
+                feature_flags::gAuthoritativeShardsCRUD.isEnabled(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+        for (const auto& [nss, _] : _collAndChunkTaskLists) {
+            collNssToFlush.push_back(nss);
+        }
+        for (const auto& [dbName, _] : _dbTaskLists) {
+            dbNamesToFlush.push_back(dbName);
+        }
+    }
+
+    for (const auto& nss : collNssToFlush) {
+        waitForCollectionFlush(opCtx, nss);
+    }
+    for (const auto& dbName : dbNamesToFlush) {
+        waitForDatabaseFlush(opCtx, dbName);
+    }
+}
+
 void ShardServerCatalogCacheLoaderImpl::waitForCollectionFlush(OperationContext* opCtx,
                                                                const NamespaceString& nss) {
     std::unique_lock<std::mutex> lg(_mutex);
@@ -1104,6 +1141,9 @@ void ShardServerCatalogCacheLoaderImpl::_ensureMajorityPrimaryAndScheduleCollAnd
     {
         std::lock_guard<std::mutex> lock(_mutex);
 
+        // Check Authoritative Shards flag under _mutex to serialize with waitForAllFlushes.
+        uassertAuthoritativeShardsDisabled(opCtx);
+
         auto& list = _collAndChunkTaskLists[nss];
         auto wasEmpty = list.empty();
         list.addTask(std::move(task));
@@ -1132,6 +1172,9 @@ void ShardServerCatalogCacheLoaderImpl::_ensureMajorityPrimaryAndScheduleDbTask(
     performNoopMajorityWriteLocally(opCtx, "ensureMajorityPrimaryAndScheduleDbTask");
     {
         std::lock_guard<std::mutex> lock(_mutex);
+
+        // Check Authoritative Shards flag under _mutex to serialize with waitForAllFlushes.
+        uassertAuthoritativeShardsDisabled(opCtx);
 
         auto& list = _dbTaskLists[dbName];
         auto wasEmpty = list.empty();

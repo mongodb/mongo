@@ -312,6 +312,14 @@ void FilteringMetadataCache::shutDown() {
         _cache->shutDownAndJoin();
 }
 
+void FilteringMetadataCache::waitForAllFlushes(OperationContext* opCtx) {
+    tassert(10727900,
+            "FilteringMetadataCache has not yet been initialized with a CatalogCacheLoader",
+            _loader);
+
+    _loader->waitForAllFlushes(opCtx);
+}
+
 void FilteringMetadataCache::onStepDown() {
     tassert(9539100,
             "FilteringMetadataCache has not yet been initialized with a CatalogCacheLoader",

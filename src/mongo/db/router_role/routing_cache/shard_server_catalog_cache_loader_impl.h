@@ -94,6 +94,8 @@ public:
     void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) override;
     void waitForDatabaseFlush(OperationContext* opCtx, const DatabaseName& dbName) override;
 
+    void waitForAllFlushes(OperationContext* opCtx) override;
+
 private:
     // Differentiates the server's role in the replica set so that the chunk loader knows whether to
     // load metadata locally or remotely.

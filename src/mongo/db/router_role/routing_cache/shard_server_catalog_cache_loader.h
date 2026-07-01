@@ -91,6 +91,12 @@ public:
     virtual void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) = 0;
 
     virtual void waitForDatabaseFlush(OperationContext* opCtx, const DatabaseName& dbName) = 0;
+
+    /**
+     * Waits for all currently-queued collection and database metadata flushes to complete.
+     * TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+     */
+    virtual void waitForAllFlushes(OperationContext* opCtx) = 0;
 };
 
 }  // namespace mongo

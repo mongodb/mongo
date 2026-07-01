@@ -7,6 +7,7 @@
 
 import {handleRandomSetFCVErrors} from "jstests/concurrency/fsm_workload_helpers/fcv/handle_setFCV_errors.js";
 import {assertTimeseriesConsistentWithViewlessFlag} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {assertNoLegacyShardCacheCollections} from "jstests/core/catalog/libs/assert_no_legacy_shard_cache_collections.js";
 
 if (typeof db === "undefined") {
     throw new Error(
@@ -67,6 +68,7 @@ const sendFCVUpDown = function (ver) {
         throw e;
     }
     assertTimeseriesConsistentWithViewlessFlag(db);
+    assertNoLegacyShardCacheCollections(db);
 };
 
 Random.setRandomSeed();
