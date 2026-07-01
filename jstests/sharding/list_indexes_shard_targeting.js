@@ -2,14 +2,10 @@
  * Test that for an unsharded collection the listIndexes command targets the database's primary
  * shard, and for a sharded collection the command sends and checks shard versions and only
  * targets the shard that owns the MinKey chunk.
- *
- * @tags: [
- *   # TODO (SERVER-129875): Adapt test to work with authoritative shards commits
- *   featureFlagAuthoritativeShardsDDL_incompatible,
- * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
+import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 // This test makes shards have inconsistent indexes.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
@@ -21,6 +17,10 @@ const nodeOptions = {
 };
 
 const st = new ShardingTest({shards: 3, other: {configOptions: nodeOptions}});
+
+// TODO (SERVER-129875): Adapt test to work with authoritative shards commits.
+skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
+
 const dbName = "test";
 const collName = "user";
 const ns = dbName + "." + collName;

@@ -7,8 +7,6 @@
  *   featureFlagGetExecutorDeferredEngineChoice,
  *   featureFlagShardFilteringDistinctScan,
  *   requires_fcv_82,
- *   # TODO (SERVER-129938) Re-enable once this gets fixed
- *   featureFlagAuthoritativeShardsDDL_incompatible,
  * ]
  */
 import {section, subSection} from "jstests/libs/query/pretty_md.js";

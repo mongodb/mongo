@@ -1,17 +1,18 @@
 /*
  * Tests that a StaleConfigError received from a shard on dropIndexes will allow the command to
  * successfully complete upon the mongos' command retry.
- * @tags: [
- *   # TODO (SERVER-129875): Adapt test to work with authoritative shards commits
- *   featureFlagAuthoritativeShardsDDL_incompatible,
- * ]
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 import {flushRoutersAndRefreshShardMetadata} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 const st = new ShardingTest({mongos: 2, shards: 2});
+
+// TODO (SERVER-129875): Adapt test to work with authoritative shards commits.
+skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
+
 const dbName = jsTestName();
 const collName = "coll";
 const ns = dbName + "." + collName;

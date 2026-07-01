@@ -13,7 +13,7 @@
  * response for stale txnNumbers, and idempotency for retried txnNumbers.
  *
  * @tags: [
- *   featureFlagAuthoritativeShardsDDL,
+ *   requires_fcv_90,
  * ]
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";

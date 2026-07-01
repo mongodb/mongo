@@ -5,7 +5,7 @@
  * no inconsistencies after each DDL.
  *
  * @tags: [
- *   featureFlagAuthoritativeShardsDDL,
+ *   requires_fcv_90,
  *   requires_timeseries,
  * ]
  */

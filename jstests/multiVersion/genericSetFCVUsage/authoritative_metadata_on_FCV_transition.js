@@ -5,8 +5,7 @@
  * TODO (SERVER-98118): Remove this test.
  *
  * @tags: [
- *   featureFlagAuthoritativeShardsCRUD,
- *   featureFlagAuthoritativeShardsDDL,
+ *   requires_fcv_90,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

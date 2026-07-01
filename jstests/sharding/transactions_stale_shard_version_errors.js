@@ -5,8 +5,6 @@
 //  uses_transactions,
 //  uses_multi_shard_transaction,
 //  assumes_balancer_off,
-//  # TODO (SERVER-129875): Adapt test to work with authoritative shards commits
-//  featureFlagAuthoritativeShardsDDL_incompatible,
 // ]
 import "jstests/multiVersion/libs/verify_versions.js";
 
@@ -19,6 +17,7 @@ import {
     enableStaleVersionAndSnapshotRetriesWithinTransactions,
     kShardOptionsForDisabledStaleShardVersionRetries,
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 function expectChunks(st, ns, chunks) {
     for (let i = 0; i < chunks.length; i++) {
@@ -51,6 +50,9 @@ const st = new ShardingTest({
         enableBalancer: false,
     },
 });
+
+// TODO (SERVER-129875): Adapt test to work with authoritative shards commits.
+skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
 
 enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 

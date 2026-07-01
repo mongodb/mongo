@@ -6,9 +6,6 @@
  *   do_not_wrap_aggregations_in_facets,
  *   not_allowed_with_signed_security_token,
  *   requires_fcv_82,
- *   # TODO (SERVER-129885): Enable once prepareShardedCollectionWithOrphans is adapted with
- *   # authoritative shards.
- *   featureFlagAuthoritativeShardsDDL_incompatible,
  * ]
  */
 
@@ -18,10 +15,15 @@ import {
     prepareShardedCollectionWithOrphans,
 } from "jstests/libs/query/group_to_distinct_scan_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 TestData.skipCheckOrphans = true;
 
 const st = new ShardingTest({shards: 2});
+
+// TODO (SERVER-129885): Enable once prepareShardedCollectionWithOrphans is adapted with authoritative shards.
+skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
+
 const db = prepareShardedCollectionWithOrphans(st);
 
 function assertDistinctResultsAndExplain({field, query, expectedOutput, validateExplain}) {

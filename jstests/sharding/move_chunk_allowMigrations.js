@@ -6,11 +6,6 @@
  *
  * @tags: [
  *    does_not_support_stepdowns,
- *    # TODO (SERVER-98118): Remove this test once 9.0 becomes last LTS.
- *    # The test asserts legacy shard-local filtering cache version bumps after
- *    # _configsvrSetAllowMigrations. With authoritative shard DDL metadata, that cache/version
- *    # bump is no longer the contract under test.
- *    featureFlagAuthoritativeShardsDDL_incompatible,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
@@ -18,8 +13,16 @@ import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
+import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 const st = new ShardingTest({shards: 2, other: {chunkSize: 1}});
+
+// TODO (SERVER-98118): Remove this test once 9.0 becomes last LTS.
+// The test asserts legacy shard-local filtering cache version bumps after
+// _configsvrSetAllowMigrations. With authoritative shard DDL metadata, that cache/version bump is
+// no longer the contract under test.
+skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
+
 const configDB = st.s.getDB("config");
 
 // Resets database dbName and enables sharding and establishes shard0 as primary, test case agnostic

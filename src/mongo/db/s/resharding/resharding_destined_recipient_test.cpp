@@ -161,6 +161,15 @@ public:
             _featureFlagScope.emplace("featureFlagReshardingRegistry", false);
         }
 
+        // This suite installs filtering metadata through the deprecated non-authoritative refresh
+        // path (forceDatabaseMetadataRefresh_DEPRECATED /
+        // forceCollectionMetadataRefresh_DEPRECATED), which is rejected once shards are
+        // authoritative for their metadata. Pin the authoritative shards flags off so the legacy
+        // refresh path remains valid.
+        // TODO (SERVER-98118): adapt this unit test to work with authoritative shards.
+        _authoritativeDDLScope.emplace("featureFlagAuthoritativeShardsDDL", false);
+        _authoritativeCRUDScope.emplace("featureFlagAuthoritativeShardsCRUD", false);
+
         ShardServerTestFixtureWithCatalogCacheLoaderMock::setUp();
 
         WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
@@ -186,6 +195,8 @@ public:
 
         ShardServerTestFixtureWithCatalogCacheLoaderMock::tearDown();
 
+        _authoritativeCRUDScope.reset();
+        _authoritativeDDLScope.reset();
         _featureFlagScope.reset();
     }
 
@@ -397,6 +408,8 @@ protected:
 
     boost::optional<CommonReshardingMetadata> _registeredMetadata;
     boost::optional<unittest::ServerParameterGuard> _featureFlagScope;
+    boost::optional<unittest::ServerParameterGuard> _authoritativeDDLScope;
+    boost::optional<unittest::ServerParameterGuard> _authoritativeCRUDScope;
 };
 
 INSTANTIATE_TEST_SUITE_P(DestinedRecipient,

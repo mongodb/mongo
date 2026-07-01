@@ -9,7 +9,7 @@
  *
  * @tags: [
  *   does_not_support_stepdowns,
- *   featureFlagAuthoritativeShardsDDL,
+ *   requires_fcv_90,
  * ]
  */
 

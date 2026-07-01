@@ -5,7 +5,7 @@
  * older request on the same session cannot replay the split onto a newer state.
  *
  * @tags: [
- *   featureFlagAuthoritativeShardsDDL,
+ *   requires_fcv_90,
  * ]
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";

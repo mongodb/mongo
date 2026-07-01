@@ -10,8 +10,6 @@
  *   # Require persistence to restart nodes
  *   requires_persistence,
  *   config_shard_incompatible,
- *   # TODO (SERVER-129909): adapt this test to work with MoveRangeCoordinator.
- *   featureFlagAuthoritativeShardsDDL_incompatible,
  * ]
  */
 
@@ -25,6 +23,7 @@ import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 function getNewNs(dbName) {
     if (typeof getNewNs.counter == "undefined") {
@@ -37,6 +36,10 @@ function getNewNs(dbName) {
 
 const dbName = "test";
 const st = new ShardingTest({shards: 2});
+
+// TODO (SERVER-129909): adapt this test to work with MoveRangeCoordinator.
+skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
+
 const donorShard = st.shard0;
 const recipientShard = st.shard1;
 assert.commandWorked(

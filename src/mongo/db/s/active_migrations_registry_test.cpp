@@ -593,8 +593,6 @@ TEST_F(MoveChunkRegistration, TestBlockingWhileSplitOrMergeInProgress) {
 }
 
 TEST_F(MoveChunkRegistration, RegisterChunkOperationsRejectDuringFCVTransitionWithoutOperationFCV) {
-    unittest::ServerParameterGuard ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
-    unittest::ServerParameterGuard crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
     const auto originalFCV =
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
     ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });
@@ -634,8 +632,6 @@ TEST_F(MoveChunkRegistration, RegisterChunkOperationsRejectDuringFCVTransitionWi
 }
 
 TEST_F(MoveChunkRegistration, RegisterChunkOperationsWithStableOperationFCVRejectDuringTransition) {
-    unittest::ServerParameterGuard ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
-    unittest::ServerParameterGuard crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
     const auto originalFCV =
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
     ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });
@@ -669,8 +665,6 @@ TEST_F(MoveChunkRegistration, RegisterChunkOperationsWithStableOperationFCVRejec
 }
 
 TEST_F(MoveChunkRegistration, RecoveryBypassWithStableOperationFCVAllowsRegistration) {
-    unittest::ServerParameterGuard ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
-    unittest::ServerParameterGuard crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
     const auto originalFCV =
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
     ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });

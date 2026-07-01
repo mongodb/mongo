@@ -1,10 +1,5 @@
 /**
  * Verifies creating the logical sessions collection TTL index retries on stale version errors.
- *
- * @tags: [
- *   # TODO (SERVER-129875): Adapt test to work with authoritative shards commits
- *   featureFlagAuthoritativeShardsDDL_incompatible,
- * ]
  */
 
 import {
@@ -13,8 +8,12 @@ import {
 } from "jstests/libs/sessions_collection.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
+import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 let st = new ShardingTest({shards: 2});
+
+// TODO (SERVER-129875): Adapt test to work with authoritative shards commits.
+skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
 
 // Validate the initial state.
 const {

@@ -2,11 +2,6 @@
  * Test that the index commands send and check shard versions, and only target the shards
  * that have chunks for the collection. Also test that the commands fail if they are run
  * when the critical section is in progress, and block until the critical section is over.
- *
- * @tags: [
- *   # TODO (SERVER-129875): Adapt test to work with authoritative shards commits
- *   featureFlagAuthoritativeShardsDDL_incompatible,
- * ]
  */
 import {
     moveChunkParallel,
@@ -19,6 +14,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 import {ShardedIndexUtil} from "jstests/sharding/libs/sharded_index_util.js";
+import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 // Test deliberately inserts orphans outside of migration.
 TestData.skipCheckOrphans = true;
@@ -143,6 +139,9 @@ const nodeOptions = {
 
 const numShards = 3;
 const st = new ShardingTest({shards: numShards, other: {configOptions: nodeOptions}});
+
+// TODO (SERVER-129875): Adapt test to work with authoritative shards commits.
+skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
 
 if (!FeatureFlagUtil.isEnabled(st.s.getDB("admin"), "featureFlagDropIndexesDDLCoordinator")) {
     // Do not check index consistency because a dropIndexes command that times out may leave indexes inconsistent.

@@ -6,7 +6,7 @@
  * paused and present once it is released.
  *
  * @tags: [
- *   featureFlagAuthoritativeShardsDDL,
+ *   requires_fcv_90,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

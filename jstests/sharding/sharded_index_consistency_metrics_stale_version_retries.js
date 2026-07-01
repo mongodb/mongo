@@ -3,8 +3,6 @@
  * version errors.
  * @tags: [
  *   requires_sharding,
- *   # TODO (SERVER-129875): Adapt test to work with authoritative shards commits
- *   featureFlagAuthoritativeShardsDDL_incompatible,
  * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -13,6 +11,7 @@ import {
     getServerStatusNumCollsWithInconsistentIndexes,
 } from "jstests/noPassthrough/libs/sharded_index_consistency_metrics_helpers.js";
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
+import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 // This test creates inconsistent indexes.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
@@ -23,6 +22,9 @@ const st = new ShardingTest({
     config: 1,
     configOptions: {setParameter: {"shardedIndexConsistencyCheckIntervalMS": intervalMS}},
 });
+
+// TODO (SERVER-129875): Adapt test to work with authoritative shards commits.
+skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
 
 const dbName = "testDb";
 const ns0 = dbName + ".testColl0";

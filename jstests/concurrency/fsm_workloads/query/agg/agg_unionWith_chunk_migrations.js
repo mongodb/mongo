@@ -17,12 +17,14 @@
  *  # The $unionWith stage cannot be run within a transaction. Therefore the original aggregation
  *  # and subsequent getMores will be run outside a transaction.
  *  uses_getmore_outside_of_transaction,
- *  # TODO (SERVER-129901) Re-enable once this ticket gets fixed
- *  featureFlagAuthoritativeShardsDDL_incompatible,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/agg/agg_with_chunk_migrations.js";
+import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
+
+// TODO (SERVER-129901) Re-enable once this ticket gets fixed.
+skipTestIfAuthoritativeShardsEnabled(db);
 
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.collWithMigrations = "union_ns";

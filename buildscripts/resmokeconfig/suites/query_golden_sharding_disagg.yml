@@ -3,6 +3,10 @@ test_kind: js_test
 selector:
   roots:
     - jstests/query_golden_sharding/**/*.js
+  exclude_files:
+    # TODO (SERVER-129938): Re-enable once these work with authoritative shard-local metadata.
+    - jstests/query_golden_sharding/distinct_scan_multi_chunk.js
+    - jstests/query_golden_sharding/shard_filtering_plan_cache.js
 
 executor:
   config:

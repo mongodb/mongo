@@ -10,19 +10,20 @@
  *   # Index filter commands do not support causal consistency.
  *   does_not_support_causal_consistency,
  *   requires_fcv_82,
- *   # TODO (SERVER-129885): Enable once prepareShardedCollectionWithOrphans is adapted with
- *   # authoritative shards.
- *   featureFlagAuthoritativeShardsDDL_incompatible,
  * ]
  */
 
 import {prepareShardedCollectionWithOrphans} from "jstests/libs/query/group_to_distinct_scan_utils.js";
 import {runGroupWithAccNToDistinctScanTests} from "jstests/libs/query/group_with_acc_n_to_distinct_scan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 TestData.skipCheckOrphans = true;
 
 const st = new ShardingTest({shards: 2});
+
+// TODO (SERVER-129885): Enable once prepareShardedCollectionWithOrphans is adapted with authoritative shards.
+skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
 const db = prepareShardedCollectionWithOrphans(st);
 
 runGroupWithAccNToDistinctScanTests(db);

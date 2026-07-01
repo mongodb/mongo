@@ -2,8 +2,7 @@
  * Checks that the global commit command _configSvrCommitMergeAllPrecomputedChunksOnShard is idempotent and succeeds after it returns error.
  *
  * @tags: [
- *   featureFlagAuthoritativeShardsCRUD,
- *   featureFlagAuthoritativeShardsDDL,
+ *   requires_fcv_90,
  * ]
  */
 

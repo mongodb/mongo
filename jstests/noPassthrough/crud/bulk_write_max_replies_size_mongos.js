@@ -8,13 +8,12 @@
  *   # Contains commands that fail which will fail the entire transaction
  *   does_not_support_transactions,
  *   requires_fcv_80,
- *   # TODO (SERVER-129875): Adapt test to work with authoritative shards commits
- *   featureFlagAuthoritativeShardsDDL_incompatible,
  * ]
  */
 import {cursorEntryValidator, cursorSizeValidator} from "jstests/libs/bulk_write_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
+import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 const st = new ShardingTest({
     mongos: 1,
@@ -27,6 +26,9 @@ const st = new ShardingTest({
         },
     },
 });
+
+// TODO (SERVER-129875): Adapt test to work with authoritative shards commits.
+skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
 
 const dbName = "test";
 const db = st.getDB(dbName);

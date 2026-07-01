@@ -215,6 +215,11 @@ public:
 };
 
 TEST_F(DatabaseShardingRuntimeTestWithMockedLoader, ForceDatabaseRefresh) {
+    unittest::ServerParameterGuard authoritativeCrudGuard("featureFlagAuthoritativeShardsCRUD",
+                                                          false);
+    unittest::ServerParameterGuard authoritativeDdlGuard("featureFlagAuthoritativeShardsDDL",
+                                                         false);
+
     const auto uuid = UUID::gen();
 
     const auto oldDb = createDatabase(uuid, Timestamp(1));

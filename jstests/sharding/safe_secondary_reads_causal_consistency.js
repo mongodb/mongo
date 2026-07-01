@@ -1,11 +1,6 @@
 /**
  * Tests that donor shard's secondaries correctly
  * block reads and refresh metadata cache when migration occurs.
- *
- * @tags: [
- *   # TODO (SERVER-129909): Adapt this test to authoritative shards / MoveRangeCoordinator.
- *   featureFlagAuthoritativeShardsDDL_incompatible,
- * ]
  */
 
 import {
@@ -17,6 +12,7 @@ import {
 } from "jstests/libs/chunk_manipulation_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 /**
  * @summary This function executes a count command with read preference "secondary" and returns the
@@ -91,6 +87,9 @@ const st = new ShardingTest({
     rs: {nodes: [{}, {rsConfig: {priority: 0}}]},
     causalConsistency: true,
 });
+
+// TODO (SERVER-129909): Adapt this test to authoritative shards / MoveRangeCoordinator.
+skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
 
 const mongos0AlphaDB = st.s0.getDB(dbName1);
 const mongos1AlphaDB = st.s1.getDB(dbName1);

@@ -3,7 +3,9 @@
  * recovery (rather than relying on the asynchronous step-up recovery, which may race with setFCV).
  * TODO (SERVER-98118): Remove this test.
  *
- * @tags: [featureFlagAuthoritativeShardsDDL]
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 import {moveChunkParallel} from "jstests/libs/chunk_manipulation_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

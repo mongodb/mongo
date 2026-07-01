@@ -6,7 +6,7 @@
  * reported as configDebugDump == false, as they are rebuilt and must never be dumped.
  *
  * @tags: [
- *   featureFlagAuthoritativeShardsDDL,
+ *   requires_fcv_90,
  * ]
  */
 

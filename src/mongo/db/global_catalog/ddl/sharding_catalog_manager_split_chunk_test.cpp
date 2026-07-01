@@ -444,8 +444,6 @@ TEST_F(SplitChunkTest, RetryCommittedSplitSucceedsDuringFCVTransition) {
 
     ASSERT_OK(doSplit());
 
-    unittest::ServerParameterGuard ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
-    unittest::ServerParameterGuard crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
     const auto originalFCV =
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
     ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });

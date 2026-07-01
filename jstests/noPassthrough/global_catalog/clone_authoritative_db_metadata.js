@@ -4,8 +4,7 @@
  * and cache correctly.
  *
  * @tags: [
- *     featureFlagAuthoritativeShardsCRUD,
- *     featureFlagAuthoritativeShardsDDL,
+ *     requires_fcv_90,
  * ]
  */
 

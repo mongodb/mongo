@@ -5,12 +5,11 @@
  * @tags: [
  *   featureFlagShardFilteringDistinctScan,
  *   requires_fcv_82,
- *   # TODO (SERVER-129938) Re-enable once this gets fixed
- *   featureFlagAuthoritativeShardsDDL_incompatible,
  * ]
  */
 import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {setupShardedCollectionWithOrphans} from "jstests/libs/query/golden_sharding_utils.js";
+import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 TestData.skipCheckOrphans = true; // Deliberately inserts orphans.
 
@@ -183,6 +182,8 @@ const readConcernAvailable = {
 };
 
 const {shardingTest, coll} = setupShardedCollectionWithOrphans();
+// TODO (SERVER-129938) Re-enable once this gets fixed.
+skipTestIfAuthoritativeShardsEnabled(shardingTest.s, () => shardingTest.stop());
 // The setup function already created indexes 'shardKey_1' and 'shardKey_1_notShardKey_1'.
 coll.createIndex({notShardKey: 1});
 

@@ -200,9 +200,6 @@ protected:
         return fullMetrics.getObjectField("collectionShardingMetadataRecoveryStatistics")
             .getOwned();
     };
-
-    unittest::ServerParameterGuard crudFeatureFlag{"featureFlagAuthoritativeShardsCRUD", true};
-    unittest::ServerParameterGuard ddlFeatureFlag{"featureFlagAuthoritativeShardsDDL", true};
 };
 
 TEST_F(AuthoritativeRefreshFixture, UntrackedIsCorrectlyRecoveredFromDisk) {

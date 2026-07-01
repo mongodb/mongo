@@ -4,7 +4,6 @@
  *
  * @tags: [
  *   requires_fcv_90,
- *   featureFlagAuthoritativeShardsDDL,
  * ]
  */
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";

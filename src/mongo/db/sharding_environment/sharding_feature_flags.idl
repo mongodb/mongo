@@ -104,7 +104,8 @@ feature_flags:
             "Feature flag to enable the authoritative model to read database and collection
             metadata from stored shard-local information"
         cpp_varname: feature_flags::gAuthoritativeShardsCRUD
-        default: false
+        default: true
+        version: 9.0
         fcv_gated: true
     # TODO (SERVER-98118): remove once 9.0 becomes last LTS.
     featureFlagAuthoritativeShardsDDL:
@@ -118,7 +119,8 @@ feature_flags:
             If this feature flag is disabled by a FCV downgrade, all DDL coordinators checking
             this flag are drained when finalizing the downgrade.
         cpp_varname: feature_flags::gAuthoritativeShardsDDL
-        default: false
+        default: true
+        version: 9.0
         fcv_gated: true
         enable_on_transitional_fcv_UNSAFE: true
     featureFlagTerminateSecondaryReadsUponRangeDeletion:
