@@ -655,9 +655,9 @@ Status CollectionImpl::checkValidationAndParseResult(OperationContext* opCtx,
                 "Document would fail validation",
                 logAttrs(ns()),
                 "document"_attr = redact(document),
-                "errInfo"_attr =
+                "errInfo"_attr = redact(
                     result.second.extraInfo<doc_validation_error::DocumentValidationFailureInfo>()
-                        ->getDetails());
+                        ->getDetails()));
             return Status::OK();
         case SchemaValidationResult::kErrorAndLog:
             LOGV2_WARNING(
@@ -665,9 +665,9 @@ Status CollectionImpl::checkValidationAndParseResult(OperationContext* opCtx,
                 "Document failed validation",
                 logAttrs(ns()),
                 "document"_attr = redact(document),
-                "errInfo"_attr =
+                "errInfo"_attr = redact(
                     result.second.extraInfo<doc_validation_error::DocumentValidationFailureInfo>()
-                        ->getDetails());
+                        ->getDetails()));
             return result.second;
         case SchemaValidationResult::kError:
             return result.second;
