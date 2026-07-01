@@ -415,3 +415,88 @@ TEST(WasmtimeScopeGeneration, StalesRetainedBsonArgOnNextInvocation) {
     ASSERT_THROWS_CODE(
         scope->invoke(read, &readArgs, nullptr, 0), DBException, ErrorCodes::BadValue);
 }
+
+// SERVER-129745: copyProps() in _setupChildRealm() was missing Array.tojson, Array.shuffle,
+// Array.fetchRefs, Array.stdDev, Set.tojson, Map.tojson, and RegExp.prototype.tojson.
+// These tests verify each missing extension is available inside $function/$where bodies.
+TEST(WasmtimeScope, BuiltinExtensions_ArrayTojson) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    ScriptingFunction fn = scope->createFunction("return Array.tojson([1, 2, 3], '', true);");
+    ASSERT_EQ(0, scope->invoke(fn, nullptr, nullptr, 0));
+    ASSERT_EQ(scope->getString("__returnValue"), "[ 1, 2, 3 ]");
+}
+
+TEST(WasmtimeScope, BuiltinExtensions_ArrayShuffle) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    // Array.shuffle requires Random.randInt() which isn't wired in unit-test context;
+    // just verify it was copied into the child realm (i.e. is a function).
+    ScriptingFunction fn = scope->createFunction("return typeof Array.shuffle === 'function';");
+    ASSERT_EQ(0, scope->invoke(fn, nullptr, nullptr, 0));
+    ASSERT_TRUE(scope->getBoolean("__returnValue"));
+}
+
+TEST(WasmtimeScope, BuiltinExtensions_ArrayStdDev) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    // stdDev([2,4,4,4,5,5,7,9]) == 2.0
+    ScriptingFunction fn = scope->createFunction("return Array.stdDev([2, 4, 4, 4, 5, 5, 7, 9]);");
+    ASSERT_EQ(0, scope->invoke(fn, nullptr, nullptr, 0));
+    ASSERT_APPROX_EQUAL(scope->getNumber("__returnValue"), 2.0, 1e-9);
+}
+
+TEST(WasmtimeScope, BuiltinExtensions_ArrayFetchRefs) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    // Array.fetchRefs requires a live DB connection; just verify it was copied.
+    ScriptingFunction fn = scope->createFunction("return typeof Array.fetchRefs === 'function';");
+    ASSERT_EQ(0, scope->invoke(fn, nullptr, nullptr, 0));
+    ASSERT_TRUE(scope->getBoolean("__returnValue"));
+}
+
+TEST(WasmtimeScope, BuiltinExtensions_SetTojson) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    ScriptingFunction fn =
+        scope->createFunction("return Set.tojson(new Set([1, 2, 3]), '', true);");
+    ASSERT_EQ(0, scope->invoke(fn, nullptr, nullptr, 0));
+    ASSERT_EQ(scope->getString("__returnValue"), "new Set([ 1, 2, 3 ])");
+}
+
+TEST(WasmtimeScope, BuiltinExtensions_MapTojson) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    ScriptingFunction fn =
+        scope->createFunction("return Map.tojson(new Map([['a', 1]]), '', true);");
+    ASSERT_EQ(0, scope->invoke(fn, nullptr, nullptr, 0));
+    ASSERT_EQ(scope->getString("__returnValue"), "new Map([ [ \"a\", 1 ] ])");
+}
+
+TEST(WasmtimeScope, BuiltinExtensions_RegExpTojson) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    ScriptingFunction fn = scope->createFunction("return /abc/.tojson();");
+    ASSERT_EQ(0, scope->invoke(fn, nullptr, nullptr, 0));
+    ASSERT_EQ(scope->getString("__returnValue"), "/abc/");
+}
+
+// BSONAwareMap is the internal implementation class used by types.js. It must not appear in the
+// child realm's user-visible scope (kChildRealmMirrorExclusions excludes it). User code should
+// use the standard Map constructor instead.
+TEST(WasmtimeScope, GlobalHelpers_BSONAwareMap_NotExposed) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    ScriptingFunction fn = scope->createFunction("return typeof BSONAwareMap === 'undefined';");
+    ASSERT_EQ(0, scope->invoke(fn, nullptr, nullptr, 0));
+    ASSERT_EQ(scope->getBoolean("__returnValue"), true);
+}
+
+// Representative top-level types.js global; guards the mirror's global-copy path.
+TEST(WasmtimeScope, GlobalHelpers_Tojson) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    ScriptingFunction fn = scope->createFunction("return tojson({a: 1});");
+    ASSERT_EQ(0, scope->invoke(fn, nullptr, nullptr, 0));
+    ASSERT_EQ(scope->getString("__returnValue"), "{ \"a\" : 1 }");
+}

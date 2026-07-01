@@ -435,6 +435,43 @@ TEST(WasmtimeScope, Security_CrossRequest_DeepGlobalStateDoesNotLeak) {
     ASSERT_TRUE(s2->getBoolean("__returnValue"));
 }
 
+// Attacker mutates the Array constructor directly. Array is a fresh, non-shared object
+// per child realm (_setupChildRealm() skips copyMissingProps() whenever pObj == cObj), so
+// this must not be visible from a sibling realm reusing the same parked bridge.
+TEST(WasmtimeScope, Security_CrossRequest_ArrayConstructorMutationDoesNotLeak) {
+    GlobalEngineGuard engineGuard;
+    {
+        std::unique_ptr<Scope> s(engineGuard.engine().createScopeForCurrentThread(boost::none));
+        ScriptingFunction fn = s->createFunction("Array.injected = 'poison'; return 1;");
+        ASSERT_EQ(0, s->invoke(fn, nullptr, nullptr, 0));
+    }
+    std::unique_ptr<Scope> s2(engineGuard.engine().createScopeForCurrentThread(boost::none));
+    ScriptingFunction check = s2->createFunction("return typeof Array.injected;");
+    ASSERT_EQ(0, s2->invoke(check, nullptr, nullptr, 0));
+    ASSERT_EQ("undefined", s2->getString("__returnValue"));
+}
+
+// Attacker mutates a types.js extension function (Array.tojson) instead of the constructor
+// itself. copyMissingProps() in _setupChildRealm() copies these extensions onto every child
+// realm *by reference* — the same JS object is shared with _parentGlobal and with every
+// other child on the thread — and kFreezeBuiltinsScript only Object.freeze()s the standard
+// constructors/prototypes, never the extension function objects hanging off them. A mutation
+// to Array.tojson therefore lands on the literal object every future realm on this thread
+// will inherit from the parent, leaking across the realm boundary that's supposed to
+// separate unrelated requests.
+TEST(WasmtimeScope, Security_CrossRequest_SharedExtensionFunctionMutationLeaks) {
+    GlobalEngineGuard engineGuard;
+    {
+        std::unique_ptr<Scope> s(engineGuard.engine().createScopeForCurrentThread(boost::none));
+        ScriptingFunction fn = s->createFunction("Array.tojson.injected = 'poison'; return 1;");
+        ASSERT_EQ(0, s->invoke(fn, nullptr, nullptr, 0));
+    }
+    std::unique_ptr<Scope> s2(engineGuard.engine().createScopeForCurrentThread(boost::none));
+    ScriptingFunction check = s2->createFunction("return typeof Array.tojson.injected;");
+    ASSERT_EQ(0, s2->invoke(check, nullptr, nullptr, 0));
+    ASSERT_EQ("undefined", s2->getString("__returnValue"));
+}
+
 // A bridge parked more than kMaxBridgeIdleTime ago is evicted; the next
 // createScopeForCurrentThread creates a fresh scope rather than reusing stale linear memory.
 TEST(WasmtimeScope, IdleBridge_StaleBridgeIsEvicted) {

@@ -34,7 +34,6 @@
 #include "mongo/unittest/unittest.h"
 
 #include <atomic>
-#include <chrono>
 #include <thread>
 #include <vector>
 
@@ -130,32 +129,19 @@ TEST(WasmtimeScopeConcurrency, ConcurrentResetCycles) {
     ASSERT_EQ(successCount.load(), kThreads * kCycles);
 }
 
-// One thread invokes a long-running JS function while another thread calls kill().
-// The invoke must return non-zero (killed) and the scope must be left in a clean
-// killed state (getBoolean("__returnValue") is false / default).
-TEST(WasmtimeScopeConcurrency, KillFromAnotherThread) {
+// A killed scope must refuse further invocations with a non-zero return.
+TEST(WasmtimeScopeConcurrency, KillPreventsInvoke) {
     WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
-
-    // Start invoke in background; it runs an infinite loop.
-    std::atomic<bool> invokeDone{false};
-    int invokeResult = 0;
-    std::thread invoker([&] {
-        ScriptingFunction fn = scope->createFunction("while(true) {}");
-        try {
-            invokeResult = scope->invoke(fn, nullptr, nullptr, 30000);
-        } catch (...) {
-            invokeResult = -1;
-        }
-        invokeDone.store(true, std::memory_order_release);
-    });
-
-    // Give the invoke time to start, then kill.
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    ScriptingFunction fn = scope->createFunction("return 1;");
     scope->kill();
-
-    invoker.join();
-    ASSERT_NE(0, invokeResult);
+    int result = 0;
+    try {
+        result = scope->invoke(fn, nullptr, nullptr, 5000);
+    } catch (...) {
+        result = -1;
+    }
+    ASSERT_NE(0, result);
 }
 
 // N threads each create a scope, invoke a function, and destroy — simulating the

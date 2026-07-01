@@ -74,6 +74,7 @@
 #include "js/Initialization.h"
 #include "js/Interrupt.h"
 #include "js/PropertyAndElement.h"
+#include "js/PropertyDescriptor.h"
 #include "js/Realm.h"
 #include "js/RealmOptions.h"
 #include "js/SourceText.h"
@@ -146,8 +147,27 @@ static const char* const kFreezeBuiltinsScript =
     "    targets.push(FinalizationRegistry, FinalizationRegistry.prototype);"
     "  }"
     "  if (typeof Atomics !== 'undefined') { targets.push(Atomics); }"
+    // Freezing a target only locks its own property slots (no add/remove/reconfigure);
+    // it does NOT freeze the object/function *values* those slots hold. Extension methods
+    // types.js attaches to these built-ins (Array.tojson, RegExp.escape, ...) and copyProps()
+    // mirrors by reference into every realm are therefore left mutable: one realm could add
+    // an own property to e.g. Array.tojson and every other realm sharing that same function
+    // object — including future ones — would see it. Freeze each own value (function or
+    // object) one level deep, in addition to the container, to close that hole. Descriptors
+    // are used (not direct gets) so accessor properties are skipped without invoking them.
+    "  var keysOf = function(o) {"
+    "    return Object.getOwnPropertyNames(o).concat(Object.getOwnPropertySymbols(o));"
+    "  };"
     "  for (var i = 0; i < targets.length; i++) {"
-    "    Object.freeze(targets[i]);"
+    "    var t = targets[i];"
+    "    var keys = keysOf(t);"
+    "    for (var j = 0; j < keys.length; j++) {"
+    "      var desc = Object.getOwnPropertyDescriptor(t, keys[j]);"
+    "      if (!desc || !('value' in desc) || desc.value === null) continue;"
+    "      if (typeof desc.value !== 'function' && typeof desc.value !== 'object') continue;"
+    "      try { Object.freeze(desc.value); } catch (e) {}"
+    "    }"
+    "    Object.freeze(t);"
     "  }"
     "})();";
 
@@ -451,124 +471,122 @@ err_code_t MozJSScriptEngine::_setupChildRealm(ExecutionCheck& chk, wasm_mozjs_e
         if (!chk.ok(installParseJSFunctionHelper(_cx, _global), SM_E_INTERNAL))
             return err ? err->code : SM_E_INTERNAL;
 
-        // Copy Array helpers from parent's frozen Array to child's Array.
+        // Mirror the parent realm's globals into the freshly-created child realm. The parent is
+        // the single source of truth: it has run the hex_md5 inline script, types.js and
+        // assert_wasm.js, and had installTypes() applied, so it holds every helper, Mongo type
+        // and built-in extension the child must expose. InitRealmStandardClasses() and the
+        // child's own installTypes() already gave it standard built-ins and Mongo type
+        // constructors, so we copy only what the child is *missing*:
+        //   - top-level globals it lacks (hex_md5, ISODate, tojson, assert, ...),
+        //   - own properties types.js added to shared constructors/prototypes that the child's
+        //     fresh copies lack (Array.tojson, RegExp.escape, Date.prototype.tojson, ...).
+        // The parent is populated only by trusted init scripts, so "copy what the child lacks"
+        // introduces nothing dangerous (eval/Function/Proxy/Reflect and the per-realm parse
+        // helper already exist in the child and are skipped). Anything that must NOT be mirrored
+        // goes in kChildRealmMirrorExclusions; the BuiltinExtensions/GlobalHelpers scope tests
+        // fail loudly if a future parent global silently stops reaching the child.
         {
-            JS::RootedValue parentArrayVal(_cx);
-            JS::RootedValue childArrayVal(_cx);
-            if (JS_GetProperty(_cx, _parentGlobal, "Array", &parentArrayVal) &&
-                JS_GetProperty(_cx, _global, "Array", &childArrayVal) &&
-                parentArrayVal.isObject() && childArrayVal.isObject()) {
-                JS::RootedObject parentArr(_cx, &parentArrayVal.toObject());
-                JS::RootedObject childArr(_cx, &childArrayVal.toObject());
-                static const char* kHelpers[] = {"sum", "avg", "contains", "unique"};
-                for (const auto* h : kHelpers) {
-                    JS::RootedValue hval(_cx);
-                    if (JS_GetProperty(_cx, parentArr, h, &hval) && !hval.isUndefined())
-                        JS_SetProperty(_cx, childArr, h, hval);
-                }
-            }
-        }
-
-        // TODO (SERVER-129745): The copyProps() calls below are incomplete — Array.tojson,
-        // Array.shuffle, Set/Map/RegExp.prototype.tojson and others added by types.js are missing.
-        // Copy static methods and prototype extensions that types.js added to standard built-ins.
-        // types.js runs once in the parent realm; the child realm has fresh
-        // InitRealmStandardClasses objects that don't inherit these additions, so we copy them
-        // explicitly before freeze.
-        {
-            auto copyProps = [&](JS::HandleObject from,
-                                 JS::HandleObject to,
-                                 std::initializer_list<const char*> props) {
-                JS::RootedValue v(_cx);
-                for (const char* p : props) {
-                    if (JS_GetProperty(_cx, from, p, &v) && !v.isUndefined())
-                        JS_SetProperty(_cx, to, p, v);
-                }
+            static constexpr std::string_view kChildRealmMirrorExclusions[] = {
+                // BSONAwareMap is the internal implementation of Map used by types.js. It must
+                // not appear in user-visible scope; the user-facing name is "Map". The parent
+                // realm keeps it as "BSONAwareMap" (unlike the native MozJS shell which renames
+                // it to "Map") so that the parent's standard Map slot is unchanged, but the
+                // child realm must not expose the implementation name.
+                "BSONAwareMap",
             };
-            auto getObj =
-                [&](JS::HandleObject scope, const char* name, JS::MutableHandleObject out) -> bool {
-                JS::RootedValue v(_cx);
-                if (!JS_GetProperty(_cx, scope, name, &v) || !v.isObject())
+            auto isExcluded = [&](const char* name) {
+                for (std::string_view e : kChildRealmMirrorExclusions)
+                    if (e == name)
+                        return true;
+                return false;
+            };
+
+            // Copy own properties present on `from` but missing on `to`, by *descriptor*. Using
+            // descriptors (not get/set) is essential: a value-based copy would invoke getters, and
+            // some standard accessors are poison pills that throw on get (Function.prototype.caller
+            // / .arguments). Existence is checked with HasOwnProperty so we never read a value
+            // either. Members the child already has are left untouched; only the additions land.
+            auto copyMissingProps = [&](JS::HandleObject from, JS::HandleObject to) -> bool {
+                JS::RootedVector<JS::PropertyKey> ids(_cx);
+                if (!js::GetPropertyKeys(_cx, from, JSITER_OWNONLY | JSITER_HIDDEN, &ids))
                     return false;
-                out.set(&v.toObject());
+                JS::RootedId id(_cx);
+                JS::Rooted<mozilla::Maybe<JS::PropertyDescriptor>> maybeDesc(_cx);
+                for (size_t i = 0; i < ids.length(); ++i) {
+                    id.set(ids[i]);
+                    bool hasOwn = false;
+                    if (!JS_HasOwnPropertyById(_cx, to, id, &hasOwn))
+                        return false;
+                    if (hasOwn)
+                        continue;  // child already has its own — don't clobber standard members
+                    if (!JS_GetOwnPropertyDescriptorById(_cx, from, id, &maybeDesc))
+                        return false;
+                    if (maybeDesc.isNothing())
+                        continue;
+                    JS::Rooted<JS::PropertyDescriptor> desc(_cx, *maybeDesc);
+                    if (!JS_DefinePropertyById(_cx, to, id, desc))
+                        return false;
+                }
                 return true;
             };
-            auto getProto = [&](JS::HandleObject ctor, JS::MutableHandleObject out) -> bool {
-                JS::RootedValue v(_cx);
-                if (!JS_GetProperty(_cx, ctor, "prototype", &v) || !v.isObject())
-                    return false;
-                out.set(&v.toObject());
-                return true;
-            };
 
-            // Object.extend / merge / deepMerge / keySet
-            {
-                JS::RootedObject pO(_cx), cO(_cx);
-                if (getObj(_parentGlobal, "Object", &pO) && getObj(_global, "Object", &cO))
-                    copyProps(pO, cO, {"extend", "merge", "deepMerge", "keySet"});
-            }
-            // Date.timeFunc (static) and Date.prototype.tojson
-            {
-                JS::RootedObject pD(_cx), cD(_cx);
-                if (getObj(_parentGlobal, "Date", &pD) && getObj(_global, "Date", &cD)) {
-                    copyProps(pD, cD, {"timeFunc"});
-                    JS::RootedObject pDP(_cx), cDP(_cx);
-                    if (getProto(pD, &pDP) && getProto(cD, &cDP))
-                        copyProps(pDP, cDP, {"tojson"});
-                }
-            }
-            // String.prototype.ltrim / rtrim / pad
-            {
-                JS::RootedObject pS(_cx), cS(_cx);
-                if (getObj(_parentGlobal, "String", &pS) && getObj(_global, "String", &cS)) {
-                    JS::RootedObject pSP(_cx), cSP(_cx);
-                    if (getProto(pS, &pSP) && getProto(cS, &cSP))
-                        copyProps(pSP, cSP, {"ltrim", "rtrim", "pad"});
-                }
-            }
-            // Number.prototype.toPercentStr / zeroPad
-            {
-                JS::RootedObject pN(_cx), cN(_cx);
-                if (getObj(_parentGlobal, "Number", &pN) && getObj(_global, "Number", &cN)) {
-                    JS::RootedObject pNP(_cx), cNP(_cx);
-                    if (getProto(pN, &pNP) && getProto(cN, &cNP))
-                        copyProps(pNP, cNP, {"toPercentStr", "zeroPad"});
-                }
-            }
-        }
+            JS::RootedVector<JS::PropertyKey> parentIds(_cx);
+            if (!chk.ok(js::GetPropertyKeys(
+                            _cx, _parentGlobal, JSITER_OWNONLY | JSITER_HIDDEN, &parentIds),
+                        SM_E_JSAPI_FAIL))
+                return err ? err->code : SM_E_JSAPI_FAIL;
 
-        // Copy MongoDB global helpers from the parent realm to child globalThis.
-        // These are exec'd once in _setupNewGlobal() (parent realm), so they appear in
-        // _initGlobalNames and survive reset() in the child without re-execution.
-        {
-            // From hex_md5 inline script, types.js, and assert_wasm.js respectively.
-            static const char* kGlobalHelpers[] = {
-                "hex_md5",
-                // types.js globals:
-                "ISODate",
-                "isNumber",
-                "isObject",
-                "isString",
-                "printjson",
-                "toJsonForLog",
-                "tojson",
-                "tojsonObject",
-                "tojsononeline",
-                // assert_wasm.js globals:
-                "_buildAssertionMessage",
-                "_doassert",
-                "_isEq",
-                "_processMsg",
-                "assert",
-                "assertThrowsHelper",
-                "doassert",
-                "formatErrorMsg",
-                "friendlyEqual",
-            };
-            for (const auto* h : kGlobalHelpers) {
-                JS::RootedValue hval(_cx);
-                if (JS_GetProperty(_cx, _parentGlobal, h, &hval) && !hval.isUndefined())
-                    JS_SetProperty(_cx, _global, h, hval);
+            JS::RootedId id(_cx);
+            JS::Rooted<mozilla::Maybe<JS::PropertyDescriptor>> maybeDesc(_cx);
+            JS::RootedValue parentVal(_cx), childVal(_cx);
+            for (size_t i = 0; i < parentIds.length(); ++i) {
+                id.set(parentIds[i]);
+                if (!id.isString())
+                    continue;
+                JS::RootedString rstr(_cx, id.toString());
+                JS::UniqueChars name = JS_EncodeStringToUTF8(_cx, rstr);
+                if (!name || isExcluded(name.get()))
+                    continue;
+
+                bool childHas = false;
+                if (!chk.ok(JS_HasOwnPropertyById(_cx, _global, id, &childHas), SM_E_JSAPI_FAIL))
+                    return err ? err->code : SM_E_JSAPI_FAIL;
+
+                if (!childHas) {
+                    // A top-level global the child lacks (helper, Mongo type, ...):
+                    // copy it by descriptor.
+                    if (!chk.ok(JS_GetOwnPropertyDescriptorById(_cx, _parentGlobal, id, &maybeDesc),
+                                SM_E_JSAPI_FAIL))
+                        return err ? err->code : SM_E_JSAPI_FAIL;
+                    if (maybeDesc.isNothing())
+                        continue;
+                    JS::Rooted<JS::PropertyDescriptor> desc(_cx, *maybeDesc);
+                    if (!chk.ok(JS_DefinePropertyById(_cx, _global, id, desc), SM_E_JSAPI_FAIL))
+                        return err ? err->code : SM_E_JSAPI_FAIL;
+                    continue;
+                }
+
+                // Present in both realms. If it's a shared constructor/object, copy the own props
+                // types.js added that the child's fresh copy lacks, plus its prototype's. Reading
+                // the constructor value is safe — globals are data properties, not accessors.
+                if (!JS_GetPropertyById(_cx, _parentGlobal, id, &parentVal) ||
+                    !parentVal.isObject())
+                    continue;
+                if (!JS_GetPropertyById(_cx, _global, id, &childVal) || !childVal.isObject())
+                    continue;
+                JS::RootedObject pObj(_cx, &parentVal.toObject()), cObj(_cx, &childVal.toObject());
+                if (pObj == cObj || pObj == _parentGlobal)
+                    continue;  // genuinely shared object, or the globalThis self-reference
+                if (!chk.ok(copyMissingProps(pObj, cObj), SM_E_JSAPI_FAIL))
+                    return err ? err->code : SM_E_JSAPI_FAIL;
+
+                JS::RootedValue pProto(_cx), cProto(_cx);
+                if (JS_GetProperty(_cx, pObj, "prototype", &pProto) && pProto.isObject() &&
+                    JS_GetProperty(_cx, cObj, "prototype", &cProto) && cProto.isObject()) {
+                    JS::RootedObject pP(_cx, &pProto.toObject()), cP(_cx, &cProto.toObject());
+                    if (pP != cP && !chk.ok(copyMissingProps(pP, cP), SM_E_JSAPI_FAIL))
+                        return err ? err->code : SM_E_JSAPI_FAIL;
+                }
             }
         }
 
