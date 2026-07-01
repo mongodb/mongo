@@ -38,7 +38,7 @@ export const kRateLimiterExemptAppName = "testRateLimiter";
  * The server uses prefix (starts_with) matching, so "NetworkInterfaceTL-Repl" covers
  * ReplNetwork, ReplCoordExternNetwork, and ReplNodeDbWorkerNetwork;
  * "NetworkInterfaceTL-ReplicaSetMonitor" covers ReplicaSetMonitor-TaskExecutor;
- * "OplogFetcher" covers "OplogFetcher-{UUID}-{shard}"; and "NetworkInterfaceTL-Reshard"
+ * "OplogFetcher" covers "OplogFetcher-{UUID}-{shard}"; and "NetworkInterfaceTL-Resharding"
  * covers all resharding NetworkInterfaceTL names.
  *
  * Sourced from:
@@ -50,7 +50,6 @@ export const kInternalConnectionAppNameExemptions = [
     "NetworkInterfaceTL-ConfigsvrCoordinatorServiceNetwork",
     "NetworkInterfaceTL-HelloMe-TaskExecutor",
     "NetworkInterfaceTL-Repl",
-    "NetworkInterfaceTL-Reshard",
     "NetworkInterfaceTL-StandaloneNetwork",
     "NetworkInterfaceTL-Sharding-Fixed",
     "NetworkInterfaceTL-ShardingCoordinatorNetwork",
