@@ -225,7 +225,7 @@ TEST_F(FeatureCompatibilityVersionTestFixture, ResolveStartNewUpgrade) {
 
     ASSERT_EQ(result.transitionalVersion, multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
     ASSERT_EQ(result.startPhase, SetFCVPhaseEnum::kStart);
-    ASSERT_EQ(result.endPhase, SetFCVPhaseEnum::kComplete);
+    ASSERT_EQ(result.endPhase, SetFCVPhaseEnum::kCommitAddedFeatures);
     ASSERT_GT(result.changeTimestamp, lastChangeTimestamp);
 }
 
@@ -250,7 +250,7 @@ TEST_F(FeatureCompatibilityVersionTestFixture, ResolveReturnToOriginalFCVBeforeC
     ASSERT_EQ(result.transitionalVersion,
               multiversion::GenericFCV::kDowngradingFromLatestToLastLTS);
     ASSERT_EQ(result.startPhase, SetFCVPhaseEnum::kStart);
-    ASSERT_EQ(result.endPhase, SetFCVPhaseEnum::kComplete);
+    ASSERT_EQ(result.endPhase, SetFCVPhaseEnum::kCommitAddedFeatures);
     ASSERT_GT(result.changeTimestamp, lastChangeTimestamp);
 }
 
@@ -515,13 +515,16 @@ BSONObj appendFcvParameter(OperationContext* opCtx) {
     return b.obj().getObjectField(sp->name()).getOwned();
 }
 
-void seedFcvDocAtPhase(OperationContext* opCtx, FCV transitionalVersion, SetFCVPhaseEnum phase) {
+void seedFcvDocAtPhase(OperationContext* opCtx,
+                       FCV version,
+                       boost::optional<SetFCVPhaseEnum> phase) {
     FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
         opCtx,
-        transitionalVersion,
+        version,
         phase,
         Timestamp(1, 1),
-        phase >= SetFCVPhaseEnum::kEnableTargetFeatures /* setIsCleaningServerMetadata */);
+        phase &&
+            *phase >= SetFCVPhaseEnum::kEnableTargetFeatures /* setIsCleaningServerMetadata */);
     // The FCV op observer that normally mirrors disk writes to in-memory FCV does not run in
     // unit tests. Replicate its effect here so callers see consistent in-memory state.
     auto docResult = FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(opCtx);
@@ -535,8 +538,10 @@ std::string_view fcvStr(FCV v) {
 }
 
 struct AppendFCVFormatTestParams {
-    FCV transitionalVersion;
-    SetFCVPhaseEnum phase;
+    // The version to seed on disk. A non-transitional version with an unset phase yields a
+    // steady-state document; a transitional version paired with a phase yields a transitional one.
+    FCV seedVersion;
+    boost::optional<SetFCVPhaseEnum> phase;
     std::function<BSONObj()> expectedDoc;
     std::string label;
 };
@@ -601,6 +606,12 @@ INSTANTIATE_TEST_SUITE_P(
                                                   << fcvStr(multiversion::GenericFCV::kLatest));
                                   },
                                   "upgrade_start"},
+        // A fully steady-state FCV (no transition in progress) reports just {version}.
+        AppendFCVFormatTestParams{
+            multiversion::GenericFCV::kLatest,
+            boost::none,
+            []() { return BSON("version" << fcvStr(multiversion::GenericFCV::kLatest)); },
+            "steady_state"},
     }),
     [](const testing::TestParamInfo<AppendFCVFormatTestParams>& info) { return info.param.label; });
 
@@ -609,24 +620,11 @@ TEST_P(AppendFCVFormatTestFixture, AppendEmitsExpectedFormat) {
     unittest::ServerParameterGuard symmetricFCV{"featureFlagSymmetricFCV", true};
     serverGlobalParams.clusterRole = ClusterRole::None;
     doStartupFCVSequence(multiversion::GenericFCV::kLatest);
-    seedFcvDocAtPhase(operationContext(), params.transitionalVersion, params.phase);
+    seedFcvDocAtPhase(operationContext(), params.seedVersion, params.phase);
 
     auto fcv = appendFcvParameter(operationContext());
 
     ASSERT_BSONOBJ_EQ(fcv, params.expectedDoc());
-}
-
-// A fully steady-state FCV (no transition in progress) reports just {version}.
-// TODO (SERVER-96888) Once the featureFlagSymmetricFCV is enabled, we can include this test in the
-// suite above; right now it makes sense because we are testing this both when the
-// featureFlagSymmetricFCV is enabled and when it is disabled.
-TEST_F(FeatureCompatibilityVersionTestFixture, AppendSteadyStateEmitsBareVersion) {
-    serverGlobalParams.clusterRole = ClusterRole::None;
-    doStartupFCVSequence(multiversion::GenericFCV::kLatest);
-
-    auto fcv = appendFcvParameter(operationContext());
-
-    ASSERT_BSONOBJ_EQ(fcv, BSON("version" << fcvStr(multiversion::GenericFCV::kLatest)));
 }
 
 TEST_F(FeatureCompatibilityVersionTestFixture,

@@ -18,16 +18,13 @@
  *   # TODO (SERVER-104789): config shards cause setFCV to hang because resharding is not aborted.
  *   config_shard_incompatible,
  *   runs_set_fcv,
- *   # TODO (SERVER-104789): when featureFlagSymmetricFCV is enabled, this test fails
- *   # with "Authoritative shards requires no shard refreshes to be executed" error, which is
- *   # exactly the same error being investigated in SERVER-104789.
- *   featureFlagSymmetricFCV_incompatible,
  * ]
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_setFCV_operations.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // Counts the number of time the setFeatureCompatibility command succeeds.
@@ -100,6 +97,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
     // Auxiliary function to catch and handle the move collection errors.
     $config.data.moveCollectionHelper = function (db, nss, destinationShard) {
+        if (this.shouldSkipTest) {
+            return;
+        }
         try {
             assert.commandWorked(db.adminCommand({moveCollection: nss, toShard: destinationShard}));
         } catch (e) {
@@ -111,6 +111,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
     // Override create state to create unsharded collections instead of sharded collections.
     $config.states.create = function (db, collName, connCache) {
+        if (this.shouldSkipTest) {
+            return;
+        }
         db = $config.data.getRandomDb(db);
         const coll = $config.data.getRandomCollection(db);
         const fullNs = coll.getFullName();
@@ -128,6 +131,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
     // Move a random collection to a random shard, effectively tracking it.
     $config.states.moveCollection = function (db, collName, connCache) {
+        if (this.shouldSkipTest) {
+            return;
+        }
         db = $config.data.getRandomDb(db);
         const coll = $config.data.getRandomCollection(db);
         const fullNs = coll.getFullName();
@@ -147,6 +153,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.states.setFCV = function (db, collName, connCache) {
+        if (this.shouldSkipTest) {
+            return;
+        }
         try {
             const fcvValues = [latestFCV, lastContinuousFCV, lastLTSFCV];
             const targetFCV = fcvValues[Random.randInt(3)];
@@ -170,6 +179,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // Unfortunately, the way extending works on fsm, we can't modify the error list for the
     // parent states, so, we need to also reimplement the states.
     $config.states.movePrimary = function (db, collName, connCache) {
+        if (this.shouldSkipTest) {
+            return;
+        }
         db = $config.data.getRandomDb(db);
         const shardId = $config.data.getRandomShard(db);
 
@@ -179,6 +191,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.states.checkDatabaseMetadataConsistency = function (db, collName, connCache) {
+        if (this.shouldSkipTest) {
+            return;
+        }
         db = $config.data.getRandomDb(db);
         jsTestLog("STATE:checkDatabaseMetadataConsistency for database: " + db.getName());
         try {
@@ -192,6 +207,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.states.checkCollectionMetadataConsistency = function (db, collName, connCache) {
+        if (this.shouldSkipTest) {
+            return;
+        }
         db = $config.data.getRandomDb(db);
         const coll = $config.data.getRandomCollection(db);
         jsTestLog("STATE:checkCollectionMetadataConsistency for collection: " + coll.getFullName());
@@ -207,13 +225,40 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
     $config.transitions = uniformDistTransitions($config.states);
 
+    $config.states.drop = function (db, collName, connCache) {
+        if (this.shouldSkipTest) return;
+        $super.states.drop.apply(this, arguments);
+    };
+
+    $config.states.rename = function (db, collName, connCache) {
+        if (this.shouldSkipTest) return;
+        $super.states.rename.apply(this, arguments);
+    };
+
+    $config.states.collMod = function (db, collName, connCache) {
+        if (this.shouldSkipTest) return;
+        $super.states.collMod.apply(this, arguments);
+    };
+
     $config.setup = function (db, collName, cluster) {
+        // TODO (SERVER-104789): when featureFlagSymmetricFCV is enabled, this test fails
+        // with "Authoritative shards requires no shard refreshes to be executed" error. This
+        // issue is being investigated in the mentioned ticket. Once that is resolved,
+        // remove all the shouldSkipTest logic
+        if (FeatureFlagUtil.isEnabled(db.getSiblingDB("admin"), "SymmetricFCV")) {
+            jsTestLog("Skipping test: incompatible with SymmetricFCV");
+            this.shouldSkipTest = true;
+            return;
+        }
         db.getSiblingDB($config.data.succesfullSetFCVDbName)[
             $config.data.succesfullSetFCVCollName
         ].insert({count: 0});
     };
 
     $config.teardown = function (db, collName, cluster) {
+        if (this.shouldSkipTest) {
+            return;
+        }
         assert.commandWorked(
             db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
         );
