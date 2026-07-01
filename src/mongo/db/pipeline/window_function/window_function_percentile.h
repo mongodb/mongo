@@ -33,6 +33,8 @@
 #include "mongo/db/pipeline/percentile_algo.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
 
+#include <cmath>
+
 namespace mongo {
 
 /**
@@ -54,7 +56,6 @@ public:
         if (!value.numeric()) {
             return;
         }
-
         auto iter = _values.find(value.coerceToDouble());
         tassert(7455904,
                 "Cannot remove a value not tracked by WindowFunctionPercentile",
@@ -75,13 +76,20 @@ protected:
     Value computePercentile(double p) const {
         // Calculate the rank.
         const double n = _values.size();
-        const double rank = PercentileAlgorithm::computeTrueRank(n, p);
+        const int rank = PercentileAlgorithm::computeTrueRank(n, p);
 
         // boost::container::flat_multiset stores the values in ascending order, so we don't need to
         // sort them before finding the value at index 'rank'.
         // boost::container::flat_multiset has random-access iterators, so std::advance has an
         // expected runtime of O(1).
         auto it = _values.begin();
+        // computeTrueRank() guarantees rank is in [0, n-1]: when p >= 1.0 it returns n-1,
+        // otherwise max(0, ceil(n*p)-1). Since p < 1.0 implies n*p < n and n is an integer,
+        // the result always fits in int and is a valid index. This tassert is a defense-in-depth
+        // invariant.
+        tassert(12961700,
+                "percentile rank is not a valid in-bounds index into the window's values",
+                rank >= 0 && static_cast<size_t>(rank) < _values.size());
         std::advance(it, rank);
         return Value(*it);
     }

@@ -40,9 +40,6 @@
 #include "mongo/db/pipeline/granularity_rounder.h"
 #include "mongo/platform/bits.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -79,11 +76,11 @@ Value GranularityRounderPowersOfTwo::roundUp(Value value) {
 
     Value exp;
     if (value.getType() == BSONType::NumberDouble) {
-        exp = Value(static_cast<int>(std::floor(std::log2(value.getDouble())) + 1.0));
+        exp = Value(representAsChecked<int>(std::floor(std::log2(value.getDouble())) + 1.0));
     } else if (value.getType() == BSONType::NumberDecimal) {
         Decimal128 input = value.getDecimal();
         exp = Value(Decimal128(
-            static_cast<int>((std::floor(input.logarithm(Decimal128(2)).toDouble()) + 1.0))));
+            representAsChecked<int>(std::floor(input.logarithm(Decimal128(2)).toDouble()) + 1.0)));
     } else {
         long long number = value.getLong();
 
@@ -105,11 +102,11 @@ Value GranularityRounderPowersOfTwo::roundDown(Value value) {
 
     Value exp;
     if (value.getType() == BSONType::NumberDouble) {
-        exp = Value(static_cast<int>(std::ceil(std::log2(value.getDouble())) - 1.0));
+        exp = Value(representAsChecked<int>(std::ceil(std::log2(value.getDouble())) - 1.0));
     } else if (value.getType() == BSONType::NumberDecimal) {
         Decimal128 input = value.getDecimal();
         exp = Value(Decimal128(
-            static_cast<int>((std::ceil(input.logarithm(Decimal128(2)).toDouble()) - 1.0))));
+            representAsChecked<int>(std::ceil(input.logarithm(Decimal128(2)).toDouble()) - 1.0)));
     } else {
         long long number = value.getLong();
 

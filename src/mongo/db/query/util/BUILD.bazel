@@ -1,3 +1,5 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
 exports_files(glob([
@@ -8,4 +10,14 @@ exports_files(glob([
 filegroup(
     name = "util_global_hdrs",
     srcs = glob(["*.h"]),
+)
+
+mongo_cc_library(
+    name = "represent_as_util",
+    hdrs = [
+        "represent_as_util.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
 )

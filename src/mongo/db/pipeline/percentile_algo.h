@@ -33,7 +33,16 @@
 #include <cmath>
 #include <memory>
 
+#include "mongo/db/query/util/represent_as_util.h"
+
 namespace mongo {
+
+inline int computeDiscreteRank(int n, double p) {
+    if (p >= 1.0) {
+        return n - 1;
+    }
+    return std::max(0, representAsChecked<int>(std::ceil(n * p)) - 1);
+}
 
 enum class PercentileMethod : int8_t {
     Approximate = 0,
