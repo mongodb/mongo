@@ -155,7 +155,7 @@ tlEnv.Library(
 _enterpriseLinux = env.TargetOSIs('linux') and 'enterprise' in env['MONGO_MODULES']
 env.Clone().InjectModule("enterprise").Library(
     target='message_filter_hooks',
-    source=[] if _enterpriseLinux else [
+    source=['message_filter_hooks_enterprise_shim.cpp'] if _enterpriseLinux else [
         'message_filter_hooks.cpp',
     ],
     LIBDEPS=[
