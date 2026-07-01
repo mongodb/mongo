@@ -120,16 +120,18 @@ bool collectionHasSimpleCollation(OperationContext* opCtx, const NamespaceString
 
 }  // namespace
 
-ReshardingCollectionCloner::ReshardingCollectionCloner(ReshardingMetrics* metrics,
-                                                       const UUID& reshardingUUID,
-                                                       ShardKeyPattern newShardKeyPattern,
-                                                       NamespaceString sourceNss,
-                                                       const UUID& sourceUUID,
-                                                       ShardId recipientShard,
-                                                       Timestamp atClusterTime,
-                                                       NamespaceString outputNss,
-                                                       bool storeProgress,
-                                                       bool relaxed)
+ReshardingCollectionCloner::ReshardingCollectionCloner(
+    ReshardingMetrics* metrics,
+    const UUID& reshardingUUID,
+    ShardKeyPattern newShardKeyPattern,
+    NamespaceString sourceNss,
+    const UUID& sourceUUID,
+    ShardId recipientShard,
+    Timestamp atClusterTime,
+    NamespaceString outputNss,
+    bool storeProgress,
+    bool relaxed,
+    boost::optional<ForwardableOperationMetadata> forwardableOpMetadata)
     : _metrics(metrics),
       _reshardingUUID(reshardingUUID),
       _newShardKeyPattern(std::move(newShardKeyPattern)),
@@ -139,7 +141,8 @@ ReshardingCollectionCloner::ReshardingCollectionCloner(ReshardingMetrics* metric
       _atClusterTime(atClusterTime),
       _outputNss(std::move(outputNss)),
       _storeProgress(storeProgress),
-      _relaxed(std::move(relaxed)) {}
+      _relaxed(std::move(relaxed)),
+      _forwardableOpMetadata(std::move(forwardableOpMetadata)) {}
 
 std::pair<std::vector<BSONObj>, boost::intrusive_ptr<ExpressionContext>>
 ReshardingCollectionCloner::makeRawNaturalOrderPipeline(
@@ -251,9 +254,8 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
             request.setHint(BSON("$natural" << 1));
 
             // Send with rawData since the shard key is already translated for timeseries.
-            if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
-                    VersionContext::getDecoration(opCtx),
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            if (resharding::isEnabledWithPinnedVersion(
+                    _forwardableOpMetadata, gFeatureFlagAllBinariesSupportRawDataOperations)) {
                 request.setRawData(true);
             }
 

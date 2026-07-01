@@ -123,7 +123,8 @@ std::unique_ptr<ReshardingCollectionCloner> ReshardingDataReplication::_makeColl
         cloneTimestamp,
         metadata.getTempReshardingNss(),
         storeProgress,
-        relaxed);
+        relaxed,
+        metadata.getForwardableOpMetadata());
 }
 
 std::vector<std::unique_ptr<ReshardingTxnCloner>> ReshardingDataReplication::_makeTxnCloners(
@@ -177,7 +178,8 @@ std::vector<std::unique_ptr<ReshardingOplogFetcher>> ReshardingDataReplication::
             donor.getShardId(),
             myShardId,
             std::move(oplogBufferNss),
-            storeOplogFetcherProgress));
+            storeOplogFetcherProgress,
+            metadata.getForwardableOpMetadata()));
     }
 
     return oplogFetchers;
@@ -264,7 +266,8 @@ std::vector<std::unique_ptr<ReshardingOplogApplier>> ReshardingDataReplication::
                     oplogBufferNss, std::make_unique<MongoProcessInterfaceFactoryImpl>()),
                 std::move(idToResumeFrom),
                 oplogFetchers[i].get()),
-            resharding::data_copy::isCollectionCapped(opCtx, metadata.getTempReshardingNss())));
+            resharding::data_copy::isCollectionCapped(opCtx, metadata.getTempReshardingNss()),
+            metadata.getForwardableOpMetadata()));
     }
 
     return oplogAppliers;

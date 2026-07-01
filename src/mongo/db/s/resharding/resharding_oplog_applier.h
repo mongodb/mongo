@@ -35,6 +35,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
@@ -97,16 +98,18 @@ public:
         ReshardingOplogApplierMetrics* _applierMetrics;
     };
 
-    ReshardingOplogApplier(std::unique_ptr<Env> env,
-                           std::size_t oplogBatchTaskCount,
-                           ReshardingSourceId sourceId,
-                           NamespaceString oplogBufferNss,
-                           NamespaceString outputNss,
-                           std::vector<NamespaceString> allStashNss,
-                           size_t myStashIdx,
-                           ChunkManager sourceChunkMgr,
-                           std::unique_ptr<ReshardingDonorOplogIteratorInterface> oplogIterator,
-                           bool isCapped = false);
+    ReshardingOplogApplier(
+        std::unique_ptr<Env> env,
+        std::size_t oplogBatchTaskCount,
+        ReshardingSourceId sourceId,
+        NamespaceString oplogBufferNss,
+        NamespaceString outputNss,
+        std::vector<NamespaceString> allStashNss,
+        size_t myStashIdx,
+        ChunkManager sourceChunkMgr,
+        std::unique_ptr<ReshardingDonorOplogIteratorInterface> oplogIterator,
+        bool isCapped = false,
+        boost::optional<ForwardableOperationMetadata> forwardableOpMetadata = boost::none);
 
     /**
      * Schedules work to repeatedly apply batches of oplog entries from a donor shard.
@@ -186,6 +189,7 @@ private:
     // The source of the oplog entries to be applied.
     std::unique_ptr<ReshardingDonorOplogIteratorInterface> _oplogIter;
 
+    const boost::optional<ForwardableOperationMetadata> _forwardableOpMetadata;
     boost::optional<bool> _supportEstimatingRemainingTimeBasedOnMovingAverage;
 };
 

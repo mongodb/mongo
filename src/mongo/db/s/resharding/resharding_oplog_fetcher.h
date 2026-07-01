@@ -37,6 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 #include "mongo/db/service_context.h"
@@ -85,14 +86,16 @@ public:
     // fetched.
     static const ReshardingDonorOplogId kFinalOpAlreadyFetched;
 
-    ReshardingOplogFetcher(std::unique_ptr<Env> env,
-                           UUID reshardingUUID,
-                           UUID collUUID,
-                           ReshardingDonorOplogId startAt,
-                           ShardId donorShard,
-                           ShardId recipientShard,
-                           NamespaceString oplogBufferNss,
-                           bool storeProgress);
+    ReshardingOplogFetcher(
+        std::unique_ptr<Env> env,
+        UUID reshardingUUID,
+        UUID collUUID,
+        ReshardingDonorOplogId startAt,
+        ShardId donorShard,
+        ShardId recipientShard,
+        NamespaceString oplogBufferNss,
+        bool storeProgress,
+        boost::optional<ForwardableOperationMetadata> forwardableOpMetadata = boost::none);
 
     ~ReshardingOplogFetcher() override;
 
@@ -229,6 +232,7 @@ private:
     const ShardId _recipientShard;
     const NamespaceString _oplogBufferNss;
     const bool _storeProgress;
+    const boost::optional<ForwardableOperationMetadata> _forwardableOpMetadata;
     boost::optional<bool> _supportEstimatingRemainingTimeBasedOnMovingAverage;
 
     int _numOplogEntriesCopied = 0;

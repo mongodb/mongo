@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/executor/task_executor.h"
@@ -75,16 +76,18 @@ class ServiceContext;
  */
 class ReshardingCollectionCloner {
 public:
-    ReshardingCollectionCloner(ReshardingMetrics* metrics,
-                               const UUID& reshardingUUID,
-                               ShardKeyPattern newShardKeyPattern,
-                               NamespaceString sourceNss,
-                               const UUID& sourceUUID,
-                               ShardId recipientShard,
-                               Timestamp atClusterTime,
-                               NamespaceString outputNss,
-                               bool storeProgress,
-                               bool relaxed);
+    ReshardingCollectionCloner(
+        ReshardingMetrics* metrics,
+        const UUID& reshardingUUID,
+        ShardKeyPattern newShardKeyPattern,
+        NamespaceString sourceNss,
+        const UUID& sourceUUID,
+        ShardId recipientShard,
+        Timestamp atClusterTime,
+        NamespaceString outputNss,
+        bool storeProgress,
+        bool relaxed,
+        boost::optional<ForwardableOperationMetadata> forwardableOpMetadata = boost::none);
 
     std::pair<std::vector<BSONObj>, boost::intrusive_ptr<ExpressionContext>>
     makeRawNaturalOrderPipeline(OperationContext* opCtx,
@@ -138,6 +141,7 @@ private:
     const NamespaceString _outputNss;
     const bool _storeProgress;
     const bool _relaxed;
+    const boost::optional<ForwardableOperationMetadata> _forwardableOpMetadata;
 };
 
 }  // namespace mongo

@@ -265,14 +265,16 @@ Milliseconds calculateTimeToFetch(OperationContext* opCtx,
 const ReshardingDonorOplogId ReshardingOplogFetcher::kFinalOpAlreadyFetched{Timestamp::max(),
                                                                             Timestamp::max()};
 
-ReshardingOplogFetcher::ReshardingOplogFetcher(std::unique_ptr<Env> env,
-                                               UUID reshardingUUID,
-                                               UUID collUUID,
-                                               ReshardingDonorOplogId startAt,
-                                               ShardId donorShard,
-                                               ShardId recipientShard,
-                                               NamespaceString oplogBufferNss,
-                                               bool storeProgress)
+ReshardingOplogFetcher::ReshardingOplogFetcher(
+    std::unique_ptr<Env> env,
+    UUID reshardingUUID,
+    UUID collUUID,
+    ReshardingDonorOplogId startAt,
+    ShardId donorShard,
+    ShardId recipientShard,
+    NamespaceString oplogBufferNss,
+    bool storeProgress,
+    boost::optional<ForwardableOperationMetadata> forwardableOpMetadata)
     : _env(std::move(env)),
       _reshardingUUID(reshardingUUID),
       _collUUID(collUUID),
@@ -280,6 +282,7 @@ ReshardingOplogFetcher::ReshardingOplogFetcher(std::unique_ptr<Env> env,
       _recipientShard(recipientShard),
       _oplogBufferNss(oplogBufferNss),
       _storeProgress(storeProgress),
+      _forwardableOpMetadata(std::move(forwardableOpMetadata)),
       _startAt(startAt) {
     auto [p, f] = makePromiseFuture<void>();
     std::lock_guard lk(_mutex);
@@ -536,9 +539,9 @@ bool ReshardingOplogFetcher::_needToEstimateRemainingTimeBasedOnMovingAverage(
         // Only check the feature flag once since the setFCV command aborts any in-progress
         // resharding operation so no resharding operations can span multiple FCV versions.
         _supportEstimatingRemainingTimeBasedOnMovingAverage =
-            resharding::gFeatureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage.isEnabled(
-                VersionContext::getDecoration(opCtx),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+            resharding::isEnabledWithPinnedVersion(
+                _forwardableOpMetadata,
+                resharding::gFeatureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage);
     }
 
     return *_supportEstimatingRemainingTimeBasedOnMovingAverage &&

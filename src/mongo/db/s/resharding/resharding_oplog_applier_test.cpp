@@ -58,6 +58,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/router_role/routing_cache/config_server_catalog_cache_loader_mock.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
@@ -76,6 +77,7 @@
 #include "mongo/db/topology/vector_clock/vector_clock_metadata_hook.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/executor/network_connection_hook.h"
@@ -466,6 +468,13 @@ protected:
                                                              _applierMetrics.get());
     }
 
+    ForwardableOperationMetadata makeTestFom() {
+        ForwardableOperationMetadata fom;
+        fom.setVersionContext(
+            VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
+        return fom;
+    }
+
     std::shared_ptr<executor::ThreadPoolTaskExecutor> makeTaskExecutorForApplier() {
         // The ReshardingOplogApplier expects there to already be a Client associated with the
         // thread from the thread pool. We set up the ThreadPoolTaskExecutor identically to how the
@@ -551,7 +560,9 @@ TEST_F(ReshardingOplogApplierTest, NothingToIterate) {
                     stashCollections(),
                     0U /* myStashIdx */,
                     chunkManager(),
-                    std::move(iterator));
+                    std::move(iterator),
+                    /* isCapped */ false,
+                    makeTestFom());
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
@@ -591,7 +602,9 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
                     stashCollections(),
                     0U /* myStashIdx */,
                     chunkManager(),
-                    std::move(iterator));
+                    std::move(iterator),
+                    /* isCapped */ false,
+                    makeTestFom());
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
@@ -639,7 +652,9 @@ TEST_F(ReshardingOplogApplierTest, CanceledApplyingBatch) {
                     stashCollections(),
                     0U /* myStashIdx */,
                     chunkManager(),
-                    std::move(iterator));
+                    std::move(iterator),
+                    /* isCapped */ false,
+                    makeTestFom());
 
     auto abortSource = CancellationSource();
     abortSource.cancel();
@@ -673,7 +688,9 @@ TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
                     stashCollections(),
                     0U /* myStashIdx */,
                     chunkManager(),
-                    std::move(iterator));
+                    std::move(iterator),
+                    /* isCapped */ false,
+                    makeTestFom());
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
@@ -717,7 +734,9 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringFirstBatchApply) {
                     stashCollections(),
                     0U /* myStashIdx */,
                     chunkManager(),
-                    std::move(iterator));
+                    std::move(iterator),
+                    /* isCapped */ false,
+                    makeTestFom());
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
@@ -763,7 +782,9 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringSecondBatchApply) {
                     stashCollections(),
                     0U /* myStashIdx */,
                     chunkManager(),
-                    std::move(iterator));
+                    std::move(iterator),
+                    /* isCapped */ false,
+                    makeTestFom());
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
@@ -807,7 +828,9 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplog) {
                     stashCollections(),
                     0U /* myStashIdx */,
                     chunkManager(),
-                    std::move(iterator));
+                    std::move(iterator),
+                    /* isCapped */ false,
+                    makeTestFom());
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
@@ -846,7 +869,9 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatch) {
                     stashCollections(),
                     0U /* myStashIdx */,
                     chunkManager(),
-                    std::move(iterator));
+                    std::move(iterator),
+                    /* isCapped */ false,
+                    makeTestFom());
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
@@ -891,7 +916,9 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatch) {
                     stashCollections(),
                     0U /* myStashIdx */,
                     chunkManager(),
-                    std::move(iterator));
+                    std::move(iterator),
+                    /* isCapped */ false,
+                    makeTestFom());
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
@@ -933,7 +960,9 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDown) {
                     stashCollections(),
                     0U /* myStashIdx */,
                     chunkManager(),
-                    std::move(iterator));
+                    std::move(iterator),
+                    /* isCapped */ false,
+                    makeTestFom());
 
     getExecutor()->shutdown();
 
@@ -978,7 +1007,9 @@ TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldError) {
                     stashCollections(),
                     0U /* myStashIdx */,
                     chunkManager(),
-                    std::move(iterator));
+                    std::move(iterator),
+                    /* isCapped */ false,
+                    makeTestFom());
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
@@ -1017,7 +1048,9 @@ TEST_F(ReshardingOplogApplierTest, DropSourceCollectionCmdShouldError) {
                     stashCollections(),
                     0U /* myStashIdx */,
                     chunkManager(),
-                    std::move(iterator));
+                    std::move(iterator),
+                    /* isCapped */ false,
+                    makeTestFom());
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
@@ -1057,7 +1090,9 @@ TEST_F(ReshardingOplogApplierTest, MetricsAreReported) {
                                    stashCollections(),
                                    0U /* myStashIdx */,
                                    chunkManager(),
-                                   std::move(iterator));
+                                   std::move(iterator),
+                                   /* isCapped */ false,
+                                   makeTestFom());
 
     ASSERT_EQ(metricsAppliedCount(), 0);
 
@@ -1158,6 +1193,9 @@ TEST_F(ReshardingOplogApplierTest, UpdateAverageTimeToApplyBasic) {
 
             advanceTime(Milliseconds(100));
             auto iterator = std::make_unique<OplogIteratorMock>(std::move(ops), batchSize);
+            ForwardableOperationMetadata fom;
+            fom.setVersionContext(
+                VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
             boost::optional<ReshardingOplogApplier> applier;
             applier.emplace(makeApplierEnv(),
                             kApplierBatchTaskCount,
@@ -1167,7 +1205,9 @@ TEST_F(ReshardingOplogApplierTest, UpdateAverageTimeToApplyBasic) {
                             stashCollections(),
                             0U /* myStashIdx */,
                             chunkManager(),
-                            std::move(iterator));
+                            std::move(iterator),
+                            /* isCapped */ false,
+                            std::move(fom));
 
             auto cancelToken = operationContext()->getCancellationToken();
             auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
@@ -1225,7 +1265,9 @@ TEST_F(ReshardingOplogApplierTest, UpdateAverageTimeToApply_EmptyBatch) {
                     stashCollections(),
                     0U /* myStashIdx */,
                     chunkManager(),
-                    std::move(iterator));
+                    std::move(iterator),
+                    /* isCapped */ false,
+                    makeTestFom());
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
@@ -1252,6 +1294,9 @@ TEST_F(ReshardingOplogApplierTest, UpdateAverageTimeToApply_ClockSkew) {
                             now() + Milliseconds(100)));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(ops), batchSize);
+    ForwardableOperationMetadata fom;
+    fom.setVersionContext(
+        VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
                     kApplierBatchTaskCount,
@@ -1261,7 +1306,9 @@ TEST_F(ReshardingOplogApplierTest, UpdateAverageTimeToApply_ClockSkew) {
                     stashCollections(),
                     0U /* myStashIdx */,
                     chunkManager(),
-                    std::move(iterator));
+                    std::move(iterator),
+                    /* isCapped */ false,
+                    std::move(fom));
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(

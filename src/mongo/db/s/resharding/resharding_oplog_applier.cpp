@@ -100,7 +100,8 @@ ReshardingOplogApplier::ReshardingOplogApplier(
     size_t myStashIdx,
     ChunkManager sourceChunkMgr,
     std::unique_ptr<ReshardingDonorOplogIteratorInterface> oplogIterator,
-    bool isCapped)
+    bool isCapped,
+    boost::optional<ForwardableOperationMetadata> forwardableOpMetadata)
     : _env(std::move(env)),
       _sourceId(std::move(sourceId)),
       _batchPreparer{oplogBatchTaskCount,
@@ -115,7 +116,8 @@ ReshardingOplogApplier::ReshardingOplogApplier(
                        isCapped},
       _sessionApplication{std::move(oplogBufferNss)},
       _batchApplier{_crudApplication, _sessionApplication},
-      _oplogIter(std::move(oplogIterator)) {}
+      _oplogIter(std::move(oplogIterator)),
+      _forwardableOpMetadata(std::move(forwardableOpMetadata)) {}
 
 CancelableOperationContext ReshardingOplogApplier::_makeOperationContext(
     std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) const {
@@ -325,9 +327,9 @@ bool ReshardingOplogApplier::_needToEstimateRemainingTimeBasedOnMovingAverage(
         // Only check the feature flag once since the setFCV command aborts any in-progress
         // resharding operation so no resharding operations can span multiple FCV versions.
         _supportEstimatingRemainingTimeBasedOnMovingAverage =
-            resharding::gFeatureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage.isEnabled(
-                VersionContext::getDecoration(opCtx),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+            resharding::isEnabledWithPinnedVersion(
+                _forwardableOpMetadata,
+                resharding::gFeatureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage);
     }
 
     return *_supportEstimatingRemainingTimeBasedOnMovingAverage &&
