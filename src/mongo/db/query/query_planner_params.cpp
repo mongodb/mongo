@@ -53,16 +53,6 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(pauseAfterFillingOutIndexEntries);
 
-namespace {
-/**
- * Converts the catalog metadata for an index into an IndexEntry, which is a format that is meant to
- * be consumed by the query planner. This function can perform index reads and should not be called
- * unless access to the storage engine is permitted.
- *
- * When 'canonicalQuery' is not null, only multikey metadata paths that intersect with the query
- * field set will be retrieved for a multikey wildcard index. Otherwise all multikey metadata paths
- * will be retrieved.
- */
 IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
                                            const CollectionPtr& collection,
                                            std::shared_ptr<const IndexCatalogEntry> ice,
@@ -143,6 +133,7 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
             std::move(ice)};
 }
 
+namespace {
 void fillOutIndexEntries(OperationContext* opCtx,
                          const CanonicalQuery& canonicalQuery,
                          const CollectionPtr& collection,

@@ -484,4 +484,15 @@ private:
 bool shouldWaitForOplogVisibility(OperationContext* opCtx,
                                   const CollectionPtr& collection,
                                   bool tailable);
+
+/**
+ * Converts catalog metadata for an index into an IndexEntry suitable for query planning. Performs
+ * index reads (multikey paths for wildcard indexes) and must not be called without storage engine
+ * access.
+ */
+IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
+                                           const CollectionPtr& collection,
+                                           std::shared_ptr<const IndexCatalogEntry> ice,
+                                           const CanonicalQuery& canonicalQuery);
+
 }  // namespace mongo

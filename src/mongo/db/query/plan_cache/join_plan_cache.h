@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/compiler/optimizer/join/join_method.h"
 #include "mongo/db/query/compiler/optimizer/join/join_predicate.h"
+#include "mongo/db/query/compiler/optimizer/join/logical_defs.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/rwmutex.h"
@@ -57,12 +58,13 @@ struct CachedJoinPlan;
 // Cached single-collection access path. Reuses SolutionCacheData / index-tag machinery
 // from the classic plan cache to reconstruct the physical access path on a cache hit.
 struct CachedAccessPath {
-    const NamespaceString nss;
+    const join_ordering::NodeId nodeId;
     std::unique_ptr<const SolutionCacheData> solnCacheData;
 };
 
 // Cached extra state for the right-hand side of an INLJ.
 struct CachedInljNode {
+    const join_ordering::NodeId nodeId;
     const std::string inljForeignIndexName;
 };
 

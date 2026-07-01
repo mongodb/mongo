@@ -87,11 +87,11 @@ TEST(JoinPlanCacheTest, GetComplexEntry) {
                 .rightField = FieldPath("bar"),
             }},
             .left = std::make_unique<CachedJoinPlan>(CachedAccessPath{
-                .nss = NamespaceString::createNamespaceString_forTest("db.left"),
+                .nodeId = 0,
                 .solnCacheData = std::make_unique<SolutionCacheData>(SolutionCacheData{}),
             }),
             .right = std::make_unique<CachedJoinPlan>(CachedAccessPath{
-                .nss = NamespaceString::createNamespaceString_forTest("db.right"),
+                .nodeId = 1,
                 .solnCacheData = std::make_unique<SolutionCacheData>(SolutionCacheData{}),
             }),
         })});

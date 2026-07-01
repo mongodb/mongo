@@ -31,6 +31,7 @@
 #include "mongo/db/query/compiler/optimizer/join/cardinality_estimator.h"
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_cache/join_plan_cache.h"
 #include "mongo/util/modules.h"
 
@@ -94,5 +95,17 @@ StatusWith<ReorderedJoinSolution> constructSolutionBottomUp(const JoinReordering
 std::unique_ptr<CachedJoinPlan> toCachedJoinPlan(const JoinReorderingContext& ctx,
                                                  const JoinPlanNodeRegistry& registry,
                                                  JoinPlanNodeId nodeId);
+
+/**
+ * Reconstructs a 'QuerySolutionNode' tree from 'plan'. Uses 'joinGraph' to get each
+ * 'CanonicalQuery' associated with each node (via stored NodeIds, which correctly handles
+ * self-joins), and 'collections' + 'opCtx' to build IndexEntry objects with correct multikey
+ * information via 'indexEntryFromIndexCatalogEntry'.
+ */
+std::unique_ptr<QuerySolutionNode> fromCachedJoinPlan(OperationContext* opCtx,
+                                                      const JoinGraph& joinGraph,
+                                                      const MultipleCollectionAccessor& collections,
+                                                      const AvailableIndexes& perCollIdxs,
+                                                      const CachedJoinPlan& plan);
 
 }  // namespace mongo::join_ordering

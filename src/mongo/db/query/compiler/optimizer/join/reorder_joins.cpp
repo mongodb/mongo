@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/compiler/optimizer/join/reorder_joins.h"
 
+#include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/optimizer/join/join_plan.h"
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
@@ -36,6 +37,8 @@
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator_helpers.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/random_utils.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -554,12 +557,13 @@ std::unique_ptr<CachedJoinPlan> toCachedJoinPlan(const JoinReorderingContext& ct
                         "SolutionCacheData must be present on base node",
                         base.soln->cacheData);
                 return std::make_unique<CachedJoinPlan>(CachedAccessPath{
-                    .nss = base.nss,
+                    .nodeId = base.node,
                     .solnCacheData = base.soln->cacheData->clone(),
                 });
             },
             [&](const INLJRHSNode& ip) -> std::unique_ptr<CachedJoinPlan> {
                 return std::make_unique<CachedJoinPlan>(CachedInljNode{
+                    .nodeId = ip.node,
                     .inljForeignIndexName = std::string(ip.entry->descriptor()->indexName()),
                 });
             },
@@ -595,5 +599,72 @@ std::unique_ptr<CachedJoinPlan> toCachedJoinPlan(const JoinReorderingContext& ct
             },
         },
         registry.get(nodeId));
+}
+std::unique_ptr<QuerySolutionNode> fromCachedJoinPlan(OperationContext* opCtx,
+                                                      const JoinGraph& joinGraph,
+                                                      const MultipleCollectionAccessor& collections,
+                                                      const AvailableIndexes& perCollIdxs,
+                                                      const CachedJoinPlan& plan) {
+    return std::visit(
+        OverloadedVisitor{
+            [&](const CachedAccessPath& ap) -> std::unique_ptr<QuerySolutionNode> {
+                const CanonicalQuery* cq = joinGraph.accessPathAt(ap.nodeId);
+                tassert(12926301,
+                        fmt::format("cannot find access path for node {}", ap.nodeId),
+                        cq != nullptr);
+
+                const NamespaceString& nss = joinGraph.getNode(ap.nodeId).collectionName;
+                std::vector<IndexEntry> indexes;
+                if (auto it = perCollIdxs.find(nss);
+                    it != perCollIdxs.end() && !it->second.empty()) {
+                    const CollectionPtr& collection = collections.lookupCollection(nss);
+                    for (const auto& ice : it->second) {
+                        indexes.push_back(
+                            indexEntryFromIndexCatalogEntry(opCtx, collection, ice, *cq));
+                    }
+                }
+                QueryPlannerParams params(QueryPlannerParams::ArgsForSingleCollectionQuery{
+                    .opCtx = opCtx,
+                    .canonicalQuery = *cq,
+                    .collections = collections,
+                });
+                params.mainCollectionInfo.indexes = std::move(indexes);
+
+                auto solnStatus = QueryPlanner::planFromCache(*cq, params, *ap.solnCacheData);
+                tassert(12926303, "planFromCache failed for cached access path", solnStatus.isOK());
+                return solnStatus.getValue()->root()->clone();
+            },
+            [&](const CachedInljNode& inlj) -> std::unique_ptr<QuerySolutionNode> {
+                const auto& joinNode = joinGraph.getNode(inlj.nodeId);
+                const NamespaceString& nss = joinNode.collectionName;
+                auto idxIt = perCollIdxs.find(nss);
+                tassert(12926304,
+                        "Available indexes must exist for INLJ collection",
+                        idxIt != perCollIdxs.end());
+                for (const auto& ice : idxIt->second) {
+                    if (ice->descriptor()->indexName() == inlj.inljForeignIndexName) {
+                        return createIndexProbeQSN(joinNode, ice);
+                    }
+                }
+                tasserted(12926305,
+                          fmt::format("Could not find index {} for INLJ collection {}",
+                                      inlj.inljForeignIndexName,
+                                      nss.toStringForErrorMsg()));
+            },
+            [&](const CachedJoinNode& join) -> std::unique_ptr<QuerySolutionNode> {
+                auto leftChild =
+                    fromCachedJoinPlan(opCtx, joinGraph, collections, perCollIdxs, *join.left);
+                auto rightChild =
+                    fromCachedJoinPlan(opCtx, joinGraph, collections, perCollIdxs, *join.right);
+                return makeBinaryJoinEmbeddingQSN(
+                    join.method,
+                    std::vector<QSNJoinPredicate>(join.joinPredicates),
+                    std::move(leftChild),
+                    join.leftEmbeddingField,
+                    std::move(rightChild),
+                    join.rightEmbeddingField);
+            },
+        },
+        plan.node);
 }
 }  // namespace mongo::join_ordering
