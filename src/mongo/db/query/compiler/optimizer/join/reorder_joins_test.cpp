@@ -507,4 +507,239 @@ TEST(IndexSatisfyingJoinPredicates, NoSatisfyingIndex) {
     ASSERT_EQ(res, nullptr);
 }
 
+class ToCachedJoinPlanTest : public ReorderGraphTest {
+protected:
+    std::unique_ptr<QuerySolution> makeSolnWithCacheData(NamespaceString nss) {
+        auto soln = makeCollScanPlan(std::move(nss));
+        auto scd = std::make_unique<SolutionCacheData>();
+        scd->solnType = SolutionCacheData::COLLSCAN_SOLN;
+        soln->cacheData = std::move(scd);
+        return soln;
+    }
+
+    JoinCostEstimate zeroCostEstimate() {
+        return JoinCostEstimate(zeroCE, zeroCE, zeroCE, zeroCE);
+    }
+};
+
+TEST_F(ToCachedJoinPlanTest, BaseNodeToCachedAccessPath) {
+    auto nodeId =
+        addNssWithEmbedding({.collName = "a", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto jCtx = makeContext();
+
+    auto soln = makeSolnWithCacheData(namespaces[0]);
+
+    JoinPlanNodeRegistry registry;
+    auto baseId = registry.registerBaseNode(nodeId, soln.get(), namespaces[0], zeroCostEstimate());
+
+    auto result = toCachedJoinPlan(jCtx, registry, baseId);
+    ASSERT(result);
+    auto* ap = std::get_if<CachedAccessPath>(&result->node);
+    ASSERT_NE(ap, nullptr);
+    ASSERT_EQ(ap->nss, namespaces[0]);
+    ASSERT_NE(ap->solnCacheData, nullptr);
+    ASSERT_EQ(ap->solnCacheData->solnType, SolutionCacheData::COLLSCAN_SOLN);
+}
+
+TEST_F(ToCachedJoinPlanTest, INLJRHSNodeToCachedInljNode) {
+    auto nodeId =
+        addNssWithEmbedding({.collName = "b", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto jCtx = makeContext();
+
+    auto entries = makeIndexCatalogEntries({BSON("b" << 1)});
+    ASSERT_EQ(entries.size(), 1u);
+
+    JoinPlanNodeRegistry registry;
+    auto inljId = registry.registerINLJRHSNode(nodeId, entries[0], namespaces[0]);
+
+    auto result = toCachedJoinPlan(jCtx, registry, inljId);
+    ASSERT(result);
+    auto* cached = std::get_if<CachedInljNode>(&result->node);
+    ASSERT_NE(cached, nullptr);
+    // makeIndexDescriptor always assigns the name "name".
+    ASSERT_EQ(cached->inljForeignIndexName, "name");
+}
+
+TEST_F(ToCachedJoinPlanTest, INLJJoinNodeToCachedJoinNode) {
+    auto idA = addNssWithEmbedding({.collName = "a", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto idB = addNssWithEmbedding(
+        {.collName = "b", .embedPath = {}, .filter = {}, .indexes = {BSON("b" << 1)}});
+
+    resolvedPaths = {
+        ResolvedPath{.nodeId = idA, .fieldName = FieldPath{"a"}},
+        ResolvedPath{.nodeId = idB, .fieldName = FieldPath{"b"}},
+    };
+    graph.addSimpleEqualityEdge(idA, idB, 0 /*a*/, 1 /*b*/);
+
+    auto jCtx = makeContext();
+    auto solnA = makeSolnWithCacheData(namespaces[0]);
+
+    auto entries = makeIndexCatalogEntries({BSON("b" << 1)});
+    ASSERT_EQ(entries.size(), 1u);
+
+    JoinPlanNodeRegistry registry;
+    auto baseAId = registry.registerBaseNode(idA, solnA.get(), namespaces[0], zeroCostEstimate());
+    auto inljBId = registry.registerINLJRHSNode(idB, entries[0], namespaces[1]);
+
+    JoinSubset joinSubset(makeNodeSet(idA, idB));
+    auto joinId = registry.registerJoinNode(
+        joinSubset, JoinMethod::INLJ, baseAId, inljBId, zeroCostEstimate());
+
+    auto result = toCachedJoinPlan(jCtx, registry, joinId);
+    ASSERT(result);
+
+    auto* joinNode = std::get_if<CachedJoinNode>(&result->node);
+    ASSERT_NE(joinNode, nullptr);
+    ASSERT_EQ(joinNode->method, JoinMethod::INLJ);
+    ASSERT(!joinNode->leftEmbeddingField.has_value());
+    ASSERT(!joinNode->rightEmbeddingField.has_value());
+
+    auto* leftAP = std::get_if<CachedAccessPath>(&joinNode->left->node);
+    ASSERT_NE(leftAP, nullptr);
+    ASSERT_EQ(leftAP->nss, namespaces[0]);
+
+    auto* rightINLJ = std::get_if<CachedInljNode>(&joinNode->right->node);
+    ASSERT_NE(rightINLJ, nullptr);
+    ASSERT_EQ(rightINLJ->inljForeignIndexName, "name");
+}
+
+TEST_F(ToCachedJoinPlanTest, HJTwoBaseNodesToCachedJoinNode) {
+    auto idA = addNssWithEmbedding({.collName = "a", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto idB = addNssWithEmbedding({.collName = "b", .embedPath = {}, .filter = {}, .indexes = {}});
+
+    // PathId 0 maps to field "x" on node A; PathId 1 maps to field "y" on node B.
+    resolvedPaths = {
+        ResolvedPath{.nodeId = idA, .fieldName = FieldPath{"x"}},
+        ResolvedPath{.nodeId = idB, .fieldName = FieldPath{"y"}},
+    };
+    graph.addSimpleEqualityEdge(idA, idB, 0 /*x*/, 1 /*y*/);
+
+    auto jCtx = makeContext();
+
+    auto solnA = makeSolnWithCacheData(namespaces[0]);
+    auto solnB = makeSolnWithCacheData(namespaces[1]);
+
+    JoinPlanNodeRegistry registry;
+    auto leftId = registry.registerBaseNode(idA, solnA.get(), namespaces[0], zeroCostEstimate());
+    auto rightId = registry.registerBaseNode(idB, solnB.get(), namespaces[1], zeroCostEstimate());
+
+    JoinSubset joinSubset(makeNodeSet(idA, idB));
+    auto joinId =
+        registry.registerJoinNode(joinSubset, JoinMethod::HJ, leftId, rightId, zeroCostEstimate());
+
+    auto result = toCachedJoinPlan(jCtx, registry, joinId);
+    ASSERT(result);
+    auto* joinNode = std::get_if<CachedJoinNode>(&result->node);
+    ASSERT_NE(joinNode, nullptr);
+    ASSERT_EQ(joinNode->method, JoinMethod::HJ);
+    ASSERT_EQ(joinNode->joinPredicates.size(), 1u);
+    ASSERT_EQ(joinNode->joinPredicates[0].leftField.fullPath(), "x");
+    ASSERT_EQ(joinNode->joinPredicates[0].rightField.fullPath(), "y");
+    ASSERT(!joinNode->leftEmbeddingField.has_value());
+    ASSERT(!joinNode->rightEmbeddingField.has_value());
+
+    auto* leftAP = std::get_if<CachedAccessPath>(&joinNode->left->node);
+    ASSERT_NE(leftAP, nullptr);
+    ASSERT_EQ(leftAP->nss, namespaces[0]);
+
+    auto* rightAP = std::get_if<CachedAccessPath>(&joinNode->right->node);
+    ASSERT_NE(rightAP, nullptr);
+    ASSERT_EQ(rightAP->nss, namespaces[1]);
+}
+
+TEST_F(ToCachedJoinPlanTest, EmbeddingFieldPreserved) {
+    auto idA = addNssWithEmbedding({.collName = "a", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto idB = addNssWithEmbedding(
+        {.collName = "b", .embedPath = FieldPath{"b"}, .filter = {}, .indexes = {}});
+
+    resolvedPaths = {
+        ResolvedPath{.nodeId = idA, .fieldName = FieldPath{"a"}},
+        ResolvedPath{.nodeId = idB, .fieldName = FieldPath{"b"}},
+    };
+    graph.addSimpleEqualityEdge(idA, idB, 0 /*a*/, 1 /*b*/);
+
+    auto jCtx = makeContext();
+
+    auto solnA = makeSolnWithCacheData(namespaces[0]);
+    auto solnB = makeSolnWithCacheData(namespaces[1]);
+
+    JoinPlanNodeRegistry registry;
+    auto leftId = registry.registerBaseNode(idA, solnA.get(), namespaces[0], zeroCostEstimate());
+    auto rightId = registry.registerBaseNode(idB, solnB.get(), namespaces[1], zeroCostEstimate());
+
+    JoinSubset joinSubset(makeNodeSet(idA, idB));
+    auto joinId =
+        registry.registerJoinNode(joinSubset, JoinMethod::NLJ, leftId, rightId, zeroCostEstimate());
+
+    auto result = toCachedJoinPlan(jCtx, registry, joinId);
+    auto* joinNode = std::get_if<CachedJoinNode>(&result->node);
+    ASSERT_NE(joinNode, nullptr);
+    ASSERT(!joinNode->leftEmbeddingField.has_value());
+    ASSERT(joinNode->rightEmbeddingField.has_value());
+    ASSERT_EQ(joinNode->rightEmbeddingField->fullPath(), "b");
+}
+
+TEST_F(ToCachedJoinPlanTest, NestedJoinNodeThreeCollections) {
+    // Graph: A -- B -- C, join plan is (A join B) join C.
+    auto idA = addNssWithEmbedding({.collName = "a", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto idB = addNssWithEmbedding({.collName = "b", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto idC = addNssWithEmbedding({.collName = "c", .embedPath = {}, .filter = {}, .indexes = {}});
+
+    resolvedPaths = {
+        ResolvedPath{.nodeId = idA, .fieldName = FieldPath{"a"}},
+        ResolvedPath{.nodeId = idB, .fieldName = FieldPath{"b"}},
+        ResolvedPath{.nodeId = idC, .fieldName = FieldPath{"c"}},
+    };
+    graph.addSimpleEqualityEdge(idA, idB, 0 /*a*/, 1 /*b*/);
+    graph.addSimpleEqualityEdge(idB, idC, 1 /*b*/, 2 /*c*/);
+
+    auto jCtx = makeContext();
+
+    auto solnA = makeSolnWithCacheData(namespaces[0]);
+    auto solnB = makeSolnWithCacheData(namespaces[1]);
+    auto solnC = makeSolnWithCacheData(namespaces[2]);
+
+    JoinPlanNodeRegistry registry;
+    auto baseAId = registry.registerBaseNode(idA, solnA.get(), namespaces[0], zeroCostEstimate());
+    auto baseBId = registry.registerBaseNode(idB, solnB.get(), namespaces[1], zeroCostEstimate());
+    auto baseCId = registry.registerBaseNode(idC, solnC.get(), namespaces[2], zeroCostEstimate());
+
+    // A join B
+    JoinSubset innerSubset(makeNodeSet(idA, idB));
+    auto innerJoinId = registry.registerJoinNode(
+        innerSubset, JoinMethod::NLJ, baseAId, baseBId, zeroCostEstimate());
+
+    // (A join B) join C
+    JoinSubset outerSubset(makeNodeSet(idA, idB, idC));
+    auto outerJoinId = registry.registerJoinNode(
+        outerSubset, JoinMethod::HJ, innerJoinId, baseCId, zeroCostEstimate());
+
+    auto result = toCachedJoinPlan(jCtx, registry, outerJoinId);
+    ASSERT(result);
+
+    // Outer node is a CachedJoinNode (HJ).
+    auto* outerJoin = std::get_if<CachedJoinNode>(&result->node);
+    ASSERT_NE(outerJoin, nullptr);
+    ASSERT_EQ(outerJoin->method, JoinMethod::HJ);
+
+    // Left child of outer is another CachedJoinNode (NLJ for A join B).
+    ASSERT(outerJoin->left);
+    auto* innerJoin = std::get_if<CachedJoinNode>(&outerJoin->left->node);
+    ASSERT_NE(innerJoin, nullptr);
+    ASSERT_EQ(innerJoin->method, JoinMethod::NLJ);
+
+    // Leaves are CachedAccessPaths for A, B, C.
+    auto* leafA = std::get_if<CachedAccessPath>(&innerJoin->left->node);
+    ASSERT_NE(leafA, nullptr);
+    ASSERT_EQ(leafA->nss, namespaces[0]);
+
+    auto* leafB = std::get_if<CachedAccessPath>(&innerJoin->right->node);
+    ASSERT_NE(leafB, nullptr);
+    ASSERT_EQ(leafB->nss, namespaces[1]);
+
+    auto* leafC = std::get_if<CachedAccessPath>(&outerJoin->right->node);
+    ASSERT_NE(leafC, nullptr);
+    ASSERT_EQ(leafC->nss, namespaces[2]);
+}
+
 }  // namespace mongo::join_ordering

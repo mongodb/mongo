@@ -543,4 +543,57 @@ StatusWith<ReorderedJoinSolution> constructSolutionBottomUp(const JoinReordering
 
     return makeReorderedJoinSoln(ctx, peCtx);
 }
+
+std::unique_ptr<CachedJoinPlan> toCachedJoinPlan(const JoinReorderingContext& ctx,
+                                                 const JoinPlanNodeRegistry& registry,
+                                                 JoinPlanNodeId nodeId) {
+    return std::visit(
+        OverloadedVisitor{
+            [&](const BaseNode& base) -> std::unique_ptr<CachedJoinPlan> {
+                tassert(12926201,
+                        "SolutionCacheData must be present on base node",
+                        base.soln->cacheData);
+                return std::make_unique<CachedJoinPlan>(CachedAccessPath{
+                    .nss = base.nss,
+                    .solnCacheData = base.soln->cacheData->clone(),
+                });
+            },
+            [&](const INLJRHSNode& ip) -> std::unique_ptr<CachedJoinPlan> {
+                return std::make_unique<CachedJoinPlan>(CachedInljNode{
+                    .inljForeignIndexName = std::string(ip.entry->descriptor()->indexName()),
+                });
+            },
+            [&](const JoiningNode& join) -> std::unique_ptr<CachedJoinPlan> {
+                const auto leftBitset = registry.getBitset(join.left);
+                const auto rightBitset = registry.getBitset(join.right);
+
+                const bool isLeftBase = leftBitset.count() == 1;
+                const bool isRightBase = rightBitset.count() == 1;
+
+                boost::optional<FieldPath> leftEmbed, rightEmbed;
+                if (isLeftBase) {
+                    leftEmbed = findFirstNode(ctx.joinGraph, leftBitset).embedPath;
+                }
+                if (isRightBase) {
+                    rightEmbed = findFirstNode(ctx.joinGraph, rightBitset).embedPath;
+                }
+
+                auto edges = getEdges(ctx.joinGraph, leftBitset, rightBitset);
+                auto joinPreds = makeJoinPreds(ctx,
+                                               edges,
+                                               /*expandLeftPath=*/!isLeftBase,
+                                               /*expandRightPath=*/!isRightBase);
+
+                return std::make_unique<CachedJoinPlan>(CachedJoinNode{
+                    .method = join.method,
+                    .joinPredicates = std::move(joinPreds),
+                    .leftEmbeddingField = std::move(leftEmbed),
+                    .rightEmbeddingField = std::move(rightEmbed),
+                    .left = toCachedJoinPlan(ctx, registry, join.left),
+                    .right = toCachedJoinPlan(ctx, registry, join.right),
+                });
+            },
+        },
+        registry.get(nodeId));
+}
 }  // namespace mongo::join_ordering

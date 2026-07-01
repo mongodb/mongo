@@ -31,6 +31,7 @@
 #include "mongo/db/query/compiler/optimizer/join/cardinality_estimator.h"
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator.h"
+#include "mongo/db/query/plan_cache/join_plan_cache.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::join_ordering {
@@ -84,5 +85,14 @@ StatusWith<ReorderedJoinSolution> constructSolutionBottomUp(const JoinReordering
                                                             JoinCardinalityEstimator& estimator,
                                                             JoinCostEstimator& coster,
                                                             EnumerationStrategy strategy);
+
+/**
+ * Converts the join plan rooted at 'nodeId' in 'registry' into an owning 'CachedJoinPlan' tree
+ * suitable for storage in the 'JoinPlanCache'. 'ctx' is required to resolve join predicates and
+ * embedding fields via the join graph.
+ */
+std::unique_ptr<CachedJoinPlan> toCachedJoinPlan(const JoinReorderingContext& ctx,
+                                                 const JoinPlanNodeRegistry& registry,
+                                                 JoinPlanNodeId nodeId);
 
 }  // namespace mongo::join_ordering
