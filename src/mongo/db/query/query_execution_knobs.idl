@@ -1034,7 +1034,7 @@ server_parameters:
         description: >-
             Enables behavior where the query engine will release resources before sleeping for write
             conflicts.
-        set_at: [startup]
+        set_at: [startup, runtime]
         cpp_varname: internalQueryEnableWriteConflictBackoffWithoutTicket
         cpp_vartype: AtomicWord<bool>
         default: false
