@@ -46,7 +46,7 @@ filters:
   - "*upgrade_downgrade_viewless_timeseries_*.js":
     approvers:
       - 10gen/server-catalog-and-routing-ddl
-  - "fixed_bucketing_ddl_during_fcv_transition.js":
+  - "fixed_bucketing_ddl_*":
     approvers:
       - 10gen/server-catalog-and-routing-ddl
   - "s2_index_v4_downgrade.js":
