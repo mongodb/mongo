@@ -317,6 +317,54 @@ TEST(WasmtimeScope, Security_CrossRequest_FrozenBackdoorProperty) {
     ASSERT_TRUE(s2->getBoolean("__returnValue"));
 }
 
+// A non-configurable global installed during one invocation must not survive reset() on the
+// same scope. reset() must detect the failed deletion and fall back to resetRealm().
+TEST(WasmtimeScope, Security_Reset_NonConfigurableGlobalFallsBackToRealmReset) {
+    GlobalEngineGuard engineGuard;
+    std::unique_ptr<Scope> scope(engineGuard.engine().createScopeForCurrentThread(boost::none));
+
+    ScriptingFunction install = scope->createFunction(
+        "try {"
+        "  Object.defineProperty(globalThis, '__frozen__', {"
+        "    value: 'LEAK', writable: false, configurable: false, enumerable: true"
+        "  });"
+        "} catch(e) {}"
+        "return 1;");
+    ASSERT_EQ(0, scope->invoke(install, nullptr, nullptr, 0));
+
+    // reset() must erase the non-configurable property via a realm reset fallback.
+    scope->reset();
+
+    ScriptingFunction check =
+        scope->createFunction("return typeof globalThis.__frozen__ === 'undefined';");
+    ASSERT_EQ(0, scope->invoke(check, nullptr, nullptr, 0));
+    ASSERT_TRUE(scope->getBoolean("__returnValue"));
+}
+
+// A non-configurable property pinned onto a compiled slot function via arguments.callee must
+// not survive reset(). reset() must detect the failed deletion and fall back to resetRealm().
+TEST(WasmtimeScope, Security_Reset_NonConfigurableSlotFnPropertyFallsBackToRealmReset) {
+    GlobalEngineGuard engineGuard;
+    std::unique_ptr<Scope> scope(engineGuard.engine().createScopeForCurrentThread(boost::none));
+
+    ScriptingFunction install = scope->createFunction(
+        "try {"
+        "  Object.defineProperty(arguments.callee, '__frozen__', {"
+        "    value: 'LEAK', writable: false, configurable: false, enumerable: true"
+        "  });"
+        "} catch(e) {}"
+        "return 1;");
+    ASSERT_EQ(0, scope->invoke(install, nullptr, nullptr, 0));
+
+    scope->reset();
+
+    // The property must be gone — either deleted or the function replaced by resetRealm().
+    ScriptingFunction check =
+        scope->createFunction("return typeof arguments.callee.__frozen__ === 'undefined';");
+    ASSERT_EQ(0, scope->invoke(check, nullptr, nullptr, 0));
+    ASSERT_TRUE(scope->getBoolean("__returnValue"));
+}
+
 // Attacker captures sensitive data in a closure installed as a global function.
 // The next request must not be able to call the closure or observe its data.
 TEST(WasmtimeScope, Security_CrossRequest_ClosureCapturedInGlobal) {

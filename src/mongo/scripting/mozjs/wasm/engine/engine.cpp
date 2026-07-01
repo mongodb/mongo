@@ -1318,105 +1318,131 @@ err_code_t MozJSScriptEngine::reset(wasm_mozjs_error_t* err) {
     if (!_initialized || !_cx || !_global)
         return SM_E_BAD_STATE;
 
-    JSAutoRealm ar(_cx, _global);
-    ExecutionCheck chk(_cx, err);
-
-    // TODO (SERVER-129746): JS_DeleteProperty result is never inspected in these deletion passes.
-    // A non-configurable property (Object.defineProperty with configurable:false) silently
-    // survives reset. On deletion failure, fall back to resetRealm().
-    // Delete all own properties of globalThis (including non-enumerable and symbols) not
-    // present after init(). _initGlobalNames holds the post-init snapshot.
+    bool needsRealmReset = false;
     {
-        JS::RootedVector<JS::PropertyKey> ids(_cx);
-        if (!chk.ok(js::GetPropertyKeys(
-                _cx, _global, JSITER_OWNONLY | JSITER_HIDDEN | JSITER_SYMBOLS, &ids)))
-            return err ? err->code : SM_E_JSAPI_FAIL;
-        JS::RootedId id(_cx);
-        for (size_t i = 0; i < ids.length(); ++i) {
-            id.set(ids[i]);
-            if (id.isString()) {
-                JS::RootedString rstr(_cx, id.toString());
-                JS::UniqueChars name = JS_EncodeStringToUTF8(_cx, rstr);
-                if (name) {
-                    if (_initGlobalNames.find(name.get()) == _initGlobalNames.end()) {
+        JSAutoRealm ar(_cx, _global);
+        ExecutionCheck chk(_cx, err);
+
+        // Delete all own properties of globalThis (including non-enumerable and symbols) not
+        // present after init(). _initGlobalNames holds the post-init snapshot. If any property
+        // is non-configurable (Object.defineProperty with configurable:false), JS_DeleteProperty
+        // silently fails; we detect that via ObjectOpResult and fall back to resetRealm().
+        {
+            JS::RootedVector<JS::PropertyKey> ids(_cx);
+            if (!chk.ok(js::GetPropertyKeys(
+                    _cx, _global, JSITER_OWNONLY | JSITER_HIDDEN | JSITER_SYMBOLS, &ids)))
+                return err ? err->code : SM_E_JSAPI_FAIL;
+            JS::RootedId id(_cx);
+            for (size_t i = 0; i < ids.length(); ++i) {
+                id.set(ids[i]);
+                if (id.isString()) {
+                    JS::RootedString rstr(_cx, id.toString());
+                    JS::UniqueChars name = JS_EncodeStringToUTF8(_cx, rstr);
+                    if (name) {
+                        if (_initGlobalNames.find(name.get()) == _initGlobalNames.end()) {
+                            JS::ObjectOpResult result;
+                            if (!JS_DeleteProperty(_cx, _global, name.get(), result) ||
+                                !result.ok()) {
+                                JS_ClearPendingException(_cx);
+                                needsRealmReset = true;
+                                break;
+                            }
+                        }
+                    } else {
+                        // Encoding failed (OOM) — fall back to by-id deletion.
                         JS::ObjectOpResult result;
-                        JS_DeleteProperty(_cx, _global, name.get(), result);
+                        if (!JS_DeletePropertyById(_cx, _global, id, result) || !result.ok()) {
+                            JS_ClearPendingException(_cx);
+                            needsRealmReset = true;
+                            break;
+                        }
                     }
                 } else {
-                    // Encoding failed (OOM) — fall back to by-id deletion.
+                    // Symbol-keyed property — not in _initGlobalNames, always delete.
                     JS::ObjectOpResult result;
-                    JS_DeletePropertyById(_cx, _global, id, result);
+                    if (!JS_DeletePropertyById(_cx, _global, id, result) || !result.ok()) {
+                        JS_ClearPendingException(_cx);
+                        needsRealmReset = true;
+                        break;
+                    }
                 }
-            } else {
-                // Symbol-keyed property — not in _initGlobalNames, always delete.
-                JS::ObjectOpResult result;
-                JS_DeletePropertyById(_cx, _global, id, result);
             }
         }
-    }
 
-    // Scrub own properties attached to cached function objects in _slots.
-    // User code can write properties onto JS functions (e.g. fn.__stash__ = 'secret')
-    // which would otherwise survive reset().
-    {
-        JS::RootedValue fnVal(_cx);
-        JS::RootedObject fnObj(_cx);
-        for (auto& slot : _slots) {
-            fnVal.set(slot.fn.get());
-            if (!fnVal.isObject())
-                continue;
-            fnObj.set(&fnVal.toObject());
-            JS::RootedVector<JS::PropertyKey> fnIds(_cx);
-            if (!js::GetPropertyKeys(
-                    _cx, fnObj, JSITER_OWNONLY | JSITER_HIDDEN | JSITER_SYMBOLS, &fnIds)) {
-                JS_ClearPendingException(_cx);
-                continue;
-            }
-            JS::RootedId fid(_cx);
-            for (size_t i = 0; i < fnIds.length(); ++i) {
-                fid.set(fnIds[i]);
-                JS::ObjectOpResult result;
-                JS_DeletePropertyById(_cx, fnObj, fid, result);
-            }
-        }
-    }
-
-    // Scrub user-added own properties from engine-installed function objects on globalThis.
-    // Their names survive the deletion pass above (present in _initGlobalNames), but the
-    // functions themselves can carry user-set properties. _initFnProps maps each such
-    // function name to its init-time properties; only user-added ones are deleted.
-    {
-        JS::RootedValue gval(_cx);
-        JS::RootedObject gfnObj(_cx);
-        for (const auto& [initName, initProps] : _initFnProps) {
-            if (!JS_GetProperty(_cx, _global, initName.c_str(), &gval))
-                continue;
-            if (!gval.isObject())
-                continue;
-            gfnObj.set(&gval.toObject());
-            if (!js::IsFunctionObject(gfnObj))
-                continue;
-            JS::RootedVector<JS::PropertyKey> gfnIds(_cx);
-            if (!js::GetPropertyKeys(
-                    _cx, gfnObj, JSITER_OWNONLY | JSITER_HIDDEN | JSITER_SYMBOLS, &gfnIds)) {
-                JS_ClearPendingException(_cx);
-                continue;
-            }
-            JS::RootedId gfid(_cx);
-            for (size_t i = 0; i < gfnIds.length(); ++i) {
-                gfid.set(gfnIds[i]);
-                if (gfid.isString()) {
-                    JS::RootedString rstr(_cx, gfid.toString());
-                    JS::UniqueChars pname = JS_EncodeStringToUTF8(_cx, rstr);
-                    if (pname && initProps.find(pname.get()) != initProps.end())
-                        continue;  // present at init time — keep it
+        // Scrub own properties attached to cached function objects in _slots.
+        // User code can write properties onto JS functions (e.g. fn.__stash__ = 'secret')
+        // which would otherwise survive reset(). Non-configurable properties (prototype,
+        // length, name, arguments, caller) are intrinsic engine properties — skip them;
+        // never trigger a realm reset from here since _slots must survive reset().
+        if (!needsRealmReset) {
+            JS::RootedValue fnVal(_cx);
+            JS::RootedObject fnObj(_cx);
+            for (auto& slot : _slots) {
+                fnVal.set(slot.fn.get());
+                if (!fnVal.isObject())
+                    continue;
+                fnObj.set(&fnVal.toObject());
+                JS::RootedVector<JS::PropertyKey> fnIds(_cx);
+                if (!js::GetPropertyKeys(
+                        _cx, fnObj, JSITER_OWNONLY | JSITER_HIDDEN | JSITER_SYMBOLS, &fnIds)) {
+                    JS_ClearPendingException(_cx);
+                    continue;
                 }
-                // Symbol-keyed or string-keyed property not present at init — user added it.
-                JS::ObjectOpResult result;
-                JS_DeletePropertyById(_cx, gfnObj, gfid, result);
+                JS::RootedId fid(_cx);
+                for (size_t i = 0; i < fnIds.length(); ++i) {
+                    fid.set(fnIds[i]);
+                    JS::ObjectOpResult result;
+                    if (!JS_DeletePropertyById(_cx, fnObj, fid, result) || !result.ok()) {
+                        JS_ClearPendingException(_cx);
+                        continue;
+                    }
+                }
             }
         }
-    }
+
+        // Scrub user-added own properties from engine-installed function objects on globalThis.
+        // Their names survive the deletion pass above (present in _initGlobalNames), but the
+        // functions themselves can carry user-set properties. _initFnProps maps each such
+        // function name to its init-time properties; only user-added ones are deleted.
+        if (!needsRealmReset) {
+            JS::RootedValue gval(_cx);
+            JS::RootedObject gfnObj(_cx);
+            for (const auto& [initName, initProps] : _initFnProps) {
+                if (!JS_GetProperty(_cx, _global, initName.c_str(), &gval))
+                    continue;
+                if (!gval.isObject())
+                    continue;
+                gfnObj.set(&gval.toObject());
+                if (!js::IsFunctionObject(gfnObj))
+                    continue;
+                JS::RootedVector<JS::PropertyKey> gfnIds(_cx);
+                if (!js::GetPropertyKeys(
+                        _cx, gfnObj, JSITER_OWNONLY | JSITER_HIDDEN | JSITER_SYMBOLS, &gfnIds)) {
+                    JS_ClearPendingException(_cx);
+                    continue;
+                }
+                JS::RootedId gfid(_cx);
+                for (size_t i = 0; i < gfnIds.length(); ++i) {
+                    gfid.set(gfnIds[i]);
+                    if (gfid.isString()) {
+                        JS::RootedString rstr(_cx, gfid.toString());
+                        JS::UniqueChars pname = JS_EncodeStringToUTF8(_cx, rstr);
+                        if (pname && initProps.find(pname.get()) != initProps.end())
+                            continue;  // present at init time — keep it
+                    }
+                    // Symbol-keyed or string-keyed property not present at init — user added it.
+                    JS::ObjectOpResult result;
+                    if (!JS_DeletePropertyById(_cx, gfnObj, gfid, result) || !result.ok()) {
+                        JS_ClearPendingException(_cx);
+                        continue;
+                    }
+                }
+            }
+        }
+    }  // JSAutoRealm ar destroyed here — old child realm exited before resetRealm().
+
+    if (needsRealmReset)
+        return resetRealm(err);
 
     // Compiled JS functions are preserved across resets — bytecodes are independent of
     // user globals, keeping _cachedFunctions valid and avoiding per-document recompilation.
