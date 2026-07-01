@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/global_catalog/ddl/shardsvr_commit_drop_database_metadata_command.h"
+
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/commands.h"
@@ -49,8 +51,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
-
-namespace {
 
 void commitDropDatabaseMetadataLocally(OperationContext* opCtx, const DatabaseName& dbName) {
     auto dbNameStr = DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
@@ -104,6 +104,8 @@ void commitDropDatabaseMetadataLocally(OperationContext* opCtx, const DatabaseNa
     auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
     scopedDsr->clearDbMetadata(opCtx);
 }
+
+namespace {
 
 class ShardsvrCommitDropDatabaseMetadataCommand final
     : public TypedCommand<ShardsvrCommitDropDatabaseMetadataCommand> {

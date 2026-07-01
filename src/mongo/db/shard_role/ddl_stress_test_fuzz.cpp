@@ -29,11 +29,14 @@
 
 #include "mongo/base/initializer.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_catalog/ddl/shardsvr_commit_create_database_metadata_command.h"
+#include "mongo/db/global_catalog/ddl/shardsvr_commit_drop_database_metadata_command.h"
 #include "mongo/db/global_catalog/sharding_catalog_client_mock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/router_role/router_role.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
+#include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_role_loop.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
@@ -42,10 +45,42 @@
 #include "mongo/util/scopeguard.h"
 
 #include <atomic>
+#include <cstdlib>
+#include <string>
 #include <vector>
 
 #include "fuzztest/fuzztest.h"
 #include "gtest/gtest.h"
+
+namespace {
+
+// TODO SERVER-130010: the following is arguably a hack since the binaries produced by the existing
+// mongo fuzztest integration don't support setting flags meant for centipede (the fuzzing engine).
+//
+// The intent of the following snippet is to disable the "Per-batch timeout" error in order to
+// reduce false positives.
+
+// In centipede runner mode CENTIPEDE_RUNNER_FLAGS is set in the environment by
+// the engine before the subprocess binary starts. We append
+// :ignore_timeout_reports: here (init_priority 101) before GlobalRunnerState
+// reads those flags (init_priority 200). In engine mode the variable is absent,
+// so we leave it alone — setting it would make IsCentipedeRunner() return true
+// and turn the engine binary into a runner.
+struct IgnoreTimeoutReportsSetter {
+    IgnoreTimeoutReportsSetter() {
+        const char* existing = getenv("CENTIPEDE_RUNNER_FLAGS");
+        if (!existing)
+            return;
+        std::string flags = existing;
+        if (flags.empty() || flags.back() != ':')
+            flags += ':';
+        flags += "ignore_timeout_reports:";
+        setenv("CENTIPEDE_RUNNER_FLAGS", flags.c_str(), /*overwrite=*/1);
+    }
+};
+
+IgnoreTimeoutReportsSetter kIgnoreTimeoutReportsSetter __attribute__((init_priority(101)));
+}  // namespace
 
 namespace mongo {
 
@@ -213,7 +248,15 @@ struct RenameDDL {
     }
 };
 
-using DDL = std::variant<ClearMetadataDDL, CreateDDL, DropDDL, RenameDDL>;
+struct MovePrimaryDDL {
+    ShardRef to;
+
+    static auto arbitrary() {
+        return StructOf<MovePrimaryDDL>(ArbitraryShardRef());
+    }
+};
+
+using DDL = std::variant<ClearMetadataDDL, CreateDDL, DropDDL, RenameDDL, MovePrimaryDDL>;
 
 /**
  * A mocking client that supports transactional updates to the returned contents. This class is
@@ -378,9 +421,9 @@ public:
     }
 
     template <typename F>
-    void updateAtomically(F&& f) {
+    auto updateAtomically(F&& f) {
         std::unique_lock lk{_mutex};
-        f(*this, UpdatePass{});
+        return f(*this, UpdatePass{});
     }
 
 private:
@@ -592,6 +635,47 @@ private:
             isCurrentPrimary);
     }
 
+    void executeDDL(OperationContext* opCtx, const MovePrimaryDDL& op) {
+        if (!((isCurrentPrimary && op.to != kThisShard) ||
+              (!isCurrentPrimary && op.to == kThisShard))) {
+            // Only valid states are moving primary outside of this shard or into this shard.
+            return;
+        }
+
+        static const auto csReason = BSON("reason" << "movePrimary");
+        {
+            auto scopedCsr = DatabaseShardingRuntime::acquireExclusive(opCtx, kTargetNss.dbName());
+            scopedCsr->enterCriticalSectionCatchUpPhase(opCtx, csReason);
+            scopedCsr->enterCriticalSectionCommitPhase(opCtx, csReason);
+        }
+        ON_BLOCK_EXIT([&] {
+            auto scopedCsr = DatabaseShardingRuntime::acquireExclusive(opCtx, kTargetNss.dbName());
+            scopedCsr->exitCriticalSection(opCtx, csReason);
+        });
+        auto currDbEntry =
+            actualFixture->mockCatalogClient()->updateAtomically([&](auto& client, auto pass) {
+                auto currDbEntry = client.getDatabase(pass);
+                currDbEntry.setPrimary(op.to);
+                currDbEntry.setVersion(currDbEntry.getVersion().makeUpdated());
+                client.setDatabaseEntry(pass, currDbEntry);
+                return currDbEntry;
+            });
+        if (op.to == kThisShard) {
+            for (const auto& [nss, collInfo] : currentCatalog) {
+                if (collInfo.collType == ShardingCollType::kUntracked) {
+                    // Untracked collections don't have any metadata to handle
+                    continue;
+                }
+                shard_catalog_commit::commitChunklessCollectionMetadataLocally(opCtx, nss);
+            }
+            commitCreateDatabaseMetadataLocally(opCtx, currDbEntry);
+        } else {
+            commitDropDatabaseMetadataLocally(opCtx, kTargetNss.dbName());
+        }
+
+        isCurrentPrimary = (op.to == kThisShard);
+    }
+
     void executeDDL(OperationContext* opCtx, const ClearMetadataDDL& clear) {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, clear.nss);
         csr->clearCollectionMetadata(opCtx);
@@ -690,21 +774,25 @@ private:
         }
 
         // And reset the "CSRS" contents
-        actualFixture->mockCatalogClient()->updateAtomically([&](auto& client, auto pass) {
-            for (const auto& nss : kNamespacesToTest) {
-                client.eraseCollectionMetadata(pass, nss);
-                auto scopedCsr = CollectionShardingRuntime::acquireExclusive(
-                    actualFixture->getFixtureOpCtx(), nss);
-                scopedCsr->clearCollectionMetadata(actualFixture->getFixtureOpCtx(), true);
-                scopedCsr->setAuthoritative();
-            }
+        auto dbEntry =
+            actualFixture->mockCatalogClient()->updateAtomically([&](auto& client, auto pass) {
+                for (const auto& nss : kNamespacesToTest) {
+                    client.eraseCollectionMetadata(pass, nss);
+                    auto scopedCsr = CollectionShardingRuntime::acquireExclusive(
+                        actualFixture->getFixtureOpCtx(), nss);
+                    scopedCsr->clearCollectionMetadata(actualFixture->getFixtureOpCtx(), true);
+                    scopedCsr->setAuthoritative();
+                }
 
-            auto currDbEntry = client.getDatabase(pass);
-            currDbEntry.setPrimary(kThisShard);
-            auto dbVersion = currDbEntry.getVersion();
-            currDbEntry.setVersion(dbVersion.makeUpdated());
-            client.setDatabaseEntry(pass, std::move(currDbEntry));
-        });
+                auto currDbEntry = client.getDatabase(pass);
+                currDbEntry.setPrimary(kThisShard);
+                currDbEntry.setVersion(currDbEntry.getVersion().makeUpdated());
+                client.setDatabaseEntry(pass, currDbEntry);
+                return currDbEntry;
+            });
+
+        // The shard is now back to being the primary.
+        commitCreateDatabaseMetadataLocally(actualFixture->getFixtureOpCtx(), dbEntry);
     };
 
     void executeDDLOperations(const std::vector<DDL>& ddls, std::atomic_flag& doneSignal) {
@@ -776,7 +864,8 @@ auto ArbitraryDDL() {
     return VariantOf(ClearMetadataDDL::arbitrary(),
                      CreateDDL::arbitrary(),
                      DropDDL::arbitrary(),
-                     RenameDDL::arbitrary());
+                     RenameDDL::arbitrary(),
+                     MovePrimaryDDL::arbitrary());
 }
 
 FUZZ_TEST_F(DDLStateMachine, FuzzDDLInvariants)
