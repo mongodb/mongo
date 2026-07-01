@@ -1291,9 +1291,19 @@ void CommonMongodProcessInterface::_handleTimeseriesCreateError(const DBExceptio
         throw;
     }
     auto timeseriesOpts = _getTimeseriesOptions(opCtx, ns);
-    // Confirming there is a time-series view in that namespace and the time-series options of the
-    // existing view are the same as expected.
-    if (!timeseriesOpts || !mongo::timeseries::optionsAreEqual(timeseriesOpts.value(), userOpts)) {
+    if (!timeseriesOpts) {
+        throw;
+    }
+
+    // If the target was concurrently upgraded to viewless, it now carries the system-managed
+    // 'fixedBucketing' option, whereas 'userOpts' never does ('fixedBucketing' is rejected in the
+    // $out spec and legacy timeseries lack it). Strip it from the existing options so the
+    // comparison isn't tripped by that difference.
+    // TODO(SERVER-128579): Revisit once 9.0 becomes last LTS and viewful timeseries no longer
+    // exist.
+    timeseriesOpts->setFixedBucketing(OptionalBool{});
+
+    if (!mongo::timeseries::optionsAreEqual(timeseriesOpts.value(), userOpts)) {
         throw;
     }
 }
