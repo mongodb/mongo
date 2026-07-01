@@ -196,8 +196,8 @@ protected:
     }
 
     auto internalSearchIdLookup() {
-        return DocumentSourceInternalSearchIdLookUp::createFromBson(
-            BSON("$_internalSearchIdLookup" << BSONObj()).firstElement(), getExpCtx());
+        return make_intrusive<DocumentSourceInternalSearchIdLookUp>(DocumentSourceIdLookupSpec{},
+                                                                    getExpCtx());
     }
 };
 

@@ -58,11 +58,6 @@ class DSInternalSearchIdLookUpCatalogResourceHandle;
 class DocumentSourceInternalSearchIdLookUp final : public DocumentSource {
 public:
     static constexpr std::string_view kStageName = "$_internalSearchIdLookup"sv;
-    /**
-     * Creates an $_internalSearchIdLookup stage. "elem" must be an empty object.
-     */
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     DocumentSourceInternalSearchIdLookUp(DocumentSourceIdLookupSpec spec,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx);

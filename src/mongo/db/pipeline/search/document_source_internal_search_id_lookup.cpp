@@ -76,22 +76,6 @@ DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
     _searchIdLookupMetrics->resetIdLookupMetrics();
 }
 
-intrusive_ptr<DocumentSource> DocumentSourceInternalSearchIdLookUp::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
-    uassert(ErrorCodes::FailedToParse,
-            str::stream() << "The " << kStageName
-                          << " stage specification must be an object, found "
-                          << typeName(elem.type()),
-            elem.type() == BSONType::object);
-
-    auto specObj = elem.embeddedObject().getOwned();
-    auto searchIdLookupSpec =
-        DocumentSourceIdLookupSpec::parse(std::move(specObj), IDLParserContext(kStageName));
-
-    return make_intrusive<DocumentSourceInternalSearchIdLookUp>(std::move(searchIdLookupSpec),
-                                                                expCtx);
-}
-
 Value DocumentSourceInternalSearchIdLookUp::serialize(
     const query_shape::SerializationOptions& opts) const {
     MutableDocument outputSpec;
