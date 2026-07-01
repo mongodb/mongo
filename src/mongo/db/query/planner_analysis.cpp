@@ -787,20 +787,27 @@ void removeInclusionProjectionBelowGroupRecursive(QuerySolutionNode* solnRoot) {
         return;
     }
 
-    // Look for a GROUP => PROJECTION_SIMPLE where the dependency set of the PROJECTION_SIMPLE
-    // is a super set of the dependency set of the GROUP. If so, the projection isn't needed and
-    // it can be elminated.
+    // Look for a GROUP node whose immediate child is a PROJECTION that whose effects are invisible
+    // and can be eliminated. This is true when every field the group reads is passed through
+    // unchanged by the projection (i.e. isFieldRetainedExactly returns true for each required
+    // field). This covers both simple inclusion projections and mixed projections that have
+    // computed fields alongside plain pass-throughs, as long as the group only touches the
+    // pass-through fields.
     if (solnRoot->getType() == StageType::STAGE_GROUP) {
         auto groupNode = static_cast<GroupNode*>(solnRoot);
 
         QuerySolutionNode* projectNodeCandidate = groupNode->children[0].get();
         if (auto projection = attemptToGetProjectionFromQuerySolution(*projectNodeCandidate);
-            // only eliminate inclusion projections
-            projection && projection.value()->isInclusionOnly() &&
-            // only eliminate when group depends on a subset of fields
-            !groupNode->needWholeDocument &&
-            // only eliminate projections which preserve all fields used by the group
-            isSubset(groupNode->requiredFields, projection.value()->getRequiredFields())) {
+            // The group must not require the full document (e.g. $$ROOT).
+            projection && !groupNode->needWholeDocument &&
+            // Either the group has no field dependencies (e.g. $count), so any projection is
+            // safe to drop, or every field the group reads is passed through unchanged by the
+            // projection.
+            std::all_of(groupNode->requiredFields.begin(),
+                        groupNode->requiredFields.end(),
+                        [&proj = projection.value()](const std::string& f) {
+                            return proj->isFieldRetainedExactly(f);
+                        })) {
             // Attach the projectNode's child directly as the groupNode's child, eliminating the
             // project node.
             groupNode->children[0] = std::move(projectNodeCandidate->children[0]);
