@@ -27,24 +27,25 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/transport/asio/asio_session_manager.h"
 
-#include "mongo/transport/session_manager_common.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/unittest/unittest.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::transport {
+namespace {
 
-class HandoffSessionManager : public SessionManagerCommon {
-public:
-    using SessionManagerCommon::SessionManagerCommon;
+class AsioSessionManagerTest : public ServiceContextTest {};
 
-    bool shouldIncludeInConnectionsServerStatus() const override {
-        return true;
-    }
+/**
+ * Verifies that AsioSessionManager opts in to the "connections" serverStatus section.
+ */
+TEST_F(AsioSessionManagerTest, ShouldIncludeInConnectionsServerStatus) {
+    AsioSessionManager sm(getServiceContext());
+    ASSERT_TRUE(sm.shouldIncludeInConnectionsServerStatus());
+}
 
-protected:
-    std::string getClientThreadName(const Session&) const override;
-    void configureServiceExecutorContext(Client&, bool isPrivilegedSession) const override;
-    bool isPrivileged(const Session&) const override;
-};
-
+}  // namespace
 }  // namespace mongo::transport

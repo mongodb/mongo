@@ -62,6 +62,10 @@ public:
 
     ConnectionsStatsSnapshot getConnectionsStatsSnapshot() const;
 
+    bool shouldIncludeInConnectionsServerStatus() const override {
+        return true;
+    }
+
 protected:
     std::string getClientThreadName(const Session&) const override;
     void configureServiceExecutorContext(Client& client, bool isPrivilegedSession) const override;

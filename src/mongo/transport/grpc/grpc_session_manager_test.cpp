@@ -27,24 +27,28 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/transport/grpc/grpc_session_manager.h"
 
-#include "mongo/transport/session_manager_common.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/transport/grpc/client_cache.h"
+#include "mongo/unittest/unittest.h"
 
-namespace mongo::transport {
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-class HandoffSessionManager : public SessionManagerCommon {
-public:
-    using SessionManagerCommon::SessionManagerCommon;
+namespace mongo::transport::grpc {
+namespace {
 
-    bool shouldIncludeInConnectionsServerStatus() const override {
-        return true;
-    }
+class GRPCSessionManagerTest : public ServiceContextTest {};
 
-protected:
-    std::string getClientThreadName(const Session&) const override;
-    void configureServiceExecutorContext(Client&, bool isPrivilegedSession) const override;
-    bool isPrivileged(const Session&) const override;
-};
+/**
+ * Verifies that GRPCSessionManager does not opt in to the "connections" serverStatus section
+ * (it reports under the "gRPC" section instead).
+ */
+TEST_F(GRPCSessionManagerTest, DoesNotReportToConnectionsServerStatusSection) {
+    auto clientCache = std::make_shared<ClientCache>();
+    GRPCSessionManager sm(getServiceContext(), clientCache);
+    ASSERT_FALSE(sm.shouldIncludeInConnectionsServerStatus());
+}
 
-}  // namespace mongo::transport
+}  // namespace
+}  // namespace mongo::transport::grpc

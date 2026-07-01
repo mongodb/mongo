@@ -225,6 +225,18 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_unit_test(
+    name = "grpc_session_manager_test",
+    srcs = ["grpc_session_manager_test.cpp"],
+    tags = ["mongo_unittest_second_group"],
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":grpc_transport_layer",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/shard_role:service_context_non_d",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "grpc_core_test",
     srcs = [
         "core_test.cpp",

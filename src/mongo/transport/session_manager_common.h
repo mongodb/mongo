@@ -79,6 +79,14 @@ public:
     void decrementPrioritySessions();
     long long numPrioritySessions() const;
 
+    /**
+     * Returns true if this manager's session counts should be included in the "connections"
+     * serverStatus section. Defaults to false. Opt in by overriding in subclasses.
+     */
+    virtual bool shouldIncludeInConnectionsServerStatus() const {
+        return false;
+    }
+
 protected:
     /** Generate a unique thread name for this session. */
     virtual std::string getClientThreadName(const Session&) const = 0;

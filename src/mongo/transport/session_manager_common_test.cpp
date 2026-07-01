@@ -128,5 +128,10 @@ TEST_F(SessionManagerCommonTest, OnClientConnectAndDisconnectStandardSessions) {
     ASSERT_EQ(sm.numPrioritySessions(), 0);
 }
 
+TEST_F(SessionManagerCommonTest, ShouldIncludeInConnectionsServerStatusDefaultsToFalse) {
+    MockSessionManagerCommon sm(getServiceContext());
+    ASSERT_FALSE(sm.shouldIncludeInConnectionsServerStatus());
+}
+
 }  // namespace
 }  // namespace mongo::transport

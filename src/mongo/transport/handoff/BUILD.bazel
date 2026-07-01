@@ -79,6 +79,18 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "handoff_session_manager_test",
+    srcs = ["handoff_session_manager_test.cpp"],
+    tags = ["mongo_unittest_first_group"],
+    target_compatible_with = HANDOFF_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":handoff_session_manager",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/shard_role:service_context_non_d",
+    ],
+)
+
 mongo_cc_library(
     name = "handoff_posix_interface",
     srcs = ["handoff_posix_interface.cpp"],
