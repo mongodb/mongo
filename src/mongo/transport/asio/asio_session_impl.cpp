@@ -41,12 +41,12 @@
 #include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/otel/metrics/metrics_histogram.h"
 #include "mongo/otel/metrics/metrics_service.h"
-#include "mongo/transport/asio/asio_session_manager.h"
 #include "mongo/transport/asio/asio_utils.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
 #include "mongo/transport/message_filter_hooks.h"
 #include "mongo/transport/proxy_protocol_header_parser.h"
 #include "mongo/transport/proxy_protocol_tlv_extraction.h"
+#include "mongo/transport/session_manager_common.h"
 #include "mongo/transport/session_util.h"
 #include "mongo/transport/transport_options_gen.h"
 #include "mongo/util/active_exception_witness.h"
@@ -320,12 +320,12 @@ void CommonAsioSession::setIsLoadBalancerPeer(bool helloHasLoadBalancedOption) {
     }
     _isLoadBalancerPeer = helloHasLoadBalancedOption;
 
-    auto sessionManager = _tl->getSharedSessionManager();
-    if (auto asioSessionManager = checked_pointer_cast<AsioSessionManager>(sessionManager)) {
+    if (auto sessionManager =
+            checked_pointer_cast<SessionManagerCommon>(_tl->getSharedSessionManager())) {
         if (helloHasLoadBalancedOption) {
-            asioSessionManager->incrementLBConnections();
+            sessionManager->incrementLoadBalancedSessions();
         } else {
-            asioSessionManager->decrementLBConnections();
+            sessionManager->decrementLoadBalancedSessions();
         }
     }
 }

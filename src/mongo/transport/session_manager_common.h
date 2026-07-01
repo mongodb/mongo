@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/counter.h"
 #include "mongo/db/client.h"
 #include "mongo/transport/client_transport_observer.h"
 #include "mongo/transport/session_manager.h"
@@ -70,6 +71,14 @@ public:
 
     std::vector<std::pair<SessionId, std::string>> getOpenSessionIDs() const override;
 
+    void incrementLoadBalancedSessions();
+    void decrementLoadBalancedSessions();
+    long long numLoadBalancedSessions() const;
+
+    void incrementPrioritySessions();
+    void decrementPrioritySessions();
+    long long numPrioritySessions() const;
+
 protected:
     /** Generate a unique thread name for this session. */
     virtual std::string getClientThreadName(const Session&) const = 0;
@@ -89,11 +98,11 @@ protected:
     virtual void configureServiceExecutorContext(Client& client,
                                                  bool isPrivilegedSession) const = 0;
 
-    /** Called upon client connection. Default behavior is to do nothing. */
-    virtual void onClientConnect(Client* client) {}
+    /** Called upon client connection. */
+    virtual void onClientConnect(Client* client);
 
-    /** Called upon client disconnection. Default behavior is to do nothing. */
-    virtual void onClientDisconnect(Client* client) {}
+    /** Called upon client disconnection. */
+    virtual void onClientDisconnect(Client* client);
 
     /** Total number of sessions created. */
     std::size_t numCreatedSessions() const;
@@ -107,6 +116,9 @@ protected:
     ServiceContext* _svcCtx;
 
     const std::size_t _maxOpenSessions;
+
+    Counter64 _loadBalancedSessions;
+    Counter64 _prioritySessions;
 
     class Sessions;
     std::unique_ptr<Sessions> _sessions;

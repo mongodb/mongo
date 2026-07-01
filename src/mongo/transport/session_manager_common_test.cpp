@@ -31,9 +31,11 @@
 
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/transport/mock_session.h"
+#include "mongo/transport/session.h"
 #include "mongo/transport/session_manager_common_mock.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point.h"
 
 #include <cerrno>
 
@@ -44,7 +46,12 @@
 namespace mongo::transport {
 namespace {
 
-class SessionManagerCommonTest : public ServiceContextTest {};
+class SessionManagerCommonTest : public ServiceContextTest {
+public:
+    auto makeClient(std::shared_ptr<Session> session) {
+        return getServiceContext()->getService()->makeClient("test", std::move(session));
+    }
+};
 
 TEST_F(SessionManagerCommonTest, VerifyMaxOpenSessionsBasedOnRlimit) {
     struct rlimit originalLimit, newLimit;
@@ -68,6 +75,57 @@ TEST_F(SessionManagerCommonTest, VerifyMaxOpenSessionsBasedOnRlimit) {
     rlimitReturnCode = setrlimit(RLIMIT_NOFILE, &originalLimit);
     const auto savedErrno3 = errno;
     ASSERT_EQ(rlimitReturnCode, 0) << savedErrno3;
+}
+
+// The three tests below verify that onClientConnect/onClientDisconnect correctly
+// updates the number of sessions on the load balancer port and the priority port.
+
+TEST_F(SessionManagerCommonTest, OnClientConnectAndDisconnectLoadBalancedSessions) {
+    TransportLayerMock tl;
+    MockSessionManagerCommon sm(getServiceContext());
+    ASSERT_EQ(sm.numLoadBalancedSessions(), 0);
+
+    FailPointEnableBlock fp("clientIsLoadBalancedPeer");
+    auto session = MockSession::create(&tl);
+    auto client = makeClient(session);
+    sm.onClientConnect(client.get());
+    ASSERT_EQ(sm.numLoadBalancedSessions(), 1);
+    ASSERT_EQ(sm.numPrioritySessions(), 0);
+
+    sm.onClientDisconnect(client.get());
+    ASSERT_EQ(sm.numLoadBalancedSessions(), 0);
+    ASSERT_EQ(sm.numPrioritySessions(), 0);
+}
+
+TEST_F(SessionManagerCommonTest, OnClientConnectAndDisconnectPrioritySessions) {
+    TransportLayerMock tl;
+    MockSessionManagerCommon sm(getServiceContext());
+    ASSERT_EQ(sm.numPrioritySessions(), 0);
+
+    auto session = std::make_shared<MockPrioritySession>(&tl);
+    auto client = makeClient(session);
+    sm.onClientConnect(client.get());
+    ASSERT_EQ(sm.numLoadBalancedSessions(), 0);
+    ASSERT_EQ(sm.numPrioritySessions(), 1);
+
+    sm.onClientDisconnect(client.get());
+    ASSERT_EQ(sm.numLoadBalancedSessions(), 0);
+    ASSERT_EQ(sm.numPrioritySessions(), 0);
+}
+
+TEST_F(SessionManagerCommonTest, OnClientConnectAndDisconnectStandardSessions) {
+    TransportLayerMock tl;
+    MockSessionManagerCommon sm(getServiceContext());
+
+    auto session = MockSession::create(&tl);
+    auto client = makeClient(session);
+    sm.onClientConnect(client.get());
+    ASSERT_EQ(sm.numLoadBalancedSessions(), 0);
+    ASSERT_EQ(sm.numPrioritySessions(), 0);
+
+    sm.onClientDisconnect(client.get());
+    ASSERT_EQ(sm.numLoadBalancedSessions(), 0);
+    ASSERT_EQ(sm.numPrioritySessions(), 0);
 }
 
 }  // namespace

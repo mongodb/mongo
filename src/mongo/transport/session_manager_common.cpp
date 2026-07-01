@@ -443,6 +443,30 @@ std::size_t SessionManagerCommon::numRejectedSessions() const {
     return _sessions->rejected();
 }
 
+void SessionManagerCommon::incrementLoadBalancedSessions() {
+    _loadBalancedSessions.increment();
+}
+
+void SessionManagerCommon::decrementLoadBalancedSessions() {
+    _loadBalancedSessions.decrement();
+}
+
+long long SessionManagerCommon::numLoadBalancedSessions() const {
+    return _loadBalancedSessions.get();
+}
+
+void SessionManagerCommon::incrementPrioritySessions() {
+    _prioritySessions.increment();
+}
+
+void SessionManagerCommon::decrementPrioritySessions() {
+    _prioritySessions.decrement();
+}
+
+long long SessionManagerCommon::numPrioritySessions() const {
+    return _prioritySessions.get();
+}
+
 void SessionManagerCommon::endSessionByClient(Client* client) {
     onClientDisconnect(client);
     for (auto&& observer : _observers) {
@@ -462,6 +486,26 @@ void SessionManagerCommon::endSessionByClient(Client* client) {
         LOGV2(22944,
               "Connection ended",
               logv2::DynamicAttributes{logAttrs(summary), "connectionCount"_attr = sync.size()});
+    }
+}
+
+void SessionManagerCommon::onClientConnect(Client* client) {
+    auto session = client->session();
+    if (session && session->isLoadBalancerPeer()) {
+        _loadBalancedSessions.increment();
+    }
+    if (session && session->isConnectedToPriorityPort()) {
+        _prioritySessions.increment();
+    }
+}
+
+void SessionManagerCommon::onClientDisconnect(Client* client) {
+    auto session = client->session();
+    if (session && session->isLoadBalancerPeer()) {
+        _loadBalancedSessions.decrement();
+    }
+    if (session && session->isConnectedToPriorityPort()) {
+        _prioritySessions.decrement();
     }
 }
 

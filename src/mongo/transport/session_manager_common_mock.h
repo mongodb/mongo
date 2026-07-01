@@ -44,6 +44,8 @@ namespace mongo::transport {
 
 class MockSessionManagerCommon : public SessionManagerCommon {
 public:
+    using SessionManagerCommon::onClientConnect;
+    using SessionManagerCommon::onClientDisconnect;
     using SessionManagerCommon::SessionManagerCommon;
 
 protected:
