@@ -61,16 +61,16 @@ classDiagram
 ### Authoritative containers
 
 Put in a naive way, a container is said to be "authoritative" if it can be "frozen in time" and its
-data can be trusted to be definitive for the respective catalog object. For example, if the CSRS is
-"frozen", we can safely trust the _config.chunks_ collection to know where data is located; however,
-currently it is not possible to "freeze" a shard and trust it to know what set of chunks it owns. On
-the other hand, if a shard is "frozen" we can safely trust the metadata in its
-_config.shard.catalog.databases_ to know the set of owned databases.
+data can be trusted to be definitive for the respective catalog object. For example, if a shard is
+"frozen" we can safely trust _config.shard.catalog.chunks_ to know the set of chunks it owns, and
+_config.shard.catalog.databases_ to know the set of databases it is primary for.
 
-Based on the above, as it stands, different containers on different nodes are authoritative for
-different parts of the catalog. Most authoritative containers are on the CSRS. In the future we
-would like the shards to be authoritative for everything they own and the CSRS just acting as a
-materialised view (i.e., cache) of all shards' catalogs.
+With the _Authoritative Shards_ model, different containers on different nodes are authoritative for
+different parts of the catalog. Each shard is the definitive source for the metadata it owns,
+durably persisted in its [shard-local authoritative catalog](#shard-local-authoritative-catalog).
+The CSRS holds a cluster-wide **materialised view** of all shards' catalogs — it is kept in sync on
+every DDL commit (so DDL operations commit to **both** catalogs), but it is not the true source for
+metadata a shard owns.
 
 ### Synchronisation
 
@@ -86,6 +86,175 @@ state of the world changes (e.g. chunk migration).
 The main goal of these protocols is to maintain certain causal relationships between the different
 catalog containers, where _routers_ operate on cached information and rely on the _shards_ to
 "correct" them if the data is no longer where the router thinks it is.
+
+### Persistent state at a glance
+
+The catalog is persisted in ordinary replicated MongoDB collections backed by WiredTiger and the
+standard replication/transaction machinery. There is no separate store or persistence technology.
+There are three layers of persisted catalog state:
+
+1. **Global catalog (CSRS)** — the cluster-wide materialised view used for routing, on the config
+   server. It is kept in sync with the shards' authoritative catalogs on every DDL commit.
+2. **Shard-local authoritative catalog** — the [authoritative](#authoritative-containers) copy of
+   the metadata each shard owns, persisted locally on the shard (`config.shard.catalog.*`). This is
+   the model described as _Authoritative Shards_.
+3. **Shard-local cache (legacy)** — the pre-authoritative on-disk cache of routing information
+   (`config.cache.*`), still used when the Authoritative Shards feature is not enabled. It is being
+   superseded by the shard-local authoritative catalog.
+
+The transition between the legacy cache model and the authoritative model is FCV-gated by the
+`featureFlagAuthoritativeShardsDDL` (store shard-local metadata) and
+`featureFlagAuthoritativeShardsCRUD` (read from shard-local metadata) feature flags.
+
+### Persisted containers
+
+#### Global catalog (CSRS)
+
+These collections live in the `config` database on the CSRS and hold the cluster-wide materialised
+view used for routing.
+
+| Collection                | Reserved-namespace constant           | Document type            | Contents                                                                        |
+| ------------------------- | ------------------------------------- | ------------------------ | ------------------------------------------------------------------------------- |
+| `config.databases`        | `kConfigDatabasesNamespace`           | `DatabaseType`           | One doc per database: primary shard and `databaseVersion`.                      |
+| `config.collections`      | `kConfigsvrCollectionsNamespace`      | `CollectionType`         | One doc per tracked collection: UUID, shard key, `timestamp`/`epoch`, flags.    |
+| `config.chunks`           | `kConfigsvrChunksNamespace`           | `ChunkType`              | One doc per chunk: `min`/`max`, owning shard, `history`, `onCurrentShardSince`. |
+| `config.shards`           | `kConfigsvrShardsNamespace`           | `ShardType`              | One doc per shard; carries the `topologyTime`.                                  |
+| `config.placementHistory` | `kConfigsvrPlacementHistoryNamespace` | `NamespacePlacementType` | Historical placement, used to answer point-in-time placement queries.           |
+
+#### Shard-local authoritative catalog
+
+These collections live in the `config` database on **each shard** and durably persist the metadata
+that the shard owns.
+
+| Collection                         | Reserved-namespace constant               | Contents                                                                                                                |
+| ---------------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `config.shard.catalog.databases`   | `kConfigShardCatalogDatabasesNamespace`   | Authoritative state of each database the shard owns (is primary for): primary shard + `databaseVersion`.                |
+| `config.shard.catalog.collections` | `kConfigShardCatalogCollectionsNamespace` | Authoritative state of each tracked collection relevant to the shard: UUID, shard key, version, `allowChunkOperations`. |
+| `config.shard.catalog.chunks`      | `kConfigShardCatalogChunksNamespace`      | Authoritative chunk metadata relevant to the shard.                                                                     |
+
+Notable properties:
+
+- **Only metadata "relevant to the shard" is stored.** This is the true source of that metadata on
+  the shard. For `config.shard.catalog.chunks` that means chunks currently owned, as well as stale
+  data for chunks previously owned by the shard (retained locally to support point-in-time reads).
+- **Unowned-chunks in DB primary.** The DB primary always records the collection entry for a tracked
+  collection it owns no chunks for, so it can correctly represent the _tracked-without-chunks_ state
+  (as opposed to _untracked_ or _unknown_). See `commitChunklessCollectionMetadataLocally` in
+  [`commit_collection_metadata_locally.h`](commit_collection_metadata_locally.h).
+- The `_id` index on `config.shard.catalog.collections` and the indexes on
+  `config.shard.catalog.chunks` are created at sharding initialization (see
+  `ensureCollectionIndexes` in
+  [`sharding_initialization_mongod.cpp`](../../sharding_environment/sharding_initialization_mongod.cpp)).
+
+#### Supporting persisted state (recoverable operations)
+
+These collections do not hold catalog _objects_ directly, but they persist the state of in-flight
+operations that mutate the catalog, so that those operations survive failover. They are listed here
+because they are part of how catalog mutations become durable and recoverable.
+
+| Collection                                | Reserved-namespace constant            | Purpose                                                                                                    |
+| ----------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `config.collectionCriticalSections`       | `kCollectionCriticalSectionsNamespace` | Recoverable critical sections, persisted by the [ShardingRecoveryService](#recoverable-critical-sections). |
+| `config.system.sharding_ddl_coordinators` | `kShardingDDLCoordinatorsNamespace`    | DDL coordinator state documents (PrimaryOnlyService).                                                      |
+| `config.sharding_configsvr_coordinators`  | `kConfigsvrCoordinatorsNamespace`      | ConfigsvrCoordinator state documents.                                                                      |
+| `config.migrationCoordinators`            | `kMigrationCoordinatorsNamespace`      | Donor-side chunk-migration coordinator state (e.g. the `MoveRangeCoordinator` document).                   |
+| `config.migrationRecipients`              | `kMigrationRecipientsNamespace`        | Recipient-side chunk-migration state.                                                                      |
+| `config.rangeDeletions`                   | `kRangeDeletionNamespace`              | Pending range deletions (see [Range Deleter](../../s/README_range_deleter.md)).                            |
+| `config.localReshardingOperations.*`      | (donor/recipient namespaces)           | Resharding coordinator/donor/recipient state (see [Resharding](../../s/resharding/README.md)).             |
+| `config.dropPendingDBs`                   | `kConfigDropPendingDBsNamespace`       | Serializes `dropDatabase` against a following concurrent `createDatabase`.                                 |
+
+DDL and chunk-operation coordinators recover on step-up from these documents via the
+PrimaryOnlyService machinery. The full list of reserved namespaces is in
+[`namespace_string_reserved.h`](../../namespace_string_reserved.h).
+
+### In-memory caches
+
+Catalog state is materialised in memory in several caches. They split along the
+[router/shard role](#sharding-catalog-api) boundary.
+
+#### Router-side caches
+
+| Cache           | Class                                                                | Backed by                    | Role                                                                                                                                                                                                                           |
+| --------------- | -------------------------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `CatalogCache`  | [`catalog_cache.h`](../../router_role/routing_cache/catalog_cache.h) | CSRS `config.*` (via loader) | Routing table cache backing the [Router role](#router-role). Its consistency model is described in the [Routing Info Cache Consistency Model](../../router_role/routing_cache/README_routing_info_cache_consistency_model.md). |
+| `ShardRegistry` | [`shard_registry.h`](../../topology/shard_registry.h)                | CSRS `config.shards`         | Shard connection strings; tracks gossiped `topologyTime`.                                                                                                                                                                      |
+
+#### Shard-side caches (filtering / ownership)
+
+| Cache                           | Class                                                                                           | Backed by                                                   | Role                                                                                                |
+| ------------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `ShardingState` (SS)            | [`sharding_state.h`](../../topology/sharding_state.h)                                           | `shardIdentity` document                                    | Per-process shard identity / initialization state.                                                  |
+| `DatabaseShardingState` (DSS)   | [`database_sharding_state.h`](database_sharding_state.h), `DatabaseShardingRuntime`             | `config.shard.catalog.databases` (authoritative)            | In-memory DB primary + `databaseVersion` + database critical section.                               |
+| `CollectionShardingState` (CSS) | [`collection_sharding_state.h`](collection_sharding_state.h), `CollectionShardingRuntime` (CSR) | `config.shard.catalog.{collections,chunks}` (authoritative) | In-memory `CollectionMetadata` (ownership filter) + collection critical section + range preservers. |
+| `FilteringMetadataCache`        | [`shard_filtering_metadata_refresh.h`](shard_filtering_metadata_refresh.h)                      | the above + the durable shard catalog                       | Orchestrates refresh/recovery of CSS and DSS (`onShardVersionMismatch`, `onDbVersionMismatch`).     |
+
+#### Cache recoverability
+
+In the authoritative model the in-memory caches are coherent with the durable state through oplog
+`c` entries and are recoverable from disk:
+
+- **DSS** is reconstructed from `config.shard.catalog.databases`. On secondaries and during recovery
+  it is kept coherent by `CreateDatabaseMetadataOplogEntry` / `DropDatabaseMetadataOplogEntry` oplog
+  `c` entries (see [oplog entries](#oplog-c-entries-for-cache-coherency)). It is available
+  immediately on step-up and after replication rollback.
+- **CSS** is left `kUnknown` on startup or replication rollback and resolved **lazily** on first
+  access via
+  [`onShardVersionMismatch`](../../versioning_protocol/README_versioning_protocols.md#authoritative-shard-versioning-protocol).
+  Recovery reads `config.shard.catalog.{collections,chunks}` through the
+  [`CollectionCacheRecoverer`](collection_cache_recoverer.h), draining any concurrent oplog deltas.
+  This deliberately avoids a long, resource-holding reconstruction at startup and avoids reading at
+  a non-stable snapshot.
+
+#### Oplog `c` entries for cache coherency
+
+Authoritative catalog commits write an oplog `c` entry alongside the durable write, so secondaries
+(and primaries during recovery) update their in-memory caches consistently. The entry formats are
+defined in [`type_oplog_catalog_metadata.idl`](type_oplog_catalog_metadata.idl) and handled in
+[`shard_server_op_observer.cpp`](../../sharding_environment/shard_server_op_observer.cpp):
+
+| Oplog `c` entry                          | Effect                                                                        |
+| ---------------------------------------- | ----------------------------------------------------------------------------- |
+| `CreateDatabaseMetadataOplogEntry`       | Populates the DSS for a database (also used by the authoritative clone).      |
+| `DropDatabaseMetadataOplogEntry`         | Clears the DSS for a database.                                                |
+| `InvalidateCollectionMetadataOplogEntry` | Triggers a CSS recovery from the durable shard catalog (optionally pre-drop). |
+| `CollectionShardingStateDeltaOplogEntry` | Applies inserted/updated chunk deltas to the CSS.                             |
+| `SetAllowChunkOperationsOplogEntry`      | Updates the `allowChunkOperations` flag of a collection.                      |
+
+## Service commands
+
+The commands below operate directly on the catalog containers. They are internal (server-to-server)
+commands.
+
+### Authoritative catalog commands
+
+These commands write the shard-local authoritative catalog (`config.shard.catalog.*`) and emit the
+oplog `c` entries that keep the in-memory caches coherent. The DDL coordinators (see
+[DDL Operations](../../global_catalog/ddl/README_ddl_operations.md)) commit to **both** the global
+catalog (CSRS) and the shard-local catalog.
+
+| Command                                            | Operates on                                                   | Description                                                                                                                                                                                           |
+| -------------------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `_shardsvrCloneAuthoritativeMetadata`              | `config.shard.catalog.databases` / `.collections` / `.chunks` | During FCV upgrade, clones all owned DB/collection metadata from the CSRS into the shard catalog (via the `CloneAuthoritativeMetadataCoordinator`). Idempotent if the shard is already authoritative. |
+| `_shardsvrFetchCollMetadata`                       | `config.shard.catalog.collections` / `.chunks`                | Fetches a collection's metadata + owned chunks from the CSRS and persists them into the shard catalog.                                                                                                |
+| `_shardsvrCommitCreateDatabaseMetadata`            | `config.shard.catalog.databases`                              | Commits a `createDatabase` into the shard catalog.                                                                                                                                                    |
+| `_shardsvrCommitDropDatabaseMetadata`              | `config.shard.catalog.databases`                              | Commits a `dropDatabase` into the shard catalog.                                                                                                                                                      |
+| `_shardsvrCommitCreateCollectionMetadata`          | `config.shard.catalog.collections` / `.chunks`                | Commits a `shardCollection`/`createCollection` into the shard catalog.                                                                                                                                |
+| `_shardsvrCommitCreateCollectionChunklessMetadata` | `config.shard.catalog.collections`                            | Commits the collection entry for a tracked collection the shard owns no chunks for (the chunkless sentinel).                                                                                          |
+| `_shardsvrCommitDropCollectionMetadata`            | `config.shard.catalog.collections` / `.chunks`                | Drops a collection's metadata from the shard catalog.                                                                                                                                                 |
+| `_shardsvrCommitRenameCollectionMetadata`          | `config.shard.catalog.collections` / `.chunks`                | Commits a `renameCollection` into the shard catalog (both source and target namespaces).                                                                                                              |
+| `_shardsvrCommitRefineCollectionShardKey`          | `config.shard.catalog.collections` / `.chunks`                | Commits a `refineCollectionShardKey` into the shard catalog.                                                                                                                                          |
+| `_shardsvrCommitCollModCollectionMetadata`         | `config.shard.catalog.collections`                            | Commits a `collMod` into the shard catalog.                                                                                                                                                           |
+
+## Recoverable critical sections
+
+Catalog mutations are protected by critical sections that block conflicting CRUD/DDL on a namespace.
+These are made recoverable across failover by the `ShardingRecoveryService`
+([`sharding_recovery_service.h`](../../global_catalog/ddl/sharding_recovery_service.h)), which
+persists them in `config.collectionCriticalSections`. Because the critical section is durable, it is
+always released even after a failover, and it is re-acquired in memory on step-up and re-evaluated
+on rollback. The two-phase critical section (block writes, then also block reads) is described in
+[DDL Operations](../../global_catalog/ddl/README_ddl_operations.md) and
+[Migrations](../../s/README_migrations.md).
 
 ## Sharding catalog API
 
