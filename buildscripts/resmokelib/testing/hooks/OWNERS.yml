@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/mongo-default-approvers
+      - 10gen/devprod-test-infrastructure
   - "README.md":
     approvers:
       - 10gen/devprod-test-infrastructure
