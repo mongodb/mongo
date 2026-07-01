@@ -298,6 +298,13 @@ std::pair<typename FlatBSONStore<Element, Value>::Iterator,
           typename FlatBSONStore<Element, Value>::Iterator>
 FlatBSONStore<Element, Value>::Obj::insert(FlatBSONStore<Element, Value>::Iterator pos,
                                            std::string fieldName) {
+    // Check if the field name is already in the fast lookup map before inserting the new entry.
+    if (_pos->_fieldNameToIndex) {
+        uassert(12602101,
+                "Duplicate field names cannot be present in the same FlatBSON object",
+                !_pos->_fieldNameToIndex->contains(fieldName));
+    }
+
     // Remember our iterator position so we can restore it after inserting a new element.
     auto index = std::distance(_entries.begin(), _pos);
     auto inserted = _entries.emplace(pos._pos, _trackingContext, 1, 0);
@@ -307,14 +314,12 @@ FlatBSONStore<Element, Value>::Obj::insert(FlatBSONStore<Element, Value>::Iterat
 
     // Also store our offset in the fast lookup map if it is available.
     if (_pos->_fieldNameToIndex) {
-        uassert(12602101,
-                "Duplicate field names cannot be present in the same FlatBSON object",
-                _pos->_fieldNameToIndex
-                    ->try_emplace(tracking::make_string(_trackingContext,
-                                                        inserted->_element.fieldName().data(),
-                                                        inserted->_element.fieldName().size()),
-                                  inserted->_offsetParent)
-                    .second);
+        invariant(_pos->_fieldNameToIndex
+                      ->try_emplace(tracking::make_string(_trackingContext,
+                                                          inserted->_element.fieldName().data(),
+                                                          inserted->_element.fieldName().size()),
+                                    inserted->_offsetParent)
+                      .second);
     }
 
     // We need to traverse the hiearchy up to the root and modify stored offsets to account for
