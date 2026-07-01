@@ -91,7 +91,11 @@ struct ServerStatusMetricPolicySelection<HistogramServerStatusMetric> {
         }
 
         void appendTo(BSONObjBuilder& bob, std::string_view leafName) const {
-            appendHistogram(bob, _v.hist(), leafName);
+            BSONArrayBuilder arr{bob.subarrayStart(leafName)};
+            for (auto&& [count, lower, upper] : _v.hist())
+                BSONObjBuilder{arr.subobjStart()}
+                    .append("lowerBound", static_cast<long long>(lower ? *lower : 0))
+                    .append("count", count);
         }
 
     private:

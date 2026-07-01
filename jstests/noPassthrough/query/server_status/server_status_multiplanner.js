@@ -4,10 +4,8 @@
 
 function sumHistogramBucketCounts(histogram) {
     let sum = 0;
-    for (const [key, bucket] of Object.entries(histogram)) {
-        if (bucket.hasOwnProperty("count")) {
-            sum += bucket.count;
-        }
+    for (const bucket of histogram) {
+        sum += bucket.count;
     }
     return sum;
 }
