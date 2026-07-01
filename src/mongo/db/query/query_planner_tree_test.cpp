@@ -3060,6 +3060,105 @@ TEST_F(QueryPlannerTest, NoOrSolutionsIfMaxOrSolutionsIsZero) {
     assertNumSolutions(2U);
 }
 
+TEST_F(QueryPlannerTest, HitIndexedOrLimitIsReportedOnAllSolutions) {
+    auto defaultMaxOr = internalQueryEnumerationMaxOrSolutions.load();
+    ON_BLOCK_EXIT([&] { internalQueryEnumerationMaxOrSolutions.store(defaultMaxOr); });
+
+    internalQueryEnumerationMaxOrSolutions.store(2);
+
+    // Each $or branch can be satisfied by more than one index, so the enumerator has several
+    // combinations to walk through and will exceed the OR enumeration limit.
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("b" << 1));
+    addIndex(BSON("c" << 1));
+    addIndex(BSON("d" << 1));
+
+    runQuery(fromjson("{$or: [{a: 1, b: 1}, {c: 1, d: 1}]}"));
+
+    // Two IndexedOr plans plus a fallback collection scan were generated.
+    assertNumSolutions(3U);
+
+    // Every generated solution must report that the indexed OR limit was reached, including ones
+    // enumerated before the limit was actually tripped.
+    for (const auto& soln : solns) {
+        ASSERT_TRUE(soln->_enumeratorExplainInfo.hitIndexedOrLimit)
+            << "solution did not report hitIndexedOrLimit: " << soln->toString();
+    }
+}
+
+TEST_F(QueryPlannerTest, HitIndexedAndLimitIsReportedOnAllSolutions) {
+    params.mainCollectionInfo.options |= QueryPlannerParams::INDEX_INTERSECTION;
+
+    auto defaultMaxIntersect = internalQueryEnumerationMaxIntersectPerAnd.load();
+    ON_BLOCK_EXIT([&] { internalQueryEnumerationMaxIntersectPerAnd.store(defaultMaxIntersect); });
+    internalQueryEnumerationMaxIntersectPerAnd.store(1);
+
+    // Three single-field indexes give the enumerator three candidate intersection pairs, which
+    // exceeds the limit of one.
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("b" << 1));
+    addIndex(BSON("c" << 1));
+
+    runQuery(fromjson("{a: 1, b: 1, c: 1}"));
+
+    // Several indexed plans plus a fallback collection scan were generated.
+    ASSERT_GT(getNumSolutions(), 1U);
+
+    // Every generated solution must report that the indexed AND limit was reached, including the
+    // collection scan, which is built outside the indexed plan enumeration loop.
+    for (const auto& soln : solns) {
+        ASSERT_TRUE(soln->_enumeratorExplainInfo.hitIndexedAndLimit)
+            << "solution did not report hitIndexedAndLimit: " << soln->toString();
+    }
+}
+
+TEST_F(QueryPlannerTest, PrunedAnyIndexesIsReportedOnAllSolutions) {
+    unittest::ServerParameterGuard pruningController("internalQueryPlannerEnableIndexPruning",
+                                                     true);
+
+    // {a: 1, b: 1} is interchangeable with {a: 1} for the query {a: 1}, so one gets pruned.
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    runQuery(fromjson("{a: 1}"));
+
+    // One indexed plan plus a fallback collection scan were generated.
+    assertNumSolutions(2U);
+
+    // Every generated solution must report that indexes were pruned, including the collection scan,
+    // which is built outside the indexed plan enumeration loop.
+    for (const auto& soln : solns) {
+        ASSERT_TRUE(soln->_enumeratorExplainInfo.prunedAnyIndexes)
+            << "solution did not report prunedAnyIndexes: " << soln->toString();
+    }
+}
+
+TEST_F(QueryPlannerTest, HitScanLimitIsReportedOnAllSolutions) {
+    unittest::ServerParameterGuard maxScansController("internalQueryMaxScansToExplode", 2);
+    // explodeForSort handles "filter on the leading key, sort on a trailing key" query shape (eg
+    // {a: {$in: [1, 2, 3]}}, {b: 1} where `a` is the filter and `b` is the sort). More
+    // specifically, explodeForSort() rewrites an index scan over point intervals on one field into
+    // multiple scans so it can preserve a sort on the later indexed field. So in order to trigger
+    // scan explosion, we need to create a compound index on the filtered field (a) and the trailing
+    // sort field (b)
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    // Three $in values would require 3 index scans when exploded for sort on the trailing field
+    // 'b', exceeding the limit of 2.
+    runQuerySortProj(fromjson("{a: {$in: [1, 2, 3]}}"), fromjson("{b: 1}"), BSONObj());
+
+    // One indexed plan plus a fallback collection scan were generated.
+    assertNumSolutions(2U);
+
+    // Every generated solution must report that the scan limit was reached, including the
+    // collection scan, which is built outside the indexed plan enumeration loop and does not
+    // go through explodeForSort.
+    for (const auto& soln : solns) {
+        ASSERT_TRUE(soln->_enumeratorExplainInfo.hitScanLimit)
+            << "solution did not report hitScanLimit: " << soln->toString();
+    }
+}
+
 TEST_F(QueryPlannerTest, EOFForAlwaysFalsePredicates) {
     runQuery(fromjson("{$alwaysFalse: 1}"));
     assertNumSolutions(1);

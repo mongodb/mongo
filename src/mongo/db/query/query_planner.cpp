@@ -1487,6 +1487,14 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
     std::vector<std::unique_ptr<QuerySolution>> out;
 
+    // Accumulates the planner-global explain flags so we can merge the same final state onto every
+    // candidate solution before explain reads it from the winning plan.
+    PlanEnumeratorExplainInfo enumeratorExplainInfo;
+
+    // 'hitScanLimit' is computed from the built solution tree during analysis/setRoot(),
+    // not by PlanEnumerator itself, so we need a separate accumulator.
+    bool anyHitScanLimit = false;
+
     // If we have any relevant indices, we try to create indexed plans.
     if (!relevantIndices.empty()) {
         // The enumerator spits out trees tagged with IndexTag(s).
@@ -1558,6 +1566,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
             if (soln) {
                 soln->taggedMatchExpressionHash = taggedMatchExpressionHash;
                 soln->_enumeratorExplainInfo.merge(planEnumerator._explainInfo);
+                anyHitScanLimit = anyHitScanLimit || soln->_enumeratorExplainInfo.hitScanLimit;
                 LOGV2_DEBUG(20978,
                             5,
                             "Planner: adding solution",
@@ -1570,6 +1579,14 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                 out.push_back(std::move(soln));
             }
         }
+        // The PlanEnumerator explain flags are only generated while producing indexed plans, so we
+        // capture them here after indexed enumeration finishes. However, we propagate outside this
+        // if block such all plans (index and table scans) have the same/correct flag values.
+        // If we were to propagate inside this if block, `out` would only contain indexed solutions
+        // and thus the PlanEnumerator explain flags wouldn't be set on any table scan solutions
+        // produced below.
+        enumeratorExplainInfo = planEnumerator._explainInfo;
+        enumeratorExplainInfo.hitScanLimit = enumeratorExplainInfo.hitScanLimit || anyHitScanLimit;
     }
 
     // Don't leave tags on query tree.
@@ -1708,6 +1725,17 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     if (collScanRequired && noTableScan(params) && !isClusteredIDXScan) {
         return Status(ErrorCodes::NoQueryExecutionPlans,
                       "No indexed plans available, and running with 'notablescan' 2");
+    }
+
+    // Explain reads the plan enumerator's explain info from the winning plan's solution.
+    // The hitIndexedOrLimit flag is set only on the advanced plan that trips the limit so plans
+    // generated before the limit will have a stale hitIndexedOrLimit value (false). Moreover, the
+    // winning plan could be the fallback collection scan, which is built outside the indexed plan
+    // enumerator loop and therefore would also have an incorrect hitIndexedOrLimit value. For these
+    // reasons, we need to we need to propagate the plan enumerator's explain info onto every
+    // candidate solution so whichever plan wins, we always report the limit flag correctly.
+    for (auto& soln : out) {
+        soln->_enumeratorExplainInfo.merge(enumeratorExplainInfo);
     }
 
     // If CanonicalQuery is distinct-like and we haven't generated a plan that features
