@@ -87,6 +87,10 @@ function configureFailCommandAllConfigNodes(rs, cmd) {
     });
 }
 
+function readZoneScanStats(rs) {
+    return rs.getPrimary().adminCommand({serverStatus: 1}).shardingStatistics;
+}
+
 function insertTagDirectly(rs, ns, tagName, minBound, maxBound) {
     const primary = rs.getPrimary();
     assert.commandWorked(
@@ -162,6 +166,19 @@ const cleanState = stepUpAndAwaitScanState(
         "alertEmitted=false on a cluster with only well-formed and legitimate prefix zone tags",
 );
 
+let cleanZoneStats;
+assert.soon(
+    () => {
+        cleanZoneStats = readZoneScanStats(st.configRS);
+        return (
+            cleanZoneStats.maxKeyZoneScanComplete == 1 &&
+            cleanZoneStats.maxKeyZoneScanFoundBuggyZone == 0 &&
+            cleanZoneStats.maxKeyZoneScanAlertEmitted == 0
+        );
+    },
+    () => `maxKeyZoneScan stats must reflect clean scan outcome; got ${tojson(cleanZoneStats)}`,
+);
+
 jsTest.log.info("Case 1 follow-up: second stepup must short-circuit");
 stepDownAndUp(st.configRS);
 sleep(2 * 1000);
@@ -169,6 +186,20 @@ assert.docEq(
     cleanState,
     readScanState(st.configRS),
     "State doc must be unchanged after re-stepup once scanCompletedAt is persisted",
+);
+
+let lastZoneStats;
+assert.soon(
+    () => {
+        lastZoneStats = readZoneScanStats(st.configRS);
+        return (
+            lastZoneStats.maxKeyZoneScanComplete == 1 &&
+            lastZoneStats.maxKeyZoneScanFoundBuggyZone == 0 &&
+            lastZoneStats.maxKeyZoneScanAlertEmitted == 0
+        );
+    },
+    () =>
+        `Short-circuit must republish prior scan outcome to FTDC stats; got ${tojson(lastZoneStats)}`,
 );
 
 // --- Case 2: buggy MinKey fingerprint on a compound shard key -----------------------------------
@@ -190,6 +221,20 @@ stepUpAndAwaitScanState(
         doc.alertEmitted === true,
     "Scan should flag the buggy MinKey fingerprint and persist alertEmitted=true on the first " +
         "foundBuggyZone transition",
+);
+
+let foundZoneStats;
+assert.soon(
+    () => {
+        foundZoneStats = readZoneScanStats(st.configRS);
+        return (
+            foundZoneStats.maxKeyZoneScanComplete == 1 &&
+            foundZoneStats.maxKeyZoneScanFoundBuggyZone == 1 &&
+            foundZoneStats.maxKeyZoneScanAlertEmitted == 1
+        );
+    },
+    () =>
+        `maxKeyZoneScan stats must reflect buggy zone detection outcome; got ${tojson(foundZoneStats)}`,
 );
 
 assert.soon(

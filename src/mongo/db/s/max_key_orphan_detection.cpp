@@ -62,6 +62,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
@@ -348,6 +349,13 @@ void runMaxKeyOrphanDetection(OperationContext* opCtx, long long term) {
         }
     }
 
+    auto publishOrphanScanStats = [&](bool foundMaxKey, bool alertEmitted) {
+        auto& stats = ShardingStatistics::get(opCtx);
+        stats.maxKeyOrphanScanComplete.store(1);
+        stats.maxKeyOrphanScanFoundMaxKey.store(foundMaxKey ? 1 : 0);
+        stats.maxKeyOrphanScanAlertEmitted.store(alertEmitted ? 1 : 0);
+    };
+
     // Read the prior state doc. A completed sweep short-circuits this one-shot sweep; the prior
     // alertEmitted is preserved so a re-scan never downgrades it.
     boost::optional<MaxKeyOrphanScanState> priorState;
@@ -373,6 +381,7 @@ void runMaxKeyOrphanDetection(OperationContext* opCtx, long long term) {
     }
 
     if (priorState && priorState->getScanCompletedAt().has_value()) {
+        publishOrphanScanStats(priorState->getFoundMaxKey(), priorState->getAlertEmitted());
         LOGV2_DEBUG(12799006,
                     2,
                     "Skipping MaxKey orphan detection: prior sweep already completed",
@@ -424,6 +433,7 @@ void runMaxKeyOrphanDetection(OperationContext* opCtx, long long term) {
             if (isScanFatalError(ex.code())) {
                 throw;
             }
+            ShardingStatistics::get(opCtx).maxKeyOrphanScanErrors.fetchAndAdd(1);
             LOGV2_WARNING(
                 12799007,
                 "MaxKey orphan detection: skipping collection due to per-collection error",
@@ -454,6 +464,8 @@ void runMaxKeyOrphanDetection(OperationContext* opCtx, long long term) {
     PersistentTaskStore<MaxKeyOrphanScanState> store(
         NamespaceString::kConfigMaxKeyOrphanScanStateNamespace);
     store.upsert(opCtx, BSON("_id" << kMaxKeyOrphanScanStateId), BSON("$set" << setBob.obj()));
+
+    publishOrphanScanStats(foundMaxKey, priorAlertEmitted || emitAlert);
 
     LOGV2_DEBUG(12799009,
                 2,

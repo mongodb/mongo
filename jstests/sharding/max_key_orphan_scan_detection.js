@@ -44,6 +44,10 @@ function stepDownAndUp(rs) {
     rs.waitForPrimary();
 }
 
+function readOrphanScanStats(rs) {
+    return rs.getPrimary().adminCommand({serverStatus: 1}).shardingStatistics;
+}
+
 // Always fetch a collection handle bound to the *current* primary. Caching a handle across a
 // stepup leaves it pointing at the old (now secondary) node, so subsequent writes fail with
 // NotWritablePrimary.
@@ -145,6 +149,19 @@ const cleanState = stepUpAndAwaitScanState(
     "Detector should persist scanCompletedAt with foundMaxKey=false, alertEmitted=false on a clean cluster",
 );
 
+let cleanOrphanStats;
+assert.soon(
+    () => {
+        cleanOrphanStats = readOrphanScanStats(st.rs0);
+        return (
+            cleanOrphanStats.maxKeyOrphanScanComplete == 1 &&
+            cleanOrphanStats.maxKeyOrphanScanFoundMaxKey == 0 &&
+            cleanOrphanStats.maxKeyOrphanScanAlertEmitted == 0
+        );
+    },
+    () => `maxKeyOrphanScan stats must reflect clean scan outcome; got ${tojson(cleanOrphanStats)}`,
+);
+
 // One-shot guard: a second stepup with scanCompletedAt persisted must not rewrite the doc.
 // Assert byte-equality (including timestamps) to confirm no upsert ran.
 jsTest.log.info("Case 1 follow-up: second stepup must short-circuit");
@@ -157,6 +174,20 @@ assert.docEq(
     cleanState,
     guardedState,
     "State doc must be unchanged after re-stepup once scanCompletedAt is persisted",
+);
+
+let lastOrphanStats;
+assert.soon(
+    () => {
+        lastOrphanStats = readOrphanScanStats(st.rs0);
+        return (
+            lastOrphanStats.maxKeyOrphanScanComplete == 1 &&
+            lastOrphanStats.maxKeyOrphanScanFoundMaxKey == 0 &&
+            lastOrphanStats.maxKeyOrphanScanAlertEmitted == 0
+        );
+    },
+    () =>
+        `Short-circuit must republish prior scan outcome to FTDC stats; got ${tojson(lastOrphanStats)}`,
 );
 
 // --- Case 2: non-findings (owned all-MaxKey doc, hashed key, range-deletion-covered doc) --------
@@ -265,6 +296,20 @@ stepUpAndAwaitScanState(
     (doc) =>
         doc.scanCompletedAt !== undefined && doc.foundMaxKey === true && doc.alertEmitted === true,
     "Detector should flag the already-orphan MaxKey doc and record alertEmitted=true",
+);
+
+let foundOrphanStats;
+assert.soon(
+    () => {
+        foundOrphanStats = readOrphanScanStats(st.rs0);
+        return (
+            foundOrphanStats.maxKeyOrphanScanComplete == 1 &&
+            foundOrphanStats.maxKeyOrphanScanFoundMaxKey == 1 &&
+            foundOrphanStats.maxKeyOrphanScanAlertEmitted == 1
+        );
+    },
+    () =>
+        `maxKeyOrphanScan stats must reflect orphan detection outcome; got ${tojson(foundOrphanStats)}`,
 );
 
 checkLog.containsJson(st.rs0.getPrimary(), warningLogId);

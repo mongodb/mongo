@@ -185,6 +185,23 @@ struct MONGO_MOD_NEEDS_REPLACEMENT ShardingStatistics {
     // reclaimed prepared transactions from precise checkpoint recovery to resolve.
     AtomicWord<long long> chunkMigrationWaitForReclaimedPreparedTxnsMillis{0};
 
+    // FTDC metrics for the MaxKey orphan detection sweep run on shard primaries.
+    // The *Complete/*FoundMaxKey/*AlertEmitted fields are 0/1 flags describing the last published
+    // sweep outcome on this process. *Errors counts non-fatal per-collection errors encountered
+    // while running the sweep.
+    AtomicWord<long long> maxKeyOrphanScanComplete{0};
+    AtomicWord<long long> maxKeyOrphanScanFoundMaxKey{0};
+    AtomicWord<long long> maxKeyOrphanScanAlertEmitted{0};
+    AtomicWord<long long> maxKeyOrphanScanErrors{0};
+
+    // FTDC metrics for the MaxKey zone inventory scan run by the balancer on config primaries.
+    // The *Complete/*FoundBuggyZone/*AlertEmitted fields are 0/1 flags describing the last
+    // published scan outcome on this process. *Errors counts non-fatal scan errors.
+    AtomicWord<long long> maxKeyZoneScanComplete{0};
+    AtomicWord<long long> maxKeyZoneScanFoundBuggyZone{0};
+    AtomicWord<long long> maxKeyZoneScanAlertEmitted{0};
+    AtomicWord<long long> maxKeyZoneScanErrors{0};
+
     CriticalSectionStatistics<DatabaseName> databaseCriticalSectionStatistics;
     CriticalSectionStatistics<NamespaceString> collectionCriticalSectionStatistics;
 

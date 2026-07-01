@@ -32,6 +32,7 @@
 #include "mongo/db/global_catalog/type_tags.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/balancer/balancer.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string>
@@ -138,6 +139,36 @@ TEST(BalancerMaxKeyZoneScanTest, PipelineProjectsOnlyClassifiedFields) {
     ASSERT_TRUE(project.hasField(TagsType::tag()));
     ASSERT_TRUE(project.hasField(TagsType::max()));
     ASSERT_TRUE(project.hasField(kCollKeyField));
+}
+
+TEST(BalancerMaxKeyZoneScanTest, ShardingStatisticsReportIncludesZoneScanFields) {
+    ShardingStatistics stats;
+    stats.maxKeyZoneScanComplete.store(1);
+    stats.maxKeyZoneScanFoundBuggyZone.store(1);
+    stats.maxKeyZoneScanAlertEmitted.store(1);
+    stats.maxKeyZoneScanErrors.store(2);
+
+    BSONObjBuilder bob;
+    stats.report(&bob);
+    const BSONObj obj = bob.obj();
+
+    ASSERT_EQ(1LL, obj["maxKeyZoneScanComplete"].Long());
+    ASSERT_EQ(1LL, obj["maxKeyZoneScanFoundBuggyZone"].Long());
+    ASSERT_EQ(1LL, obj["maxKeyZoneScanAlertEmitted"].Long());
+    ASSERT_EQ(2LL, obj["maxKeyZoneScanErrors"].Long());
+}
+
+TEST(BalancerMaxKeyZoneScanTest, ShardingStatisticsZoneScanFieldsDefaultToZero) {
+    ShardingStatistics stats;
+
+    BSONObjBuilder bob;
+    stats.report(&bob);
+    const BSONObj obj = bob.obj();
+
+    ASSERT_EQ(0LL, obj["maxKeyZoneScanComplete"].Long());
+    ASSERT_EQ(0LL, obj["maxKeyZoneScanFoundBuggyZone"].Long());
+    ASSERT_EQ(0LL, obj["maxKeyZoneScanAlertEmitted"].Long());
+    ASSERT_EQ(0LL, obj["maxKeyZoneScanErrors"].Long());
 }
 
 }  // namespace

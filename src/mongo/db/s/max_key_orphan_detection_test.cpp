@@ -35,6 +35,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
@@ -182,6 +183,36 @@ TEST_F(MaxKeyOrphanDetectionFixture, PreservesAlertEmittedAcrossRescan) {
     ASSERT(doc->hasField("scanCompletedAt")) << *doc;
     ASSERT_TRUE(doc->getField("alertEmitted").Bool())
         << "Expected the re-scan to preserve a prior alertEmitted=true: " << *doc;
+}
+
+TEST(MaxKeyOrphanDetectionTest, ShardingStatisticsReportIncludesOrphanScanFields) {
+    ShardingStatistics stats;
+    stats.maxKeyOrphanScanComplete.store(1);
+    stats.maxKeyOrphanScanFoundMaxKey.store(1);
+    stats.maxKeyOrphanScanAlertEmitted.store(1);
+    stats.maxKeyOrphanScanErrors.store(3);
+
+    BSONObjBuilder bob;
+    stats.report(&bob);
+    const BSONObj obj = bob.obj();
+
+    ASSERT_EQ(1LL, obj["maxKeyOrphanScanComplete"].Long());
+    ASSERT_EQ(1LL, obj["maxKeyOrphanScanFoundMaxKey"].Long());
+    ASSERT_EQ(1LL, obj["maxKeyOrphanScanAlertEmitted"].Long());
+    ASSERT_EQ(3LL, obj["maxKeyOrphanScanErrors"].Long());
+}
+
+TEST(MaxKeyOrphanDetectionTest, ShardingStatisticsOrphanScanFieldsDefaultToZero) {
+    ShardingStatistics stats;
+
+    BSONObjBuilder bob;
+    stats.report(&bob);
+    const BSONObj obj = bob.obj();
+
+    ASSERT_EQ(0LL, obj["maxKeyOrphanScanComplete"].Long());
+    ASSERT_EQ(0LL, obj["maxKeyOrphanScanFoundMaxKey"].Long());
+    ASSERT_EQ(0LL, obj["maxKeyOrphanScanAlertEmitted"].Long());
+    ASSERT_EQ(0LL, obj["maxKeyOrphanScanErrors"].Long());
 }
 
 }  // namespace

@@ -81,6 +81,7 @@
 #include "mongo/db/sharding_environment/sharding_config_server_parameters_gen.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/version_context.h"
@@ -1506,6 +1507,13 @@ void Balancer::_runMaxKeyZoneScan(OperationContext* opCtx) {
     PersistentTaskStore<MaxKeyZoneScanState> store(
         NamespaceString::kConfigMaxKeyZoneScanStateNamespace);
 
+    auto publishZoneScanStats = [&](bool complete, bool foundBuggyZone, bool alertEmitted) {
+        auto& stats = ShardingStatistics::get(opCtx);
+        stats.maxKeyZoneScanComplete.store(complete ? 1 : 0);
+        stats.maxKeyZoneScanFoundBuggyZone.store(foundBuggyZone ? 1 : 0);
+        stats.maxKeyZoneScanAlertEmitted.store(alertEmitted ? 1 : 0);
+    };
+
     // Read the prior state doc with a local read on this primary (via DBDirectClient).
     // priorAlertEmitted is captured so the final upsert below does not clobber a previously-emitted
     // alert with 'false'.
@@ -1529,6 +1537,7 @@ void Balancer::_runMaxKeyZoneScan(OperationContext* opCtx) {
     }
 
     if (priorState && priorState->getScanCompletedAt()) {
+        publishZoneScanStats(true, priorState->getFoundBuggyZone(), priorState->getAlertEmitted());
         LOGV2(12829503,
               "Skipping MaxKey zone inventory scan: prior scan already completed",
               "term"_attr = term,
@@ -1576,6 +1585,7 @@ void Balancer::_runMaxKeyZoneScan(OperationContext* opCtx) {
         if (isScanFatalError(ex.code())) {
             throw;
         }
+        ShardingStatistics::get(opCtx).maxKeyZoneScanErrors.fetchAndAdd(1);
         LOGV2_DEBUG(12829510,
                     2,
                     "MaxKey zone inventory scan: catalog read error, abandoning scan",
@@ -1613,6 +1623,8 @@ void Balancer::_runMaxKeyZoneScan(OperationContext* opCtx) {
                       serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion()));
 
     store.upsert(opCtx, BSON("_id" << "scanState"), BSON("$set" << setBob.obj()));
+
+    publishZoneScanStats(loopCompleted, foundBuggyZone, priorAlertEmitted || emitAlert);
 
     LOGV2_INFO(12829505,
                "Completed MaxKey zone inventory scan",
