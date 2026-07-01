@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup_gen.h"
 #include "mongo/db/pipeline/stage_params.h"
+#include "mongo/db/query/allowed_contexts.h"
 
 namespace mongo {
 
@@ -70,6 +71,14 @@ public:
 
         // Parse using IDL.
         auto idlSpec = DocumentSourceIdLookupSpec::parse(specObj, IDLParserContext(kStageName));
+
+        // 'viewPipeline' is an internal field injected by the router. Reject it from external
+        // clients, since it runs an arbitrary sub-pipeline without an authorization re-check.
+        if (idlSpec.getViewPipeline() && opts.opCtx) {
+            assertAllowedInternalIfRequired(opts.opCtx,
+                                            DocumentSourceIdLookupSpec::kViewPipelineFieldName,
+                                            AllowedWithClientType::kInternal);
+        }
 
         return std::make_unique<LiteParsedInternalSearchIdLookUp>(std::move(idlSpec));
     }

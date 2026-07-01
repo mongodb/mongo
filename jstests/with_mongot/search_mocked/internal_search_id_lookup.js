@@ -77,4 +77,28 @@ assert.commandFailedWithCode(
     11140100,
 );
 
+// 'viewPipeline' is an internal field injected by the router, so any user-supplied 'viewPipeline'
+// must be rejected at parse time, regardless of its contents.
+const kNotAllowedInUserRequest = 5491300;
+assert.throwsWithCode(
+    () =>
+        db[collName].aggregate([
+            {
+                $_internalSearchIdLookup: {
+                    viewPipeline: [{$merge: {into: {db: "targetdb", coll: "pwned"}}}],
+                },
+            },
+        ]),
+    kNotAllowedInUserRequest,
+);
+// Any viewPipeline is rejected regardless of its (even benign) contents.
+assert.throwsWithCode(
+    () => db[collName].aggregate([{$_internalSearchIdLookup: {viewPipeline: [{$match: {x: "ow"}}]}}]),
+    kNotAllowedInUserRequest,
+);
+assert.throwsWithCode(
+    () => db[collName].aggregate([{$_internalSearchIdLookup: {viewPipeline: []}}]),
+    kNotAllowedInUserRequest,
+);
+
 MongoRunner.stopMongod(conn);

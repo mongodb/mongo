@@ -94,12 +94,13 @@ public:
                 !aggregationRequest.getQuerySettings().has_value());
 
         return std::make_unique<Invocation>(
-            this, opMsgRequest, std::move(aggregationRequest), std::move(privileges));
+            opCtx, this, opMsgRequest, std::move(aggregationRequest), std::move(privileges));
     }
 
     class Invocation final : public CommandInvocation {
     public:
-        Invocation(Command* cmd,
+        Invocation(OperationContext* opCtx,
+                   Command* cmd,
                    const OpMsgRequest& request,
                    AggregateCommandRequest aggregationRequest,
                    PrivilegeVector privileges)
@@ -113,10 +114,11 @@ public:
               // from clients (which cannot include ifrFlags), so we always create an empty context
               // here.
               _ifrContext(std::make_shared<IncrementalFeatureRolloutContext>()),
-              _liteParsedPipeline(
-                  _aggregationRequest,
-                  false /* isRunningAgainstView_ForHybridSearch */,
-                  {.ifrContext = _ifrContext, .extensionMetrics = &_extensionMetrics}),
+              _liteParsedPipeline(_aggregationRequest,
+                                  false /* isRunningAgainstView_ForHybridSearch */,
+                                  {.ifrContext = _ifrContext,
+                                   .opCtx = opCtx,
+                                   .extensionMetrics = &_extensionMetrics}),
               _privileges(std::move(privileges)) {}
 
         const GenericArguments& getGenericArguments() const override {

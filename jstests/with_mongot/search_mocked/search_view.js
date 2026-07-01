@@ -95,4 +95,25 @@ assert.eq([{$search: mongotQuery}], getPipelineFromViewDef(searchView.getFullNam
     assert.eq([{$searchMeta: mongotQuery}], getPipelineFromViewDef(searchMetaView.getFullName()));
 }
 
+// An external client must not be able to supply the internal 'viewPipeline' field itself.
+const kNotAllowedInUserRequest = 5491300;
+const shardColl = st.rs0.getPrimary().getDB(dbName).getCollection(collName);
+for (const target of [coll, shardColl]) {
+    assert.throwsWithCode(
+        () =>
+            target.aggregate([
+                {
+                    $_internalSearchIdLookup: {
+                        viewPipeline: [{$merge: {into: {db: dbName, coll: "pwned"}}}],
+                    },
+                },
+            ]),
+        kNotAllowedInUserRequest,
+    );
+    assert.throwsWithCode(
+        () => target.aggregate([{$_internalSearchIdLookup: {viewPipeline: [{$match: {a: 10}}]}}]),
+        kNotAllowedInUserRequest,
+    );
+}
+
 stWithMock.stop();
