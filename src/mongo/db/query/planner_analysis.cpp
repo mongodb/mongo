@@ -1051,6 +1051,12 @@ void QueryPlannerAnalysis::analyzeGeo(const QueryPlannerParams& params,
             continue;
         }
 
+        // Partial indexes don't validate unmatched documents on insertion, so they cannot
+        // guarantee every stored value was already validated.
+        if (indexEntry.filterExpr) {
+            continue;
+        }
+
         S2IndexingParams params;
         index2dsphere::initialize2dsphereParams(indexEntry.infoObj, indexEntry.collator, &params);
 
