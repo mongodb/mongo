@@ -104,7 +104,9 @@ bool isNodeUnsupportedByCBR(StageType type) {
     // Once every node here is supported by CBR we should delete this function and any references to
     // it.
     switch (type) {
-        case STAGE_DISTINCT_SCAN:  // TODO SERVER-99075: Implement distinct scan
+        case STAGE_COLLSCAN_MULTI_RANGE:  // TODO(130287): Add support for multi-range clustered
+                                          // collection scans
+        case STAGE_DISTINCT_SCAN:         // TODO SERVER-99075: Implement distinct scan
         case STAGE_TEXT_OR:
         case STAGE_TEXT_MATCH:
         case STAGE_GEO_NEAR_2D:
@@ -173,6 +175,7 @@ bool isNodeUnexpectedByCBR(StageType type) {
     switch (type) {
         case STAGE_BATCHED_DELETE:
         case STAGE_CACHED_PLAN:
+        case STAGE_COLLSCAN_MULTI_RANGE:
         case STAGE_COUNT:
         case STAGE_COUNT_SCAN:
         case STAGE_DELETE:

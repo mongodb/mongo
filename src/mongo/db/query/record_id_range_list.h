@@ -130,6 +130,24 @@ public:
         return _ranges;
     }
 
+    // Tag struct returned if the rid given to seek is beyond all the ranges in the list.
+    struct SeekBeyondAllRanges {};
+    // Tag struct returned if the rid given to seek is in a specific range.
+    struct SeekInRange {
+        size_t idx;
+    };
+    // Tag struct returned if the rid given to seek falls between two ranges in the list.
+    struct SeekBeforeRange {
+        size_t idx;
+    };
+    using SeekResult = std::variant<SeekBeyondAllRanges, SeekInRange, SeekBeforeRange>;
+
+    // Uses std::lower_bound to seek for rid between the ranges:
+    //   if  forward: (startIdx, getRanges().size())
+    //   if !forward: [0, startIdx)
+    SeekResult seek(const RecordId& rid, size_t startIdx, bool forward) const;
+
+
 private:
     struct EMPTY_TAG {};
 

@@ -338,14 +338,22 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
                 NamespaceStringUtil::serialize(qsnNode->nss, SerializationContext::stateDefault()));
         }
         bob->append("direction", spec->direction > 0 ? "forward" : "backward");
-        if (spec->minRecord) {
-            spec->minRecord->appendToBSONAs(bob, "minRecord");
+        // For backwards compatibility, keep minRecord/maxRecord as the outer bounds.
+        {
+            const auto outerBounds = spec->rangeList.outerBounds();
+            if (outerBounds.getMin()) {
+                outerBounds.getMin()->appendToBSONAs(bob, "minRecord");
+            }
+            if (outerBounds.getMax()) {
+                outerBounds.getMax()->appendToBSONAs(bob, "maxRecord");
+            }
         }
-        if (spec->maxRecord) {
-            spec->maxRecord->appendToBSONAs(bob, "maxRecord");
+        if (spec->rangeList.getRanges().size() != 1) {
+            bob->appendArray("recordIdRanges", spec->rangeList.toBSONArray());
         }
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("docsExamined", static_cast<long long>(spec->docsTested));
+            bob->appendNumber("seeks", static_cast<long long>(spec->seeks));
         }
     } else if (STAGE_COUNT == stats.stageType) {
         CountStats* spec = static_cast<CountStats*>(stats.specific.get());

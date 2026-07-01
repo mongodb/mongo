@@ -196,6 +196,43 @@ BSONArray RecordIdRangeList::toBSONArray() const {
     return arr.arr();
 }
 
+RecordIdRangeList::SeekResult RecordIdRangeList::seek(const RecordId& rid,
+                                                      size_t startIdx,
+                                                      bool forward) const {
+    const int exhausted = forward ? 1 : -1;
+    auto search = [&](auto begin, auto end) -> boost::optional<size_t> {
+        auto recordRange =
+            std::lower_bound(forward ? begin + startIdx : begin + (_ranges.size() - 1 - startIdx),
+                             end,
+                             rid,
+                             [&](const RecordIdRange& range, const RecordId& rid) {
+                                 return range.compare(rid) == exhausted;
+                             });
+
+        if (recordRange == end) {
+            return boost::none;
+        }
+
+        if (forward) {
+            return recordRange - begin;
+        } else {
+            return _ranges.size() - 1 - (recordRange - begin);
+        }
+    };
+
+    auto idx =
+        forward ? search(_ranges.begin(), _ranges.end()) : search(_ranges.rbegin(), _ranges.rend());
+
+    if (!idx) {
+        return SeekBeyondAllRanges{};
+    }
+
+    if (_ranges[*idx].compare(rid) == 0) {
+        return SeekInRange{*idx};
+    }
+    return SeekBeforeRange{*idx};
+}
+
 // ---------------------------------------------------------------------------
 // Factory functions
 // ---------------------------------------------------------------------------

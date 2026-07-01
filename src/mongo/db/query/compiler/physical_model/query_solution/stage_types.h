@@ -55,6 +55,7 @@ enum MONGO_MOD_NEEDS_REPLACEMENT StageType {
     STAGE_CACHED_PLAN,
 
     STAGE_COLLSCAN,
+    STAGE_COLLSCAN_MULTI_RANGE,
 
     // A virtual scan stage that simulates a collection scan and doesn't depend on underlying
     // storage.

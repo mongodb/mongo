@@ -97,6 +97,8 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
         switch (root->getType()) {
             case STAGE_COLLSCAN: {
                 const CollectionScanNode* csn = static_cast<const CollectionScanNode*>(root);
+                // TODO(SERVER-125912): Build a MultiRangeClusteredScan once QSN supports
+                // RecordIdRangeList.
                 CollectionScanParams params;
                 params.tailable = csn->tailable;
                 params.shouldTrackLatestOplogTimestamp = csn->shouldTrackLatestOplogTimestamp;
@@ -470,6 +472,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             }
             case STAGE_BATCHED_DELETE:
             case STAGE_CACHED_PLAN:
+            case STAGE_COLLSCAN_MULTI_RANGE:
             case STAGE_COUNT:
             case STAGE_DELETE:
             case STAGE_EQ_LOOKUP:

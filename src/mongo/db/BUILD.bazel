@@ -850,6 +850,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/classic:multi_plan.cpp",
         "//src/mongo/db/exec/classic:multi_plan_admission_context.cpp",
         "//src/mongo/db/exec/classic:multi_plan_rate_limiter.cpp",
+        "//src/mongo/db/exec/classic:multi_range_clustered_scan.cpp",
         "//src/mongo/db/exec/classic:near.cpp",
         "//src/mongo/db/exec/classic:or.cpp",
         "//src/mongo/db/exec/classic:orphan_chunk_skipper.cpp",

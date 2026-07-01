@@ -560,7 +560,7 @@ export class QuerySettingsIndexHintsTests {
 
         const plansWithoutSettings = collectPlans(explainWithoutQuerySettings);
         const plansWithSettings = collectPlans(explainWithQuerySettings);
-        const changeStreamIgnoreFields = ["t", "ts", "minRecord"];
+        const changeStreamIgnoreFields = ["t", "ts", "minRecord", "recordIdRanges"];
 
         assert.eq(
             explainWithQuerySettings.pipeline,

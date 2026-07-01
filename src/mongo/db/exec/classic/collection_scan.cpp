@@ -41,6 +41,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/record_id_bound.h"
+#include "mongo/db/query/record_id_range.h"
+#include "mongo/db/query/record_id_range_list.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
@@ -62,9 +64,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-namespace {
 MONGO_FAIL_POINT_DEFINE(hangCollScanDoWork);
-}  // namespace
 
 namespace mongo {
 
@@ -107,9 +107,30 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
     const auto& collPtr = collection.getCollectionPtr();
     // Explain reports the direction of the collection scan.
     _specificStats.direction = params.direction;
-    _specificStats.minRecord = params.minRecord;
-    _specificStats.maxRecord = params.maxRecord;
     _specificStats.tailable = params.tailable;
+    // Mirror the bounds as a single-range RecordIdRangeList so explain output is uniform with
+    // MultiRangeClusteredScan. Inclusivity is expressed in min/max (value) order; for BACKWARD
+    // scans, the user-facing "start" is the max and "end" is the min, so the inclusivity flags
+    // get swapped accordingly.
+    if (params.minRecord || params.maxRecord) {
+        const bool startInclusive =
+            (params.boundInclusion ==
+                 CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords ||
+             params.boundInclusion ==
+                 CollectionScanParams::ScanBoundInclusion::kIncludeStartRecordOnly);
+        const bool endInclusive =
+            (params.boundInclusion ==
+                 CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords ||
+             params.boundInclusion ==
+                 CollectionScanParams::ScanBoundInclusion::kIncludeEndRecordOnly);
+        const bool minInclusive =
+            (params.direction == CollectionScanParams::FORWARD) ? startInclusive : endInclusive;
+        const bool maxInclusive =
+            (params.direction == CollectionScanParams::FORWARD) ? endInclusive : startInclusive;
+        RecordIdRange range;
+        range.intersectRange(params.minRecord, params.maxRecord, minInclusive, maxInclusive);
+        _specificStats.rangeList = RecordIdRangeList(std::move(range));
+    }
     if (params.minRecord || params.maxRecord) {
         // The 'minRecord' and 'maxRecord' parameters are used for a special optimization that
         // applies only to forwards scans of the oplog and scans on clustered collections.
@@ -309,6 +330,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                                                 << "tailable cursor position. "
                                                 << "Last seen record id: " << _lastSeenId);
                     }
+                    ++_specificStats.seeks;
                 }
 
                 if (_params.resumeScanPoint) {
@@ -337,10 +359,12 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                     // positioned on the recordId we want to return so we don't need to advance it
                     // again below. If tolerateKeyNotFound = false, we throw.
                     auto testRecord = _cursor->seekExact(recordIdToSeek);
+                    ++_specificStats.seeks;
                     if (!testRecord) {
                         if (resumeScanPoint.tolerateKeyNotFound) {
                             record = _cursor->seek(recordIdToSeek,
                                                    SeekableRecordCursor::BoundInclusion::kInclude);
+                            ++_specificStats.seeks;
                             return PlanStage::ADVANCED;
                         } else {
                             uasserted(
@@ -360,6 +384,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                                            shouldIncludeStartRecord(_params)
                                                ? SeekableRecordCursor::BoundInclusion::kInclude
                                                : SeekableRecordCursor::BoundInclusion::kExclude);
+                    ++_specificStats.seeks;
                     return PlanStage::ADVANCED;
                 } else if (_lastSeenId.isNull() &&
                            _params.direction == CollectionScanParams::BACKWARD &&
@@ -369,6 +394,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                                            shouldIncludeStartRecord(_params)
                                                ? SeekableRecordCursor::BoundInclusion::kInclude
                                                : SeekableRecordCursor::BoundInclusion::kExclude);
+                    ++_specificStats.seeks;
                     return PlanStage::ADVANCED;
                 }
             }

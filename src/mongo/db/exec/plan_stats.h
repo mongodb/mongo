@@ -37,7 +37,7 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
-#include "mongo/db/query/record_id_bound.h"
+#include "mongo/db/query/record_id_range_list.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
@@ -313,11 +313,11 @@ struct CollectionScanStats : public SpecificStats {
 
     bool tailable{false};
 
-    // The start location of a forward scan and end location for a reverse scan.
-    boost::optional<RecordIdBound> minRecord;
+    // The set of RecordId ranges being scanned (mirrors CollectionScanParams::rangeList).
+    RecordIdRangeList rangeList;
 
-    // The end location of a reverse scan and start location for a forward scan.
-    boost::optional<RecordIdBound> maxRecord;
+    // Number of seeks performed (initial + inter-range seeks for multi-interval scans).
+    size_t seeks = 0;
 };
 
 struct CountStats : public SpecificStats {
