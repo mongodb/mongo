@@ -153,5 +153,106 @@ TEST_F(BucketCatalogInternalTest, RolloverUpdatesRolloverStats) {
         _testRolloverWithRolloverReasonUpdatesStats(reason, metric);
     }
 }
+
+TEST_F(BucketCatalogInternalTest, PredictNextBucketOIDMatchesActualNextOID) {
+    TimeseriesOptions options;
+    const Date_t timestamp = Date_t::now();
+
+    [[maybe_unused]] auto [oid1, unusedTs1] = internal::generateBucketOID(timestamp, options);
+    auto predicted2 = predictNextBucketOID(oid1);
+    [[maybe_unused]] auto [oid2, unusedTs2] = internal::generateBucketOID(timestamp, options);
+    ASSERT_EQ(predicted2, oid2);
+
+    auto predicted3 = predictNextBucketOID(oid2);
+    [[maybe_unused]] auto [oid3, unusedTs3] = internal::generateBucketOID(timestamp, options);
+    ASSERT_EQ(predicted3, oid3);
+}
+
+TEST_F(BucketCatalogInternalTest, OIDCollisionDoesNotRemoveExistingBucketId) {
+    // For simplicity, use only one stripe.
+    FailPointEnableBlock failPoint("alwaysUseSameBucketCatalogStripe");
+
+    auto key = BucketKey(_uuid1,
+                         BucketMetadata(getTrackingContext(_bucketCatalog->trackingContexts,
+                                                           TrackingScope::kOpenBucketsByKey),
+                                        BSONElement{},
+                                        boost::none));
+    TimeseriesOptions options;
+    auto collectionStats = std::make_shared<ExecutionStats>();
+    ExecutionStatsController stats(collectionStats, _globalStats);
+    const Date_t timestamp = Date_t::now();
+
+    auto [currentOID, roundedTime] = internal::generateBucketOID(timestamp, options);
+    auto collidingOID = predictNextBucketOID(currentOID);
+    BucketId collidingBucketId{key.collectionUUID, collidingOID, key.signature()};
+
+    // Manually insert a bucket at collidingBucketId to simulate a pre-existing entry.
+    auto [it, inserted] = _bucketCatalog->stripes[0]->openBucketsById.try_emplace(
+        collidingBucketId,
+        tracking::make_unique<Bucket>(
+            getTrackingContext(_bucketCatalog->trackingContexts, TrackingScope::kOpenBucketsById),
+            _bucketCatalog->trackingContexts,
+            collidingBucketId,
+            key,
+            options.getTimeField(),
+            roundedTime,
+            _bucketCatalog->bucketStateRegistry));
+    ASSERT_TRUE(inserted);
+    ASSERT_OK(initializeBucketState(_bucketCatalog->bucketStateRegistry, collidingBucketId));
+
+    ASSERT(_bucketCatalog->stripes[0]->openBucketsById.contains(collidingBucketId));
+
+    // Allocate a bucket. The first attempt collides with collidingBucketId, after which we reset
+    // the counter and then successfully retry with a new OID.
+    Bucket& newBucket = internal::allocateBucket(*_bucketCatalog,
+                                                 *_bucketCatalog->stripes[0],
+                                                 WithLock::withoutLock(),
+                                                 key,
+                                                 options,
+                                                 timestamp,
+                                                 nullptr,
+                                                 stats);
+
+    EXPECT_NE(collidingBucketId, newBucket.bucketId);
+    // The existing entry should still exist.
+    ASSERT(_bucketCatalog->stripes[0]->openBucketsById.contains(collidingBucketId));
+}
+
+TEST_F(BucketCatalogInternalTest,
+       OIDCollisionInBucketStateRegistryDoesNotLeaveDanglingEntryInOpenBucketsById) {
+    // For simplicity, use only one stripe.
+    FailPointEnableBlock failPoint("alwaysUseSameBucketCatalogStripe");
+
+    auto key = BucketKey(_uuid1,
+                         BucketMetadata(getTrackingContext(_bucketCatalog->trackingContexts,
+                                                           TrackingScope::kOpenBucketsByKey),
+                                        BSONElement{},
+                                        boost::none));
+    TimeseriesOptions options;
+    auto collectionStats = std::make_shared<ExecutionStats>();
+    ExecutionStatsController stats(collectionStats, _globalStats);
+    const Date_t timestamp = Date_t::now();
+
+    [[maybe_unused]] auto [currentOID, unused] = internal::generateBucketOID(timestamp, options);
+    auto frozenOID = predictNextBucketOID(currentOID);
+    BucketId frozenBucketId{key.collectionUUID, frozenOID, key.signature()};
+
+    // Freeze the bucket state so initializeBucketState will fail for this ID. There should be an
+    // entry for this bucketId in the bucket state registry but none in the openBucketsById map.
+    freezeBucket(_bucketCatalog->bucketStateRegistry, frozenBucketId);
+    ASSERT_FALSE(_bucketCatalog->stripes[0]->openBucketsById.contains(frozenBucketId));
+
+    Bucket& newBucket = internal::allocateBucket(*_bucketCatalog,
+                                                 *_bucketCatalog->stripes[0],
+                                                 WithLock::withoutLock(),
+                                                 key,
+                                                 options,
+                                                 timestamp,
+                                                 nullptr,
+                                                 stats);
+
+    EXPECT_NE(frozenBucketId, newBucket.bucketId);
+    ASSERT_FALSE(_bucketCatalog->stripes[0]->openBucketsById.contains(frozenBucketId));
+}
 }  // namespace
 }  // namespace mongo::timeseries::bucket_catalog

@@ -33,6 +33,7 @@
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -43,6 +44,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
+#include <cstring>
 #include <functional>
 #include <utility>
 #include <vector>
@@ -305,4 +307,32 @@ protected:
     BSONObj _codeWScopeMeta = BSON(_metaField << BSONCodeWScope(_metaValue, BSON("x" << 1)));
     BSONObj _stringMeta = BSON(_metaField << _metaValue);
 };
+/**
+ * Predicts the OID that the next generateBucketOID call will produce, given an OID returned by
+ * the most recent call. The counter embedded in the non-timestamp portion is stored as a big-endian
+ * uint64 split across the InstanceUnique (5 bytes) and Increment (3 bytes) fields, and increments
+ * by 1 on each call.
+ */
+inline OID predictNextBucketOID(const OID& oid) {
+    uint8_t bits[8];
+    OID::InstanceUnique instance = oid.getInstanceUnique();
+    OID::Increment increment = oid.getIncrement();
+    std::memcpy(bits, instance.bytes, OID::kInstanceUniqueSize);
+    std::memcpy(bits + OID::kInstanceUniqueSize, increment.bytes, OID::kIncrementSize);
+
+    for (int i = 7; i >= 0; --i)
+        if (++bits[i] != 0)
+            break;
+
+    OID next;
+    next.setTimestamp(oid.getTimestamp());
+    OID::InstanceUnique newInstance;
+    std::memcpy(newInstance.bytes, bits, OID::kInstanceUniqueSize);
+    next.setInstanceUnique(newInstance);
+    OID::Increment newIncrement;
+    std::memcpy(newIncrement.bytes, bits + OID::kInstanceUniqueSize, OID::kIncrementSize);
+    next.setIncrement(newIncrement);
+    return next;
+}
+
 }  // namespace mongo::timeseries
