@@ -129,6 +129,7 @@ def create_backport_ticket(version: str):
     for attempt in range(3):
         try:
             server_issue = jira.create_issue(fields=server_issue_dict)
+            server_issue.update({"customfield_26868": {"value": "No"}})
             backport_issue = jira.create_issue(fields=backport_issue_dict)
             # For some reason you cant assign a team on creation for backport tickets
             backport_issue.update({"customfield_12751": [{"value": PROFILE_DATA_OWNING_TEAM}]})
@@ -175,12 +176,16 @@ def create_pr(target_branch: str, new_branch: str, original_file, new_content: s
         message="Updating profile files.",
         sha=original_file.sha,
     )
-    repo.create_pull(
+    pr = repo.create_pull(
         base=target_branch,
         head=new_branch,
         title=f"{jira_ticket} Update profiling data",
         body="Automated PR updating the profiling data.",
     )
+
+    # Backport PRs (any non-master target) get a reviewer from the backport team.
+    if target_branch != "master":
+        pr.create_review_request(team_reviewers=["performance-backport"])
 
 
 def create_profile_data_pr(repo, args, target_branch, new_branch):
