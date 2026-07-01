@@ -1168,6 +1168,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/exec/document_value:document_value_test_util",
+        "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/unittest",
     ],
 )
