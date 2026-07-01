@@ -64,6 +64,15 @@ namespace search_helpers {
 void validateInternalSearchFieldsNotSetByUser(const OperationContext* opCtx, const BSONObj& spec);
 
 /**
+ * Rejects a user-supplied $vectorSearch spec that contains any of the security-trusted,
+ * mongod-owned fields ('vectorSearch', 'collectionUUID', 'viewName'). mongod derives these from
+ * trusted sources (the target collection name, its UUID, and the authorized view name) when
+ * building the command sent to mongot. Letting a client inject one of them would bypass view
+ * authorization or redirect the query to another collection. See SERVER-129618.
+ */
+void validateUserSpecDoesNotOverrideTrustedFields(const BSONObj& spec);
+
+/**
  * Consult mongot to get planning information for sharded search queries.
  */
 InternalSearchMongotRemoteSpec planShardedSearch(

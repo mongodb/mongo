@@ -203,6 +203,12 @@ static const std::vector<StringData>& getInternalOnlyFieldNames() {
     };
     return fields;
 }
+
+// Single source of truth for the security-trusted, mongod-owned $vectorSearch field names. mongod
+// derives these from trusted sources (the target collection name, its UUID, and the authorized view
+// name) when building the command sent to mongot.
+constexpr std::array kVectorSearchTrustedFields{
+    mongot_cursor::kVectorSearchCmd, mongot_cursor::kCollectionUuidField, "viewName"_sd};
 }  // namespace
 
 void validateInternalSearchFieldsNotSetByUser(const OperationContext* opCtx, const BSONObj& spec) {
@@ -620,5 +626,15 @@ std::unique_ptr<RemoteExplainVector> getSearchRemoteExplains(
     }
     return nullptr;
 }
+
+void validateUserSpecDoesNotOverrideTrustedFields(const BSONObj& spec) {
+    for (const auto& field : kVectorSearchTrustedFields) {
+        uassert(12961800,
+                str::stream() << "Cannot specify the reserved field '" << field
+                              << "' in a $vectorSearch stage",
+                !spec.hasField(field));
+    }
+}
+
 }  // namespace search_helpers
 }  // namespace mongo

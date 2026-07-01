@@ -178,6 +178,12 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::createFromB
                           << " value must be an object. Found: " << typeName(elem.type()),
             elem.type() == BSONType::Object);
 
+    auto spec = elem.embeddedObject();
+
+    // Reject any user attempt to inject the security-trusted, mongod-owned fields (the mongot
+    // command name and collection UUID) into the $vectorSearch spec.
+    search_helpers::validateUserSpecDoesNotOverrideTrustedFields(spec);
+
     auto serviceContext = expCtx->opCtx->getServiceContext();
     std::list<intrusive_ptr<DocumentSource>> desugaredPipeline = {
         make_intrusive<DocumentSourceVectorSearch>(

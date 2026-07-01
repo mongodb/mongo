@@ -43,7 +43,11 @@ executor::RemoteCommandRequest getRemoteCommandRequestForVectorSearchQuery(
             expCtx->uuid);
     expCtx->uuid.value().appendToBuilder(&cmdBob, mongot_cursor::kCollectionUuidField);
     if (expCtx->explain) {
-        cmdBob.append("explain",
+        uassert(10804601,
+                "Cannot specify the 'explain' field in a $vectorSearch stage when the aggregate "
+                "command is run with explain",
+                !request.hasField(mongot_cursor::kExplainField));
+        cmdBob.append(mongot_cursor::kExplainField,
                       BSON("verbosity" << ExplainOptions::verbosityString(*expCtx->explain)));
     }
 
