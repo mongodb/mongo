@@ -3564,6 +3564,11 @@ void IndexBuildsCoordinator::_resumeHybridIndexBuildFromPhase(
             index_builds::primary_driven::deleteSorterEntriesOutsideRanges(opCtx,
                                                                            resumeInfo.getIndexes());
 
+            // Orphaned index entries can exist if the build never spilled and then was interrupted
+            // in the load phase.
+            index_builds::primary_driven::deleteAllIndexEntries(
+                opCtx, replState->dbName, replState->collectionUUID, replState->getIndexes());
+
             // Resume the scan after the lowest spilled record id across all indexes, or restart it
             // from the beginning if any index never spilled.
             resumeAfterRecordId = index_builds::minLastSpilledRecordId(resumeInfo.getIndexes());
