@@ -40,13 +40,17 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
+#include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/global_catalog/type_chunk.h"
+#include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_options.h"
@@ -79,6 +83,24 @@ namespace mongo {
 namespace {
 
 using unittest::assertGet;
+
+// Returns the comma-joined, sorted list of top-level field names of a BSON document, so two
+// documents can be compared by structure (which fields are present) independently of their values.
+std::string sortedFieldNames(const BSONObj& obj) {
+    std::vector<std::string> names;
+    for (const auto& elem : obj) {
+        names.push_back(std::string{elem.fieldNameStringData()});
+    }
+    std::sort(names.begin(), names.end());
+    std::string joined;
+    for (const auto& name : names) {
+        if (!joined.empty()) {
+            joined += ", ";
+        }
+        joined += name;
+    }
+    return joined;
+}
 
 class CommitChunkMigrate : public ConfigServerTestFixture {
 protected:
@@ -1011,6 +1033,92 @@ public:
         }
     }
 
+    // Builds a chunk owned by 'shardId' with a single-entry history (validAfter Timestamp(100, 0)).
+    ChunkType createChunk(const BSONObj& min,
+                          const BSONObj& max,
+                          const ChunkVersion& version,
+                          const ShardId& shardId) {
+        return createChunk(
+            _collUUID, min, max, version, shardId, {ChunkHistory(Timestamp(100, 0), shardId)});
+    }
+
+    // Returns the highest chunk version currently owned by 'shard', i.e. its shard placement
+    // version.
+    ChunkVersion getShardVersion(const ShardId& shard) {
+        auto doc = uassertStatusOK(findOneOnConfigCollection(
+            operationContext(),
+            NamespaceString::kConfigsvrChunksNamespace,
+            BSON(ChunkType::collectionUUID << _collUUID << ChunkType::shard(shard.toString())),
+            BSON(ChunkType::lastmod << -1)));
+        return uassertStatusOK(ChunkType::parseFromConfigBSON(doc, _collEpoch, _collTimestamp))
+            .getVersion();
+    }
+
+    // Reads the collection's chunks back from the global catalog through the catalog client - the
+    // same read participants use to load chunks.
+    std::vector<ChunkType> getChunksFromCatalogClient() {
+        return uassertStatusOK(
+            catalogClient()->getChunks(operationContext(),
+                                       BSON(ChunkType::collectionUUID() << _collUUID),
+                                       BSON(ChunkType::min() << 1) /* sort */,
+                                       boost::none /* limit */,
+                                       nullptr /* opTime */,
+                                       _collEpoch,
+                                       _collTimestamp,
+                                       repl::ReadConcernLevel::kLocalReadConcern));
+    }
+
+    boost::optional<ChunkType> getChangedChunkByMin(const std::vector<ChunkType>& changedChunks,
+                                                    const BSONObj& min) {
+        for (const auto& chunk : changedChunks) {
+            if (chunk.getMin().woCompare(min) == 0) {
+                return chunk;
+            }
+        }
+        return boost::none;
+    }
+
+    // Asserts two changed-chunks lists describe the same chunks. The order can differ between a
+    // commit and its idempotent retry, so the comparison is order-independent (keyed by chunk min).
+    void assertSameChangedChunks(std::vector<ChunkType> lhs, std::vector<ChunkType> rhs) {
+        ASSERT_EQ(lhs.size(), rhs.size());
+        const auto byMin = [](const ChunkType& l, const ChunkType& r) {
+            return l.getMin().woCompare(r.getMin()) < 0;
+        };
+        std::sort(lhs.begin(), lhs.end(), byMin);
+        std::sort(rhs.begin(), rhs.end(), byMin);
+        for (size_t i = 0; i < lhs.size(); ++i) {
+            ASSERT_BSONOBJ_EQ(lhs[i].getMin(), rhs[i].getMin());
+            ASSERT_BSONOBJ_EQ(lhs[i].getMax(), rhs[i].getMax());
+            ASSERT_EQ(lhs[i].getShard(), rhs[i].getShard());
+            ASSERT_EQ(lhs[i].getVersion(), rhs[i].getVersion());
+        }
+    }
+
+    std::vector<ChunkType> commit(const ChunkType& migratedChunk,
+                                  const ChunkVersion& donorShardVersionPreMigration,
+                                  const ShardId& donor,
+                                  const ShardId& recipient) {
+        return assertGet(ShardingCatalogManager::get(operationContext())
+                             ->commitMoveRange(operationContext(),
+                                               kNamespace,
+                                               migratedChunk,
+                                               donorShardVersionPreMigration,
+                                               donor,
+                                               recipient));
+    }
+
+    // Simulates a concurrent DDL disabling chunk operations on the collection by clearing the
+    // allowChunkOperations flag on its config.collections document.
+    void disallowChunkOperations() {
+        DBDirectClient client(operationContext());
+        client.update(
+            NamespaceString::kConfigsvrCollectionsNamespace,
+            BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
+                     kNamespace, SerializationContext::stateDefault())),
+            BSON("$set" << BSON(CollectionType::kAllowChunkOperationsFieldName << false)));
+    }
+
     std::vector<ShardId> _shardIds;
     std::vector<ChunkType> chunks;
 
@@ -1037,6 +1145,7 @@ private:
         chunks = std::vector<ChunkType>();
     }
 
+protected:
     const UUID _collUUID = UUID::gen();
     const OID _collEpoch = OID::gen();
     const Timestamp _collTimestamp = Timestamp(42);
@@ -1144,6 +1253,183 @@ TEST_F(CommitMoveRangeTest, MoveRangeRandom) {
           "migratedChunk"_attr = migratedChunk);
 
     runMoveRangeAndVerify(origChunk, migratedChunk, expectLeftSplit, expectRightSplit);
+}
+
+// A moveChunk where the donor keeps another chunk: the response carries the migrated chunk (now on
+// the recipient) and the donor's control chunk (whose version was bumped).
+TEST_F(CommitMoveRangeTest, ReturnsMigratedAndControlChunk) {
+    const auto chunkMin = BSON("x" << 0);
+    const auto chunkMid = BSON("x" << 10);
+    const auto chunkMax = BSON("x" << 20);
+
+    auto migratedChunk = createChunk(
+        chunkMin, chunkMid, ChunkVersion({_collEpoch, _collTimestamp}, {2, 0}), _shardIds[0]);
+    auto controlChunk = createChunk(
+        chunkMid, chunkMax, ChunkVersion({_collEpoch, _collTimestamp}, {2, 1}), _shardIds[0]);
+    setupCollection(kNamespace, kKeyPattern, {migratedChunk, controlChunk});
+
+    const auto donorPreVersion = getShardVersion(_shardIds[0]);
+    auto changedChunks = commit(migratedChunk, donorPreVersion, _shardIds[0], _shardIds[1]);
+
+    ASSERT_EQ(2U, changedChunks.size());
+
+    auto migrated = getChangedChunkByMin(changedChunks, chunkMin);
+    ASSERT(migrated.has_value());
+    ASSERT_EQ(_shardIds[1], migrated->getShard());
+    ASSERT_BSONOBJ_EQ(chunkMid, migrated->getMax());
+
+    auto control = getChangedChunkByMin(changedChunks, chunkMid);
+    ASSERT(control.has_value());
+    ASSERT_EQ(_shardIds[0], control->getShard());
+    ASSERT_BSONOBJ_EQ(chunkMax, control->getMax());
+
+    // The migrated chunk's major version was bumped past the pre-migration collection version.
+    ASSERT_EQ(donorPreVersion.majorVersion() + 1, migrated->getVersion().majorVersion());
+}
+
+// Migrating the donor's only chunk leaves no control chunk, so the response carries just the
+// migrated chunk.
+TEST_F(CommitMoveRangeTest, LastChunkOnDonorReturnsOnlyMigratedChunk) {
+    auto chunk = createChunk(kKeyPattern.globalMin(),
+                             kKeyPattern.globalMax(),
+                             ChunkVersion({_collEpoch, _collTimestamp}, {1, 0}),
+                             _shardIds[0]);
+    setupCollection(kNamespace, kKeyPattern, {chunk});
+
+    const auto donorPreVersion = getShardVersion(_shardIds[0]);
+    auto changedChunks = commit(chunk, donorPreVersion, _shardIds[0], _shardIds[1]);
+
+    ASSERT_EQ(1U, changedChunks.size());
+    ASSERT_EQ(_shardIds[1], changedChunks[0].getShard());
+    ASSERT_BSONOBJ_EQ(kKeyPattern.globalMin(), changedChunks[0].getMin());
+    ASSERT_BSONOBJ_EQ(kKeyPattern.globalMax(), changedChunks[0].getMax());
+}
+
+// A moveRange that moves a sub-range of a chunk splits it first: the response carries the migrated
+// sub-range (on the recipient) plus the left and right side chunks left on the donor.
+TEST_F(CommitMoveRangeTest, MoveRangeSplitReturnsSideChunks) {
+    auto chunk = createChunk(kKeyPattern.globalMin(),
+                             kKeyPattern.globalMax(),
+                             ChunkVersion({_collEpoch, _collTimestamp}, {1, 0}),
+                             _shardIds[0]);
+    setupCollection(kNamespace, kKeyPattern, {chunk});
+
+    const auto subMin = BSON("x" << 1);
+    const auto subMax = BSON("x" << 10);
+    auto migratedChunk = chunk;
+    migratedChunk.setRange({subMin, subMax});
+
+    const auto donorPreVersion = getShardVersion(_shardIds[0]);
+    auto changedChunks = commit(migratedChunk, donorPreVersion, _shardIds[0], _shardIds[1]);
+
+    ASSERT_EQ(3U, changedChunks.size());
+
+    auto migrated = getChangedChunkByMin(changedChunks, subMin);
+    ASSERT(migrated.has_value());
+    ASSERT_EQ(_shardIds[1], migrated->getShard());
+    ASSERT_BSONOBJ_EQ(subMax, migrated->getMax());
+
+    auto leftSplit = getChangedChunkByMin(changedChunks, kKeyPattern.globalMin());
+    ASSERT(leftSplit.has_value());
+    ASSERT_EQ(_shardIds[0], leftSplit->getShard());
+    ASSERT_BSONOBJ_EQ(subMin, leftSplit->getMax());
+
+    auto rightSplit = getChangedChunkByMin(changedChunks, subMax);
+    ASSERT(rightSplit.has_value());
+    ASSERT_EQ(_shardIds[0], rightSplit->getShard());
+    ASSERT_BSONOBJ_EQ(kKeyPattern.globalMax(), rightSplit->getMax());
+}
+
+// Re-running the same commit must be idempotent: the migration is detected as already applied, the
+// response is rebuilt from durable state, and no versions are bumped a second time.
+TEST_F(CommitMoveRangeTest, IdempotentRetryReturnsSameChangedChunks) {
+    const auto chunkMin = BSON("x" << 0);
+    const auto chunkMid = BSON("x" << 10);
+    const auto chunkMax = BSON("x" << 20);
+
+    auto migratedChunk = createChunk(
+        chunkMin, chunkMid, ChunkVersion({_collEpoch, _collTimestamp}, {2, 0}), _shardIds[0]);
+    auto controlChunk = createChunk(
+        chunkMid, chunkMax, ChunkVersion({_collEpoch, _collTimestamp}, {2, 1}), _shardIds[0]);
+    setupCollection(kNamespace, kKeyPattern, {migratedChunk, controlChunk});
+
+    const auto donorPreVersion = getShardVersion(_shardIds[0]);
+
+    auto firstResult = commit(migratedChunk, donorPreVersion, _shardIds[0], _shardIds[1]);
+    const auto collVersionAfterFirst = getShardVersion(_shardIds[1]);
+
+    // Retry with the same arguments; the migration is already committed.
+    auto secondResult = commit(migratedChunk, donorPreVersion, _shardIds[0], _shardIds[1]);
+
+    assertSameChangedChunks(firstResult, secondResult);
+
+    // The retry must not bump any version.
+    ASSERT_EQ(collVersionAfterFirst, getShardVersion(_shardIds[1]));
+}
+
+// An idempotent retry of an already-applied commit must return OK even when chunk operations have
+// since been disallowed on the collection (e.g. a concurrent DDL set allowChunkOperations=false).
+// The allowChunkOperations check runs only on the non-retry path.
+TEST_F(CommitMoveRangeTest, IdempotentRetrySucceedsWhenChunkOperationsDisallowed) {
+    const auto chunkMin = BSON("x" << 0);
+    const auto chunkMid = BSON("x" << 10);
+    const auto chunkMax = BSON("x" << 20);
+
+    auto migratedChunk = createChunk(
+        chunkMin, chunkMid, ChunkVersion({_collEpoch, _collTimestamp}, {2, 0}), _shardIds[0]);
+    auto controlChunk = createChunk(
+        chunkMid, chunkMax, ChunkVersion({_collEpoch, _collTimestamp}, {2, 1}), _shardIds[0]);
+    setupCollection(kNamespace, kKeyPattern, {migratedChunk, controlChunk});
+
+    const auto donorPreVersion = getShardVersion(_shardIds[0]);
+
+    auto firstResult = commit(migratedChunk, donorPreVersion, _shardIds[0], _shardIds[1]);
+    const auto collVersionAfterFirst = getShardVersion(_shardIds[1]);
+
+    disallowChunkOperations();
+
+    // The retry is detected as already applied and must still return the same changed chunks rather
+    // than failing with ConflictingOperationInProgress.
+    auto secondResult = commit(migratedChunk, donorPreVersion, _shardIds[0], _shardIds[1]);
+
+    assertSameChangedChunks(firstResult, secondResult);
+
+    // The retry must not bump any version.
+    ASSERT_EQ(collVersionAfterFirst, getShardVersion(_shardIds[1]));
+}
+
+// The commit returns chunks that participants store alongside chunks they load from the global
+// catalog through the catalog client, so both must expose the same set of fields. This compares the
+// field set (format), not the values, of each commit chunk against the catalog chunk for the same
+// range. A moveRange that splits the source chunk is used so the response carries a recipient chunk
+// plus the donor's two side chunks, covering generated _ids and inherited
+// history/onCurrentShardSince.
+TEST_F(CommitMoveRangeTest, ChangedChunksHaveSameFormatAsGetChunks) {
+    auto chunk = createChunk(kKeyPattern.globalMin(),
+                             kKeyPattern.globalMax(),
+                             ChunkVersion({_collEpoch, _collTimestamp}, {1, 0}),
+                             _shardIds[0]);
+    setupCollection(kNamespace, kKeyPattern, {chunk});
+
+    const auto subMin = BSON("x" << 1);
+    const auto subMax = BSON("x" << 10);
+    auto migratedChunk = chunk;
+    migratedChunk.setRange({subMin, subMax});
+
+    const auto donorPreVersion = getShardVersion(_shardIds[0]);
+    auto changedChunks = commit(migratedChunk, donorPreVersion, _shardIds[0], _shardIds[1]);
+    ASSERT_EQ(3U, changedChunks.size());
+
+    const auto catalogChunks = getChunksFromCatalogClient();
+
+    // Each chunk returned by the commit must have the same fields as the matching catalog chunk,
+    // regardless of their values.
+    for (const auto& changed : changedChunks) {
+        auto fromCatalog = getChangedChunkByMin(catalogChunks, changed.getMin());
+        ASSERT(fromCatalog.has_value());
+        ASSERT_EQ(sortedFieldNames(changed.toConfigBSON()),
+                  sortedFieldNames(fromCatalog->toConfigBSON()));
+    }
 }
 
 }  // namespace

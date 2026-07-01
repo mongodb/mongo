@@ -1086,6 +1086,7 @@ const allTestCases = {
         _configsvrCommitMergeAllChunksOnShard: {skip: "TODO"},
         _configsvrCommitMergeAllPrecomputedChunksOnShard: {skip: "internal command"},
         _configsvrCommitMovePrimary: {skip: "TODO"},
+        _configsvrCommitMoveRange: {skip: "internal command"},
         _configsvrCommitRefineCollectionShardKey: {skip: "TODO"},
         _configsvrCommitReshardCollection: {skip: "TODO"},
         _configsvrCommitShardRemoval: {skip: "runs on the configserver"},

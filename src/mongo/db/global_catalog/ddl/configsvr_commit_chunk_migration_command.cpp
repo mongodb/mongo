@@ -104,7 +104,7 @@ ChunkType toChunkType(const MigratedChunkType& migratedChunk) {
     return chunk;
 }
 
-
+// TODO (SERVER-127253): Remove this command
 class ConfigSvrCommitChunkMigrationCommand
     : public TypedCommand<ConfigSvrCommitChunkMigrationCommand> {
 public:

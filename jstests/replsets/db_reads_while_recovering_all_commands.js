@@ -43,6 +43,7 @@ const allCommands = {
     _configsvrCommitMergeAllChunksOnShard: {skip: isPrimaryOnly},
     _configsvrCommitMergeAllPrecomputedChunksOnShard: {skip: isPrimaryOnly},
     _configsvrCommitMovePrimary: {skip: isPrimaryOnly},
+    _configsvrCommitMoveRange: {skip: isPrimaryOnly},
     _configsvrCommitRefineCollectionShardKey: {skip: isPrimaryOnly},
     _configsvrCommitReshardCollection: {skip: isPrimaryOnly},
     _configsvrCommitShardRemoval: {skip: isPrimaryOnly},

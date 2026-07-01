@@ -366,6 +366,24 @@ public:
         const ShardId& toShard);
 
     /**
+     * Commits a chunk migration to the global catalog (config server).
+     *
+     * Returns the chunk documents changed by the commit. Participants use this list to update their
+     * shard catalog.
+     *
+     * 'donorShardVersionPreMigration' is the donor's shard version captured before the migration.
+     * It provides the collection generation (epoch/timestamp) used to validate the commit and, on
+     * idempotent retries, bounds the read that reconstructs the list of changed chunks.
+     */
+    StatusWith<std::vector<ChunkType>> commitMoveRange(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const ChunkType& migratedChunk,
+        const ChunkVersion& donorShardVersionPreMigration,
+        const ShardId& fromShard,
+        const ShardId& toShard);
+
+    /**
      * Removes the jumbo flag from the specified chunk.
      */
     void clearJumboFlag(OperationContext* opCtx,
@@ -863,6 +881,77 @@ private:
                                             const std::vector<ChunkType>& splitChunks,
                                             const boost::optional<ChunkType>& controlChunk,
                                             const ShardId& donorShardId);
+
+    /**
+     * Result of a shared chunk-operation commit core (migration, split or merge). It carries both
+     * forms of the result; each caller reads the one it needs. On a fresh commit the requested
+     * form is populated; on an idempotent retry only the requested form is reconstructed and the
+     * other is left default-constructed.
+     */
+    struct ChunkOpCommitOutcome {
+        // The chunk documents changed by the commit -- or, on an idempotent retry, the same set
+        // reconstructed from the durable catalog.
+        std::vector<ChunkType> changedChunks;
+
+        // Shard and collection placement versions produced by the commit.
+        ShardAndCollectionPlacementVersions placementVersions;
+    };
+
+    /**
+     * Shared core of a chunk-migration commit. Acquires the chunk-operation lock, validates the
+     * request against the durable catalog, and either detects that the migration was already
+     * committed (idempotent retry) or generates the new migrated/split/control chunk documents and
+     * commits them durably in a single transaction.
+     *
+     * All catalog reads, including those that rebuild the idempotent response, happen while the
+     * chunk-operation lock is held. On the idempotent path, when
+     * 'donorShardVersionPreMigrationForRebuild' is set the changed chunks are rebuilt (see
+     * _rebuildChangedChunksAfterMigration); when unset, the donor's shard placement version is read
+     * instead. See ChunkOpCommitOutcome.
+     *
+     * TODO (SERVER-127253): Make donorShardVersionPreMigrationForRebuild non-optional.
+     */
+    StatusWith<ChunkOpCommitOutcome> _commitChunkMigrationImpl(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const ChunkType& migratedChunk,
+        const OID& collectionEpoch,
+        const Timestamp& collectionTimestamp,
+        const ShardId& fromShard,
+        const ShardId& toShard,
+        const boost::optional<ChunkVersion>& donorShardVersionPreMigrationForRebuild);
+
+    /**
+     * Reconstructs the chunks an already-committed operation changed on a single shard by reading
+     * the durable catalog: the chunks on 'shard' whose version is greater than 'shardVersionPreOp'.
+     *
+     * Because chunk commits are serialized under the chunk-operation lock, the shard's highest
+     * version before the operation is exactly 'shardVersionPreOp', so these are precisely the
+     * chunks the operation changed on that shard: the split sub-chunks, the merged chunk, or (for a
+     * moveRange) the siblings left behind and the bumped control chunk. Returned sorted by version
+     * ascending. This identifies changes on the requesting shard for split, merge and the donor of
+     * a migration.
+     */
+    StatusWith<std::vector<ChunkType>> _rebuildChangedChunksOnShard(
+        OperationContext* opCtx,
+        const CollectionType& coll,
+        const ShardId& shard,
+        const ChunkVersion& shardVersionPreOp);
+
+    /**
+     * Reconstructs the list of chunks changed by an already-committed migration. Combines the
+     * chunks changed on the donor (see _rebuildChangedChunksOnShard) with, when ownership changed
+     * ('toShard' != 'fromShard'), the single chunk now owned by 'toShard' matching 'migratedRange'
+     * exactly. The recipient chunk is found by bounds rather than by version because the
+     * recipient's pre-migration version is not known here.
+     */
+    StatusWith<std::vector<ChunkType>> _rebuildChangedChunksAfterMigration(
+        OperationContext* opCtx,
+        const CollectionType& coll,
+        const ChunkRange& migratedRange,
+        const ChunkVersion& donorShardVersionPreMigration,
+        const ShardId& fromShard,
+        const ShardId& toShard);
 
     /**
      * Execute the merge chunk updates using the internal transaction API.

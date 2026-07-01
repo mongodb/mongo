@@ -202,6 +202,28 @@ const internalCommandsMap = {
             collModRequest: {},
         },
     },
+    _configsvrCommitMoveRange: {
+        testname: "_configsvrCommitMoveRange",
+        command: {
+            _configsvrCommitMoveRange: "db.fooHashed",
+            fromShard: "move_chunk_basic-rs0",
+            toShard: "move_chunk_basic-rs1",
+            migratedChunk: {
+                lastmod: {
+                    e: new ObjectId("62b052ac7f5653479a67a54f"),
+                    t: new Timestamp(1655722668, 22),
+                    v: new Timestamp(1, 0),
+                },
+                min: {_id: MinKey},
+                max: {_id: 611686018427387902},
+            },
+            donorShardVersionPreMigration: {
+                e: new ObjectId("62b052ac7f5653479a67a54f"),
+                t: new Timestamp(1655722668, 22),
+                v: new Timestamp(1, 3),
+            },
+        },
+    },
     _configsvrCommitMovePrimary: {
         testname: "_configsvrCommitMovePrimary",
         command: {

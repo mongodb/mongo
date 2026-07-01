@@ -53,6 +53,15 @@ structs:
             min: object
             max: object
 
+    ConfigSvrCommitMoveRangeResponse:
+        description: "Response of the _configsvrCommitMoveRange command."
+        strict: false
+        is_command_reply: true
+        fields:
+            changedChunks:
+                type: array<object>
+                description: "A list with the changed chunks by the migration commit, in config BSON form."
+
 commands:
     _configsvrCommitChunkMigration:
         command_name: _configsvrCommitChunkMigration
@@ -88,3 +97,34 @@ commands:
                     Set by the MoveRangeCoordinator to request the authoritative commit path. The
                     legacy path leaves it unset; an absent value means the legacy commit path.
                 optional: true
+
+    _configsvrCommitMoveRange:
+        command_name: _configsvrCommitMoveRange
+        cpp_name: CommitMoveRangeRequest
+        description:
+            "Internal command that commits a chunk migration to the global catalog and
+            returns the chunks it changed."
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        strict: false
+        reply_type: ConfigSvrCommitMoveRangeResponse
+        fields:
+            fromShard:
+                type: shard_ref
+                description: "Donor shard name."
+
+            toShard:
+                type: shard_ref
+                description: "Recipient shard name."
+
+            migratedChunk:
+                type: MigratedChunkType
+                description: "ChunkType describing the migrated chunk."
+
+            donorShardVersionPreMigration:
+                type: ChunkVersion
+                description:
+                    "Donor shard version captured before the migration. Provides the collection
+                    generation used to validate the commit and bounds the read that rebuilds the
+                    response on idempotent retries."
