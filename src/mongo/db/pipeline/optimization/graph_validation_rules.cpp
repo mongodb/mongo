@@ -72,7 +72,14 @@ void insertArraynessValidationStages(Pipeline& pipeline) {
         DepsTracker deps;
         stage->getDependencies(&deps);
 
-        if (deps.needWholeDocument || deps.fields.empty()) {
+        // Never inject a validation stage at the very front of the pipeline. The leading stage
+        // reads directly from the collection and may be pulled into the query executor as part of
+        // the find layer (e.g. a leading $match, $sort, or $geoNear). Injecting a validation stage
+        // ahead of it makes the validation stage the pipeline front and defeats that pushdown. This
+        // costs no dependency-graph coverage: for the leading stage, canPathBeArray() is a direct
+        // passthrough to the collection's path-arrayness metadata, not the graph's
+        // stage-transformation inference that this validation is meant to exercise.
+        if (stageIndex == 0 || deps.needWholeDocument || deps.fields.empty()) {
             ++stageIndex;
             continue;
         }

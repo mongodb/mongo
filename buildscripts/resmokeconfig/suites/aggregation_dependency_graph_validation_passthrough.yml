@@ -20,8 +20,6 @@ selector:
     # which conflicts with the suite's automatic stage injection and the stage's
     # internal-only (non-user-request) gating.
     - jstests/aggregation/sources/internal_assert_data_assumptions_test.js
-    # TODO SERVER-127290
-    - jstests/aggregation/sources/shred_documents.js
     # TODO SERVER-23229: remove when the underlying issue is resolved.
     - jstests/aggregation/sources/group/groupMissing.js
     # TODO SERVER-127292
