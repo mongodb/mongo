@@ -345,13 +345,6 @@ void updateShardCatalogCache(OperationContext* opCtx,
 
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
     scopedCsr->setCollectionMetadata(opCtx, std::move(ownedMetadata));
-
-    // Update allowChunkOperations and write an oplog 'c' entry to send the new allowChunkOperations
-    // value to secondaries, since its value could have potentially changed.
-    // TODO (SERVER-127444): remove these lines.
-    scopedCsr->setAllowChunkOperations(coll.getAllowChunkOperations());
-    setAllowChunkOperationsOnSecondaries(
-        opCtx, nss, coll.getUuid(), coll.getAllowChunkOperations());
 }
 
 }  // namespace
