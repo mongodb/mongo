@@ -37,13 +37,10 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/version_context.h"
 #include "mongo/util/assert_util.h"
 
@@ -108,12 +105,6 @@ DocumentSourceContainer DocumentSourceListCatalog::createFromBson(
         ErrorCodes::InvalidNamespace,
         "Collectionless $listCatalog must be run against the 'admin' database with {aggregate: 1}",
         nss.isAdminDB() || !nss.isCollectionlessAggregateNS());
-
-    uassert(ErrorCodes::QueryFeatureNotAllowed,
-            fmt::format("The {} aggregation stage is not enabled", kStageName),
-            feature_flags::gDocumentSourceListCatalog.isEnabled(
-                VersionContext::getDecoration(pExpCtx->getOperationContext()),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     DocumentSourceContainer result;
     result.emplace_back(new DocumentSourceListCatalog(pExpCtx));

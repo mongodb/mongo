@@ -256,12 +256,6 @@ feature_flags:
         default: true
         version: 8.0
         fcv_gated: true
-    featureFlagDocumentSourceListCatalog:
-        description: "When enabled, allow the use of the $listCatalog aggregation stage"
-        cpp_varname: feature_flags::gDocumentSourceListCatalog
-        default: true
-        version: 6.0
-        fcv_gated: true
     featureFlagInternalWritesAreReplicatedTransactionally:
         description: Feature flag to enable internal writes to use the transactionally replicated WriteUnitOfWork API by default.
         cpp_varname: gFeatureFlagInternalWritesAreReplicatedTransactionally
