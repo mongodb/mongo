@@ -1267,10 +1267,12 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/exec/document_value:document_value_test_util",
+        "//src/mongo/db/memory_tracking",
         "//src/mongo/db/query/collation:collator_factory_mock",
         "//src/mongo/db/query/collation:collator_interface_mock",
         "//src/mongo/scripting:scripting_server",
         "//src/mongo/unittest",
+        "//src/mongo/unittest:server_parameter_guard",
     ],
 )
 

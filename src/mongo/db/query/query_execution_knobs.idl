@@ -254,6 +254,21 @@ server_parameters:
             gt: 0
         redact: false
 
+    internalQueryMaxConstantFoldingBytes:
+        description: >-
+            Limits the memory used per constant-fold evaluation in ExpressionNary::optimize().
+            When featureFlagQueryMemoryTracking and featureFlagExpressionMemoryTracking are both
+            enabled, this local cap applies in addition to any operation-wide limit set by
+            internalQueryMaxMemoryUsageBytesPerOperation; whichever is tighter wins.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryMaxConstantFoldingBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 100 * 1024 * 1024
+        validator:
+            gt: 0
+        redact: false
+
     internalQueryMaxMapReduceExpressionBytes:
         description: "Limits the amount of memory that can be used while constructing the result of a $map or $range expression"
         set_at: [startup, runtime]
