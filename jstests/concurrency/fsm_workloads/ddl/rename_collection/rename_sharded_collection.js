@@ -15,6 +15,12 @@
  *  ]
  */
 
+import {
+    checkExceptionHasBeenThrown,
+    getRandomCollName,
+    getRandomDbName,
+} from "jstests/concurrency/fsm_workload_helpers/catalog_and_routing/random_ddl_utils.js";
+
 const numDocs = 100;
 const dbNames = ["db0", "db1"];
 const collNames = [
@@ -39,19 +45,6 @@ function initAndFillShardedCollection(db, collName) {
 }
 
 /*
- * Get a random db/coll name from the test lists.
- *
- * Using the thread id to introduce more randomness: it has been observed that concurrent calls to
- * Random.randInt(array.length) are returning too often the same number to different threads.
- */
-function getRandomDbName(tid) {
-    return dbNames[Random.randInt(tid * tid) % dbNames.length];
-}
-function getRandomCollName(tid) {
-    return collNames[Random.randInt(tid * tid) % collNames.length];
-}
-
-/*
  * Keep track of raised exceptions in a collection to be checked during teardown.
  */
 const expectedExceptions = [
@@ -67,21 +60,14 @@ function logException(db, exceptionCode) {
     assert.commandWorked(coll.insert({code: exceptionCode}));
 }
 
-function checkExceptionHasBeenThrown(db, exceptionCode) {
-    db = db.getSiblingDB(logExceptionsDBName);
-    const coll = db[logExceptionsCollName];
-    const count = coll.countDocuments({code: exceptionCode});
-    assert.gte(count, 1, "No exception with error code " + exceptionCode + " has been thrown");
-}
-
 export const $config = (function () {
     let states = {
         rename: function (db, collName, connCache) {
-            const dbName = getRandomDbName(this.threadCount);
+            const dbName = getRandomDbName(this.threadCount, dbNames);
             db = db.getSiblingDB(dbName);
-            collName = getRandomCollName(this.threadCount);
+            collName = getRandomCollName(this.threadCount, collNames);
             let srcColl = db[collName];
-            const destCollName = getRandomCollName(this.threadCount);
+            const destCollName = getRandomCollName(this.threadCount, collNames);
             try {
                 assert.commandWorked(srcColl.renameCollection(destCollName));
             } catch (e) {
@@ -120,7 +106,9 @@ export const $config = (function () {
         // Ensure that NamespaceNotFound and ConflictingOperationInProgress have been raised at
         // least once: with a high level of concurrency, it's too improbable for such exceptions to
         // never be thrown (in that case, it's very likely that a bug has been introduced).
-        expectedExceptions.forEach((errCode) => checkExceptionHasBeenThrown(db, errCode));
+        expectedExceptions.forEach((errCode) =>
+            checkExceptionHasBeenThrown(db, errCode, logExceptionsDBName, logExceptionsCollName),
+        );
 
         // Check that at most one collection per test DB is present and that no data has been lost
         // upon multiple renames.
