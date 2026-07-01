@@ -46,6 +46,59 @@ using namespace std::literals::string_view_literals;
 
 using boost::intrusive_ptr;
 
+/* ----------------------------- ExpressionArray ------------------------------ */
+
+namespace {
+intrusive_ptr<Expression> parseArrayLiteral(ExpressionContextForTest* expCtx,
+                                            const BSONArray& elems) {
+    BSONObj wrapper = BSON("" << elems);
+    return Expression::parseOperand(expCtx, wrapper.firstElement(), expCtx->variablesParseState);
+}
+}  // namespace
+
+TEST(ExpressionArrayTest, TracksOutputMemoryAndReleasesAfterEvaluation) {
+    auto expCtx = ExpressionContextForTest{};
+    auto expr = parseArrayLiteral(&expCtx, BSON_ARRAY("$a"sv << "$b"sv));
+
+    SimpleMemoryUsageTracker tracker{4096};
+    EvaluationContext ctx{.tracker = &tracker};
+
+    Document doc{{"a", "hello"sv}, {"b", "world"sv}};
+    ASSERT_VALUE_EQ(expr->evaluate(doc, &expCtx.variables, ctx),
+                    Value(BSON_ARRAY("hello"sv << "world"sv)));
+
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(tracker.peakTrackedMemoryBytes(), 0);
+}
+
+TEST(ExpressionArrayTest, ThrowsExceededMemoryLimitWhenOverLimit) {
+    auto expCtx = ExpressionContextForTest{};
+    auto expr = parseArrayLiteral(&expCtx, BSON_ARRAY("$a"sv << "$b"sv));
+
+    SimpleMemoryUsageTracker tracker{8};
+    EvaluationContext ctx{.tracker = &tracker};
+
+    Document doc{{"a", std::string(100, 'x')}, {"b", std::string(100, 'y')}};
+    try {
+        expr->evaluate(doc, &expCtx.variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$array");
+    }
+
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
+}
+
+TEST(ExpressionArrayTest, NoTrackerDoesNotThrow) {
+    auto expCtx = ExpressionContextForTest{};
+    auto expr = parseArrayLiteral(&expCtx, BSON_ARRAY("$a"sv << "$b"sv));
+
+    Document doc{{"a", std::string(100, 'x')}, {"b", std::string(100, 'y')}};
+    ASSERT_VALUE_EQ(expr->evaluate(doc, &expCtx.variables),
+                    Value(BSON_ARRAY(std::string(100, 'x') << std::string(100, 'y'))));
+}
+
 /* ------------------------- ExpressionArrayToObject -------------------------- */
 
 TEST(ExpressionArrayToObjectTest, KVFormatSimple) {
@@ -944,22 +997,19 @@ TEST(ExpressionConcatArraysTest, MemoryTrackerAccumulatesOutputSize) {
 
 TEST(ExpressionConcatArraysTest, MemoryTrackerThrowsWhenLimitExceeded) {
     auto expCtx = ExpressionContextForTest{};
-    // 20 integer elements should exceed the 100-byte limit when tracked via
-    // Value::getApproximateSize().
-    BSONArrayBuilder arr1, arr2;
+    std::vector<Value> arr1, arr2;
     for (int i = 0; i < 10; ++i)
-        arr1.append(i);
+        arr1.push_back(Value(i));
     for (int i = 10; i < 20; ++i)
-        arr2.append(i);
-    auto expr =
-        Expression::parseExpression(&expCtx,
-                                    BSON("$concatArrays" << BSON_ARRAY(arr1.arr() << arr2.arr())),
-                                    expCtx.variablesParseState);
+        arr2.push_back(Value(i));
+    auto expr = Expression::parseExpression(
+        &expCtx, BSON("$concatArrays" << BSON_ARRAY("$a"sv << "$b"sv)), expCtx.variablesParseState);
+    Document doc{{"a", Value(arr1)}, {"b", Value(arr2)}};
 
     SimpleMemoryUsageTracker tracker{100};
     EvaluationContext ctx{.tracker = &tracker};
     try {
-        expr->evaluate({}, &expCtx.variables, ctx);
+        expr->evaluate(doc, &expCtx.variables, ctx);
         FAIL("Expected ExceededMemoryLimit to be thrown");
     } catch (const AssertionException& ex) {
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
@@ -969,18 +1019,14 @@ TEST(ExpressionConcatArraysTest, MemoryTrackerThrowsWhenLimitExceeded) {
 
 TEST(ExpressionConcatArraysTest, MemoryTrackerThrowsWhenQueryLimitExceeded) {
     auto expCtx = ExpressionContextForTest{};
-    // 20 integer elements exceed the operation-wide (query) limit. Here the stage tracker's own
-    // local limit is generous, so the throw must come from the per-operation cap held by the root
-    // tracker, not the local one.
-    BSONArrayBuilder arr1, arr2;
+    std::vector<Value> arr1, arr2;
     for (int i = 0; i < 10; ++i)
-        arr1.append(i);
+        arr1.push_back(Value(i));
     for (int i = 10; i < 20; ++i)
-        arr2.append(i);
-    auto expr =
-        Expression::parseExpression(&expCtx,
-                                    BSON("$concatArrays" << BSON_ARRAY(arr1.arr() << arr2.arr())),
-                                    expCtx.variablesParseState);
+        arr2.push_back(Value(i));
+    auto expr = Expression::parseExpression(
+        &expCtx, BSON("$concatArrays" << BSON_ARRAY("$a"sv << "$b"sv)), expCtx.variablesParseState);
+    Document doc{{"a", Value(arr1)}, {"b", Value(arr2)}};
 
     // Root (operation-wide) tracker carries the 100-byte cap; the stage tracker reports into it but
     // has a large local limit of its own. Usage rolls up via the base chain.
@@ -988,7 +1034,7 @@ TEST(ExpressionConcatArraysTest, MemoryTrackerThrowsWhenQueryLimitExceeded) {
     SimpleMemoryUsageTracker stageTracker{&operationTracker, 100 * 1024 * 1024};
     EvaluationContext ctx{.tracker = &stageTracker};
     try {
-        expr->evaluate({}, &expCtx.variables, ctx);
+        expr->evaluate(doc, &expCtx.variables, ctx);
         FAIL("Expected ExceededMemoryLimit to be thrown");
     } catch (const AssertionException& ex) {
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
@@ -1032,23 +1078,19 @@ TEST(ExpressionSetUnionTest, MemoryTrackerAccumulatesOutputSize) {
 
 TEST(ExpressionSetUnionTest, MemoryTrackerThrowsWhenLimitExceeded) {
     auto expCtx = ExpressionContextForTest{};
-    // 20 integer elements should exceed the stage limit when tracked via
-    // Value::getApproximateSize().
-    BSONArrayBuilder arr1, arr2;
+    std::vector<Value> arr1, arr2;
     for (int i = 0; i < 10; ++i)
-        arr1.append(i);
+        arr1.push_back(Value(i));
     for (int i = 10; i < 20; ++i)
-        arr2.append(i);
-    auto expr =
-        Expression::parseExpression(&expCtx,
-                                    BSON("$setUnion" << BSON_ARRAY(arr1.arr() << arr2.arr())),
-                                    expCtx.variablesParseState);
-
+        arr2.push_back(Value(i));
+    auto expr = Expression::parseExpression(
+        &expCtx, BSON("$setUnion" << BSON_ARRAY("$a"sv << "$b"sv)), expCtx.variablesParseState);
+    Document doc{{"a", Value(arr1)}, {"b", Value(arr2)}};
 
     SimpleMemoryUsageTracker tracker{256};
     EvaluationContext ctx{.tracker = &tracker};
     try {
-        expr->evaluate({}, &expCtx.variables, ctx);
+        expr->evaluate(doc, &expCtx.variables, ctx);
         FAIL("Expected ExceededMemoryLimit to be thrown");
     } catch (const AssertionException& ex) {
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
@@ -1058,18 +1100,14 @@ TEST(ExpressionSetUnionTest, MemoryTrackerThrowsWhenLimitExceeded) {
 
 TEST(ExpressionSetUnionTest, MemoryTrackerThrowsWhenQueryLimitExceeded) {
     auto expCtx = ExpressionContextForTest{};
-    // 20 integer elements exceed the operation-wide (query) limit. Here the stage tracker's own
-    // local limit is generous, so the throw must come from the per-operation cap held by the root
-    // tracker, not the local one.
-    BSONArrayBuilder arr1, arr2;
+    std::vector<Value> arr1, arr2;
     for (int i = 0; i < 10; ++i)
-        arr1.append(i);
+        arr1.push_back(Value(i));
     for (int i = 10; i < 20; ++i)
-        arr2.append(i);
-    auto expr =
-        Expression::parseExpression(&expCtx,
-                                    BSON("$setUnion" << BSON_ARRAY(arr1.arr() << arr2.arr())),
-                                    expCtx.variablesParseState);
+        arr2.push_back(Value(i));
+    auto expr = Expression::parseExpression(
+        &expCtx, BSON("$setUnion" << BSON_ARRAY("$a"sv << "$b"sv)), expCtx.variablesParseState);
+    Document doc{{"a", Value(arr1)}, {"b", Value(arr2)}};
 
     // Root (operation-wide) tracker carries the cap; the stage tracker reports into it but
     // has a large local limit of its own. Usage rolls up via the base chain.
@@ -1077,7 +1115,7 @@ TEST(ExpressionSetUnionTest, MemoryTrackerThrowsWhenQueryLimitExceeded) {
     SimpleMemoryUsageTracker stageTracker{&operationTracker, 100 * 1024 * 1024};
     EvaluationContext ctx{.tracker = &stageTracker};
     try {
-        expr->evaluate({}, &expCtx.variables, ctx);
+        expr->evaluate(doc, &expCtx.variables, ctx);
         FAIL("Expected ExceededMemoryLimit to be thrown");
     } catch (const AssertionException& ex) {
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);

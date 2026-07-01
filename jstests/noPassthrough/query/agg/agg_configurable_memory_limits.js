@@ -389,4 +389,54 @@ assert.commandWorked(bulk.execute());
     setParam(chunkSizeKnob, chunkOriginalVal);
 })();
 
+(function testArrayExpressionMemoryLimit() {
+    // featureFlagExpressionMemoryTracking turns on the expression evaluation tracking.
+    if (!FeatureFlagUtil.isEnabled(db, "ExpressionMemoryTracking")) {
+        jsTest.log.info("Skipping test because ExpressionMemoryTracking is not enabled");
+        return;
+    }
+
+    // TODO SERVER-130093: remove once SBE tracks $array (ExpressionArray).
+    if (sbeFullyEnabled) {
+        jsTest.log.info(
+            "Skipping test because $array memory tracking is not yet implemented in SBE",
+        );
+        return;
+    }
+    const knob = "internalQueryMaxMemoryUsageBytesPerOperation";
+    const chunkSizeKnob = "internalQueryMaxWriteToCurOpMemoryUsageBytes";
+
+    const pipeline = [
+        {$limit: 1},
+        {
+            $project: {
+                a: [
+                    {$range: [0, {$add: ["$_id", 50]}]},
+                    {$range: [{$add: ["$_id", 50]}, {$add: ["$_id", 100]}]},
+                ],
+            },
+        },
+    ];
+
+    assert.doesNotThrow(() => coll.aggregate(pipeline).toArray());
+
+    // Lower the operation-wide limit so the $array result exceeds it.
+    const originalVal = setParam(knob, 1024);
+    // TODO SERVER-129201: Remove this explicit knob set.
+    const chunkOriginalVal = setParam(chunkSizeKnob, 256);
+
+    const err = assert.throwsWithCode(
+        () => coll.aggregate(pipeline).toArray(),
+        ErrorCodes.ExceededMemoryLimit,
+    );
+    assert(
+        err.message.includes("$array needs too much memory"),
+        "Expected error message to mention $array, but got: " + err.message,
+        {err},
+    );
+
+    setParam(knob, originalVal);
+    setParam(chunkSizeKnob, chunkOriginalVal);
+})();
+
 MongoRunner.stopMongod(conn);

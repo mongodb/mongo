@@ -73,9 +73,21 @@ Value evaluate(const ExpressionArray& expr,
     auto& children = expr.getChildren();
     std::vector<Value> values;
     values.reserve(children.size());
+
+    SimpleMemoryUsageToken memToken;
+    if (ctx.tracker) {
+        memToken = SimpleMemoryUsageToken(0, ctx.tracker);
+    }
+
     for (auto&& child : children) {
         Value elemVal = child->evaluate(root, variables, ctx);
-        values.push_back(elemVal.missing() ? Value(BSONNULL) : std::move(elemVal));
+        Value& stored =
+            values.emplace_back(elemVal.missing() ? Value(BSONNULL) : std::move(elemVal));
+
+        if (ctx.tracker) {
+            memToken.add(static_cast<int64_t>(stored.getApproximateSize()));
+            ctx.tracker->assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
+        }
     }
     return Value(std::move(values));
 }
