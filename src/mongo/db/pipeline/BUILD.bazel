@@ -531,7 +531,6 @@ mongo_cc_library(
         "//src/mongo/db/exec/agg:union_with_stage.cpp",
         "//src/mongo/db/exec/agg:unwind_processor.cpp",
         "//src/mongo/db/exec/agg:unwind_stage.cpp",
-        "//src/mongo/db/exec/agg/search:internal_search_id_lookup_stage.cpp",
         "//src/mongo/db/exec/agg/search:internal_search_mongot_remote_stage.cpp",
         "//src/mongo/db/exec/agg/search:list_search_indexes_stage.cpp",
         "//src/mongo/db/exec/agg/search:search_meta_stage.cpp",
@@ -1038,6 +1037,20 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "search_id_lookup_stage",
+    srcs = [
+        "//src/mongo/db/exec/agg/search:internal_search_id_lookup_stage.cpp",
+    ],
+    deps = [
+        ":pipeline",
+        "//src/mongo/db/exec/single_doc_lookup:collection_acquirer",
+        "//src/mongo/db/exec/single_doc_lookup:express_single_document_lookup_executor",
+        "//src/mongo/db/exec/single_doc_lookup:local_lookup_eligibility",
+        "//src/mongo/db/exec/single_doc_lookup:single_document_lookup_executor",
+    ],
+)
+
+mongo_cc_library(
     name = "change_stream_pipeline",
     srcs = [
         "change_stream_document_diff_parser.cpp",
@@ -1521,10 +1534,13 @@ mongo_cc_unit_test(
         ":document_sources_idl",
         ":field_path",
         ":graph_lookup_mock_mongo_interface",
+        ":search_id_lookup_stage",
         "//src/mongo/db:curop_metrics",
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/exec/document_value:document_value_test_util",
+        "//src/mongo/db/exec/single_doc_lookup:express_single_document_lookup_executor",
+        "//src/mongo/db/exec/single_doc_lookup:single_document_lookup_executor",
         "//src/mongo/db/extension/host:extension_loader",
         "//src/mongo/db/memory_tracking",
         "//src/mongo/db/pipeline/optimization:pipeline_optimization",

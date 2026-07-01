@@ -140,6 +140,11 @@ TEST_F(ExpressLookupTest, UnknownEligibilityReturnsNotHandled) {
 
 // --- Happy paths (C1.1 / C1.3 / C3.2) ---------------------------------------------------------
 
+// An existing _id is found and the full document returned. This fixture's collection is unsharded,
+// so this also covers the shard-filter no-op: Express always requests the acquisition's shard
+// filter, but an unsharded acquisition has none to apply (getShardingFilter() would tassert), so
+// the document is returned unfiltered. Orphan dropping on a truly sharded collection is exercised
+// end-to-end by the $_internalSearchIdLookup orphan tests with the feature flag on.
 TEST_F(ExpressLookupTest, FindsExistingDocument) {
     insert(BSON("_id" << 1 << "value" << "hello"));
     auto exec = makeExecutor(MockLocalLookupEligibility::makeAlwaysLocal());

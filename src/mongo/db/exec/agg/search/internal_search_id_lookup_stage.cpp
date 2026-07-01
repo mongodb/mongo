@@ -34,6 +34,10 @@
 #include "mongo/db/curop_metrics.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
+#include "mongo/db/exec/single_doc_lookup/collection_acquirer.h"
+#include "mongo/db/exec/single_doc_lookup/express_single_document_lookup_executor.h"
+#include "mongo/db/exec/single_doc_lookup/local_lookup_eligibility.h"
+#include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
@@ -56,7 +60,9 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalSearchIdLookupToSta
         documentSource->_spec,
         documentSource->getExpCtx(),
         documentSource->_catalogResourceHandle,
-        documentSource->_searchIdLookupMetrics);
+        documentSource->_searchIdLookupMetrics,
+        exec::agg::buildIdLookupExecutor(documentSource->getExpCtx(),
+                                         documentSource->_catalogResourceHandle));
 }
 
 namespace exec::agg {
@@ -65,18 +71,35 @@ REGISTER_AGG_STAGE_MAPPING(internalSearchIdLookupStage,
                            DocumentSourceInternalSearchIdLookUp::id,
                            documentSourceInternalSearchIdLookupToStageFn);
 
+std::unique_ptr<SingleDocumentLookupExecutor> buildIdLookupExecutor(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const boost::intrusive_ptr<DSInternalSearchIdLookUpCatalogResourceHandle>&
+        catalogResourceHandle) {
+    // idLookup is always local (mongot returns _ids for documents on this shard), so use
+    // AlwaysLocalEligibility. Those _ids can include orphans, which Express drops by applying the
+    // acquisition's shard filter. Reuse the stage's upfront acquisition via
+    // PreAcquiredCollectionAcquirer rather than re-acquiring per document.
+    return std::make_unique<ExpressSingleDocumentLookupExecutor>(
+        std::make_unique<PreAcquiredCollectionAcquirer>(
+            catalogResourceHandle->getStasher(),
+            catalogResourceHandle->getCollectionForLookupExecutor()),
+        std::make_unique<AlwaysLocalEligibility>());
+}
+
 InternalSearchIdLookUpStage::InternalSearchIdLookUpStage(
     std::string_view stageName,
     DocumentSourceIdLookupSpec spec,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const boost::intrusive_ptr<DSInternalSearchIdLookUpCatalogResourceHandle>&
         catalogResourceHandle,
-    const std::shared_ptr<SearchIdLookupMetrics>& searchIdLookupMetrics)
+    const std::shared_ptr<SearchIdLookupMetrics>& searchIdLookupMetrics,
+    std::unique_ptr<SingleDocumentLookupExecutor> lookupExecutor)
     : Stage(stageName, expCtx),
       _stageName(stageName),
       _spec(std::move(spec)),
       _catalogResourceHandle(catalogResourceHandle),
-      _searchIdLookupMetrics(searchIdLookupMetrics) {}
+      _searchIdLookupMetrics(searchIdLookupMetrics),
+      _lookupExecutor(std::move(lookupExecutor)) {}
 
 Document InternalSearchIdLookUpStage::getExplainOutput(
     const query_shape::SerializationOptions& opts) const {

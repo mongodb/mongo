@@ -801,6 +801,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline",
         "//src/mongo/db/pipeline:change_stream_pipeline",
         "//src/mongo/db/pipeline:document_source_internal_apply_oplog_update",
+        "//src/mongo/db/pipeline:search_id_lookup_stage",
         "//src/mongo/db/repl:isself",
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/session:logical_session_cache",

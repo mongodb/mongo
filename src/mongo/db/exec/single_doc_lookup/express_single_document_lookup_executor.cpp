@@ -38,6 +38,7 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
+#include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -81,11 +82,17 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutor(
         .parsedFind = ParsedFindCommandParams{std::move(findCmd)},
     });
 
-    // No shard filter needed. Unlike a scatter-gathered find({_id}), the eligibility check already
-    // shard-key-targeted this documentKey to this shard as the unique owner, and the versioned
-    // acquisition confirms that ownership is current. With per-shard _id uniqueness, the doc found
-    // by _id here is the owned one, not an orphan.
+    // Always apply the acquisition's shard filter so orphans physically present on this node are
+    // dropped post-read. For callers whose eligibility has already shard-key-targeted the
+    // documentKey to this shard (e.g. change-stream updateLookup) this is a redundant-but-harmless
+    // no-op; for callers running on bare _ids that may include orphans (e.g. $search/$vectorSearch
+    // idLookup) it is what drops them. The filter is only defined on sharded collections --
+    // getShardingFilter() tasserts otherwise -- so guard on isSharded(); unsharded collections have
+    // no orphans and leave the filter unset.
     boost::optional<ScopedCollectionFilter> collectionFilter;
+    if (coll.collection().getShardingDescription().isSharded()) {
+        collectionFilter = coll.collection().getShardingFilter();
+    }
 
     // The find command carries no collation, so adopt the collection's default collation.
     const auto& collPtr = coll.getCollectionPtr();

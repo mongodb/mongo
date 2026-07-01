@@ -160,6 +160,14 @@ public:
         return _collection;
     }
 
+    /**
+     * Returns the upfront acquisition for building a PreAcquiredCollectionAcquirer. Unlike
+     * getCollection(), this does not require the handle to be acquired onto the opCtx.
+     */
+    CollectionAcquisition getCollectionForLookupExecutor() const {
+        return _collection;
+    }
+
 private:
     CollectionAcquisition _collection;
 };

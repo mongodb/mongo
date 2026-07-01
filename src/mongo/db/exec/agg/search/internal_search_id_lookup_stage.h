@@ -32,6 +32,7 @@
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup_gen.h"
@@ -55,7 +56,8 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const boost::intrusive_ptr<DSInternalSearchIdLookUpCatalogResourceHandle>&
             catalogResourceHandle,
-        const std::shared_ptr<SearchIdLookupMetrics>& searchIdLookupMetrics);
+        const std::shared_ptr<SearchIdLookupMetrics>& searchIdLookupMetrics,
+        std::unique_ptr<SingleDocumentLookupExecutor> lookupExecutor);
 
     const SpecificStats* getSpecificStats() const override {
         return &_stats;
@@ -63,6 +65,14 @@ public:
 
     Document getExplainOutput(const query_shape::SerializationOptions& opts =
                                   query_shape::SerializationOptions{}) const override;
+
+    /**
+     * Test-only accessor for the single-document lookup executor held by this stage, so wiring
+     * tests can assert the concrete strategy installed by the stage factory via dynamic_cast.
+     */
+    const SingleDocumentLookupExecutor* getLookupExecutor_forTest() const {
+        return _lookupExecutor.get();
+    }
 
 private:
     GetNextResult doGetNext() final;
@@ -76,6 +86,20 @@ private:
 
     std::shared_ptr<SearchIdLookupMetrics> _searchIdLookupMetrics;
     DocumentSourceIdLookupStats _stats;
+
+    // Express fast-path strategy for local _id point lookups. Held by the stage but, as of this
+    // change, not yet consulted by doGetNext(); wiring it into execution behind a feature flag is a
+    // follow-up.
+    std::unique_ptr<SingleDocumentLookupExecutor> _lookupExecutor;
 };
+
+/**
+ * Builds the Express SingleDocumentLookupExecutor that InternalSearchIdLookUpStage uses to resolve
+ * each _id to its full document.
+ */
+std::unique_ptr<SingleDocumentLookupExecutor> buildIdLookupExecutor(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const boost::intrusive_ptr<DSInternalSearchIdLookUpCatalogResourceHandle>&
+        catalogResourceHandle);
 
 }  // namespace mongo::exec::agg

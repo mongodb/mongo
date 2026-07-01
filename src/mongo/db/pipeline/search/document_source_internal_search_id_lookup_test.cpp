@@ -36,8 +36,11 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/mock_stage.h"
+#include "mongo/db/exec/agg/search/internal_search_id_lookup_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/exec/single_doc_lookup/express_single_document_lookup_executor.h"
+#include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/global_catalog/type_chunk.h"
@@ -249,6 +252,35 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, BasicSearchTest) {
     ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{{"_id", 2}, {"color", "yellow"sv}}));
 
     ASSERT_TRUE(idLookupStage->getNext().isEOF());
+
+    // Clearing collections as it needs to be destroyed before the stasher.
+    collections.clear();
+}
+
+// buildIdLookupExecutor() builds an Express fast-path executor with AlwaysLocalEligibility, used
+// unconditionally on sharded and non-sharded collections alike.
+TEST_F(InternalSearchIdLookupWithCatalogTest, BuildIdLookupExecutorReturnsExpressExecutor) {
+    auto [sharedStasher, collections] = createCatalogResources();
+    auto catalogResourceHandle = make_intrusive<DSInternalSearchIdLookUpCatalogResourceHandle>(
+        sharedStasher, collections.getMainCollectionAcquisition());
+    auto executor = exec::agg::buildIdLookupExecutor(expCtx, catalogResourceHandle);
+    ASSERT_TRUE(executor);
+    ASSERT_TRUE(
+        dynamic_cast<const exec::agg::ExpressSingleDocumentLookupExecutor*>(executor.get()));
+
+    // Clearing collections as it needs to be destroyed before the stasher.
+    collections.clear();
+}
+
+// The stage factory installs the Express executor onto the constructed stage.
+TEST_F(InternalSearchIdLookupWithCatalogTest, StageHoldsExpressLookupExecutor) {
+    expCtx->setUUID(UUID::gen());
+    auto [idLookup, idLookupStage, collections] = createIdLookup();
+
+    auto* stage = dynamic_cast<exec::agg::InternalSearchIdLookUpStage*>(idLookupStage.get());
+    ASSERT_TRUE(stage);
+    ASSERT_TRUE(dynamic_cast<const exec::agg::ExpressSingleDocumentLookupExecutor*>(
+        stage->getLookupExecutor_forTest()));
 
     // Clearing collections as it needs to be destroyed before the stasher.
     collections.clear();
