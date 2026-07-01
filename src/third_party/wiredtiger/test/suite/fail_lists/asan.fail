@@ -4,6 +4,3 @@
 
 # FIXME-WT-17765: memory leaks in dir_store storage source
 test_tiered06.py
-
-# FIXME-WT-17769: log slot buffer leaks on corrupted-log open failure
-test_txn19.py

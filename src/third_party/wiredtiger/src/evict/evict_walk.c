@@ -282,7 +282,9 @@ __evict_btree_dominating_cache(WT_SESSION_IMPL *session, WT_BTREE *btree)
 
     if (__wt_cache_bytes_plus_overhead(
           cache, __wt_atomic_load_uint64_relaxed(&btree->bytes_inmem)) >
-      (uint64_t)(0.5 * evict->eviction_target * bytes_max) / 100)
+      (uint64_t)(0.5 * evict->eviction_target *
+        (bytes_max + __wt_atomic_load_uint64_relaxed(&cache->bytes_shared_dsk_duplicate))) /
+        100)
         return (true);
 
     bytes_dirty = __wt_atomic_load_uint64_relaxed(&btree->bytes_dirty_intl) +
@@ -649,7 +651,9 @@ __evict_walk_target(WT_SESSION_IMPL *session)
      */
     if (F_ISSET(evict, WT_EVICT_CACHE_CLEAN)) {
         btree_clean_inuse = __wt_btree_bytes_evictable(session);
-        cache_inuse = __wt_cache_bytes_inuse(cache);
+        cache_inuse = __wt_cache_bytes_inuse(cache) +
+          __wt_cache_bytes_plus_overhead(
+            cache, __wt_atomic_load_uint64_relaxed(&cache->bytes_shared_dsk_duplicate));
         bytes_per_slot = 1 + cache_inuse / evict->evict_slots;
         target_pages_clean = (uint32_t)((btree_clean_inuse + bytes_per_slot / 2) / bytes_per_slot);
     }

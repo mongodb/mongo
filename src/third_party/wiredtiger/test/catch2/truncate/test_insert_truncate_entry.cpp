@@ -18,6 +18,8 @@
 
 // WiredTiger include:
 #include "wt_internal.h"
+
+#include "src/cursor/cur_layered_private.h"
 #include "wrappers/connection_wrapper.h"
 #include "truncate_list_helpers.hpp"
 
@@ -64,7 +66,7 @@ public:
     [[nodiscard]] WT_LAYERED_TABLE &
     layered_table() const
     {
-        auto *clayered = reinterpret_cast<WT_CURSOR_LAYERED *>(_cursor);
+        auto *clayered = reinterpret_cast<WTI_CURSOR_LAYERED *>(_cursor);
         return *reinterpret_cast<WT_LAYERED_TABLE *>(clayered->dhandle);
     }
 

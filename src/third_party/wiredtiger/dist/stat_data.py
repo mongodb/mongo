@@ -347,6 +347,7 @@ conn_stats = [
     CacheStat('cache_pages_inuse_stable', 'pages currently held in the cache from the stable btrees', 'no_clear,no_scale'),
     CacheStat('cache_read_app_count', 'application threads page read from disk to cache count'),
     CacheStat('cache_read_app_time', 'application threads page read from disk to cache time (usecs)'),
+    CacheStat('cache_shared_dsk_bytes_duplicate', 'shared disk bytes saved by sharing duplicate disk images', 'no_clear,no_scale,size'),
     CacheStat('cache_shared_dsk_hash_size', 'shared disk hash table size', 'no_clear,no_scale'),
     CacheStat('cache_shared_dsk_hit', 'shared disk hit'),
     CacheStat('cache_shared_dsk_miss', 'shared disk miss'),

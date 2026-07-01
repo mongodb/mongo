@@ -56,6 +56,8 @@ __wt_shared_dsk_cache_get(WT_SESSION_IMPL *session, const uint8_t *addr, size_t 
         if (shared_dsk_item->addr_size == addr_size && shared_dsk_item->fid == S2BT(session)->id &&
           memcmp(shared_dsk_item->addr, addr, addr_size) == 0) {
             ++shared_dsk_item->ref_count;
+            (void)__wt_atomic_add_uint64_relaxed(
+              &S2C(session)->cache->bytes_shared_dsk_duplicate, shared_dsk_item->data_size);
 #ifdef HAVE_DIAGNOSTIC
             if (shared_dsk_cache->max_ref_count < shared_dsk_item->ref_count) {
                 shared_dsk_cache->max_ref_count = shared_dsk_item->ref_count;
@@ -137,6 +139,8 @@ __wt_shared_dsk_cache_put(WT_SESSION_IMPL *session, void *data, size_t data_size
         if (shared_dsk_item->addr_size == addr_size && shared_dsk_item->fid == S2BT(session)->id &&
           memcmp(shared_dsk_item->addr, addr, addr_size) == 0) {
             ++shared_dsk_item->ref_count;
+            (void)__wt_atomic_add_uint64_relaxed(
+              &S2C(session)->cache->bytes_shared_dsk_duplicate, shared_dsk_item->data_size);
             __wt_spin_unlock(session, &shared_dsk_cache->hash_locks[lock_idx]);
 
             *shared_dsk_retp = shared_dsk_item;
@@ -205,10 +209,10 @@ __wt_shared_dsk_cache_release(WT_SESSION_IMPL *session, WT_SHARED_DSK_ITEM *shar
 
     __wt_spin_lock(session, &shared_dsk_cache->hash_locks[lock_idx]);
     WT_ASSERT(session, shared_dsk_item->ref_count > 0);
+    data_size = shared_dsk_item->data_size;
     /* Remove the shared dsk item when ref count is reduced to 0. */
     if (--shared_dsk_item->ref_count == 0) {
         TAILQ_REMOVE(&shared_dsk_cache->hash[bucket], shared_dsk_item, hashq);
-        data_size = shared_dsk_item->data_size;
         dsk_type = ((WT_PAGE_HEADER *)shared_dsk_item->data)->type;
         __wt_spin_unlock(session, &shared_dsk_cache->hash_locks[lock_idx]);
 
@@ -222,10 +226,12 @@ __wt_shared_dsk_cache_release(WT_SESSION_IMPL *session, WT_SHARED_DSK_ITEM *shar
         __wt_overwrite_and_free_len(session, shared_dsk_item->data, shared_dsk_item->data_size);
         __wt_free(session, shared_dsk_item);
     } else {
-        __wt_spin_unlock(session, &shared_dsk_cache->hash_locks[lock_idx]);
         __shared_dsk_cache_verbose(session, WT_VERBOSE_DEBUG_2,
           "release: disk image ref decremented in shared dsk cache", hash, bucket, lock_idx,
           shared_dsk_item->addr, shared_dsk_item->addr_size);
+        __wt_spin_unlock(session, &shared_dsk_cache->hash_locks[lock_idx]);
+        __wt_cache_decr_check_uint64(session, &S2C(session)->cache->bytes_shared_dsk_duplicate,
+          data_size, "WT_CACHE.bytes_shared_dsk_duplicate");
     }
 }
 
@@ -274,6 +280,7 @@ err:
 void
 __wti_shared_dsk_cache_destroy(WT_SESSION_IMPL *session)
 {
+    WT_CACHE *cache;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_ITEM(tmp);
     WT_SHARED_DSK_CACHE *shared_dsk_cache;
@@ -285,7 +292,8 @@ __wti_shared_dsk_cache_destroy(WT_SESSION_IMPL *session)
     bool check_leaks;
 
     conn = S2C(session);
-    shared_dsk_cache = &conn->cache->shared_dsk_cache;
+    cache = conn->cache;
+    shared_dsk_cache = &cache->shared_dsk_cache;
     leaked_bytes = leaked_entries = 0;
     first_fid = 0;
     first_addr = NULL;
@@ -298,8 +306,13 @@ __wti_shared_dsk_cache_destroy(WT_SESSION_IMPL *session)
      * be empty, otherwise we should check as surviving entries are leaked references.
      */
     check_leaks = !F_ISSET_ATOMIC_32(conn, WT_CONN_PANIC | WT_CONN_LEAK_MEMORY);
-    if (check_leaks)
+    if (check_leaks) {
         WT_IGNORE_RET(__wt_scr_alloc(session, 0, &tmp));
+        if (__wt_atomic_load_uint64_relaxed(&cache->bytes_shared_dsk_duplicate) != 0)
+            __wt_errx(session,
+              "cache server: exiting with %" PRIu64 " duplicate shared disk bytes in memory",
+              __wt_atomic_load_uint64_relaxed(&cache->bytes_shared_dsk_duplicate));
+    }
 
     for (i = 0; i < shared_dsk_cache->hash_size; i++) {
         while (!TAILQ_EMPTY(&shared_dsk_cache->hash[i])) {

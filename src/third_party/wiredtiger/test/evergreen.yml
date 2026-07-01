@@ -5350,11 +5350,11 @@ tasks:
   - name: format-abort-recovery-stress-test
     depends_on: *s-all-dep
     commands:
-      # Allow 30 minutes beyond test runtime because recovery under load can cause the test to
+      # Allow one hour beyond test runtime because recovery under load can cause the test to
       # run longer.
       - command: timeout.update
         params:
-          exec_timeout_secs: 3600
+          exec_timeout_secs: 5400
       - func: "get project"
       - func: "compile wiredtiger"
         vars:

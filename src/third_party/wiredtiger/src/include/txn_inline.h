@@ -1355,6 +1355,66 @@ __wt_txn_snap_min_visible(
 }
 
 /*
+ * __wt_txn_snapshot_intersects_range --
+ *     Return whether any id in the sorted snapshot array falls within the inclusive range [lo, hi].
+ *     The array holds the concurrent (uncommitted-at-snapshot) transaction ids in ascending order.
+ */
+static WT_INLINE bool
+__wt_txn_snapshot_intersects_range(
+  uint64_t *snapshot, uint32_t snapshot_count, uint64_t lo, uint64_t hi)
+{
+    uint32_t base, indx, limit;
+
+    /* Find the lowest index whose id is not less than lo, then test it against the upper bound. */
+    for (base = 0, limit = snapshot_count; limit != 0; limit >>= 1) {
+        indx = base + (limit >> 1);
+        if (snapshot[indx] < lo) {
+            base = indx + 1;
+            --limit;
+        }
+    }
+    return (base < snapshot_count && snapshot[base] <= hi);
+}
+
+/*
+ * __wt_txn_snap_range_visible --
+ *     Can the current transaction's snapshot see an entire range of stop transactions? Used to
+ *     decide whether a fully-deleted page can be skipped during a tree walk. Unlike
+ *     __wt_txn_snap_min_visible, which only proves visibility when the whole range sits below the
+ *     smallest concurrent transaction, this also skips when the range straddles the concurrent
+ *     window but no concurrent transaction's id falls inside it. As with the snap_min variant, this
+ *     assesses broader visibility from an aggregated time window; it does not reflect whether a
+ *     specific update is visible.
+ */
+static WT_INLINE bool
+__wt_txn_snap_range_visible(WT_SESSION_IMPL *session, uint64_t oldest_id, uint64_t newest_id,
+  wt_timestamp_t timestamp, wt_timestamp_t durable_timestamp)
+{
+    WT_TXN *txn;
+
+    txn = session->txn;
+    WT_ASSERT(session, F_ISSET(txn, WT_TXN_HAS_SNAPSHOT));
+
+    /* A stop from a transaction not committed at snapshot time (or still in flight) blocks skip. */
+    if (newest_id >= txn->snapshot_data.snap_max)
+        return (false);
+
+    /*
+     * If the whole stop range sits below the smallest concurrent transaction, every stop committed
+     * before the snapshot and is visible. Otherwise the range overlaps the concurrent window: only
+     * proceed when no concurrent transaction's id falls within the range, which proves every stop
+     * on the page committed before the snapshot.
+     */
+    if (newest_id >= txn->snapshot_data.snap_min && txn->snapshot_data.snapshot_count != 0 &&
+      __wt_txn_snapshot_intersects_range(
+        txn->snapshot_data.snapshot, txn->snapshot_data.snapshot_count, oldest_id, newest_id))
+        return (false);
+
+    /* Timestamp check. */
+    return (__wt_txn_timestamp_visible(session, timestamp, durable_timestamp));
+}
+
+/*
  * __wt_txn_visible --
  *     Can the current transaction see the given ID/timestamp?
  */

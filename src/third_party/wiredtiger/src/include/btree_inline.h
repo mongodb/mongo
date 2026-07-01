@@ -2802,13 +2802,17 @@ __wt_btcur_skip_page(
             walk_skip_stats->total_del_pages_skipped++;
         }
     } else if (clean_page && __wt_get_page_modify_ta(session, ref->page, &ta) && !ta->prepare &&
-      __wt_txn_snap_min_visible(
-        session, ta->newest_stop_txn, ta->newest_stop_ts, ta->newest_stop_durable_ts)) {
+      __wt_txn_snap_range_visible(session, ta->oldest_stop_txn, ta->newest_stop_txn,
+        ta->newest_stop_ts, ta->newest_stop_durable_ts)) {
         /*
          * If the reader can see all of the deleted content, they can skip a deleted clean page.
          * Before determining whether the deleted page is visible, copy the stop time aggregate
          * information pointer because as part of the checkpoint operation, this pointer can be
          * released in parallel.
+         *
+         * The in-memory page-modify aggregate carries both ends of the stop-transaction range, so
+         * use the range visibility check; it skips more pages than the snap_min bound used on the
+         * disk-address path, which only has the newest stop transaction.
          */
         *skipp = true;
         walk_skip_stats->total_inmem_del_pages_skipped++;

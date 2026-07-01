@@ -449,10 +449,13 @@ typedef struct {
 #define scan_end_check(a) testutil_assert(a)
 
 #ifdef _WIN32
-__declspec(noreturn)
+#define TESTUTIL_NORETURN __declspec(noreturn)
+#else
+#define TESTUTIL_NORETURN
 #endif
-void
-testutil_die(int, const char *, ...) WT_GCC_FUNC_ATTRIBUTE((cold))
+
+TESTUTIL_NORETURN
+void testutil_die(int, const char *, ...) WT_GCC_FUNC_ATTRIBUTE((cold))
   WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 
 /*

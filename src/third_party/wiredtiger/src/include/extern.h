@@ -2099,6 +2099,12 @@ static WT_INLINE bool __wt_txn_read_committed_should_release_snapshot(WT_SESSION
 static WT_INLINE bool __wt_txn_snap_min_visible(
   WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t timestamp, wt_timestamp_t durable_timestamp)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE bool __wt_txn_snap_range_visible(WT_SESSION_IMPL *session, uint64_t oldest_id,
+  uint64_t newest_id, wt_timestamp_t timestamp, wt_timestamp_t durable_timestamp)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE bool __wt_txn_snapshot_intersects_range(
+  uint64_t *snapshot, uint32_t snapshot_count, uint64_t lo, uint64_t hi)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE bool __wt_txn_timestamp_visible(WT_SESSION_IMPL *session, wt_timestamp_t timestamp,
   wt_timestamp_t durable_timestamp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE bool __wt_txn_timestamp_visible_all(WT_SESSION_IMPL *session,

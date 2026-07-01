@@ -2268,6 +2268,7 @@ static const char *const __stats_connection_desc[] = {
   "cache: reconciled pages scrubbed and added back to the cache clean",
   "cache: reverse splits performed",
   "cache: reverse splits skipped because of VLCS namespace gap restrictions",
+  "cache: shared disk bytes saved by sharing duplicate disk images",
   "cache: shared disk hash table size",
   "cache: shared disk hit",
   "cache: shared disk miss",
@@ -3349,6 +3350,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_scrub_restore = 0;
     stats->cache_reverse_splits = 0;
     stats->cache_reverse_splits_skipped_vlcs = 0;
+    /* not clearing cache_shared_dsk_bytes_duplicate */
     /* not clearing cache_shared_dsk_hash_size */
     stats->cache_shared_dsk_hit = 0;
     stats->cache_shared_dsk_miss = 0;
@@ -4511,6 +4513,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cache_reverse_splits += WT_STAT_CONN_READ(from, cache_reverse_splits);
     to->cache_reverse_splits_skipped_vlcs +=
       WT_STAT_CONN_READ(from, cache_reverse_splits_skipped_vlcs);
+    to->cache_shared_dsk_bytes_duplicate +=
+      WT_STAT_CONN_READ(from, cache_shared_dsk_bytes_duplicate);
     to->cache_shared_dsk_hash_size += WT_STAT_CONN_READ(from, cache_shared_dsk_hash_size);
     to->cache_shared_dsk_hit += WT_STAT_CONN_READ(from, cache_shared_dsk_hit);
     to->cache_shared_dsk_miss += WT_STAT_CONN_READ(from, cache_shared_dsk_miss);

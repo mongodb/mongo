@@ -1446,7 +1446,7 @@ __wt_curhs_open(WT_SESSION_IMPL *session, uint32_t btree_id, const char *checkpo
  * __wt_curhs_open_ext --
  *     Initialize a history store cursor using a logical history store ID. This does not check
  *     whether the btree ID actually belongs to the selected history store; use 0 to simply ignore
- *     the it.
+ *     it.
  */
 int
 __wt_curhs_open_ext(WT_SESSION_IMPL *session, uint32_t hs_id, uint32_t btree_id,

@@ -502,10 +502,11 @@ int
 __wti_log_slot_destroy(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
     WTI_LOG *log;
     WTI_LOGSLOT *slot;
     int64_t rel;
-    int i;
+    int i, write_ret;
 
     conn = S2C(session);
     log = conn->log_mgr.log;
@@ -519,15 +520,22 @@ __wti_log_slot_destroy(WT_SESSION_IMPL *session)
               WTI_LOG_SLOT_RESERVED)) {
             rel =
               WTI_LOG_SLOT_RELEASED_BUFFERED(__wt_atomic_load_int64_v_relaxed(&slot->slot_state));
-            if (rel != 0)
+            if (rel != 0) {
                 /* Writes are not throttled. */
-                WT_RET(__wt_write(session, slot->slot_fh,
+                write_ret = __wt_write(session, slot->slot_fh,
                   __wt_atomic_load_int64_relaxed(&slot->slot_start_offset), (size_t)rel,
-                  slot->slot_buf.mem));
+                  slot->slot_buf.mem);
+                if (write_ret != 0)
+                    __wt_verbose_warning(session, WT_VERB_LOG,
+                      "log_slot_destroy: failed to write slot %d to %s: %s", i,
+                      slot->slot_fh == NULL ? "(null)" : slot->slot_fh->name,
+                      __wt_strerror(session, write_ret, NULL, 0));
+                WT_TRET(write_ret);
+            }
         }
         __wt_buf_free(session, &log->slot_pool[i].slot_buf);
     }
-    return (0);
+    return (ret);
 }
 
 /*

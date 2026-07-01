@@ -448,6 +448,15 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE previous_state, u
         goto done;
     }
 
+    /*
+     * Dirty pages on an outdated disaggregated read-only btree can never be written to shared
+     * storage. Clear the dirty flag so eviction discards the page cleanly instead of attempting
+     * reconciliation.
+     */
+    if (F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) &&
+      F_ISSET(S2BT(session), WT_BTREE_READONLY) && F_ISSET(session->dhandle, WT_DHANDLE_OUTDATED))
+        __wt_page_modify_clear(session, page);
+
     if (__wt_page_is_modified(page))
         is_dirty = true;
 

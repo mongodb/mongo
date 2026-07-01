@@ -122,6 +122,8 @@ struct __wt_cache {
     wt_shared uint64_t bytes_image_leaf; /* Bytes of disk images (leaf) */
     wt_shared uint64_t bytes_image_leaf_ingest;
     wt_shared uint64_t bytes_image_leaf_stable;
+    /* Shared disk image bytes charged to more than one btree's in-memory total. */
+    wt_shared uint64_t bytes_shared_dsk_duplicate;
     wt_shared uint64_t bytes_inmem; /* Bytes/pages in memory */
     wt_shared uint64_t bytes_inmem_ingest;
     wt_shared uint64_t bytes_inmem_stable;

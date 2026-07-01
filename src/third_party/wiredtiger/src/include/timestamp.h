@@ -62,6 +62,15 @@ struct __wt_time_aggregate {
     wt_timestamp_t newest_stop_ts;  /* default value: WT_TS_MAX */
     uint64_t newest_stop_txn;       /* default value: WT_TXN_MAX */
 
+    /*
+     * Smallest stop transaction on the page, excluding records with no stop and records whose stop
+     * is already cleared as globally visible. In-memory only: it is never packed into a cell, so a
+     * disk-loaded aggregate leaves it at the default. Only the in-memory page-modify skip path
+     * (__wt_get_page_modify_ta) consults it, to test whether a reader's concurrent snapshot
+     * intersects the page's stop-txn range rather than falling back to the snap_min bound.
+     */
+    uint64_t oldest_stop_txn; /* default value: WT_TXN_MAX */
+
     uint8_t prepare;
 
     uint8_t init_merge; /* Initialized for aggregation and merge */
