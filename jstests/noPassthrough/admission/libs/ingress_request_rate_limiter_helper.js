@@ -2,7 +2,12 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const maxInt32 = Math.pow(2, 31) - 1;
-const kKeyFile = "jstests/libs/key1";
+
+/**
+ * Keyfile used to authenticate as __system for direct shard/config node access in sharded
+ * cluster tests.
+ */
+export const kKeyFile = "jstests/libs/key1";
 
 // Restore sane parameters for the end of a test to ensure
 // rate limiting is disabled during shutdown.
@@ -89,7 +94,7 @@ const kPass = "pwd";
  *
  * To authenticate connections other than the exempt conn, use 'authenticateConnection'.
  */
-function setupAuth(conn, exemptConn) {
+export function setupAuth(conn, exemptConn) {
     // Since rate limiting only applies when authenticated, create a user and authenticate.
     const admin = conn.getDB("admin");
     admin.createUser({user: kUser, pwd: kPass, roles: ["root"]});
@@ -249,6 +254,107 @@ export const kExpectedErrorLabels = [
 export function assertContainsExpectedErrorLabels(res) {
     assert(res.hasOwnProperty("errorLabels"), res);
     assert.sameMembers(kExpectedErrorLabels, res.errorLabels);
+}
+
+/**
+ * Returns the shardingStatistics for the given shard from a mongos admin connection.
+ */
+export function getShardStats(adminConn, shardName) {
+    return adminConn.getDB("admin").serverStatus().shardingStatistics.shards[shardName];
+}
+
+/**
+ * Returns the difference between two shardingStatistics snapshots (as returned by
+ * getShardStats), for use in asserting on overload/retry counters observed during a test.
+ */
+export function shardingStatisticsDifference(after, before) {
+    return {
+        numOperationsAttempted: after.numOperationsAttempted - before.numOperationsAttempted,
+        numOperationsRetriedAtLeastOnceDueToOverload:
+            after.numOperationsRetriedAtLeastOnceDueToOverload -
+            before.numOperationsRetriedAtLeastOnceDueToOverload,
+        numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded:
+            after.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded -
+            before.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded,
+        numRetriesDueToOverloadAttempted:
+            after.numRetriesDueToOverloadAttempted - before.numRetriesDueToOverloadAttempted,
+        numRetriesRetargetedDueToOverload:
+            after.numRetriesRetargetedDueToOverload - before.numRetriesRetargetedDueToOverload,
+        numOverloadErrorsReceived:
+            after.numOverloadErrorsReceived - before.numOverloadErrorsReceived,
+        totalBackoffTimeMillis: after.totalBackoffTimeMillis - before.totalBackoffTimeMillis,
+        retryBudgetTokenBucketBalance:
+            after.retryBudgetTokenBucketBalance - before.retryBudgetTokenBucketBalance,
+    };
+}
+
+/**
+ * Asserts that the overload-related shardingStatistics counters in `diff` (as returned by
+ * shardingStatisticsDifference) match `expected`; only the listed fields are checked, so callers
+ * can assert as many or as few counters as relevant.
+ */
+export function assertShardingStatisticsDiffEq(diff, expected) {
+    for (const [name, value] of Object.entries(expected)) {
+        assert.eq(diff[name], value, `unexpected ${name}`, {diff});
+    }
+}
+
+/**
+ * Asserts a top-level command failure carrying the IngressRequestRateLimitExceeded code and the
+ * SystemOverloadedError label mongos derives fresh for the client-facing reply (independent of
+ * whatever labels the failpoint injected at the shard).
+ */
+export function assertMongosIRRLCommandFailure(result, message) {
+    assert.commandFailedWithCode(result, ErrorCodes.IngressRequestRateLimitExceeded, message);
+    assert.eq(result.errorLabels, ["SystemOverloadedError"]);
+}
+
+/**
+ * Arms the failCommand failpoint on shardHost via an exempt keyfile-authenticated connection, so
+ * calls to the target commands are rejected with IngressRequestRateLimitExceeded. Uses
+ * failCommand (not failIngressRequestRateLimiting) so that fires can be scoped to specific
+ * commands/namespace, preventing background operations from consuming them.
+ */
+export function enableFailCommandOnShards(shardHost, mode, failCommands, namespace) {
+    const conn = new Mongo(`mongodb://${shardHost}/?appName=${kRateLimiterExemptAppName}`);
+    authutil.asCluster(conn, kKeyFile, () => {
+        assert.commandWorked(
+            conn.adminCommand({
+                configureFailPoint: "failCommand",
+                mode,
+                data: {
+                    errorCode: ErrorCodes.IngressRequestRateLimitExceeded,
+                    failCommands,
+                    failInternalCommands: true,
+                    namespace,
+                    errorLabels: kExpectedErrorLabels,
+                },
+            }),
+        );
+    });
+}
+
+/**
+ * Disables the failCommand failpoint armed by enableFailCommandOnShards on shardHost.
+ */
+export function disableFailCommandOnShards(shardHost) {
+    const conn = new Mongo(`mongodb://${shardHost}/?appName=${kRateLimiterExemptAppName}`);
+    authutil.asCluster(conn, kKeyFile, () => {
+        assert.commandWorked(conn.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
+    });
+}
+
+/**
+ * Sets each parameter in `params` on conn and returns the previous values, so a second call with
+ * the returned object restores the originals.
+ */
+export function setParameter(conn, params) {
+    const getCmd = {getParameter: 1};
+    for (const name in params) getCmd[name] = 1;
+    const orig = assert.commandWorked(conn.adminCommand(getCmd));
+
+    assert.commandWorked(conn.adminCommand({setParameter: 1, ...params}));
+    return Object.fromEntries(Object.keys(params).map((name) => [name, orig[name]]));
 }
 
 /**
