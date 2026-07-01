@@ -98,9 +98,12 @@ public:
         return _resolvedPaths;
     }
 
-    std::vector<ResolvedPath> releaseResolvedPaths() {
-        return std::move(_resolvedPaths);
-    }
+    /**
+     * Releases _resolvedPaths vector for processing once our graph has been fully built.
+     * 'maxNodeIdExclusive' is used to filter out any paths resolved to nodes we ultimately decided
+     * not to include in the join graph.
+     */
+    std::vector<ResolvedPath> releaseResolvedPaths(size_t maxNodeIdExclusive);
 
     const ResolvedPath& operator[](PathId pathId) const {
         return _resolvedPaths.at(pathId);

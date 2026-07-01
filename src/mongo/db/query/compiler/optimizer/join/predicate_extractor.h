@@ -37,17 +37,20 @@ namespace mongo::join_ordering {
 
 /**
  * Class representing an agg expression of the form {$eq: ['$foreignCollFieldPath',
- * '$$localCollVar']}, used in join predicate resolution.
+ * '$$localCollVar']} or a localField/foreignField join, used in join predicate resolution.
  */
-class JoinPredicateExpr {
+class ExtractedJoinPredicate {
 public:
     /**
      * Note: this expects 'expr', 'letVars', & 'source' to outlive the returned instance. This
      * doesn't take ownership of either.
      */
-    static JoinPredicateExpr make(const DocumentSource* source,
-                                  const ExpressionCompare* expr,
-                                  const std::vector<LetVariable>& letVars);
+    static ExtractedJoinPredicate make(const DocumentSource* source,
+                                       const ExpressionCompare* expr,
+                                       const std::vector<LetVariable>& letVars);
+    static ExtractedJoinPredicate make(FieldPath localField,
+                                       FieldPath foreignField,
+                                       const DocumentSource* source);
 
     const FieldPath& localField() const {
         return _localField;
@@ -59,23 +62,31 @@ public:
 
     // Used by unit tests.
     auto serialize() const {
-        return _expr->serialize();
+        return _expr ? _expr->serialize() : Value(BSONNULL);
     }
 
     auto source() const {
         return _source;
     }
 
+    bool isExpr() const {
+        return _isExpr;
+    }
+
 private:
-    JoinPredicateExpr(FieldPath localField,
-                      FieldPath foreignField,
-                      const ExpressionCompare* expr,
-                      const DocumentSource* source)
-        : _localField(std::move(localField)),
+    ExtractedJoinPredicate(bool isExpr,
+                           FieldPath localField,
+                           FieldPath foreignField,
+                           const ExpressionCompare* expr,
+                           const DocumentSource* source)
+        : _isExpr{isExpr},
+          _localField(std::move(localField)),
           _foreignField(std::move(foreignField)),
           _expr(expr),
           _source{source} {}
 
+    // Is this a $expr predicate (true) or a localFieldForeign field join (false)?
+    bool _isExpr;
     FieldPath _localField;
     FieldPath _foreignField;
     // These track both the origin document source and the expression this was extracted from.
@@ -94,7 +105,7 @@ struct SplitPredicatesResult {
     // {$eq: ['$fieldPathInForeignNSS', '$$varCorrespondingToPathInLocalNSS']}
     // Note that the order of operands is not guaranteed and there may be semantically duplicate
     // entries.
-    std::vector<JoinPredicateExpr> joinPredicates;
+    std::vector<ExtractedJoinPredicate> joinPredicates;
     // Residual predicate on the single table which does not contain any correlated predicates. In
     // other terms, this expression is able to be pushed down to the find layer.
     std::unique_ptr<MatchExpression> singleTablePredicates;

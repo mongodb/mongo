@@ -133,6 +133,8 @@ public:
 
 TEST_F(PathResolverTest, Basic) {
     auto pipeline = makeBasicTestPipeline("lf", "ff", "embed", "lf2", "ff2", "embed2");
+    markFieldsAsScalar(
+        *pipeline, {}, {{"foreign", {"ff", "a", "embed.a"}}, {"foreign2", {"ff2", "embed.a"}}});
     pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
                                                    mainCollPathAlwaysScalar);
 
@@ -247,6 +249,7 @@ TEST_F(PathResolverTest, EmbedPathCollisions1stPrefixed) {
 
 TEST_F(PathResolverTest, EmbedPathShadowsExact) {
     auto pipeline = makeBasicTestPipeline("lf", "ff", "as", "lf2", "ff2", "lf");
+    markFieldsAsScalar(*pipeline, {}, {{"foreign", {"ff"}}, {"foreign2", {"ff2"}}});
     pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
                                                    mainCollPathAlwaysScalar);
     PathResolver pr(0, dg);
@@ -271,6 +274,7 @@ TEST_F(PathResolverTest, EmbedPathShadowsExact) {
 
 TEST_F(PathResolverTest, EmbedPathShadowsPrefix) {
     auto pipeline = makeBasicTestPipeline("lf", "ff", "as", "lf2", "ff2", "lf.as");
+    markFieldsAsScalar(*pipeline, {}, {{"foreign", {"ff"}}, {"foreign2", {"ff2"}}});
     pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
                                                    mainCollPathAlwaysScalar);
     PathResolver pr(0, dg);
@@ -295,6 +299,7 @@ TEST_F(PathResolverTest, EmbedPathShadowsPrefix) {
 
 TEST_F(PathResolverTest, EmbedPathShadowsSuffix) {
     auto pipeline = makeBasicTestPipeline("lf", "ff", "as.x", "lf2", "ff2", "as");
+    markFieldsAsScalar(*pipeline, {}, {{"foreign", {"ff"}}, {"foreign2", {"ff2"}}});
     pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
                                                    mainCollPathAlwaysScalar);
     PathResolver pr(0, dg);
@@ -319,6 +324,7 @@ TEST_F(PathResolverTest, EmbedPathShadowsSuffix) {
 
 TEST_F(PathResolverTest, EmbedPathParallelOk) {
     auto pipeline = makeBasicTestPipeline("lf", "ff", "as.x", "lf2", "ff2", "as.y");
+    markFieldsAsScalar(*pipeline, {}, {{"foreign", {"ff"}}, {"foreign2", {"ff2"}}});
     pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
                                                    mainCollPathAlwaysScalar);
     PathResolver pr(0, dg);
@@ -349,6 +355,10 @@ TEST_F(PathResolverTest, HandleSubpipelineProject) {
         "lf",
         "ff",
         "embed2");
+    markFieldsAsScalar(*pipeline,
+                       {},
+                       {{"foreign", {"someField", "someOtherField", "someOtherField.bar"}},
+                        {"foreign2", {"ff", "someOtherField", "someOtherField2"}}});
     pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
                                                    mainCollPathAlwaysScalar);
     PathResolver pr(0, dg);
@@ -389,6 +399,111 @@ TEST_F(PathResolverTest, HandleSubpipelineProject) {
     ASSERT_FALSE(pr.resolve("embed.someDroppedField", nullptr));
 }
 
+TEST_F(PathResolverTest, PathValidation_NumericComponentOnBaseCollection) {
+    auto pipeline = makeBasicTestPipeline("lf", "ff", "embed", "lf2", "ff2", "embed2");
+    markFieldsAsScalar(*pipeline, {}, {{"foreign", {"ff"}}, {"foreign2", {"ff2"}}});
+    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
+                                                   mainCollPathAlwaysScalar);
+
+    const NodeId kBaseNode = 0;
+    const NodeId kForeignNode = 1;
+
+    PathResolver pr(kBaseNode, dg);
+
+    auto it = pipeline->getSources().begin();
+    const auto* dsLookup = it->get();
+    const auto* lookup = dynamic_cast<const DocumentSourceLookUp*>(dsLookup);
+    ASSERT(lookup);
+    ASSERT_TRUE(pr.trackEmbedPath(*lookup, kForeignNode));
+
+    // A path with a purely numeric component at any position is rejected.
+    ASSERT_FALSE(pr.resolve("a.0", dsLookup));
+    ASSERT_FALSE(pr.resolve("0.a", dsLookup));
+    ASSERT_FALSE(pr.resolve("a.0.b", dsLookup));
+    ASSERT_FALSE(pr.resolve("0", dsLookup));
+
+    // Paths where a component merely starts or ends with digits are valid.
+    testResolve(pr, "a0", "a0", kBaseNode, dsLookup);
+    testResolve(pr, "0a", "0a", kBaseNode, dsLookup);
+}
+
+TEST_F(PathResolverTest, PathValidation_NumericComponentOnEmbeddedPath) {
+    auto pipeline = makeBasicTestPipeline("lf", "ff", "embed", "lf2", "ff2", "embed2");
+    markFieldsAsScalar(*pipeline, {}, {{"foreign", {"ff"}}, {"foreign2", {"ff2"}}});
+    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
+                                                   mainCollPathAlwaysScalar);
+
+    const NodeId kBaseNode = 0;
+    const NodeId kForeignNode = 1;
+
+    PathResolver pr(kBaseNode, dg);
+
+    auto it = pipeline->getSources().begin();
+    const auto* dsLookup = it->get();
+    const auto* lookup = dynamic_cast<const DocumentSourceLookUp*>(dsLookup);
+    ASSERT(lookup);
+    ASSERT_TRUE(pr.trackEmbedPath(*lookup, kForeignNode));
+
+    // Numeric component in the portion after the embed prefix is rejected.
+    ASSERT_FALSE(pr.resolve("embed.0", nullptr));
+    ASSERT_FALSE(pr.resolve("embed.0.b", nullptr));
+    ASSERT_FALSE(pr.resolve("embed.a.1", nullptr));
+
+    // The embed prefix itself is never numeric (it is "embed"), so a non-numeric suffix is valid.
+    testResolve(pr, "embed.ff", "ff", kForeignNode, nullptr);
+}
+
+TEST_F(PathResolverTest, PathValidation_ArrayPathOnForeignCollection) {
+    auto pipeline = makeBasicTestPipeline("lf", "ff", "embed", "lf2", "ff2", "embed2");
+    // Only "scalarField" is marked as non-array in the foreign collection; "ff" is not.
+    markFieldsAsScalar(*pipeline, {}, {{"foreign", {"scalarField"}}, {"foreign2", {"ff2"}}});
+    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
+                                                   mainCollPathAlwaysScalar);
+
+    const NodeId kBaseNode = 0;
+    const NodeId kForeignNode = 1;
+
+    PathResolver pr(kBaseNode, dg);
+
+    auto it = pipeline->getSources().begin();
+    const auto* dsLookup = it->get();
+    const auto* lookup = dynamic_cast<const DocumentSourceLookUp*>(dsLookup);
+    ASSERT(lookup);
+    ASSERT_TRUE(pr.trackEmbedPath(*lookup, kForeignNode));
+
+    // "ff" is not marked as scalar, so it can be an array and cannot be used in a join predicate.
+    ASSERT_FALSE(pr.resolve("ff", nullptr, kForeignNode));
+
+    // "scalarField" is marked as scalar so it is valid as a join predicate field.
+    testResolve(pr, "scalarField", "scalarField", kForeignNode, nullptr, kForeignNode);
+}
+
+TEST_F(PathResolverTest, PathValidation_ArrayPathOnBaseCollection) {
+    auto pipeline = makeBasicTestPipeline("lf", "ff", "embed", "lf2", "ff2", "embed2");
+    markFieldsAsScalar(*pipeline, {}, {{"foreign", {"ff"}}, {"foreign2", {"ff2"}}});
+
+    // Use a canPathBeArray callback that marks "arrayField" as potentially an array.
+    pipeline::dependency_graph::DependencyGraph dg(
+        pipeline->getSources(), [](std::string_view path) { return path == "arrayField"; });
+
+    const NodeId kBaseNode = 0;
+    const NodeId kForeignNode = 1;
+
+    PathResolver pr(kBaseNode, dg);
+
+    auto it = pipeline->getSources().begin();
+    const auto* dsLookup = it->get();
+    const auto* lookup = dynamic_cast<const DocumentSourceLookUp*>(dsLookup);
+    ASSERT(lookup);
+    ASSERT_TRUE(pr.trackEmbedPath(*lookup, kForeignNode));
+
+    // "arrayField" can be an array on the base collection, so it is not a valid predicate path.
+    ASSERT_FALSE(pr.resolve("arrayField", dsLookup));
+
+    // "lf" is not known to be an array so it resolves correctly.
+    testResolve(pr, "lf", "lf", kBaseNode, dsLookup);
+}
+
 TEST_F(PathResolverTest, HandleMainPipelineProject) {
     auto pipeline =
         makeBasicTestPipeline("lf",
@@ -398,6 +513,7 @@ TEST_F(PathResolverTest, HandleMainPipelineProject) {
                               "ff",
                               "embed2",
                               /* prefix */ R"({$project: {lf: 1, embed: 1, lf2: "computed"}},)");
+    markFieldsAsScalar(*pipeline, {}, {{"foreign", {"ff", "bar"}}, {"foreign2", {"ff2"}}});
     pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
                                                    mainCollPathAlwaysScalar);
     PathResolver pr(0, dg);

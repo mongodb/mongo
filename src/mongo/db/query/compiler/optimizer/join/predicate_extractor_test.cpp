@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/dependency_analysis/pipeline_dependency_graph.h"
+#include "mongo/db/query/compiler/optimizer/join/agg_join_model_fixture.h"
 #include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
 #include "mongo/unittest/unittest.h"
 
@@ -491,40 +492,48 @@ TEST_F(PredicateExtractorTest, LocalFieldIncludesPathSuffixOnLetVariable) {
 class ExtractExprPredicatesTest : public unittest::Test {
 public:
     static constexpr auto pipelineStr = R"([
-            {$lookup: {from: "first", localField: "a", foreignField: "b", as: "first"}},
+            {$lookup: {from: "first", as: "first", pipeline: []}},
             {$unwind: "$first"},
-            {$lookup: {from: "second", localField: "c", foreignField: "d", as: "second"}},
+            {$lookup: {from: "second", as: "second", pipeline: []}},
             {$unwind: "$second"}
         ])";
 
-    ExtractExprPredicatesTest()
-        : _expCtx(new ExpressionContextForTest()),
-          _pipeline{makePipelineForTest(pipelineStr, {"first", "second"}, _expCtx)},
-          _graph{pipeline::dependency_graph::DependencyGraph(_pipeline->getSources())},
-          _pathResolver{_baseNodeId, _graph} {
-        _pathResolver.trackEmbedPath(
-            *dynamic_cast<DocumentSourceLookUp*>(_pipeline->getSources().begin()->get()), 1);
-        _pathResolver.trackEmbedPath(
-            *dynamic_cast<DocumentSourceLookUp*>(_pipeline->getSources().rbegin()->get()), 2);
-    }
-
     ExprPredicatesResult extract(std::string_view json) {
+        const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+
+        auto pipeline = makePipelineForTest(pipelineStr, {"first", "second"}, expCtx);
         auto bson = fromjson(json);
-        auto match = DocumentSourceMatch::create(bson, _expCtx);
-        _pipeline->addFinalSource(match);
-        _graph.resize(_pipeline->getSources().end());
-        return extractExprPredicates(_pathResolver, match.get());
+        auto match = DocumentSourceMatch::create(bson, expCtx);
+        // Note: optimization results in $unwinds being absorbed.
+        auto* lookup1 = dynamic_cast<DocumentSourceLookUp*>(pipeline->getSources().begin()->get());
+        ASSERT_NE(lookup1, nullptr);
+        auto* lookup2 = dynamic_cast<DocumentSourceLookUp*>(pipeline->getSources().rbegin()->get());
+        ASSERT_NE(lookup2, nullptr);
+        pipeline->addFinalSource(match);
+
+        AggJoinModelFixture::markFieldsAsScalar(
+            *pipeline,
+            {"a", "b", "c", "d"},
+            {{"first", {"a", "b", "e"}}, {"second", {"a", "b", "c", "d", "e"}}});
+
+        auto canMainCollPathBeArray = [expCtx](std::string_view path) {
+            return expCtx->canPathBeArrayForNss(FieldRef(path), expCtx->getNamespaceString());
+        };
+        auto graph = pipeline::dependency_graph::DependencyGraph(pipeline->getSources(),
+                                                                 canMainCollPathBeArray);
+        PathResolver pathResolver(_baseNodeId, graph);
+
+        ASSERT_TRUE(pathResolver.trackEmbedPath(*lookup1, _firstNodeId));
+        ASSERT_TRUE(pathResolver.trackEmbedPath(*lookup2, _secondNodeId));
+
+        graph.resize(pipeline->getSources().end());
+        return extractExprPredicates(pathResolver, match.get());
     }
 
 protected:
     static constexpr NodeId _baseNodeId = 0;
     static constexpr NodeId _firstNodeId = 1;
     static constexpr NodeId _secondNodeId = 2;
-
-    const boost::intrusive_ptr<ExpressionContextForTest> _expCtx;
-    std::unique_ptr<Pipeline> _pipeline;
-    pipeline::dependency_graph::DependencyGraph _graph;
-    PathResolver _pathResolver;
 };
 
 /**

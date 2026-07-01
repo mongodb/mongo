@@ -231,10 +231,6 @@ output: {
         {
             "nodeId": {"$numberInt":"4"},
             "fieldName": "d"
-        },
-        {
-            "nodeId": {"$numberInt":"4"},
-            "fieldName": "a"
         }
     ],
     "prefix": [

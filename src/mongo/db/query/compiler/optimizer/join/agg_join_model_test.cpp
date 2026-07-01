@@ -1669,9 +1669,11 @@ TEST_F(PipelineAnalyzerTest, ConflictingLocalFields) {
     markFieldsAsScalar(*pipeline, {"x"sv, "a"sv}, {{"B", {"y"sv}}, {"C", {"z"sv}}});
     // We don't detect ineligibility of local path fields here.
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    // But we do here, and shorten the prefix.
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
-    ASSERT_EQ(swJoinModel.getStatus(), ErrorCodes::BadValue);
-    ASSERT_EQ(swJoinModel.getStatus().reason(), "Local path could not be resolved");
+    ASSERT_OK(swJoinModel);
+    ASSERT_EQ(swJoinModel.getValue().getGraph().numNodes(), 2);
+    ASSERT_EQ(swJoinModel.getValue().getGraph().numEdges(), 1);
 }
 
 TEST_F(PipelineAnalyzerTest, LocalFieldExactlyMatchesPriorAsField) {
@@ -1680,7 +1682,8 @@ TEST_F(PipelineAnalyzerTest, LocalFieldExactlyMatchesPriorAsField) {
     // in PathResolver::resolve(): the embed path is a prefix of the field path (equal paths count
     // as a prefix), so the early conflict bail is skipped and the path is stripped. This must not
     // crash - the path refers to the bare embedded field, which is not traceable to a base
-    // collection, so the join should bail gracefully.
+    // collection, so the second $lookup can't be incorporated. We bail gracefully by ending the
+    // prefix there, leaving a valid 2-node join graph (base + B).
     auto query = R"([
         {$lookup: {from: "B", as: "a", localField: "x", foreignField: "y"}},
         {$unwind: "$a"},
@@ -1692,8 +1695,9 @@ TEST_F(PipelineAnalyzerTest, LocalFieldExactlyMatchesPriorAsField) {
     markFieldsAsScalar(*pipeline, {"x"sv, "a"sv}, {{"B", {"y"sv}}, {"C", {"z"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
-    ASSERT_EQ(swJoinModel.getStatus(), ErrorCodes::BadValue);
-    ASSERT_EQ(swJoinModel.getStatus().reason(), "Local path could not be resolved");
+    ASSERT_OK(swJoinModel);
+    ASSERT_EQ(swJoinModel.getValue().getGraph().numNodes(), 2);
+    ASSERT_EQ(swJoinModel.getValue().getGraph().numEdges(), 1);
 }
 
 TEST_F(PipelineAnalyzerTest, ConflictingLocalFieldExprSyntax) {
@@ -1727,9 +1731,11 @@ TEST_F(PipelineAnalyzerTest, ConflictingLocalFieldExprSyntax) {
         *pipeline, {"x"sv, "foo"sv, "bar"sv}, {{"B", {"y"sv}}, {"A", {"foo"sv, "bar"sv}}});
     // We don't detect ineligibility of local path fields here.
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    // But we do here, and shorten the prefix.
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
-    ASSERT_EQ(swJoinModel.getStatus(), ErrorCodes::BadValue);
-    ASSERT_EQ(swJoinModel.getStatus().reason(), "Local path could not be resolved");
+    ASSERT_OK(swJoinModel);
+    ASSERT_EQ(swJoinModel.getValue().getGraph().numNodes(), 2);
+    ASSERT_EQ(swJoinModel.getValue().getGraph().numEdges(), 1);
 }
 
 TEST_F(PipelineAnalyzerTest, CompatibleAsFields) {

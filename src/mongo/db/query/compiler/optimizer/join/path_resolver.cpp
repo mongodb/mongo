@@ -35,6 +35,29 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo::join_ordering {
+namespace {
+/**
+ * Ensures path can't include a numeric component.
+ */
+bool hasNumericPathComponent(const FieldPath& fp) {
+    for (size_t i = 0; i < fp.getPathLength(); ++i) {
+        if (FieldRef::isNumericPathComponentLenient(fp.getFieldName(i))) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Ensures join predicate paths can't include arrays and doesn't have a numeric component.
+ */
+bool isPathValid(const pipeline::dependency_graph::DependencyGraph& graph,
+                 const DocumentSource* at,
+                 const FieldPath& path) {
+    return !hasNumericPathComponent(path) && !graph.canPathBeArray(at, path.fullPath());
+}
+}  // namespace
+
 PathResolver::PathResolver(NodeId baseNode,
                            const pipeline::dependency_graph::DependencyGraph& graph)
     : _graph(graph), _baseNodeId(baseNode) {
@@ -118,6 +141,9 @@ boost::optional<PathId> PathResolver::resolve(const FieldPath& fieldPath,
     auto src = graph->getPrevModifyingStage(at, fieldPath.fullPath());
     if (src == nullptr) {
         // Path originates at base of pipeline for this graph.
+        if (!isPathValid(*graph, at, fieldPath)) {
+            return boost::none;
+        }
         return addPathOrGetExisting({nodeId.get_value_or(_baseNodeId), fieldPath});
 
     } else if (auto lookup = dynamic_cast<const DocumentSourceLookUp*>(src.get()); lookup) {
@@ -148,10 +174,26 @@ boost::optional<PathId> PathResolver::resolve(const FieldPath& fieldPath,
             return boost::none;
         }
 
-        return addPathOrGetExisting({_lookupNodes[lookup], std::move(strippedPath)});
+        // Validate the original path where it is referenced for arrayness.
+        if (!isPathValid(*graph, at, fieldPath)) {
+            return boost::none;
+        }
+
+        return addPathOrGetExisting({_lookupNodes[lookup], strippedPath});
     }
 
     // This comes from a rename/ field computation! Bail- we don't support this.
     return boost::none;
 }
+
+std::vector<ResolvedPath> PathResolver::releaseResolvedPaths(size_t maxNodeIdExclusive) {
+    // Erase all paths belonging to a reserved node that hasn't actually made it into the graph.
+    auto it = _resolvedPaths.begin();
+    while (it != _resolvedPaths.end() && it->nodeId < maxNodeIdExclusive) {
+        it++;
+    }
+    _resolvedPaths.erase(it, _resolvedPaths.end());
+    return std::move(_resolvedPaths);
+}
+
 }  // namespace mongo::join_ordering
