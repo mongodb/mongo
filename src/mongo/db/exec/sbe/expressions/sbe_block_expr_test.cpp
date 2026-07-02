@@ -54,13 +54,11 @@ public:
      * is for BSON arrays.
      */
     static TypedValue makeArrayFromValues(std::vector<TypedValue> vals) {
-        auto [arrTag, arrVal] = value::makeNewArray();
-        value::ValueGuard guard(arrTag, arrVal);
+        value::TagValueOwned arr = value::TagValueOwned::fromRaw(value::makeNewArray());
         for (auto [t, v] : vals) {
-            value::getArrayView(arrVal)->push_back_raw(t, v);
+            value::getArrayView(arr.value())->push_back_raw(t, v);
         }
-        guard.reset();
-        return {arrTag, arrVal};
+        return arr.releaseToRaw();
     }
 
     void assertBlockOfBool(value::TypeTags tag,
@@ -171,10 +169,10 @@ public:
         typeMaskAccessor.reset(testCase.typeMask.first, testCase.typeMask.second);
         fillAccessor.reset(testCase.fill.first, testCase.fill.second);
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        assertBlockEq(runTag, runVal, testCase.expected);
+        assertBlockEq(result.tag(), result.value(), testCase.expected);
     }
 };
 
@@ -248,10 +246,10 @@ TEST_F(SBEBlockExpressionTest, BlockExistsTest) {
 
     blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                         value::bitcastFrom<value::ValueBlock*>(&block));
-    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(runTag, runVal);
+    value::TagValueOwned result =
+        value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-    assertBlockOfBool(runTag, runVal, {true, true, true, false, true});
+    assertBlockOfBool(result.tag(), result.value(), {true, true, true, false, true});
 }
 
 TEST_F(SBEBlockExpressionTest, BlockIsNullishTest) {
@@ -270,10 +268,10 @@ TEST_F(SBEBlockExpressionTest, BlockIsNullishTest) {
 
     blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                         value::bitcastFrom<value::ValueBlock*>(&block));
-    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(runTag, runVal);
+    value::TagValueOwned result =
+        value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-    assertBlockOfBool(runTag, runVal, {true, false, false, true, true});
+    assertBlockOfBool(result.tag(), result.value(), {true, false, false, true, true});
 }
 
 TEST_F(SBEBlockExpressionTest, BlockTypeMatchInvalidMaskTest) {
@@ -295,11 +293,11 @@ TEST_F(SBEBlockExpressionTest, BlockTypeMatchInvalidMaskTest) {
 
     blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                         value::bitcastFrom<value::ValueBlock*>(&block));
-    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(runTag, runVal);
+    value::TagValueOwned result =
+        value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-    assertBlockEq(runTag,
-                  runVal,
+    assertBlockEq(result.tag(),
+                  result.value(),
                   std::vector<std::pair<value::TypeTags, value::Value>>{
                       makeNothing(), makeNothing(), makeNothing(), makeNothing()});
 }
@@ -325,11 +323,11 @@ TEST_F(SBEBlockExpressionTest, BlockTypeMatchHeterogeneousTest) {
 
     blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                         value::bitcastFrom<value::ValueBlock*>(&block));
-    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(runTag, runVal);
+    value::TagValueOwned result =
+        value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-    assertBlockEq(runTag,
-                  runVal,
+    assertBlockEq(result.tag(),
+                  result.value(),
                   std::vector<std::pair<value::TypeTags, value::Value>>{makeBool(true),
                                                                         makeBool(false),
                                                                         makeBool(false),
@@ -359,12 +357,12 @@ TEST_F(SBEBlockExpressionTest, BlockTypeMatchHomogeneousTest) {
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&block));
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         assertBlockEq(
-            runTag,
-            runVal,
+            result.tag(),
+            result.value(),
             std::vector<std::pair<value::TypeTags, value::Value>>{
                 makeBool(true), makeBool(true), makeBool(true), makeNothing(), makeBool(true)});
     }
@@ -376,10 +374,10 @@ TEST_F(SBEBlockExpressionTest, BlockTypeMatchHomogeneousTest) {
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&denseBlock));
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        assertBlockOfBool(runTag, runVal, {true, true});
+        assertBlockOfBool(result.tag(), result.value(), {true, true});
     }
 
     {
@@ -389,12 +387,12 @@ TEST_F(SBEBlockExpressionTest, BlockTypeMatchHomogeneousTest) {
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&sparseBlock));
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         assertBlockEq(
-            runTag,
-            runVal,
+            result.tag(),
+            result.value(),
             std::vector<std::pair<value::TypeTags, value::Value>>{makeNothing(), makeNothing()});
     }
 
@@ -403,10 +401,10 @@ TEST_F(SBEBlockExpressionTest, BlockTypeMatchHomogeneousTest) {
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&monoBlock));
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        assertBlockOfBool(runTag, runVal, {true, true});
+        assertBlockOfBool(result.tag(), result.value(), {true, true});
     }
 
     {
@@ -415,10 +413,10 @@ TEST_F(SBEBlockExpressionTest, BlockTypeMatchHomogeneousTest) {
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&monoBlock));
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        assertBlockOfBool(runTag, runVal, {false, false});
+        assertBlockOfBool(result.tag(), result.value(), {false, false});
     }
 
     {
@@ -427,10 +425,10 @@ TEST_F(SBEBlockExpressionTest, BlockTypeMatchHomogeneousTest) {
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&monoBlock));
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        assertBlockOfBool(runTag, runVal, {false, false});
+        assertBlockOfBool(result.tag(), result.value(), {false, false});
     }
 
     {
@@ -438,12 +436,12 @@ TEST_F(SBEBlockExpressionTest, BlockTypeMatchHomogeneousTest) {
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&monoBlock));
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         assertBlockEq(
-            runTag,
-            runVal,
+            result.tag(),
+            result.value(),
             std::vector<std::pair<value::TypeTags, value::Value>>{makeNothing(), makeNothing()});
     }
 }
@@ -467,11 +465,11 @@ TEST_F(SBEBlockExpressionTest, BlockIsTimezoneNoTimezoneDBTest) {
 
     blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                         value::bitcastFrom<value::ValueBlock*>(&block));
-    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(runTag, runVal);
+    value::TagValueOwned result =
+        value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-    assertBlockEq(runTag,
-                  runVal,
+    assertBlockEq(result.tag(),
+                  result.value(),
                   std::vector<std::pair<value::TypeTags, value::Value>>{
                       makeNothing(), makeNothing(), makeNothing(), makeNothing(), makeNothing()});
 }
@@ -498,10 +496,10 @@ TEST_F(SBEBlockExpressionTest, BlockIsTimezoneHeterogeneousTest) {
 
     blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                         value::bitcastFrom<value::ValueBlock*>(&block));
-    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(runTag, runVal);
+    value::TagValueOwned result =
+        value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-    assertBlockOfBool(runTag, runVal, {false, false, true, false, false, false});
+    assertBlockOfBool(result.tag(), result.value(), {false, false, true, false, false, false});
     delete tzdb;
 }
 
@@ -523,10 +521,10 @@ TEST_F(SBEBlockExpressionTest, BlockIsTimezoneHomogeneousTest) {
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&monoBlock));
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        assertBlockOfBool(runTag, runVal, {true, true});
+        assertBlockOfBool(result.tag(), result.value(), {true, true});
     }
 
     {
@@ -535,10 +533,10 @@ TEST_F(SBEBlockExpressionTest, BlockIsTimezoneHomogeneousTest) {
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&monoBlock));
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        assertBlockOfBool(runTag, runVal, {false, false});
+        assertBlockOfBool(result.tag(), result.value(), {false, false});
     }
 
     {
@@ -547,10 +545,10 @@ TEST_F(SBEBlockExpressionTest, BlockIsTimezoneHomogeneousTest) {
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&monoBlock));
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        assertBlockOfBool(runTag, runVal, {false, false});
+        assertBlockOfBool(result.tag(), result.value(), {false, false});
     }
 
     {
@@ -558,10 +556,10 @@ TEST_F(SBEBlockExpressionTest, BlockIsTimezoneHomogeneousTest) {
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&monoBlock));
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        assertBlockOfBool(runTag, runVal, {false, false});
+        assertBlockOfBool(result.tag(), result.value(), {false, false});
     }
     delete tzdb;
 }
@@ -583,10 +581,10 @@ TEST_F(SBEBlockExpressionTest, BlockExistsMonoHomogeneousTest) {
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&block));
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        assertBlockOfBool(runTag, runVal, {true, true, true, false, true});
+        assertBlockOfBool(result.tag(), result.value(), {true, true, true, false, true});
     }
 
     {
@@ -596,10 +594,10 @@ TEST_F(SBEBlockExpressionTest, BlockExistsMonoHomogeneousTest) {
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&denseBlock));
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        assertBlockOfBool(runTag, runVal, {true, true});
+        assertBlockOfBool(result.tag(), result.value(), {true, true});
     }
 
     {
@@ -609,10 +607,10 @@ TEST_F(SBEBlockExpressionTest, BlockExistsMonoHomogeneousTest) {
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&sparseBlock));
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        assertBlockOfBool(runTag, runVal, {false, false});
+        assertBlockOfBool(result.tag(), result.value(), {false, false});
     }
 
     {
@@ -621,10 +619,10 @@ TEST_F(SBEBlockExpressionTest, BlockExistsMonoHomogeneousTest) {
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&monoBlock));
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        assertBlockOfBool(runTag, runVal, {true, true});
+        assertBlockOfBool(result.tag(), result.value(), {true, true});
     }
 
     {
@@ -632,10 +630,10 @@ TEST_F(SBEBlockExpressionTest, BlockExistsMonoHomogeneousTest) {
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&monoBlock));
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        assertBlockOfBool(runTag, runVal, {false, false});
+        assertBlockOfBool(result.tag(), result.value(), {false, false});
     }
 }
 
@@ -661,12 +659,12 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyShallowTest) {
 
     blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                         value::bitcastFrom<value::ValueBlock*>(&block));
-    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(runTag, runVal);
+    value::TagValueOwned result =
+        value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
     assertBlockEq(
-        runTag,
-        runVal,
+        result.tag(),
+        result.value(),
         std::vector{makeInt32(42), makeInt32(43), makeInt32(44), makeInt32(45), makeInt32(46)});
 }
 
@@ -693,12 +691,12 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyDeepTest) {
 
     blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                         value::bitcastFrom<value::ValueBlock*>(&block));
-    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(runTag, runVal);
+    value::TagValueOwned result =
+        value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
     auto extracted = block.extract();
-    assertBlockEq(runTag,
-                  runVal,
+    assertBlockEq(result.tag(),
+                  result.value(),
                   std::vector<std::pair<value::TypeTags, value::Value>>{
                       extracted[0], {fillTag, fillVal}, extracted[2], extracted[3], extracted[4]});
 }
@@ -725,12 +723,12 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyNothingTest) {
 
     blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                         value::bitcastFrom<value::ValueBlock*>(&block));
-    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(runTag, runVal);
+    value::TagValueOwned result =
+        value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
     assertBlockEq(
-        runTag,
-        runVal,
+        result.tag(),
+        result.value(),
         std::vector{makeInt32(42), makeInt32(43), makeInt32(44), makeNothing(), makeInt32(46)});
 }
 
@@ -759,12 +757,12 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyMonoHomogeneousTest) {
         {
             blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                                 value::bitcastFrom<value::ValueBlock*>(&block));
-            auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-            value::ValueGuard guard(runTag, runVal);
+            value::TagValueOwned result =
+                value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
             assertBlockEq(
-                runTag,
-                runVal,
+                result.tag(),
+                result.value(),
                 std::vector{
                     makeInt32(42), makeInt32(43), makeInt32(44), makeInt32(45), makeInt32(46)});
         }
@@ -777,10 +775,11 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyMonoHomogeneousTest) {
 
             blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                                 value::bitcastFrom<value::ValueBlock*>(&nothingBlock));
-            auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-            value::ValueGuard guard{runTag, runVal};
+            value::TagValueOwned result =
+                value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-            assertBlockEq(runTag, runVal, TypedValues{{fillTag, fillVal}, {fillTag, fillVal}});
+            assertBlockEq(
+                result.tag(), result.value(), TypedValues{{fillTag, fillVal}, {fillTag, fillVal}});
         }
 
         {
@@ -791,10 +790,10 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyMonoHomogeneousTest) {
 
             blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                                 value::bitcastFrom<value::ValueBlock*>(&denseBlock));
-            auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-            value::ValueGuard guard{runTag, runVal};
+            value::TagValueOwned result =
+                value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-            assertBlockEq(runTag, runVal, TypedValues{makeInt32(1), makeInt32(2)});
+            assertBlockEq(result.tag(), result.value(), TypedValues{makeInt32(1), makeInt32(2)});
         }
     }
 
@@ -805,12 +804,12 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyMonoHomogeneousTest) {
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&block));
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         assertBlockEq(
-            runTag,
-            runVal,
+            result.tag(),
+            result.value(),
             std::vector{
                 makeInt32(42), makeInt32(43), makeInt32(44), {fillTag, fillVal}, makeInt32(46)});
     }
@@ -824,13 +823,13 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyMonoHomogeneousTest) {
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&monoBlock));
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         auto extracted = monoBlock.extract();
         assertBlockEq(
-            runTag,
-            runVal,
+            result.tag(),
+            result.value(),
             std::vector<std::pair<value::TypeTags, value::Value>>{extracted[0], extracted[1]});
     }
 
@@ -843,17 +842,18 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyMonoHomogeneousTest) {
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&monoBlock));
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        assertBlockEq(
-            runTag, runVal, std::vector{std::pair(fillTag, fillVal), std::pair(fillTag, fillVal)});
+        assertBlockEq(result.tag(),
+                      result.value(),
+                      std::vector{std::pair(fillTag, fillVal), std::pair(fillTag, fillVal)});
     }
 }
 
 TEST_F(SBEBlockExpressionTest, BlockFillTypeTest) {
     auto fill = makeObject(BSON("a" << "replacement for arrays"));
-    value::ValueGuard fillGuard{fill.first, fill.second};
+    value::TagValueOwned fillOwned = value::TagValueOwned::fromRaw(fill.first, fill.second);
 
     value::HeterogeneousBlock block;
     block.push_back(value::makeNewString("First string"sv));
@@ -906,7 +906,7 @@ TEST_F(SBEBlockExpressionTest, BlockFillTypeMonoHomogeneousTest) {
 
     {
         auto fill = makeDecimal("1234.5678");
-        value::ValueGuard fillGuard{fill.first, fill.second};
+        value::TagValueOwned fillOwned = value::TagValueOwned::fromRaw(fill.first, fill.second);
 
         auto typeMask = makeInt32(getBSONTypeMask(BSONType::numberDouble));
 
@@ -962,7 +962,7 @@ TEST_F(SBEBlockExpressionTest, BlockFillTypeMonoHomogeneousTest) {
         // Block matches the type mask and fillTag is different than the block type so fall back
         // to ValueBlock::fillType().
         auto fill = makeDecimal("1234.5678");
-        value::ValueGuard fillGuard{fill.first, fill.second};
+        value::TagValueOwned fillOwned = value::TagValueOwned::fromRaw(fill.first, fill.second);
 
         auto typeMask = makeInt32(getBSONTypeMask(BSONType::numberInt));
 
@@ -979,7 +979,7 @@ TEST_F(SBEBlockExpressionTest, BlockFillTypeMonoHomogeneousTest) {
         auto extracted = monoBlock.extract();
 
         auto fill = makeDecimal("1234.5678");
-        value::ValueGuard fillGuard{fill.first, fill.second};
+        value::TagValueOwned fillOwned = value::TagValueOwned::fromRaw(fill.first, fill.second);
 
         {
             // MonoBlock that doesn't match the type mask.
@@ -1032,12 +1032,12 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyBlockTest) {
 
     blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                         value::bitcastFrom<value::ValueBlock*>(&block));
-    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(runTag, runVal);
+    value::TagValueOwned result =
+        value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
     assertBlockEq(
-        runTag,
-        runVal,
+        result.tag(),
+        result.value(),
         std::vector{makeInt32(42), makeInt32(43), makeInt32(44), makeInt32(745), makeInt32(46)});
 }
 
@@ -1231,12 +1231,13 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxTest) {
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
         auto compiledMinExpr = compileAggExpression(*compiledExpr, &aggAccessor);
 
-        auto [runTag, runVal] = runCompiledExpression(compiledMinExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledMinExpr.get()));
 
-        ASSERT_EQ(runTag, value::TypeTags::NumberInt32);
+        ASSERT_EQ(result.tag(), value::TypeTags::NumberInt32);
         auto expectedMin = makeInt32(41);
-        auto [t, v] = value::compareValue(runTag, runVal, expectedMin.first, expectedMin.second);
+        auto [t, v] = value::compareValue(
+            result.tag(), result.value(), expectedMin.first, expectedMin.second);
 
         ASSERT_EQ(t, value::TypeTags::NumberInt32);
         ASSERT_EQ(value::bitcastTo<int32_t>(v), 0);
@@ -1251,12 +1252,13 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxTest) {
 
         auto compiledMinExpr = compileAggExpression(*compiledExpr, &aggAccessor);
 
-        auto [runTag, runVal] = runCompiledExpression(compiledMinExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledMinExpr.get()));
 
-        ASSERT_EQ(runTag, value::TypeTags::NumberInt32);
+        ASSERT_EQ(result.tag(), value::TypeTags::NumberInt32);
         auto expectedMax = makeInt32(42);
-        auto [t, v] = value::compareValue(runTag, runVal, expectedMax.first, expectedMax.second);
+        auto [t, v] = value::compareValue(
+            result.tag(), result.value(), expectedMax.first, expectedMax.second);
 
         ASSERT_EQ(t, value::TypeTags::NumberInt32);
         ASSERT_EQ(value::bitcastTo<int32_t>(v), 0);
@@ -1295,12 +1297,13 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxDeepTest) {
 
         auto compiledMinExpr = compileAggExpression(*compiledExpr, &aggAccessor);
 
-        auto [runTag, runVal] = runCompiledExpression(compiledMinExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledMinExpr.get()));
 
-        ASSERT_EQ(runTag, value::TypeTags::NumberInt32);
+        ASSERT_EQ(result.tag(), value::TypeTags::NumberInt32);
         auto expectedMin = makeInt32(41);
-        auto [t, v] = value::compareValue(runTag, runVal, expectedMin.first, expectedMin.second);
+        auto [t, v] = value::compareValue(
+            result.tag(), result.value(), expectedMin.first, expectedMin.second);
 
         ASSERT_EQ(t, value::TypeTags::NumberInt32);
         ASSERT_EQ(value::bitcastTo<int32_t>(v), 0);
@@ -1315,13 +1318,13 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxDeepTest) {
 
         auto compiledMinExpr = compileAggExpression(*compiledExpr, &aggAccessor);
 
-        auto [runTag, runVal] = runCompiledExpression(compiledMinExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned run =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledMinExpr.get()));
 
-        ASSERT_EQ(runTag, value::TypeTags::StringBig);
-        auto [maxTag, maxVal] = value::makeNewString("abcdefgh"sv);
-        value::ValueGuard maxGuard(maxTag, maxVal);
-        auto [t, v] = value::compareValue(runTag, runVal, maxTag, maxVal);
+        ASSERT_EQ(run.tag(), value::TypeTags::StringBig);
+        value::TagValueOwned max =
+            value::TagValueOwned::fromRaw(value::makeNewString("abcdefgh"sv));
+        auto [t, v] = value::compareValue(run.tag(), run.value(), max.tag(), max.value());
 
         ASSERT_EQ(t, value::TypeTags::NumberInt32);
         ASSERT_EQ(value::bitcastTo<int32_t>(v), 0);
@@ -1352,12 +1355,13 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxSkipExtractTest) {
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
         auto compiledMinExpr = compileAggExpression(*compiledExpr, &aggAccessor);
 
-        auto [runTag, runVal] = runCompiledExpression(compiledMinExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledMinExpr.get()));
 
-        ASSERT_EQ(runTag, value::TypeTags::NumberInt32);
+        ASSERT_EQ(result.tag(), value::TypeTags::NumberInt32);
         auto expectedMin = makeInt32(-10);
-        auto [t, v] = value::compareValue(runTag, runVal, expectedMin.first, expectedMin.second);
+        auto [t, v] = value::compareValue(
+            result.tag(), result.value(), expectedMin.first, expectedMin.second);
 
         ASSERT_EQ(t, value::TypeTags::NumberInt32);
         ASSERT_EQ(value::bitcastTo<int32_t>(v), 0);
@@ -1372,12 +1376,13 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxSkipExtractTest) {
 
         auto compiledMaxExpr = compileAggExpression(*compiledExpr, &aggAccessor);
 
-        auto [runTag, runVal] = runCompiledExpression(compiledMaxExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledMaxExpr.get()));
 
-        ASSERT_EQ(runTag, value::TypeTags::NumberInt32);
+        ASSERT_EQ(result.tag(), value::TypeTags::NumberInt32);
         auto expectedMax = makeInt32(100);
-        auto [t, v] = value::compareValue(runTag, runVal, expectedMax.first, expectedMax.second);
+        auto [t, v] = value::compareValue(
+            result.tag(), result.value(), expectedMax.first, expectedMax.second);
 
         ASSERT_EQ(t, value::TypeTags::NumberInt32);
         ASSERT_EQ(value::bitcastTo<int32_t>(v), 0);
@@ -1395,12 +1400,13 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxSkipExtractTest) {
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
         auto compiledMinExpr = compileAggExpression(*compiledExpr, &aggAccessor);
 
-        auto [runTag, runVal] = runCompiledExpression(compiledMinExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledMinExpr.get()));
 
-        ASSERT_EQ(runTag, value::TypeTags::NumberInt32);
+        ASSERT_EQ(result.tag(), value::TypeTags::NumberInt32);
         auto expectedMin = makeInt32(10);
-        auto [t, v] = value::compareValue(runTag, runVal, expectedMin.first, expectedMin.second);
+        auto [t, v] = value::compareValue(
+            result.tag(), result.value(), expectedMin.first, expectedMin.second);
 
         ASSERT_EQ(t, value::TypeTags::NumberInt32);
         ASSERT_EQ(value::bitcastTo<int32_t>(v), 0);
@@ -1415,12 +1421,13 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxSkipExtractTest) {
 
         auto compiledMaxExpr = compileAggExpression(*compiledExpr, &aggAccessor);
 
-        auto [runTag, runVal] = runCompiledExpression(compiledMaxExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledMaxExpr.get()));
 
-        ASSERT_EQ(runTag, value::TypeTags::NumberInt32);
+        ASSERT_EQ(result.tag(), value::TypeTags::NumberInt32);
         auto expectedMax = makeInt32(50);
-        auto [t, v] = value::compareValue(runTag, runVal, expectedMax.first, expectedMax.second);
+        auto [t, v] = value::compareValue(
+            result.tag(), result.value(), expectedMax.first, expectedMax.second);
 
         ASSERT_EQ(t, value::TypeTags::NumberInt32);
         ASSERT_EQ(value::bitcastTo<int32_t>(v), 0);
@@ -1452,11 +1459,11 @@ TEST_F(SBEBlockExpressionTest, BlockApplyLambdaTest) {
 
     blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                         value::bitcastFrom<value::ValueBlock*>(&block));
-    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(runTag, runVal);
+    value::TagValueOwned result =
+        value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-    assertBlockEq(runTag,
-                  runVal,
+    assertBlockEq(result.tag(),
+                  result.value(),
                   std::vector<std::pair<value::TypeTags, value::Value>>{
                       makeInt32(84), makeInt32(86), makeInt32(88), makeNothing(), makeInt32(92)});
 }
@@ -1493,11 +1500,11 @@ TEST_F(SBEBlockExpressionTest, BlockApplyMaskedLambdaTest) {
     maskAccessor.reset(sbe::value::TypeTags::valueBlock,
                        value::bitcastFrom<value::ValueBlock*>(mask.get()));
 
-    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(runTag, runVal);
+    value::TagValueOwned result =
+        value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-    assertBlockEq(runTag,
-                  runVal,
+    assertBlockEq(result.tag(),
+                  result.value(),
                   std::vector<std::pair<value::TypeTags, value::Value>>{
                       makeInt32(84), makeNothing(), makeInt32(88), makeNothing(), makeNothing()});
 }
@@ -1533,8 +1540,8 @@ void SBEBlockExpressionTest::testBlockLogicalOp(EPrimBinary::Op scalarOp,
             blockFunctionName,
             sbe::makeEs(makeE<EVariable>(leftBlockSlot), makeE<EVariable>(rightBlockSlot)));
         auto compiledBlockExpr = compileExpression(*blockExpr);
-        auto [resTag, resVal] = runCompiledExpression(compiledBlockExpr.get());
-        value::ValueGuard resGuard(resTag, resVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledBlockExpr.get()));
 
         // Compare the results against the result of the scalar operation.
         auto scalarExpr = sbe::makeE<sbe::EPrimBinary>(
@@ -1556,15 +1563,15 @@ void SBEBlockExpressionTest::testBlockLogicalOp(EPrimBinary::Op scalarOp,
             scalarResults.push_back(runCompiledExpression(compiledScalarExpr.get()));
         }
 
-        assertBlockEq(resTag, resVal, scalarResults);
+        assertBlockEq(result.tag(), result.value(), scalarResults);
 
         if (BlockType::MONOBLOCK == bt) {  // It should be a MonoBlock
-            auto* block = value::bitcastTo<value::ValueBlock*>(resVal);
+            auto* block = value::bitcastTo<value::ValueBlock*>(result.value());
             ASSERT(block->as<value::MonoBlock>());
         }
 
         if (BlockType::BOOLBLOCK == bt) {  // It should be a BoolBlock
-            auto* block = value::bitcastTo<value::ValueBlock*>(resVal);
+            auto* block = value::bitcastTo<value::ValueBlock*>(result.value());
             ASSERT(block->as<value::BoolBlock>());
         }
     }
@@ -1585,10 +1592,9 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     std::unique_ptr<value::ValueBlock> leftMonoblock =
         std::make_unique<value::MonoBlock>(monoBlockSize, lTag, lVal);
 
-    auto [rTag, rVal] = value::makeSmallString("small");
-    value::ValueGuard sguard(rTag, rVal);
+    value::TagValueOwned s = value::TagValueOwned::fromRaw(value::makeSmallString("small"));
     std::unique_ptr<value::ValueBlock> rightMonoblock =
-        std::make_unique<value::MonoBlock>(monoBlockSize, rTag, rVal);
+        std::make_unique<value::MonoBlock>(monoBlockSize, s.tag(), s.value());
 
     value::HeterogeneousBlock leftBlockValues;
     leftBlockValues.push_back(makeBool(true));
@@ -1941,10 +1947,10 @@ TEST_F(SBEBlockExpressionTest, BlockLogicAndOrTest) {
             sbe::makeEs(makeE<EVariable>(blockLeftSlot), makeE<EVariable>(blockRightSlot)));
         auto compiledExpr = compileExpression(*expr);
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        assertBlockOfBool(runTag, runVal, {true, false, false, false});
+        assertBlockOfBool(result.tag(), result.value(), {true, false, false, false});
     }
 
     {
@@ -1953,10 +1959,10 @@ TEST_F(SBEBlockExpressionTest, BlockLogicAndOrTest) {
             sbe::makeEs(makeE<EVariable>(blockLeftSlot), makeE<EVariable>(blockRightSlot)));
         auto compiledExpr = compileExpression(*expr);
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        assertBlockOfBool(runTag, runVal, {true, true, true, false});
+        assertBlockOfBool(result.tag(), result.value(), {true, true, true, false});
     }
 
     {
@@ -1976,22 +1982,22 @@ TEST_F(SBEBlockExpressionTest, BlockLogicAndOrTest) {
                     sbe::makeEs(makeE<EVariable>(blockSlots[i]), makeE<EVariable>(blockSlots[j])));
                 auto compiledAndExpr = compileExpression(*andExpr);
 
-                auto [andTag, andVal] = runCompiledExpression(compiledAndExpr.get());
-                value::ValueGuard andGuard(andTag, andVal);
+                value::TagValueOwned andRes =
+                    value::TagValueOwned::fromRaw(runCompiledExpression(compiledAndExpr.get()));
 
                 auto orExpr = makeE<sbe::EFunction>(
                     EFn::kValueBlockLogicalOr,
                     sbe::makeEs(makeE<EVariable>(blockSlots[i]), makeE<EVariable>(blockSlots[j])));
                 auto compiledOrExpr = compileExpression(*orExpr);
 
-                auto [orTag, orVal] = runCompiledExpression(compiledOrExpr.get());
-                value::ValueGuard orGuard(orTag, orVal);
+                value::TagValueOwned orRes =
+                    value::TagValueOwned::fromRaw(runCompiledExpression(compiledOrExpr.get()));
 
                 auto [andNaive, orNaive] =
                     naiveLogicalAndOr(kBlocks[i]->clone(), kBlocks[j]->clone());
 
-                assertBlockOfBool(andTag, andVal, andNaive);
-                assertBlockOfBool(orTag, orVal, orNaive);
+                assertBlockOfBool(andRes.tag(), andRes.value(), andNaive);
+                assertBlockOfBool(orRes.tag(), orRes.value(), orNaive);
             }
         }
     }
@@ -2016,19 +2022,19 @@ TEST_F(SBEBlockExpressionTest, BlockLogicAndOrTest) {
             sbe::makeEs(makeE<EVariable>(boolBlockLeftSlot), makeE<EVariable>(boolBlockRightSlot)));
         auto compiledAndExpr = compileExpression(*andExpr);
 
-        auto [andTag, andVal] = runCompiledExpression(compiledAndExpr.get());
-        value::ValueGuard andGuard(andTag, andVal);
+        value::TagValueOwned andRes =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledAndExpr.get()));
 
         auto orExpr = makeE<sbe::EFunction>(
             EFn::kValueBlockLogicalOr,
             sbe::makeEs(makeE<EVariable>(boolBlockLeftSlot), makeE<EVariable>(boolBlockRightSlot)));
         auto compiledOrExpr = compileExpression(*orExpr);
 
-        auto [orTag, orVal] = runCompiledExpression(compiledOrExpr.get());
-        value::ValueGuard orGuard(orTag, orVal);
+        value::TagValueOwned orRes =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledOrExpr.get()));
 
-        assertBlockOfBool(andTag, andVal, {true, false, false, false});
-        assertBlockOfBool(orTag, orVal, {true, true, true, false});
+        assertBlockOfBool(andRes.tag(), andRes.value(), {true, false, false, false});
+        assertBlockOfBool(orRes.tag(), orRes.value(), {true, true, true, false});
 
         // Test HeterogeneousBlock fallback when applying the op to a bool block on one side and
         // heterogeneous on the other.
@@ -2037,21 +2043,21 @@ TEST_F(SBEBlockExpressionTest, BlockLogicAndOrTest) {
             sbe::makeEs(makeE<EVariable>(blockLeftSlot), makeE<EVariable>(boolBlockRightSlot)));
         auto compiledHeterogeneousAndExpr = compileExpression(*andExpr);
 
-        auto [andHeterogeneousTag, andHeterogeneousVal] =
-            runCompiledExpression(compiledHeterogeneousAndExpr.get());
-        value::ValueGuard andHeterogeneousGuard(andHeterogeneousTag, andHeterogeneousVal);
+        value::TagValueOwned andHeterogeneous = value::TagValueOwned::fromRaw(
+            runCompiledExpression(compiledHeterogeneousAndExpr.get()));
 
         auto heretergeneousOrExpr = makeE<sbe::EFunction>(
             EFn::kValueBlockLogicalOr,
             sbe::makeEs(makeE<EVariable>(blockLeftSlot), makeE<EVariable>(boolBlockRightSlot)));
         auto compiledHeterogeneousOrExpr = compileExpression(*orExpr);
 
-        auto [orHeterogeneousTag, orHeterogeneousVal] =
-            runCompiledExpression(compiledHeterogeneousOrExpr.get());
-        value::ValueGuard orHeterogeneousGuard(orHeterogeneousTag, orHeterogeneousVal);
+        value::TagValueOwned orHeterogeneous =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledHeterogeneousOrExpr.get()));
 
-        assertBlockOfBool(andHeterogeneousTag, andHeterogeneousVal, {true, false, false, false});
-        assertBlockOfBool(orHeterogeneousTag, orHeterogeneousVal, {true, true, true, false});
+        assertBlockOfBool(
+            andHeterogeneous.tag(), andHeterogeneous.value(), {true, false, false, false});
+        assertBlockOfBool(
+            orHeterogeneous.tag(), orHeterogeneous.value(), {true, true, true, false});
     }
 }
 
@@ -2082,10 +2088,10 @@ void SBEBlockExpressionTest::testFoldF(std::vector<std::pair<value::TypeTags, va
             sbe::makeEs(makeE<EVariable>(valBlockSlot), makeE<EVariable>(cellBlockSlot)));
         auto compiledExpr = compileExpression(*expr);
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        assertBlockOfBool(runTag, runVal, expectedResult);
+        assertBlockOfBool(result.tag(), result.value(), expectedResult);
     }
 }
 
@@ -2264,11 +2270,11 @@ void SBEBlockExpressionTest::testCmpScalar(EPrimBinary::Op scalarOp,
         scalarAccessorRhs.reset(deblocked.tags()[i], deblocked.vals()[i]);
 
         // Run the block expression and get the result.
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(runTag, value::TypeTags::valueBlock);
-        auto* resultValBlock = value::getValueBlock(runVal);
+        ASSERT_EQ(result.tag(), value::TypeTags::valueBlock);
+        auto* resultValBlock = value::getValueBlock(result.value());
         auto resultExtracted = resultValBlock->extract();
 
         ASSERT_EQ(resultExtracted.count(), deblocked.count());
@@ -2276,17 +2282,19 @@ void SBEBlockExpressionTest::testCmpScalar(EPrimBinary::Op scalarOp,
         for (size_t j = 0; j < resultExtracted.count(); ++j) {
             // Determine the expected result.
             scalarAccessorLhs.reset(deblocked.tags()[j], deblocked.vals()[j]);
-            auto [expectedTag, expectedVal] = runCompiledExpression(compiledScalarExpr.get());
-            value::ValueGuard guard(expectedTag, expectedVal);
+            value::TagValueOwned expected =
+                value::TagValueOwned::fromRaw(runCompiledExpression(compiledScalarExpr.get()));
 
 
             auto [gotTag, gotVal] = resultExtracted[j];
 
-            auto [cmpTag, cmpVal] = value::compareValue(gotTag, gotVal, expectedTag, expectedVal);
-            ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32) << gotTag << " " << expectedTag;
+            auto [cmpTag, cmpVal] =
+                value::compareValue(gotTag, gotVal, expected.tag(), expected.value());
+            ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32) << gotTag << " " << expected.tag();
             ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), 0)
                 << "Comparing " << deblocked[i] << " " << deblocked[j] << " and got "
-                << std::pair(gotTag, gotVal) << " expected " << std::pair(expectedTag, expectedVal);
+                << std::pair(gotTag, gotVal) << " expected "
+                << std::pair(expected.tag(), expected.value());
         }
     }
 }
@@ -2374,12 +2382,12 @@ void SBEBlockExpressionTest::testBlockBlockArithmeticOp(EPrimBinary::Op scalarOp
                              value::bitcastFrom<value::ValueBlock*>(rightBlock));
 
     // run the block operation
-    auto [resBlockTag, resBlockVal] = runCompiledExpression(blockCompiledExpr.get());
-    value::ValueGuard guard(resBlockTag, resBlockVal);
-    auto* resBlock = value::bitcastTo<value::ValueBlock*>(resBlockVal);
+    value::TagValueOwned result =
+        value::TagValueOwned::fromRaw(runCompiledExpression(blockCompiledExpr.get()));
+    auto* resBlock = value::bitcastTo<value::ValueBlock*>(result.value());
     auto resBlockExtractedValues = resBlock->extract();
 
-    ASSERT_EQ(resBlockTag, value::TypeTags::valueBlock);
+    ASSERT_EQ(result.tag(), value::TypeTags::valueBlock);
     if (monoBlockExpected) {
         ASSERT_TRUE(resBlock->as<value::MonoBlock>());
     }
@@ -2472,20 +2480,18 @@ void SBEBlockExpressionTest::testBlockScalarArithmeticOp(
 
 
     // run the block operations
-    auto [resScalarBlockTag, resScalarBlockVal] =
-        runCompiledExpression(scalarBlockCompiledExpr.get());
-    value::ValueGuard scalarBlockGuard(resScalarBlockTag, resScalarBlockVal);
-    auto* resScalarBlock = value::bitcastTo<value::ValueBlock*>(resScalarBlockVal);
+    value::TagValueOwned scalarBlock =
+        value::TagValueOwned::fromRaw(runCompiledExpression(scalarBlockCompiledExpr.get()));
+    auto* resScalarBlock = value::bitcastTo<value::ValueBlock*>(scalarBlock.value());
     auto resScalarBlockExtractedValues = resScalarBlock->extract();
 
-    auto [resBlockScalarTag, resBlockScalarVal] =
-        runCompiledExpression(blockScalarCompiledExpr.get());
-    value::ValueGuard blockScalarGuard(resBlockScalarTag, resBlockScalarVal);
-    auto* resBlockScalar = value::bitcastTo<value::ValueBlock*>(resBlockScalarVal);
+    value::TagValueOwned blockScalar =
+        value::TagValueOwned::fromRaw(runCompiledExpression(blockScalarCompiledExpr.get()));
+    auto* resBlockScalar = value::bitcastTo<value::ValueBlock*>(blockScalar.value());
     auto resBlockScalarExtractedValues = resBlockScalar->extract();
 
-    ASSERT_EQ(resScalarBlockTag, value::TypeTags::valueBlock);
-    ASSERT_EQ(resBlockScalarTag, value::TypeTags::valueBlock);
+    ASSERT_EQ(scalarBlock.tag(), value::TypeTags::valueBlock);
+    ASSERT_EQ(blockScalar.tag(), value::TypeTags::valueBlock);
 
     if (block->as<value::MonoBlock>()) {
         ASSERT_TRUE(resScalarBlock->as<value::MonoBlock>());
@@ -2561,7 +2567,7 @@ void SBEBlockExpressionTest::testBlockSum(sbe::value::OwnedValueAccessor& aggAcc
                                           std::vector<bool> bitsetData,
                                           TypedValue expectedResult) {
     ASSERT_EQ(blockData.size(), bitsetData.size());
-    value::ValueGuard expectedResultGuard(expectedResult);
+    value::TagValueOwned expectedResultOwned = value::TagValueOwned::fromRaw(expectedResult);
 
     value::ViewOfValueAccessor blockAccessor;
     value::ViewOfValueAccessor bitsetAccessor;
@@ -2587,13 +2593,13 @@ void SBEBlockExpressionTest::testBlockSum(sbe::value::OwnedValueAccessor& aggAcc
 
     auto compiledFinalExpr = compileAggExpression(*compiledExpr, &aggAccessor);
 
-    auto [runTag, runVal] = runCompiledExpression(compiledFinalExpr.get());
-    value::ValueGuard guard(runTag, runVal);
+    value::TagValueOwned result =
+        value::TagValueOwned::fromRaw(runCompiledExpression(compiledFinalExpr.get()));
 
-    ASSERT_EQ(runTag, expectedResult.first);
-    if (runTag != value::TypeTags::Nothing) {
-        auto [compTag, compVal] =
-            value::compareValue(runTag, runVal, expectedResult.first, expectedResult.second);
+    ASSERT_EQ(result.tag(), expectedResult.first);
+    if (result.tag() != value::TypeTags::Nothing) {
+        auto [compTag, compVal] = value::compareValue(
+            result.tag(), result.value(), expectedResult.first, expectedResult.second);
 
         ASSERT_EQ(compTag, value::TypeTags::NumberInt32);
         ASSERT_EQ(value::bitcastTo<int32_t>(compVal), 0);
@@ -3190,10 +3196,9 @@ TEST_F(SBEBlockExpressionTest, BlockNewTest) {
                                       sbe::makeEs(makeC(makeBool(false)), makeC(makeInt32(7))));
     auto compiledExpr = compileExpression(*expr);
 
-    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(runTag, runVal);
+    auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-    assertBlockOfBool(runTag, runVal, {false, false, false, false, false, false, false});
+    assertBlockOfBool(run.tag(), run.value(), {false, false, false, false, false, false, false});
 }
 
 TEST_F(SBEBlockExpressionTest, BlockSizeTest) {
@@ -3208,11 +3213,10 @@ TEST_F(SBEBlockExpressionTest, BlockSizeTest) {
         makeE<sbe::EFunction>(EFn::kValueBlockSize, sbe::makeEs(makeE<EVariable>(blockSlot)));
     auto compiledExpr = compileExpression(*expr);
 
-    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(runTag, runVal);
+    auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-    ASSERT_EQ(runTag, value::TypeTags::NumberInt32);
-    ASSERT_EQ(value::bitcastTo<int32_t>(runVal), 4);
+    ASSERT_EQ(run.tag(), value::TypeTags::NumberInt32);
+    ASSERT_EQ(value::bitcastTo<int32_t>(run.value()), 4);
 }
 
 TEST_F(SBEBlockExpressionTest, BitmapNoneTest) {
@@ -3254,10 +3258,9 @@ TEST_F(SBEBlockExpressionTest, BlockLogicNotTest) {
         makeE<sbe::EFunction>(EFn::kValueBlockLogicalNot, sbe::makeEs(makeE<EVariable>(blockSlot)));
     auto compiledExpr = compileExpression(*expr);
 
-    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(runTag, runVal);
+    auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-    assertBlockOfBool(runTag, runVal, {false, true, false, true});
+    assertBlockOfBool(run.tag(), run.value(), {false, true, false, true});
 }
 
 TEST_F(SBEBlockExpressionTest, BlockCombineTest) {
@@ -3297,19 +3300,17 @@ TEST_F(SBEBlockExpressionTest, BlockCombineTest) {
                                                       makeE<EVariable>(blockMaskSlot)));
         auto compiledExpr = compileExpression(*expr);
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guardRun(runTag, runVal);
-        auto [strTag, strVal] = value::makeNewString("This is item #4"sv);
-        value::ValueGuard guardStr(strTag, strVal);
+        auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
+        auto str = value::TagValueOwned::fromRaw(value::makeNewString("This is item #4"sv));
 
-        assertBlockEq(
-            runTag,
-            runVal,
-            std::vector<std::pair<value::TypeTags, value::Value>>{makeInt32(1),
-                                                                  makeNothing(),
-                                                                  makeInt32(3),
-                                                                  std::make_pair(strTag, strVal),
-                                                                  makeInt32(5)});
+        assertBlockEq(run.tag(),
+                      run.value(),
+                      std::vector<std::pair<value::TypeTags, value::Value>>{
+                          makeInt32(1),
+                          makeNothing(),
+                          makeInt32(3),
+                          std::make_pair(str.tag(), str.value()),
+                          makeInt32(5)});
     }
 
     {
@@ -3328,19 +3329,17 @@ TEST_F(SBEBlockExpressionTest, BlockCombineTest) {
                                                       makeE<EVariable>(blockMaskSlot)));
         auto compiledExpr = compileExpression(*expr);
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guardRun(runTag, runVal);
-        auto [strTag, strVal] = value::makeNewString("This is item #4"sv);
-        value::ValueGuard guardStr(strTag, strVal);
+        auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
+        auto str = value::TagValueOwned::fromRaw(value::makeNewString("This is item #4"sv));
 
-        assertBlockEq(
-            runTag,
-            runVal,
-            std::vector<std::pair<value::TypeTags, value::Value>>{makeInt32(1),
-                                                                  makeNothing(),
-                                                                  makeInt32(3),
-                                                                  std::make_pair(strTag, strVal),
-                                                                  makeNothing()});
+        assertBlockEq(run.tag(),
+                      run.value(),
+                      std::vector<std::pair<value::TypeTags, value::Value>>{
+                          makeInt32(1),
+                          makeNothing(),
+                          makeInt32(3),
+                          std::make_pair(str.tag(), str.value()),
+                          makeNothing()});
     }
 
     // Test optimised path in the cases of all-true and all-false bitmask
@@ -3360,11 +3359,10 @@ TEST_F(SBEBlockExpressionTest, BlockCombineTest) {
                                                       makeE<EVariable>(blockMaskSlot)));
         auto compiledExpr = compileExpression(*expr);
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guardRun(runTag, runVal);
+        auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        assertBlockEq(runTag,
-                      runVal,
+        assertBlockEq(run.tag(),
+                      run.value(),
                       std::vector<std::pair<value::TypeTags, value::Value>>{
                           makeInt32(1), makeInt32(2), makeInt32(3), makeNothing(), makeInt32(5)});
     }
@@ -3385,23 +3383,22 @@ TEST_F(SBEBlockExpressionTest, BlockCombineTest) {
                                                       makeE<EVariable>(blockMaskSlot)));
         auto compiledExpr = compileExpression(*expr);
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guardRun(runTag, runVal);
+        auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         auto str1 = value::makeNewString("This is item #1"sv);
-        value::ValueGuard guardStr1(str1);
+        value::TagValueOwned str1Owned = value::TagValueOwned::fromRaw(str1);
 
         auto str3 = value::makeNewString("This is item #3"sv);
-        value::ValueGuard guardStr3(str3);
+        value::TagValueOwned str3Owned = value::TagValueOwned::fromRaw(str3);
 
         auto str4 = value::makeNewString("This is item #4"sv);
-        value::ValueGuard guardStr4(str4);
+        value::TagValueOwned str4Owned = value::TagValueOwned::fromRaw(str4);
 
         auto str5 = value::makeNewString("This is item #5"sv);
-        value::ValueGuard guardStr5(str5);
+        value::TagValueOwned str5Owned = value::TagValueOwned::fromRaw(str5);
 
-        assertBlockEq(runTag,
-                      runVal,
+        assertBlockEq(run.tag(),
+                      run.value(),
                       std::vector<std::pair<value::TypeTags, value::Value>>{
                           str1, makeNothing(), str3, str4, str5});
     }
@@ -3433,10 +3430,9 @@ TEST_F(SBEBlockExpressionTest, BlockIsMemberArrayTestNumeric) {
 
     auto compiledExpr = compileExpression(*expr);
 
-    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(runTag, runVal);
+    auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-    assertBlockOfBool(runTag, runVal, {true, false, false, false, true});
+    assertBlockOfBool(run.tag(), run.value(), {true, false, false, false, true});
 }
 
 TEST_F(SBEBlockExpressionTest, BlockIsMemberArrayTestString) {
@@ -3465,10 +3461,9 @@ TEST_F(SBEBlockExpressionTest, BlockIsMemberArrayTestString) {
 
     auto compiledExpr = compileExpression(*expr);
 
-    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(runTag, runVal);
+    auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-    assertBlockOfBool(runTag, runVal, {true, false, false, false, true});
+    assertBlockOfBool(run.tag(), run.value(), {true, false, false, false, true});
 }
 
 TEST_F(SBEBlockExpressionTest, BlockIsMemberOnNothingTest) {
@@ -3491,11 +3486,10 @@ TEST_F(SBEBlockExpressionTest, BlockIsMemberOnNothingTest) {
 
     auto compiledExpr = compileExpression(*expr);
 
-    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(runTag, runVal);
+    auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-    assertBlockEq(runTag,
-                  runVal,
+    assertBlockEq(run.tag(),
+                  run.value(),
                   std::vector<std::pair<value::TypeTags, value::Value>>{
                       makeNothing(), makeNothing(), makeNothing(), makeNothing(), makeNothing()});
 }
@@ -3526,10 +3520,9 @@ TEST_F(SBEBlockExpressionTest, BlockIsMemberWithArraySet) {
 
     auto compiledExpr = compileExpression(*expr);
 
-    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(runTag, runVal);
+    auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-    assertBlockOfBool(runTag, runVal, {true, false, false, false, true});
+    assertBlockOfBool(run.tag(), run.value(), {true, false, false, false, true});
 }
 
 TEST_F(SBEBlockExpressionTest, BlockIsMemberWithInList) {
@@ -3561,10 +3554,9 @@ TEST_F(SBEBlockExpressionTest, BlockIsMemberWithInList) {
 
     auto compiledExpr = compileExpression(*expr);
 
-    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(runTag, runVal);
+    auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-    assertBlockOfBool(runTag, runVal, {true, false, false, false, true});
+    assertBlockOfBool(run.tag(), run.value(), {true, false, false, false, true});
 }
 
 TEST_F(SBEBlockExpressionTest, BlockCoerceToBool) {
@@ -3593,11 +3585,10 @@ TEST_F(SBEBlockExpressionTest, BlockCoerceToBool) {
 
     auto compiledExpr = compileExpression(*expr);
 
-    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(runTag, runVal);
+    auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-    assertBlockEq(runTag,
-                  runVal,
+    assertBlockEq(run.tag(),
+                  run.value(),
                   std::vector<std::pair<value::TypeTags, value::Value>>{
                       makeBool(true),   // "teststring1"
                       makeBool(true),   // ""
@@ -3648,8 +3639,7 @@ TEST_F(SBEBlockExpressionTest, BlockRound) {
                             value::bitcastFrom<value::ValueBlock*>(&block));
         scalarAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int>(2));
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
             makeNothing(),  // string
@@ -3669,7 +3659,7 @@ TEST_F(SBEBlockExpressionTest, BlockRound) {
             makeNothing(),  // Null
         };
 
-        assertBlockEq(runTag, runVal, expectedResults);
+        assertBlockEq(run.tag(), run.value(), expectedResults);
 
         for (size_t i = 0; i < expectedResults.size(); ++i) {
             releaseValue(expectedResults[i].first, expectedResults[i].second);
@@ -3687,8 +3677,7 @@ TEST_F(SBEBlockExpressionTest, BlockRound) {
                             value::bitcastFrom<value::ValueBlock*>(&block));
         scalarAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int>(-2));
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
             makeNothing(),  // string
@@ -3708,7 +3697,7 @@ TEST_F(SBEBlockExpressionTest, BlockRound) {
             makeNothing(),  // Null
         };
 
-        assertBlockEq(runTag, runVal, expectedResults);
+        assertBlockEq(run.tag(), run.value(), expectedResults);
 
         for (size_t i = 0; i < expectedResults.size(); ++i) {
             releaseValue(expectedResults[i].first, expectedResults[i].second);
@@ -3724,8 +3713,7 @@ TEST_F(SBEBlockExpressionTest, BlockRound) {
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&block));
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
             makeNothing(),  // string
@@ -3745,7 +3733,7 @@ TEST_F(SBEBlockExpressionTest, BlockRound) {
             makeNothing(),  // Null
         };
 
-        assertBlockEq(runTag, runVal, expectedResults);
+        assertBlockEq(run.tag(), run.value(), expectedResults);
 
         for (size_t i = 0; i < expectedResults.size(); ++i) {
             releaseValue(expectedResults[i].first, expectedResults[i].second);
@@ -3788,8 +3776,7 @@ TEST_F(SBEBlockExpressionTest, BlockTrunc) {
                             value::bitcastFrom<value::ValueBlock*>(&block));
         scalarAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int>(2));
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
             makeNothing(),  // string
@@ -3809,7 +3796,7 @@ TEST_F(SBEBlockExpressionTest, BlockTrunc) {
             makeNothing(),  // Null
         };
 
-        assertBlockEq(runTag, runVal, expectedResults);
+        assertBlockEq(run.tag(), run.value(), expectedResults);
 
         for (size_t i = 0; i < expectedResults.size(); ++i) {
             releaseValue(expectedResults[i].first, expectedResults[i].second);
@@ -3827,8 +3814,7 @@ TEST_F(SBEBlockExpressionTest, BlockTrunc) {
                             value::bitcastFrom<value::ValueBlock*>(&block));
         scalarAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int>(-2));
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
             makeNothing(),  // string
@@ -3848,7 +3834,7 @@ TEST_F(SBEBlockExpressionTest, BlockTrunc) {
             makeNothing(),  // Null
         };
 
-        assertBlockEq(runTag, runVal, expectedResults);
+        assertBlockEq(run.tag(), run.value(), expectedResults);
 
         for (size_t i = 0; i < expectedResults.size(); ++i) {
             releaseValue(expectedResults[i].first, expectedResults[i].second);
@@ -3863,8 +3849,7 @@ TEST_F(SBEBlockExpressionTest, BlockTrunc) {
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&block));
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
             makeNothing(),  // string
@@ -3884,7 +3869,7 @@ TEST_F(SBEBlockExpressionTest, BlockTrunc) {
             makeNothing(),  // Null
         };
 
-        assertBlockEq(runTag, runVal, expectedResults);
+        assertBlockEq(run.tag(), run.value(), expectedResults);
 
         for (size_t i = 0; i < expectedResults.size(); ++i) {
             releaseValue(expectedResults[i].first, expectedResults[i].second);
@@ -3926,8 +3911,7 @@ TEST_F(SBEBlockExpressionTest, BlockMod) {
                             value::bitcastFrom<value::ValueBlock*>(&block));
         scalarAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int>(5));
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
             makeNothing(),  // string
@@ -3951,7 +3935,7 @@ TEST_F(SBEBlockExpressionTest, BlockMod) {
             makeNothing(),  // Null
         };
 
-        assertBlockEq(runTag, runVal, expectedResults);
+        assertBlockEq(run.tag(), run.value(), expectedResults);
 
         for (size_t i = 0; i < expectedResults.size(); ++i) {
             releaseValue(expectedResults[i].first, expectedResults[i].second);
@@ -3964,8 +3948,7 @@ TEST_F(SBEBlockExpressionTest, BlockMod) {
                             value::bitcastFrom<value::ValueBlock*>(&block));
         scalarAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int>(-5));
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
             makeNothing(),  // string
@@ -3989,7 +3972,7 @@ TEST_F(SBEBlockExpressionTest, BlockMod) {
             makeNothing(),  // Null
         };
 
-        assertBlockEq(runTag, runVal, expectedResults);
+        assertBlockEq(run.tag(), run.value(), expectedResults);
 
         for (size_t i = 0; i < expectedResults.size(); ++i) {
             releaseValue(expectedResults[i].first, expectedResults[i].second);
@@ -4002,8 +3985,7 @@ TEST_F(SBEBlockExpressionTest, BlockMod) {
                             value::bitcastFrom<value::ValueBlock*>(&block));
         scalarAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(1.2));
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
             makeNothing(),  // string
@@ -4050,8 +4032,7 @@ TEST_F(SBEBlockExpressionTest, BlockMod) {
                             value::bitcastFrom<value::ValueBlock*>(&block));
         scalarAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-1.2));
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
             makeNothing(),  // string
@@ -4087,7 +4068,7 @@ TEST_F(SBEBlockExpressionTest, BlockMod) {
             makeNothing(),  // Null
         };
 
-        assertBlockEq(runTag, runVal, expectedResults);
+        assertBlockEq(run.tag(), run.value(), expectedResults);
 
         for (size_t i = 0; i < expectedResults.size(); ++i) {
             releaseValue(expectedResults[i].first, expectedResults[i].second);
@@ -4098,12 +4079,10 @@ TEST_F(SBEBlockExpressionTest, BlockMod) {
     {
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&block));
-        auto dec = makeDecimal("8.56");
-        value::ValueGuard decGuard(dec.first, dec.second);
-        scalarAccessor.reset(dec.first, dec.second);
+        auto dec = value::TagValueOwned::fromRaw(makeDecimal("8.56"));
+        scalarAccessor.reset(dec.tag(), dec.value());
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
             makeNothing(),  // string
@@ -4121,7 +4100,7 @@ TEST_F(SBEBlockExpressionTest, BlockMod) {
             makeNothing(),  // Null
         };
 
-        assertBlockEq(runTag, runVal, expectedResults);
+        assertBlockEq(run.tag(), run.value(), expectedResults);
 
         for (size_t i = 0; i < expectedResults.size(); ++i) {
             releaseValue(expectedResults[i].first, expectedResults[i].second);
@@ -4132,12 +4111,10 @@ TEST_F(SBEBlockExpressionTest, BlockMod) {
     {
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&block));
-        auto dec = makeDecimal("-8.56");
-        value::ValueGuard decGuard(dec.first, dec.second);
-        scalarAccessor.reset(dec.first, dec.second);
+        auto dec = value::TagValueOwned::fromRaw(makeDecimal("-8.56"));
+        scalarAccessor.reset(dec.tag(), dec.value());
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
             makeNothing(),  // string
@@ -4155,7 +4132,7 @@ TEST_F(SBEBlockExpressionTest, BlockMod) {
             makeNothing(),  // Null
         };
 
-        assertBlockEq(runTag, runVal, expectedResults);
+        assertBlockEq(run.tag(), run.value(), expectedResults);
 
         for (size_t i = 0; i < expectedResults.size(); ++i) {
             releaseValue(expectedResults[i].first, expectedResults[i].second);
@@ -4166,17 +4143,15 @@ TEST_F(SBEBlockExpressionTest, BlockMod) {
     {
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&block));
-        auto md = value::makeSmallString("abc"sv);
-        value::ValueGuard mdGuard(md.first, md.second);
-        scalarAccessor.reset(md.first, md.second);
+        auto md = value::TagValueOwned::fromRaw(value::makeSmallString("abc"sv));
+        scalarAccessor.reset(md.tag(), md.value());
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         auto expectedResults =
             std::vector<std::pair<value::TypeTags, value::Value>>(13, makeNothing());
 
-        assertBlockEq(runTag, runVal, expectedResults);
+        assertBlockEq(run.tag(), run.value(), expectedResults);
 
         for (size_t i = 0; i < expectedResults.size(); ++i) {
             releaseValue(expectedResults[i].first, expectedResults[i].second);
@@ -4216,9 +4191,8 @@ TEST_F(SBEBlockExpressionTest, BlockMod) {
     {
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&block));
-        auto md = makeDecimal("0");
-        value::ValueGuard mdGuard(md.first, md.second);
-        scalarAccessor.reset(md.first, md.second);
+        auto md = value::TagValueOwned::fromRaw(makeDecimal("0"));
+        scalarAccessor.reset(md.tag(), md.value());
 
         ASSERT_THROWS_CODE(runCompiledExpression(compiledExpr.get()),
                            DBException,
@@ -4266,8 +4240,7 @@ TEST_F(SBEBlockExpressionTest, BlockDateAdd) {
         blockAccessor.reset(value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(block.get()));
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
             {value::TypeTags::Date, value::bitcastFrom<int64_t>(0)},
@@ -4279,7 +4252,7 @@ TEST_F(SBEBlockExpressionTest, BlockDateAdd) {
             makeNothing(),
         };
 
-        assertBlockEq(runTag, runVal, expectedResults);
+        assertBlockEq(run.tag(), run.value(), expectedResults);
     }
 }
 
@@ -4319,8 +4292,7 @@ TEST_F(SBEBlockExpressionTest, BlockNumConvert) {
             value::TypeTags::NumberInt32,
             value::bitcastFrom<int32_t>(static_cast<int32_t>(value::TypeTags::NumberInt32)));
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
             makeNothing(),  // string
@@ -4338,7 +4310,7 @@ TEST_F(SBEBlockExpressionTest, BlockNumConvert) {
             makeNothing(),  // Null
         };
 
-        assertBlockEq(runTag, runVal, expectedResults);
+        assertBlockEq(run.tag(), run.value(), expectedResults);
 
         for (size_t i = 0; i < expectedResults.size(); ++i) {
             releaseValue(expectedResults[i].first, expectedResults[i].second);
@@ -4353,8 +4325,7 @@ TEST_F(SBEBlockExpressionTest, BlockNumConvert) {
             value::TypeTags::NumberInt32,
             value::bitcastFrom<int32_t>(static_cast<int32_t>(value::TypeTags::NumberInt64)));
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
             makeNothing(),  // string
@@ -4372,7 +4343,7 @@ TEST_F(SBEBlockExpressionTest, BlockNumConvert) {
             makeNothing(),  // Null
         };
 
-        assertBlockEq(runTag, runVal, expectedResults);
+        assertBlockEq(run.tag(), run.value(), expectedResults);
 
         for (size_t i = 0; i < expectedResults.size(); ++i) {
             releaseValue(expectedResults[i].first, expectedResults[i].second);
@@ -4387,8 +4358,7 @@ TEST_F(SBEBlockExpressionTest, BlockNumConvert) {
             value::TypeTags::NumberInt32,
             value::bitcastFrom<int32_t>(static_cast<int32_t>(value::TypeTags::NumberDouble)));
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
             makeNothing(),  // string
@@ -4406,7 +4376,7 @@ TEST_F(SBEBlockExpressionTest, BlockNumConvert) {
             makeNothing(),  // Null
         };
 
-        assertBlockEq(runTag, runVal, expectedResults);
+        assertBlockEq(run.tag(), run.value(), expectedResults);
 
         for (size_t i = 0; i < expectedResults.size(); ++i) {
             releaseValue(expectedResults[i].first, expectedResults[i].second);
@@ -4421,8 +4391,7 @@ TEST_F(SBEBlockExpressionTest, BlockNumConvert) {
             value::TypeTags::NumberInt32,
             value::bitcastFrom<int32_t>(static_cast<int32_t>(value::TypeTags::NumberDecimal)));
 
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        auto run = value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
             makeNothing(),  // string
@@ -4440,7 +4409,7 @@ TEST_F(SBEBlockExpressionTest, BlockNumConvert) {
             makeNothing(),  // Null
         };
 
-        assertBlockEq(runTag, runVal, expectedResults);
+        assertBlockEq(run.tag(), run.value(), expectedResults);
 
         for (size_t i = 0; i < expectedResults.size(); ++i) {
             releaseValue(expectedResults[i].first, expectedResults[i].second);
@@ -4588,21 +4557,21 @@ TEST_F(SBEBlockExpressionTest, BlockGetSortKey) {
                             value::bitcastFrom<value::ValueBlock*>(block.get()));
 
         {
-            auto [runOwned, runTag, runVal] = runExpression(*ascSortKeyExpr);
-            value::ValueGuard guard(runOwned, runTag, runVal);
+            value::TagValueMaybeOwned result =
+                value::TagValueMaybeOwned::fromRaw(runExpression(*ascSortKeyExpr));
 
             auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
                 makeInt32(0), makeInt32(1), makeInt32(2), makeInt32(3), makeInt32(4)};
-            assertBlockEq(runTag, runVal, expectedResults);
+            assertBlockEq(result.tag(), result.value(), expectedResults);
         }
 
         {
-            auto [runOwned, runTag, runVal] = runExpression(*descSortKeyExpr);
-            value::ValueGuard guard(runOwned, runTag, runVal);
+            value::TagValueMaybeOwned result =
+                value::TagValueMaybeOwned::fromRaw(runExpression(*descSortKeyExpr));
 
             auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
                 makeInt32(2), makeInt32(3), makeInt32(4), makeInt32(5), makeInt32(6)};
-            assertBlockEq(runTag, runVal, expectedResults);
+            assertBlockEq(result.tag(), result.value(), expectedResults);
         }
     }
 
@@ -4616,21 +4585,21 @@ TEST_F(SBEBlockExpressionTest, BlockGetSortKey) {
                             value::bitcastFrom<value::ValueBlock*>(block.get()));
 
         {
-            auto [runOwned, runTag, runVal] = runExpression(*ascSortKeyExpr);
-            value::ValueGuard guard(runOwned, runTag, runVal);
+            value::TagValueMaybeOwned result =
+                value::TagValueMaybeOwned::fromRaw(runExpression(*ascSortKeyExpr));
 
             auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
                 makeInt32(0), makeInt32(1), makeInt32(2), makeInt32(3), makeInt32(4)};
-            assertBlockEq(runTag, runVal, expectedResults);
+            assertBlockEq(result.tag(), result.value(), expectedResults);
         }
 
         {
-            auto [runOwned, runTag, runVal] = runExpression(*descSortKeyExpr);
-            value::ValueGuard guard(runOwned, runTag, runVal);
+            value::TagValueMaybeOwned result =
+                value::TagValueMaybeOwned::fromRaw(runExpression(*descSortKeyExpr));
 
             auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
                 makeInt32(0), makeInt32(1), makeInt32(2), makeInt32(3), makeInt32(4)};
-            assertBlockEq(runTag, runVal, expectedResults);
+            assertBlockEq(result.tag(), result.value(), expectedResults);
         }
     }
 
@@ -4666,25 +4635,25 @@ TEST_F(SBEBlockExpressionTest, BlockGetSortKey) {
                                value::bitcastFrom<CollatorInterfaceMock*>(collator.get()));
 
         {
-            auto [runOwned, runTag, runVal] = runExpression(*ascSortKeyCollatorExpr);
-            value::ValueGuard guard(runOwned, runTag, runVal);
+            value::TagValueMaybeOwned result =
+                value::TagValueMaybeOwned::fromRaw(runExpression(*ascSortKeyCollatorExpr));
 
             auto expectedResults =
                 std::vector<std::pair<value::TypeTags, value::Value>>{value::makeSmallString("37"),
                                                                       value::makeSmallString("42"),
                                                                       value::makeSmallString("51")};
-            assertBlockEq(runTag, runVal, expectedResults);
+            assertBlockEq(result.tag(), result.value(), expectedResults);
         }
 
         {
-            auto [runOwned, runTag, runVal] = runExpression(*descSortKeyCollatorExpr);
-            value::ValueGuard guard(runOwned, runTag, runVal);
+            value::TagValueMaybeOwned result =
+                value::TagValueMaybeOwned::fromRaw(runExpression(*descSortKeyCollatorExpr));
 
             auto expectedResults =
                 std::vector<std::pair<value::TypeTags, value::Value>>{value::makeSmallString("19"),
                                                                       value::makeSmallString("26"),
                                                                       value::makeSmallString("35")};
-            assertBlockEq(runTag, runVal, expectedResults);
+            assertBlockEq(result.tag(), result.value(), expectedResults);
         }
     }
 
