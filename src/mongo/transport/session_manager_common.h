@@ -49,6 +49,16 @@ namespace transport {
  */
 class SessionManagerCommon : public SessionManager {
 public:
+    struct SessionStats {
+        int64_t numOpenSessions = 0;
+        int64_t maxOpenSessions = 0;
+        int64_t numCreatedSessions = 0;
+        int64_t numRejectedSessions = 0;
+        int64_t numActiveOperations = 0;
+        int64_t numLoadBalancedSessions = 0;
+        int64_t numPrioritySessions = 0;
+    };
+
     explicit SessionManagerCommon(ServiceContext*);
     SessionManagerCommon(ServiceContext*, std::shared_ptr<ClientTransportObserver> observer);
     SessionManagerCommon(ServiceContext* svcCtx,
@@ -71,13 +81,13 @@ public:
 
     std::vector<std::pair<SessionId, std::string>> getOpenSessionIDs() const override;
 
+    virtual SessionStats getSessionStats() const;
+
     void incrementLoadBalancedSessions();
     void decrementLoadBalancedSessions();
-    long long numLoadBalancedSessions() const;
 
     void incrementPrioritySessions();
     void decrementPrioritySessions();
-    long long numPrioritySessions() const;
 
     /**
      * Returns true if this manager's session counts should be included in the "connections"

@@ -102,7 +102,7 @@ public:
      * Returns the rate limiter component used for session establishment. New sessions should call
      * into this component to ensure they are respecting the configured establishment rate limit.
      */
-    SessionEstablishmentRateLimiter& getSessionEstablishmentRateLimiter() {
+    virtual SessionEstablishmentRateLimiter& getSessionEstablishmentRateLimiter() {
         return _sessionEstablishmentRateLimiter;
     }
 
@@ -119,7 +119,7 @@ public:
      * Number of operations on sessions belonging to this SessionManager
      * which have begun but not yet completed.
      */
-    std::size_t getActiveOperations() const {
+    virtual std::size_t getActiveOperations() const {
         return getTotalOperations() - getCompletedOperations();
     }
 

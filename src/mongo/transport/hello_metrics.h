@@ -104,6 +104,8 @@ class MONGO_MOD_PUBLIC HelloMetrics {
 public:
     HelloMetrics() = default;
 
+    HelloMetrics& operator+=(const HelloMetrics& other);
+
     // Convenience accessor for acquiring HelloMetrics from a SessionManager.
     static HelloMetrics* get(OperationContext* opCtx);
 

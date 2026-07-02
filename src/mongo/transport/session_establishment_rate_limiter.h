@@ -63,6 +63,8 @@ class MONGO_MOD_PUBLIC SessionEstablishmentRateLimiter {
 public:
     SessionEstablishmentRateLimiter();
 
+    virtual ~SessionEstablishmentRateLimiter() = default;
+
     /**
      * Returns the rate limiter for ingress connections associated with the specified service
      * context for the specified protocol. Returns nullptr if the service context does not have
@@ -79,12 +81,20 @@ public:
 
     // Stats
 
-    int64_t queued() const {
+    virtual int64_t queued() const {
         return _rateLimiter.queued();
     }
 
-    int64_t rejected() const {
+    virtual int64_t rejected() const {
         return _rateLimiter.stats().rejectedAdmissions();
+    }
+
+    virtual int64_t exempted() const {
+        return _rateLimiter.stats().exemptedAdmissions();
+    }
+
+    virtual int64_t interruptedDueToClientDisconnect() const {
+        return _interruptedDueToClientDisconnect.get();
     }
 
     /** These stats go in the "connections" section of the server status. **/
@@ -109,7 +119,6 @@ private:
     admission::RateLimiter _rateLimiter;
 
     // Stats
-    Counter64 _exempted;
     Counter64 _interruptedDueToClientDisconnect;
 };
 }  // namespace mongo::transport

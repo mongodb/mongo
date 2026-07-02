@@ -451,20 +451,12 @@ void SessionManagerCommon::decrementLoadBalancedSessions() {
     _loadBalancedSessions.decrement();
 }
 
-long long SessionManagerCommon::numLoadBalancedSessions() const {
-    return _loadBalancedSessions.get();
-}
-
 void SessionManagerCommon::incrementPrioritySessions() {
     _prioritySessions.increment();
 }
 
 void SessionManagerCommon::decrementPrioritySessions() {
     _prioritySessions.decrement();
-}
-
-long long SessionManagerCommon::numPrioritySessions() const {
-    return _prioritySessions.get();
 }
 
 void SessionManagerCommon::endSessionByClient(Client* client) {
@@ -487,6 +479,20 @@ void SessionManagerCommon::endSessionByClient(Client* client) {
               "Connection ended",
               logv2::DynamicAttributes{logAttrs(summary), "connectionCount"_attr = sync.size()});
     }
+}
+
+SessionManagerCommon::SessionStats SessionManagerCommon::getSessionStats() const {
+    return {
+        .numOpenSessions = static_cast<int64_t>(numOpenSessions()),
+        .maxOpenSessions = static_cast<int64_t>(maxOpenSessions()),
+        .numCreatedSessions = static_cast<int64_t>(numCreatedSessions()),
+        .numRejectedSessions = static_cast<int64_t>(numRejectedSessions()) +
+            _sessionEstablishmentRateLimiter.rejected(),
+        .numActiveOperations = static_cast<int64_t>(getActiveOperations()),
+
+        .numLoadBalancedSessions = _loadBalancedSessions.get(),
+        .numPrioritySessions = _prioritySessions.get(),
+    };
 }
 
 void SessionManagerCommon::onClientConnect(Client* client) {

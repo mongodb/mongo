@@ -51,6 +51,20 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "connections_server_status_section",
+    srcs = ["connections_server_status_section.cpp"],
+    hdrs = ["connections_server_status_section.h"],
+    deps = [
+        ":service_executor",
+        ":session_manager",
+        ":transport_layer",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/commands/server_status:server_status_core",
+    ],
+)
+
+mongo_cc_library(
     name = "transport_layer_manager",
     srcs = [
         "transport_layer_manager_impl.cpp",
@@ -63,6 +77,7 @@ mongo_cc_library(
         "//src/mongo/transport/handoff:handoff_feature_flag_gen",
     ],
     deps = [
+        ":connections_server_status_section",
         ":service_executor",
         ":session_manager",
         ":transport_layer",

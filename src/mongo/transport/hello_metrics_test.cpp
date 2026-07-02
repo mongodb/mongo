@@ -154,5 +154,35 @@ TEST_F(HelloMetricsTest, SessionManagerDecrementsExhaustInMasterMetrics) {
     ASSERT_EQ(transportLayer->getSessionManager()->helloMetrics.getNumExhaustIsMaster(), 1);
 }
 
+/**
+ * Verifies that operator+= sums all three fields (exhaustIsMaster, exhaustHello,
+ * awaitingTopologyChanges) from another HelloMetrics instance into the receiver.
+ */
+TEST_F(HelloMetricsTest, AdditionOperatorSumsAllFields) {
+    auto& metrics = transportLayer->getSessionManager()->helloMetrics;
+
+    // Drive exhaustHello and exhaustIsMaster via InExhaustHello on separate sessions.
+    auto sessionForHello = transportLayer->createSession();
+    InExhaustHello::get(sessionForHello.get())->setInExhaust(InExhaustHello::Command::kHello);
+
+    auto sessionForIsMaster = transportLayer->createSession();
+    InExhaustHello::get(sessionForIsMaster.get())->setInExhaust(InExhaustHello::Command::kIsMaster);
+
+    metrics.incrementNumAwaitingTopologyChanges();
+    metrics.incrementNumAwaitingTopologyChanges();
+
+    HelloMetrics accumulated;
+    accumulated += metrics;
+
+    ASSERT_EQ(accumulated.getNumExhaustHello(), 1);
+    ASSERT_EQ(accumulated.getNumExhaustIsMaster(), 1);
+    ASSERT_EQ(accumulated.getNumAwaitingTopologyChanges(), 2);
+
+    // Fail if a new field is added to HelloMetrics without being covered above.
+    BSONObjBuilder bob;
+    accumulated.serialize(&bob);
+    ASSERT_EQ(bob.obj().nFields(), 3) << "new HelloMetrics field needs a sum assertion above";
+}
+
 }  // namespace
 }  // namespace mongo::transport

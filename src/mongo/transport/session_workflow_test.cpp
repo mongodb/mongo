@@ -48,6 +48,7 @@
 #include "mongo/db/baton.h"
 #include "mongo/db/client.h"
 #include "mongo/db/client_strand.h"
+#include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/error_labels_gen.h"
@@ -418,6 +419,7 @@ public:
     }
 
 
+    std::function<void(Client*)> onClientConnectCb;
     std::function<void(Client*)> onClientDisconnectCb;
     std::function<void()> onPreludeCb;
 
@@ -425,6 +427,10 @@ protected:
     class SWTObserver : public ClientTransportObserver {
     public:
         explicit SWTObserver(SessionWorkflowTest* test) : _test(test) {}
+        void onClientConnect(Client* client) override {
+            if (_test->onClientConnectCb)
+                _test->onClientConnectCb(client);
+        }
         void onClientDisconnect(Client* client) override {
             _test->_onMockEvent<Event::sepEndSession>(std::tie(client->session()));
             if (_test->onClientDisconnectCb) {
@@ -575,7 +581,12 @@ TEST_F(SessionWorkflowTest, StartThenEndSession) {
 TEST_F(SessionWorkflowTest, OneNormalCommand) {
     startSession();
     expect<Event::sessionSourceMessage>(makeOpMsg());
-    expect<Event::sepHandleRequest>(makeResponse(makeOpMsg()));
+    std::size_t activeOpsWhileHandling = 0;
+    expect<Event::sepHandleRequest>([&](OperationContext*, const Message&) -> Future<DbResponse> {
+        activeOpsWhileHandling = sessionManager()->getSessionStats().numActiveOperations;
+        return makeResponse(makeOpMsg());
+    });
+    ASSERT_EQ(activeOpsWhileHandling, 1);
     expect<Event::sessionSinkMessage>(Status::OK());
     expect<Event::sessionSourceMessage>(kClosedSessionError);
     expect<Event::sepEndSession>();
@@ -642,9 +653,13 @@ TEST_F(SessionWorkflowTest, GetOpenSession) {
     startSession();
     auto sessionIds = sessionManager()->getOpenSessionIDs();
     ASSERT_EQ(sessionIds.size(), 1);
+    ASSERT_EQ(sessionManager()->getSessionStats().numOpenSessions, 1);
+    ASSERT_EQ(sessionManager()->getSessionStats().numCreatedSessions, 1);
     expect<Event::sessionSourceMessage>(kShutdownError);
     expect<Event::sepEndSession>();
     joinSessions();
+    ASSERT_EQ(sessionManager()->getSessionStats().numOpenSessions, 0);
+    ASSERT_EQ(sessionManager()->getSessionStats().numCreatedSessions, 1);
 }
 
 /**
@@ -719,17 +734,18 @@ public:
     }
 
     BSONObj getConnectionStats() {
-        BSONObjBuilder bob;
-        sessionManager()->appendStats(&bob);
-        auto stats = bob.obj();
+        auto client = getServiceContext()->getService()->makeClient("getConnectionStats");
+        auto opCtx = client->makeOperationContext();
+        auto stats = _connectionsSection->generateSection(opCtx.get(), BSONElement{});
         LOGV2(10481100, "Connection stats", "stats"_attr = stats);
         return stats;
     }
 
-    void waitUntil(std::function<bool(void)> pred) {
-        auto retries = 0;
-        while (!pred() && retries < 5) {
-            sleepmillis(pow(5, ++retries));
+    void waitUntil(std::function<bool()> pred) {
+        const auto deadline = Date_t::now() + Minutes{2};
+        while (!pred()) {
+            ASSERT_LT(Date_t::now(), deadline) << "waitUntil timed out";
+            sleepmillis(10);
         }
     }
 
@@ -739,6 +755,16 @@ private:
         _sessionManager = sm.get();
         return sm;
     }
+
+    ServerStatusSection* _connectionsSection = [] {
+        for (auto it = ServerStatusSectionRegistry::instance()->begin();
+             it != ServerStatusSectionRegistry::instance()->end();
+             ++it) {
+            if (it->second->getSectionName() == "connections")
+                return it->second.get();
+        }
+        MONGO_UNREACHABLE;
+    }();
 
     unittest::ServerParameterGuard featureEnabled{
         "ingressConnectionEstablishmentRateLimiterEnabled", true};
@@ -772,6 +798,8 @@ TEST_F(ConnectionEstablishmentQueueingTest, RejectEstablishmentWhenQueueingDisab
     ASSERT_EQ(getConnectionStats()["establishmentRateLimit"]["rejected"].numberLong(), 1);
     ASSERT_EQ(getConnectionStats()["queuedForEstablishment"].numberLong(), 0);
     ASSERT_EQ(getConnectionStats()["totalCreated"].numberLong(), 2);
+    ASSERT_EQ(sessionManager()->getSessionStats().numRejectedSessions, 1);
+    ASSERT_EQ(sessionManager()->getSessionEstablishmentRateLimiter().rejected(), 1);
 
     joinSessions();
 }
@@ -797,6 +825,7 @@ TEST_F(ConnectionEstablishmentQueueingTest, InterruptQueuedEstablishments) {
     // Queued connections should be counted in "queuedForEstablishment", "totalCreated", and
     // "available" stats.
     ASSERT_EQ(getConnectionStats()["queuedForEstablishment"].numberLong(), 1);
+    ASSERT_EQ(sessionManager()->getSessionEstablishmentRateLimiter().queued(), 1);
     ASSERT_EQ(getConnectionStats()["available"].numberLong(), initialAvailable - 1);
     ASSERT_EQ(getConnectionStats()["totalCreated"].numberLong(), 2);
 
@@ -839,8 +868,54 @@ TEST_F(ConnectionEstablishmentQueueingTest, BypassQueueingEstablishment) {
     expect<Event::sessionSourceMessage>(kClosedSessionError);
     expect<Event::sepEndSession>();
     ASSERT_EQ(getConnectionStats()["establishmentRateLimit"]["exempted"].numberLong(), 1);
+    ASSERT_EQ(sessionManager()->getSessionEstablishmentRateLimiter().exempted(), 1);
 
     joinSessions();
+}
+
+/**
+ * Verifies that rateLimitInterrupted is incremented when a queued session's client disconnects.
+ */
+TEST_F(ConnectionEstablishmentQueueingTest, RateLimitInterruptedOnClientDisconnect) {
+    unittest::ServerParameterGuard refreshRate{"ingressConnectionEstablishmentRatePerSec", 1.0};
+    unittest::ServerParameterGuard burstCapacitySecs{
+        "ingressConnectionEstablishmentBurstCapacitySecs", 1};
+    unittest::ServerParameterGuard maxQueueDepth{"ingressConnectionEstablishmentMaxQueueDepth", 10};
+
+    // First session consumes the burst token.
+    startSession();
+    expect<Event::sessionSourceMessage>(kClosedSessionError);
+    expect<Event::sepEndSession>();
+
+    // Capture the second session's client when it connects.
+    Client* queuedClient = nullptr;
+    onClientConnectCb = [&](Client* client) {
+        queuedClient = client;
+    };
+
+    // Second session queues waiting for a token.
+    initializeNewSession();
+    startSession();
+    onClientConnectCb = nullptr;
+
+    // Wait for the session to queue and for the establishment opCtx to be created.
+    ASSERT_NE(queuedClient, nullptr);
+    waitUntil([&] { return sessionManager()->getSessionEstablishmentRateLimiter().queued() == 1; });
+
+    // Simulate client disconnect by killing the establishment opCtx with ClientDisconnect.
+    {
+        ClientLock clientLock(queuedClient);
+        if (auto* opCtx = queuedClient->getOperationContext()) {
+            getServiceContext()->killOperation(clientLock, opCtx, ErrorCodes::ClientDisconnect);
+        }
+    }
+
+    expect<Event::sepEndSession>();
+    joinSessions();
+
+    ASSERT_EQ(
+        sessionManager()->getSessionEstablishmentRateLimiter().interruptedDueToClientDisconnect(),
+        1);
 }
 
 /**

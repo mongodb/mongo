@@ -83,34 +83,34 @@ TEST_F(SessionManagerCommonTest, VerifyMaxOpenSessionsBasedOnRlimit) {
 TEST_F(SessionManagerCommonTest, OnClientConnectAndDisconnectLoadBalancedSessions) {
     TransportLayerMock tl;
     MockSessionManagerCommon sm(getServiceContext());
-    ASSERT_EQ(sm.numLoadBalancedSessions(), 0);
+    ASSERT_EQ(sm.getSessionStats().numLoadBalancedSessions, 0);
 
     FailPointEnableBlock fp("clientIsLoadBalancedPeer");
     auto session = MockSession::create(&tl);
     auto client = makeClient(session);
     sm.onClientConnect(client.get());
-    ASSERT_EQ(sm.numLoadBalancedSessions(), 1);
-    ASSERT_EQ(sm.numPrioritySessions(), 0);
+    ASSERT_EQ(sm.getSessionStats().numLoadBalancedSessions, 1);
+    ASSERT_EQ(sm.getSessionStats().numPrioritySessions, 0);
 
     sm.onClientDisconnect(client.get());
-    ASSERT_EQ(sm.numLoadBalancedSessions(), 0);
-    ASSERT_EQ(sm.numPrioritySessions(), 0);
+    ASSERT_EQ(sm.getSessionStats().numLoadBalancedSessions, 0);
+    ASSERT_EQ(sm.getSessionStats().numPrioritySessions, 0);
 }
 
 TEST_F(SessionManagerCommonTest, OnClientConnectAndDisconnectPrioritySessions) {
     TransportLayerMock tl;
     MockSessionManagerCommon sm(getServiceContext());
-    ASSERT_EQ(sm.numPrioritySessions(), 0);
+    ASSERT_EQ(sm.getSessionStats().numPrioritySessions, 0);
 
     auto session = std::make_shared<MockPrioritySession>(&tl);
     auto client = makeClient(session);
     sm.onClientConnect(client.get());
-    ASSERT_EQ(sm.numLoadBalancedSessions(), 0);
-    ASSERT_EQ(sm.numPrioritySessions(), 1);
+    ASSERT_EQ(sm.getSessionStats().numLoadBalancedSessions, 0);
+    ASSERT_EQ(sm.getSessionStats().numPrioritySessions, 1);
 
     sm.onClientDisconnect(client.get());
-    ASSERT_EQ(sm.numLoadBalancedSessions(), 0);
-    ASSERT_EQ(sm.numPrioritySessions(), 0);
+    ASSERT_EQ(sm.getSessionStats().numLoadBalancedSessions, 0);
+    ASSERT_EQ(sm.getSessionStats().numPrioritySessions, 0);
 }
 
 TEST_F(SessionManagerCommonTest, OnClientConnectAndDisconnectStandardSessions) {
@@ -120,17 +120,45 @@ TEST_F(SessionManagerCommonTest, OnClientConnectAndDisconnectStandardSessions) {
     auto session = MockSession::create(&tl);
     auto client = makeClient(session);
     sm.onClientConnect(client.get());
-    ASSERT_EQ(sm.numLoadBalancedSessions(), 0);
-    ASSERT_EQ(sm.numPrioritySessions(), 0);
+    ASSERT_EQ(sm.getSessionStats().numLoadBalancedSessions, 0);
+    ASSERT_EQ(sm.getSessionStats().numPrioritySessions, 0);
 
     sm.onClientDisconnect(client.get());
-    ASSERT_EQ(sm.numLoadBalancedSessions(), 0);
-    ASSERT_EQ(sm.numPrioritySessions(), 0);
+    ASSERT_EQ(sm.getSessionStats().numLoadBalancedSessions, 0);
+    ASSERT_EQ(sm.getSessionStats().numPrioritySessions, 0);
 }
 
 TEST_F(SessionManagerCommonTest, ShouldIncludeInConnectionsServerStatusDefaultsToFalse) {
     MockSessionManagerCommon sm(getServiceContext());
     ASSERT_FALSE(sm.shouldIncludeInConnectionsServerStatus());
+}
+
+TEST_F(SessionManagerCommonTest, GetSessionStatsMaxOpenSessions) {
+    MockSessionManagerCommon sm(getServiceContext());
+    ASSERT_EQ(sm.getSessionStats().maxOpenSessions, static_cast<int64_t>(sm.maxOpenSessions()));
+}
+
+TEST_F(SessionManagerCommonTest, GetSessionStatsNumRejectedSessions) {
+    TransportLayerMock tl;
+    MockSessionManagerCommon sm(getServiceContext());
+
+    FailPointEnableBlock fp("rejectNewNonPriorityConnections");
+    sm.startSession(MockSession::create(&tl));
+    ASSERT_EQ(sm.getSessionStats().numRejectedSessions, 1);
+}
+
+TEST_F(SessionManagerCommonTest, GetSessionStatsNumLoadBalancedSessions) {
+    MockSessionManagerCommon sm(getServiceContext());
+    sm.incrementLoadBalancedSessions();
+    sm.incrementLoadBalancedSessions();
+    ASSERT_EQ(sm.getSessionStats().numLoadBalancedSessions, 2);
+}
+
+TEST_F(SessionManagerCommonTest, GetSessionStatsNumPrioritySessions) {
+    MockSessionManagerCommon sm(getServiceContext());
+    sm.incrementPrioritySessions();
+    sm.incrementPrioritySessions();
+    ASSERT_EQ(sm.getSessionStats().numPrioritySessions, 2);
 }
 
 }  // namespace

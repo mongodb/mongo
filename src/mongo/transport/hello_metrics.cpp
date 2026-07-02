@@ -86,6 +86,14 @@ HelloMetrics* HelloMetrics::get(OperationContext* opCtx) {
     return &transportlessHelloMetrics(opCtx->getServiceContext());
 }
 
+HelloMetrics& HelloMetrics::operator+=(const HelloMetrics& other) {
+    _connectionsAwaitingTopologyChanges.fetchAndAddRelaxed(
+        other._connectionsAwaitingTopologyChanges.load());
+    _exhaustIsMasterConnections.fetchAndAddRelaxed(other._exhaustIsMasterConnections.load());
+    _exhaustHelloConnections.fetchAndAddRelaxed(other._exhaustHelloConnections.load());
+    return *this;
+}
+
 size_t HelloMetrics::getNumExhaustIsMaster() const {
     return _exhaustIsMasterConnections.load();
 }

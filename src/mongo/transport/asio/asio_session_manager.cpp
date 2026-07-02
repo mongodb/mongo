@@ -29,48 +29,14 @@
 
 #include "mongo/transport/asio/asio_session_manager.h"
 
-#include "mongo/db/commands/server_status/server_status.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
-#include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/service_executor.h"
-#include "mongo/transport/service_executor_reserved.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_manager.h"
 
 #include <algorithm>
-#include <string_view>
 
 namespace mongo::transport {
-namespace {
-// "connections" is a legacy name from when only one TransportLayer was in use at any time.
-// Asio, being that singular layer inherits the "connection" namespace, while others
-// are introduced in their own named section (e.g. "gRPC").
-class Connections : public ServerStatusSection {
-public:
-    using ServerStatusSection::ServerStatusSection;
-
-    bool includeByDefault() const override {
-        return true;
-    }
-
-    BSONObj generateSection(OperationContext* opCtx, const BSONElement&) const override {
-        bool asioSeen = false;
-        BSONObjBuilder bb;
-        if (auto tlm = opCtx->getServiceContext()->getTransportLayerManager()) {
-            tlm->forEach([&](TransportLayer* tl) {
-                if (auto sm = dynamic_cast<AsioSessionManager*>(tl->getSessionManager())) {
-                    massert(8076900, "Multiple AsioSessionManagers", !asioSeen);
-                    asioSeen = true;
-                    sm->appendStats(&bb);
-                }
-            });
-        }
-        return bb.obj();
-    }
-};
-auto& connections = *ServerStatusSectionBuilder<Connections>("connections");
-}  // namespace
 
 std::string AsioSessionManager::getClientThreadName(const Session& session) const {
     return fmt::format("conn{}", session.id());
@@ -83,46 +49,6 @@ void AsioSessionManager::configureServiceExecutorContext(Client& client,
     seCtx->setCanUseReserved(isPrivilegedSession);
     std::lock_guard lk(client);
     ServiceExecutorContext::set(&client, std::move(seCtx));
-}
-
-void AsioSessionManager::appendStats(BSONObjBuilder* bob) const {
-    const auto sessionCount = numOpenSessions();
-
-    const auto appendInt = [&](std::string_view n, auto v) {
-        bob->append(n, static_cast<int>(v));
-    };
-
-    appendInt("current", sessionCount - _sessionEstablishmentRateLimiter.queued());
-    appendInt("available", maxOpenSessions() - sessionCount);
-    appendInt("totalCreated", numCreatedSessions());
-    appendInt("rejected", numRejectedSessions() + _sessionEstablishmentRateLimiter.rejected());
-
-    appendInt("active", getActiveOperations() - _sessionEstablishmentRateLimiter.queued());
-
-    _sessionEstablishmentRateLimiter.appendStatsConnections(bob);
-
-    // Historically, this number may have differed from "current" since
-    // some sessions would have used the non-threaded ServiceExecutorFixed.
-    // Currently all sessions are threaded, so this number is redundant.
-    appendInt("threaded", sessionCount - _sessionEstablishmentRateLimiter.queued());
-    auto maxIncomingConnsOverride = serverGlobalParams.maxIncomingConnsOverride.makeSnapshot();
-    const bool priorityPortEnabled = serverGlobalParams.priorityPort.has_value();
-    if (priorityPortEnabled || (maxIncomingConnsOverride && !maxIncomingConnsOverride->empty())) {
-        appendInt("limitExempt", serviceExecutorStats.limitExempt.load());
-    }
-
-    helloMetrics.serialize(bob);
-
-    invariant(_svcCtx);
-    if (auto adminExec = ServiceExecutorReserved::get(_svcCtx)) {
-        BSONObjBuilder section(bob->subobjStart("adminConnections"));
-        adminExec->appendStats(&section);
-    }
-
-    bob->append("loadBalanced", _loadBalancedSessions.get());
-    if (gFeatureFlagDedicatedPortForPriorityOperations.isEnabled()) {
-        bob->append("priority", _prioritySessions.get());
-    }
 }
 
 ConnectionsStatsSnapshot AsioSessionManager::getConnectionsStatsSnapshot() const {
