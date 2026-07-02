@@ -32,9 +32,12 @@
 #include "mongo/base/data_range.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/restriction_environment.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/rpc/message.h"
 #include "mongo/transport/handoff/handoff_s2n_init.h"
 #include "mongo/transport/handoff/session_handoff_message_gen.h"
+#include "mongo/transport/session_manager_common_mock.h"
+#include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -346,22 +349,94 @@ DEATH_TEST_F(HandoffSessionPropertiesDeathTest,
     makeSession()->setTimeout(Milliseconds{100});
 }
 
+class HandoffSessionLoadBalancerTest : public ServiceContextTest {
+public:
+    void setUp() override {
+        ServiceContextTest::setUp();
+        int fds[2];
+        ASSERT_EQ(::socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0)
+            << "socketpair failed: " << errorMessage(lastSocketError());
+        _mongodFd = fds[0];
+        _proxyFd = fds[1];
+
+        auto sm = std::make_unique<MockSessionManagerCommon>(getServiceContext());
+        _sessionManager = sm.get();
+        _tl = std::make_unique<TransportLayerMock>(std::move(sm));
+    }
+
+    void tearDown() override {
+        if (_proxyFd >= 0) {
+            ::close(_proxyFd);
+            _proxyFd = -1;
+        }
+        ServiceContextTest::tearDown();
+    }
+
+    std::shared_ptr<HandoffSession> makeLoadBalancedSession() {
+        return std::make_shared<HandoffSession>(
+            HandoffSession::Params{.fd = _mongodFd,
+                                   .localAddress = std::filesystem::path("/dummy/mongod"),
+                                   .transportLayer = _tl.get(),
+                                   .acceptedOnLoadBalancedSocket = true,
+                                   .acceptedOnPrioritySocket = false,
+                                   .s2nConfig = nullptr,
+                                   .posix = _posix});
+    }
+
+    MockSessionManagerCommon& sessionManager() {
+        return *_sessionManager;
+    }
+
+private:
+    int _mongodFd = -1;
+    int _proxyFd = -1;
+    POSIXInterface _posix;
+    MockSessionManagerCommon* _sessionManager = nullptr;
+    std::unique_ptr<TransportLayerMock> _tl;
+};
+
 /**
- * setIsLoadBalancerPeer is called by `load_balancer_support.cpp`, but only if the session was
- * accepted on the load balancer socket. Rather than enforce a redundant check in the session
- * implementation, trust any value specified in setIsLoadBalancerPeer, and verify that the same
- * value is returned by bindsToOperationState.
+ * setIsLoadBalancerPeer tracks whether the session is a load balancer peer, and increments and
+ * decrements the number of load balancer sessions in the session manager accordingly.
  */
-TEST_F(HandoffSessionPropertiesTest, SetIsLoadBalancerPeerDeterminesBindsToOperationState) {
-    auto session = makeSession();
-    // initially false
+TEST_F(HandoffSessionLoadBalancerTest, SetIsLoadBalancerPeerBasic) {
+    auto session = makeLoadBalancedSession();
+
+    ASSERT_FALSE(session->isLoadBalancerPeer());
     ASSERT_FALSE(session->bindsToOperationState());
-    // true means true
+    ASSERT_EQ(sessionManager().getSessionStats().numLoadBalancedSessions, 0);
+
     session->setIsLoadBalancerPeer(true);
+    ASSERT_TRUE(session->isLoadBalancerPeer());
     ASSERT_TRUE(session->bindsToOperationState());
-    // false means false
+    ASSERT_EQ(sessionManager().getSessionStats().numLoadBalancedSessions, 1);
+
     session->setIsLoadBalancerPeer(false);
+    ASSERT_FALSE(session->isLoadBalancerPeer());
     ASSERT_FALSE(session->bindsToOperationState());
+    ASSERT_EQ(sessionManager().getSessionStats().numLoadBalancedSessions, 0);
+}
+
+TEST_F(HandoffSessionLoadBalancerTest, SetIsLoadBalancerPeerIsIdempotent) {
+    auto session = makeLoadBalancedSession();
+
+    session->setIsLoadBalancerPeer(true);
+    session->setIsLoadBalancerPeer(true);
+    ASSERT_EQ(sessionManager().getSessionStats().numLoadBalancedSessions, 1);
+
+    session->setIsLoadBalancerPeer(false);
+    session->setIsLoadBalancerPeer(false);
+    ASSERT_EQ(sessionManager().getSessionStats().numLoadBalancedSessions, 0);
+}
+
+/**
+ * setIsLoadBalancerPeer rejects a connection claiming to be from a load balancer when the session
+ * was not accepted on the load balancer port.
+ */
+DEATH_TEST_F(HandoffSessionPropertiesDeathTest,
+             SetIsLoadBalancerPeerRejectsNonLoadBalancerPortConnections,
+             "Client claimed to be from a loadBalancer, but is not on load balancer port") {
+    makeSession()->setIsLoadBalancerPeer(true);
 }
 
 //

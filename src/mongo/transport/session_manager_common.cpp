@@ -443,20 +443,12 @@ std::size_t SessionManagerCommon::numRejectedSessions() const {
     return _sessions->rejected();
 }
 
-void SessionManagerCommon::incrementLoadBalancedSessions() {
-    _loadBalancedSessions.increment();
-}
-
-void SessionManagerCommon::decrementLoadBalancedSessions() {
-    _loadBalancedSessions.decrement();
-}
-
-void SessionManagerCommon::incrementPrioritySessions() {
-    _prioritySessions.increment();
-}
-
-void SessionManagerCommon::decrementPrioritySessions() {
-    _prioritySessions.decrement();
+void SessionManagerCommon::onLoadBalancerPeerSet(bool isLoadBalancerPeer) {
+    if (isLoadBalancerPeer) {
+        _loadBalancedSessions.increment();
+    } else {
+        _loadBalancedSessions.decrement();
+    }
 }
 
 void SessionManagerCommon::endSessionByClient(Client* client) {

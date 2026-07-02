@@ -850,12 +850,6 @@ Future<void> HandoffSession::asyncWaitForData() {
     MONGO_UNREACHABLE;
 }
 
-void HandoffSession::setIsLoadBalancerPeer(bool value) {
-    // This function is called from the service executor thread only. It may access any data members
-    // except _isShutDown without holding a lock on _mutex. To modify data members, or to access
-    // _isShutDown, it must hold a lock on _mutex.
-    _isLoadBalancerPeer = value;
-}
 
 Status HandoffSession::validateProxyUnixSocketPeerPermissions() {
     // This function is an implementation detail of AsioTransportLayer, and as such cannot be called

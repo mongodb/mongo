@@ -212,9 +212,16 @@ public:
     }
 
     /**
-     * Signal the session that the client declared being from a load balancer.
+     * Marks this as a load balancer session or not based on whether the client sent
+     * {loadBalanced: true} in its hello command.
+     * - If the client sent {loadBalanced: true} but is not connecting through the load balancer
+     *   port, throws a tassert since that indicates a driver that does not have load balancing
+     *   enabled.
+     * - If the client did not send {loadBalanced: true} but is connecting through the load balancer
+     *   port, does not throw an error since it is treated as a client connecting directly to the
+     *   load balancer port.
      */
-    virtual void setIsLoadBalancerPeer(bool helloHasLoadBalancedOption) = 0;
+    virtual void setIsLoadBalancerPeer(bool helloHasLoadBalancedOption);
 
     /**
      * Returns true if the connection is on the priority port or corresponding unix socket.

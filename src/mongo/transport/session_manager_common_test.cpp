@@ -147,19 +147,5 @@ TEST_F(SessionManagerCommonTest, GetSessionStatsNumRejectedSessions) {
     ASSERT_EQ(sm.getSessionStats().numRejectedSessions, 1);
 }
 
-TEST_F(SessionManagerCommonTest, GetSessionStatsNumLoadBalancedSessions) {
-    MockSessionManagerCommon sm(getServiceContext());
-    sm.incrementLoadBalancedSessions();
-    sm.incrementLoadBalancedSessions();
-    ASSERT_EQ(sm.getSessionStats().numLoadBalancedSessions, 2);
-}
-
-TEST_F(SessionManagerCommonTest, GetSessionStatsNumPrioritySessions) {
-    MockSessionManagerCommon sm(getServiceContext());
-    sm.incrementPrioritySessions();
-    sm.incrementPrioritySessions();
-    ASSERT_EQ(sm.getSessionStats().numPrioritySessions, 2);
-}
-
 }  // namespace
 }  // namespace mongo::transport

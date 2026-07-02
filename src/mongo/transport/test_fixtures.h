@@ -228,6 +228,8 @@ public:
         _onStartSession = std::move(cb);
     }
 
+    void onLoadBalancerPeerSet(bool) override {}
+
 private:
     void _join() {
         LOGV2(6109513, "Joining all session threads");

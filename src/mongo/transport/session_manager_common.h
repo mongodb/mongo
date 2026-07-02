@@ -83,11 +83,7 @@ public:
 
     virtual SessionStats getSessionStats() const;
 
-    void incrementLoadBalancedSessions();
-    void decrementLoadBalancedSessions();
-
-    void incrementPrioritySessions();
-    void decrementPrioritySessions();
+    void onLoadBalancerPeerSet(bool isLoadBalancerPeer) override;
 
     /**
      * Returns true if this manager's session counts should be included in the "connections"

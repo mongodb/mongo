@@ -137,7 +137,6 @@ public:
 
     Status validateProxyUnixSocketPeerPermissions() override;
 
-    void setIsLoadBalancerPeer(bool helloHasLoadBalancedOption) override;
 
     bool bindsToOperationState() const override {
         return isLoadBalancerPeer();

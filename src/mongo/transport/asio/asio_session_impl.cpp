@@ -310,25 +310,6 @@ Status CommonAsioSession::validateProxyUnixSocketPeerPermissions() {
     MONGO_UNREACHABLE;
 }
 
-void CommonAsioSession::setIsLoadBalancerPeer(bool helloHasLoadBalancedOption) {
-    tassert(ErrorCodes::BadValue,
-            "Client claimed to be from a loadBalancer, but is not on load balancer port",
-            isConnectedToLoadBalancerPort() || !helloHasLoadBalancedOption);
-
-    if (_isLoadBalancerPeer == helloHasLoadBalancedOption) {
-        return;
-    }
-    _isLoadBalancerPeer = helloHasLoadBalancedOption;
-
-    if (auto sessionManager =
-            checked_pointer_cast<SessionManagerCommon>(_tl->getSharedSessionManager())) {
-        if (helloHasLoadBalancedOption) {
-            sessionManager->incrementLoadBalancedSessions();
-        } else {
-            sessionManager->decrementLoadBalancedSessions();
-        }
-    }
-}
 
 void CommonAsioSession::end() {
     std::error_code ec;

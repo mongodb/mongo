@@ -63,8 +63,12 @@ mongo_cc_unit_test(
     deps = [
         ":handoff_s2n_init",
         ":handoff_session",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/shard_role:service_context_non_d",
         "//src/mongo/rpc:message",
+        "//src/mongo/transport:session_manager",
         "//src/mongo/transport:transport_layer_common",
+        "//src/mongo/transport:transport_layer_mock",
         "//src/third_party/s2n:s2n-tls",
     ],
 )

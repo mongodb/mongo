@@ -193,6 +193,7 @@ public:
     std::vector<std::pair<SessionId, std::string>> getOpenSessionIDs() const override {
         return {};
     }
+    void onLoadBalancerPeerSet(bool) override {}
 
 private:
     bool _shutdownResult;

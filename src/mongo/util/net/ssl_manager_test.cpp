@@ -131,6 +131,8 @@ public:
         return {};
     }
 
+    void onLoadBalancerPeerSet(bool isLoadBalancerPeer) override {}
+
 private:
     mutable std::mutex _mutex;
     stdx::condition_variable _cv;

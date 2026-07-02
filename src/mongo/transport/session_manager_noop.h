@@ -53,5 +53,6 @@ public:
     std::vector<std::pair<SessionId, std::string>> getOpenSessionIDs() const override {
         return {};
     }
+    void onLoadBalancerPeerSet(bool) override {}
 };
 }  // namespace mongo::transport

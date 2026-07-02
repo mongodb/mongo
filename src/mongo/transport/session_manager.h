@@ -134,6 +134,12 @@ public:
         return _opCounters;
     }
 
+    /**
+     * Called when marking a session as a load balancer session or not. Increments or decrements
+     * the number of sessions on the loadBalancer port accordingly.
+     */
+    virtual void onLoadBalancerPeerSet(bool isLoadBalancerPeer) = 0;
+
     HelloMetrics helloMetrics;
     ServiceExecutorStats serviceExecutorStats;
 

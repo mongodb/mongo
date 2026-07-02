@@ -29,9 +29,11 @@
 
 #include "mongo/transport/session.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace transport {
@@ -79,6 +81,23 @@ void Session::setInOperation(bool state) {
         _opCounters->total.fetchAndAddRelaxed(1);
     } else if (oldState) {
         _opCounters->completed.fetchAndAddRelaxed(1);
+    }
+}
+
+void Session::setIsLoadBalancerPeer(bool helloHasLoadBalancedOption) {
+    tassert(ErrorCodes::BadValue,
+            "Client claimed to be from a loadBalancer, but is not on load balancer port",
+            isConnectedToLoadBalancerPort() || !helloHasLoadBalancedOption);
+
+    if (_isLoadBalancerPeer == helloHasLoadBalancedOption) {
+        return;
+    }
+    _isLoadBalancerPeer = helloHasLoadBalancedOption;
+
+    if (auto tl = getTransportLayer()) {
+        if (auto* sm = tl->getSessionManager()) {
+            sm->onLoadBalancerPeerSet(helloHasLoadBalancedOption);
+        }
     }
 }
 

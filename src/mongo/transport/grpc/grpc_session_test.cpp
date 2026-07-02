@@ -36,6 +36,7 @@
 #include "mongo/transport/grpc/test_fixtures.h"
 #include "mongo/transport/grpc/util.h"
 #include "mongo/transport/test_fixtures.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/scopeguard.h"
@@ -451,6 +452,26 @@ TEST_F(GRPCSessionTest, FinishCancelled) {
     auto finishStatus = egressSession->finish();
     ASSERT_TRUE(ErrorCodes::isCancellationError(finishStatus));
     ASSERT_EQ(ingressSession->terminationStatus(), cancellationReason);
+}
+
+/**
+ * setIsLoadBalancerPeer(false) is a no-op on gRPC sessions, which do not support load balancing.
+ */
+TEST_F(GRPCSessionTest, SetIsLoadBalancerPeerFalseIsNoOp) {
+    auto session = makeSession<IngressSession>();
+    session->setIsLoadBalancerPeer(false);
+    ASSERT_FALSE(session->isLoadBalancerPeer());
+}
+
+class GRPCSessionDeathTest : public GRPCSessionTest {};
+
+/**
+ * setIsLoadBalancerPeer(true) is rejected on gRPC sessions, which do not support load balancing.
+ */
+DEATH_TEST_F(GRPCSessionDeathTest,
+             SetIsLoadBalancerPeerTrueIsRejected,
+             "Unable to set loadBalancer option on GRPC connection") {
+    makeSession<IngressSession>()->setIsLoadBalancerPeer(true);
 }
 
 }  // namespace

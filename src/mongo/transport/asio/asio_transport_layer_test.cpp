@@ -43,6 +43,8 @@
 #include "mongo/transport/asio/asio_tcp_fast_open.h"
 #include "mongo/transport/baton.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/session.h"
+#include "mongo/transport/session_manager_common_mock.h"
 #include "mongo/transport/test_fixtures.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager_impl.h"
@@ -1462,6 +1464,8 @@ public:
             return {};
         }
 
+        void onLoadBalancerPeerSet(bool isLoadBalancerPeer) override {}
+
     private:
         void _join() {
             std::lock_guard lk{_mutex};
@@ -2155,6 +2159,138 @@ TEST_F(NetworkOperationTest, InterruptDuringRead) {
 }
 
 #endif  // __linux__
+
+class MockSessionManagerCommonWithHook : public MockSessionManagerCommon {
+public:
+    using MockSessionManagerCommon::MockSessionManagerCommon;
+    using OnStartSessionFn = std::function<void(std::shared_ptr<Session>)>;
+
+    void startSession(std::shared_ptr<Session> session) override {
+        if (_onStartSession)
+            _onStartSession(session);
+        MockSessionManagerCommon::startSession(std::move(session));
+    }
+
+    void setOnStartSession(OnStartSessionFn cb) {
+        _onStartSession = std::move(cb);
+    }
+
+private:
+    OnStartSessionFn _onStartSession;
+};
+
+class AsioTransportLayerWithMockSessionManagerCommonTest : public ServiceContextTest {
+public:
+    void setUp() override {
+        ServiceContextTest::setUp();
+        auto* svcCtx = getServiceContext();
+        svcCtx->getService()->setServiceEntryPoint(
+            std::make_unique<test::ServiceEntryPointUnimplemented>());
+        auto sm = std::make_unique<MockSessionManagerCommonWithHook>(svcCtx);
+        _sessionManager = sm.get();
+        auto tla = makeTLA(std::move(sm));
+        _listenerPort = tla->listenerMainPort();
+        svcCtx->setTransportLayerManager(
+            std::make_unique<TransportLayerManagerImpl>(std::move(tla)));
+    }
+
+    void tearDown() override {
+        getServiceContext()->getTransportLayerManager()->shutdown();
+    }
+
+    MockSessionManagerCommonWithHook& sessionManager() {
+        return *_sessionManager;
+    }
+
+    int listenerPort() const {
+        return _listenerPort;
+    }
+
+    /**
+     * Returns a session accepted on the main port with the load balancer failpoint active,
+     * simulating a load-balanced connection for setIsLoadBalancerPeer tests.
+     */
+    std::shared_ptr<Session> makeLoadBalancedSession() {
+        Notification<std::shared_ptr<Session>> sessionCreated;
+        sessionManager().setOnStartSession(
+            [&](std::shared_ptr<Session> session) { sessionCreated.set(std::move(session)); });
+        auto connectThread = std::make_shared<ConnectionThread>(listenerPort(), &setNoLinger);
+        _connectThreads.push_back(std::move(connectThread));
+
+        auto session = sessionCreated.get();
+        clientIsConnectedToLoadBalancerPort.setMode(FailPoint::alwaysOn);
+        return session;
+    }
+
+    void tearDownLoadBalancedSessions() {
+        clientIsConnectedToLoadBalancerPort.setMode(FailPoint::off);
+        for (auto& t : _connectThreads)
+            t->wait();
+        _connectThreads.clear();
+    }
+
+private:
+    MockSessionManagerCommonWithHook* _sessionManager = nullptr;
+    int _listenerPort = 0;
+    std::vector<std::shared_ptr<ConnectionThread>> _connectThreads;
+};
+
+/**
+ * setIsLoadBalancerPeer tracks whether the session is a load balancer peer, and increments and
+ * decrements the number of load balancer sessions in the session manager accordingly.
+ */
+TEST_F(AsioTransportLayerWithMockSessionManagerCommonTest, SetIsLoadBalancerPeerBasic) {
+    auto session = makeLoadBalancedSession();
+    ON_BLOCK_EXIT([&] { tearDownLoadBalancedSessions(); });
+
+    ASSERT_FALSE(session->isLoadBalancerPeer());
+    ASSERT_EQ(sessionManager().getSessionStats().numLoadBalancedSessions, 0);
+
+    session->setIsLoadBalancerPeer(true);
+    ASSERT_TRUE(session->isLoadBalancerPeer());
+    ASSERT_TRUE(session->bindsToOperationState());
+    ASSERT_EQ(sessionManager().getSessionStats().numLoadBalancedSessions, 1);
+
+    session->setIsLoadBalancerPeer(false);
+    ASSERT_FALSE(session->isLoadBalancerPeer());
+    ASSERT_FALSE(session->bindsToOperationState());
+    ASSERT_EQ(sessionManager().getSessionStats().numLoadBalancedSessions, 0);
+}
+
+/**
+ * setIsLoadBalancerPeer is idempotent: calling it with the same value multiple times does not
+ * change the load balanced session count.
+ */
+TEST_F(AsioTransportLayerWithMockSessionManagerCommonTest, SetIsLoadBalancerPeerIsIdempotent) {
+    auto session = makeLoadBalancedSession();
+    ON_BLOCK_EXIT([&] { tearDownLoadBalancedSessions(); });
+
+    session->setIsLoadBalancerPeer(true);
+    session->setIsLoadBalancerPeer(true);
+    ASSERT_EQ(sessionManager().getSessionStats().numLoadBalancedSessions, 1);
+
+    session->setIsLoadBalancerPeer(false);
+    session->setIsLoadBalancerPeer(false);
+    ASSERT_EQ(sessionManager().getSessionStats().numLoadBalancedSessions, 0);
+}
+
+/**
+ * setIsLoadBalancerPeer rejects a connection claiming to be from a load balancer when the session
+ *  was not accepted on the load balancer port.
+ */
+DEATH_TEST(AsioSessionDeathTest,
+           SetIsLoadBalancerPeerRejectsNonLoadBalancerPortConnections,
+           "Client claimed to be from a loadBalancer, but is not on load balancer port") {
+    TestFixture tf;
+    Notification<test::SessionThread*> sessionCreated;
+    tf.sessionManager().setOnStartSession(
+        [&](test::SessionThread& st) { sessionCreated.set(&st); });
+
+    ConnectionThread connectThread(tf.tla().listenerMainPort(), &setNoLinger);
+
+    auto& st = *sessionCreated.get();
+    st.session()->setIsLoadBalancerPeer(true);
+}
 
 }  // namespace
 }  // namespace mongo::transport

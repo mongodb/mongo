@@ -171,7 +171,6 @@ public:
      */
     void prelude() override;
 
-    void setIsLoadBalancerPeer(bool) override;
 
     Status validateProxyUnixSocketPeerPermissions() override;
 
