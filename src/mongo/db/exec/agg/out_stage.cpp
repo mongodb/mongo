@@ -80,6 +80,9 @@ void OutStage::doDispose() {
     // Create a new operation context so that any interrupts on the current operation
     // will not affect the dropCollection operation below.
     auto cleanupOpCtx = cc().makeOperationContext();
+    // TODO(SERVER-130397): This cleanup opCtx does not share the query's QueryLifespan, so
+    // decorated state (e.g. resolved query settings) set during $out's main execution is not
+    // visible here.
     DocumentSourceWriteBlock writeBlock(cleanupOpCtx.get());
     auto dropCollectionCmd = [&](NamespaceString dropNs) {
         try {

@@ -21,6 +21,7 @@ mongo_cc_library(
         "//src/mongo/db:commands",
         "//src/mongo/db/auth:auth_checks",
         "//src/mongo/db/memory_tracking",
+        "//src/mongo/db/query:query_lifespan",
         "//src/mongo/db/repl:optime",
         "//src/mongo/db/repl:storage_interface",
         "//src/mongo/db/shard_role",

@@ -318,6 +318,11 @@ void setUpOperationContextAndCurOpStateForGetMore(OperationContext* opCtx,
                                                   const ClientCursor& cursor,
                                                   const GetMoreCommandRequest& cmd,
                                                   bool disableAwaitDataFailpointActive) {
+    // Make the originating query's lifespan state available on this getMore's 'opCtx'.
+    cursor.bindQueryLifespan(opCtx);
+
+    // TODO(SERVER-130398): Migrate the remaining per-getMore state setup below onto QueryLifespan.
+
     applyConcernsAndReadPreference(opCtx, cursor);
 
     // Restore rawData onto the opCtx.

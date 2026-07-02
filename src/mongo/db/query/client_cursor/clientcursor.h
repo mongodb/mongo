@@ -44,6 +44,7 @@
 #include "mongo/db/query/client_cursor/generic_cursor_gen.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/query_lifespan.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/tailable_mode_gen.h"
@@ -377,6 +378,16 @@ public:
         _transactionResources = std::move(resources);
     }
 
+    /**
+     * Binds this cursor's query lifespan onto 'opCtx', making the originating query's resolved
+     * state (query settings, knob configuration) available for the duration of the operation.
+     * Called when a getMore adopts the cursor.
+     */
+    void bindQueryLifespan(OperationContext* opCtx) const {
+        tassert(13020603, "ClientCursor should always have a QueryLifespan", _queryLifespan);
+        _queryLifespan->bind(opCtx);
+    }
+
 private:
     friend class CursorManager;
     friend class ClientCursorPin;
@@ -540,6 +551,8 @@ private:
     boost::optional<Microseconds> _firstResponseExecutionTime;
 
     std::unique_ptr<OperationMemoryUsageTracker> _memoryUsageTracker;
+
+    QueryLifespan::Handle _queryLifespan;
 };
 
 /**
