@@ -788,22 +788,33 @@ StatusWith<bool> offlineValidateCollection(OperationContext* opCtx,
                         "nss"_attr = nss.toStringForErrorMsg(),
                         "error"_attr = status.toString());
             return status;
-        } else {
-            BSONObjBuilder results;
-            validateResults.appendToResultObj(&results, /*debug=*/false);
-            LOGV2_OPTIONS(9437301,
-                          {logv2::LogTruncation::Disabled},
-                          "Offline validation result",
-                          "results"_attr = results.done());
-            return validateResults.isValid();
         }
     } catch (const DBException& e) {
+        // When validating at 'atClusterTime', a collection present in the latest catalog may not
+        // have existed at that timestamp because it was created or renamed into place afterwards;
+        // validate() throws NamespaceNotFound. That is a valid catalog state rather than
+        // corruption, so skip the collection and continue validating the rest.
+        if (e.code() == ErrorCodes::NamespaceNotFound && parsedOptions.getReadTimestamp()) {
+            LOGV2(11790100,
+                  "Skipping validation of collection because it did not exist at atClusterTime",
+                  "nss"_attr = nss.toStringForErrorMsg(),
+                  "atClusterTime"_attr = *parsedOptions.getReadTimestamp());
+            return true;
+        }
         LOGV2_ERROR(11790201,
                     "Collection validation failed to complete, see logs for more details",
                     "nss"_attr = nss.toStringForErrorMsg(),
                     "error"_attr = e.toString());
         return e.toStatus();
     }
+
+    BSONObjBuilder results;
+    validateResults.appendToResultObj(&results, /*debug=*/false);
+    LOGV2_OPTIONS(9437301,
+                  {logv2::LogTruncation::Disabled},
+                  "Offline validation result",
+                  "results"_attr = results.done());
+    return validateResults.isValid();
 }
 
 OfflineValidateResults offlineValidateParallel(OperationContext* opCtx,
