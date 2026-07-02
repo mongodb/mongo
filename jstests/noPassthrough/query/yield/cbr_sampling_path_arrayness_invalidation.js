@@ -20,6 +20,8 @@ const conn = MongoRunner.runMongod({
         // TODO SERVER-117707: remove once CBR supports SBE.
         internalQueryFrameworkControl: "forceClassicEngine",
         logComponentVerbosity: tojson({query: {verbosity: 5}}),
+        // Explicitly disable for variants that enable this.
+        internalQuerySamplingByStrides: false,
     },
 });
 assert.neq(null, conn, "mongod was unable to start up");

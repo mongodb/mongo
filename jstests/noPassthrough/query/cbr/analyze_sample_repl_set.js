@@ -26,6 +26,8 @@ const rst = new ReplSetTest({
             internalQueryCBRCEMode: "samplingCE",
             internalQuerySamplingCEMethod: "random",
             internalQuerySamplingBySequentialScan: false,
+            // Explicitly disable for variants that enable this.
+            internalQuerySamplingByStrides: false,
         },
     },
 });

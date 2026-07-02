@@ -7,6 +7,11 @@
  * Requires featureFlagSbeEqLookupUnwind and featureFlagGetExecutorDeferredEngineChoice to be on
  * since plan-based engine selection only fires when both are active. The test enables both flags
  * itself via MongoRunner.runMongod setParameter, so no suite-level flag is needed.
+ *
+ * @tags: [
+ *  # This test expects join optimization to be off.
+ *  incompatible_with_join_optimization
+ * ]
  */
 
 import {

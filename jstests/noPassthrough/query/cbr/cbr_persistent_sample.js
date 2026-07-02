@@ -18,6 +18,8 @@ import * as PersistentSamplesUtils from "jstests/libs/query/persistent_samples_u
 const conn = MongoRunner.runMongod({
     setParameter: {
         featureFlagPersistentStats: true,
+        // Explicitly disable for variants that enable this.
+        internalQuerySamplingByStrides: false,
     },
 });
 const db = conn.getDB("test");

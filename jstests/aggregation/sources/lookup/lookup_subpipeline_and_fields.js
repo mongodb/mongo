@@ -1,5 +1,9 @@
 /**
  * Tests for the $lookup stage with sub-pipeline syntax and localField/foreignField syntax.
+ * @tags: [
+ *  # TODO SERVER-129989: Fix Query knobs shouldn't be initialized before query settings are set
+ *  incompatible_with_join_optimization
+ * ]
  */
 const testDB = db.getSiblingDB(jsTestName());
 assert(testDB.dropDatabase());

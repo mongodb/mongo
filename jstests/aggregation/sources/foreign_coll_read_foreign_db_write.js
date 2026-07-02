@@ -5,6 +5,8 @@
 // @tags: [
 //   # Serverless does not support $out
 //   command_not_supported_in_serverless,
+//   # TODO SERVER-129993: remove once "cursor id not found" is fixed
+//   incompatible_with_join_optimization
 // ]
 
 const localDB = db.getSiblingDB(`${jsTestName()}` + "_local_db");

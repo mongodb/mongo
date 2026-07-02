@@ -3,11 +3,14 @@
  * parameters: sampleSize, sampleRate, samplingMethod, numChunks, and mode.
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import * as PersistentSamplesUtils from "jstests/libs/query/persistent_samples_utils.js";
 
 const conn = MongoRunner.runMongod({
     setParameter: {
         featureFlagPersistentStats: true,
+        // Explicitly disable for variants that enable this.
+        internalQuerySamplingByStrides: false,
     },
 });
 const db = conn.getDB("test");
@@ -462,17 +465,19 @@ MongoRunner.stopMongod(conn);
 // =============================================================================
 
 // When the feature flag is disabled, analyze with sample mode fails with CommandNotSupported.
-// Skip in all-feature-flags environments: MongoRunner.runMongod() inherits
-// featureFlagPersistentStats=true from TestData.setParameters, so the flag cannot be off.
+// Skip in environments where the flag is force-enabled for all mongods (e.g. all-feature-flags
+// suites, or suites passing --additionalFeatureFlags=featureFlagPersistentStats):
+// MongoRunner.runMongod() inherits such settings from TestData.setParameters, so the flag cannot
+// be made to appear off.
 
-if (!TestData.runAllFeatureFlagTests) {
-    // TODO SERVER-112627: Need to explicitly disable once the feature flag is enabled by default
-    const conn2 = MongoRunner.runMongod({}); // flag off by default
-    const db2 = conn2.getDB(jsTestName());
+// TODO SERVER-112627: Need to explicitly disable once the feature flag is enabled by default
+const conn2 = MongoRunner.runMongod({}); // flag off by default
+const db2 = conn2.getDB(jsTestName());
+if (!FeatureFlagUtil.isEnabled(db2, "PersistentStats")) {
     assert.commandWorked(db2[collName].insert({a: 1}));
     assert.commandFailedWithCode(
         db2.runCommand({analyze: collName, mode: "sample", samplingMethod: "random"}),
         ErrorCodes.CommandNotSupported,
     );
-    MongoRunner.stopMongod(conn2);
 }
+MongoRunner.stopMongod(conn2);

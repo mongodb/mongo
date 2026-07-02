@@ -484,15 +484,6 @@ class GoldenTestApp(object):
 
         for suite in suites:
             resmoke_args = ["--suite", suite]
-            if suite in {
-                "query_golden_join_optimization",
-                "query_golden_join_optimization_plan_stability",
-            }:
-                # This suite runs with --runAllFeatureFlagTests in evergreen, so should be run that way locally.
-                # There is currently no known way to detect this without calling `evergreen evaluate` and fishing
-                # in the output, so we are forced to match on the suite name here.
-                resmoke_args.append("--runAllFeatureFlagTests")
-
             resmoke_invocations.append(resmoke_args)
 
         if "query_golden_classic" in suites:

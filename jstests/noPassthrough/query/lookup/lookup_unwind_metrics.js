@@ -4,6 +4,11 @@
  * LU IFR flags used to incrementally roll out the feature.
  *
  * Requires featureFlagGetExecutorDeferredEngineChoice and SBE to be enabled.
+ *
+ * @tags: [
+ *  # Join reordering may affect metrics expected by some of these test cases.
+ *  incompatible_with_join_optimization
+ * ]
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
