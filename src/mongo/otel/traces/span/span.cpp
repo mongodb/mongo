@@ -121,7 +121,7 @@ void Span::setStatus(const Status& status) {
     }
 }
 
-Span Span::startImpl(std::shared_ptr<TelemetryContext>& telemetryCtx, std::string_view name) {
+Span Span::start(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName name) {
     TracerProviderService* tracerProviderService = getGlobalTracerProviderService();
     if (!tracerProviderService || !tracerProviderService->isEnabled()) {
         return Span{};
@@ -137,27 +137,37 @@ Span Span::startImpl(std::shared_ptr<TelemetryContext>& telemetryCtx, std::strin
         return Span{};
     }
 
-    if (!telemetryCtx) {
-        telemetryCtx = std::make_shared<SpanTelemetryContextImpl>();
+    ScopedSpan parentSpan = nullptr;
+    bool hasParent = false;
+    std::shared_ptr<SpanTelemetryContextImpl> spanCtx = nullptr;
+    if (telemetryCtx != nullptr) {
+        spanCtx = std::dynamic_pointer_cast<SpanTelemetryContextImpl>(telemetryCtx);
+        if (!spanCtx) {
+            LOGV2(10011700,
+                  "TelemetryContext is not of type SpanTelemetryContextImpl",
+                  "context_type"_attr = telemetryCtx->type());
+            return Span{};
+        }
+        parentSpan = spanCtx->getSpan();
+        hasParent = parentSpan->GetContext().IsValid();
     }
-
-    auto spanCtx = std::dynamic_pointer_cast<SpanTelemetryContextImpl>(telemetryCtx);
-    if (!spanCtx) {
-        LOGV2(10011700,
-              "TelemetryContext is not of type SpanTelemetryContextImpl",
-              "context_type"_attr = telemetryCtx->type());
-        return Span{};
-    }
-
-    ScopedSpan parentSpan = spanCtx->getSpan();
-    bool hasParent = parentSpan->GetContext().IsValid();
 
     if (!hasParent) {
         // Root span: drop if either feature flag is disabled or the sampler rejects it.
         // (Ignore FCV check) — no VersionContext is available in this path.
         if (!feature_flags::gFeatureFlagTracing.isEnabledAndIgnoreFCVUnsafe() ||
-            !feature_flags::gFeatureFlagOtelTraceSampling.isEnabledAndIgnoreFCVUnsafe() ||
-            !TracingSampler::get().shouldSample(name, spanCtx->getSamplingValue())) {
+            !feature_flags::gFeatureFlagOtelTraceSampling.isEnabledAndIgnoreFCVUnsafe()) {
+            return Span{};
+        }
+        // We need a telemetryCtx for sampling, but it is slightly expensive to create, so do so
+        // only if needed.
+        if (!telemetryCtx) {
+            spanCtx = std::make_shared<SpanTelemetryContextImpl>();
+            telemetryCtx = spanCtx;
+            parentSpan = spanCtx->getSpan();
+        }
+
+        if (!TracingSampler::get().shouldSample(name.getName(), spanCtx->getSamplingValue())) {
             return Span{};
         }
     }
@@ -165,15 +175,13 @@ Span Span::startImpl(std::shared_ptr<TelemetryContext>& telemetryCtx, std::strin
     opentelemetry::trace::StartSpanOptions opts;
     opts.parent = parentSpan->GetContext();
 
-    return Span(std::make_unique<Span::SpanImpl>(
-        tracer->StartSpan(std::string{name}, opts), std::move(parentSpan), std::move(spanCtx)));
+    return Span(
+        std::make_unique<Span::SpanImpl>(tracer->StartSpan(std::string{name.getName()}, opts),
+                                         std::move(parentSpan),
+                                         std::move(spanCtx)));
 }
 
-Span Span::start(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName name) {
-    return startImpl(telemetryCtx, name.getName());
-}
-
-Span Span::startImpl(OperationContext* opCtx, std::string_view name) {
+Span Span::start(OperationContext* opCtx, SpanName name) {
     if (opCtx == nullptr) {
         return Span{};
     }
@@ -181,16 +189,15 @@ Span Span::startImpl(OperationContext* opCtx, std::string_view name) {
     auto& telemetryCtxHolder = TelemetryContextHolder::getDecoration(opCtx);
     auto telemetryCtx = telemetryCtxHolder.getTelemetryContext();
 
-    if (!telemetryCtx) {
-        telemetryCtx = std::make_shared<SpanTelemetryContextImpl>();
+    bool hadTelemetryCtx = telemetryCtx != nullptr;
+
+    Span span = start(telemetryCtx, name);
+
+    // Start created a new TelemetryContext, so we need to store it for future use.
+    if (!hadTelemetryCtx && telemetryCtx != nullptr) {
         telemetryCtxHolder.setTelemetryContext(telemetryCtx);
     }
-
-    return startImpl(telemetryCtx, name);
-}
-
-Span Span::start(OperationContext* opCtx, SpanName name) {
-    return startImpl(opCtx, name.getName());
+    return span;
 }
 
 std::shared_ptr<TelemetryContext> Span::createTelemetryContext() {

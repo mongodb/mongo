@@ -67,7 +67,8 @@ class Span {
 public:
     /**
      * Starts a new Span with the provided `name` and using the provided `telemetryCtx` to allow for
-     * propagation of parent-child relationships.
+     * propagation of parent-child relationships. If a `telemetryCtx` is not provided but will be
+     * needed going forward, `telemetryCtx` will be populated with a newly created one.
      */
     static Span start(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName name);
 
@@ -108,19 +109,7 @@ public:
     void setStatus(const Status& status);
 
 private:
-    /**
-     * Starts a new Span assuming we are in an environment where this is possible. `telemetryCtx`
-     * will be populated if it is currently nullptr.
-     */
-    static Span startImpl(std::shared_ptr<TelemetryContext>& telemetryCtx, std::string_view name);
-
-    /**
-     * Starts a new Span assuming we are in an environment where this is possible. Creates a
-     * TelemetryContext on `opCtx` if none exists.
-     */
-    static Span startImpl(OperationContext* opCtx, std::string_view name);
-
-    /** Construction of Spans should be done through Span::start(traceable, name). */
+    /** Construction of Spans should be done through Span::start(context, name). */
     Span();
     Span(std::unique_ptr<SpanImpl> impl);
 
