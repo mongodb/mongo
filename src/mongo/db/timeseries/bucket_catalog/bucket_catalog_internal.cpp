@@ -37,6 +37,7 @@
 #include "mongo/db/operation_id.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
@@ -294,6 +295,10 @@ BSONObj reopenFetchedBucket(OperationContext* opCtx,
                             const OID& bucketId,
                             ExecutionStatsController& stats) {
 
+    bool& rawDataFlag = isRawDataOperation(opCtx);
+    const bool savedRawData = rawDataFlag;
+    ScopeGuard restoreRawData([&] { rawDataFlag = savedRawData; });
+
     const auto reopenedBucketDoc = [&] {
         FindCommandRequest findReq{bucketsColl->ns()};
         findReq.setFilter(BSON("_id" << bucketId));
@@ -319,6 +324,10 @@ BSONObj reopenQueriedBucket(OperationContext* opCtx,
     // take a performance hit.
     if (const auto& index =
             getIndexSupportingReopeningQuery(opCtx, bucketsColl->getIndexCatalog(), options)) {
+        bool& rawDataFlag = isRawDataOperation(opCtx);
+        const bool savedRawData = rawDataFlag;
+        ScopeGuard restoreRawData([&] { rawDataFlag = savedRawData; });
+
         DBDirectClient client{opCtx};
 
         // Run an aggregation to find a suitable bucket to reopen.

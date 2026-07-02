@@ -29,6 +29,8 @@
 
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
@@ -157,6 +159,48 @@ TEST_F(BucketCatalogInternalTest, RolloverUpdatesRolloverStats) {
     for (const auto& [reason, metric] : rolloverReasonAndMetricPairs) {
         _testRolloverWithRolloverReasonUpdatesStats(reason, metric);
     }
+}
+
+TEST_F(BucketCatalogInternalTest, ReopenFetchedBucketPreservesIsRawDataOperationFlag) {
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
+    const Collection* bucketsColl = (*autoColl).get();
+
+    auto collectionStats = std::make_shared<ExecutionStats>();
+    ExecutionStatsController stats(collectionStats, _globalStats);
+
+    isRawDataOperation(_opCtx) = false;
+
+    internal::reopenFetchedBucket(_opCtx, bucketsColl, OID::gen(), stats);
+
+    ASSERT_FALSE(isRawDataOperation(_opCtx));
+}
+
+TEST_F(BucketCatalogInternalTest, ReopenQueriedBucketPreservesIsRawDataOperationFlag) {
+    {
+        DBDirectClient client{_opCtx};
+        BSONObj cmdResult;
+        client.runCommand(
+            _ns1.dbName(),
+            BSON("createIndexes"
+                 << _resolveTimeseriesNss(_ns1).coll() << "indexes"
+                 << BSON_ARRAY(BSON("key" << BSON("meta" << 1 << "control.min.time" << 1) << "name"
+                                          << "meta_1_control.min.time_1"))),
+            cmdResult);
+        ASSERT(cmdResult["ok"].trueValue()) << cmdResult;
+    }
+
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
+    const Collection* bucketsColl = (*autoColl).get();
+    const auto tsOptions = _getTimeseriesOptions(_ns1);
+
+    auto collectionStats = std::make_shared<ExecutionStats>();
+    ExecutionStatsController stats(collectionStats, _globalStats);
+
+    isRawDataOperation(_opCtx) = false;
+
+    internal::reopenQueriedBucket(_opCtx, bucketsColl, tsOptions, /*pipeline=*/{}, stats);
+
+    ASSERT_FALSE(isRawDataOperation(_opCtx));
 }
 
 
