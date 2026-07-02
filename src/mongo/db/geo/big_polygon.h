@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -59,6 +60,9 @@ public:
 
     ~BigSimplePolygon() override;
 
+    BigSimplePolygon(const BigSimplePolygon&) = delete;
+    BigSimplePolygon& operator=(const BigSimplePolygon&) = delete;
+
     void Init(S2Loop* loop);
 
     double GetArea() const;
@@ -78,10 +82,6 @@ public:
 
     // Only used in tests
     void Invert();
-
-    const S2Polygon& GetPolygonBorder() const;
-
-    const S2Polyline& GetLineBorder() const;
 
     //
     // S2Region interface
@@ -115,8 +115,19 @@ private:
     // with the border polygon, otherwise, the border polygon is its complement.
     bool _isNormalized;
 
-    // Cached to do Intersects() and Contains() with S2Polylines.
+    // _borderPoly and _borderLine are lazily initialized caches used for spatial queries
+    // against S2Polygon and S2Polyline respectively. Both the initialization and all S2
+    // operations on these objects must be performed under _borderMu, because S2's internal
+    // edge index (S2EdgeIndex) mutates shared state (query_count_) on every spatial query.
+    // _borderMu also guards mutations of _loop and _isNormalized in Invert().
+    mutable stdx::mutex _borderMu;
     mutable std::unique_ptr<S2Polyline> _borderLine;
     mutable std::unique_ptr<S2Polygon> _borderPoly;
+
+    // Initialize _borderPoly if not already done. Caller must hold _borderMu.
+    const S2Polygon& _getPolygonBorderLocked() const;
+
+    // Initialize _borderLine if not already done. Caller must hold _borderMu.
+    const S2Polyline& _getLineBorderLocked() const;
 };
 }  // namespace mongo
