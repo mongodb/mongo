@@ -934,6 +934,8 @@ public:
 
     IndexStateInfo persistDataForShutdown() final;
 
+    void releaseSorter() final;
+
 protected:
     const MultikeyPaths& getMultikeyPaths() const final;
 
@@ -1371,6 +1373,11 @@ IndexStateInfo BulkBuilderImpl::getPersistedState() {
 
 IndexStateInfo BulkBuilderImpl::persistDataForShutdown() {
     return makeIndexStateInfo(_sorter->persistDataForShutdown(), _keysInserted);
+}
+
+void BulkBuilderImpl::releaseSorter() {
+    _sortedIterator.reset();
+    _sorter.reset();
 }
 
 void BulkBuilderImpl::_addKeyForCommit(OperationContext* opCtx,

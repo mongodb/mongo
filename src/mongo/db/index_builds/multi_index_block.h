@@ -373,6 +373,12 @@ private:
     void _writeStateToDisk(OperationContext* opCtx);
 
     /**
+     * If replicating container writes, releases the builder's sorters and any resources held by
+     * them.
+     */
+    void _releaseReplicatedSorters();
+
+    /**
      * Performs an update-or-insert of a single record into the index build container. Caller must
      * already be inside a WriteUnitOfWork.
      */

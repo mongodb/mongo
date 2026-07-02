@@ -315,6 +315,11 @@ public:
          */
         virtual IndexStateInfo persistDataForShutdown() = 0;
 
+        /**
+         * Releases the builder's sorter and any resources it holds.
+         */
+        virtual void releaseSorter() = 0;
+
     protected:
         static void countNewBuildInStats();
         static void countResumedBuildInStats();

@@ -703,6 +703,9 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
     // would have been interrupted.
     invariant(!_buildIsCleanedUp);
 
+    // Ensure any resources acquired by replicated sorters get released.
+    ON_BLOCK_EXIT([this] { _releaseReplicatedSorters(); });
+
     // UUIDs are not guaranteed during startup because the check happens after indexes are rebuilt.
     if (_collectionUUID) {
         invariant(_collectionUUID.value() == collection->uuid());
@@ -1166,6 +1169,9 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                   _phase == IndexBuildPhaseEnum::kBulkLoad,
               idl::serialize(_phase));
 
+    // Ensure any resources acquired by replicated sorters get released.
+    ON_BLOCK_EXIT([this] { _releaseReplicatedSorters(); });
+
     for (auto&& index : _indexes) {
         // If the build has spilled, force all builders to spill their in-memory remainder so the
         // persisted sorter is a complete copy and it's safe to resume from the load phase.
@@ -1290,6 +1296,18 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
     return Status::OK();
 } catch (...) {
     return exceptionToStatus();
+}
+
+void MultiIndexBlock::_releaseReplicatedSorters() {
+    if (_containerWriteBehavior != ContainerWriteBehavior::kReplicate) {
+        return;
+    }
+
+    for (auto&& index : _indexes) {
+        if (index.bulk) {
+            index.bulk->releaseSorter();
+        }
+    }
 }
 
 Status MultiIndexBlock::drainBackgroundWrites(
