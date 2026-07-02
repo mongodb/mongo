@@ -909,13 +909,23 @@ void MigrationChunkClonerSource::_processDeferredXferMods(OperationContext* opCt
         deferredReloadOrDeletePreImageDocKeys.swap(_deferredReloadOrDeletePreImageDocKeys);
     }
 
+    auto const& minKey = _args.getMin().value();
+    auto const& maxKey = _args.getMax().value();
+
     for (const auto& preImageDocKey : deferredReloadOrDeletePreImageDocKeys) {
         auto idElement = preImageDocKey["_id"];
         BSONObj newerVersionDoc;
         if (!Helpers::findById(opCtx, this->nss(), BSON("_id" << idElement), newerVersionDoc)) {
             // If the document can no longer be found, this means that another later op must have
-            // deleted it. That delete would have been captured by the xferMods so nothing else to
-            // do here.
+            // deleted it. If the document was moved out of the chunk by this transaction and then
+            // deleted, the later delete would not have been captured by the xferMods. We must 
+            // explicitly model a delete if the pre-image was in the chunk.
+            auto preImageShardKeyValues =
+                _shardKeyPattern.extractShardKeyFromDocumentKey(preImageDocKey);
+
+            if (isKeyInRange(preImageShardKeyValues, minKey, maxKey)) {
+                _addToTransferModsQueue(idElement.wrap(), 'd', {});
+            }
             continue;
         }
 
