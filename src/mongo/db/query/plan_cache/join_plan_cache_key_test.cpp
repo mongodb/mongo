@@ -104,6 +104,23 @@ protected:
         return GraphAndResolvedPaths{JoinGraph(std::move(mg)), std::move(rps)};
     }
 
+    // Builds a two-node graph identical to makeTwoNodeGraph's shape (empty filters, single Eq
+    // predicate on "id") but with projections attached to node0 and/or node1. Used by the
+    // projection-related tests below.
+    GraphAndResolvedPaths makeTwoNodeGraphWithProjections(BSONObj proj0,
+                                                          BSONObj proj1 = BSONObj{}) {
+        std::vector<ResolvedPath> rps;
+        MutableJoinGraph mg;
+        auto n0 = *mg.addNode(kNss0, makeCanonicalQuery(kNss0, BSONObj{}, proj0), boost::none);
+        auto n1 = *mg.addNode(kNss1, makeCanonicalQuery(kNss1, BSONObj{}, proj1), boost::none);
+        PathId lp = static_cast<PathId>(rps.size());
+        rps.push_back(ResolvedPath{n0, FieldPath("id")});
+        PathId rp = static_cast<PathId>(rps.size());
+        rps.push_back(ResolvedPath{n1, FieldPath("id")});
+        mg.addEdge(n0, n1, {{JoinPredicate::Eq, lp, rp}});
+        return GraphAndResolvedPaths{JoinGraph(std::move(mg)), std::move(rps)};
+    }
+
     // Builds a MultipleCollectionAccessor for the namespaces present in 'g' and calls
     // makeJoinPlanCacheKey. All namespaces in 'g' must have been created in setUp().
     JoinPlanCacheKey makeKey(const JoinGraph& g, const std::vector<ResolvedPath>& rps) {
@@ -196,6 +213,36 @@ TEST_F(JoinPlanCacheKeyTest, EmbedPathAffectsKey) {
     auto f1 = buildGraph(FieldPath("orders"));
     auto f2 = buildGraph(FieldPath("products"));
     ASSERT_NE(makeKey(f1.graph, f1.resolvedPaths), makeKey(f2.graph, f2.resolvedPaths));
+}
+
+TEST_F(JoinPlanCacheKeyTest, DifferentProjectionsProduceDifferentKeys) {
+    auto f1 = makeTwoNodeGraphWithProjections(fromjson("{a: 1}"));
+    auto f2 = makeTwoNodeGraphWithProjections(fromjson("{b: 1}"));
+    ASSERT_NE(makeKey(f1.graph, f1.resolvedPaths), makeKey(f2.graph, f2.resolvedPaths));
+}
+
+TEST_F(JoinPlanCacheKeyTest, SameProjectionProducesSameKey) {
+    auto f1 = makeTwoNodeGraphWithProjections(fromjson("{a: 1}"));
+    auto f2 = makeTwoNodeGraphWithProjections(fromjson("{a: 1}"));
+    ASSERT_EQ(makeKey(f1.graph, f1.resolvedPaths), makeKey(f2.graph, f2.resolvedPaths));
+}
+
+TEST_F(JoinPlanCacheKeyTest, ProjectionPresenceAffectsKey) {
+    auto f1 = makeTwoNodeGraphWithProjections(fromjson("{a: 1}"));
+    auto f2 = makeTwoNodeGraphWithProjections(BSONObj{});
+    ASSERT_NE(makeKey(f1.graph, f1.resolvedPaths), makeKey(f2.graph, f2.resolvedPaths));
+}
+
+TEST_F(JoinPlanCacheKeyTest, ProjectionOnDifferentNodesProducesDifferentKeys) {
+    auto f1 = makeTwoNodeGraphWithProjections(fromjson("{a: 1}"), BSONObj{});
+    auto f2 = makeTwoNodeGraphWithProjections(BSONObj{}, fromjson("{a: 1}"));
+    ASSERT_NE(makeKey(f1.graph, f1.resolvedPaths), makeKey(f2.graph, f2.resolvedPaths));
+}
+
+TEST_F(JoinPlanCacheKeyTest, ProjectionFieldOrderDoesNotAffectKey) {
+    auto f1 = makeTwoNodeGraphWithProjections(fromjson("{a: 1, b: 1}"));
+    auto f2 = makeTwoNodeGraphWithProjections(fromjson("{b: 1, a: 1}"));
+    ASSERT_EQ(makeKey(f1.graph, f1.resolvedPaths), makeKey(f2.graph, f2.resolvedPaths));
 }
 
 TEST_F(JoinPlanCacheKeyTest, MultiplePredicatesOnEdgeProduceDifferentKey) {

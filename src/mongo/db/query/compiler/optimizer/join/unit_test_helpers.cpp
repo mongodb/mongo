@@ -100,11 +100,13 @@ MultipleCollectionAccessor multipleCollectionAccessor(OperationContext* opCtx,
 }
 
 std::unique_ptr<CanonicalQuery> JoinOrderingTestFixture::makeCanonicalQuery(NamespaceString nss,
-                                                                            BSONObj filter) {
+                                                                            BSONObj filter,
+                                                                            BSONObj projection) {
     auto expCtx = ExpressionContextBuilder{}.opCtx(operationContext()).build();
+    auto findCmd = std::make_unique<FindCommandRequest>(nss);
     if (!filter.isEmpty()) {
-        auto findCmd = std::make_unique<FindCommandRequest>(nss);
         findCmd->setFilter(filter);
+        findCmd->setProjection(projection.getOwned());
         auto swFindCmd = ParsedFindCommand::withExistingFilter(
             expCtx,
             nullptr,
@@ -115,9 +117,9 @@ std::unique_ptr<CanonicalQuery> JoinOrderingTestFixture::makeCanonicalQuery(Name
         return std::make_unique<CanonicalQuery>(
             CanonicalQueryParams{.expCtx = expCtx, .parsedFind = std::move(swFindCmd.getValue())});
     }
-    auto findCommand = std::make_unique<FindCommandRequest>(nss);
+    findCmd->setProjection(projection.getOwned());
     return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = expCtx, .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+        .expCtx = expCtx, .parsedFind = ParsedFindCommandParams{std::move(findCmd)}});
 }
 
 std::unique_ptr<QuerySolution> JoinOrderingTestFixture::makeCollScanPlan(

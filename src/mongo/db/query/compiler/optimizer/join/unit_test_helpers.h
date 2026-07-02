@@ -88,7 +88,8 @@ public:
     JoinOrderingTestFixture() : goldenTestConfig{"src/mongo/db/test_output/query/join"} {}
 
     std::unique_ptr<CanonicalQuery> makeCanonicalQuery(NamespaceString nss,
-                                                       BSONObj filter = BSONObj::kEmptyObject);
+                                                       BSONObj filter = BSONObj::kEmptyObject,
+                                                       BSONObj projection = BSONObj::kEmptyObject);
 
     std::unique_ptr<QuerySolution> makeCollScanPlan(
         NamespaceString nss, std::unique_ptr<MatchExpression> filter = nullptr);

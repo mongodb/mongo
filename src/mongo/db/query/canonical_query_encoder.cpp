@@ -1434,9 +1434,6 @@ uint32_t computeHash(std::string_view key) {
 }
 
 CanonicalQuery::QueryShapeString encodeCanonicalQueryForJoin(const CanonicalQuery& cq) {
-    tassert(12926101,
-            "join plan cache key: access path must not have a projection",
-            cq.getProj() == nullptr);
     tassert(
         12926102, "join plan cache key: access path must not have a sort", !cq.getSortPattern());
     tassert(12926103,
@@ -1447,7 +1444,7 @@ CanonicalQuery::QueryShapeString encodeCanonicalQueryForJoin(const CanonicalQuer
 
     StringBuilder keyBuilder;
     encodeKeyForMatch(cq.getPrimaryMatchExpression(), &keyBuilder);
-    // TODO SERVER-128364: Encode projection once they are supported in the JoinGraph.
+    encodeKeyForProj(cq.getProj(), &keyBuilder);
     return keyBuilder.str();
 }
 }  // namespace canonical_query_encoder
