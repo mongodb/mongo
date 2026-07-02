@@ -1167,6 +1167,7 @@ Status WiredTigerKVEngine::_rebuildIdent(WiredTigerSession& session, const char*
         return status;
     }
     Status status = _drop(session, uri, nullptr);
+    invariant(status != ErrorCodes::LockBusy);
     if (!status.isOK()) {
         LOGV2_ERROR(22358,
                     "Rebuilding ident failed: failed to drop",
@@ -2104,7 +2105,8 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
                                      std::string_view ident,
                                      bool identHasSizeInfo,
                                      const StorageEngine::DropIdentCallback& onDrop,
-                                     boost::optional<uint64_t> schemaEpoch) {
+                                     boost::optional<uint64_t> schemaEpoch,
+                                     bool waitForLocks) {
     string uri = WiredTigerUtil::buildTableUri(ident);
 
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
@@ -2120,10 +2122,15 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
     WiredTigerSession session(_connection.get());
 
     // TODO: SERVER-122163 pass drop schema epoch to WT.
-    Status status = _drop(session, uri.c_str(), "checkpoint_wait=false");
+    std::string config = "checkpoint_wait=false";
+    if (!waitForLocks) {
+        config += ",lock_wait=false";
+    }
+    Status status = _drop(session, uri.c_str(), config.c_str());
     LOGV2_DEBUG(22338, 1, "WT drop", "uri"_attr = uri, "status"_attr = status);
 
-    if (status == ErrorCodes::ObjectIsBusy) {
+    if (status == ErrorCodes::ObjectIsBusy || status == ErrorCodes::LockBusy) {
+        invariant(!waitForLocks || status != ErrorCodes::LockBusy, status.codeString());
         return status;
     }
     if (MONGO_unlikely(WTDropEBUSY.shouldFail())) {
@@ -2163,7 +2170,7 @@ void WiredTigerKVEngine::dropIdentForImport(Interruptible& interruptible,
     // backup cursor is open. In short, using "checkpoint_wait=false" and "lock_wait=true" means
     // that we can potentially be waiting for a short period of time for WT_SESSION::drop() to
     // run, but would rather get EBUSY than wait a long time for a checkpoint to complete.
-    const std::string config = "checkpoint_wait=false,lock_wait=true,remove_files=false";
+    const char* config = "checkpoint_wait=false,lock_wait=true,remove_files=false";
     Status dropStatus = Status::OK();
     size_t attempt = 0;
     do {
@@ -2174,7 +2181,8 @@ void WiredTigerKVEngine::dropIdentForImport(Interruptible& interruptible,
 
         ++attempt;
 
-        dropStatus = _drop(session, uri.c_str(), config.c_str());
+        dropStatus = _drop(session, uri.c_str(), config);
+        invariant(dropStatus != ErrorCodes::LockBusy);
         logAndBackoff(5114600,
                       ::mongo::logv2::LogComponent::kStorage,
                       logv2::LogSeverity::Debug(1),
@@ -3371,13 +3379,13 @@ Status WiredTigerKVEngine::_drop(WiredTigerSession& session, const char* uri, co
     const char* err_msg = "";
 
     session.get_last_error(&err, &sub_level_err, &err_msg);
+    // TODO(SERVER-100890): Re-enable this invariant once we have fixed the bug that causes this to
+    // fail.
+    // invariant(sub_level_err != WT_UNCOMMITTED_DATA);
 
-    // We should never run into these situations when we are already in the process of dropping
-    // the table.
-    // TODO: SERVER-100890 Re-enable this invariant once we have fixed the bug that causes this
-    // to fail. invariant(sub_level_err != WT_UNCOMMITTED_DATA);
-    invariant(sub_level_err != WT_CONFLICT_TABLE_LOCK);
-    invariant(sub_level_err != WT_CONFLICT_SCHEMA_LOCK);
+    if (sub_level_err == WT_CONFLICT_TABLE_LOCK || sub_level_err == WT_CONFLICT_SCHEMA_LOCK) {
+        return Status(ErrorCodes::LockBusy, err_msg);
+    }
 
     // If we failed due to uncheckpointed data, checkpoint and retry the operation so that
     // it will attempt to clean up the dirty elements during checkpointing, thus allowing

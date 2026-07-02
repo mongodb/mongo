@@ -86,8 +86,6 @@ protected:
         return kvEngine;
     }
 
-    ~SpillWiredTigerKVEngineTest() override {}
-
     unittest::TempDir _dbpath;
     ClockSourceMock _clockSource;
     ServiceContext::UniqueOperationContext _opCtx;
@@ -126,7 +124,7 @@ TEST_F(SpillWiredTigerKVEngineTest, StorageSize) {
 TEST_F(SpillWiredTigerKVEngineTest, InFlightDrop) {
     FailPoint* fp = globalFailPointRegistry().find("hangOnSpillWiredTigerKVEngineCleanShutdown"sv);
     const auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
-    auto kvEngine = makeKvEngine();
+    std::unique_ptr<KVEngine> kvEngine = makeKvEngine();
     auto ru = kvEngine->newRecoveryUnit();
 
     unittest::JoinThread shutterDowner([&] { kvEngine->cleanShutdown(memLeakAllowed); });
@@ -135,14 +133,9 @@ TEST_F(SpillWiredTigerKVEngineTest, InFlightDrop) {
 
     const std::string ident{kCollectionIdent};
     EXPECT_EQ(ErrorCodes::ShutdownInProgress,
-              kvEngine
-                  ->dropIdent(
-                      *ru,
-                      ident,
-                      /*identHasSizeInfo=*/false,
-                      /*onDrop=*/[] {},
-                      /*schemaEpoch=*/boost::none)
-                  .code());
+              kvEngine->dropIdent(*ru,
+                                  ident,
+                                  /*identHasSizeInfo=*/false));
 
     fp->setMode(FailPoint::off);
 }
@@ -156,7 +149,7 @@ TEST_F(SpillWiredTigerKVEngineTest, BusyInFlightDrop) {
     // The on-disk files will re-load idents upon spinning up the kvEngine due to use of
     // cleanShutdown, so the ident must be unique for each pass.
     static constexpr size_t countIdents{32};
-    auto kvEngine = makeKvEngine();
+    std::unique_ptr<KVEngine> kvEngine = makeKvEngine();
     unittest::Barrier bar(countIdents + 1);
     std::vector<unittest::JoinThread> spillers;
     spillers.reserve(countIdents);
@@ -169,14 +162,9 @@ TEST_F(SpillWiredTigerKVEngineTest, BusyInFlightDrop) {
             bar.countDownAndWait();
             // This is an ASSERT_THAT as failures may be frequent and clutter
             // results if EXPECT_THAT is used instead.
-            ASSERT_THAT(kvEngine
-                            ->dropIdent(
-                                *ru,
-                                ident,
-                                /*identHasSizeInfo=*/false,
-                                /*onDrop=*/[] {},
-                                /*schemaEpoch=*/boost::none)
-                            .code(),
+            ASSERT_THAT(kvEngine->dropIdent(*ru,
+                                            ident,
+                                            /*identHasSizeInfo=*/false),
                         testing::AnyOf(ErrorCodes::OK, ErrorCodes::ShutdownInProgress));
         });
     });

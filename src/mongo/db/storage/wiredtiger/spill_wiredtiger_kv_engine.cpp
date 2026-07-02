@@ -212,7 +212,9 @@ Status SpillWiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
                                           std::string_view ident,
                                           bool identHasSizeInfo,
                                           const StorageEngine::DropIdentCallback& onDrop,
-                                          boost::optional<uint64_t> schemaEpoch) {
+                                          boost::optional<uint64_t> schemaEpoch,
+                                          bool waitForLocks) {
+    invariant(waitForLocks);
     WiredTigerConnection::BlockShutdown blockShutdown(_connection.get());
     if (blockShutdown.isShuttingDown()) {
         return Status(ErrorCodes::ShutdownInProgress,

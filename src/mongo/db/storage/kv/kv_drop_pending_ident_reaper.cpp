@@ -342,6 +342,13 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(
                             "ident"_attr = identInfo->identName,
                             "dropTimestamp"_attr = identInfo->dropTime,
                             "error"_attr = status);
+        } else if (status == ErrorCodes::LockBusy) {
+            LOGV2(12865400,
+                  "Drop-pending ident could not be locked. This typically means that a "
+                  "checkpoint was accessing the table.",
+                  "ident"_attr = identInfo->identName,
+                  "dropTimestamp"_attr = identInfo->dropTime,
+                  "error"_attr = status);
         } else if (status.isA<ErrorCategory::Interruption>()) {
             LOGV2(11873702,
                   "Interruption while dropping ident",
@@ -395,6 +402,7 @@ Status KVDropPendingIdentReaper::immediatelyCompletePendingDrop(OperationContext
     for (size_t retries = 1;; ++retries) {
         auto status = _immediatelyAttemptToCompletePendingDrop(opCtx, ident, boost::none);
         if (status != ErrorCodes::ObjectIsBusy) {
+            invariant(status != ErrorCodes::LockBusy);
             return status;
         }
 
@@ -446,6 +454,7 @@ Status KVDropPendingIdentReaper::immediatelyCompletePendingDropAtTimestamp(Opera
     for (size_t retries = 1;; ++retries) {
         auto status = _immediatelyAttemptToCompletePendingDrop(opCtx, ident, timestamp);
         if (status != ErrorCodes::ObjectIsBusy) {
+            invariant(status != ErrorCodes::LockBusy);
             return status;
         }
 
@@ -529,11 +538,13 @@ Status KVDropPendingIdentReaper::_tryToDrop(WithLock,
 
                     const uint64_t schemaEpoch = provider.getSchemaEpochForTimestamp(
                         reservedIdentDropTimestamp.getTimestamp());
+                    const bool waitForLocks = false;
                     auto s = _engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
                                                 identInfo.identName,
                                                 ident::isCollectionIdent(identInfo.identName),
                                                 identInfo.onDrop,
-                                                schemaEpoch);
+                                                schemaEpoch,
+                                                waitForLocks);
                     if (s.isOK()) {
                         wuow.commit();
                     }

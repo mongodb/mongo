@@ -120,7 +120,8 @@ public:
                      std::string_view ident,
                      bool identHasSizeInfo,
                      const StorageEngine::DropIdentCallback& onDrop,
-                     boost::optional<uint64_t> schemaEpoch) override {
+                     boost::optional<uint64_t> schemaEpoch,
+                     bool waitForLocks) override {
         return Status::OK();
     }
 

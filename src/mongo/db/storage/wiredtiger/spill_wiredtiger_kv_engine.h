@@ -77,8 +77,9 @@ public:
     Status dropIdent(RecoveryUnit& ru,
                      std::string_view ident,
                      bool identHasSizeInfo,
-                     const StorageEngine::DropIdentCallback& onDrop = nullptr,
-                     boost::optional<uint64_t> schemaEpoch = boost::none) override;
+                     const StorageEngine::DropIdentCallback& onDrop,
+                     boost::optional<uint64_t> schemaEpoch,
+                     bool waitForLocks) override;
 
     std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
                                                 const NamespaceString& nss,

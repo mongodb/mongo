@@ -27,17 +27,7 @@
  *    it in the license file.
  */
 
-#include <ostream>
-#include <string_view>
-#include <utility>
-
-#include <boost/filesystem/fstream.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
@@ -64,7 +54,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
@@ -73,6 +62,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/temp_dir.h"
@@ -84,6 +74,17 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/version/releases.h"
 
+#include <condition_variable>
+#include <cstring>
+#include <mutex>
+#include <ostream>
+#include <string_view>
+#include <utility>
+
+#include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -284,7 +285,7 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     boost::filesystem::rename(*dataFilePath, tmpFile, err);
     ASSERT(!err) << err.message();
 
-    ASSERT_OK(_helper->getWiredTigerKVEngine()->dropIdent(
+    ASSERT_OK(_helper->getEngine()->dropIdent(
         *shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident, /*identHasSizeInfo=*/true));
 
     // The data file is moved back in place so that it becomes an "orphan" of the storage
@@ -344,7 +345,7 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     // Dropping a collection might fail if we haven't checkpointed the data
     _helper->getWiredTigerKVEngine()->checkpoint();
 
-    ASSERT_OK(_helper->getWiredTigerKVEngine()->dropIdent(
+    ASSERT_OK(_helper->getEngine()->dropIdent(
         *shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident, /*identHasSizeInfo=*/true));
 
 #ifdef _WIN32
@@ -607,7 +608,7 @@ TEST_F(WiredTigerKVEngineTest, IdentDrop) {
     ASSERT(boost::filesystem::exists(*dataFilePath));
     ASSERT(boost::filesystem::exists(renamedFilePath));
 
-    ASSERT_OK(_helper->getWiredTigerKVEngine()->dropIdent(
+    ASSERT_OK(_helper->getEngine()->dropIdent(
         *shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident, /*identHasSizeInfo=*/true));
 
     // WiredTiger drops files asynchronously.
@@ -1135,7 +1136,7 @@ protected:
     }
 
     Status removeIdent(std::string_view ident) {
-        return _helper->getWiredTigerKVEngine()->dropIdent(
+        return _helper->getEngine()->dropIdent(
             *shard_role_details::getRecoveryUnit(_opCtx.get()), ident, /*identHasSizeInfo=*/true);
     }
 
@@ -1776,6 +1777,109 @@ TEST_F(WiredTigerKVEngineTest, FlushAllFilesNotifiesRegisteredObserver) {
     engine->setFlushAllFilesObserver(nullptr);
     engine->flushAllFiles(opCtx.get(), /*callerHoldsReadLock=*/false);
     ASSERT_EQ(1, observer.timesNotified);
+}
+
+/**
+ * A test helper which uses a custom collator to lock and unlock the WiredTiger schema lock. This
+ * takes advantage of that the customize callback is invoked with the locks held to enable us to
+ * test lock_wait=false behavior without relying on timing.
+ *
+ * As WiredTiger does not have a remove_collator() function, the WiredTigerKVEngine passed to this
+ * must be destroyed *before* this object.
+ */
+class BlockingCollator : WT_COLLATOR {
+public:
+    BlockingCollator(WiredTigerKVEngine& engine) : _engine(engine) {
+        compare = [](auto...) {
+            return 0;
+        };
+        customize = [](WT_COLLATOR* collator, auto...) {
+            auto* self = static_cast<BlockingCollator*>(collator);
+            std::unique_lock lk(self->_mutex);
+            self->_started = true;
+            self->_cv.notify_all();
+            self->_cv.wait(lk, [&] { return self->_released; });
+            return 0;
+        };
+        terminate = nullptr;
+
+        WT_CONNECTION* conn = engine.getConn();
+        ASSERT_EQ(conn->add_collator(conn, "lockBusyTestCollator", this, nullptr), 0);
+    }
+
+    /**
+     * Acquires the WiredTiger schema lock. Must not be called while already locked.
+     */
+    void lock() {
+        std::unique_lock lk(_mutex);
+        invariant(!_thread.joinable());
+        _thread = unittest::JoinThread([&] {
+            WiredTigerSession session(&_engine.getConnection());
+            ASSERT_EQ(session.create("table:lockBusyTestCollatorTable",
+                                     "key_format=S,value_format=S,collator=lockBusyTestCollator"),
+                      0);
+        });
+        _cv.wait(lk, [&] { return _started; });
+    }
+
+    /**
+     * Releases the WiredTiger schema lock. Must not be called when not locked.
+     */
+    void unlock() {
+        {
+            std::lock_guard lk(_mutex);
+            _released = true;
+        }
+        _cv.notify_all();
+        _thread.join();
+    }
+
+private:
+    WiredTigerKVEngine& _engine;
+    std::mutex _mutex;
+    std::condition_variable _cv;
+    unittest::JoinThread _thread;
+    bool _started = false;
+    bool _released = false;
+};
+
+TEST_F(WiredTigerKVEngineTest, DropIdentReturnsLockBusyWhenSchemaLockHeld) {
+    auto opCtxPtr = _makeOperationContext();
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    std::string ident = "collection-1234";
+    RecordStore::Options options;
+
+    auto& provider = rss::ReplicatedStorageService::get(opCtxPtr.get()).getPersistenceProvider();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtxPtr.get());
+    {
+        StorageWriteTransaction swt(ru);
+        ASSERT_OK(
+            _helper->getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options));
+        swt.commit();
+    }
+
+    // Dropping a collection might fail if we haven't checkpointed the data.
+    _helper->getWiredTigerKVEngine()->checkpoint();
+
+    auto* engine = _helper->getWiredTigerKVEngine();
+
+    BlockingCollator blockingCollator(*engine);
+    auto status = [&] {
+        std::lock_guard lock(blockingCollator);
+        return engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtxPtr.get()),
+                                 ident,
+                                 /*identHasSizeInfo=*/true,
+                                 /*onDrop=*/nullptr,
+                                 /*schemaEpoch=*/boost::none,
+                                 /*waitForLocks=*/false);
+    }();
+    EXPECT_EQ(status, ErrorCodes::LockBusy);
+
+    // The WiredTigerKVEngine must be destroyed before the test collator as WiredTiger holds a
+    // pointer to it and will call terminate() on teardown
+    opCtxPtr.reset();
+    _helper.reset();
 }
 
 }  // namespace

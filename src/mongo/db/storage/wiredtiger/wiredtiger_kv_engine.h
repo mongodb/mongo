@@ -537,8 +537,9 @@ public:
     Status dropIdent(RecoveryUnit& ru,
                      std::string_view ident,
                      bool identHasSizeInfo,
-                     const StorageEngine::DropIdentCallback& onDrop = nullptr,
-                     boost::optional<uint64_t> schemaEpoch = boost::none) override;
+                     const StorageEngine::DropIdentCallback& onDrop,
+                     boost::optional<uint64_t> schemaEpoch,
+                     bool waitForLocks) override;
 
     void dropIdentForImport(Interruptible&, RecoveryUnit&, std::string_view ident) override;
 
