@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/global_catalog/type_shard.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/change_stream_pipeline_helpers.h"
 #include "mongo/db/pipeline/change_stream_read_mode.h"
@@ -209,6 +210,8 @@ public:
                 aggregation_request_helper::setFromRouter(
                     VersionContext::getDecoration(opCtx), aggReq, true);
                 aggReq.setNeedsMerge(true);
+
+                aggregation_request_helper::addQuerySettingsToRequest(aggReq, expCtx);
 
                 SimpleCursorOptions cursor;
                 cursor.setBatchSize(0);

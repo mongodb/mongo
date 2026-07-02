@@ -338,19 +338,22 @@ export function ChangeStreamTest(_db, options) {
         const collName = collection instanceof DBCollection ? collection.getName() : collection;
 
         return runInFixture(() => {
-            const cmdObj = Object.merge(
-                {aggregate: collName, pipeline, querySettings},
-                aggregateOptions,
-            );
+            const cmdObj = Object.merge({aggregate: collName, pipeline}, aggregateOptions);
             if (querySettings) {
                 cmdObj.querySettings = querySettings;
             }
+
             // Maximum number of tries, i.e. 1 initial attempt + 3 retries.
             // If adjusting this value in the future, be sure to constraint the maximum backoff time
             // below to avoid overly long sleeps.
             const maxTries = 4;
             let res;
             for (let attemptNumber = 1; attemptNumber <= maxTries; attemptNumber++) {
+                const logProgress = (msg, data) => {
+                    jsTest.log.info(msg, Object.assign({attempt: attemptNumber, cmdObj}, data));
+                };
+
+                logProgress("ChangeStreamTest.startWatchingChanges", {});
                 try {
                     res = assert.commandWorked(
                         runCommandChangeStreamPassthroughAware(
@@ -361,6 +364,11 @@ export function ChangeStreamTest(_db, options) {
                     );
                     break;
                 } catch (e) {
+                    logProgress("ChangeStreamTest.startWatchingChanges: command failed", {
+                        code: e.code,
+                        error: e.message,
+                    });
+
                     if (attemptNumber === maxTries || !_isRetryableError(e)) {
                         throw e;
                     }
@@ -418,8 +426,12 @@ export function ChangeStreamTest(_db, options) {
         if (!cursorInfo || !cursorInfo.resumeToken) {
             throw new Error("Cannot resume change stream - no resume token available for cursor");
         }
-        jsTest.log.info("ChangeStreamTest.restartChangeStream: restarting change stream", {
-            oldCursorId: cursorId,
+
+        const logProgress = (msg, data) => {
+            jsTest.log.info(msg, Object.assign({oldCursorId: cursorId, cursorInfo}, data));
+        };
+
+        logProgress("ChangeStreamTest.restartChangeStream: restarting change stream", {
             resumeToken: cursorInfo.resumeToken,
         });
         const pipeline = addResumeToken(cursorInfo.pipeline, cursorInfo.resumeToken);
@@ -437,8 +449,7 @@ export function ChangeStreamTest(_db, options) {
         }
         const newCursor = self.startWatchingChanges(params);
         Object.assign(cursor, newCursor);
-        jsTest.log.info("ChangeStreamTest.restartChangeStream: restart complete", {
-            oldCursorId: cursorId,
+        logProgress("ChangeStreamTest.restartChangeStream: restart complete", {
             newCursorId: String(cursor.id),
         });
         assert.neq(
@@ -470,14 +481,25 @@ export function ChangeStreamTest(_db, options) {
      */
     self.getNextBatch = function (cursor) {
         const maxRetries = 3;
+
         for (let attemptNumber = 1; attemptNumber <= maxRetries; attemptNumber++) {
+            const collName = getCollectionNameFromFullNamespace(cursor.ns);
+            const logProgress = (msg, data) => {
+                jsTest.log.info(
+                    msg,
+                    Object.assign(
+                        {
+                            attempt: attemptNumber,
+                            cursorId: cursor.id,
+                            collection: collName,
+                        },
+                        data,
+                    ),
+                );
+            };
+
+            logProgress("ChangeStreamTest.getNextBatch: sending getMore", {});
             try {
-                let collName = getCollectionNameFromFullNamespace(cursor.ns);
-                jsTest.log.info("ChangeStreamTest.getNextBatch: sending getMore", {
-                    attempt: attemptNumber,
-                    cursorId: cursor.id,
-                    collection: collName,
-                });
                 const res = assert.commandWorked(
                     _db.runCommand({getMore: cursor.id, collection: collName, batchSize: 1}),
                 );
@@ -489,9 +511,7 @@ export function ChangeStreamTest(_db, options) {
                 updateResumeToken(cursor, getBatchFromCursorDocument(cursor));
                 return cursor;
             } catch (e) {
-                jsTest.log.info("ChangeStreamTest.getNextBatch: getMore failed", {
-                    attempt: attemptNumber,
-                    cursorId: cursor.id,
+                logProgress("ChangeStreamTest.getNextBatch: getMore failed", {
                     code: e.code,
                     error: e.message,
                 });

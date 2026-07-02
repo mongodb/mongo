@@ -359,7 +359,7 @@ std::string mapToString(const StringMap<std::string>& map) {
     return sb.str();
 }
 
-BSONObj buildNewKeyPattern(const ShardKeyPattern& shardKey, StringMap<std::string> renames) {
+BSONObj buildNewKeyPattern(const ShardKeyPattern& shardKey, const StringMap<std::string>& renames) {
     BSONObjBuilder newPattern;
     for (auto&& elem : shardKey.getKeyPattern().toBSON()) {
         auto it = renames.find(elem.fieldNameStringData());
@@ -766,6 +766,7 @@ std::unique_ptr<Pipeline> runPipelineDirectlyOnSingleShard(
 
             // Convert remote cursors into a vector of "owned" cursors.
             std::vector<OwnedRemoteCursor> ownedCursors;
+            ownedCursors.reserve(cursors.size());
             for (auto&& cursor : cursors) {
                 auto cursorNss = cursor.getCursorResponse().getNSS();
                 ownedCursors.emplace_back(opCtx, std::move(cursor), std::move(cursorNss));
@@ -1288,6 +1289,7 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
 
     // Convert remote cursors into a vector of "owned" cursors.
     std::vector<OwnedRemoteCursor> ownedCursors;
+    ownedCursors.reserve(cursors.size());
     for (auto&& cursor : cursors) {
         auto cursorNss = cursor.getCursorResponse().getNSS();
         ownedCursors.emplace_back(opCtx, std::move(cursor), std::move(cursorNss));
@@ -1840,7 +1842,7 @@ std::unique_ptr<Pipeline> targetShardsAndAddMergeCursorsWithRoutingCtx(
 
     return dispatchTargetedPipelineAndAddMergeCursors(expCtx,
                                                       routingCtx,
-                                                      aggRequest,
+                                                      std::move(aggRequest),
                                                       std::move(pipelineToTarget),
                                                       std::move(pipelineTargetingInfo),
                                                       pipelineDataSource,
@@ -2060,6 +2062,8 @@ boost::optional<RemoteCursor> openChangeStreamCursorOnConfigsvrIfNeeded(
     aggregation_request_helper::setFromRouter(
         VersionContext::getDecoration(expCtx->getOperationContext()), aggReq, true);
     aggReq.setNeedsMerge(true);
+
+    aggregation_request_helper::addQuerySettingsToRequest(aggReq, expCtx);
 
     SimpleCursorOptions cursor;
     cursor.setBatchSize(0);

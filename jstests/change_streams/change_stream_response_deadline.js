@@ -9,7 +9,7 @@
  *   each subsequent doWork() call. After the first doWork() completes and takes kDelayMS ms, the
  *   very next yield check fires and detects elapsed > kScanMaxMS. Using kDelayMS >
  *   kScanMaxMS guarantees that exactly ONE doWork() call exhausts the budget, making the
- *   behaviour reliable regardless of timer granularity.
+ *   behavior reliable regardless of timer granularity.
  *
  * Test flow:
  *   1. Record clusterTime T0 before creating the collection.
@@ -25,7 +25,6 @@
  *      postBatchResumeToken.
  *
  * @tags: [
- *   assumes_read_preference_unchanged,
  *   assumes_stable_shard_list,
  *   assumes_unsharded_collection,
  *   # Cannot wrap initial insert operations into a single transaction, in order to make them
@@ -41,6 +40,8 @@
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {configureFailPointForAllShardsAndMongos} from "jstests/libs/fail_point_util.js";
 import {ChangeStreamTest, getClusterTime} from "jstests/libs/query/change_stream_util.js";
+import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
+import {checkLog} from "src/mongo/shell/check_log.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 describe("change stream oplog scan PBRT updates via operationResponseMaxMS", () => {
@@ -56,11 +57,42 @@ describe("change stream oplog scan PBRT updates via operationResponseMaxMS", () 
     // are produced before the matching document is returned.
     const kNumDocs = 10;
 
+    // Log ID emitted by PlanExecutorImpl::_handleResponseDeadline() at debug level 3 when the
+    // operationResponseMaxMS deadline interrupts a collection scan.
+    const kResponseDeadlineLogId = 10290000;
+
     const collName = jsTestName();
 
     let coll;
     let cst;
     let startTime;
+
+    // Connections to replica set nodes  where log 10290000 is expected.
+    // Populated in 'before()' after topology discovery.
+    let replicaSetNodes = [];
+
+    // Returns an array of Mongo connections to RS nodes. Works for both a direct RS connection (change_streams suite) and a mongos connection (sharded passthrough suites).
+    const getReplicaSetNodes = (mongoConn) => {
+        let nodes = [];
+        const topology = DiscoverTopology.findConnectedNodes(mongoConn);
+        if (topology.type === Topology.kReplicaSet) {
+            topology.nodes.forEach((n) => {
+                nodes.push({conn: new Mongo(n)});
+            });
+        } else if (topology.type === Topology.kShardedCluster) {
+            Object.values(topology.shards)
+                .filter((s) => s.type === Topology.kReplicaSet)
+                .forEach((s) => {
+                    s.nodes.forEach((n) => {
+                        nodes.push({conn: new Mongo(n)});
+                    });
+                });
+        } else {
+            // Standalone topology is not supported for change streams, so this should never happen.
+            throw new Error(`Unexpected topology type: ${topology.type}`);
+        }
+        return nodes;
+    };
 
     const runWithFailPoint = (conn, failPointName, data = {}, cb) => {
         configureFailPointForAllShardsAndMongos({
@@ -79,6 +111,13 @@ describe("change stream oplog scan PBRT updates via operationResponseMaxMS", () 
     // Test that a change stream opened on a collection returns multiple empty batches with a
     // postBatchResumeToken before it returns the single matching document.
     const runTest = (querySettings = undefined, withChangeStreamRestart = false) => {
+        // Clear logs and capture near-zero offsets before the test runs. This avoids false
+        // negatives caused by the ring buffer wrapping around when many entries accumulate.
+        for (const node of replicaSetNodes) {
+            node.conn.adminCommand({clearLog: "global"});
+        }
+        const logOffsets = replicaSetNodes.map((node) => checkLog.getGlobalLog(node.conn).length);
+
         runWithFailPoint(db.getMongo(), "hangCollScanDoWork", {delay: kDelayMS}, () => {
             // Open the change stream at startTime with batchSize: 0.
             let cursor = cst.startWatchingChanges({
@@ -169,6 +208,28 @@ describe("change stream oplog scan PBRT updates via operationResponseMaxMS", () 
                 {differentPBRTsReturned},
             );
         });
+
+        // Verify that log 10290000 was emitted on at least one shard. In sharded passthrough mode
+        // the collection is unsharded and only the primary shard will have a cursor, so "at least
+        // one" is sufficient.
+        assert.soon(
+            () =>
+                replicaSetNodes.some((node, i) => {
+                    const offset = logOffsets[i];
+                    return checkLog
+                        .getGlobalLog(node.conn)
+                        .slice(offset)
+                        .some((log) => {
+                            try {
+                                return JSON.parse(log).id === kResponseDeadlineLogId;
+                            } catch (e) {
+                                return false;
+                            }
+                        });
+                }),
+            `Expected log ${kResponseDeadlineLogId} on at least one shard node, indicating ` +
+                "the response deadline was applied and interrupted the collection scan",
+        );
     };
 
     before(() => {
@@ -187,10 +248,35 @@ describe("change stream oplog scan PBRT updates via operationResponseMaxMS", () 
         for (let i = 0; i < kNumDocs; ++i) {
             assert.commandWorked(coll.insert({_id: i}));
         }
+
+        // Discover replica set nodes and enable verbosity 3 for the query log component so that
+        // debug-level-3 log entries (including log 10290000) are visible. Dynamic setParameter is
+        // used instead of startup parameters to avoid conflicts with resmoke's global verbosity.
+        replicaSetNodes = getReplicaSetNodes(db.getMongo());
+        for (const node of replicaSetNodes) {
+            const res = assert.commandWorked(
+                node.conn.adminCommand({
+                    setParameter: 1,
+                    logComponentVerbosity: {query: {verbosity: 3}},
+                }),
+            );
+            node.previousQueryVerbosity = res.was.query;
+        }
     });
 
     after(() => {
         assert(coll.drop());
+        // Restore default query verbosity and close the connections opened for log checks.
+        for (const node of replicaSetNodes) {
+            assert.commandWorked(
+                node.conn.adminCommand({
+                    setParameter: 1,
+                    logComponentVerbosity: {query: node.previousQueryVerbosity},
+                }),
+            );
+            node.conn.close();
+        }
+        replicaSetNodes = [];
     });
 
     beforeEach(() => {
