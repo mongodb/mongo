@@ -92,6 +92,10 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
     NamespaceString nss = NamespaceStringUtil::deserialize(
         tid, nsElem.checkAndGetStringData(), SerializationContext::stateDefault());
 
+    // The database named in the 'ns' field, before the UUID override below. dropDatabase ignores
+    // any 'ui' at execution time and drops this database, so it must be authorized against it.
+    const DatabaseName nsFieldDbName = nss.dbName();
+
     if (oplogEntry.hasField("ui"_sd)) {
         // ns by UUID overrides the ns specified if they are different.
         auto catalog = CollectionCatalog::get(opCtx);
@@ -119,6 +123,10 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
             // renameCollection was originally run on 'admin', so we must restore this.
             dbNameForAuthCheck = DatabaseNameUtil::deserialize(
                 nss.tenantId(), "admin", SerializationContext::stateDefault());
+        } else if (commandName == "dropDatabase") {
+            // dropDatabase ignores any 'ui' at execution time and drops the database named in the
+            // 'ns' field, so authorize that database rather than the UUID-resolved one.
+            dbNameForAuthCheck = nsFieldDbName;
         }
 
         // TODO reuse the parse result for when we run() later. Note that when running,

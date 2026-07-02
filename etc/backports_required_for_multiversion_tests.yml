@@ -21,6 +21,8 @@
 #
 last-continuous:
   all:
+  - test_file: jstests/auth/apply_ops_uuid_ddl_auth_divergence.js
+    ticket: SERVER-130139
   - test_file: jstests/aggregation/accumulators/percentiles_syntax.js
     ticket: SERVER-129617
   - test_file: jstests/aggregation/expressions/percentile_expression_syntax.js
@@ -968,6 +970,8 @@ last-continuous:
   suites: null
 last-lts:
   all:
+  - test_file: jstests/auth/apply_ops_uuid_ddl_auth_divergence.js
+    ticket: SERVER-130139
   - test_file: jstests/aggregation/accumulators/percentiles_syntax.js
     ticket: SERVER-129617
   - test_file: jstests/aggregation/expressions/percentile_expression_syntax.js
