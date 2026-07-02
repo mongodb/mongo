@@ -2502,7 +2502,13 @@ TEST_F(ReplCoordTest, ShouldChangeSyncSource) {
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
-    getTopoCoord().updateConfig(config, 1, getNet()->now());
+    // Updates should happen in the executor thread to avoid data races with heartbeats.
+    auto handle = getReplExec()->scheduleWork(
+        [this, &config](const executor::TaskExecutor::CallbackArgs& cb) {
+            getTopoCoord().updateConfig(config, 1, getNet()->now());
+        });
+    ASSERT_OK(handle.getStatus());
+    getReplExec()->wait(handle.getValue());
 
     OplogQueryMetadata opMetaData(OpTimeAndWallTime(),
                                   OpTime(Timestamp(1, 1), 1),
