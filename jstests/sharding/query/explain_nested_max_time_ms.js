@@ -4,6 +4,7 @@
  *
  * @tags: [
  *   requires_sharding,
+ *   requires_fcv_90,
  * ]
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
