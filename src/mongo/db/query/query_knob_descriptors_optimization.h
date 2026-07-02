@@ -33,8 +33,18 @@
 
 #pragma once
 
+#include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/query/query_knobs/query_knob.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/storage/storage_options.h"
+
+namespace mongo {
+// MSVC C1001 workaround: MSVC cannot use a member access expression (e.g.
+// storageGlobalParams.noTableScan) as a non-type template argument. Bind the target member to a
+// named reference so the KNOB() macro can pass it as a simple identifier.
+// TODO (SERVER-129983): Remove this workaround once the underlying MSVC ICE is fixed.
+inline AtomicWord<bool>& gKnobNoTableScan = storageGlobalParams.noTableScan;
+}  // namespace mongo
 
 // clang-format off
 #define MONGO_EXPAND_QUERY_KNOBS_OPTIMIZATION(KNOB)                                      \
@@ -353,6 +363,10 @@
          kInternalEnableDependencyGraphValidationName,                                    \
          internalEnableDependencyGraphValidation,                                         \
          getEnableDependencyGraphValidation)                                              \
+    KNOB(kNoTableScan,                                                                    \
+         kNotablescanName,                                                                \
+         gKnobNoTableScan,                                                                \
+         getNoTableScan)                                                                  \
     /* End MONGO_EXPAND_QUERY_KNOBS_OPTIMIZATION */
 // clang-format on
 

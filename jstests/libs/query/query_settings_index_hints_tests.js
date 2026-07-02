@@ -409,11 +409,13 @@ export class QuerySettingsIndexHintsTests {
         ns,
         additionalHints = [],
         additionalAssertions = () => {},
+        additionalSettings = {},
     ) {
         const query = this._qsutils.withoutDollarDB(querySettingsQuery);
         const naturalForwardScan = {$natural: 1};
         const naturalForwardSettings = {
             indexHints: [{ns, allowedIndexes: [naturalForwardScan]}, ...additionalHints],
+            ...additionalSettings,
         };
         this._qsutils.withQuerySettings(querySettingsQuery, naturalForwardSettings, () => {
             this.assertCollScanStage(query, ["forward"], ns);
@@ -424,6 +426,7 @@ export class QuerySettingsIndexHintsTests {
         const naturalBackwardScan = {$natural: -1};
         const naturalBackwardSettings = {
             indexHints: [{ns, allowedIndexes: [naturalBackwardScan]}, ...additionalHints],
+            ...additionalSettings,
         };
         this._qsutils.withQuerySettings(querySettingsQuery, naturalBackwardSettings, () => {
             this.assertCollScanStage(query, ["backward"], ns);
@@ -436,6 +439,7 @@ export class QuerySettingsIndexHintsTests {
                 {ns, allowedIndexes: [naturalForwardScan, naturalBackwardScan]},
                 ...additionalHints,
             ],
+            ...additionalSettings,
         };
         this._qsutils.withQuerySettings(querySettingsQuery, naturalAnyDirectionSettings, () => {
             this.assertCollScanStage(query, ["forward", "backward"], ns);
@@ -512,9 +516,17 @@ export class QuerySettingsIndexHintsTests {
      * any viable plans have the same generated plans as the queries that have no query settings
      * attached to them.
      */
-    assertQuerySettingsFallback(querySettingsQuery, ns, explainWithoutQuerySettings = null) {
+    assertQuerySettingsFallback(
+        querySettingsQuery,
+        ns,
+        explainWithoutQuerySettings = null,
+        additionalSettings = {},
+    ) {
         const query = this._qsutils.withoutDollarDB(querySettingsQuery);
-        const settings = {indexHints: {ns, allowedIndexes: ["doesnotexist"]}};
+        const settings = {
+            indexHints: {ns, allowedIndexes: ["doesnotexist"]},
+            ...additionalSettings,
+        };
         const explainCmd = getExplainCommand(query);
 
         const explainWithQuerySettings = this._qsutils.withQuerySettings(

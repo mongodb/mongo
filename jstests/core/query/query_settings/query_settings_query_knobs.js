@@ -77,6 +77,17 @@ describe("setQuerySettings with queryKnobs", function () {
         assertQueryKnobsNotSettable({queryFrameworkControl: "trySbeEngine"}, 12194500);
     });
 
+    it("Should accept bool values for noTableScan", function () {
+        for (const value of [true, false]) {
+            const stored = qsutils
+                .withQuerySettings(representativeQuery, {queryKnobs: {noTableScan: value}}, () => {
+                    return qsutils.getQuerySettings({filter: {representativeQuery}});
+                })
+                .at(0)?.settings?.queryKnobs?.noTableScan;
+            assert.eq(stored, value, {value, stored});
+        }
+    });
+
     it("Should round trip correctly", function () {
         const queryKnobs = {
             samplingMarginOfError: 3.0,
@@ -84,6 +95,7 @@ describe("setQuerySettings with queryKnobs", function () {
             automaticCEPlanRankingStrategy: "CBRCostBasedRankerChoice",
             samplingConfidenceInterval: "99",
             samplingCEMethod: "random",
+            noTableScan: false,
         };
         const roundTrippedSettings = qsutils
             .withQuerySettings(representativeQuery, {queryKnobs}, () => {

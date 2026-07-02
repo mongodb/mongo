@@ -55,6 +55,10 @@ const excludeKnobs = [
     "automaticCEPlanRankingStrategy",
     "internalQueryPlannerEnableHashIntersection",
     "internalQuerySamplingCEMethod",
+    // Disallows collection scans; if the generated query has no covering index this is a
+    // legitimate NoQueryExecutionPlans server-side guardrail, not a correctness divergence, so it
+    // can't be compared against a forced-COLLSCAN control.
+    "notablescan",
 ];
 
 const knobSchema = db

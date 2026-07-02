@@ -32,6 +32,7 @@ const kWireNameToServerParam = {
     samplingConfidenceInterval: "samplingConfidenceInterval",
     samplingMarginOfError: "samplingMarginOfError",
     samplingCEMethod: "internalQuerySamplingCEMethod",
+    noTableScan: "notablescan",
 };
 
 const kPqsKnobsDefaults = {
@@ -40,6 +41,7 @@ const kPqsKnobsDefaults = {
     samplingConfidenceInterval: "95",
     samplingMarginOfError: 5.0,
     samplingCEMethod: "chunk",
+    noTableScan: false,
 };
 
 const kPqsKnobsNonDefault = {

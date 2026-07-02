@@ -13,6 +13,7 @@
 // ]
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {isIdhackOrExpress} from "jstests/libs/query/analyze_plan.js";
 import {QuerySettingsIndexHintsTests} from "jstests/libs/query/query_settings_index_hints_tests.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
@@ -21,6 +22,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 function checkError(err) {
     assert.includes(err.toString(), "'notablescan'");
 }
+
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
@@ -107,6 +109,69 @@ assert.commandWorked(db.adminCommand({setParameter: 1, notablescan: true}));
 
     qstests.assertQuerySettingsNaturalApplication(querySettingsFindQuery, ns);
     qstests.assertQuerySettingsFallback(querySettingsFindQuery, ns);
+
+    if (FeatureFlagUtil.isEnabled(db, "PqsQueryKnobs")) {
+        // Drop indexes so the collection scan tests below work.
+        assert.commandWorked(coll.dropIndexes());
+
+        const noTableScanQuery = qsutils.makeFindQueryInstance({filter: {a: 1}});
+
+        // noTableScan=false overrides global notablescan=true, allowing collection scans.
+        assert.throws(() => coll.find({a: 1}).toArray());
+        qsutils.withQuerySettings(noTableScanQuery, {queryKnobs: {noTableScan: false}}, () => {
+            assert.doesNotThrow(() => coll.find({a: 1}).toArray());
+        });
+
+        // noTableScan=true blocks collection scans even when the global is false.
+        assert.commandWorked(db.adminCommand({setParameter: 1, notablescan: false}));
+        assert.doesNotThrow(() => coll.find({a: 1}).toArray());
+        qsutils.withQuerySettings(noTableScanQuery, {queryKnobs: {noTableScan: true}}, () => {
+            assert.throws(() => coll.find({a: 1}).toArray());
+        });
+        assert.commandWorked(db.adminCommand({setParameter: 1, notablescan: true}));
+
+        // Restore indexes for the interaction tests below.
+        assert.commandWorked(coll.createIndexes([qstests.indexA, qstests.indexB, qstests.indexAB]));
+
+        // Interaction: $natural hint + noTableScan knob.
+        // noTableScan=false: collscan allowed despite global notablescan=true.
+        qstests.assertQuerySettingsNaturalApplication(querySettingsFindQuery, ns, [], () => {}, {
+            queryKnobs: {noTableScan: false},
+        });
+        // noTableScan=true: QS $natural has higher priority and clears the NO_TABLE_SCAN flag,
+        // so the collection scan is allowed regardless.
+        qstests.assertQuerySettingsNaturalApplication(querySettingsFindQuery, ns, [], () => {}, {
+            queryKnobs: {noTableScan: true},
+        });
+
+        // Interaction: fallback + noTableScan knob.
+        // Drop indexes so the fallback lands on a collscan.
+        assert.commandWorked(coll.dropIndexes());
+
+        // noTableScan=false: collscan allowed despite global notablescan=true.
+        qsutils.withQuerySettings(
+            querySettingsFindQuery,
+            {indexHints: {ns, allowedIndexes: ["doesnotexist"]}, queryKnobs: {noTableScan: false}},
+            () => {
+                assert.commandWorked(
+                    db.runCommand(qsutils.withoutDollarDB(querySettingsFindQuery)),
+                );
+            },
+        );
+        // noTableScan=true: fallback collscan blocked even when global notablescan=false.
+        assert.commandWorked(db.adminCommand({setParameter: 1, notablescan: false}));
+        qsutils.withQuerySettings(
+            querySettingsFindQuery,
+            {indexHints: {ns, allowedIndexes: ["doesnotexist"]}, queryKnobs: {noTableScan: true}},
+            () => {
+                assert.commandFailedWithCode(
+                    db.runCommand(qsutils.withoutDollarDB(querySettingsFindQuery)),
+                    ErrorCodes.NoQueryExecutionPlans,
+                );
+            },
+        );
+        assert.commandWorked(db.adminCommand({setParameter: 1, notablescan: true}));
+    }
 }
 
 rst.stopSet();
