@@ -1923,6 +1923,15 @@ TEST(SerializeInternalSchema, ExpressionInternalSchemaMaxPropertiesSerializesCor
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 
+TEST(SerializeInternalSchema, ExpressionNotInternalSchemaMaxPropertiesSerializesCorrectly) {
+    auto maxProperties = std::make_unique<InternalSchemaMaxPropertiesMatchExpression>(5);
+    auto notExpr = std::make_unique<NotMatchExpression>(
+        std::make_unique<AndMatchExpression>(std::move(maxProperties)));
+
+    ASSERT_BSONOBJ_EQ_AUTO(R"({"$nor":[{"$_internalSchemaMaxProperties":5}]})",
+                           serialize(notExpr.get()));
+}
+
 TEST(SerializeInternalSchema, ExpressionInternalSchemaFmodSerializesCorrectly) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(
