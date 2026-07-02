@@ -41,6 +41,7 @@ const verifySortOptimizationApplied = (
     const pipelineWithSort = [stage, ...interveningStages, ...sortStages];
 
     const explainOutput = coll.explain("queryPlanner").aggregate(pipelineWithSort);
+    // Check for $sort in both regular stages and splitPipeline (for sharded clusters).
     const sortFound =
         getStageFromSplitPipeline(explainOutput, "$sort") != null ||
         getAggPlanStages(explainOutput, "$sort").length > 0;
@@ -77,7 +78,8 @@ const runTestStoredSourceFalse = () => {
     ]);
     verifySortOptimizationApplied(validStage, [sortStageScore], false);
     verifySortOptimizationApplied(validStage, [multiFieldSort], false);
-    // TODO SERVER-127594: expect sort removal once intervening stages set preservesOrderAndMetadata=true.
+    // TODO SERVER-127594: check that $sort is removed for these types of pipelines with intervening
+    // stages that preserve order and metadata.
     verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore], false, [{$limit: 67}]);
     verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore], false, [
         {$addFields: {"cats": 67}},
@@ -105,7 +107,8 @@ const runTestStoredSourceTrue = () => {
     );
     verifySortOptimizationApplied(validStage, [sortStageScore], false);
     verifySortOptimizationApplied(validStage, [multiFieldSort], false);
-    // TODO SERVER-127594: expect sort removal once intervening stages set preservesOrderAndMetadata=true.
+    // TODO SERVER-127594: check that $sort is removed for these types of pipelines with intervening
+    // stages that preserve order and metadata.
     verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore], false, [{$limit: 67}]);
     verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore], false, [
         {$addFields: {"cats": 67}},
@@ -127,12 +130,17 @@ testDesugarFalse();
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // getPipelineSuffixBounds Tests
 //
-// Each case verifies three values together:
-//   - minBoundsType / maxBoundsType: the constraint kind returned by getPipelineSuffixBounds()
-//   - extractedLimit: the discrete max value written via setExtractedLimitVal_deprecated(), which
-//     is only set when maxBounds is discrete (this is the limit-pushdown path used for batch size
-//     tuning; it subsumes the old standalone limit-extraction test coverage)
+// These tests run with featureFlagExtensionsOptimizations ON (via --runAllFeatureFlagTests). The
+// applyPipelineBounds rule calls getPipelineSuffixBounds() and $testVectorSearch stores the derived
+// limit in pipelineBoundsLimit. The host does NOT call setExtractedLimitVal_deprecated() (the old
+// way extensions extracted limits) when the flag is on, so extractedLimit is always absent.
 //
+// Each case verifies:
+//   - minBoundsType / maxBoundsType: constraint type as returned from getPipelineSuffixBounds()
+//   - pipelineBoundsLimit: discrete max value derived by the extension rule (flag ON / new path)
+//   - extractedLimit: always undefined here (flag ON; host does not push via deprecated path)
+//
+// Limit extraction correctness for the deprecated path is covered in a separate dedicated test.
 // desugarFalseStage is used so the suffix seen by $testVectorSearch is exactly the user-supplied
 // stages. A separate block below exercises a representative subset with the storedSource variants
 // ($replaceRoot, $_internalSearchIdLookup) to confirm those desugared stages do not affect bounds.
@@ -141,34 +149,50 @@ testDesugarFalse();
 const getPipelineSuffixBoundsFromExplain = (explainOutput) => {
     const inSplit = getStageFromSplitPipeline(explainOutput, "$testVectorSearch");
     if (inSplit && inSplit.$testVectorSearch) {
-        const {minBoundsType, maxBoundsType, extractedLimit} = inSplit.$testVectorSearch.limit;
-        return {minBoundsType, maxBoundsType, extractedLimit};
+        const {minBoundsType, maxBoundsType, extractedLimit, pipelineBoundsLimit} =
+            inSplit.$testVectorSearch.limit;
+        return {minBoundsType, maxBoundsType, extractedLimit, pipelineBoundsLimit};
     }
     const stages = getAggPlanStages(explainOutput, "$testVectorSearch");
     if (stages.length > 0 && stages[0].$testVectorSearch) {
-        const {minBoundsType, maxBoundsType, extractedLimit} = stages[0].$testVectorSearch.limit;
-        return {minBoundsType, maxBoundsType, extractedLimit};
+        const {minBoundsType, maxBoundsType, extractedLimit, pipelineBoundsLimit} =
+            stages[0].$testVectorSearch.limit;
+        return {minBoundsType, maxBoundsType, extractedLimit, pipelineBoundsLimit};
     }
-    return {minBoundsType: undefined, maxBoundsType: undefined, extractedLimit: undefined};
+    // Return extractedLimit so later checks correctly assert the old limit extraction path was not
+    // exercised.
+    return {
+        minBoundsType: undefined,
+        maxBoundsType: undefined,
+        extractedLimit: undefined,
+        pipelineBoundsLimit: undefined,
+    };
 };
 
 const assertPipelineSuffixBounds = (name, explainOutput, expected) => {
-    const {minBoundsType, maxBoundsType, extractedLimit} =
+    const {minBoundsType, maxBoundsType, extractedLimit, pipelineBoundsLimit} =
         getPipelineSuffixBoundsFromExplain(explainOutput);
     assert.eq(
         minBoundsType,
-        expected.expectedMinBoundsType,
+        expected.minBoundsType,
         `${name}: unexpected minBoundsType. Full explain: ${tojson(explainOutput)}`,
     );
     assert.eq(
         maxBoundsType,
-        expected.expectedMaxBoundsType,
+        expected.maxBoundsType,
         `${name}: unexpected maxBoundsType. Full explain: ${tojson(explainOutput)}`,
     );
+    // extractedLimit is always absent here: flag is ON so the host does not push via deprecated
+    // path.
     assert.eq(
         extractedLimit,
-        expected.expectedExtractedLimit,
-        `${name}: unexpected extractedLimit. Full explain: ${tojson(explainOutput)}`,
+        undefined,
+        `${name}: extractedLimit must be absent when flag is ON. Full explain: ${tojson(explainOutput)}`,
+    );
+    assert.eq(
+        pipelineBoundsLimit,
+        expected.pipelineBoundsLimit,
+        `${name}: unexpected pipelineBoundsLimit. Full explain: ${tojson(explainOutput)}`,
     );
 };
 
@@ -179,109 +203,110 @@ const testPipelineSuffixBounds = () => {
             // No downstream stages: initial context has no constraints.
             name: "empty suffix",
             stages: [],
-            expectedMinBoundsType: "unknownConstraints",
-            expectedMaxBoundsType: "unknownConstraints",
-            expectedExtractedLimit: undefined,
+            minBoundsType: "unknownConstraints",
+            maxBoundsType: "unknownConstraints",
+            pipelineBoundsLimit: undefined,
         },
         {
             // $match has unknown selectivity so the discrete max resets to Unknown.
             name: "$match only",
             stages: [{$match: {x: 1}}],
-            expectedMinBoundsType: "unknownConstraints",
-            expectedMaxBoundsType: "unknownConstraints",
-            expectedExtractedLimit: undefined,
+            minBoundsType: "unknownConstraints",
+            maxBoundsType: "unknownConstraints",
+            pipelineBoundsLimit: undefined,
         },
         {
             // $skip with no $limit: skip only inflates existing discrete bounds, leaves Unknown unchanged.
             name: "$skip only (no limit)",
             stages: [{$skip: 10}],
-            expectedMinBoundsType: "unknownConstraints",
-            expectedMaxBoundsType: "unknownConstraints",
-            expectedExtractedLimit: undefined,
+            minBoundsType: "unknownConstraints",
+            maxBoundsType: "unknownConstraints",
+            pipelineBoundsLimit: undefined,
         },
         {
             // $unwind may increase or decrease cardinality, so both min and max reset to Unknown.
             name: "$unwind before $limit",
             stages: [{$unwind: "$arr"}, {$limit: 10}],
-            expectedMinBoundsType: "unknownConstraints",
-            expectedMaxBoundsType: "unknownConstraints",
-            expectedExtractedLimit: undefined,
+            minBoundsType: "unknownConstraints",
+            maxBoundsType: "unknownConstraints",
+            pipelineBoundsLimit: undefined,
         },
         // ---- NeedAll bounds ----
         {
             // $group is a blocking stage: needs all documents from its source.
             name: "$group (blocking)",
             stages: [{$group: {_id: "$x", count: {$sum: 1}}}],
-            expectedMinBoundsType: "needAll",
-            expectedMaxBoundsType: "needAll",
-            expectedExtractedLimit: undefined,
+            minBoundsType: "needAll",
+            maxBoundsType: "needAll",
+            pipelineBoundsLimit: undefined,
         },
         {
             // $sort (non-metadata) is blocking: must consume all inputs even for top-k.
             name: "$sort on plain field (blocking)",
             stages: [{$sort: {x: 1}}],
-            expectedMinBoundsType: "needAll",
-            expectedMaxBoundsType: "needAll",
-            expectedExtractedLimit: undefined,
+            minBoundsType: "needAll",
+            maxBoundsType: "needAll",
+            pipelineBoundsLimit: undefined,
         },
         // ---- Discrete bounds ----
         {
             // A plain $limit: both bounds collapse to discrete(N).
             name: "$limit only",
             stages: [{$limit: 10}],
-            expectedMinBoundsType: "discrete",
-            expectedMaxBoundsType: "discrete",
-            expectedExtractedLimit: 10,
+            minBoundsType: "discrete",
+            maxBoundsType: "discrete",
+            pipelineBoundsLimit: 10,
         },
         {
             // Multiple limits: the minimum across all limits is extracted.
             name: "multiple $limits (minimum wins)",
             stages: [{$limit: 20}, {$limit: 5}, {$limit: 15}],
-            expectedMinBoundsType: "discrete",
-            expectedMaxBoundsType: "discrete",
-            expectedExtractedLimit: 5,
+            minBoundsType: "discrete",
+            maxBoundsType: "discrete",
+            pipelineBoundsLimit: 5,
         },
         {
             // $skip inflates the limit: discrete bounds stay discrete (value = skip + limit).
             name: "$skip then $limit",
             stages: [{$skip: 5}, {$limit: 10}],
-            expectedMinBoundsType: "discrete",
-            expectedMaxBoundsType: "discrete",
-            expectedExtractedLimit: 15,
+            minBoundsType: "discrete",
+            maxBoundsType: "discrete",
+            pipelineBoundsLimit: 15,
         },
         {
             // Same as above with different values.
             name: "$skip then $limit (larger skip)",
             stages: [{$skip: 10}, {$limit: 5}],
-            expectedMinBoundsType: "discrete",
-            expectedMaxBoundsType: "discrete",
-            expectedExtractedLimit: 15,
+            minBoundsType: "discrete",
+            maxBoundsType: "discrete",
+            pipelineBoundsLimit: 15,
         },
         {
             // $project is a 1:1 transformation (DocumentSourceSingleDocumentTransformation):
             // no change to bounds; discrete limit propagates through.
             name: "$project then $limit",
             stages: [{$project: {x: 1}}, {$limit: 10}],
-            expectedMinBoundsType: "discrete",
-            expectedMaxBoundsType: "discrete",
-            expectedExtractedLimit: 10,
+            minBoundsType: "discrete",
+            maxBoundsType: "discrete",
+            pipelineBoundsLimit: 10,
         },
         {
             // $limit sandwiched between two $projects: both $projects are no-ops for bounds.
             name: "$project, $limit, $project",
             stages: [{$project: {x: 1}}, {$limit: 15}, {$project: {x: 1}}],
-            expectedMinBoundsType: "discrete",
-            expectedMaxBoundsType: "discrete",
-            expectedExtractedLimit: 15,
+            minBoundsType: "discrete",
+            maxBoundsType: "discrete",
+            pipelineBoundsLimit: 15,
         },
         {
-            // The sort on vectorSearchScore is erased by the server optimizer (isSortedByVectorSearchScore)
-            // before rule-based rewrites fire, so the effective suffix is just [$limit: 10].
+            // The sort on vectorSearchScore is erased by REDUNDANT_SORT_REMOVAL before rule-based
+            // rewrites fire, so the effective suffix seen by getPipelineSuffixBounds() is just
+            // [$limit: 10].
             name: "$sort on vectorSearchScore then $limit (sort erased before bounds are computed)",
             stages: [{$sort: {vectorSearchScore: {$meta: "vectorSearchScore"}}}, {$limit: 10}],
-            expectedMinBoundsType: "discrete",
-            expectedMaxBoundsType: "discrete",
-            expectedExtractedLimit: 10,
+            minBoundsType: "discrete",
+            maxBoundsType: "discrete",
+            pipelineBoundsLimit: 10,
         },
         // ---- Mixed bounds ----
         {
@@ -289,31 +314,27 @@ const testPipelineSuffixBounds = () => {
             // while leaving min at discrete(10).
             name: "$match before $limit (min=discrete, max=unknown)",
             stages: [{$match: {x: 1}}, {$limit: 10}],
-            expectedMinBoundsType: "discrete",
-            expectedMaxBoundsType: "unknownConstraints",
-            expectedExtractedLimit: undefined,
+            minBoundsType: "discrete",
+            maxBoundsType: "unknownConstraints",
+            pipelineBoundsLimit: undefined,
         },
     ];
 
-    testCases.forEach(
-        ({name, stages, expectedMinBoundsType, expectedMaxBoundsType, expectedExtractedLimit}) => {
-            const pipeline = [desugarFalseStage, ...stages];
-            const explainOutput = coll.explain("queryPlanner").aggregate(pipeline);
-            assertPipelineSuffixBounds(name, explainOutput, {
-                expectedMinBoundsType,
-                expectedMaxBoundsType,
-                expectedExtractedLimit,
-            });
-        },
-    );
+    testCases.forEach(({name, stages, minBoundsType, maxBoundsType, pipelineBoundsLimit}) => {
+        const pipeline = [desugarFalseStage, ...stages];
+        const explainOutput = coll.explain("queryPlanner").aggregate(pipeline);
+        assertPipelineSuffixBounds(name, explainOutput, {
+            minBoundsType,
+            maxBoundsType,
+            pipelineBoundsLimit,
+        });
+    });
 };
 
 testPipelineSuffixBounds();
 
 // Verify that the stages introduced by desugaring ($replaceRoot for storedSource:true and
-// $_internalSearchIdLookup for storedSource:false) do not perturb suffix bounds. We cannot rely
-// purely on reading the visitor source for this; run a representative subset of cases with each
-// desugared form.
+// $_internalSearchIdLookup for storedSource:false) do not affect suffix bounds.
 {
     const storedSourceStage = buildTestVectorSearchOptStage({storedSource: true});
     const idLookupStage = buildTestVectorSearchOptStage({storedSource: false});
@@ -323,54 +344,132 @@ testPipelineSuffixBounds();
             name: "plain $limit is discrete through $replaceRoot",
             stage: storedSourceStage,
             suffix: [{$limit: 10}],
-            expectedMinBoundsType: "discrete",
-            expectedMaxBoundsType: "discrete",
-            expectedExtractedLimit: 10,
+            minBoundsType: "discrete",
+            maxBoundsType: "discrete",
+            pipelineBoundsLimit: 10,
         },
         {
             name: "$group (blocking) through $replaceRoot",
             stage: storedSourceStage,
             suffix: [{$group: {_id: "$x"}}],
-            expectedMinBoundsType: "needAll",
-            expectedMaxBoundsType: "needAll",
-            expectedExtractedLimit: undefined,
+            minBoundsType: "needAll",
+            maxBoundsType: "needAll",
+            pipelineBoundsLimit: undefined,
         },
         {
             name: "plain $limit is discrete through $_internalSearchIdLookup",
             stage: idLookupStage,
             suffix: [{$limit: 10}],
-            expectedMinBoundsType: "discrete",
-            expectedMaxBoundsType: "discrete",
-            expectedExtractedLimit: 10,
+            minBoundsType: "discrete",
+            maxBoundsType: "discrete",
+            pipelineBoundsLimit: 10,
         },
         {
             name: "$match before $limit (mixed) through $_internalSearchIdLookup",
             stage: idLookupStage,
             suffix: [{$match: {x: 1}}, {$limit: 10}],
-            expectedMinBoundsType: "discrete",
-            expectedMaxBoundsType: "unknownConstraints",
-            expectedExtractedLimit: undefined,
+            minBoundsType: "discrete",
+            maxBoundsType: "unknownConstraints",
+            pipelineBoundsLimit: undefined,
         },
     ];
 
     desugaredCases.forEach(
-        ({
-            name,
-            stage,
-            suffix,
-            expectedMinBoundsType,
-            expectedMaxBoundsType,
-            expectedExtractedLimit,
-        }) => {
+        ({name, stage, suffix, minBoundsType, maxBoundsType, pipelineBoundsLimit}) => {
             const explainOutput = coll.explain("queryPlanner").aggregate([stage, ...suffix]);
             assertPipelineSuffixBounds(name, explainOutput, {
-                expectedMinBoundsType,
-                expectedMaxBoundsType,
-                expectedExtractedLimit,
+                minBoundsType,
+                maxBoundsType,
+                pipelineBoundsLimit,
             });
         },
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// vectorSearch $limit Optimization Tests
+//
+// Tests run with featureFlagExtensionsOptimizations ON (via --runAllFeatureFlagTests). The
+// applyPipelineBounds rule fires and stores the result in pipelineBoundsLimit. extractedLimit
+// (the deprecated path) is verified absent in every case.
+// Tests run for all three stage variants: storedSource:false, storedSource:true, desugar:false.
+//
+// Coverage for the deprecated path (featureFlagExtensionsOptimizations OFF, extractedLimit set)
+// lives in jstests/noPassthrough/extensions/vector_search_limit_deprecated_path.js.
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const testLimitOptimization = (stage) => {
+    const testCases = [
+        {
+            name: "Single limit",
+            stages: [{$limit: 10}],
+            expectedLimit: 10,
+        },
+        {
+            name: "Multiple limits (minimum extracted)",
+            stages: [{$limit: 20}, {$limit: 5}, {$limit: 15}],
+            expectedLimit: 5,
+        },
+        {
+            name: "No limit (match only)",
+            stages: [{$match: {x: 1}}],
+            expectedLimit: undefined,
+        },
+        {
+            name: "Skip and limit combined",
+            stages: [{$skip: 10}, {$limit: 5}],
+            expectedLimit: 15,
+        },
+        {
+            name: "Limit after $project (transparent)",
+            stages: [{$project: {x: 1}}, {$limit: 10}],
+            expectedLimit: 10,
+        },
+        {
+            name: "Limit after $unwind (blocking)",
+            stages: [{$unwind: "$arr"}, {$limit: 10}],
+            expectedLimit: undefined,
+        },
+        {
+            name: "Limit with sort on vectorSearchScore (sort erased before limit is computed)",
+            stages: [{$sort: {vectorSearchScore: {$meta: "vectorSearchScore"}}}, {$limit: 10}],
+            expectedLimit: 10,
+        },
+        {
+            name: "Limit in middle of pipeline",
+            stages: [{$project: {x: 1}}, {$limit: 15}, {$project: {x: 1}}],
+            expectedLimit: 15,
+        },
+        {
+            name: "Only skip, no limit",
+            stages: [{$skip: 10}],
+            expectedLimit: undefined,
+        },
+    ];
+
+    testCases.forEach(({name, stages, expectedLimit}) => {
+        const pipeline = [stage, ...stages];
+        const explainOutput = coll.explain("queryPlanner").aggregate(pipeline);
+        const {extractedLimit, pipelineBoundsLimit} =
+            getPipelineSuffixBoundsFromExplain(explainOutput);
+        assert.eq(
+            pipelineBoundsLimit,
+            expectedLimit,
+            `${name} (stage ${tojson(stage)}): unexpected pipelineBoundsLimit`,
+            {explainOutput},
+        );
+        assert.eq(
+            extractedLimit,
+            undefined,
+            `${name} (stage ${tojson(stage)}): extractedLimit must be absent`,
+            {explainOutput},
+        );
+    });
+};
+
+testLimitOptimization(buildTestVectorSearchOptStage({storedSource: false}));
+testLimitOptimization(buildTestVectorSearchOptStage({storedSource: true}));
+testLimitOptimization(desugarFalseStage);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // vectorSearch Rewrite Rule Optimization Tests

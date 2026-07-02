@@ -83,9 +83,9 @@ function getStageSpecFromExplain(explain, stageName) {
 }
 
 function getPipelineSuffixBoundsFromExplain(explain) {
-    const {minBoundsType, maxBoundsType, extractedLimit} =
+    const {minBoundsType, maxBoundsType, pipelineBoundsLimit} =
         getStageSpecFromExplain(explain, "$testVectorSearch")?.limit ?? {};
-    return {minBoundsType, maxBoundsType, extractedLimit};
+    return {minBoundsType, maxBoundsType, pipelineBoundsLimit};
 }
 
 function isStagePresent(explain, stageName) {
@@ -179,12 +179,21 @@ describe("$testVectorSearchOptimization in views", function () {
     });
 
     describe("applyPipelineBounds limit extraction in a view", function () {
+        // With featureFlagExtensionsOptimizations on, the host does not run the deprecated
+        // setExtractedLimitVal_deprecated() path, so extractedLimit is always absent; the extension
+        // derives the discrete max from getPipelineSuffixBounds() and reports it as
+        // pipelineBoundsLimit. See jstests/extensions/vector_search_optimization.js.
         function assertBounds(explain, expected) {
-            const {minBoundsType, maxBoundsType, extractedLimit} =
+            const {minBoundsType, maxBoundsType, pipelineBoundsLimit} =
                 getPipelineSuffixBoundsFromExplain(explain);
             assert.eq(minBoundsType, expected.minBoundsType, "wrong minBoundsType", {explain});
             assert.eq(maxBoundsType, expected.maxBoundsType, "wrong maxBoundsType", {explain});
-            assert.eq(extractedLimit, expected.extractedLimit, "wrong extractedLimit", {explain});
+            assert.eq(
+                pipelineBoundsLimit,
+                expected.pipelineBoundsLimit,
+                "wrong pipelineBoundsLimit",
+                {explain},
+            );
         }
 
         it("discrete bounds when $limit follows extension in view def", function () {
@@ -193,7 +202,7 @@ describe("$testVectorSearchOptimization in views", function () {
             assertBounds(explainView(viewName), {
                 minBoundsType: "discrete",
                 maxBoundsType: "discrete",
-                extractedLimit: 10,
+                pipelineBoundsLimit: 10,
             });
             assertViewMatchesResolved(viewName);
         });
@@ -203,7 +212,7 @@ describe("$testVectorSearchOptimization in views", function () {
             assertBounds(explainView(viewName, [{$limit: 7}]), {
                 minBoundsType: "discrete",
                 maxBoundsType: "discrete",
-                extractedLimit: 7,
+                pipelineBoundsLimit: 7,
             });
             assertViewMatchesResolved(viewName, [{$limit: 7}]);
         });
@@ -218,7 +227,7 @@ describe("$testVectorSearchOptimization in views", function () {
             assertBounds(explainView(viewName), {
                 minBoundsType: "discrete",
                 maxBoundsType: "discrete",
-                extractedLimit: 6,
+                pipelineBoundsLimit: 6,
             });
             assertViewMatchesResolved(viewName);
         });
@@ -312,11 +321,11 @@ describe("$testVectorSearchOptimization in views", function () {
             it(`applyPipelineBounds extracts the limit over view prefix [${suffix}]`, function () {
                 const viewName = makeView("user_bounds_over_" + suffix, coll.getName(), pipeline);
                 const user = [desugarFalseStage, {$limit: 5}];
-                const {minBoundsType, maxBoundsType, extractedLimit} =
+                const {minBoundsType, maxBoundsType, pipelineBoundsLimit} =
                     getPipelineSuffixBoundsFromExplain(explainView(viewName, user));
                 assert.eq(minBoundsType, "discrete", "wrong minBoundsType");
                 assert.eq(maxBoundsType, "discrete", "wrong maxBoundsType");
-                assert.eq(extractedLimit, 5, "wrong extractedLimit");
+                assert.eq(pipelineBoundsLimit, 5, "wrong pipelineBoundsLimit");
                 assertViewMatchesResolved(viewName, user);
             });
 

@@ -71,7 +71,7 @@ function getTestVectorSearchBounds(explain) {
     return {
         minBoundsType: limit?.minBoundsType,
         maxBoundsType: limit?.maxBoundsType,
-        extractedLimit: limit?.extractedLimit,
+        pipelineBoundsLimit: limit?.pipelineBoundsLimit,
     };
 }
 
@@ -100,10 +100,10 @@ function assertSelectionOptStartId(explain, startId) {
 // Asserts applyPipelineBounds ran on $testVectorSearch and recorded discrete bounds with the given
 // limit.
 function assertVSBoundsDiscrete(explain, limit) {
-    const {minBoundsType, maxBoundsType, extractedLimit} = getTestVectorSearchBounds(explain);
+    const {minBoundsType, maxBoundsType, pipelineBoundsLimit} = getTestVectorSearchBounds(explain);
     assert.eq(minBoundsType, "discrete", "wrong minBoundsType", {minBoundsType});
     assert.eq(maxBoundsType, "discrete", "wrong maxBoundsType", {maxBoundsType});
-    assert.eq(extractedLimit, limit, "wrong extractedLimit", {extractedLimit});
+    assert.eq(pipelineBoundsLimit, limit, "wrong pipelineBoundsLimit", {pipelineBoundsLimit});
 }
 
 // Returns true if an explain $sort stage sorts by vectorSearchScore metadata.

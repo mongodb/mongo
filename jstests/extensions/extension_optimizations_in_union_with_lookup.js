@@ -107,7 +107,9 @@ const RULES = [
         sub: [{$limit: 3}],
         opt: (e, op) => {
             const lim = subSpec(e, op, "$testVectorSearch")?.limit;
-            assert.eq(lim?.extractedLimit, 3, "extractedLimit", {e});
+            // Flag on: host skips setExtractedLimitVal_deprecated(), so the extension reports the
+            // discrete max under pipelineBoundsLimit rather than extractedLimit.
+            assert.eq(lim?.pipelineBoundsLimit, 3, "pipelineBoundsLimit", {e});
             assert.eq(lim?.minBoundsType, "discrete", "minBoundsType", {e});
             assert.eq(lim?.maxBoundsType, "discrete", "maxBoundsType", {e});
         },

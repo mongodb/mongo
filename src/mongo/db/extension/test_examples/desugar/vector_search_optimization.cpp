@@ -32,7 +32,6 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/host_portal.h"
-#include "mongo/db/extension/sdk/log_util.h"
 #include "mongo/db/extension/sdk/test_extension_util.h"
 #include "mongo/db/extension/sdk/tests/transform_test_stages.h"
 
@@ -148,7 +147,7 @@ public:
             _minBoundsType = bounds.minBounds.type;
             _maxBoundsType = bounds.maxBounds.type;
             if (_maxBoundsType == kDocsNeededConstraintDiscrete) {
-                setExtractedLimitVal_deprecated(static_cast<long long>(bounds.maxBounds.value));
+                _pipelineBoundsLimit = static_cast<long long>(bounds.maxBounds.value);
             }
         }
 
@@ -173,8 +172,13 @@ private:
     mongo::BSONObj _buildLimitSpec() const {
         mongo::BSONObjBuilder builder;
         builder.appendElements(_arguments);
+        // Old deprecated path: limit set via setExtractedLimitVal_deprecated().
         if (auto limit = getExtractedLimitVal()) {
             builder.append("extractedLimit", *limit);
+        }
+        // New path: limit derived directly from getPipelineSuffixBounds().
+        if (_pipelineBoundsLimit) {
+            builder.append("pipelineBoundsLimit", *_pipelineBoundsLimit);
         }
         builder.append("minBoundsType", boundsTypeStr(_minBoundsType));
         builder.append("maxBoundsType", boundsTypeStr(_maxBoundsType));
@@ -184,6 +188,7 @@ private:
     mutable bool _inPlaceRuleApplied = false;
     MongoExtensionDocsNeededConstraintType _minBoundsType = kDocsNeededConstraintUnknown;
     MongoExtensionDocsNeededConstraintType _maxBoundsType = kDocsNeededConstraintUnknown;
+    boost::optional<long long> _pipelineBoundsLimit;
 };
 
 class TestVectorSearchAstNode : public sdk::TestAstNode<TestVectorSearchLogicalStage> {
