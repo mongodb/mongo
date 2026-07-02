@@ -76,6 +76,7 @@
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
+#include <memory>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -672,25 +673,33 @@ void validateInMemoryShardCatalogEntries(const CollectionMetadata& inMemoryShard
                                 inconsistencies);
 }
 
-void validateDurableShardCatalogEntries(OperationContext* opCtx,
-                                        const NamespaceString& nss,
+/**
+ * Returns true if the in-memory shard catalog metadata is still known, no write critical section is
+ * in progress, and the collection placement version still matches the snapshot taken before the
+ * remote/durable reads. When false, a chunk migration may have committed in the meantime, so a
+ * shard-vs-global comparison could yield false positives and must be skipped.
+ */
+bool isPlacementVersionStable(const CollectionShardingRuntime& csr,
+                              const ChunkVersion& expectedPlacementVersion) {
+    const auto currentMetadata = csr.getCurrentMetadataIfKnown();
+    return currentMetadata.has_value() &&
+        !csr.getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite) &&
+        currentMetadata->getCollPlacementVersion() == expectedPlacementVersion;
+}
+
+/**
+ * Validates an already-read durable shard catalog collection and its chunks against the global
+ * catalog.
+ */
+void validateDurableShardCatalogEntries(const NamespaceString& nss,
                                         const ShardId& shardId,
                                         const CollectionType& collectionInGlobalCatalog,
                                         const std::vector<ChunkType>& chunksInGlobalCatalog,
+                                        const CollectionType& collectionInDurableShardCatalog,
+                                        const std::vector<ChunkType>& chunksInDurableShardCatalog,
                                         std::vector<MetadataInconsistencyItem>& inconsistencies) {
-    auto collectionInDurableShardCatalog = getCollectionFromDurableShardCatalog(
-        opCtx, nss, collectionInGlobalCatalog.getUuid(), inconsistencies);
-    if (!collectionInDurableShardCatalog) {
-        return;
-    }
 
-    auto chunksInDurableShardCatalog = getChunksFromDurableShardCatalog(
-        opCtx, *collectionInDurableShardCatalog, shardId, inconsistencies);
-    if (!chunksInDurableShardCatalog) {
-        return;
-    }
-
-    if (chunksInDurableShardCatalog->empty() && !chunksInGlobalCatalog.empty()) {
+    if (chunksInDurableShardCatalog.empty() && !chunksInGlobalCatalog.empty()) {
         inconsistencies.emplace_back(makeInconsistency(
             MetadataInconsistencyTypeEnum::kInconsistentShardCatalogCollectionMetadata,
             InconsistentShardCatalogCollectionMetadataDetails{
@@ -701,8 +710,8 @@ void validateDurableShardCatalogEntries(OperationContext* opCtx,
         return;
     }
 
-    validateShardCatalogEntries(collectionInDurableShardCatalog->asShardCatalogType(),
-                                *chunksInDurableShardCatalog,
+    validateShardCatalogEntries(collectionInDurableShardCatalog.asShardCatalogType(),
+                                chunksInDurableShardCatalog,
                                 collectionInGlobalCatalog,
                                 chunksInGlobalCatalog,
                                 shardId,
@@ -812,25 +821,54 @@ void checkCollectionMetadataInShardCatalog(
     auto chunksInGlobalCatalog =
         getChunksFromGlobalCatalog(opCtx, *collectionInGlobalCatalog, shardId);
 
-    const auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss);
+    // Hold the CSR lock in a smart pointer so it can be released before the durable reads (which
+    // would otherwise extend the time the lock is held and block migrations/refreshes) and
+    // re-acquired solely for the final placement-version check.
+    auto scopedCsr =
+        std::make_unique<CollectionShardingRuntime::ScopedSharedCollectionShardingRuntime>(
+            CollectionShardingRuntime::acquireShared(opCtx, nss));
 
     // If metadata became unknown, the critical section was acquired, or the placement version
     // changed, a migration may have occurred during the remote call. Skip the following checks to
     // avoid false positives.
-    if (const auto currentMetadata = scopedCsr->getCurrentMetadataIfKnown(); !currentMetadata ||
-        scopedCsr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite) ||
-        currentMetadata->getCollPlacementVersion() != collectionPlacementVersion) {
+    if (!isPlacementVersionStable(**scopedCsr, collectionPlacementVersion)) {
         return;
     }
 
     // The CSR is authoritative but has no routing table (e.g. after moveCollection away from this
     // shard). Skip in-memory validation and go directly to durable shard catalog checks.
     if (isPrimaryWithNoRoutingTable) {
-        validateDurableShardCatalogEntries(opCtx,
-                                           nss,
+        // Release the CSR lock before reading the durable shard catalog so we don't block
+        // migrations/refreshes while doing storage reads.
+        scopedCsr.reset();
+
+        auto collectionInDurableShardCatalog = getCollectionFromDurableShardCatalog(
+            opCtx, nss, collectionInGlobalCatalog->getUuid(), inconsistencies);
+        if (!collectionInDurableShardCatalog) {
+            return;
+        }
+
+        auto chunksInDurableShardCatalog = getChunksFromDurableShardCatalog(
+            opCtx, *collectionInDurableShardCatalog, shardId, inconsistencies);
+        if (!chunksInDurableShardCatalog) {
+            return;
+        }
+
+        // Re-acquire the CSR lock and re-check the placement version a third time. If a chunk
+        // migration committed during the durable read, the durable and global catalogs may be
+        // transiently out of sync, so skip validation to avoid false-positive inconsistencies.
+        scopedCsr =
+            std::make_unique<CollectionShardingRuntime::ScopedSharedCollectionShardingRuntime>(
+                CollectionShardingRuntime::acquireShared(opCtx, nss));
+        if (!isPlacementVersionStable(**scopedCsr, collectionPlacementVersion)) {
+            return;
+        }
+        validateDurableShardCatalogEntries(nss,
                                            shardId,
                                            *collectionInGlobalCatalog,
                                            chunksInGlobalCatalog,
+                                           *collectionInDurableShardCatalog,
+                                           *chunksInDurableShardCatalog,
                                            inconsistencies);
         return;
     }
@@ -842,7 +880,7 @@ void checkCollectionMetadataInShardCatalog(
     // unowned state is only valid on non-primary shards, and only when neither catalog says
     // this shard currently owns chunks, validate those invariants and skip the stricter metadata
     // comparison below.
-    if (scopedCsr->isUnowned()) {
+    if ((*scopedCsr)->isUnowned()) {
         validateUnownedCsrHasNoOwnedChunks(opCtx,
                                            nss,
                                            shardId,
@@ -868,9 +906,39 @@ void checkCollectionMetadataInShardCatalog(
         return;
     }
 
+    // Release the CSR lock before reading the durable shard catalog so we don't block
+    // migrations/refreshes while doing storage reads.
+    scopedCsr.reset();
+
+    auto collectionInDurableShardCatalog = getCollectionFromDurableShardCatalog(
+        opCtx, nss, collectionInGlobalCatalog->getUuid(), inconsistencies);
+    if (!collectionInDurableShardCatalog) {
+        return;
+    }
+
+    auto chunksInDurableShardCatalog = getChunksFromDurableShardCatalog(
+        opCtx, *collectionInDurableShardCatalog, shardId, inconsistencies);
+    if (!chunksInDurableShardCatalog) {
+        return;
+    }
+
+    // Re-acquire the CSR lock and re-check the placement version a third time. If a chunk migration
+    // committed during the durable read, the durable and global catalogs may be transiently out of
+    // sync, so skip validation to avoid false-positive inconsistencies.
+    scopedCsr = std::make_unique<CollectionShardingRuntime::ScopedSharedCollectionShardingRuntime>(
+        CollectionShardingRuntime::acquireShared(opCtx, nss));
+    if (!isPlacementVersionStable(**scopedCsr, collectionPlacementVersion)) {
+        return;
+    }
+
     // Durable Shard Catalog (config.shard.catalog.*) vs Global Catalog (config.*)
-    validateDurableShardCatalogEntries(
-        opCtx, nss, shardId, *collectionInGlobalCatalog, chunksInGlobalCatalog, inconsistencies);
+    validateDurableShardCatalogEntries(nss,
+                                       shardId,
+                                       *collectionInGlobalCatalog,
+                                       chunksInGlobalCatalog,
+                                       *collectionInDurableShardCatalog,
+                                       *chunksInDurableShardCatalog,
+                                       inconsistencies);
 }
 
 void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,

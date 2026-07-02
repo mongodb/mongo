@@ -141,6 +141,10 @@ public:
         _chunks = std::move(chunks);
     }
 
+    void setOnGetChunksCallback(std::function<void(OperationContext*)> callback) {
+        _onGetChunksCallback = std::move(callback);
+    }
+
     StatusWith<std::vector<ChunkType>> getChunks(OperationContext* opCtx,
                                                  const BSONObj& filter,
                                                  const BSONObj& sort,
@@ -150,11 +154,15 @@ public:
                                                  const Timestamp& timestamp,
                                                  repl::ReadConcernLevel readConcern,
                                                  const boost::optional<BSONObj>& hint) override {
+        if (_onGetChunksCallback) {
+            _onGetChunksCallback(opCtx);
+        }
         return _chunks;
     }
 
 private:
     std::vector<ChunkType> _chunks;
+    std::function<void(OperationContext*)> _onGetChunksCallback;
 };
 
 class MetadataConsistencyTest : public ShardServerTestFixture {
@@ -1302,6 +1310,13 @@ protected:
     void setShardCatalogMetadata(const UUID& uuid,
                                  const KeyPattern& keyPattern,
                                  const std::vector<ChunkType>& chunks) {
+        setShardCatalogMetadata(operationContext(), uuid, keyPattern, chunks);
+    }
+
+    void setShardCatalogMetadata(OperationContext* opCtx,
+                                 const UUID& uuid,
+                                 const KeyPattern& keyPattern,
+                                 const std::vector<ChunkType>& chunks) {
         auto rt = RoutingTableHistory::makeNew(_nss,
                                                uuid,
                                                keyPattern,
@@ -1320,8 +1335,15 @@ protected:
             ComparableChunkVersion::makeComparableChunkVersion(version));
         const auto collectionMetadata =
             CollectionMetadata(CurrentChunkManager(rtHandle), ShardHandle(_shardId, boost::none));
+        auto scopedCSR = CollectionShardingRuntime::acquireExclusive(opCtx, _nss);
+        scopedCSR->setCollectionMetadata(opCtx, collectionMetadata);
+    }
+
+    void setCSRAuthoritativeNoRoutingTable() {
         auto scopedCSR = CollectionShardingRuntime::acquireExclusive(operationContext(), _nss);
-        scopedCSR->setCollectionMetadata(operationContext(), collectionMetadata);
+        scopedCSR->setCollectionMetadata(operationContext(),
+                                         CollectionMetadata::UNTRACKED(),
+                                         CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
     }
 
     std::vector<MetadataInconsistencyItem> checkConsistency(
@@ -2292,7 +2314,78 @@ TEST_F(MetadataConsistencyShardCatalogTest,
     ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "ownedChunks"sv));
 }
 
-// Tests for the `severity` field on `MetadataInconsistencyItem`.
+TEST_F(MetadataConsistencyShardCatalogTest,
+       SkipsValidationWhenVersionChangesAfterGlobalCatalogRead) {
+    const auto localUuid = setUpLocalCollection();
+    auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
+
+    const OID epochV1 = OID::gen();
+    auto csrChunk = generateChunk(localUuid,
+                                  _shardId,
+                                  _keyPattern.globalMin(),
+                                  _keyPattern.globalMax(),
+                                  kShard0History,
+                                  epochV1);
+    setShardCatalogMetadata(localUuid, _keyPattern, {csrChunk});
+
+    // Global catalog chunk has a different collection UUID, mismatching the CSR entry.
+    const auto differentUuid = UUID::gen();
+    auto globalChunk = generateChunk(
+        differentUuid, _shardId, _keyPattern.globalMin(), _keyPattern.globalMax(), kShard0History);
+    _catalogClient->setChunksToReturn({globalChunk});
+
+    // Simulating a migration, while fetching chunks from global catalog, by bumping a collection
+    // version
+    _catalogClient->setOnGetChunksCallback([this, localUuid, epochV1](OperationContext* opCtx) {
+        auto migratedChunk = generateChunk(localUuid,
+                                           kShard1,
+                                           _keyPattern.globalMin(),
+                                           _keyPattern.globalMax(),
+                                           kShard1History,
+                                           epochV1);
+        migratedChunk.setVersion(ChunkVersion({epochV1, Timestamp(1, 1)}, {2, 0}));
+        setShardCatalogMetadata(opCtx, localUuid, _keyPattern, {migratedChunk});
+    });
+
+    // No inconsistency should be reported due to version mismatch, triggering early exit
+    // from check metadata inconsistency.
+    const auto inconsistencies = checkConsistency(globalCatalogColl);
+    ASSERT_EQ(0, inconsistencies.size());
+}
+
+TEST_F(MetadataConsistencyShardCatalogTest,
+       SkipsValidationWhenVersionChangesAfterGlobalCatalogRead_PrimaryWithNoRoutingTable) {
+    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                         true);
+
+    const auto localUuid = setUpLocalCollection();
+    auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
+    setCSRAuthoritativeNoRoutingTable();
+
+    // Durable catalog has chunk [0, max]
+    auto durableChunk =
+        generateChunk(localUuid, _shardId, BSON("x" << 0), _keyPattern.globalMax(), kShard0History);
+    insertDurableShardCatalogCollection(globalCatalogColl);
+    insertDurableShardCatalogChunks({durableChunk});
+
+    // Global catalog has chunk [min, 0]
+    auto globalChunk =
+        generateChunk(localUuid, _shardId, _keyPattern.globalMin(), BSON("x" << 0), kShard0History);
+    _catalogClient->setChunksToReturn({globalChunk});
+
+    // Simulating a migration, while fetching chunks from global catalog, resulting CSR in gaining
+    // a routing table owned by kShard1.
+    _catalogClient->setOnGetChunksCallback([this, localUuid](OperationContext* opCtx) {
+        auto migratedChunk = generateChunk(
+            localUuid, kShard1, _keyPattern.globalMin(), _keyPattern.globalMax(), kShard1History);
+        setShardCatalogMetadata(opCtx, localUuid, _keyPattern, {migratedChunk});
+    });
+
+    // No inconsistency should be reported due to version mismatch, triggering early exit
+    // from check metadata inconsistency.
+    const auto inconsistencies = checkConsistency(globalCatalogColl);
+    ASSERT_EQ(0, inconsistencies.size());
+}
 
 class MakeInconsistencySeverityTest : public unittest::Test {
 protected:
