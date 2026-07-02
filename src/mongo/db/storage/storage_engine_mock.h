@@ -151,9 +151,11 @@ public:
 
     void demoteFromLeader() final {}
 
-    void setStableTimestamp(Timestamp stableTimestamp, bool force = false) override {}
+    void setStableTimestamp(Timestamp stableTimestamp, bool force = false) override {
+        _stableTimestamp = stableTimestamp;
+    }
     Timestamp getStableTimestamp() const override {
-        return Timestamp();
+        return _stableTimestamp;
     }
     void setInitialDataTimestamp(Timestamp timestamp) final {}
     Timestamp getInitialDataTimestamp() const override {
@@ -346,6 +348,7 @@ private:
     std::vector<std::string> _droppedSpillIdents;
     Timestamp _lastSetOldestTimestamp;
     bool _lastSetOldestTimestampForce = false;
+    Timestamp _stableTimestamp;
     std::vector<std::string> _operations;
 };
 
