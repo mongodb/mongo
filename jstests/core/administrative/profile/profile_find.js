@@ -91,6 +91,8 @@ assert.eq(profileObj.appName, "MongoDB Shell", profileObj);
     assert(profileObj.execStats.hasOwnProperty("stage"), profileObj);
     if (!ClusteredCollectionUtil.areAllCollectionsClustered(testDB)) {
         // Clustered collections are not always eligible for express path.
+        assert.eq(profileObj.execStats.stage, "EXPRESS_IXSCAN", profileObj);
+        assert.eq(profileObj.execStats.keyPattern, {a: 1}, profileObj);
         assert.eq(profileObj.planSummary, "EXPRESS_IXSCAN { a: 1 }", profileObj);
         assert(profileObj.execStats.hasOwnProperty("indexName"), profileObj);
     }

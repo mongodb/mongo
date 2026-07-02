@@ -36,8 +36,8 @@ std::string PlanExplainerExpress::getPlanSummary() const {
 
     ssb << _iteratorStats->stageName();
 
-    if (!_iteratorStats->indexKeyPattern().empty()) {
-        ssb << " " << _iteratorStats->indexKeyPattern();
+    if (!_iteratorStats->indexKeyPattern().isEmpty()) {
+        ssb << " " << KeyPattern{_iteratorStats->indexKeyPattern()};
     }
 
     if (!_writeOperationStats->stageName().empty()) {

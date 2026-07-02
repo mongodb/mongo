@@ -37,6 +37,7 @@
 #include <string_view>
 
 #include <fmt/format.h>
+using namespace std::literals::string_view_literals;
 
 namespace mongo {
 namespace express {
@@ -59,7 +60,7 @@ public:
         return _indexName;
     }
 
-    const std::string& indexKeyPattern() const {
+    const BSONObj& indexKeyPattern() const {
         return _indexKeyPattern;
     }
 
@@ -83,8 +84,8 @@ public:
         _indexName = std::string{indexName};
     }
 
-    void setIndexKeyPattern(std::string_view indexKeyPattern) {
-        _indexKeyPattern = std::string{indexKeyPattern};
+    void setIndexKeyPattern(const BSONObj& indexKeyPattern) {
+        _indexKeyPattern = indexKeyPattern.getOwned();
     }
 
     void setProjectionCovered(bool projectionCovered) {
@@ -100,7 +101,7 @@ public:
     }
 
     void appendDataAccessStats(BSONObjBuilder& builder) const {
-        if (!_indexKeyPattern.empty()) {
+        if (!_indexKeyPattern.isEmpty()) {
             builder.append("keyPattern"sv, _indexKeyPattern);
         }
         if (!_indexName.empty()) {
@@ -113,7 +114,7 @@ private:
     size_t _numKeysExamined{0};
     size_t _numDocumentsFetched{0};
     std::string _indexName;
-    std::string _indexKeyPattern;
+    BSONObj _indexKeyPattern;
     bool _projectionCovered{false};
 };
 

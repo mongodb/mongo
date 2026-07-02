@@ -328,7 +328,7 @@ public:
         _stats = stats;
         _stats->setStageName("EXPRESS_IXSCAN"sv);
         _stats->setIndexName(IndexConstants::kIdIndexName);
-        _stats->setIndexKeyPattern("{ _id: 1 }"sv);
+        _stats->setIndexKeyPattern(BSON("_id" << 1));
     }
 
     template <class Continuation>
@@ -658,8 +658,7 @@ public:
         _stats = stats;
         _stats->setStageName("EXPRESS_IXSCAN"sv);
         _stats->setIndexName(_indexName);
-        _stats->setIndexKeyPattern(
-            KeyPattern::toString(_indexCatalogEntry->descriptor()->keyPattern()));
+        _stats->setIndexKeyPattern(_indexCatalogEntry->descriptor()->keyPattern());
         if constexpr (std::is_same_v<FetchCallback, CreateDocumentFromIndexKey>) {
             _stats->setProjectionCovered(true);
         }

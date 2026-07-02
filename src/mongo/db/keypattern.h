@@ -44,7 +44,6 @@
 #include <string>
 
 namespace mongo {
-
 /**
  * A KeyPattern is an expression describing a transformation of a document into a
  * document key.  Document keys are used to store documents in indices and to target
@@ -120,13 +119,15 @@ public:
      */
     static std::string toString(const BSONObj& keyPattern) {
         StringBuilder sb;
-        return addToStringBuilder(sb, keyPattern).str();
+        return _addToStringBuilder(sb, keyPattern).str();
     }
 
     /**
      * Writes to 'sb' a string representation of this KeyPattern.
      */
     friend StringBuilder& operator<<(StringBuilder& sb, const KeyPattern& keyPattern);
+    friend StackStringBuilder& operator<<(StackStringBuilder& sb, const KeyPattern& keyPattern);
+
 
     /* Takes a BSONObj whose field names are a prefix of the fields in this keyPattern, and
      * outputs a new bound with MinKey values appended to match the fields in this keyPattern
@@ -180,7 +181,8 @@ public:
     bool isGlobalMax(const BSONObj& bound) const;
 
 private:
-    static StringBuilder& addToStringBuilder(StringBuilder& sb, const BSONObj& pattern);
+    template <typename SB>
+    static SB& _addToStringBuilder(SB& sb, const BSONObj& pattern);
     BSONObj _pattern;
 };
 

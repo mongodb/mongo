@@ -48,10 +48,15 @@ bool KeyPattern::isHashedKeyPattern(const BSONObj& pattern) {
 }
 
 StringBuilder& operator<<(StringBuilder& sb, const KeyPattern& keyPattern) {
-    return KeyPattern::addToStringBuilder(sb, keyPattern._pattern);
+    return KeyPattern::_addToStringBuilder(sb, keyPattern._pattern);
 }
 
-StringBuilder& KeyPattern::addToStringBuilder(StringBuilder& sb, const BSONObj& pattern) {
+StackStringBuilder& operator<<(StackStringBuilder& sb, const KeyPattern& keyPattern) {
+    return KeyPattern::_addToStringBuilder(sb, keyPattern._pattern);
+}
+
+template <typename SB>
+SB& KeyPattern::_addToStringBuilder(SB& sb, const BSONObj& pattern) {
     // Rather than return BSONObj::toString() we construct a keyPattern string manually. This allows
     // us to avoid the cost of writing numeric direction to the str::stream which will then undergo
     // expensive number to string conversion.
@@ -66,7 +71,7 @@ StringBuilder& KeyPattern::addToStringBuilder(StringBuilder& sb, const BSONObj& 
         }
 
         if (BSONType::string == elem.type()) {
-            sb << elem;
+            sb << elem.fieldNameStringData() << ": \"" << elem.valueStringData() << "\"";
         } else if (elem.number() >= 0) {
             // The canonical check as to whether a key pattern element is "ascending" or
             // "descending" is (elem.number() >= 0). This is defined by the Ordering class.

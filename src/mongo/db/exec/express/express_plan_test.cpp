@@ -180,7 +180,7 @@ TEST_F(ExpressPlanTest, TestIdLookupViaIndexWithMatchingQuery) {
     ASSERT_EQ(iteratorStats.numKeysExamined(), 1);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 1);
     ASSERT_EQ(iteratorStats.indexName(), IndexConstants::kIdIndexName);
-    ASSERT_EQ(iteratorStats.indexKeyPattern(), "{ _id: 1 }");
+    ASSERT_BSONOBJ_EQ(iteratorStats.indexKeyPattern(), BSON("_id" << 1));
 }
 
 TEST_F(ExpressPlanTest,
@@ -270,7 +270,7 @@ TEST_F(ExpressPlanTest, TestIdLookupViaIndexWithNonMatchingQuery) {
     ASSERT_EQ(iteratorStats.numKeysExamined(), 0);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 0);
     ASSERT_EQ(iteratorStats.indexName(), IndexConstants::kIdIndexName);
-    ASSERT_EQ(iteratorStats.indexKeyPattern(), "{ _id: 1 }");
+    ASSERT_BSONOBJ_EQ(iteratorStats.indexKeyPattern(), BSON("_id" << 1));
 }
 
 TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithMatchingQuery) {
@@ -295,7 +295,7 @@ TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithMatchingQuery) {
     ASSERT_EQ(iteratorStats.numKeysExamined(), 0);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 1);
     ASSERT(iteratorStats.indexName().empty());
-    ASSERT(iteratorStats.indexKeyPattern().empty());
+    ASSERT(iteratorStats.indexKeyPattern().isEmpty());
 }
 
 TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithNonMatchingQuery) {
@@ -317,7 +317,7 @@ TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithNonMatchingQuery) {
     ASSERT_EQ(iteratorStats.numKeysExamined(), 0);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 0);
     ASSERT(iteratorStats.indexName().empty());
-    ASSERT(iteratorStats.indexKeyPattern().empty());
+    ASSERT(iteratorStats.indexKeyPattern().isEmpty());
 }
 
 TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQuery) {
@@ -351,7 +351,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQuery) {
     ASSERT_EQ(iteratorStats.numKeysExamined(), 1);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 1);
     ASSERT_EQ(iteratorStats.indexName(), "a_1");
-    ASSERT_EQ(iteratorStats.indexKeyPattern(), "{ a: 1 }");
+    ASSERT_BSONOBJ_EQ(iteratorStats.indexKeyPattern(), BSON("a" << 1));
 }
 
 TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQueryUsingCollator) {
@@ -388,7 +388,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQueryUsingCollator) {
     ASSERT_EQ(iteratorStats.numKeysExamined(), 1);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 1);
     ASSERT_EQ(iteratorStats.indexName(), "a_1");
-    ASSERT_EQ(iteratorStats.indexKeyPattern(), "{ a: 1 }");
+    ASSERT_BSONOBJ_EQ(iteratorStats.indexKeyPattern(), BSON("a" << 1));
 }
 
 TEST_F(ExpressPlanTest, TestLookupViaUserIndexWWithNonMatchingQuery) {
@@ -419,7 +419,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWWithNonMatchingQuery) {
     ASSERT_EQ(iteratorStats.numKeysExamined(), 0);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 0);
     ASSERT_EQ(iteratorStats.indexName(), "a_1");
-    ASSERT_EQ(iteratorStats.indexKeyPattern(), "{ a: 1 }");
+    ASSERT_BSONOBJ_EQ(iteratorStats.indexKeyPattern(), BSON("a" << 1));
 }
 
 projection_ast::Projection parseProjection(OperationContext* opCtx, BSONObj projection) {
@@ -468,7 +468,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithCoveredProjection) {
     ASSERT_EQ(iteratorStats.numKeysExamined(), 1);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 0);
     ASSERT_EQ(iteratorStats.indexName(), "a_1_b_1_c_1");
-    ASSERT_EQ(iteratorStats.indexKeyPattern(), "{ a: 1, b: 1, c: 1 }");
+    ASSERT_BSONOBJ_EQ(iteratorStats.indexKeyPattern(), BSON("a" << 1 << "b" << 1 << "c" << 1));
     ASSERT_EQ(iteratorStats.projectionCovered(), true);
 }
 
