@@ -94,6 +94,30 @@ __ckpt_load_blk_mods(WT_SESSION_IMPL *session, const char *config, WT_CKPT *ckpt
 }
 
 /*
+ * __wt_meta_checkpoint_has_prepare --
+ *     Return whether any checkpoint entry in the config string has the prepare flag set.
+ */
+int
+__wt_meta_checkpoint_has_prepare(WT_SESSION_IMPL *session, const char *config, bool *has_prepp)
+{
+    WT_CONFIG ckptconf;
+    WT_CONFIG_ITEM cval, key, value;
+    WT_DECL_RET;
+
+    *has_prepp = false;
+
+    WT_RET(__wt_config_getones(session, config, "checkpoint", &cval));
+    __wt_config_subinit(session, &ckptconf, &cval);
+    for (; __wt_config_next(&ckptconf, &key, &cval) == 0;) {
+        ret = __wt_config_subgets(session, &cval, "prepare", &value);
+        if (ret == 0 && value.val)
+            *has_prepp = true;
+        WT_RET_NOTFOUND_OK(ret);
+    }
+    return (0);
+}
+
+/*
  * __wt_meta_checkpoint --
  *     Return a file's checkpoint information.
  */

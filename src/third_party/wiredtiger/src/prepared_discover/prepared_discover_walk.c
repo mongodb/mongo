@@ -9,33 +9,6 @@
 #include "wt_internal.h"
 
 /*
- * __prepared_discover_btree_has_prepare --
- *     Check the metadata entry for a btree to see whether it included prepared updates.
- */
-static int
-__prepared_discover_btree_has_prepare(WT_SESSION_IMPL *session, const char *config, bool *has_prepp)
-{
-    WT_CONFIG ckptconf;
-    WT_CONFIG_ITEM cval, key, value;
-    WT_DECL_RET;
-
-    *has_prepp = false;
-
-    /* This configuration parsing is copied out of the rollback to stable implementation */
-    WT_RET(__wt_config_getones(session, config, "checkpoint", &cval));
-    __wt_config_subinit(session, &ckptconf, &cval);
-    for (; __wt_config_next(&ckptconf, &key, &cval) == 0;) {
-        ret = __wt_config_subgets(session, &cval, "prepare", &value);
-        if (ret == 0) {
-            if (value.val)
-                *has_prepp = true;
-        }
-        WT_RET_NOTFOUND_OK(ret);
-    }
-    return (0);
-}
-
-/*
  * __prepared_discover_is_follower_stable_walk --
  *     Return true when prepared discovery should read this URI from the stable checkpoint and
  *     replay onto ingest: a disaggregated follower walking a layered stable constituent.
@@ -476,7 +449,7 @@ __wt_prepared_discover_filter_apply_handles(WT_SESSION_IMPL *session)
         if (ret == WT_NOTFOUND)
             config = NULL;
         /* Check to see if there is any prepared content in the handle */
-        WT_ERR(__prepared_discover_btree_has_prepare(session, config, &has_prepare));
+        WT_ERR(__wt_meta_checkpoint_has_prepare(session, config, &has_prepare));
         if (!has_prepare)
             continue;
         if (__prepared_discover_is_follower_stable_walk(session, uri)) {

@@ -1669,11 +1669,19 @@ __cell_redo_page_del_cleanup(
 
     WT_ASSERT(session, !WT_READING_CHECKPOINT(session));
 
-    write_gen = S2BT(session)->base_write_gen;
-
-    WT_ASSERT(session, dsk->write_gen != 0);
-    if (dsk->write_gen > write_gen)
-        return;
+    /*
+     * If there is no disk image the parent page was never reconciled, meaning the page_del was
+     * either created in-memory this run or moved here from an old parent during a B-tree split. In
+     * either case, skip the write-generation guard and always run the cleanup: stale previous-run
+     * txn IDs get cleared, and clearing a committed current-run txnid to WT_TXN_NONE is
+     * semantically correct (globally visible).
+     */
+    if (dsk != NULL) {
+        write_gen = S2BT(session)->base_write_gen;
+        WT_ASSERT(session, dsk->write_gen != 0);
+        if (dsk->write_gen > write_gen)
+            return;
+    }
 
     if (F_ISSET(session, WT_SESSION_DEBUG_DO_NOT_CLEAR_TXN_ID))
         return;

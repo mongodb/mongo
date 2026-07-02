@@ -1389,8 +1389,8 @@ done:
     } else {
         /* Although rollback to stable is not needed, we still need to set the durable timestamp. */
         WT_TXN_GLOBAL *txn_global = &conn->txn_global;
-        txn_global->has_durable_timestamp =
-          __wt_atomic_load_bool_relaxed(&txn_global->has_stable_timestamp);
+        __wt_atomic_store_bool_relaxed(&txn_global->has_durable_timestamp,
+          __wt_atomic_load_bool_relaxed(&txn_global->has_stable_timestamp));
         __wt_atomic_store_uint64_relaxed(
           &txn_global->durable_timestamp, __wt_get_stable_timestamp(session));
 

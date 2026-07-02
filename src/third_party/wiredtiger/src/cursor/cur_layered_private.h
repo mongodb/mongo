@@ -67,5 +67,4 @@ struct __wti_clayered_op {
     WT_CURSOR *stable;            /* resolved slot == clayered->stable_cursor (may be NULL) */
     WT_LAYERED_TABLE *table;
     WT_COLLATOR *collator;
-    bool need_stable; /* derived from mode+role; whether the stable cursor must be opened */
 };

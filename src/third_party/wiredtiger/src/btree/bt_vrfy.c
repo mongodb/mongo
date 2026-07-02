@@ -1576,6 +1576,15 @@ __verify_page_content_leaf(
             break;
         }
 
+        /*
+         * On a disaggregated stable table, account inline values that share the layered tombstone's
+         * encoded namespace. Overflow values never qualify (they are large and the cell holds an
+         * address, not the bytes), so only inline value cells are checked.
+         */
+        if ((unpack.type == WT_CELL_VALUE || unpack.type == WT_CELL_VALUE_SHORT) &&
+          F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED))
+            __wt_clayered_stable_value_stat(session, unpack.data, unpack.size);
+
         /* Verify key-associated history-store entries. */
         if (page->type == WT_PAGE_ROW_LEAF) {
             /*

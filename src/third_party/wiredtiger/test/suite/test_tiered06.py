@@ -232,6 +232,7 @@ class test_tiered06(wttest.WiredTigerTestCase, TieredConfigMixin):
                     self.assertEqual(in_block, a_block)
             fh.close(session)
 
+        fs.terminate(session)
         ss.terminate(session)
 
     def create_with_fs(self, fs, fname):

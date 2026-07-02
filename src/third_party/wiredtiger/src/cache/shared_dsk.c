@@ -51,7 +51,10 @@ __wt_shared_dsk_cache_get(WT_SESSION_IMPL *session, const uint8_t *addr, size_t 
     hash = __wt_hash_city64(addr, addr_size);
     bucket = hash % shared_dsk_cache->hash_size;
     lock_idx = bucket % shared_dsk_cache->hash_lock_size;
-    __wt_spin_lock(session, &shared_dsk_cache->hash_locks[lock_idx]);
+    if (__wt_spin_trylock(session, &shared_dsk_cache->hash_locks[lock_idx]) != 0) {
+        WT_STAT_CONN_INCR(session, cache_shared_dsk_lock_contention);
+        __wt_spin_lock(session, &shared_dsk_cache->hash_locks[lock_idx]);
+    }
     TAILQ_FOREACH (shared_dsk_item, &shared_dsk_cache->hash[bucket], hashq) {
         if (shared_dsk_item->addr_size == addr_size && shared_dsk_item->fid == S2BT(session)->id &&
           memcmp(shared_dsk_item->addr, addr, addr_size) == 0) {
@@ -131,7 +134,10 @@ __wt_shared_dsk_cache_put(WT_SESSION_IMPL *session, void *data, size_t data_size
      * Because collisions are unlikely, the allocation and copying remains outside of the bucket
      * lock and collision check.
      */
-    __wt_spin_lock(session, &shared_dsk_cache->hash_locks[lock_idx]);
+    if (__wt_spin_trylock(session, &shared_dsk_cache->hash_locks[lock_idx]) != 0) {
+        WT_STAT_CONN_INCR(session, cache_shared_dsk_lock_contention);
+        __wt_spin_lock(session, &shared_dsk_cache->hash_locks[lock_idx]);
+    }
     TAILQ_FOREACH (shared_dsk_item, &shared_dsk_cache->hash[bucket], hashq) {
 #ifdef HAVE_DIAGNOSTIC
         ++bucket_walk;
@@ -206,14 +212,17 @@ __wt_shared_dsk_cache_release(WT_SESSION_IMPL *session, WT_SHARED_DSK_ITEM *shar
     hash = __wt_hash_city64(shared_dsk_item->addr, shared_dsk_item->addr_size);
     bucket = hash % shared_dsk_cache->hash_size;
     lock_idx = bucket % shared_dsk_cache->hash_lock_size;
-
-    __wt_spin_lock(session, &shared_dsk_cache->hash_locks[lock_idx]);
-    WT_ASSERT(session, shared_dsk_item->ref_count > 0);
     data_size = shared_dsk_item->data_size;
+    dsk_type = ((WT_PAGE_HEADER *)shared_dsk_item->data)->type;
+
+    if (__wt_spin_trylock(session, &shared_dsk_cache->hash_locks[lock_idx]) != 0) {
+        WT_STAT_CONN_INCR(session, cache_shared_dsk_lock_contention);
+        __wt_spin_lock(session, &shared_dsk_cache->hash_locks[lock_idx]);
+    }
+    WT_ASSERT(session, shared_dsk_item->ref_count > 0);
     /* Remove the shared dsk item when ref count is reduced to 0. */
     if (--shared_dsk_item->ref_count == 0) {
         TAILQ_REMOVE(&shared_dsk_cache->hash[bucket], shared_dsk_item, hashq);
-        dsk_type = ((WT_PAGE_HEADER *)shared_dsk_item->data)->type;
         __wt_spin_unlock(session, &shared_dsk_cache->hash_locks[lock_idx]);
 
         /* Symmetrically drain the cache on last release. */

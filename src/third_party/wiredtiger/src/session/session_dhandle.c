@@ -932,11 +932,11 @@ __wt_session_get_dhandle(WT_SESSION_IMPL *session, const char *uri, const char *
     WT_ASSERT(session, !F_ISSET(session, WT_SESSION_NO_DATA_HANDLES));
 
     for (;;) {
-        WT_RET(__session_get_dhandle(session, uri, checkpoint));
+        WT_ERR(__session_get_dhandle(session, uri, checkpoint));
         dhandle = session->dhandle;
 
         /* Try to lock the handle. */
-        WT_RET(__wt_session_lock_dhandle(session, flags, &is_dead));
+        WT_ERR(__wt_session_lock_dhandle(session, flags, &is_dead));
         if (is_dead)
             continue;
 
@@ -1004,7 +1004,7 @@ __wt_session_get_dhandle(WT_SESSION_IMPL *session, const char *uri, const char *
         dhandle->excl_ref = 0;
         F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
         WT_WITH_DHANDLE(session, dhandle, __wt_session_dhandle_writeunlock(session));
-        WT_RET(ret);
+        WT_ERR(ret);
     }
 
     WT_ASSERT(session, !F_ISSET(dhandle, WT_DHANDLE_DEAD));
@@ -1014,7 +1014,10 @@ __wt_session_get_dhandle(WT_SESSION_IMPL *session, const char *uri, const char *
       LF_ISSET(WT_DHANDLE_EXCLUSIVE) == F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) ||
         dhandle->excl_ref > 1);
 
-    return (0);
+err:
+    if (ret != 0 && session->dhandle != NULL)
+        WT_DHANDLE_CLEAR(session);
+    return (ret);
 }
 
 /*

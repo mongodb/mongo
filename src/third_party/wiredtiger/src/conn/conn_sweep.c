@@ -143,9 +143,35 @@ __sweep_close_dhandle_locked(WT_SESSION_IMPL *session)
     /* This method expects dhandle write lock. */
     WT_ASSERT(session, FLD_ISSET(dhandle->lock_flags, WT_DHANDLE_LOCK_WRITE));
 
-    /* Only sweep clean trees. */
-    if (btree != NULL && btree->modified)
-        return (0);
+    /*
+     * Sweep only closes clean trees, with one exception: an ingest btree whose entire contents are
+     * known to be durable in the stable table.
+     */
+    if (btree != NULL && btree->modified) {
+        /*
+         * We check that there are no cursors open that can be adding new content, and we hold the
+         * dhandle write lock, which blocks new opens. Open transaction modifications also bump the
+         * in use counter, so we won't close trees in that state.
+         */
+        if (!F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT) ||
+          __wt_atomic_load_int32_acquire(&dhandle->session_inuse) != 0)
+            return (0);
+
+        /* Be certain that we're dealing with an ingest table. */
+        WT_ASSERT(session, WT_URI_IS_INGEST(dhandle->name));
+
+        /*
+         * The maximum write timestamp is a potentially conservative maximum of durable timestamps
+         * made in this tree. Conservative or not, it guarantees that there are no writes newer than
+         * that timestamp. Only if the checkpoint covers that timestamp, can we proceed with the
+         * close.
+         */
+        wt_timestamp_t max_write_ts = __wt_atomic_load_uint64_relaxed(&btree->max_ingest_write_ts);
+        if (max_write_ts == WT_TS_NONE ||
+          max_write_ts >
+            __wt_atomic_load_uint64_relaxed(&S2C(session)->txn_global.last_ckpt_timestamp))
+            return (0);
+    }
 
     /*
      * Mark the handle dead and close the underlying handle.

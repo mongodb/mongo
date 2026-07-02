@@ -562,6 +562,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
      * dominate these statistics.
      */
     if (!LF_ISSET(WT_READ_CACHE)) {
+        WT_STAT_CONN_DSRC_INCR(session, cache_pages_requested);
         if (WT_IS_HS(session->dhandle))
             WT_STAT_CONN_DSRC_INCR(session, cache_pages_requested_hs);
         if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))

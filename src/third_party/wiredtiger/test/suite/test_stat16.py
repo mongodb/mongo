@@ -63,8 +63,11 @@ class test_stat16(wttest.WiredTigerTestCase):
 
         internal_reads = self.get_conn_stat(stat.conn.cache_read_internal)
         leaf_reads = self.get_conn_stat(stat.conn.cache_read_leaf)
+        total_reads = self.get_conn_stat(stat.conn.cache_read)
 
         self.assertGreater(internal_reads, 0,
             'expected cache_read_internal > 0 after reading a multi-page btree')
         self.assertGreater(leaf_reads, 0,
             'expected cache_read_leaf > 0 after reading pages from disk')
+        self.assertEqual(internal_reads + leaf_reads, total_reads,
+            'cache_read_internal + cache_read_leaf must equal cache_read')

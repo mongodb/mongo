@@ -133,17 +133,15 @@ __drop_index(
 static int
 __drop_issue_trim(WT_SESSION_IMPL *session, const char *uri)
 {
-    WT_BTREE *btree;
     WT_DECL_RET;
-
-    btree = NULL;
 
     /* Get the layered data handle. */
     ret = __wt_session_get_dhandle(session, uri, NULL, NULL, WT_DHANDLE_EXCLUSIVE);
-    btree = S2BT(session);
     if (ret == EBUSY)
         WT_RET_SUB(session, ret, WT_CONFLICT_DHANDLE, WT_CONFLICT_DHANDLE_MSG);
     WT_RET(ret);
+
+    WT_BTREE *btree = S2BT(session);
 
     if (btree->page_log == NULL)
         WT_ERR(ENOTSUP);

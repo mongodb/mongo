@@ -138,13 +138,13 @@ __txn_get_durable_timestamp(WT_TXN_SHARED *txn_shared, wt_timestamp_t *durable_t
 }
 
 /*
- * __txn_global_query_timestamp --
- *     Query a timestamp on the global transaction.
+ * __txn_get_all_durable_timestamp --
+ *     Compute the all_durable timestamp: the highest durable timestamp such that all transactions
+ *     with a lower durable timestamp have committed.
  */
 static int
-__txn_global_query_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *tsp, const char *cfg[])
+__txn_get_all_durable_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *tsp)
 {
-    WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
     WT_TXN_GLOBAL *txn_global;
     WT_TXN_SHARED *s;
@@ -154,34 +154,52 @@ __txn_global_query_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *tsp, cons
     conn = S2C(session);
     txn_global = &conn->txn_global;
 
+    if (!__wt_atomic_load_bool_acquire(&txn_global->has_durable_timestamp)) {
+        *tsp = WT_TS_NONE;
+        return (0);
+    }
+
+    __wt_readlock(session, &txn_global->rwlock);
+
+    ts = __wt_atomic_load_uint64_relaxed(&txn_global->durable_timestamp);
+
+    /* Walk the array of concurrent transactions. */
+    WT_ACQUIRE_READ_WITH_BARRIER(session_cnt, conn->session_array.cnt);
+    for (i = 0, s = txn_global->txn_shared_list; i < session_cnt; i++, s++) {
+        __txn_get_durable_timestamp(s, &tmpts);
+        if (tmpts != WT_TS_NONE && (ts == WT_TS_NONE || --tmpts < ts))
+            ts = tmpts;
+    }
+
+    __wt_readunlock(session, &txn_global->rwlock);
+
+    WT_STAT_CONN_INCR(session, txn_walk_sessions);
+    WT_STAT_CONN_INCRV(session, txn_sessions_walked, i);
+
+    *tsp = ts;
+    return (0);
+}
+
+/*
+ * __txn_global_query_timestamp --
+ *     Query a timestamp on the global transaction.
+ */
+static int
+__txn_global_query_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *tsp, const char *cfg[])
+{
+    WT_CONFIG_ITEM cval;
+    WT_CONNECTION_IMPL *conn;
+    WT_TXN_GLOBAL *txn_global;
+    wt_timestamp_t ts;
+
+    conn = S2C(session);
+    txn_global = &conn->txn_global;
+
     WT_STAT_CONN_INCR(session, txn_query_ts);
     WT_RET(__wt_config_gets(session, cfg, "get", &cval));
     if (WT_CONFIG_LIT_MATCH("all_durable", cval)) {
-        /*
-         * If there is no durable timestamp set, there is nothing to return. No need to walk the
-         * concurrent transactions.
-         */
-        if (!txn_global->has_durable_timestamp) {
-            *tsp = WT_TS_NONE;
-            return (0);
-        }
-
-        __wt_readlock(session, &txn_global->rwlock);
-
-        ts = txn_global->durable_timestamp;
-
-        /* Walk the array of concurrent transactions. */
-        WT_ACQUIRE_READ_WITH_BARRIER(session_cnt, conn->session_array.cnt);
-        for (i = 0, s = txn_global->txn_shared_list; i < session_cnt; i++, s++) {
-            __txn_get_durable_timestamp(s, &tmpts);
-            if (tmpts != WT_TS_NONE && (ts == WT_TS_NONE || --tmpts < ts))
-                ts = tmpts;
-        }
-
-        __wt_readunlock(session, &txn_global->rwlock);
-
-        WT_STAT_CONN_INCR(session, txn_walk_sessions);
-        WT_STAT_CONN_INCRV(session, txn_sessions_walked, i);
+        WT_RET(__txn_get_all_durable_timestamp(session, tsp));
+        return (0);
     } else if (WT_CONFIG_LIT_MATCH("backup_checkpoint", cval)) {
         /* This code will return set a timestamp only if a backup cursor is open. */
         ts = WT_TS_NONE;
@@ -475,8 +493,8 @@ set:
      * largest durable_timestamp so it moves forward whenever transactions are assigned timestamps).
      */
     if (has_durable) {
-        __wt_tsan_suppress_store_uint64(&txn_global->durable_timestamp, durable_ts);
-        txn_global->has_durable_timestamp = true;
+        __wt_atomic_store_uint64_relaxed(&txn_global->durable_timestamp, durable_ts);
+        __wt_atomic_store_bool_release(&txn_global->has_durable_timestamp, true);
         WT_STAT_CONN_INCR(session, txn_set_ts_durable_upd);
         __wt_verbose_timestamp(session, durable_ts, "Updated global durable timestamp");
     }

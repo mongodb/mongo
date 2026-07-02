@@ -174,8 +174,8 @@ __rollback_to_stable_int(WT_SESSION_IMPL *session, bool no_ckpt)
 
     /* Rollback the global durable timestamp to the stable timestamp. */
     if (!dryrun) {
-        /* FIXME-WT-16778: use atomic write for the has durable timestamp flag. */
-        txn_global->has_durable_timestamp = stable_timestamp != WT_TS_NONE;
+        __wt_atomic_store_bool_relaxed(
+          &txn_global->has_durable_timestamp, stable_timestamp != WT_TS_NONE);
         __wt_atomic_store_uint64_relaxed(&txn_global->durable_timestamp, stable_timestamp);
     }
     __rts_assert_timestamps_unchanged(session, pinned_timestamp, stable_timestamp);

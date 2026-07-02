@@ -93,6 +93,64 @@ __clayered_deleted_decode(WT_ITEM *value)
 }
 
 /*
+ * __wt_clayered_stable_value_stat --
+ *     Count and warn about a stable-table value that shares the tombstone's encoded namespace. Such
+ *     values begin with the two tombstone bytes and, for historic reasons, are persisted to the
+ *     stable table verbatim; they are expected to be extremely rare. Encoding appends a single
+ *     tombstone byte (see __clayered_deleted_encode), so the stored form is classified by its
+ *     length and trailing byte. The raw bytes may carry application data, so the log records only
+ *     the size and a content hash to fingerprint recurring values. This takes raw bytes so both the
+ *     layered cursor and the verify page walk can share it.
+ *
+ * TODO(WT-17958): Revert WT-17957 when tombstone encoding is removed from the stable table.
+ */
+void
+__wt_clayered_stable_value_stat(WT_SESSION_IMPL *session, const void *data, size_t size)
+{
+    uint8_t tombstone_byte;
+    const uint8_t *bytes;
+    const char *what;
+
+    /* The value must begin with the whole tombstone to share its namespace. */
+    if (size < __wt_tombstone.size || memcmp(data, __wt_tombstone.data, __wt_tombstone.size) != 0)
+        return;
+
+    bytes = (const uint8_t *)data;
+    tombstone_byte = ((const uint8_t *)__wt_tombstone.data)[0];
+
+    if (size == __wt_tombstone.size) {
+        WT_STAT_CONN_DSRC_INCR(session, layered_curs_stable_value_tombstone);
+        what = "equal to the tombstone";
+    } else if (size == __wt_tombstone.size + 1 && bytes[size - 1] == tombstone_byte) {
+        WT_STAT_CONN_DSRC_INCR(session, layered_curs_stable_value_tombstone_x3);
+        what = "three tombstone bytes";
+    } else if (bytes[size - 1] == tombstone_byte) {
+        WT_STAT_CONN_DSRC_INCR(session, layered_curs_stable_value_tombstone_suffix);
+        what = "ending with a tombstone byte";
+    } else {
+        WT_STAT_CONN_DSRC_INCR(session, layered_curs_stable_value_tombstone_prefix);
+        what = "ending with a non-tombstone byte";
+    }
+
+    __wt_verbose_warning(session, WT_VERB_LAYERED,
+      "stable table value in the tombstone namespace (%s), size 0x%" PRIx64
+      ", content hash 0x%016" PRIx64,
+      what, (uint64_t)size, __wt_hash_city64(data, size));
+}
+
+/*
+ * __clayered_stable_read_value_stat --
+ *     Account a value just read from the stable constituent; a no-op when the layered cursor is
+ *     positioned on the ingest table.
+ */
+static WT_INLINE void
+__clayered_stable_read_value_stat(WTI_CURSOR_LAYERED *clayered, const WT_ITEM *value)
+{
+    if (clayered->current_cursor == clayered->stable_cursor)
+        __wt_clayered_stable_value_stat(CUR2S(clayered), value->data, value->size);
+}
+
+/*
  * __clayered_get_collator --
  *     Retrieve the collator for a layered cursor. Wrapped in a function, since in the future the
  *     collator might live in a constituent cursor instead of the handle.
@@ -182,10 +240,10 @@ __clayered_op_init(
 {
     op->clayered = clayered;
     op->ingest = (role == WTI_CLAYERED_ROLE_FOLLOWER) ? clayered->ingest_cursor : NULL;
-    op->stable = clayered->stable_cursor;
+    /* NULL the stable slot when skipped: the persistent cursor may still be open from before. */
+    op->stable = LF_ISSET(CLAYERED_ENTER_SKIP_STABLE) ? NULL : clayered->stable_cursor;
     op->table = (WT_LAYERED_TABLE *)clayered->dhandle;
     op->collator = op->table->collator;
-    op->need_stable = !LF_ISSET(CLAYERED_ENTER_SKIP_STABLE);
 }
 
 /*
@@ -590,9 +648,11 @@ __clayered_open_ingest(WT_SESSION_IMPL *session, WTI_CURSOR_LAYERED *clayered, W
     /*
      * We always open ingest in overwrite mode to be able to rewrite tombstones with insert().
      *
-     * FIXME-WT-17917: It might be possible that it'll be technically simpler to inherit OVERWRITE
-     * only if it's set for the top cursor and always call update() to put something on top of an
-     * ingest tombstone.
+     * Inheriting the top cursor's OVERWRITE flag instead does not help: duplicate detection needs
+     * both constituents but the ingest cursor sees only one, the ingest write must create or
+     * replace (over an absent key or a tombstone) so it needs overwrite regardless, and a delete is
+     * a value rather than a btree tombstone so native non-overwrite semantics give the wrong
+     * answer. The stable-side pre-lookup therefore cannot be removed.
      */
     F_SET(cursor, WT_CURSTD_OVERWRITE | WT_CURSTD_RAW);
 
@@ -1310,6 +1370,7 @@ __clayered_iterate(WTI_CURSOR_LAYERED *clayered, uint32_t iter_flag)
 
     WT_ITEM_SET(iface->key, clayered->current_cursor->key);
     WT_ITEM_SET(iface->value, clayered->current_cursor->value);
+    __clayered_stable_read_value_stat(clayered, &iface->value);
     __clayered_deleted_decode(&iface->value);
     F_CLR(iface, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
     F_SET(iface, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
@@ -1732,13 +1793,13 @@ __clayered_lookup(WTI_CLAYERED_OP *op, WT_ITEM *value)
         }
     } else
         /* Be sure we'll make a search attempt further down.  */
-        WT_ASSERT(session, op->need_stable && op->stable != NULL);
+        WT_ASSERT(session, op->stable != NULL);
 
     /*
      * If the key didn't exist in the ingest constituent and the cursor is setup for reading, check
      * the stable constituent.
      */
-    if (!found && op->need_stable && op->stable != NULL)
+    if (!found && op->stable != NULL)
         WT_ERR_NOTFOUND_OK(__clayered_lookup_constituent(op, op->stable, value), true);
 
 err:
@@ -1783,6 +1844,7 @@ __clayered_search(WT_CURSOR *cursor)
 err:
     __clayered_leave(clayered);
     if (ret == 0) {
+        __clayered_stable_read_value_stat(clayered, &cursor->value);
         __clayered_deleted_decode(&cursor->value);
         F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
         F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
@@ -2061,6 +2123,7 @@ __clayered_search_near(WT_CURSOR *cursor, int *exactp)
 err:
     __clayered_leave(clayered);
     if (ret == 0) {
+        __clayered_stable_read_value_stat(clayered, &cursor->value);
         __clayered_deleted_decode(&cursor->value);
         F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
         F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
@@ -2127,6 +2190,10 @@ __clayered_put(
     /* Reserve does not require a value. */
     if (put_op != WTI_CLAYERED_PUT_RESERVE)
         c->set_value(c, value);
+
+    /* On the leader the destination is the stable table; account tombstone-namespace values. */
+    if (c != op->ingest && put_op != WTI_CLAYERED_PUT_RESERVE)
+        __wt_clayered_stable_value_stat(session, value->data, value->size);
 
     switch (put_op) {
     case WTI_CLAYERED_PUT_INSERT:
@@ -2857,6 +2924,7 @@ __clayered_next_random(WT_CURSOR *cursor)
 err:
     __clayered_leave(clayered);
     if (ret == 0) {
+        __clayered_stable_read_value_stat(clayered, &cursor->value);
         __clayered_deleted_decode(&cursor->value);
         F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
         F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
@@ -2894,6 +2962,7 @@ __clayered_modify_stable(WTI_CLAYERED_OP *op, WT_MODIFY *entries, int nentries)
         __clayered_deleted_decode(&c_stable->value);
         WT_ERR(__wt_modify_apply_api(c_stable, entries, nentries));
         WT_ERR(__clayered_deleted_encode(session, &c_stable->value, &c_stable->value, &buf));
+        __wt_clayered_stable_value_stat(session, c_stable->value.data, c_stable->value.size);
         F_SET(c_stable, WT_CURSTD_VALUE_EXT);
         WT_ERR(c_stable->update(c_stable));
     } else

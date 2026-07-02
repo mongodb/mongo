@@ -1,6 +1,3 @@
 # This file is used by evergreen.yml when running the python test suite under ASAN.
 # List test files that are not run because they are known failures.
 # They are suppressed because they produce too many warnings that should be solved separately.
-
-# FIXME-WT-17765: memory leaks in dir_store storage source
-test_tiered06.py

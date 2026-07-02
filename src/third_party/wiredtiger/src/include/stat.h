@@ -743,10 +743,12 @@ struct __wt_connection_stats {
     int64_t eviction_pages_queued_urgent;
     int64_t eviction_pages_queued_oldest;
     int64_t eviction_pages_queued_urgent_hs_dirty;
+    int64_t cache_read;
     int64_t cache_read_deleted;
     int64_t cache_read_deleted_prepared;
     int64_t cache_read_checkpoint;
     int64_t eviction_clear_ordinary;
+    int64_t cache_pages_requested;
     int64_t cache_pages_prefetch;
     int64_t cache_pages_requested_internal;
     int64_t cache_pages_requested_leaf;
@@ -771,6 +773,7 @@ struct __wt_connection_stats {
     int64_t cache_scrub_restore;
     int64_t cache_reverse_splits;
     int64_t cache_reverse_splits_skipped_vlcs;
+    int64_t cache_shared_dsk_lock_contention;
     int64_t cache_shared_dsk_bytes_duplicate;
     int64_t cache_shared_dsk_hash_size;
     int64_t cache_shared_dsk_hit;
@@ -1024,6 +1027,10 @@ struct __wt_connection_stats {
     int64_t layered_curs_search_ingest;
     int64_t layered_curs_search_stable;
     int64_t layered_curs_update;
+    int64_t layered_curs_stable_value_tombstone_prefix;
+    int64_t layered_curs_stable_value_tombstone_suffix;
+    int64_t layered_curs_stable_value_tombstone;
+    int64_t layered_curs_stable_value_tombstone_x3;
     int64_t layered_table_manager_checkpoints;
     int64_t layered_table_manager_checkpoints_disagg_pick_up_failed;
     int64_t layered_table_manager_checkpoints_disagg_pick_up_succeed;
@@ -1595,9 +1602,11 @@ struct __wt_dsrc_stats {
     int64_t cache_write_hs;
     int64_t cache_eviction_dirty_obsolete_tw;
     int64_t cache_eviction_ahead_of_last_materialized_lsn;
+    int64_t cache_read;
     int64_t cache_read_deleted;
     int64_t cache_read_deleted_prepared;
     int64_t cache_read_checkpoint;
+    int64_t cache_pages_requested;
     int64_t cache_pages_prefetch;
     int64_t cache_pages_requested_internal;
     int64_t cache_pages_requested_leaf;
@@ -1762,6 +1771,10 @@ struct __wt_dsrc_stats {
     int64_t layered_curs_search_ingest;
     int64_t layered_curs_search_stable;
     int64_t layered_curs_update;
+    int64_t layered_curs_stable_value_tombstone_prefix;
+    int64_t layered_curs_stable_value_tombstone_suffix;
+    int64_t layered_curs_stable_value_tombstone;
+    int64_t layered_curs_stable_value_tombstone_x3;
     int64_t layered_table_manager_checkpoints;
     int64_t layered_table_manager_checkpoints_disagg_pick_up_failed;
     int64_t layered_table_manager_checkpoints_disagg_pick_up_succeed;
