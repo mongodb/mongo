@@ -1194,8 +1194,8 @@ TEST_F(CommitCollectionMetadataLocallyTest, SetAllowChunkOperationsOplogEntryUse
     auto oplogEntries =
         findLocalDocs(NamespaceString::kRsOplogNamespace,
                       BSON("op" << "c" << "o.setAllowChunkOperations" << kTestNss.coll()));
-    ASSERT_EQ(oplogEntries.size(), 1u);
-    ASSERT_EQ(oplogEntries.front().getStringField("ns"), kTestNss.getCommandNS().ns_forTest());
+    ASSERT_EQ(oplogEntries.size(), 2u);
+    ASSERT_EQ(oplogEntries.back().getStringField("ns"), kTestNss.getCommandNS().ns_forTest());
 }
 
 // ---------------------------------------------------------------------------
