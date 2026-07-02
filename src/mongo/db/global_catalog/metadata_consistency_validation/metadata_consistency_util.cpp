@@ -71,15 +71,19 @@
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/query/exec/cluster_query_result.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
+#include <algorithm>
 #include <memory>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -217,6 +221,10 @@ std::vector<ChunkType> getChunksFromInMemoryShardCatalog(const CollectionMetadat
                 coll.getUUID(), chunk.getRange(), chunk.getLastmod(), chunk.getShardId());
             // explicitly setting the history for history-related metadata checks
             chunkType.setHistory(chunk.getHistory());
+            chunkType.setJumbo(chunk.isJumbo());
+            if (!chunk.getHistory().empty()) {
+                chunkType.setOnCurrentShardSince(chunk.getHistory().front().getValidAfter());
+            }
             chunks.emplace_back(std::move(chunkType));
         }
         return true;
@@ -515,6 +523,117 @@ boost::optional<BSONObj> validateChunksDomainCoverage(
 }
 
 /**
+ * Chunk fields excluded from strict metadata-consistency validation.
+ *
+ * Every entry MUST include an inline comment explaining why it is excluded. Only add fields
+ * here when global and shard catalogs are allowed to differ without indicating corruption.
+ */
+const stdx::unordered_set<std::string_view> kStrictChunkValidationIgnoredFields = {
+    // estimatedDataSizeBytes: ephemeral balancer state written to global config.chunks during
+    // defragmentation. A shard catalog commit can copy it into the durable catalog, but the shard
+    // catalog never needs to read it.
+    "estimatedDataSizeBytes",
+    // jumbo: balancer-only hint on global config.chunks.
+    // A shard catalog commit can copy it into the durable catalog, but the shard catalog never
+    // needs to read it.
+    "jumbo",
+    // lastmod: on the authoritative resharding path, coordinator state transitions can bump
+    // config.chunks placement versions even when the config.collections writes are no-ops.
+    // Participants learn about resharding via explicit commands rather than placement refreshes,
+    // so the shard catalog is not updated and its chunk lastmod can legitimately lag global
+    // config.chunks. TODO(SERVER-128917): stop ignoring once those placement version bumps are
+    // skipped for non-committing coordinator transitions.
+    "lastmod",
+};
+
+/**
+ * BSON representation of per-chunk fields compared in strict metadata-consistency validation.
+ * Excludes chunk _id and history (validated separately). Fields listed in
+ * kStrictChunkValidationIgnoredFields are omitted here and never compared.
+ */
+BSONObj chunkToStrictComparableBSON(const ChunkType& chunk) {
+    BSONObjBuilder builder;
+    chunk.getRange().serialize(&builder);
+    chunk.getShard().serialize(ChunkType::shard.name(), &builder);
+    if (const auto& onCurrentShardSince = chunk.getOnCurrentShardSince()) {
+        builder.append(ChunkType::onCurrentShardSince.name(), *onCurrentShardSince);
+    }
+    return builder.obj();
+}
+
+std::vector<std::string_view> getSortedUnionOfFieldNames(const BSONObj& lhs, const BSONObj& rhs) {
+    std::set<std::string_view> fieldNames;
+    for (const auto& elem : lhs) {
+        fieldNames.insert(elem.fieldNameStringData());
+    }
+    for (const auto& elem : rhs) {
+        fieldNames.insert(elem.fieldNameStringData());
+    }
+    return {fieldNames.begin(), fieldNames.end()};
+}
+
+bool chunkFieldValuesEqual(const BSONObj& lhs, const BSONObj& rhs, std::string_view fieldName) {
+    const auto lhsElem = lhs.getField(fieldName);
+    const auto rhsElem = rhs.getField(fieldName);
+    if (lhsElem.eoo() && rhsElem.eoo()) {
+        return true;
+    }
+    if (lhsElem.eoo() || rhsElem.eoo()) {
+        return false;
+    }
+    return lhsElem.woCompare(rhsElem, /*compareFieldNames*/ false) == 0;
+}
+
+boost::optional<BSONObj> validateChunksStrictEquality(
+    const std::vector<ChunkType>& shardCatalogChunks,
+    const std::vector<ChunkType>& globalCatalogChunks) {
+    auto shardOwned = shardCatalogChunks;
+    auto globalOwned = globalCatalogChunks;
+    const auto chunkRangeLess = [](const ChunkType& lhs, const ChunkType& rhs) {
+        return lhs.getRange() < rhs.getRange();
+    };
+    std::sort(shardOwned.begin(), shardOwned.end(), chunkRangeLess);
+    std::sort(globalOwned.begin(), globalOwned.end(), chunkRangeLess);
+
+    if (shardOwned.size() != globalOwned.size()) {
+        return BSON("reason" << "chunkCountMismatch"
+                             << "shardCatalogCount" << static_cast<int>(shardOwned.size())
+                             << "globalCatalogCount" << static_cast<int>(globalOwned.size()));
+    }
+
+    for (size_t i = 0; i < shardOwned.size(); ++i) {
+        const auto& shardChunk = shardOwned[i];
+        const auto& globalChunk = globalOwned[i];
+
+        const auto shardComparable = chunkToStrictComparableBSON(shardChunk);
+        const auto globalComparable = chunkToStrictComparableBSON(globalChunk);
+        for (const auto& fieldName :
+             getSortedUnionOfFieldNames(shardComparable, globalComparable)) {
+            if (kStrictChunkValidationIgnoredFields.contains(fieldName)) {
+                continue;
+            }
+            if (!chunkFieldValuesEqual(shardComparable, globalComparable, fieldName)) {
+                const auto shardField = shardComparable.getField(fieldName);
+                const auto globalField = globalComparable.getField(fieldName);
+                BSONObjBuilder mismatchBuilder;
+                mismatchBuilder.append("reason", "chunkFieldsMismatch");
+                mismatchBuilder.append("mismatchedField", std::string(fieldName));
+                mismatchBuilder.append("chunkRangeMin", shardChunk.getMin());
+                if (!shardField.eoo()) {
+                    mismatchBuilder.appendAs(shardField, "shardCatalogValue");
+                }
+                if (!globalField.eoo()) {
+                    mismatchBuilder.appendAs(globalField, "globalCatalogValue");
+                }
+                return mismatchBuilder.obj();
+            }
+        }
+    }
+
+    return boost::none;
+}
+
+/**
  * Validates collection metadata on a specific shard by comparing the shard’s catalog
  * against the global catalog (either in-memory or durable).
  *
@@ -522,9 +641,11 @@ boost::optional<BSONObj> validateChunksDomainCoverage(
  *  - Consistency of the shard catalog entry and the global catalog entry
  *  - No chunks in the shard catalog that are neither currently owned by the shard
  *    nor have ever been owned by it in the past (shard id absent from the history)
- *  - Consistency of chunk range coverage between the global and shard catalogs:
- *    all ranges covered in the global catalog must appear in the shard catalog, and
- *    the shard catalog must not store any additional chunks
+ *  - Consistency of chunk metadata between the global and shard catalogs for chunks
+ *    currently owned by the shard. When the CSR is authoritative, chunks must match
+ *    on all per-chunk fields except those in kStrictChunkValidationIgnoredFields (e.g.
+ *    estimatedDataSizeBytes). Otherwise only domain coverage is checked, tolerating
+ *    different split boundaries during legacy refresh.
  *
  * The "all shard chunks ever owned" check accepts any chunk in the shard catalog whose
  * current owner is this shard or whose history records past ownership by this shard. For
@@ -534,10 +655,8 @@ boost::optional<BSONObj> validateChunksDomainCoverage(
  *
  * The chunk range coverage check is restricted to chunks currently owned by the shard in
  * both catalogs, regardless of which catalog (durable or in-memory) is being validated.
- * This avoids false positives during chunk operations: the global catalog may already
- * reflect chunks newly assigned to the shard that have not yet appeared in the shard
- * catalog, or may still hold chunks that have already left the shard catalog but whose
- * removal has not yet propagated to the global catalog.
+ * Domain-only coverage applies when the CSR is non-authoritative. Strict per-chunk
+ * validation applies when the CSR is authoritative.
  */
 void validateShardCatalogEntries(const ShardCatalogCollectionTypeBase& shardCatalogCollection,
                                  const std::vector<ChunkType>& shardCatalogChunks,
@@ -545,6 +664,7 @@ void validateShardCatalogEntries(const ShardCatalogCollectionTypeBase& shardCata
                                  const std::vector<ChunkType>& globalCatalogChunks,
                                  const ShardId& shardId,
                                  std::string_view sourceName,
+                                 bool useStrictChunkValidation,
                                  std::vector<MetadataInconsistencyItem>& inconsistencies) {
 
     if (shardCatalogCollection.getComparableFields() !=
@@ -569,13 +689,22 @@ void validateShardCatalogEntries(const ShardCatalogCollectionTypeBase& shardCata
                              << "source" << sourceName << "mismatch" << *mismatchDetail)}));
     }
 
-    // TODO (SERVER-121930): Extend the following checks to strictly validate all chunks' ranges.
+    const auto shardOwnedChunks = filterCurrentlyOwnedChunks(shardCatalogChunks, shardId);
+    const auto globalOwnedChunks = filterCurrentlyOwnedChunks(globalCatalogChunks, shardId);
 
-    // The domain coverage should be enforced only on currently owned chunks, allowing for slight
-    // de-sync of chunks owned in the past during chunk operations.
-    if (auto mismatchDetail = validateChunksDomainCoverage(
-            filterCurrentlyOwnedChunks(shardCatalogChunks, shardId),
-            filterCurrentlyOwnedChunks(globalCatalogChunks, shardId))) {
+    if (useStrictChunkValidation) {
+        if (auto mismatchDetail =
+                validateChunksStrictEquality(shardOwnedChunks, globalOwnedChunks)) {
+            inconsistencies.emplace_back(makeInconsistency(
+                MetadataInconsistencyTypeEnum::kInconsistentShardCatalogCollectionMetadata,
+                InconsistentShardCatalogCollectionMetadataDetails{
+                    globalCatalogCollection.getNss(),
+                    globalCatalogCollection.getUuid(),
+                    BSON("field" << "chunks"
+                                 << "source" << sourceName << "mismatch" << *mismatchDetail)}));
+        }
+    } else if (auto mismatchDetail =
+                   validateChunksDomainCoverage(shardOwnedChunks, globalOwnedChunks)) {
         inconsistencies.emplace_back(makeInconsistency(
             MetadataInconsistencyTypeEnum::kInconsistentShardCatalogCollectionMetadata,
             InconsistentShardCatalogCollectionMetadataDetails{
@@ -657,6 +786,7 @@ void validateInMemoryShardCatalogEntries(const CollectionMetadata& inMemoryShard
                                          const CollectionType& collectionInGlobalCatalog,
                                          const std::vector<ChunkType>& chunksInGlobalCatalog,
                                          const ShardId& shardId,
+                                         bool useStrictChunkValidation,
                                          std::vector<MetadataInconsistencyItem>& inconsistencies) {
     auto chunksInMemoryShardCatalog =
         getChunksFromInMemoryShardCatalog(inMemoryShardCatalogMetadata, shardId);
@@ -670,6 +800,7 @@ void validateInMemoryShardCatalogEntries(const CollectionMetadata& inMemoryShard
                                 chunksInGlobalCatalog,
                                 shardId,
                                 kInMemoryShardCatalogSourceScope,
+                                useStrictChunkValidation,
                                 inconsistencies);
 }
 
@@ -697,6 +828,7 @@ void validateDurableShardCatalogEntries(const NamespaceString& nss,
                                         const std::vector<ChunkType>& chunksInGlobalCatalog,
                                         const CollectionType& collectionInDurableShardCatalog,
                                         const std::vector<ChunkType>& chunksInDurableShardCatalog,
+                                        bool useStrictChunkValidation,
                                         std::vector<MetadataInconsistencyItem>& inconsistencies) {
 
     if (chunksInDurableShardCatalog.empty() && !chunksInGlobalCatalog.empty()) {
@@ -716,6 +848,7 @@ void validateDurableShardCatalogEntries(const NamespaceString& nss,
                                 chunksInGlobalCatalog,
                                 shardId,
                                 kDurableShardCatalogSourceScope,
+                                useStrictChunkValidation,
                                 inconsistencies);
 }
 
@@ -869,6 +1002,7 @@ void checkCollectionMetadataInShardCatalog(
                                            chunksInGlobalCatalog,
                                            *collectionInDurableShardCatalog,
                                            *chunksInDurableShardCatalog,
+                                           authoritativeShardsCRUDEnabled,
                                            inconsistencies);
         return;
     }
@@ -899,6 +1033,7 @@ void checkCollectionMetadataInShardCatalog(
                                             *collectionInGlobalCatalog,
                                             chunksInGlobalCatalog,
                                             shardId,
+                                            authoritativeShardsCRUDEnabled,
                                             inconsistencies);
     }
 
@@ -938,6 +1073,7 @@ void checkCollectionMetadataInShardCatalog(
                                        chunksInGlobalCatalog,
                                        *collectionInDurableShardCatalog,
                                        *chunksInDurableShardCatalog,
+                                       authoritativeShardsCRUDEnabled,
                                        inconsistencies);
 }
 

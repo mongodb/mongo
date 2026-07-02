@@ -1421,13 +1421,44 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
         );
 
         let inconsistencies = db.checkMetadataConsistency().toArray();
-        assert.eq(inconsistencies.length, 1);
-        assert.eq("CorruptedChunkHistory", inconsistencies[0].type, tojson(inconsistencies));
+        // Direct edits to config.chunks desync the global catalog from the per-shard catalog when
+        // authoritative shard CRUD is active: the same onCurrentShardSince divergence is reported
+        // once from the in-memory shard catalog and a second time from the durable shard catalog.
+        assert.eq(isAuthoritativeShardsCRUDEnabled ? 3 : 1, inconsistencies.length);
+        const corruptedChunkHistory = inconsistencies.filter(
+            (inc) => inc.type === "CorruptedChunkHistory",
+        );
+        assert.eq(1, corruptedChunkHistory.length, tojson(inconsistencies));
         assert.eq(
             "The onCurrentShardSince field is missing",
-            inconsistencies[0].details.issue,
+            corruptedChunkHistory[0].details.issue,
             tojson(inconsistencies),
         );
+        if (isAuthoritativeShardsCRUDEnabled) {
+            const inMemoryShardCatalog = inconsistencies.filter(
+                (inc) =>
+                    inc.type === "InconsistentShardCatalogCollectionMetadata" &&
+                    inc.details.details.source === "inMemoryShardCatalog",
+            );
+            assert.eq(1, inMemoryShardCatalog.length, tojson(inconsistencies));
+            assert.eq(
+                "onCurrentShardSince",
+                inMemoryShardCatalog[0].details.details.mismatch.mismatchedField,
+                tojson(inconsistencies),
+            );
+
+            const durableShardCatalog = inconsistencies.filter(
+                (inc) =>
+                    inc.type === "InconsistentShardCatalogCollectionMetadata" &&
+                    inc.details.details.source === "durableShardCatalog",
+            );
+            assert.eq(1, durableShardCatalog.length, tojson(inconsistencies));
+            assert.eq(
+                "onCurrentShardSince",
+                durableShardCatalog[0].details.details.mismatch.mismatchedField,
+                tojson(inconsistencies),
+            );
+        }
 
         // Restore correct value
         assert.commandWorked(
@@ -1453,9 +1484,12 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
             ),
         );
         let inconsistencies = db.checkMetadataConsistency().toArray();
-        assert.eq(inconsistencies.length, 1);
-        assert.eq("CorruptedChunkHistory", inconsistencies[0].type, tojson(inconsistencies));
-        assert.eq(errMsg, inconsistencies[0].details.issue, tojson(inconsistencies));
+        assert.eq(1, inconsistencies.length, tojson(inconsistencies));
+        const corruptedChunkHistory = inconsistencies.filter(
+            (inc) => inc.type === "CorruptedChunkHistory",
+        );
+        assert.eq(1, corruptedChunkHistory.length, tojson(inconsistencies));
+        assert.eq(errMsg, corruptedChunkHistory[0].details.issue, tojson(inconsistencies));
 
         // Restore correct value
         assert.commandWorked(
@@ -1471,13 +1505,41 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     {
         assert.commandWorked(configDB.chunks.update({_id: chunk._id}, {$set: {history: []}}));
         let inconsistencies = db.checkMetadataConsistency().toArray();
-        assert.eq(inconsistencies.length, 1);
-        assert.eq("CorruptedChunkHistory", inconsistencies[0].type, tojson(inconsistencies));
+        assert.eq(isAuthoritativeShardsCRUDEnabled ? 3 : 1, inconsistencies.length);
+        const corruptedChunkHistory = inconsistencies.filter(
+            (inc) => inc.type === "CorruptedChunkHistory",
+        );
+        assert.eq(1, corruptedChunkHistory.length, tojson(inconsistencies));
         assert.eq(
             "The history field is empty",
-            inconsistencies[0].details.issue,
+            corruptedChunkHistory[0].details.issue,
             tojson(inconsistencies),
         );
+        if (isAuthoritativeShardsCRUDEnabled) {
+            const inMemoryShardCatalog = inconsistencies.filter(
+                (inc) =>
+                    inc.type === "InconsistentShardCatalogCollectionMetadata" &&
+                    inc.details.details.source === "inMemoryShardCatalog",
+            );
+            assert.eq(1, inMemoryShardCatalog.length, tojson(inconsistencies));
+            assert.eq(
+                "onCurrentShardSince",
+                inMemoryShardCatalog[0].details.details.mismatch.mismatchedField,
+                tojson(inconsistencies),
+            );
+
+            const durableShardCatalog = inconsistencies.filter(
+                (inc) =>
+                    inc.type === "InconsistentShardCatalogCollectionMetadata" &&
+                    inc.details.details.source === "durableShardCatalog",
+            );
+            assert.eq(1, durableShardCatalog.length, tojson(inconsistencies));
+            assert.eq(
+                "onCurrentShardSince",
+                durableShardCatalog[0].details.details.mismatch.mismatchedField,
+                tojson(inconsistencies),
+            );
+        }
     }
 
     // Artificially corrupt chunk (missing history field)
@@ -1485,13 +1547,41 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
         assert.commandWorked(configDB.chunks.update({_id: chunk._id}, {$unset: {history: 1}}));
 
         let inconsistencies = db.checkMetadataConsistency().toArray();
-        assert.eq(inconsistencies.length, 1);
-        assert.eq("CorruptedChunkHistory", inconsistencies[0].type, tojson(inconsistencies));
+        assert.eq(isAuthoritativeShardsCRUDEnabled ? 3 : 1, inconsistencies.length);
+        const corruptedChunkHistory = inconsistencies.filter(
+            (inc) => inc.type === "CorruptedChunkHistory",
+        );
+        assert.eq(1, corruptedChunkHistory.length, tojson(inconsistencies));
         assert.eq(
             "The history field is empty",
-            inconsistencies[0].details.issue,
+            corruptedChunkHistory[0].details.issue,
             tojson(inconsistencies),
         );
+        if (isAuthoritativeShardsCRUDEnabled) {
+            const inMemoryShardCatalog = inconsistencies.filter(
+                (inc) =>
+                    inc.type === "InconsistentShardCatalogCollectionMetadata" &&
+                    inc.details.details.source === "inMemoryShardCatalog",
+            );
+            assert.eq(1, inMemoryShardCatalog.length, tojson(inconsistencies));
+            assert.eq(
+                "onCurrentShardSince",
+                inMemoryShardCatalog[0].details.details.mismatch.mismatchedField,
+                tojson(inconsistencies),
+            );
+
+            const durableShardCatalog = inconsistencies.filter(
+                (inc) =>
+                    inc.type === "InconsistentShardCatalogCollectionMetadata" &&
+                    inc.details.details.source === "durableShardCatalog",
+            );
+            assert.eq(1, durableShardCatalog.length, tojson(inconsistencies));
+            assert.eq(
+                "onCurrentShardSince",
+                durableShardCatalog[0].details.details.mismatch.mismatchedField,
+                tojson(inconsistencies),
+            );
+        }
     }
 
     db.dropDatabase();

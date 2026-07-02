@@ -19,6 +19,9 @@ import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
+// The test only updates the global catalog via direct configsvr commits, leaving the local shard catalog inconsistent
+TestData.skipCheckMetadataConsistency = true;
+
 describe("_configsvrCommitMergeAllChunksOnShard retryability", function () {
     const dbName = "test";
     const collName = "foo";

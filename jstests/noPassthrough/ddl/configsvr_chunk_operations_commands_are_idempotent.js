@@ -10,6 +10,9 @@ import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/m
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
+// The test only updates the global catalog via direct configsvr commits, leaving the local shard catalog inconsistent
+TestData.skipCheckMetadataConsistency = true;
+
 describe("_configsvr commit chunk operations are idempotent", function () {
     before(() => {
         this.st = new ShardingTest({shards: 1});
