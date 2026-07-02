@@ -49,7 +49,6 @@
 #include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/generic_argument_util.h"
-#include "mongo/db/global_catalog/ddl/chunk_operation_sharding_coordinator.h"
 #include "mongo/db/global_catalog/ddl/configsvr_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
@@ -693,7 +692,6 @@ public:
                     // be migrations pending recovery. Drain them.
                     migrationutil::drainMigrationsPendingRecovery(opCtx);
                     migrationutil::assertNoMigrationsRemaining(opCtx);
-                    assertNoChunkOperationCoordinatorsRunning(opCtx);
                 }
 
                 // Start transition to 'requestedVersion' by updating the local FCV document to a

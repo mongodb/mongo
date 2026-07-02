@@ -76,14 +76,14 @@ namespace {
 
 /**
  * Attempts to execute the merge through the sharding coordinator service, retrying while a
- * conflicting coordinator is already running for the same namespace. Returns true if the merge
- * completed via the coordinator; returns false if the caller should fall back to the legacy
- * config-server path (because the authoritative metadata feature flag is disabled). Throws
- * ConflictingOperationInProgress if the configured retry budget is exhausted.
+ * conflicting coordinator is already running for the same namespace. Returns boost::none if the
+ * merge completed via the coordinator; otherwise returns a FixedFCVRegion, for the caller to
+ * register through the legacy path under the same pin (because the authoritative metadata feature
+ * is disabled). Throws ConflictingOperationInProgress if the configured retry budget is exhausted.
  */
-bool tryRunMergeChunksCoordinator(OperationContext* opCtx,
-                                  const NamespaceString& nss,
-                                  const ShardsvrMergeChunks& req) {
+boost::optional<FixedFCVRegion> tryRunMergeChunksCoordinator(OperationContext* opCtx,
+                                                             const NamespaceString& nss,
+                                                             const ShardsvrMergeChunks& req) {
     // If a conflicting merge coordinator is already running for this namespace,
     // wait for it to complete and retry.
     // TODO (SERVER-125033): Remove the retry-loop once this task gets done.
@@ -96,7 +96,7 @@ bool tryRunMergeChunksCoordinator(OperationContext* opCtx,
                 VersionContext::getDecoration(opCtx),
                 optFixedFcvRegion.get()->acquireFCVSnapshot()) ==
             AuthoritativeMetadataAccessLevelEnum::kNone) {
-            return false;
+            return optFixedFcvRegion;
         }
 
         auto coordinatorDoc = MergeChunksCoordinatorDocument();
@@ -126,7 +126,7 @@ bool tryRunMergeChunksCoordinator(OperationContext* opCtx,
 
         optFixedFcvRegion.reset();
         coordinator->getCompletionFuture().get(opCtx);
-        return true;
+        return boost::none;
     }
 
     uasserted(ErrorCodes::ConflictingOperationInProgress,
@@ -166,7 +166,8 @@ public:
             const auto& nss = ns();
             const auto& req = request();
 
-            if (tryRunMergeChunksCoordinator(opCtx, nss, req)) {
+            auto fcvRegionForLegacyRegister = tryRunMergeChunksCoordinator(opCtx, nss, req);
+            if (!fcvRegionForLegacyRegister) {
                 return;
             }
 
@@ -179,6 +180,7 @@ public:
             auto scopedSplitOrMergeChunk(
                 uassertStatusOK(ActiveMigrationsRegistry::get(opCtx).registerSplitOrMergeChunk(
                     opCtx, nss, chunkRange)));
+            fcvRegionForLegacyRegister.reset();
 
             auto expectedEpoch = req.getEpoch();
             auto expectedTimestamp = req.getTimestamp();
@@ -192,6 +194,13 @@ public:
                 checkRangeOwnership(opCtx, nss, metadata, chunkRange);
                 return metadata;
             }();
+
+            tassert(12796802,
+                    "Legacy mergeChunks must not run when shards are authoritative",
+                    sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
+                        VersionContext::getDecoration(opCtx),
+                        FixedFCVRegion(opCtx)->acquireFCVSnapshot()) ==
+                        AuthoritativeMetadataAccessLevelEnum::kNone);
 
             auto const shardingState = ShardingState::get(opCtx);
 

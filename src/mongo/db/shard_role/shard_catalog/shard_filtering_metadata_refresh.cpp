@@ -664,6 +664,13 @@ void FilteringMetadataCache::_recoverMigrationCoordinations(OperationContext* op
                         "Recovering migration",
                         "migrationCoordinatorDocument"_attr = redact(doc.toBSON()));
 
+            tassert(12796804,
+                    "Legacy migration recovery must not run when shards are authoritative",
+                    sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
+                        VersionContext::getDecoration(opCtx),
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ==
+                        AuthoritativeMetadataAccessLevelEnum::kNone);
+
             // Ensure there is only one migrationCoordinator document to be recovered for this
             // namespace.
             invariant(++migrationRecoveryCount == 1,

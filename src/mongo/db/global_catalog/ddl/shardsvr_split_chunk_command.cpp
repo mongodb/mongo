@@ -60,14 +60,14 @@ namespace {
 
 /**
  * Attempts to execute the split through the sharding coordinator service, retrying while a
- * conflicting coordinator is already running for the same namespace. Returns true if the split
- * completed via the coordinator; returns false if the caller should fall back to the legacy
- * config-server path (because the authoritative metadata feature flag is disabled). Throws
- * ConflictingOperationInProgress if the configured retry budget is exhausted.
+ * conflicting coordinator is already running for the same namespace. Returns boost::none if the
+ * split completed via the coordinator; otherwise returns a FixedFCVRegion for the caller to
+ * register through the legacy path under the same pin (because the authoritative metadata feature
+ * is disabled). Throws ConflictingOperationInProgress if the configured retry budget is exhausted.
  */
-bool tryRunSplitChunkCoordinator(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 const ShardsvrSplitChunk& req) {
+boost::optional<FixedFCVRegion> tryRunSplitChunkCoordinator(OperationContext* opCtx,
+                                                            const NamespaceString& nss,
+                                                            const ShardsvrSplitChunk& req) {
     // If a conflicting split coordinator is already running for this namespace,
     // wait for it to complete and retry.
     // TODO (SERVER-125033): Remove the retry-loop once this task gets done.
@@ -80,7 +80,7 @@ bool tryRunSplitChunkCoordinator(OperationContext* opCtx,
                 VersionContext::getDecoration(opCtx),
                 optFixedFcvRegion.get()->acquireFCVSnapshot()) ==
             AuthoritativeMetadataAccessLevelEnum::kNone) {
-            return false;
+            return optFixedFcvRegion;
         }
 
         auto coordinatorDoc = SplitChunkCoordinatorDocument();
@@ -109,7 +109,7 @@ bool tryRunSplitChunkCoordinator(OperationContext* opCtx,
 
         optFixedFcvRegion.reset();
         coordinator->getCompletionFuture().get(opCtx);
-        return true;
+        return boost::none;
     }
 
     uasserted(ErrorCodes::ConflictingOperationInProgress,
@@ -154,7 +154,8 @@ public:
             const auto& nss = ns();
             const auto& req = request();
 
-            if (tryRunSplitChunkCoordinator(opCtx, nss, req)) {
+            auto fcvRegionForLegacyRegister = tryRunSplitChunkCoordinator(opCtx, nss, req);
+            if (!fcvRegionForLegacyRegister) {
                 return;
             }
 
@@ -174,6 +175,7 @@ public:
             auto scopedChunk =
                 uassertStatusOK(ActiveMigrationsRegistry::get(opCtx).registerSplitOrMergeChunk(
                     opCtx, nss, chunkRange));
+            fcvRegionForLegacyRegister.reset();
 
             uassertStatusOK(splitChunk_nonAuth(
                 opCtx,

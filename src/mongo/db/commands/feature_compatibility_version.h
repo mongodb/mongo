@@ -187,6 +187,8 @@ public:
     explicit FixedFCVRegion(OperationContext* opCtx);
     ~FixedFCVRegion();
 
+    FixedFCVRegion(FixedFCVRegion&&) = default;
+
     bool operator==(const multiversion::FeatureCompatibilityVersion& other) const;
     bool operator!=(const multiversion::FeatureCompatibilityVersion& other) const;
 

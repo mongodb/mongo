@@ -37,18 +37,6 @@
 
 namespace mongo {
 
-void assertNoChunkOperationCoordinatorsRunning(OperationContext* opCtx) {
-    auto* const service = ShardingCoordinatorService::getService(opCtx);
-    for (auto type : {CoordinatorTypeEnum::kMoveRange,
-                      CoordinatorTypeEnum::kSplitChunk,
-                      CoordinatorTypeEnum::kMergeChunks,
-                      CoordinatorTypeEnum::kMergeAllChunks}) {
-        tassert(12952701,
-                "Found a running chunk operation coordinator",
-                service->areAllCoordinatorsOfTypeFinished(opCtx, type));
-    }
-}
-
 void ChunkOperationShardingCoordinatorMixin::_checkSetAllowChunkOperations(
     OperationContext* opCtx, const NamespaceString& nss) {
     const auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss);

@@ -70,6 +70,7 @@
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/uuid.h"
@@ -88,10 +89,12 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(hangBeforeLegacyRegisterDonateChunk);
+
 /**
- * Attempts to execute the migration through the sharding coordinator service. Returns true if the
- * migration completed via the coordinator; returns false if the caller should fall back to the
- * legacy path.
+ * Attempts to execute the migration through the sharding coordinator service. Returns boost::none
+ * if the migration completed via the coordinator; otherwise returns the FixedFCVRegion, still
+ * held, for the caller to register through the legacy path under the same pin.
  *
  * The FixedFCVRegion is scoped to span both the feature-flag check and `getOrCreateInstance`, so
  * the FCV snapshot stays pinned for the entire coordinator construction (no window between
@@ -99,9 +102,9 @@ namespace {
  * before waiting on the coordinator's completion future, since holding the FCV pin across the
  * blocking `get(opCtx)` would block FCV transitions for the entire duration of the migration.
  */
-bool tryRunMoveRangeCoordinator(OperationContext* opCtx,
-                                const NamespaceString& nss,
-                                const ShardsvrMoveRange& req) {
+boost::optional<FixedFCVRegion> tryRunMoveRangeCoordinator(OperationContext* opCtx,
+                                                           const NamespaceString& nss,
+                                                           const ShardsvrMoveRange& req) {
     std::shared_ptr<MoveRangeCoordinator> coordinator;
     {
         FixedFCVRegion fcvRegion{opCtx};
@@ -109,7 +112,7 @@ bool tryRunMoveRangeCoordinator(OperationContext* opCtx,
         if (sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
                 VersionContext::getDecoration(opCtx), fcvRegion->acquireFCVSnapshot()) ==
             AuthoritativeMetadataAccessLevelEnum::kNone) {
-            return false;
+            return fcvRegion;
         }
 
         auto coordinatorDoc = MoveRangeCoordinatorDocument();
@@ -129,7 +132,7 @@ bool tryRunMoveRangeCoordinator(OperationContext* opCtx,
     }
 
     coordinator->getCompletionFuture().get(opCtx);
-    return true;
+    return boost::none;
 }
 
 /**
@@ -189,9 +192,21 @@ void _runLegacyImpl(OperationContext* opCtx,
  * ScopedDonateChunk, run the migration on the fixed executor (execute mode) or block on
  * waitForCompletion (join mode), and propagate the result via _runLegacyImpl.
  */
-void runLegacyMoveRange(OperationContext* opCtx, ShardsvrMoveRange req) {
+void runLegacyMoveRange(OperationContext* opCtx,
+                        ShardsvrMoveRange req,
+                        boost::optional<FixedFCVRegion>& fcvRegionForLegacyRegister) {
+    hangBeforeLegacyRegisterDonateChunk.pauseWhileSet();
+
     auto scopedMigration = uassertStatusOK(ActiveMigrationsRegistry::get(opCtx).registerDonateChunk(
         opCtx, req.getCommandParameter(), req.getShardsvrMoveRangeRequest()));
+    fcvRegionForLegacyRegister.reset();
+
+    tassert(
+        12796800,
+        "Legacy chunk migration must not run when shards are authoritative",
+        sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
+            VersionContext::getDecoration(opCtx), FixedFCVRegion(opCtx)->acquireFCVSnapshot()) ==
+            AuthoritativeMetadataAccessLevelEnum::kNone);
 
     // Check if there is an existing migration running and if so, join it
     if (scopedMigration.mustExecute()) {
@@ -299,8 +314,9 @@ public:
             sharding_ddl_util::assertDataMovementAllowed();
 
             const auto& nss = ns();
-            if (!tryRunMoveRangeCoordinator(opCtx, nss, request())) {
-                runLegacyMoveRange(opCtx, request());
+            if (auto fcvRegionForLegacyRegister =
+                    tryRunMoveRangeCoordinator(opCtx, nss, request())) {
+                runLegacyMoveRange(opCtx, request(), fcvRegionForLegacyRegister);
             }
 
             if (request().getWaitForDelete()) {

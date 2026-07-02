@@ -38,6 +38,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/shard_key_index_util.h"
+#include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/split_chunk_request_type.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
@@ -49,6 +50,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/s/active_migrations_registry.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
@@ -58,6 +60,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
@@ -174,6 +177,13 @@ Status splitChunk_nonAuth(OperationContext* opCtx,
             }
         }
     }
+
+    tassert(12796801,
+            "Legacy splitChunk must not run when shards are authoritative",
+            sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ==
+                AuthoritativeMetadataAccessLevelEnum::kNone);
 
     // Commit the split to the config server.
     auto request = SplitChunkRequest(nss,
