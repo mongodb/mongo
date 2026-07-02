@@ -9,6 +9,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     generateExtensionConfigs,
     deleteExtensionConfigs,
+    getExtensionConfDir,
 } from "jstests/noPassthrough/libs/extension_helpers.js";
 
 const fooStageUnrecognizedErrCode = 40324;
@@ -45,6 +46,7 @@ export function deleteMultiversionExtensionConfigs(extensionNames) {
 export function extensionNodeOptions(extensionName) {
     return {
         loadExtensions: [extensionName],
+        extensionsConfigPath: getExtensionConfDir(),
         setParameter: {featureFlagExtensionsAPI: true},
     };
 }
@@ -52,6 +54,7 @@ export function extensionNodeOptions(extensionName) {
 export function multipleExtensionNodeOptions(extensionNames) {
     return {
         loadExtensions: extensionNames,
+        extensionsConfigPath: getExtensionConfDir(),
         setParameter: {featureFlagExtensionsAPI: true},
     };
 }

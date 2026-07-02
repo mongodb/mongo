@@ -9,6 +9,7 @@ import {
     generateExtensionConfigs,
     deleteExtensionConfigs,
     checkPlatformCompatibleWithExtensions,
+    getExtensionConfDir,
 } from "jstests/noPassthrough/libs/extension_helpers.js";
 
 checkPlatformCompatibleWithExtensions();
@@ -21,6 +22,7 @@ const extensionNames = generateExtensionConfigs([
 
 const options = {
     loadExtensions: extensionNames,
+    extensionsConfigPath: getExtensionConfDir(),
 };
 
 function retrieveExtensionMetricLogsFromDb(databaseConn, comment) {

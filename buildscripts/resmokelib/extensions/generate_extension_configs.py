@@ -4,7 +4,6 @@ import logging
 import os
 import shutil
 import sys
-import tempfile
 
 import yaml
 
@@ -14,15 +13,14 @@ from buildscripts.resmokelib.extensions.constants import CONF_IN_PATH
 def get_conf_out_dir() -> str:
     """Return the directory for generated extension .conf files.
 
-    Checks for the temp dir explicitly. Using tempfile.gettempdir() caches its result, and
-    the temporary directory may be adjusted early by resmoke or other test setup.
+    Resolves the temp dir from the environment (TMPDIR/TEMP/TMP), falling back to "/tmp". This must
+    stay in sync with getExtensionConfDir() in jstests/noPassthrough/libs/extension_helpers.js,
+    which the test framework uses to tell the server where to read extension configs. The fallback
+    is a literal "/tmp" to match that helper rather than tempfile.gettempdir() (which could resolve
+    elsewhere, e.g. /var/tmp, and diverge). The env vars are checked explicitly so a TMPDIR adjusted
+    by resmoke or other test setup is picked up.
     """
-    tmpdir = (
-        os.environ.get("TMPDIR")
-        or os.environ.get("TEMP")
-        or os.environ.get("TMP")
-        or tempfile.gettempdir()
-    )
+    tmpdir = os.environ.get("TMPDIR") or os.environ.get("TEMP") or os.environ.get("TMP") or "/tmp"
     return os.path.join(tmpdir, "mongo", "extensions")
 
 

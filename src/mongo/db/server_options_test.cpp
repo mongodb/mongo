@@ -1543,81 +1543,172 @@ TEST_F(SetParameterOptionTest, ApplySetParameters) {
     ASSERT_EQ(p2->val, 666);
 }
 
-class ExtensionsSignaturePubKeyPathOptionTest : public unittest::Test {
-protected:
-    void setUp() override {
-        ASSERT_OK(addGeneralServerOptions(&options));
-    }
-
+/**
+ * ParseAndSetupStringPathParameterOptionTest is a helper base test class used to verify that a
+ * string configuration option is parsed/validated/setup correctly into the serverGlobalParams.
+ * Note, the configuration must belong to the 'processManagement' section of the configuration file.
+ */
+class ParseAndSetupStringPathParameterOptionTest : public unittest::Test {
 public:
-    std::filesystem::path touchTempPubKeyFile(std::string filename) {
-        pubKeyTempDir.emplace("ext_sig_pub_key_path_test");
-        auto p = std::filesystem::path(pubKeyTempDir->path()) / filename;
-        std::ofstream{p};
-        return p;
+    ~ParseAndSetupStringPathParameterOptionTest() = default;
+
+    void setUp() override {
+        ASSERT_OK(addGeneralServerOptions(&_options));
+        _tmpDir.emplace(_configName + "_test");
     }
 
-    /**
-     * 'yaml' determines if the server's argv input should specify the server options
-     * directly, or if it should look for a config yaml file.
-     *
-     * Returns 'extSigPubKeyPath'.
-     */
-    std::filesystem::path parseAndSetupServerOptions(std::filesystem::path extSigPubKeyPath,
-                                                     bool yaml) {
+protected:
+    ParseAndSetupStringPathParameterOptionTest(const std::string& configName)
+        : _configName(configName) {}
+
+    virtual const std::string& _readServerParam() = 0;
+
+    // Selects whether parseAndSetupServerOptions passes the option directly on the command line or
+    // via a YAML config file.
+    enum class ConfigSource { kCommandLine, kConfigFile };
+    struct ExpectedResult {
+        ErrorCodes::Error code{ErrorCodes::OK};
+        std::string errorMessage{};  // This value is optionally set for expected error cases.
+    };
+
+    void _testParseAndSetupServerOptions(const std::string& configValue,
+                                         ConfigSource source,
+                                         ExpectedResult expected) {
         std::vector<std::string> argv;
-        if (!yaml) {
-            argv = {"binaryname", "--extensionsSignaturePublicKeyPath", extSigPubKeyPath.string()};
-        } else {
-            argv = {"binaryname", "--config", "config.yaml"};
-            parser.setConfig("config.yaml",
-                             fmt::format("{}:\n"
-                                         "    {}: {}\n",
-                                         "processManagement",
-                                         "extensionsSignaturePublicKeyPath",
-                                         extSigPubKeyPath.string()));
+        switch (source) {
+            case ConfigSource::kCommandLine:
+                argv = {"binaryname", "--" + _configName, configValue};
+                break;
+            case ConfigSource::kConfigFile:
+                argv = {"binaryname", "--config", "config.yaml"};
+                _parser.setConfig("config.yaml",
+                                  fmt::format("{}:\n"
+                                              "    {}: {}\n",
+                                              "processManagement",
+                                              _configName,
+                                              configValue));
+                break;
         }
 
-        ASSERT_OK(parser.run(options, argv, &environment));
-        ASSERT_OK(validateServerOptions(environment));
-        ASSERT_OK(canonicalizeServerOptions(&environment));
+        ASSERT_OK(_parser.run(_options, argv, &_environment));
+        ASSERT_OK(validateServerOptions(_environment));
+        ASSERT_OK(canonicalizeServerOptions(&_environment));
         ASSERT_OK(setupServerOptions(argv));
 
-        return extSigPubKeyPath;
+        const auto storeOptionsStatus = storeServerOptions(_environment);
+        ASSERT_EQ(storeOptionsStatus, expected.code);
+
+        if (expected.code == ErrorCodes::OK) {
+            ASSERT_EQ(_readServerParam(), configValue);
+        } else {
+            if (!expected.errorMessage.empty()) {
+                ASSERT_STRING_CONTAINS(storeOptionsStatus.reason(), expected.errorMessage);
+            }
+        }
     }
 
-    OptionsParserTester parser;
-    moe::Environment environment;
-    moe::OptionSection options;
-    boost::optional<unittest::TempDir> pubKeyTempDir;
+    std::string _touchFile(std::string filename) {
+        auto p = std::filesystem::path(_tmpDir->path()) / filename;
+        std::ofstream{p};
+        return p.string();
+    }
+
+    OptionsParserTester _parser;
+    moe::Environment _environment;
+    moe::OptionSection _options;
+    boost::optional<unittest::TempDir> _tmpDir;
+
+private:
+    const std::string _configName;
+};
+
+class ExtensionsSignaturePubKeyPathOptionTest : public ParseAndSetupStringPathParameterOptionTest {
+public:
+    ExtensionsSignaturePubKeyPathOptionTest()
+        : ParseAndSetupStringPathParameterOptionTest("extensionsSignaturePublicKeyPath") {}
+
+private:
+    const std::string& _readServerParam() override {
+        return serverGlobalParams.extensionsSignaturePublicKeyPath;
+    }
 };
 
 TEST_F(ExtensionsSignaturePubKeyPathOptionTest, PathFromCLI) {
-    std::filesystem::path path =
-        parseAndSetupServerOptions(touchTempPubKeyFile("ext_sig_key.asc"), false);
-
-    ASSERT_OK(storeServerOptions(environment));
-    ASSERT_EQ(serverGlobalParams.extensionsSignaturePublicKeyPath, path);
+    _testParseAndSetupServerOptions(
+        _touchFile("ext_sig_key.asc"), ConfigSource::kCommandLine, {ErrorCodes::OK});
 }
 
 TEST_F(ExtensionsSignaturePubKeyPathOptionTest, PathFromConfigFile) {
-    std::filesystem::path path =
-        parseAndSetupServerOptions(touchTempPubKeyFile("ext_sig_key.asc"), true);
-
-    ASSERT_OK(storeServerOptions(environment));
-    ASSERT_EQ(serverGlobalParams.extensionsSignaturePublicKeyPath, path);
+    _testParseAndSetupServerOptions(
+        _touchFile("ext_sig_key.asc"), ConfigSource::kConfigFile, {ErrorCodes::OK});
 }
 
 TEST_F(ExtensionsSignaturePubKeyPathOptionTest, PathIsNotAsc) {
-    parseAndSetupServerOptions(touchTempPubKeyFile("ext_sig_key.txt"), false);
-
-    ASSERT_EQ(storeServerOptions(environment), ErrorCodes::BadValue);
+    _testParseAndSetupServerOptions(_touchFile("ext_sig_key.txt"),
+                                    ConfigSource::kCommandLine,
+                                    {ErrorCodes::BadValue, "the provided file is not a '.asc'"});
 }
 
-TEST_F(ExtensionsSignaturePubKeyPathOptionTest, NonexistantFile) {
-    parseAndSetupServerOptions("/dne/ext_sig_key.asc", false);
+TEST_F(ExtensionsSignaturePubKeyPathOptionTest, NonexistentFile) {
+    _testParseAndSetupServerOptions("/dne/ext_sig_key.asc",
+                                    ConfigSource::kCommandLine,
+                                    {ErrorCodes::BadValue, "the provided file does not exist"});
+}
 
-    ASSERT_EQ(storeServerOptions(environment), ErrorCodes::BadValue);
+class ExtensionsConfigPathOptionTest : public ParseAndSetupStringPathParameterOptionTest {
+public:
+    ExtensionsConfigPathOptionTest()
+        : ParseAndSetupStringPathParameterOptionTest("extensionsConfigPath") {}
+
+    void tearDown() override {
+        serverGlobalParams.extensionsConfigPath.clear();
+    }
+
+protected:
+    const std::string& _readServerParam() override {
+        return serverGlobalParams.extensionsConfigPath;
+    }
+};
+
+TEST_F(ExtensionsConfigPathOptionTest, PathFromCLI) {
+    _testParseAndSetupServerOptions(_tmpDir->path(), ConfigSource::kCommandLine, {ErrorCodes::OK});
+}
+
+TEST_F(ExtensionsConfigPathOptionTest, PathFromConfigFile) {
+    _testParseAndSetupServerOptions(_tmpDir->path(), ConfigSource::kConfigFile, {ErrorCodes::OK});
+}
+
+TEST_F(ExtensionsConfigPathOptionTest, NonexistentPath) {
+    _testParseAndSetupServerOptions("/dne/extensions_config",
+                                    ConfigSource::kCommandLine,
+                                    {ErrorCodes::BadValue, "does not exist"});
+}
+
+TEST_F(ExtensionsConfigPathOptionTest, NonDirectoryPath) {
+    // The config path must be a directory; an existing regular file should be rejected at startup
+    // rather than failing later during extension loading.
+    const auto filePath = _touchFile("not_a_directory");
+    ASSERT_TRUE(std::filesystem::is_regular_file(filePath));
+    _testParseAndSetupServerOptions(
+        filePath, ConfigSource::kCommandLine, {ErrorCodes::BadValue, "not a directory"});
+}
+
+TEST_F(ExtensionsConfigPathOptionTest, EmptyPath) {
+    // An explicitly provided but empty path is rejected (distinct from the option being absent,
+    // which is allowed -- see OptionNotProvided).
+    _testParseAndSetupServerOptions(
+        "", ConfigSource::kCommandLine, {ErrorCodes::BadValue, "path was empty"});
+}
+
+TEST_F(ExtensionsConfigPathOptionTest, OptionNotProvided) {
+    std::vector<std::string> argv = {"binaryname"};
+    ASSERT_OK(_parser.run(_options, argv, &_environment));
+    ASSERT_OK(validateServerOptions(_environment));
+    ASSERT_OK(canonicalizeServerOptions(&_environment));
+    ASSERT_OK(setupServerOptions(argv));
+
+    ASSERT_OK(storeServerOptions(_environment));
+    ASSERT_TRUE(serverGlobalParams.extensionsConfigPath.empty());
 }
 
 }  // namespace

@@ -60,6 +60,7 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <system_error>
 #include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
@@ -120,6 +121,36 @@ Status setExtensionsSignaturePubKeyPath(const moe::Environment& params) {
                   "extensions signature secure compilation mode. In secure mode the key "
                   "used for extensions signature verification is not configurable.");
 #endif  // not MONGO_CONFIG_EXT_SECURE
+}
+
+Status setExtensionsConfigPath(const moe::Environment& params) {
+    moe::Value extensionsConfigPathValue = params["processManagement.extensionsConfigPath"];
+    if (extensionsConfigPathValue.isEmpty()) {
+        return Status::OK();
+    }
+
+    std::filesystem::path configPath = extensionsConfigPathValue.as<std::string>();
+    if (configPath.empty()) {
+        return Status(ErrorCodes::BadValue,
+                      "`extensionsConfigPath` option was specified, "
+                      "but path was empty.");
+    }
+
+    std::error_code ec;
+    if (!std::filesystem::exists(configPath, ec)) {
+        return Status(ErrorCodes::BadValue,
+                      "`extensionsConfigPath` option was specified, "
+                      "but the provided path does not exist or is not accessible.");
+    }
+
+    if (!std::filesystem::is_directory(configPath, ec)) {
+        return Status(ErrorCodes::BadValue,
+                      "`extensionsConfigPath` option was specified, "
+                      "but the provided path is not a directory or is not accessible.");
+    }
+
+    serverGlobalParams.extensionsConfigPath = configPath.string();
+    return Status::OK();
 }
 
 }  // namespace
@@ -507,6 +538,10 @@ Status storeBaseOptions(const moe::Environment& params) {
     }
 
     if (auto err = setExtensionsSignaturePubKeyPath(params); !err.isOK()) {
+        return err;
+    }
+
+    if (auto err = setExtensionsConfigPath(params); !err.isOK()) {
         return err;
     }
 

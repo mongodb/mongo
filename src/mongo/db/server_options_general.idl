@@ -177,6 +177,10 @@ configs:
         arg_vartype: String
         condition:
             preprocessor: "!defined(MONGO_CONFIG_EXT_SIG_SECURE)"
+    "processManagement.extensionsConfigPath":
+        description: "Path to directory containing extension configuration files"
+        short_name: extensionsConfigPath
+        arg_vartype: String
 
     objcheck:
         description: "Inspect client data for validity on receipt (DEFAULT)"

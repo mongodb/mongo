@@ -334,6 +334,10 @@ struct MONGO_MOD_PUB ServerGlobalParams {
     // If empty string (default), verification will by bypassed (which is fine in insecure mode).
     std::string extensionsSignaturePublicKeyPath;
 #endif
+
+    // Path to directory containing extension configuration files. If empty, it means the config was
+    // not provided, since the parser will reject empty strings provided by the user.
+    std::string extensionsConfigPath;
 };
 
 MONGO_MOD_PUB extern ServerGlobalParams serverGlobalParams;

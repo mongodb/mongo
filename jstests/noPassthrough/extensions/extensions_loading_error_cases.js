@@ -18,6 +18,7 @@ import {
     generateExtensionConfigs,
     deleteExtensionConfigs,
     checkExtensionFailsToLoad,
+    getExtensionConfDir,
 } from "jstests/noPassthrough/libs/extension_helpers.js";
 
 const extensionNames = generateExtensionConfigs([
@@ -25,6 +26,7 @@ const extensionNames = generateExtensionConfigs([
     "libno_symbol_bad_extension.so",
     "libduplicate_stage_descriptor_bad_extension.so",
 ]);
+const confDir = getExtensionConfDir();
 
 // Create a ShardingTest so that we have a config DB for mongos to point to in our test. We don't
 // use ShardingTest directly because repeated failed ShardingTest startups causes issues in the test
@@ -40,6 +42,7 @@ try {
         checkExtensionFailsToLoad({
             options: {
                 loadExtensions: extensionNames[0],
+                extensionsConfigPath: confDir,
                 setParameter: {featureFlagExtensionsAPI: false},
             },
             st: st,
@@ -47,7 +50,13 @@ try {
         // Extensions is a scalar, non-string.
         checkExtensionFailsToLoad({options: {loadExtensions: 12345}, st: st});
         // Extension does not exist.
-        checkExtensionFailsToLoad({options: {loadExtensions: "extension_does_not_exist"}, st: st});
+        checkExtensionFailsToLoad({
+            options: {
+                loadExtensions: "extension_does_not_exist",
+                extensionsConfigPath: confDir,
+            },
+            st: st,
+        });
         // Attempts to load a filepath.
         checkExtensionFailsToLoad({
             options: {loadExtensions: "etc/mongo/extensions/extension.conf"},
@@ -58,13 +67,31 @@ try {
             st: st,
         });
         // Extension with an .so that is missing the get_mongodb_extension symbol.
-        checkExtensionFailsToLoad({options: {loadExtensions: extensionNames[1]}, st: st});
+        checkExtensionFailsToLoad({
+            options: {
+                loadExtensions: extensionNames[1],
+                extensionsConfigPath: confDir,
+            },
+            st: st,
+        });
         // Extension that attempts to register duplicate stage descriptors.
-        checkExtensionFailsToLoad({options: {loadExtensions: extensionNames[2]}, st: st});
+        checkExtensionFailsToLoad({
+            options: {
+                loadExtensions: extensionNames[2],
+                extensionsConfigPath: confDir,
+            },
+            st: st,
+        });
     } else {
         // Startup should fail because we are attempting to load an extension on a platform that is not
         // linux.
-        checkExtensionFailsToLoad({options: {loadExtensions: extensionNames[0]}, st: st});
+        checkExtensionFailsToLoad({
+            options: {
+                loadExtensions: extensionNames[0],
+                extensionsConfigPath: confDir,
+            },
+            st: st,
+        });
     }
 } finally {
     st.stop();

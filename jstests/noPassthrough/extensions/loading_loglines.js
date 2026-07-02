@@ -13,6 +13,7 @@ import {
     generateExtensionConfigs,
     deleteExtensionConfigs,
     checkPlatformCompatibleWithExtensions,
+    getExtensionConfDir,
 } from "jstests/noPassthrough/libs/extension_helpers.js";
 
 checkPlatformCompatibleWithExtensions();
@@ -21,6 +22,7 @@ const extensionNames = generateExtensionConfigs("libfoo_mongo_extension.so");
 
 const extOpts = {
     loadExtensions: extensionNames[0],
+    extensionsConfigPath: getExtensionConfDir(),
     setParameter: {featureFlagExtensionsAPI: true},
 };
 

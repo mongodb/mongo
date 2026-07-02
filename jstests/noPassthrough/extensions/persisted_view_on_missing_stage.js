@@ -9,6 +9,7 @@ import {
     generateExtensionConfigs,
     deleteExtensionConfigs,
     checkPlatformCompatibleWithExtensions,
+    getExtensionConfDir,
 } from "jstests/noPassthrough/libs/extension_helpers.js";
 
 checkPlatformCompatibleWithExtensions();
@@ -19,6 +20,7 @@ const optionsWithExtension = {
     dbpath: dbpath,
     noCleanData: true,
     loadExtensions: extensionNames[0],
+    extensionsConfigPath: getExtensionConfDir(),
     setParameter: {featureFlagExtensionStubParsers: true},
 };
 const optionsWithoutExtension = {

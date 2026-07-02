@@ -45,17 +45,13 @@
 namespace mongo::extension::host {
 namespace {
 using namespace std::literals::string_view_literals;
-const std::filesystem::path& getExtensionStubParserFile() {
-    static const std::filesystem::path kExtensionStubParserPath = [] {
-        constexpr auto kFileName = "aggregation_stage_fallback_parsers.json";
-        if (getTestCommandsEnabled()) {
-            return std::filesystem::current_path() /
-                std::filesystem::path{"src/mongo/db/extension/test_examples"} / kFileName;
-        }
-        return ExtensionLoader::kExtensionConfigPath / kFileName;
-    }();
-
-    return kExtensionStubParserPath;
+std::filesystem::path getExtensionStubParserFile() {
+    constexpr auto kFileName = "aggregation_stage_fallback_parsers.json";
+    if (getTestCommandsEnabled()) {
+        return std::filesystem::current_path() /
+            std::filesystem::path{"src/mongo/db/extension/test_examples"} / kFileName;
+    }
+    return ExtensionLoader::getExtensionConfDir() / kFileName;
 }
 
 /**

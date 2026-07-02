@@ -15,6 +15,7 @@ import {
     checkPlatformCompatibleWithExtensions,
     generateExtensionConfigWithOptions,
     deleteExtensionConfigs,
+    getExtensionConfDir,
 } from "jstests/noPassthrough/libs/extension_helpers.js";
 
 checkPlatformCompatibleWithExtensions();
@@ -30,6 +31,7 @@ mongotMock.start();
 const conn = MongoRunner.runMongod({
     setParameter: {mongotHost: mongotMock.getConnection().host},
     loadExtensions: [extensionName],
+    extensionsConfigPath: getExtensionConfDir(),
 });
 const adminDb = conn.getDB("admin");
 const testDB = conn.getDB(dbName);

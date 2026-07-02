@@ -8,7 +8,10 @@ from buildscripts.resmokelib.extensions.constants import (
     EVERGREEN_SEARCH_DIRS,
     LOCAL_SEARCH_DIRS,
 )
-from buildscripts.resmokelib.extensions.generate_extension_configs import generate_extension_configs
+from buildscripts.resmokelib.extensions.generate_extension_configs import (
+    generate_extension_configs,
+    get_conf_out_dir,
+)
 
 
 def normalize_load_extensions(load_extensions) -> list[str]:
@@ -60,8 +63,11 @@ def _generate_and_append_to_load_extensions(
     joined_names = ",".join(extension_names)
 
     _append_to_load_extensions(mongod_options, joined_names)
+    conf_out_dir = get_conf_out_dir()
+    mongod_options["extensionsConfigPath"] = conf_out_dir
     if mongos_options is not None:
         _append_to_load_extensions(mongos_options, joined_names)
+        mongos_options["extensionsConfigPath"] = conf_out_dir
 
     return joined_names
 

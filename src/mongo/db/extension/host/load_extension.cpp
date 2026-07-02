@@ -29,7 +29,6 @@
 
 #include "mongo/db/extension/host/load_extension.h"
 
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/extension/host/host_portal.h"
 #include "mongo/db/extension/host/load_stub_parsers.h"
 #include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
@@ -62,14 +61,6 @@
 namespace mongo::extension::host {
 namespace {
 
-const std::filesystem::path& getExtensionConfDir() {
-    // Use /tmp/mongo/extensions in test environments, otherwise use /etc/mongo/extensions.
-    static const std::filesystem::path kExtensionConfDir = getTestCommandsEnabled()
-        ? std::filesystem::temp_directory_path() / ExtensionLoader::kExtensionConfigPathSuffix
-        : ExtensionLoader::kExtensionConfigPath;
-
-    return kExtensionConfDir;
-}
 
 host_connector::ExtensionHandle getMongoExtension(SharedLibrary& extensionLib,
                                                   const std::string& extensionPath) {
@@ -114,6 +105,23 @@ host_connector::ExtensionHandle getMongoExtension(SharedLibrary& extensionLib,
     return host_connector::ExtensionHandle{extension};
 }
 }  // namespace
+
+std::filesystem::path ExtensionLoader::getExtensionConfDir() {
+    // In the server, serverGlobalParams.extensionsConfigPath is expected to remain consistent after
+    // start-up. However, we avoid caching its value into a static variable to accommodate any
+    // potential future unit testing which may rely on mutating the extensionsConfigPath across
+    // sequential unit tests.
+    if (!serverGlobalParams.extensionsConfigPath.empty()) {
+        return std::filesystem::path(serverGlobalParams.extensionsConfigPath);
+    }
+    // TODO SERVER-127732: Once Atlas has made the changes to provide the extensions config path
+    // value to the server, remove this fallback and assert that we received a config value.
+    static constexpr std::string_view kExtensionConfigPath = "/etc/mongo/extensions";
+    LOGV2(12758900,
+          "No extensionsConfigPath was provided; using the default extension config directory",
+          "defaultPath"_attr = kExtensionConfigPath);
+    return {kExtensionConfigPath};
+}
 
 ::MongoExtensionAPIVersion selectCompatibleVersion(
     const ::MongoExtensionAPIVersionVector& hostVersions,

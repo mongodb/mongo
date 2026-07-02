@@ -25,6 +25,20 @@ export function checkPlatformCompatibleWithExtensions() {
 }
 
 /**
+ * Returns the directory where extension .conf files are generated.
+ *
+ * Must stay in sync with get_conf_out_dir() in
+ * buildscripts/resmokelib/extensions/generate_extension_configs.py.
+ */
+export function getExtensionConfDir() {
+    const tmpdir = _getEnv("TMPDIR") || _getEnv("TEMP") || _getEnv("TMP") || "/tmp";
+    // Trim trailing slashes before appending the suffix so a TMPDIR like "/tmp/" doesn't produce a
+    // double slash ("/tmp//mongo/extensions"). This keeps the result in sync with os.path.join() in
+    // generate_extension_configs.py.
+    return tmpdir.replace(/\/+$/, "") + "/mongo/extensions";
+}
+
+/**
  * @param {string|string[]} soFileNames A shared object file name or a list of shared object file names
  *      to generate .conf files for.
  */
@@ -108,6 +122,13 @@ export function withExtensions(
 ) {
     const extensionsToLoad = [];
 
+    // Ensure the config directory exists up front so it can be populated with .conf files below and
+    // so extensionsConfigPath can always be passed, even when no extensions are loaded (in which
+    // case generate_extension_configs.py never runs to create it, and the server rejects a
+    // non-existent extensionsConfigPath at startup). mkdir() is idempotent.
+    const extensionConfDir = getExtensionConfDir();
+    mkdir(extensionConfDir);
+
     for (const [extLib, extensionOptions] of Object.entries(extToOptionsMap)) {
         const cfgStr =
             typeof extensionOptions === "string"
@@ -120,6 +141,7 @@ export function withExtensions(
     const options = Object.assign(
         {
             loadExtensions: extensionsToLoad,
+            extensionsConfigPath: extensionConfDir,
         },
         additionalMongodOptions,
     );

@@ -122,13 +122,11 @@ public:
      */
     static void unload_forTest(const std::string& name);
 
-    static inline const std::filesystem::path kExtensionConfigPathSuffix{"mongo/extensions"};
     /**
-     * Central path for all extension configuration files. Also holds
-     * aggregation_stage_fallback_parsers.json.
+     * Returns the extension configuration path where extension configuration files (.conf) and
+     * fallback parsers (i.e aggregation_stage_fallback_parsers.json) are read from.
      */
-    static inline const std::filesystem::path kExtensionConfigPath =
-        std::filesystem::path("/etc") / kExtensionConfigPathSuffix;
+    static std::filesystem::path getExtensionConfDir();
 
 private:
     // Used to keep loaded extension 'SharedLibrary' objects alive for the lifetime of the server
