@@ -33,8 +33,83 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
+#include <utility>
+
+#include <unistd.h>
 
 namespace mongo::extension::host {
+
+/**
+ * ValidatedExtension represents the result of an extension's signature verification. During the
+ * extension loading process, we must take special care to ensure the extension file we validate
+ * is not tampered with before the extension is loaded. Callers of SignatureValidator must use the
+ * path() method to obtain the path from which to load the extension.
+ *
+ * When ValidatedExtension is instantiated with a file descriptor, it acts as an RAII handle around
+ * the file descriptor. This is the case when signature validation is enabled. SignatureValidator
+ * opens the extension's file descriptor and hands the descriptor to a ValidatedExtension. Once the
+ * extension is loaded succesfully, callers must call leakDescriptor(), which intentionaly keeps the
+ * descriptor's open .so path() - a "/proc/self/fd/N" string - in use. This prevents the descriptor
+ * number from being recycled during the lifetime of the loaded library.
+ *
+ * When ValidatedExtension is instantiated with a path, there is no descriptor to own and the
+ * reported path is the originally provided path (i.e original on-disk path). This is the case when
+ * signature validation is disabled.
+ */
+class ValidatedExtension {
+    static constexpr std::string_view kProcFdPath = "/proc/self/fd/";
+
+public:
+    explicit ValidatedExtension(std::string path) : _path(std::move(path)) {}
+    explicit ValidatedExtension(int fd)
+        : _fd(fd), _path(std::string{kProcFdPath} + std::to_string(_fd)) {}
+
+    ~ValidatedExtension() {
+        _closeDescriptor();
+    }
+
+    ValidatedExtension(const ValidatedExtension&) = delete;
+    ValidatedExtension& operator=(const ValidatedExtension&) = delete;
+
+    ValidatedExtension(ValidatedExtension&& other) noexcept
+        : _fd(std::exchange(other._fd, -1)), _path(std::move(other._path)) {}
+
+    ValidatedExtension& operator=(ValidatedExtension&& other) noexcept {
+        if (this != &other) {
+            _closeDescriptor();
+            _fd = std::exchange(other._fd, -1);
+            _path = std::move(other._path);
+        }
+        return *this;
+    }
+
+    const std::string& path() const {
+        return _path;
+    }
+
+    /**
+     * Releases ownership of the descriptor without closing it, dismissing the RAII close.
+     * The descriptor is intentionally leaked so path() stays valid - and
+     * its number is never recycled by a later open() - for the lifetime of the loaded library.
+     * dlopen caches loaded objects by the name passed to it, so reusing a "/proc/self/fd/N" number
+     * would make it hand back a previously-loaded object instead of loading the new library.
+     */
+    void leakDescriptor() {
+        _fd = -1;
+    }
+
+private:
+    void _closeDescriptor() {
+        if (_fd >= 0) {
+            ::close(_fd);
+        }
+    }
+
+    int _fd = -1;
+    std::string _path;
+};
+
 /**
  * SignatureValidator is responsible for validating an extension's signature file against a
  * public key.
@@ -52,13 +127,35 @@ public:
 
     virtual ~SignatureValidator();
     /**
-     * Validates the extension's detached signature file against the validation public key.
-     * Note, extensionPath must be guaranteed to exist prior to calling this method. If the
-     * signature is not validated succesfully, an exception is thrown. extensionName must be the
-     * extension's file name including the '.so' suffix.
+     * Validates the extension's detached signature and returns a ValidatedExtension.
+     * ValidatedExtension reports the path that should be used to load the extension after signature
+     * validation.
+     *
+     * 'extensionPath' is the on-disk path to the extension:
+     *     - The path must end with '.so'.
+     *     - The path must guaranteed to exist prior to calling this method.
+     *     - The path must be a regular file, owned by a trusted user and not group/other-writable.
+     *
+     * If the signature is not validated successfully, an exception is thrown.
+     *
+     * When signature validation is enabled, this method avoids a time-of-check/time-of-use
+     * window between verification and loading:
+     *    1) We open the extension into a file descriptor
+     *    2) Verify that descriptor can't be tampered with
+     *    3) Verifies the signature against the inode descriptor's bytes
+     *    4) Returns ValidatedExtension containing the descriptor.
+     * The returned ValidatedExtension reports the "/proc/self/fd/N" path that resolves to the
+     * pinned inode. This guarantees the bytes that were verified against the signature are the
+     * bytes that get loaded into the process.
+     *
+     * Callers of this method must call leakDescriptor() once the extension is loaded so the inode
+     * path stays valid and its number is never recycled for the lifetime of the loaded library.
+     *
+     * When signature validation is disabled, the returned ValidatedExtension reports the original
+     * 'extensionPath' on-disk.
      */
-    void validateExtensionSignature(const std::string& extensionName,
-                                    const std::string& extensionPath) const;
+    ValidatedExtension validateExtensionSignature(const std::string& extensionName,
+                                                  const std::string& extensionPath) const;
 
 protected:
     /**

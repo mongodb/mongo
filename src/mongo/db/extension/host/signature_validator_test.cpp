@@ -47,6 +47,24 @@ static inline const std::string kTestFooLibExtensionName = "libfoo_mongo_extensi
 static inline const std::string kTestReadNDocumentsLibExtensionName =
     "libread_n_documents_mongo_extension.so";
 
+/**
+ * Copies a signed test extension and its detached signature into 'destDir', returning the path to
+ * the copied .so. The copy inherits the source's read-only mode (no group/other write) and is owned
+ * by the test user, so it passes the validator's permission gate by default.
+ */
+std::filesystem::path copySignedExtension(const std::filesystem::path& destDir,
+                                          const std::string& libName) {
+    namespace fs = std::filesystem;
+    fs::create_directories(destDir);
+    const fs::path dest = destDir / libName;
+    const auto src = test_util::getExtensionPath(libName);
+    fs::copy_file(src, dest, fs::copy_options::overwrite_existing);
+    fs::copy_file(std::string{src} + ".sig",
+                  std::string{dest} + ".sig",
+                  fs::copy_options::overwrite_existing);
+    return dest;
+}
+
 class TestWithTempDirectory : public unittest::Test {
 public:
     std::filesystem::path getTempDirPath() const {
@@ -227,6 +245,39 @@ TEST_F(SignatureValidatorTest,
     signatureValidator.validateExtensionSignature(
         kTestFooLibExtensionName, test_util::getExtensionPath(kTestReadNDocumentsLibExtensionName));
 }
+
+/**
+ * InsecureModeReturnsProcFdPathForValidExtension: a successfully validated extension yields a
+ * "/proc/self/fd/N" path pinned to the verified bytes, which the loader hands to dlopen so the
+ * bytes verified are the bytes loaded.
+ */
+TEST_F(SignatureValidatorTest, InsecureModeReturnsProcFdPathForValidExtension) {
+    const std::string extensionName = "foo_extension_copy.so";
+    const auto extensionPath = copySignedExtension(getTempDirPath(), kTestFooLibExtensionName);
+    // The copied .so keeps the source's filename internally, but we exercise the API name argument.
+    const std::filesystem::path renamed = getTempDirPath() / extensionName;
+    std::filesystem::rename(extensionPath, renamed);
+    std::filesystem::rename(std::string{extensionPath} + ".sig", std::string{renamed} + ".sig");
+
+    SignatureValidatorForTest signatureValidator(false);
+    ASSERT_FALSE(signatureValidator.skipValidation());
+    const ValidatedExtension verifiedFile =
+        signatureValidator.validateExtensionSignature(extensionName, renamed.string());
+    ASSERT_TRUE(verifiedFile.path().starts_with("/proc/self/fd/"));
+}
+
+/**
+ * SkippedValidationReturnsOriginalPath: when validation is skipped there is nothing to protect, so
+ * the original on-disk path is returned unchanged (and no file is even opened).
+ */
+TEST_F(SignatureValidatorTest, SkippedValidationReturnsOriginalPath) {
+    serverGlobalParams.extensionsSignaturePublicKeyPath = "";
+    SignatureValidatorForTest signatureValidator(false);
+    ASSERT_TRUE(signatureValidator.skipValidation());
+    ASSERT_EQ(signatureValidator.validateExtensionSignature("foo.so", "/some/path/foo.so").path(),
+              "/some/path/foo.so");
+}
+
 #endif
 
 /**
@@ -256,8 +307,8 @@ TEST_F(SignatureValidatorTest, ValidatingExtensionWithInvalidNameFails) {
 
 /**
  * ValidatingNonExistentExtensionPathFails: tests that validating a signature providing a
- * non-existent file path fails. The correct file name for extension foo is
- * libfoo_mongo_extension.so.
+ * non-existent file path fails when the validator tries to open it. The correct file name for
+ * extension foo is libfoo_mongo_extension.so.
  */
 TEST_F(SignatureValidatorTest, ValidatingNonExistentExtensionPathFails) {
     const std::string extensionName = "foo.so";
@@ -268,13 +319,77 @@ TEST_F(SignatureValidatorTest, ValidatingNonExistentExtensionPathFails) {
         ASSERT_THROWS_CODE(
             signatureValidator.validateExtensionSignature(extensionName, extensionPath),
             AssertionException,
-            11528923);
+            10929850);
     }
 #endif
     {
         SignatureValidatorForTest signatureValidator(true);
         ASSERT_THROWS_CODE(
             signatureValidator.validateExtensionSignature(extensionName, extensionPath),
+            AssertionException,
+            10929850);
+    }
+}
+
+/**
+ * RejectsGroupOrOtherWritableExtension: an extension file that is group- or other-writable is
+ * rejected, since such a file could be overwritten in place by another user between signature
+ * verification and dlopen. The permission gate runs before key-specific verification, so it is
+ * exercised in both secure and insecure mode.
+ */
+TEST_F(SignatureValidatorTest, RejectsGroupOrOtherWritableExtension) {
+    namespace fs = std::filesystem;
+    int i = 0;
+    for (const auto writeBit : {fs::perms::group_write, fs::perms::others_write}) {
+        // Distinct subdirectory per iteration so we never have to overwrite a read-only copy.
+        const auto extensionPath =
+            copySignedExtension(getTempDirPath() / std::to_string(i++), kTestFooLibExtensionName);
+        fs::permissions(extensionPath, writeBit, fs::perm_options::add);
+#ifndef MONGO_CONFIG_EXT_SIG_SECURE
+        {
+            SignatureValidatorForTest signatureValidator(false);
+            ASSERT_THROWS_CODE(signatureValidator.validateExtensionSignature(
+                                   kTestFooLibExtensionName, extensionPath.string()),
+                               AssertionException,
+                               10929854);
+        }
+#endif
+        {
+            SignatureValidatorForTest signatureValidator(true);
+            ASSERT_THROWS_CODE(signatureValidator.validateExtensionSignature(
+                                   kTestFooLibExtensionName, extensionPath.string()),
+                               AssertionException,
+                               10929854);
+        }
+    }
+}
+
+/**
+ * ValidatingExtensionWithMissingSignatureFails: tests that validating an existing extension whose
+ * detached signature file is absent fails with the signature-not-found error. This check is
+ * independent of the signing key, so it is exercised in both secure and insecure mode.
+ */
+TEST_F(SignatureValidatorTest, ValidatingExtensionWithMissingSignatureFails) {
+    const std::string extensionName = "foo_extension_copy.so";
+    const std::filesystem::path extensionPath = getTempDirPath() / extensionName;
+    // Copy only the .so (no .sig) so the file opens and passes the permission gate, but the
+    // signature lookup fails.
+    std::filesystem::copy_file(test_util::getExtensionPath(kTestFooLibExtensionName),
+                               extensionPath,
+                               std::filesystem::copy_options::overwrite_existing);
+#ifndef MONGO_CONFIG_EXT_SIG_SECURE
+    {
+        SignatureValidatorForTest signatureValidator(false);
+        ASSERT_THROWS_CODE(
+            signatureValidator.validateExtensionSignature(extensionName, extensionPath.string()),
+            AssertionException,
+            11528923);
+    }
+#endif
+    {
+        SignatureValidatorForTest signatureValidator(true);
+        ASSERT_THROWS_CODE(
+            signatureValidator.validateExtensionSignature(extensionName, extensionPath.string()),
             AssertionException,
             11528923);
     }

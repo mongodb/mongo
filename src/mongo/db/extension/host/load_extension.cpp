@@ -274,13 +274,23 @@ void ExtensionLoader::load(const std::string& name,
             str::stream() << "Loading extension '" << name << "' failed, path:  " << extensionPath
                           << " does not exist.",
             std::filesystem::exists(extensionPath));
-    signatureValidator.validateExtensionSignature(name, extensionPath);
+    // "When signature validation is enabled, returned handle owns a descriptor pinned to the exact
+    // bytes that were verified and its path() is a "/proc/self/fd/N" string, to avoid a window
+    // between verification and dlopen where the bytes could be modified. When validation is off,
+    //  path() is just 'extensionPath'."
+    ValidatedExtension verifiedFile =
+        signatureValidator.validateExtensionSignature(name, extensionPath);
     StatusWith<std::unique_ptr<SharedLibrary>> swExtensionLib =
-        SharedLibrary::create(extensionPath);
+        SharedLibrary::create(verifiedFile.path());
     uassert(10615500,
             str::stream() << "Loading extension '" << name
                           << "' failed: " << swExtensionLib.getStatus().reason(),
             swExtensionLib.isOK());
+
+    // Leak the descriptor so its "/proc/self/fd/N" path stays valid - and its number is never
+    // recycled by the next extension's open() - for the lifetime of the loaded library, which is
+    // itself kept alive for the process lifetime.
+    verifiedFile.leakDescriptor();
 
     // Add the 'SharedLibrary' pointer to our loaded extensions map to keep it alive for the
     // lifetime of the server.

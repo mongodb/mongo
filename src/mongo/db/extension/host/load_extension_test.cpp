@@ -103,10 +103,42 @@ protected:
         return test_util::makeEmptyExtensionConfig(kMatchTopNLibExtensionPath);
     }
 
+    /**
+     * Copies a signed test extension and its detached signature into a temp directory we own, so
+     * tests can control the on-disk file (permissions, etc.). Normalizes the copy to owner
+     * read/write with no group/other write, so it passes the loader's permission gate by default;
+     * individual tests loosen this to exercise rejection. Returns the path to the copied .so.
+     */
+    std::filesystem::path copySignedExtensionToTempDir(const std::string& libName) {
+        namespace fs = std::filesystem;
+        // Use a fresh subdirectory per call so repeated copies don't have to overwrite read-only
+        // files left behind by a previous call (copied .so/.sig inherit the source's read-only
+        // mode, which would make a subsequent copy_file fail with EACCES).
+        const fs::path destDir = fs::path(_tempDir.path()) / std::to_string(_tempCopyCounter++);
+        fs::create_directories(destDir);
+        const fs::path dest = destDir / libName;
+        const auto src = test_util::getExtensionPath(libName);
+        fs::copy_file(src, dest, fs::copy_options::overwrite_existing);
+        fs::copy_file(std::string{src} + ".sig",
+                      std::string{dest} + ".sig",
+                      fs::copy_options::overwrite_existing);
+        fs::permissions(
+            dest, fs::perms::owner_read | fs::perms::owner_write, fs::perm_options::replace);
+        return dest;
+    }
+
+    static ExtensionConfig makeConfigForPath(const std::filesystem::path& path) {
+        return ExtensionConfig{.sharedLibraryPath = path.string(),
+                               .extOptions = YAML::Node(YAML::NodeType::Map)};
+    }
+
     boost::intrusive_ptr<ExpressionContext> expCtx;
 
     static inline NamespaceString nss =
         NamespaceString::createNamespaceString_forTest(boost::none, "load_extension_test");
+
+    unittest::TempDir _tempDir{"load_extension_test"};
+    size_t _tempCopyCounter{0};
 
 private:
     unittest::ServerParameterGuard _featureFlagExtensionsAPI{"featureFlagExtensionsAPI", true};
@@ -253,6 +285,28 @@ TEST_F(LoadExtensionsTest, LoadExtensionSucceeds) {
         parsedPipeline->getSources().front().get());
     ASSERT_TRUE(firstStage != nullptr);
     ASSERT_EQUALS(std::string(firstStage->getSourceName()), std::string(kTestFooStageName));
+}
+
+// The loader pins the extension to a file descriptor and verifies/loads it through
+// "/proc/self/fd/N", and (when signature validation is enabled) refuses to load a file that an
+// untrusted party could mutate underneath us. A read-only, owner-owned copy must still load.
+TEST_F(LoadExtensionsTest, LoadExtensionAcceptsOwnerOwnedNonWritableFile) {
+    const auto path = copySignedExtensionToTempDir(kTestFooLibExtensionPath);
+    ASSERT_DOES_NOT_THROW(ExtensionLoader::load("foo", makeConfigForPath(path)));
+    ASSERT_TRUE(ExtensionLoader::isLoaded("foo"));
+}
+
+// A group- or other-writable extension file is rejected: such a file could be overwritten in place
+// by another user between signature verification and dlopen.
+TEST_F(LoadExtensionsTest, LoadExtensionRejectsGroupOrOtherWritableFile) {
+    namespace fs = std::filesystem;
+    for (const auto writeBit : {fs::perms::group_write, fs::perms::others_write}) {
+        const auto path = copySignedExtensionToTempDir(kTestFooLibExtensionPath);
+        fs::permissions(path, writeBit, fs::perm_options::add);
+        ASSERT_THROWS_CODE(
+            ExtensionLoader::load("foo", makeConfigForPath(path)), AssertionException, 10929854);
+        ASSERT_FALSE(ExtensionLoader::isLoaded("foo"));
+    }
 }
 
 // Tests successful desugar extension loading and verifies stage registration works in pipelines.

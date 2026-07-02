@@ -35,16 +35,62 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/str.h"
 
 #include <filesystem>
 #include <fstream>
+#include <string>
+
+#include <fcntl.h>
+#include <unistd.h>
 
 #include <fmt/format.h>
+#include <sys/stat.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExtension
 
 namespace mongo::extension::host {
+
+
+namespace {
+void verifyExtensionPermissions(const std::string& extensionName,
+                                const std::string& extensionPath,
+                                int extensionFd) {
+    // Refuse to load a file that an untrusted party could mutate underneath us between verification
+    // and dlopen. The file must be a regular file owned by a trusted principal (root or this
+    // process's effective user) and must not be group/other-writable. Owner-write is acceptable
+    // because only a trusted owner (or root) could exercise it. chmod is governed by ownership
+    // rather than the write bit, so requiring a trusted owner is what keeps this permission
+    // snapshot durable through the subsequent dlopen.
+    struct stat fileStat;
+    uassert(10929851,
+            fmt::format("Failed to verify extension signature for extension: {}. Could not stat "
+                        "'{}': {}",
+                        extensionName,
+                        extensionPath,
+                        errorMessage(lastSystemError())),
+            ::fstat(extensionFd, &fileStat) == 0);
+    uassert(10929852,
+            fmt::format("Failed to verify extension signature for extension: {}. '{}' is not a "
+                        "regular file",
+                        extensionName,
+                        extensionPath),
+            S_ISREG(fileStat.st_mode));
+    uassert(10929853,
+            fmt::format("Failed to verify extension signature for extension: {}. '{}' must be "
+                        "owned by root or the server's user",
+                        extensionName,
+                        extensionPath),
+            fileStat.st_uid == 0 || fileStat.st_uid == ::geteuid());
+    uassert(10929854,
+            fmt::format("Failed to verify extension signature for extension: {}. '{}' must not be "
+                        "writable by group or other users",
+                        extensionName,
+                        extensionPath),
+            (fileStat.st_mode & (S_IWGRP | S_IWOTH)) == 0);
+}
+}  // namespace
 
 SignatureValidator::SignatureValidator()
     : SignatureValidator([]() {
@@ -102,11 +148,13 @@ SignatureValidator::SignatureValidator(bool secureMode)
 
 SignatureValidator::~SignatureValidator() {}
 
-void SignatureValidator::validateExtensionSignature(const std::string& extensionName,
-                                                    const std::string& extensionPath) const {
+ValidatedExtension SignatureValidator::validateExtensionSignature(
+    const std::string& extensionName, const std::string& extensionPath) const {
     if (_skipValidation) {
         LOGV2_DEBUG(11528806, 4, "Skipping signature validation");
-        return;
+        // Nothing is being verified, so there is no time-of-check/time-of-use window to protect;
+        // load the extension directly from its on-disk path (no descriptor to own).
+        return ValidatedExtension{extensionPath};
     }
 
     LOGV2_DEBUG(11528830,
@@ -115,21 +163,39 @@ void SignatureValidator::validateExtensionSignature(const std::string& extension
                 "extensionName"_attr = extensionName,
                 "path"_attr = extensionPath);
 
-    const std::string extensionSignaturePath = extensionPath + ".sig";
     uassert(11528810,
             fmt::format("Failed to verify extension signature for extension: {}. Extension path "
                         "did not end with .so, got: '{}'",
                         extensionName,
                         extensionPath),
             extensionPath.ends_with(".so"));
+
+    // Open the extension and pin it to a file descriptor. We verify the signature against the file
+    // descriptor directly, and callers ultimately load from the bytes behind this exact descriptor.
+    // This  prevents a local attacker with write access to the path from swapping or overwriting
+    // the library between verification and dlopen.
+    const int extensionFd = ::open(extensionPath.c_str(), O_RDONLY | O_CLOEXEC);
+    uassert(10929850,
+            fmt::format("Failed to verify extension signature for extension: {}. Could not open "
+                        "path '{}': {}",
+                        extensionName,
+                        extensionPath,
+                        errorMessage(lastSystemError())),
+            extensionFd >= 0);
+
+    ValidatedExtension verifiedFile{extensionFd};
+    verifyExtensionPermissions(extensionName, extensionPath, extensionFd);
+    // The detached signature lives alongside the extension on disk, keyed off the original path.
+    const std::string extensionSignaturePath = extensionPath + ".sig";
     uassert(11528923,
             fmt::format("Failed to verify extension signature for extension: {}. Extension "
                         "signature path '{}' did not exist",
                         extensionName,
                         extensionSignaturePath),
             std::filesystem::exists(extensionSignaturePath));
+
     try {
-        _rnpCtx.verifyDetachedSignature(extensionPath, extensionSignaturePath);
+        _rnpCtx.verifyDetachedSignature(verifiedFile.path(), extensionSignaturePath);
     } catch (DBException& exc) {
         uasserted(11528920,
                   fmt::format("Failed to verify extension signature for extension: {}, with "
@@ -138,6 +204,8 @@ void SignatureValidator::validateExtensionSignature(const std::string& extension
                               extensionSignaturePath,
                               exc.what()));
     }
+
+    return verifiedFile;
 }
 
 /**
