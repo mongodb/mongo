@@ -528,7 +528,7 @@ private:
         _currFrame->end = obj + len;
 
         if constexpr (precise) {
-            auto nameLen = obj - _currElem;
+            auto nameLen = obj - _currElem - 1;  // exclude type byte
             _currFrame->elem = BSONElement(_currElem, nameLen, BSONElement::TrustedInitTag{});
         }
         return cursor.ptr;

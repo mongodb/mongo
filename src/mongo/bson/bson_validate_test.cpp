@@ -845,6 +845,16 @@ TEST(BSONValidateFast, InvalidType) {
     ASSERT_THROWS_CODE(obj.woCompare(BSON("A" << 1)), DBException, 10320);
 }
 
+TEST(BSONValidateFast, PreciseValidationCorrectFieldNameSize) {
+    auto scope = BSON("nested" << BSON("x" << 1) << "arr" << BSON_ARRAY(1));
+    ASSERT_EQ(scope["nested"].fieldNameSize(), 7);
+    ASSERT_EQ(scope["arr"].Obj()["0"].fieldNameSize(), 2);
+
+    auto doc = BSON("a" << BSONCodeWScope("code", scope));
+    ASSERT_OK(validateBSON(doc));
+    ASSERT_EQ(doc["a"].fieldNameSize(), 2);
+}
+
 TEST(BSONValidateFast, ValidCodeWScope) {
     BSONObj obj = BSON("a" << BSONCodeWScope("code", BSON("c" << BSONObj())));
     ASSERT_OK(validateBSON(obj));
