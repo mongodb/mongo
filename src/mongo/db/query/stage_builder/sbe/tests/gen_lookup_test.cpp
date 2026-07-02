@@ -1005,16 +1005,39 @@ protected:
             new ExpressionContextForTest(operationContext(), leftCollectionName));
     }
 
-    ExecutablePlan createNLJPlanWithFollowOnProjection(const NamespaceString& leftCollectionName,
-                                                       const NamespaceString& rightCollectionName,
-                                                       const FieldPath& embeddingPath,
-                                                       const FieldPath& leftJoinKey,
-                                                       const FieldPath& rightJoinKey,
-                                                       BSONObj projection) {
-        auto leftScanNode = std::make_unique<CollectionScanNode>(leftCollectionName);
-        auto rightScanNode = std::make_unique<CollectionScanNode>(rightCollectionName);
+    ExecutablePlan createNLJPlanWithProjections(const NamespaceString& leftCollectionName,
+                                                boost::optional<BSONObj> leftProjection,
+                                                const NamespaceString& rightCollectionName,
+                                                boost::optional<BSONObj> rightProjection,
+                                                const FieldPath& embeddingPath,
+                                                const FieldPath& leftJoinKey,
+                                                const FieldPath& rightJoinKey,
+                                                boost::optional<BSONObj> topProjection) {
+        boost::intrusive_ptr<ExpressionContext> expCtx(
+            new ExpressionContextForTest(operationContext(), leftCollectionName));
 
-        auto joinNode = std::make_unique<NestedLoopJoinEmbeddingNode>(
+        std::unique_ptr<QuerySolutionNode> leftScanNode =
+            std::make_unique<CollectionScanNode>(leftCollectionName);
+        if (leftProjection) {
+            leftScanNode = std::make_unique<ProjectionNodeDefault>(
+                std::move(leftScanNode),
+                nullptr,
+                projection_ast::parseAndAnalyze(expCtx,
+                                                std::move(*leftProjection),
+                                                ProjectionPolicies::aggregateProjectionPolicies()));
+        }
+        std::unique_ptr<QuerySolutionNode> rightScanNode =
+            std::make_unique<CollectionScanNode>(rightCollectionName);
+        if (rightProjection) {
+            rightScanNode = std::make_unique<ProjectionNodeDefault>(
+                std::move(rightScanNode),
+                nullptr,
+                projection_ast::parseAndAnalyze(expCtx,
+                                                std::move(*rightProjection),
+                                                ProjectionPolicies::aggregateProjectionPolicies()));
+        }
+
+        std::unique_ptr<QuerySolutionNode> joinNode = std::make_unique<NestedLoopJoinEmbeddingNode>(
             std::move(leftScanNode),
             std::move(rightScanNode),
             std::vector<QSNJoinPredicate>{{.op = QSNJoinPredicate::ComparisonOp::Eq,
@@ -1023,13 +1046,16 @@ protected:
             boost::none,
             embeddingPath);
 
-        boost::intrusive_ptr<ExpressionContext> expCtx(
-            new ExpressionContextForTest(operationContext(), leftCollectionName));
-        auto solution = makeQuerySolution(std::make_unique<ProjectionNodeDefault>(
-            std::move(joinNode),
-            nullptr,
-            projection_ast::parseAndAnalyze(
-                expCtx, std::move(projection), ProjectionPolicies::aggregateProjectionPolicies())));
+        if (topProjection) {
+            joinNode = std::make_unique<ProjectionNodeDefault>(
+                std::move(joinNode),
+                nullptr,
+                projection_ast::parseAndAnalyze(expCtx,
+                                                std::move(*topProjection),
+                                                ProjectionPolicies::aggregateProjectionPolicies()));
+        }
+
+        auto solution = makeQuerySolution(std::move(joinNode));
 
         return makeExecutablePlan(
             leftCollectionName, {rightCollectionName}, std::move(solution), expCtx);
@@ -2433,12 +2459,14 @@ TEST_F(BinaryJoinStageBuilderTest, NLJWithDottedPathEmbeddingAndFollowOnProjecti
         });
 
     // Try with a projection that manipulates the same field affected by the join.
-    createNLJPlanWithFollowOnProjection(_nss,
-                                        foreignCollectionName,
-                                        FieldPath("a.b.c"),
-                                        FieldPath("lkey"),
-                                        FieldPath("fkey"),
-                                        BSON("a.d" << 0))
+    createNLJPlanWithProjections(_nss,
+                                 boost::none,
+                                 foreignCollectionName,
+                                 boost::none,
+                                 FieldPath("a.b.c"),
+                                 FieldPath("lkey"),
+                                 FieldPath("fkey"),
+                                 BSON("a.d" << 0))
         .expectReturnedDocuments({
             fromjson("{_id: 0, a: {b: {c: {_id: 0, fkey: 0}, x: 1}, y: 1}, lkey: 0}"),
             fromjson("{_id: 1, lkey: 0, a: {x: 1, b: {y: 1, c: {_id: 0, fkey: 0}}, z: 1}}"),
@@ -2452,12 +2480,14 @@ TEST_F(BinaryJoinStageBuilderTest, NLJWithDottedPathEmbeddingAndFollowOnProjecti
         });
 
     // Insert a projection that is totally unrelated to the join graph.
-    createNLJPlanWithFollowOnProjection(_nss,
-                                        foreignCollectionName,
-                                        FieldPath("a.b.c"),
-                                        FieldPath("lkey"),
-                                        FieldPath("fkey"),
-                                        BSON("extra" << 0))
+    createNLJPlanWithProjections(_nss,
+                                 boost::none,
+                                 foreignCollectionName,
+                                 boost::none,
+                                 FieldPath("a.b.c"),
+                                 FieldPath("lkey"),
+                                 FieldPath("fkey"),
+                                 BSON("extra" << 0))
         .expectReturnedDocuments({
             fromjson("{_id: 0, a: {b: {c: {_id: 0, fkey: 0}, x: 1}, d: 90, y: 1}, lkey: 0}"),
             fromjson("{_id: 1, lkey: 0, a: {x: 1, b: {y: 1, c: {_id: 0, fkey: 0}}, z: 1}}"),
@@ -2471,12 +2501,14 @@ TEST_F(BinaryJoinStageBuilderTest, NLJWithDottedPathEmbeddingAndFollowOnProjecti
         });
 
     // Insert a projection that includes only the embedding.
-    createNLJPlanWithFollowOnProjection(_nss,
-                                        foreignCollectionName,
-                                        FieldPath("a.b.c"),
-                                        FieldPath("lkey"),
-                                        FieldPath("fkey"),
-                                        BSON("_id" << 1 << "a" << 1))
+    createNLJPlanWithProjections(_nss,
+                                 boost::none,
+                                 foreignCollectionName,
+                                 boost::none,
+                                 FieldPath("a.b.c"),
+                                 FieldPath("lkey"),
+                                 FieldPath("fkey"),
+                                 BSON("_id" << 1 << "a" << 1))
         .expectReturnedDocuments({
             fromjson("{_id: 0, a: {b: {c: {_id: 0, fkey: 0}, x: 1}, d: 90, y: 1}}"),
             fromjson("{_id: 1, a: {x: 1, b: {y: 1, c: {_id: 0, fkey: 0}}, z: 1}}"),
@@ -2490,12 +2522,14 @@ TEST_F(BinaryJoinStageBuilderTest, NLJWithDottedPathEmbeddingAndFollowOnProjecti
         });
 
     // Insert a projection that includes only part of the embedding.
-    createNLJPlanWithFollowOnProjection(_nss,
-                                        foreignCollectionName,
-                                        FieldPath("a.b.c"),
-                                        FieldPath("lkey"),
-                                        FieldPath("fkey"),
-                                        BSON("_id" << 1 << "a.b.c.fkey" << 1))
+    createNLJPlanWithProjections(_nss,
+                                 boost::none,
+                                 foreignCollectionName,
+                                 boost::none,
+                                 FieldPath("a.b.c"),
+                                 FieldPath("lkey"),
+                                 FieldPath("fkey"),
+                                 BSON("_id" << 1 << "a.b.c.fkey" << 1))
         .expectReturnedDocuments({
             fromjson("{_id: 0, a: {b: {c: {fkey: 0}}}}"),
             fromjson("{_id: 1, a: {b: {c: {fkey: 0}}}}"),
@@ -2506,6 +2540,93 @@ TEST_F(BinaryJoinStageBuilderTest, NLJWithDottedPathEmbeddingAndFollowOnProjecti
             fromjson("{_id: 6, a: {b: {c: {fkey: 0}}}}"),
             fromjson("{_id: 7, a: {b: {c: {fkey: 0}}}}"),
             fromjson("{_id: 8, a: {b: {c: {fkey: 0}}}}"),
+        });
+}
+
+TEST_F(BinaryJoinStageBuilderTest, NLJWithDottedPathEmbeddingAndProjectionOnSources) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(
+        new ExpressionContextForTest(operationContext(), _nss));
+
+    instantiateMainCollection({
+        fromjson("{_id: 0, a: {b: {c: 1, x: 1}, d: 90, y: 1}, lkey: 0}"),
+        fromjson("{_id: 1, lkey: 0, a: {x: 1, b: {y: 1, c: 1}, z: 1}}"),
+        fromjson("{_id: 2, lkey: 0, a: {x: 1, b: {y: 1}, z: 1}}"),
+        fromjson("{_id: 3, lkey: 0, a: {x: 1, b: {c: null, y: 1}, z: 1}}"),
+        fromjson("{_id: 4, lkey: 0, a: {x: 1, b: {c: [{d: 2}, 3], y: 1}, z: 1}}"),
+        fromjson("{_id: 5, lkey: 0, a: {x: 1, b: [{c: 1, y: 1}, 2], z: 1}}"),
+        fromjson("{_id: 6, lkey: 0, a: {x: 1, b: 'str', z: 1}}"),
+        fromjson("{_id: 7, lkey: 0, a: [{x: 1, b: {c: null, y: 1}, z: 1}, {b: {c: 1, d: 2}}]}"),
+        fromjson("{_id: 8, lkey: 0, a: {}, b: 2}"),
+    });
+
+    NamespaceString foreignCollectionName =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
+    instantiateSecondaryCollection(foreignCollectionName,
+                                   {
+                                       fromjson("{_id: 0, fkey: 0}"),
+                                   });
+
+    // Insert a projection that excludes a field from the main collection.
+    createNLJPlanWithProjections(_nss,
+                                 BSON("_id" << 0),
+                                 foreignCollectionName,
+                                 boost::none,
+                                 FieldPath("a.b.c"),
+                                 FieldPath("lkey"),
+                                 FieldPath("fkey"),
+                                 boost::none)
+        .expectReturnedDocuments({
+            fromjson("{a: {b: {c: {_id: 0, fkey: 0}, x: 1}, d: 90, y: 1}, lkey: 0}"),
+            fromjson("{lkey: 0, a: {x: 1, b: {y: 1, c: {_id: 0, fkey: 0}}, z: 1}}"),
+            fromjson("{lkey: 0, a: {x: 1, b: {y: 1, c: {_id: 0, fkey: 0}}, z: 1}}"),
+            fromjson("{lkey: 0, a: {x: 1, b: {c: {_id: 0, fkey: 0}, y: 1}, z: 1}}"),
+            fromjson("{lkey: 0, a: {x: 1, b: {c: {_id: 0, fkey: 0}, y: 1}, z: 1}}"),
+            fromjson("{lkey: 0, a: {x: 1, b: {c: {_id: 0, fkey: 0}}, z: 1}}"),
+            fromjson("{lkey: 0, a: {x: 1, b: {c: {_id: 0, fkey: 0}}, z: 1}}"),
+            fromjson("{lkey: 0, a: {b: {c: {_id: 0, fkey: 0}}}}"),
+            fromjson("{lkey: 0, a: {b: {c: {_id: 0, fkey: 0}}}, b: 2}"),
+        });
+
+    // Insert a projection that excludes a field from the secondary collection.
+    createNLJPlanWithProjections(_nss,
+                                 boost::none,
+                                 foreignCollectionName,
+                                 BSON("_id" << 0),
+                                 FieldPath("a.b.c"),
+                                 FieldPath("lkey"),
+                                 FieldPath("fkey"),
+                                 boost::none)
+        .expectReturnedDocuments({
+            fromjson("{_id: 0, a: {b: {c: {fkey: 0}, x: 1}, d: 90, y: 1}, lkey: 0}"),
+            fromjson("{_id: 1, lkey: 0, a: {x: 1, b: {y: 1, c: {fkey: 0}}, z: 1}}"),
+            fromjson("{_id: 2, lkey: 0, a: {x: 1, b: {y: 1, c: {fkey: 0}}, z: 1}}"),
+            fromjson("{_id: 3, lkey: 0, a: {x: 1, b: {c: {fkey: 0}, y: 1}, z: 1}}"),
+            fromjson("{_id: 4, lkey: 0, a: {x: 1, b: {c: {fkey: 0}, y: 1}, z: 1}}"),
+            fromjson("{_id: 5, lkey: 0, a: {x: 1, b: {c: {fkey: 0}}, z: 1}}"),
+            fromjson("{_id: 6, lkey: 0, a: {x: 1, b: {c: {fkey: 0}}, z: 1}}"),
+            fromjson("{_id: 7, lkey: 0, a: {b: {c: {fkey: 0}}}}"),
+            fromjson("{_id: 8, lkey: 0, a: {b: {c: {fkey: 0}}}, b: 2}"),
+        });
+
+    // Insert a projection that includes a subset of fields from both collections.
+    createNLJPlanWithProjections(_nss,
+                                 BSON("_id" << 0 << "lkey" << 1),
+                                 foreignCollectionName,
+                                 BSON("_id" << 0 << "fkey" << 1),
+                                 FieldPath("a.b.c"),
+                                 FieldPath("lkey"),
+                                 FieldPath("fkey"),
+                                 boost::none)
+        .expectReturnedDocuments({
+            fromjson("{a: {b: {c: {fkey: 0}}}, lkey: 0}"),
+            fromjson("{a: {b: {c: {fkey: 0}}}, lkey: 0}"),
+            fromjson("{a: {b: {c: {fkey: 0}}}, lkey: 0}"),
+            fromjson("{a: {b: {c: {fkey: 0}}}, lkey: 0}"),
+            fromjson("{a: {b: {c: {fkey: 0}}}, lkey: 0}"),
+            fromjson("{a: {b: {c: {fkey: 0}}}, lkey: 0}"),
+            fromjson("{a: {b: {c: {fkey: 0}}}, lkey: 0}"),
+            fromjson("{a: {b: {c: {fkey: 0}}}, lkey: 0}"),
+            fromjson("{a: {b: {c: {fkey: 0}}}, lkey: 0}"),
         });
 }
 

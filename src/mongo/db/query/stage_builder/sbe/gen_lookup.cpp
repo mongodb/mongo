@@ -2098,17 +2098,25 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildNestedLoopJoinEmb
     tassert(11158601, "Expected field effect set to be computed", fieldEffect);
 
     // Recursively build the executable plan for each side of the join.
-    PlanStageReqs leftChildReqs =
-        PlanStageReqs{}
-            .setResultInfo(FieldSet::makeOpenSet(std::vector<std::string>{}), FieldEffects())
-            .set(std::move(leftRequests));
+    PlanStageReqs leftChildReqs;
+    if (nestedLoopJoinEmbeddingNode->leftEmbeddingField) {
+        leftChildReqs.setResultObj();
+    } else {
+        leftChildReqs.setResultInfo(FieldSet::makeOpenSet(std::vector<std::string>{}),
+                                    FieldEffects());
+    }
+    leftChildReqs.set(std::move(leftRequests));
     auto [leftStage, leftOutputs] =
         build(nestedLoopJoinEmbeddingNode->children[0].get(), leftChildReqs);
 
-    PlanStageReqs rightChildReqs =
-        PlanStageReqs{}
-            .setResultInfo(FieldSet::makeOpenSet(std::vector<std::string>{}), FieldEffects())
-            .set(std::move(rightRequests));
+    PlanStageReqs rightChildReqs;
+    if (nestedLoopJoinEmbeddingNode->rightEmbeddingField) {
+        rightChildReqs.setResultObj();
+    } else {
+        rightChildReqs.setResultInfo(FieldSet::makeOpenSet(std::vector<std::string>{}),
+                                     FieldEffects());
+    }
+    rightChildReqs.set(std::move(rightRequests));
     auto [rightStage, rightOutputs] =
         build(nestedLoopJoinEmbeddingNode->children[1].get(), rightChildReqs);
 
@@ -2226,16 +2234,24 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildHashJoinEmbedding
     tassert(11158602, "Expected field effect set to be computed", fieldEffect);
 
     // Recursively build the executable plan for each side of the join.
-    PlanStageReqs leftChildReqs =
-        PlanStageReqs{}
-            .setResultInfo(FieldSet::makeOpenSet(std::vector<std::string>{}), FieldEffects())
-            .set(std::move(leftRequests));
+    PlanStageReqs leftChildReqs;
+    if (hashJoinEmbeddingNode->leftEmbeddingField) {
+        leftChildReqs.setResultObj();
+    } else {
+        leftChildReqs.setResultInfo(FieldSet::makeOpenSet(std::vector<std::string>{}),
+                                    FieldEffects());
+    }
+    leftChildReqs.set(std::move(leftRequests));
     auto [leftStage, leftOutputs] = build(hashJoinEmbeddingNode->children[0].get(), leftChildReqs);
 
-    PlanStageReqs rightChildReqs =
-        PlanStageReqs{}
-            .setResultInfo(FieldSet::makeOpenSet(std::vector<std::string>{}), FieldEffects())
-            .set(std::move(rightRequests));
+    PlanStageReqs rightChildReqs;
+    if (hashJoinEmbeddingNode->rightEmbeddingField) {
+        rightChildReqs.setResultObj();
+    } else {
+        rightChildReqs.setResultInfo(FieldSet::makeOpenSet(std::vector<std::string>{}),
+                                     FieldEffects());
+    }
+    rightChildReqs.set(std::move(rightRequests));
     auto [rightStage, rightOutputs] =
         build(hashJoinEmbeddingNode->children[1].get(), rightChildReqs);
 
@@ -2352,10 +2368,14 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildIndexedJoinEmbedd
     tassert(11122201, "Expected field effect set to be computed", fieldEffect);
 
     // Recursively build the executable plan for the left side of the join.
-    PlanStageReqs leftChildReqs =
-        PlanStageReqs{}
-            .setResultInfo(FieldSet::makeOpenSet(std::vector<std::string>{}), FieldEffects())
-            .set(std::move(leftRequests));
+    PlanStageReqs leftChildReqs;
+    if (indexedJoinEmbeddingNode->leftEmbeddingField) {
+        leftChildReqs.setResultObj();
+    } else {
+        leftChildReqs.setResultInfo(FieldSet::makeOpenSet(std::vector<std::string>{}),
+                                    FieldEffects());
+    }
+    leftChildReqs.set(std::move(leftRequests));
     auto [leftStage, leftOutputs] =
         build(indexedJoinEmbeddingNode->children[0].get(), leftChildReqs);
 
