@@ -401,3 +401,6 @@ if (!isSBEEnabled) {
 }
 assert.eq(1, coll.find({$alwaysTrue: 1, b: 2}).itcount());
 assert.eq(0, coll.find({$alwaysFalse: 1, b: 2}).itcount());
+
+// Check that queries of the shape {$jsonSchema: {not: {maxProperties: N}}} succeed.
+assert.doesNotThrow(() => coll.find({$jsonSchema: {not: {maxProperties: 5}}}).toArray());

@@ -23,6 +23,8 @@ last-continuous:
   all:
     - test_file: jstests/aggregation/accumulators/percentiles_syntax.js
       ticket: SERVER-129617
+    - test_file: jstests/core/query/json_schema/json_schema.js
+      ticket: SERVER-130111
     - test_file: jstests/aggregation/expressions/const_literal_bsoncolumn.js
       ticket: SERVER-129103
     - test_file: jstests/aggregation/expressions/convert_bindata.js
