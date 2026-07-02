@@ -41,6 +41,7 @@
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/sharding_environment/shard_server_op_observer.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -312,6 +313,12 @@ protected:
             .size();
     }
 
+    BSONObj getRecoveryStats() {
+        BSONObjBuilder builder;
+        ShardingStatistics::get(operationContext()).report(&builder);
+        return builder.obj().getObjectField("collectionShardingMetadataStatistics").getOwned();
+    }
+
 private:
     MockCatalogClient* _mockCatalogClient = nullptr;
 };
@@ -362,6 +369,10 @@ TEST_F(CommitCollectionMetadataLocallyTest, CreateCollectionPersistsCollectionAn
     mockCatalogClient()->setCollectionMetadata(collType, chunks);
 
     shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
+
+    // The commit is counted distinctly from the invalidate it emits, and is not a clone.
+    ASSERT_EQ(getRecoveryStats().getIntField("countLocalCollectionMetadataCommits"), 1);
+    ASSERT_EQ(getRecoveryStats().getIntField("countLocalCollectionMetadataClones"), 0);
 
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 1);
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 3);
@@ -1047,6 +1058,12 @@ TEST_F(CommitCollectionMetadataLocallyTest, DropCollectionDeletesMetadata) {
 
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 0);
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 0);
+
+    // The drop is counted distinctly from the commit that seeded the metadata.
+    auto stats = getRecoveryStats();
+    ASSERT_EQ(stats.getIntField("countLocalCollectionMetadataDrops"), 1);
+    ASSERT_EQ(stats.getIntField("countLocalCollectionMetadataCommits"), 1);
+    ASSERT_EQ(stats.getIntField("countLocalCollectionMetadataRenames"), 0);
 }
 
 TEST_F(CommitCollectionMetadataLocallyTest, DropCollectionClearsCSR) {
@@ -1199,6 +1216,11 @@ TEST_F(CommitCollectionMetadataLocallyTest, CloneOnlyWritesDurableCatalogAndEmit
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 1);
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 2);
 
+    // The clone is counted (it emits no 'c' entry, so this counter is the only signal for it) and
+    // is not double-counted as a commit.
+    ASSERT_EQ(getRecoveryStats().getIntField("countLocalCollectionMetadataClones"), 1);
+    ASSERT_EQ(getRecoveryStats().getIntField("countLocalCollectionMetadataCommits"), 0);
+
     // No 'c' oplog entries are written during the clone.
     ASSERT_EQ(countCommandOplogEntries("invalidateCollectionMetadata", kTestNss), 0);
     ASSERT_EQ(countCommandOplogEntries("setAllowChunkOperations", kTestNss), 0);
@@ -1269,6 +1291,9 @@ TEST_F(CommitCollectionMetadataLocallyTest, RenameUnshardedToShardedReplacingIt)
     // sharded collection is fully removed.
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 0);
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 0);
+
+    // The rename primitive is counted distinctly.
+    ASSERT_EQ(getRecoveryStats().getIntField("countLocalCollectionMetadataRenames"), 1);
 }
 
 TEST_F(CommitCollectionMetadataLocallyTest, RenameUnshardedToUnsharded) {

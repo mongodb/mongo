@@ -27,20 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/db/global_catalog/ddl/shardsvr_commit_drop_database_metadata_command.h"
-
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
-#include "mongo/db/global_catalog/type_database_gen.h"
-#include "mongo/db/query/write_ops/delete.h"
-#include "mongo/db/shard_role/lock_manager/exception_util.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
-#include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
-#include "mongo/db/shard_role/shard_catalog/type_oplog_catalog_metadata_gen.h"
+#include "mongo/db/shard_role/shard_catalog/commit_database_metadata_locally.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/transaction/transaction_participant.h"
@@ -52,63 +44,10 @@
 
 namespace mongo {
 
-void commitDropDatabaseMetadataLocally(OperationContext* opCtx, const DatabaseName& dbName) {
-    auto dbNameStr = DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
-
-    LOGV2_DEBUG(10105907,
-                1,
-                "Updating database sharding in-memory state onDropDatabaseMetadata",
-                "dbName"_attr = dbName);
-
-    // Remove database metadata from `config.shard.catalog.databases`.
-    {
-        write_ops::DeleteCommandRequest deleteOp(
-            NamespaceString::kConfigShardCatalogDatabasesNamespace);
-        deleteOp.setDeletes({[&] {
-            write_ops::DeleteOpEntry entry;
-            entry.setQ(BSON(DatabaseType::kDbNameFieldName << dbNameStr));
-            entry.setMulti(false);
-            return entry;
-        }()});
-        deleteOp.setWriteConcern(defaultMajorityWriteConcern());
-
-        DBDirectClient client(opCtx);
-        const auto result = client.remove(std::move(deleteOp));
-        write_ops::checkWriteErrors(result);
-    }
-
-    // Write an oplog 'c' entry to inform secondaries on how to populate the DSS.
-    {
-        repl::MutableOplogEntry oplogEntry;
-        oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
-        oplogEntry.setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
-        oplogEntry.setNss(NamespaceString::makeCommandNamespace(dbName));
-        oplogEntry.setObject(DropDatabaseMetadataOplogEntry{dbNameStr, dbName}.toBSON());
-        oplogEntry.setOpTime(OplogSlot());
-        oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
-
-        writeConflictRetry(opCtx, "dropDatabaseMetadata", NamespaceString::kRsOplogNamespace, [&] {
-            AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
-            WriteUnitOfWork wuow(opCtx);
-            repl::OpTime opTime = repl::logOp(opCtx, &oplogEntry);
-            uassert(9980401,
-                    str::stream() << "Failed to create new oplog entry for dropDatabaseMetadata"
-                                  << " with opTime: " << oplogEntry.getOpTime().toString() << ": "
-                                  << redact(oplogEntry.toBSON()),
-                    !opTime.isNull());
-            wuow.commit();
-        });
-    }
-
-    // Update DSR in primary node.
-    auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
-    scopedDsr->clearDbMetadata(opCtx);
-}
-
 namespace {
 
-class ShardsvrCommitDropDatabaseMetadataCommand final
-    : public TypedCommand<ShardsvrCommitDropDatabaseMetadataCommand> {
+class ShardsvrCommitCreateDatabaseMetadataCommand final
+    : public TypedCommand<ShardsvrCommitCreateDatabaseMetadataCommand> {
 public:
     bool skipApiVersionCheck() const override {
         // Internal command (server to server).
@@ -120,7 +59,7 @@ public:
     }
 
     std::string help() const override {
-        return "Internal command. This command aims to commit a dropDatabase operation to the "
+        return "Internal command. This command aims to commit a createDatabase operation to the "
                "shard catalog.";
     }
 
@@ -128,7 +67,7 @@ public:
         return true;
     }
 
-    using Request = ShardsvrCommitDropDatabaseMetadata;
+    using Request = ShardsvrCommitCreateDatabaseMetadata;
 
     class Invocation final : public InvocationBase {
     public:
@@ -146,10 +85,12 @@ public:
                     TransactionParticipant::get(opCtx));
 
             const auto dbName = request().getDbName();
+            const auto dbVersion = request().getDbVersion();
 
-            LOGV2(10105902,
-                  "About to commit dropDatabase metadata in the shard catalog",
-                  "dbName"_attr = dbName);
+            LOGV2(10105904,
+                  "About to commit createDatabase metadata in the shard catalog",
+                  "dbName"_attr = dbName,
+                  "dbVersion"_attr = dbVersion);
 
             {
                 // Using the original operation context, the write operations to update the
@@ -158,7 +99,7 @@ public:
                 // solution is to use an alternative client as well as a new operation context.
 
                 auto newClient = getGlobalServiceContext()->getService()->makeClient(
-                    "ShardsvrCommitDropDatabaseMetadata");
+                    "ShardsvrCommitCreateDatabaseMetadata");
                 AlternativeClientRegion acr(newClient);
                 auto newOpCtx = CancelableOperationContext(
                     cc().makeOperationContext(),
@@ -166,14 +107,16 @@ public:
                     Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor());
                 newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-                auto newOpCtxPtr = newOpCtx.get();
+                const auto thisShardId = ShardingState::get(opCtx)->shardId();
+                DatabaseType db{dbName, thisShardId, dbVersion};
 
-                commitDropDatabaseMetadataLocally(newOpCtxPtr, dbName);
+                shard_catalog_commit::commitCreateDatabaseMetadataLocally(newOpCtx.get(), db);
             }
 
-            LOGV2(10105903,
-                  "Committed dropDatabase metadata in the shard catalog",
-                  "dbName"_attr = dbName);
+            LOGV2(10105905,
+                  "Committed createDatabase metadata in the shard catalog",
+                  "dbName"_attr = dbName,
+                  "dbVersion"_attr = dbVersion);
 
             // Since no write that generated a retryable write oplog entry with this sessionId and
             // txnNumber happened, we need to make a dummy write so that the session gets durably
@@ -206,7 +149,7 @@ public:
     };
 };
 
-MONGO_REGISTER_COMMAND(ShardsvrCommitDropDatabaseMetadataCommand).forShard();
+MONGO_REGISTER_COMMAND(ShardsvrCommitCreateDatabaseMetadataCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

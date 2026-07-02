@@ -242,7 +242,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
             shard_role_details::getRecoveryUnit(opCtx)->onCommit(
                 [](OperationContext* opCtx, boost::optional<Timestamp>) {
                     ShardingStatistics::get(opCtx)
-                        .authoritativeShardDatabaseStatistics.registerDurableUpdate();
+                        .databaseShardingMetadataStatistics.registerShardCatalogDatabaseWrite();
                 });
         }
     }
@@ -398,7 +398,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
         shard_role_details::getRecoveryUnit(opCtx)->onCommit(
             [](OperationContext* opCtx, boost::optional<Timestamp>) {
                 ShardingStatistics::get(opCtx)
-                    .authoritativeShardDatabaseStatistics.registerDurableUpdate();
+                    .databaseShardingMetadataStatistics.registerShardCatalogDatabaseWrite();
             });
     }
 }
@@ -511,7 +511,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
         shard_role_details::getRecoveryUnit(opCtx)->onCommit(
             [](OperationContext* opCtx, boost::optional<Timestamp>) {
                 ShardingStatistics::get(opCtx)
-                    .authoritativeShardDatabaseStatistics.registerDurableUpdate();
+                    .databaseShardingMetadataStatistics.registerShardCatalogDatabaseWrite();
             });
     }
 }
@@ -691,9 +691,17 @@ void ShardServerOpObserver::onCreateDatabaseMetadata(OperationContext* opCtx,
 
     auto entry = CreateDatabaseMetadataOplogEntry::parse(
         op.getObject(), IDLParserContext("OplogCreateDatabaseMetadataOplogEntryContext"));
+    ShardingStatistics::get(opCtx)
+        .databaseShardingMetadataStatistics.registerCreateDatabaseMetadataOplogEntryApplied();
 
     auto dbMetadata = entry.getDb();
     auto dbName = dbMetadata.getDbName();
+
+    LOGV2_DEBUG(12920500,
+                1,
+                "Applying createDatabaseMetadata oplog entry",
+                logAttrs(dbName),
+                "fromClone"_attr = entry.getFromClone());
 
     // CloneAuthoritativeMetadata can bypass the critical section when writing database metadata
     // because 1) we hold the DDL lock, which guarantees that no other conflicting DDL
@@ -741,8 +749,12 @@ void ShardServerOpObserver::onDropDatabaseMetadata(OperationContext* opCtx,
 
     auto entry = DropDatabaseMetadataOplogEntry::parse(
         op.getObject(), IDLParserContext("OplogDropDatabaseMetadataOplogEntryContext"));
+    ShardingStatistics::get(opCtx)
+        .databaseShardingMetadataStatistics.registerDropDatabaseMetadataOplogEntryApplied();
 
     auto dbName = entry.getDbName();
+
+    LOGV2_DEBUG(12920501, 1, "Applying dropDatabaseMetadata oplog entry", logAttrs(dbName));
 
     auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
     scopedDsr->clearDbMetadata(opCtx);
@@ -764,6 +776,16 @@ void ShardServerOpObserver::onInvalidateCollectionMetadata(OperationContext* opC
 
     const auto entry = InvalidateCollectionMetadataOplogEntry::parse(
         op.getObject(), IDLParserContext("InvalidateCollectionMetadataOplogEntryContext"));
+    ShardingStatistics::get(opCtx)
+        .collectionShardingMetadataStatistics.registerInvalidateCollectionMetadataOplogEntryApplied(
+            entry.getForDroppedCollection());
+
+    LOGV2_DEBUG(12920502,
+                1,
+                "Applying invalidateCollectionMetadata oplog entry",
+                logAttrs(nss),
+                "uuid"_attr = op.getUuid(),
+                "forDroppedCollection"_attr = entry.getForDroppedCollection());
 
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
 
@@ -796,6 +818,16 @@ void ShardServerOpObserver::onApplyCollectionShardingStateDelta(OperationContext
 
     const auto entry = CollectionShardingStateDeltaOplogEntry::parse(
         op.getObject(), IDLParserContext("CollectionShardingStateDeltaOplogEntryContext"));
+    ShardingStatistics::get(opCtx)
+        .collectionShardingMetadataStatistics
+        .registerApplyCollectionShardingStateDeltaOplogEntryApplied();
+
+    LOGV2_DEBUG(12920503,
+                2,
+                "Applying collectionShardingStateDelta oplog entry",
+                logAttrs(nss),
+                "uuid"_attr = op.getUuid(),
+                "numChangedChunks"_attr = entry.getChangedChunks().size());
 
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
 
@@ -853,6 +885,15 @@ void ShardServerOpObserver::onSetAllowChunkOperations(OperationContext* opCtx,
 
     const auto entry = SetAllowChunkOperationsOplogEntry::parse(
         op.getObject(), IDLParserContext("SetAllowChunkOperationsOplogEntryContext"));
+    ShardingStatistics::get(opCtx)
+        .collectionShardingMetadataStatistics.registerSetAllowChunkOperationsOplogEntryApplied();
+
+    LOGV2_DEBUG(12920504,
+                2,
+                "Applying setAllowChunkOperations oplog entry",
+                logAttrs(nss),
+                "uuid"_attr = op.getUuid(),
+                "allowChunkOperations"_attr = entry.getAllowChunkOperations());
 
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
     scopedCsr->setAllowChunkOperations(entry.getAllowChunkOperations());

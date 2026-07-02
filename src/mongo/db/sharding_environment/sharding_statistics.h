@@ -32,9 +32,9 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/admission/execution_control/in_progress_time_accumulator.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/shard_role/shard_catalog/authoritative_collection_metadata_statistics.h"
-#include "mongo/db/shard_role/shard_catalog/authoritative_database_statistics.h"
+#include "mongo/db/shard_role/shard_catalog/collection_sharding_metadata_statistics.h"
 #include "mongo/db/shard_role/shard_catalog/critical_section_statistics.h"
+#include "mongo/db/shard_role/shard_catalog/database_sharding_metadata_statistics.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/modules.h"
 
@@ -205,8 +205,8 @@ struct MONGO_MOD_NEEDS_REPLACEMENT ShardingStatistics {
     CriticalSectionStatistics<DatabaseName> databaseCriticalSectionStatistics;
     CriticalSectionStatistics<NamespaceString> collectionCriticalSectionStatistics;
 
-    AuthoritativeDatabaseVersionUpdates authoritativeShardDatabaseStatistics;
-    AuthoritativeCollectionMetadataStatistics authoritativeCollectionMetadataStatistics;
+    DatabaseShardingMetadataStatistics databaseShardingMetadataStatistics;
+    CollectionShardingMetadataStatistics collectionShardingMetadataStatistics;
 
     /**
      * Obtains the per-process instance of the sharding statistics object.

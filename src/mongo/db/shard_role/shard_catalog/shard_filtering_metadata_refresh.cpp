@@ -1009,9 +1009,12 @@ void FilteringMetadataCache::_onDbVersionMismatchAuthoritative(
     const auto targetOpTime =
         repl::OpTime(receivedDbVersion.getTimestamp(), repl::OpTime::kUninitializedTerm);
 
+    Timer dbVersionWaitTimer;
     repl::ReplicationCoordinator::get(opCtx)
         ->registerWaiterForMajorityReadOpTime(opCtx, targetOpTime)
         .get(opCtx);
+    ShardingStatistics::get(opCtx).databaseShardingMetadataStatistics.registerDbVersionMismatchWait(
+        dbVersionWaitTimer.millis());
 
     while (true) {
         opCtx->checkForInterrupt();
@@ -1073,6 +1076,13 @@ void FilteringMetadataCache::_onDbVersionMismatchAuthoritative(
 
         break;
     }
+
+    LOGV2_DEBUG(12920514,
+                2,
+                "Authoritative database version mismatch handled",
+                "db"_attr = dbName,
+                "receivedDbVersion"_attr = receivedDbVersion,
+                "waitMillis"_attr = dbVersionWaitTimer.millis());
 }
 
 void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
@@ -1111,6 +1121,7 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
     //       zero chunks on this shard.
 
     bool needsDbPrimaryShardCheck = false;
+    boost::optional<Timer> diskRecoveryTimer;
     const int maxNoProgressAttempts = maxShardMetadataDiskRecoveryAttempts.loadRelaxed();
     int noProgressAttempts = 0;
     std::string_view lastRetryReason;
@@ -1123,6 +1134,12 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
     auto incrementConsecutiveNoProgressAttempts = [&](std::string_view retryReason) {
         lastRetryReason = retryReason;
         ++noProgressAttempts;
+        auto& stats = ShardingStatistics::get(opCtx).collectionShardingMetadataStatistics;
+        stats.registerDiskRecoveryNoProgressRetry();
+        const bool budgetExhausted = noProgressAttempts >= maxNoProgressAttempts;
+        if (budgetExhausted) {
+            stats.registerDiskRecoveryAttemptsExhausted();
+        }
         tassert(StaleConfigInfo(nss,
                                 ShardVersionFactory::make(chunkVersionReceived
                                                               ? *chunkVersionReceived
@@ -1134,7 +1151,7 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
                                  "recovery attempts for "
                               << nss.toStringForErrorMsg()
                               << "; last retry reason: " << lastRetryReason,
-                noProgressAttempts < maxNoProgressAttempts);
+                !budgetExhausted);
     };
 
     while (true) {
@@ -1186,8 +1203,11 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
                 return;
             }
 
+            if (!diskRecoveryTimer) {
+                diskRecoveryTimer.emplace();
+            }
             ShardingStatistics::get(opCtx)
-                .authoritativeCollectionMetadataStatistics.registerCreationOfRecoverer();
+                .collectionShardingMetadataStatistics.registerRecovererCreated();
 
             recoverer =
                 std::make_shared<CollectionCacheRecoverer>(nss, opCtx->getCancellationToken());
@@ -1329,8 +1349,9 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
                             AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed);
 
                 scopedCsr->setCollectionMetadata(opCtx, *metadata, noRoutingTableAs);
-                ShardingStatistics::get(opCtx)
-                    .authoritativeCollectionMetadataStatistics.registerDiskRecovery();
+                auto& stats = ShardingStatistics::get(opCtx).collectionShardingMetadataStatistics;
+                stats.registerDiskRecoveryMillis(diskRecoveryTimer->millis());
+                stats.registerDiskRecovery();
             }
 
             scopedCsr->setCollectionRecoverer(nullptr);
@@ -1376,6 +1397,7 @@ FilteringMetadataCache::_waitForConfigTimeOrChunkVersionChange(OperationContext*
     // Race two futures: (1) majority read concern reaching configTime, which proves all DDLs have
     // been applied and the router must be stale, or (2) the shard version matching the router's
     // via oplog application. Whichever completes first allows the caller to return authoritatively.
+    Timer postRecoveryWaitTimer;
     auto majorityFuture =
         repl::ReplicationCoordinator::get(opCtx)->registerWaiterForMajorityReadOpTime(
             opCtx, timeToWaitFor);
@@ -1413,7 +1435,8 @@ FilteringMetadataCache::_waitForConfigTimeOrChunkVersionChange(OperationContext*
         uassertStatusOK(status);
     }
 
-    auto& stats = ShardingStatistics::get(opCtx).authoritativeCollectionMetadataStatistics;
+    auto& stats = ShardingStatistics::get(opCtx).collectionShardingMetadataStatistics;
+    stats.registerPostRecoveryWaitMillis(postRecoveryWaitTimer.millis());
     if (versionFuture.isReady()) {
         stats.registerPostRecoveryWaitResolvedByVersionChange();
     } else {
@@ -1536,7 +1559,8 @@ void FilteringMetadataCache::_onShardVersionMismatchAuthoritative(
         if (receivedShardVersion &&
             _isRecoveredShardVersionSufficient(opCtx, nss, *receivedShardVersion)) {
             ShardingStatistics::get(opCtx)
-                .authoritativeCollectionMetadataStatistics.registerVersionResolvedBeforeRecovery();
+                .collectionShardingMetadataStatistics
+                .registerVersionMismatchResolvedBeforeRecovery();
 
             LOGV2(12307911,
                   "Authoritative collection metadata recovery completed successfully",
@@ -1567,7 +1591,8 @@ void FilteringMetadataCache::_onShardVersionMismatchAuthoritative(
         // retry loop.
         if (_isRecoveredShardVersionSufficient(opCtx, nss, *receivedShardVersion)) {
             ShardingStatistics::get(opCtx)
-                .authoritativeCollectionMetadataStatistics.registerVersionResolvedAfterRecovery();
+                .collectionShardingMetadataStatistics
+                .registerVersionMismatchResolvedAfterRecovery();
 
             LOGV2(12307913,
                   "Authoritative collection metadata recovery completed successfully",

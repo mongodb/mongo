@@ -46,6 +46,7 @@
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/type_oplog_catalog_metadata_gen.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
@@ -547,6 +548,9 @@ void commitDropCollectionLocally(OperationContext* opCtx,
                "nss"_attr = nss,
                "uuid"_attr = uuid);
 
+    ShardingStatistics::get(opCtx)
+        .collectionShardingMetadataStatistics.registerLocalCollectionMetadataDrop();
+
     // Write to `config.shard.catalog.(collections|chunks)` to delete collection metadata.
     deleteAllCollectionMetadataLocally(opCtx, nss, uuid);
 
@@ -568,6 +572,17 @@ void commitRenameOfCollectionMetadata(OperationContext* opCtx,
                                       const boost::optional<UUID>& newTargetUUID,
                                       bool isUpgrading,
                                       bool isDbPrimary) {
+    LOGV2_DEBUG(12920505,
+                1,
+                "Committing rename of collection shard catalog metadata locally",
+                "fromNss"_attr = fromNss,
+                "toNss"_attr = toNss,
+                "isUpgrading"_attr = isUpgrading,
+                "isDbPrimary"_attr = isDbPrimary);
+
+    ShardingStatistics::get(opCtx)
+        .collectionShardingMetadataStatistics.registerLocalCollectionMetadataRename();
+
     // Delete the old collection entries if any exist since they'll be replaced by the final
     // state.
     deleteCollectionEntryLocally(opCtx, fromNss);
@@ -609,11 +624,13 @@ void commitRenameOfCollectionMetadata(OperationContext* opCtx,
         try {
             auto _ = fetchCollection(opCtx, toNss);
         } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
-            LOGV2_INFO(12295701,
-                       "Nothing to persist in the local shard catalog since the renamed collection "
-                       "is untracked",
-                       "toNss"_attr = toNss,
-                       "error"_attr = ex.toStatus());
+            LOGV2_DEBUG(
+                12920506,
+                1,
+                "Nothing to persist in the local shard catalog since the renamed collection "
+                "is untracked",
+                "toNss"_attr = toNss,
+                "error"_attr = ex.toStatus());
             cleanupInMemoryState(false, true);
             return;
         }
@@ -643,10 +660,11 @@ void commitRenameOfCollectionMetadata(OperationContext* opCtx,
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
         // For the second one we have to delete all entries which has already occurred at the
         // beginning.
-        LOGV2_INFO(12295700,
-                   "Target collection is untracked, nothing to persist in the local shard catalog",
-                   "toNss"_attr = toNss,
-                   "error"_attr = ex);
+        LOGV2_DEBUG(12920507,
+                    1,
+                    "Target collection is untracked, nothing to persist in the local shard catalog",
+                    "toNss"_attr = toNss,
+                    "error"_attr = ex);
     }
     cleanupInMemoryState(true /*clearFromNss*/, true /*clearToNss*/);
 
@@ -687,12 +705,31 @@ void commitCollectionMetadataLocally(OperationContext* opCtx,
         // query doesn't have to recover it from disk.
         updateShardCatalogCache(opCtx, nss, coll, ownedChunks);
     }
+
+    ShardingStatistics::get(opCtx)
+        .collectionShardingMetadataStatistics.registerLocalCollectionMetadataCommit();
+
+    LOGV2_DEBUG(12920508,
+                1,
+                "Committed collection metadata to the local shard catalog",
+                "nss"_attr = nss,
+                "uuid"_attr = coll.getUuid(),
+                "tracked"_attr = hasCollectionEntry,
+                "numOwnedChunks"_attr = ownedChunks.size());
 }
 
 void cloneCollectionMetadataLocally(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     bool isDbPrimaryShard) {
     auto coll = fetchCollection(opCtx, nss);
+
+    // Fires once per collection during the FCV upgrade clone, so keep it at DEBUG.
+    LOGV2_DEBUG(12920509,
+                1,
+                "Cloning collection metadata into the local shard catalog",
+                "nss"_attr = nss,
+                "uuid"_attr = coll.getUuid(),
+                "isDbPrimaryShard"_attr = isDbPrimaryShard);
 
     const auto ownedChunks = fetchOwnedChunks(opCtx, nss, coll);
 
@@ -707,6 +744,9 @@ void cloneCollectionMetadataLocally(OperationContext* opCtx,
         // The shard owns no chunks and is not the dbPrimary, so it doesn't track the collection.
         deleteCollectionEntryLocally(opCtx, nss);
     }
+
+    ShardingStatistics::get(opCtx)
+        .collectionShardingMetadataStatistics.registerLocalCollectionMetadataClone();
 }
 
 void commitChunklessCollectionMetadataLocally(OperationContext* opCtx, const NamespaceString& nss) {
@@ -735,6 +775,13 @@ void commitChunklessCollectionMetadataLocally(OperationContext* opCtx, const Nam
     if (isUnowned) {
         invalidateCollectionMetadata(opCtx, nss, coll.getUuid(), false /* forDroppedCollection */);
     }
+
+    LOGV2_DEBUG(12920510,
+                1,
+                "Committed chunkless collection shard catalog metadata locally",
+                "nss"_attr = nss,
+                "uuid"_attr = coll.getUuid(),
+                "wasUnownedAndInvalidated"_attr = isUnowned);
 }
 
 void commitSetAllowChunkOperationsLocally(OperationContext* opCtx,
@@ -901,6 +948,13 @@ void commitDropOfStaleChunksForRename(OperationContext* opCtx,
         shard_catalog_commit::invalidateCollectionMetadata(
             opCtx, nss, oldUuid, true /* forDroppedCollection */);
     }
+
+    LOGV2_DEBUG(12920513,
+                1,
+                "Dropped stale shard catalog chunks after rename",
+                "nss"_attr = nss,
+                "oldUuid"_attr = oldUuid,
+                "shardOwnsChunks"_attr = shardOwnsChunks);
 }
 
 }  // namespace shard_catalog_commit_for_resharding

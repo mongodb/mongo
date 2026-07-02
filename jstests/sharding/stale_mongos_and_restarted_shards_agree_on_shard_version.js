@@ -74,7 +74,7 @@ const isAuthoritativeShardsCRUDEnabled = FeatureFlagUtil.isPresentAndEnabled(
 
 function getCollectionShardingMetadataRecoveryStats(shard) {
     return shard.getDB("admin").serverStatus().shardingStatistics
-        .collectionShardingMetadataRecoveryStatistics;
+        .collectionShardingMetadataStatistics;
 }
 
 {
@@ -260,10 +260,11 @@ withRetryOnTransientTxnError(
         const recoveryStatsAfter = getCollectionShardingMetadataRecoveryStats(st.shard0);
 
         // Authoritative recovery runs in the operation that won the race to create the recoverer.
-        assert.eq(recoveryStatsBefore.recoverersCreated + 1, recoveryStatsAfter.recoverersCreated, {
-            recoveryStatsBefore,
-            recoveryStatsAfter,
-        });
+        assert.eq(
+            recoveryStatsBefore.countRecoverersCreated + 1,
+            recoveryStatsAfter.countRecoverersCreated,
+            {recoveryStatsBefore, recoveryStatsAfter},
+        );
     } else {
         let shardOps = st.shard0
             .getDB("admin")

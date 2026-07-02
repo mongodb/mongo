@@ -197,8 +197,7 @@ protected:
         BSONObjBuilder builder;
         shardingStatistics.report(&builder);
         auto fullMetrics = builder.obj();
-        return fullMetrics.getObjectField("collectionShardingMetadataRecoveryStatistics")
-            .getOwned();
+        return fullMetrics.getObjectField("collectionShardingMetadataStatistics").getOwned();
     };
 };
 
@@ -263,9 +262,9 @@ TEST_F(AuthoritativeRefreshFixture, ChunkVersionMatchReturnsEarly) {
     ASSERT_TRUE(csr->getCurrentMetadataIfKnown().has_value());
     ASSERT_EQ(csr->getCurrentMetadataIfKnown()->getCollPlacementVersion(), matchingVersion);
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 1);
-    ASSERT_EQ(stats.getIntField("recoverersCreated"), 1);
-    ASSERT_EQ(stats.getIntField("versionResolvedAfterRecovery"), 1);
+    ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
+    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 1);
+    ASSERT_EQ(stats.getIntField("countVersionMismatchResolutionsAfterRecovery"), 1);
 }
 
 // Refresh uses the node FCV, not the operation's OFCV (see SERVER-128194 for details).
@@ -291,7 +290,7 @@ TEST_F(AuthoritativeRefreshFixture, RefreshUsesGlobalFCVRatherThanOperationFCV) 
 
     // Despite the OFCV, the refresh recovers authoritatively (from disk) per the node FCV.
     ASSERT_OK(onShardVersionMismatch(opCtx, kTestNss, boost::none));
-    ASSERT_EQ(getStatistics(opCtx).getIntField("diskRecoveriesPerformed"), 1);
+    ASSERT_EQ(getStatistics(opCtx).getIntField("countDiskRecoveriesPerformed"), 1);
 }
 
 TEST_F(AuthoritativeRefreshFixture,
@@ -309,16 +308,16 @@ TEST_F(AuthoritativeRefreshFixture,
     ASSERT_OK(onShardVersionMismatch(opCtx, kTestNss, boost::none));
 
     auto statsAfterFirst = getStatistics(opCtx);
-    ASSERT_EQ(statsAfterFirst.getIntField("diskRecoveriesPerformed"), 1);
-    ASSERT_EQ(statsAfterFirst.getIntField("recoverersCreated"), 1);
+    ASSERT_EQ(statsAfterFirst.getIntField("countDiskRecoveriesPerformed"), 1);
+    ASSERT_EQ(statsAfterFirst.getIntField("countRecoverersCreated"), 1);
 
     ASSERT_OK(onShardVersionMismatch(opCtx, kTestNss, ChunkVersion::UNTRACKED()));
 
     auto statsAfterSecond = getStatistics(opCtx);
-    ASSERT_EQ(statsAfterSecond.getIntField("diskRecoveriesPerformed"), 1)
+    ASSERT_EQ(statsAfterSecond.getIntField("countDiskRecoveriesPerformed"), 1)
         << "Second placement mismatch should not re-run disk recovery when CSS already has "
            "metadata";
-    ASSERT_EQ(statsAfterSecond.getIntField("recoverersCreated"), 1);
+    ASSERT_EQ(statsAfterSecond.getIntField("countRecoverersCreated"), 1);
 }
 
 TEST_F(AuthoritativeRefreshFixture,
@@ -341,11 +340,11 @@ TEST_F(AuthoritativeRefreshFixture,
     ASSERT_EQ(csr->getCurrentMetadataIfKnown()->getCollPlacementVersion(),
               chunks.back().getVersion());
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 1);
-    ASSERT_EQ(stats.getIntField("recoverersCreated"), 1);
-    ASSERT_EQ(stats.getIntField("versionResolvedAfterRecovery"), 1);
-    ASSERT_EQ(stats.getIntField("postRecoveryWaitResolvedByConfigTime"), 0);
-    ASSERT_EQ(stats.getIntField("postRecoveryWaitResolvedByVersionChange"), 0);
+    ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
+    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 1);
+    ASSERT_EQ(stats.getIntField("countVersionMismatchResolutionsAfterRecovery"), 1);
+    ASSERT_EQ(stats.getIntField("countPostRecoveryWaitsResolvedByConfigTime"), 0);
+    ASSERT_EQ(stats.getIntField("countPostRecoveryWaitsResolvedByVersionChange"), 0);
 }
 
 TEST_F(AuthoritativeRefreshFixture, HigherRouterVersionTriggersRecoveryThenConfigTimeWait) {
@@ -370,9 +369,11 @@ TEST_F(AuthoritativeRefreshFixture, HigherRouterVersionTriggersRecoveryThenConfi
     ASSERT_TRUE(csr->getCurrentMetadataIfKnown().has_value());
     ASSERT_EQ(csr->getCurrentMetadataIfKnown()->getCollPlacementVersion(), currentVersion);
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 1);
-    ASSERT_EQ(stats.getIntField("recoverersCreated"), 1);
-    ASSERT_EQ(stats.getIntField("postRecoveryWaitResolvedByConfigTime"), 1);
+    ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
+    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 1);
+    ASSERT_EQ(stats.getIntField("countPostRecoveryWaitsResolvedByConfigTime"), 1);
+    ASSERT_TRUE(stats.hasField("totalPostRecoveryWaitMillis"));
+    ASSERT_GTE(stats["totalPostRecoveryWaitMillis"].safeNumberLong(), 0);
 }
 
 TEST_F(AuthoritativeRefreshFixture, ConfigTimeReachedWithEmptyCSRTriggersFullRecovery) {
@@ -396,8 +397,8 @@ TEST_F(AuthoritativeRefreshFixture, ConfigTimeReachedWithEmptyCSRTriggersFullRec
     ASSERT_TRUE(metadataOpt.has_value());
     ASSERT_EQ(metadataOpt->getCollPlacementVersion(), chunks.back().getVersion());
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 1);
-    ASSERT_EQ(stats.getIntField("recoverersCreated"), 1);
+    ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
+    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 1);
 }
 
 TEST_F(AuthoritativeRefreshFixture, CriticalSectionBlocksRecoveryThenProceeds) {
@@ -547,7 +548,7 @@ TEST_F(AuthoritativeRefreshFixture, ClearFilteringMetadataDuringPostRecoveryWait
     // The retry path must have run disk recovery a second time: once for the original wait that was
     // interrupted, and once for the retried iteration that completed.
     auto stats = getStatistics(opCtx);
-    ASSERT_GTE(stats.getIntField("diskRecoveriesPerformed"), 2)
+    ASSERT_GTE(stats.getIntField("countDiskRecoveriesPerformed"), 2)
         << "Expected the wait interrupt to trigger a second disk recovery";
 }
 
@@ -572,8 +573,12 @@ TEST_F(AuthoritativeRefreshFixture, RecoveryCreatesExactlyOneRecoverer) {
     ASSERT_TRUE(metadataOpt.has_value());
     ASSERT_EQ(metadataOpt->getCollPlacementVersion(), chunks.back().getVersion());
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("recoverersCreated"), 1);
-    ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 1);
+    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 1);
+    ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
+    // A tracked collection is resolved in a single Mode A pass, so the no-progress budget is never
+    // touched on the happy path.
+    ASSERT_EQ(stats.getIntField("countDiskRecoveryNoProgressRetries"), 0);
+    ASSERT_EQ(stats.getIntField("countDiskRecoveryAttemptsExhausted"), 0);
 }
 
 TEST_F(AuthoritativeRefreshFixture, RecovererCleanedUpAfterRecovery) {
@@ -749,8 +754,8 @@ TEST_F(AuthoritativeRefreshFixture, PartialRangeDiskCatalogRecoversWithoutChunkM
     ASSERT_TRUE(metadataOpt->getShardPlacementVersion().isSet());
     ASSERT_EQ(metadataOpt->getShardPlacementVersion(), myOwnedChunks.back().getVersion());
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 1);
-    ASSERT_EQ(stats.getIntField("recoverersCreated"), 1);
+    ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
+    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 1);
 }
 
 TEST_F(AuthoritativeRefreshFixture, SequentialCallsAreIdempotent) {
@@ -786,8 +791,8 @@ TEST_F(AuthoritativeRefreshFixture, SequentialCallsAreIdempotent) {
     ASSERT_EQ(secondVersion, recoveredVersion);
 
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("recoverersCreated"), 1);
-    ASSERT_EQ(stats.getIntField("versionResolvedBeforeRecovery"), 1);
+    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 1);
+    ASSERT_EQ(stats.getIntField("countVersionMismatchResolutionsBeforeRecovery"), 1);
 }
 
 TEST_F(AuthoritativeRefreshFixture, RecoveredVersionMatchSkipsRecoveryLoopOnNextCall) {
@@ -820,8 +825,8 @@ TEST_F(AuthoritativeRefreshFixture, RecoveredVersionMatchSkipsRecoveryLoopOnNext
     ASSERT_EQ(finalVersion, recoveredVersion);
 
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("recoverersCreated"), 1);
-    ASSERT_EQ(stats.getIntField("versionResolvedBeforeRecovery"), 1);
+    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 1);
+    ASSERT_EQ(stats.getIntField("countVersionMismatchResolutionsBeforeRecovery"), 1);
 }
 
 TEST_F(AuthoritativeRefreshFixture, OngoingRecoverySatisfiesVersionSkipsDiskRecovery) {
@@ -879,8 +884,8 @@ TEST_F(AuthoritativeRefreshFixture, OngoingRecoverySatisfiesVersionSkipsDiskReco
     ASSERT_EQ(csr->getCurrentMetadataIfKnown()->getCollPlacementVersion(), matchingVersion);
 
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("recoverersCreated"), 1);
-    ASSERT_EQ(stats.getIntField("versionResolvedBeforeRecovery"), 1);
+    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 1);
+    ASSERT_EQ(stats.getIntField("countVersionMismatchResolutionsBeforeRecovery"), 1);
 }
 
 TEST_F(AuthoritativeRefreshFixture, ReRecoveryAfterMetadataCleared) {
@@ -898,8 +903,8 @@ TEST_F(AuthoritativeRefreshFixture, ReRecoveryAfterMetadataCleared) {
     ASSERT_OK(onShardVersionMismatch(opCtx, kTestNss, boost::none));
 
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("recoverersCreated"), 1);
-    ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 1);
+    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 1);
+    ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
 
     {
         auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
@@ -922,8 +927,8 @@ TEST_F(AuthoritativeRefreshFixture, ReRecoveryAfterMetadataCleared) {
     ASSERT_OK(onShardVersionMismatch(opCtx, kTestNss, boost::none));
 
     stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("recoverersCreated"), 2);
-    ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 2);
+    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 2);
+    ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 2);
 
     auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
     auto metadataOpt = csr->getCurrentMetadataIfKnown();
@@ -981,9 +986,49 @@ TEST_F(AuthoritativeRefreshFixture, CriticalSectionExitedWithExternalMetadataSki
     ASSERT_EQ(metadataOpt->getCollPlacementVersion(), externalMetadata.getCollPlacementVersion());
     ASSERT_NE(metadataOpt->getCollPlacementVersion(), chunks.back().getVersion());
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("recoverersCreated"), 0);
-    ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 0);
-    ASSERT_EQ(stats.getIntField("versionResolvedBeforeRecovery"), 1);
+    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 0);
+    ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 0);
+    ASSERT_EQ(stats.getIntField("countVersionMismatchResolutionsBeforeRecovery"), 1);
+}
+
+TEST_F(AuthoritativeRefreshFixture, KnownMetadataShortCircuitDoesNotRecordDiskRecoveryMillis) {
+    auto* opCtx = operationContext();
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->clearCollectionMetadata(opCtx);
+        csr->enterCriticalSectionCatchUpPhase(opCtx, BSONObj());
+        csr->enterCriticalSectionCommitPhase(opCtx, BSONObj());
+    }
+
+    auto* fp = globalFailPointRegistry().find("hangBeforePlacementVersionCriticalSectionWait");
+    auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
+
+    stdx::thread recoveryThread([&] {
+        auto bgClient = getGlobalServiceContext()->getService()->makeClient("bgCS");
+        auto bgOpCtx = bgClient->makeOperationContext();
+        auto bgStatus = onShardVersionMismatch(bgOpCtx.get(), kTestNss, boost::none);
+        ASSERT_OK(bgStatus);
+    });
+
+    fp->waitForTimesEntered(initialTimesEntered + 1);
+
+    auto externalMetadata = makeShardedMetadataInMemory(opCtx);
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->setCollectionMetadata(
+            opCtx, externalMetadata, CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
+        csr->exitCriticalSection(opCtx, BSONObj());
+    }
+
+    fp->setMode(FailPoint::off);
+
+    recoveryThread.join();
+
+    auto stats = getStatistics(opCtx);
+    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 0);
+    ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 0);
+    ASSERT_EQ(stats.getIntField("totalDiskRecoveryMillis"), 0);
 }
 
 TEST_F(AuthoritativeRefreshFixture, UnownedRecoveryAcceptsTrackedWithNoChunksVersion) {
@@ -1012,12 +1057,12 @@ TEST_F(AuthoritativeRefreshFixture, UnownedRecoveryAcceptsTrackedWithNoChunksVer
     ASSERT_FALSE(metadataOpt->isSharded());
 
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 1);
-    ASSERT_EQ(stats.getIntField("versionResolvedAfterRecovery"), 1)
+    ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
+    ASSERT_EQ(stats.getIntField("countVersionMismatchResolutionsAfterRecovery"), 1)
         << "Expected the post-recovery compatibility check to accept UNOWNED + 0-chunks without "
            "falling through to a configTime wait";
-    ASSERT_EQ(stats.getIntField("postRecoveryWaitResolvedByConfigTime"), 0);
-    ASSERT_EQ(stats.getIntField("postRecoveryWaitResolvedByVersionChange"), 0);
+    ASSERT_EQ(stats.getIntField("countPostRecoveryWaitsResolvedByConfigTime"), 0);
+    ASSERT_EQ(stats.getIntField("countPostRecoveryWaitsResolvedByVersionChange"), 0);
 }
 
 TEST_F(AuthoritativeRefreshFixture, UnownedShardVersionCheckAcceptsTrackedWithNoChunksVersion) {
@@ -1166,8 +1211,13 @@ TEST_F(AuthoritativeRefreshFixture, TransientPrimaryAbaForcesModeBRetry) {
     ASSERT_FALSE(csr->getCurrentMetadataIfKnown()->isSharded());
 
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("recoverersCreated"), 3);  // 1 Mode A + 2 Mode B (one retry).
-    ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 1);
+    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 3);  // 1 Mode A + 2 Mode B (one retry).
+    ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
+    // Mode A -> Mode B switch plus the ABA-driven Mode B retry both count against the no-progress
+    // budget, but the recovery still converges so nothing is reported as exhausted.
+    ASSERT_GTE(stats.getIntField("countDiskRecoveryNoProgressRetries"), 2);
+    ASSERT_EQ(stats.getIntField("countDiskRecoveryAttemptsExhausted"), 0);
+    ASSERT_GTE(stats.getIntField("totalDiskRecoveryMillis"), 0);
 }
 
 // Stable DB primary baseline: no mid-flight mutation, no retry. Converges to kUntracked with
@@ -1192,8 +1242,8 @@ TEST_F(AuthoritativeRefreshFixture, DbPrimaryShardInstallsUntrackedOnEmptyDisk) 
     ASSERT_FALSE(csr->getCurrentMetadataIfKnown()->isSharded());
 
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("recoverersCreated"), 2);  // 1 Mode A + 1 Mode B, no retry.
-    ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 1);
+    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 2);  // 1 Mode A + 1 Mode B, no retry.
+    ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
 }
 
 // A retained DSR entry from the legacy non-authoritative model only says which shard the cached
@@ -1223,8 +1273,8 @@ TEST_F(AuthoritativeRefreshFixture, RetainedNonAuthoritativeDsrEntryInstallsUnow
     ASSERT_FALSE(csr->getCurrentMetadataIfKnown()->isSharded());
 
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("recoverersCreated"), 2);  // 1 Mode A + 1 Mode B, no retry.
-    ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 1);
+    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 2);  // 1 Mode A + 1 Mode B, no retry.
+    ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
 }
 
 TEST_F(AuthoritativeRefreshFixture, ConfigSystemSessionsEmptyDiskRecoversAsUnownedNotUntracked) {
@@ -1278,8 +1328,8 @@ TEST_F(AuthoritativeRefreshFixture, PrimaryChangeDuringRecoveryForcesModeBRetry)
     ASSERT_FALSE(csr->getCurrentMetadataIfKnown()->isSharded());
 
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("recoverersCreated"), 3);
-    ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 1);
+    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 3);
+    ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
 }
 
 class RefreshCancellationFixture : public ShardServerTestFixtureWithCatalogCacheLoaderMock {

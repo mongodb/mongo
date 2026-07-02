@@ -43,7 +43,6 @@
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
-#include "mongo/db/global_catalog/ddl/shardsvr_commit_create_database_metadata_command.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/global_catalog/type_namespace_placement_gen.h"
@@ -57,6 +56,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_role/ddl/list_collections_filter.h"
+#include "mongo/db/shard_role/shard_catalog/commit_database_metadata_locally.h"
 #include "mongo/db/shard_role/shard_catalog/flush_database_cache_updates_gen.h"
 #include "mongo/db/shard_role/shard_catalog/participant_block_gen.h"
 #include "mongo/db/sharding_environment/grid.h"
@@ -145,7 +145,8 @@ void cloneAuthoritativeDatabaseMetadata(OperationContext* opCtx, const DatabaseN
                         thisShardId.toString()),
             thisShardId == dbMetadata.getPrimary());
 
-    commitCreateDatabaseMetadataLocally(opCtx, dbMetadata, true /* fromClone */);
+    shard_catalog_commit::commitCreateDatabaseMetadataLocally(
+        opCtx, dbMetadata, true /* fromClone */);
 }
 
 /**

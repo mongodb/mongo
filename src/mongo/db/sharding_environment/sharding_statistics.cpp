@@ -135,14 +135,13 @@ void ShardingStatistics::report(BSONObjBuilder* builder) const {
         collectionCriticalSectionBuilder.doneFast();
     }
     {
-        BSONObjBuilder databaseVersionUpdateCountersBuilder{
-            builder->subobjStart("databaseVersionUpdateCounters")};
-        authoritativeShardDatabaseStatistics.report(databaseVersionUpdateCountersBuilder);
-        databaseVersionUpdateCountersBuilder.doneFast();
+        BSONObjBuilder subobj{builder->subobjStart("databaseShardingMetadataStatistics")};
+        databaseShardingMetadataStatistics.report(subobj);
+        subobj.doneFast();
     }
     {
-        BSONObjBuilder subobj{builder->subobjStart("collectionShardingMetadataRecoveryStatistics")};
-        authoritativeCollectionMetadataStatistics.report(subobj);
+        BSONObjBuilder subobj{builder->subobjStart("collectionShardingMetadataStatistics")};
+        collectionShardingMetadataStatistics.report(subobj);
         subobj.doneFast();
     }
 }

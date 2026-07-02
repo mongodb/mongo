@@ -241,13 +241,15 @@ public:
         return csr._metadataType == CollectionShardingRuntime::MetadataType::kTracked;
     }
 
-    static repl::OplogEntry makeInvalidateCollectionMetadataOplogEntry(const NamespaceString& nss,
-                                                                       const UUID& uuid) {
+    static repl::OplogEntry makeInvalidateCollectionMetadataOplogEntry(
+        const NamespaceString& nss, const UUID& uuid, bool forDroppedCollection = false) {
         // Fixed OpTime used for synthetic oplog entries. These tests should never read it because
         // CollectionCacheRecoverer is not installed, so reusing the same value everywhere is fine.
         return repl::makeCommandOplogEntry(repl::OpTime(Timestamp(1, 1), 1),
                                            nss.getCommandNS(),
-                                           BSON("invalidateCollectionMetadata" << nss.coll()),
+                                           BSON("invalidateCollectionMetadata"
+                                                << nss.coll() << "forDroppedCollection"
+                                                << forDroppedCollection),
                                            boost::none,
                                            uuid);
     }
@@ -268,6 +270,24 @@ public:
                                                 << changedChunksBuilder.arr()),
                                            boost::none,
                                            uuid);
+    }
+
+    static repl::OplogEntry makeSetAllowChunkOperationsOplogEntry(const NamespaceString& nss,
+                                                                  const UUID& uuid,
+                                                                  bool allowChunkOperations) {
+        return repl::makeCommandOplogEntry(repl::OpTime(Timestamp(1, 1), 1),
+                                           nss,
+                                           BSON("setAllowChunkOperations" << nss.coll()
+                                                                          << "allowChunkOperations"
+                                                                          << allowChunkOperations),
+                                           boost::none,
+                                           uuid);
+    }
+
+    BSONObj getCollectionRecoveryStatistics() {
+        BSONObjBuilder builder;
+        ShardingStatistics::get(operationContext()).report(&builder);
+        return builder.obj().getObjectField("collectionShardingMetadataStatistics").getOwned();
     }
 };
 
@@ -1677,11 +1697,41 @@ TEST_F(CollectionShardingRuntimeTest, OnInvalidateCollectionMetadataClearsCSRWit
     auto oplogEntry = makeInvalidateCollectionMetadataOplogEntry(kTestNss, collUuid);
     ShardServerOpObserver observer;
     observer.onInvalidateCollectionMetadata(opCtx, oplogEntry);
+    ASSERT_EQ(getCollectionRecoveryStatistics().getIntField(
+                  "countInvalidateCollectionMetadataOplogEntriesApplied"),
+              1);
+    // A refresh-driven invalidation must not be accounted as a drop.
+    ASSERT_EQ(getCollectionRecoveryStatistics().getIntField(
+                  "countInvalidateCollectionMetadataOplogEntriesForDroppedCollections"),
+              0);
 
     {
         auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
         ASSERT_FALSE(csr->getCurrentMetadataIfKnown());
     }
+}
+
+TEST_F(CollectionShardingRuntimeTest,
+       OnInvalidateCollectionMetadataForDroppedCollectionTracksDrop) {
+    auto opCtx = operationContext();
+    createTestCollection(opCtx, kTestNss);
+    auto collUuid = UUID::gen();
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        scopedCsr->setCollectionMetadata(opCtx,
+                                         makeShardedMetadata(opCtx, collUuid),
+                                         CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
+    }
+
+    auto oplogEntry = makeInvalidateCollectionMetadataOplogEntry(
+        kTestNss, collUuid, true /* forDroppedCollection */);
+    ShardServerOpObserver observer;
+    observer.onInvalidateCollectionMetadata(opCtx, oplogEntry);
+
+    auto stats = getCollectionRecoveryStatistics();
+    ASSERT_EQ(stats.getIntField("countInvalidateCollectionMetadataOplogEntriesApplied"), 1);
+    ASSERT_EQ(
+        stats.getIntField("countInvalidateCollectionMetadataOplogEntriesForDroppedCollections"), 1);
 }
 
 TEST_F(CollectionShardingRuntimeTest, OnApplyCollectionShardingStateDeltaCSRWithMatchingUUID) {
@@ -1705,6 +1755,9 @@ TEST_F(CollectionShardingRuntimeTest, OnApplyCollectionShardingStateDeltaCSRWith
         makeCollectionShardingStateDeltaOplogEntry(kTestNss, collUuid, {changedChunk});
     ShardServerOpObserver observer;
     observer.onApplyCollectionShardingStateDelta(opCtx, oplogEntry);
+    ASSERT_EQ(getCollectionRecoveryStatistics().getIntField(
+                  "countApplyCollectionShardingStateDeltaOplogEntriesApplied"),
+              1);
 
     {
         auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
@@ -1712,6 +1765,24 @@ TEST_F(CollectionShardingRuntimeTest, OnApplyCollectionShardingStateDeltaCSRWith
         ASSERT_TRUE(metadata);
         ASSERT_EQ(metadata->getCollPlacementVersion(), newVersion);
     }
+}
+
+TEST_F(CollectionShardingRuntimeTest, OnSetAllowChunkOperationsTracksOplogEntryApplication) {
+    auto opCtx = operationContext();
+    createTestCollection(opCtx, kTestNss);
+    const auto collUuid = UUID::gen();
+
+    auto oplogEntry =
+        makeSetAllowChunkOperationsOplogEntry(kTestNss, collUuid, false /* allowChunkOperations */);
+    ShardServerOpObserver observer;
+    observer.onSetAllowChunkOperations(opCtx, oplogEntry);
+
+    ASSERT_EQ(getCollectionRecoveryStatistics().getIntField(
+                  "countSetAllowChunkOperationsOplogEntriesApplied"),
+              1);
+
+    auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+    ASSERT_FALSE(csr->allowChunkOperations());
 }
 
 TEST_F(CollectionShardingRuntimeTest, OnApplyCollectionShardingStateDeltaWithoutKnownMetadata) {

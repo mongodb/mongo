@@ -112,7 +112,8 @@ void DatabaseShardingMetadataAccessor::setDbMetadata(OperationContext* opCtx,
     _dbPrimaryShard.emplace(dbPrimaryShard);
     _dbVersion.emplace(dbVersion);
     ++_numMetadataMutations;
-    ShardingStatistics::get(opCtx).authoritativeShardDatabaseStatistics.registerInMemorySet();
+    ShardingStatistics::get(opCtx)
+        .databaseShardingMetadataStatistics.registerDatabaseMetadataCacheSet();
 }
 
 void DatabaseShardingMetadataAccessor::clearDbMetadata(OperationContext* opCtx) {
@@ -133,28 +134,29 @@ void DatabaseShardingMetadataAccessor::clearDbMetadata(OperationContext* opCtx) 
     _dbPrimaryShard = boost::none;
     _dbVersion = boost::none;
     ++_numMetadataMutations;
-    ShardingStatistics::get(opCtx).authoritativeShardDatabaseStatistics.registerInMemoryClear();
+    ShardingStatistics::get(opCtx)
+        .databaseShardingMetadataStatistics.registerDatabaseMetadataCacheClear();
 }
 
 void DatabaseShardingMetadataAccessor::setMovePrimaryInProgress(OperationContext* opCtx) {
     auto oldState = std::exchange(_movePrimaryInProgress, true);
     if (oldState == false)
         ShardingStatistics::get(opCtx)
-            .authoritativeShardDatabaseStatistics.registerInMemoryMovePrimaryState(true);
+            .databaseShardingMetadataStatistics.registerMovePrimaryInProgress(true);
 }
 
 void DatabaseShardingMetadataAccessor::unsetMovePrimaryInProgress(OperationContext* opCtx) {
     auto oldState = std::exchange(_movePrimaryInProgress, false);
     if (oldState == true)
         ShardingStatistics::get(opCtx)
-            .authoritativeShardDatabaseStatistics.registerInMemoryMovePrimaryState(false);
+            .databaseShardingMetadataStatistics.registerMovePrimaryInProgress(false);
 }
 
 void DatabaseShardingMetadataAccessor::setAccessType(OperationContext* opCtx,
                                                      AccessType accessType) {
     _accessType = accessType;
     ShardingStatistics::get(opCtx)
-        .authoritativeShardDatabaseStatistics.registerInMemoryAccessTypeChange();
+        .databaseShardingMetadataStatistics.registerDatabaseMetadataAccessorAccessTypeChange();
 }
 
 void DatabaseShardingMetadataAccessor::setDbMetadata_UNSAFE(OperationContext* opCtx,
@@ -168,7 +170,8 @@ void DatabaseShardingMetadataAccessor::setDbMetadata_UNSAFE(OperationContext* op
     _dbPrimaryShard.emplace(dbPrimaryShard);
     _dbVersion.emplace(dbVersion);
     ++_numMetadataMutations;
-    ShardingStatistics::get(opCtx).authoritativeShardDatabaseStatistics.registerInMemorySet();
+    ShardingStatistics::get(opCtx)
+        .databaseShardingMetadataStatistics.registerDatabaseMetadataCacheSet();
 }
 
 OperationDatabaseMetadata& OperationDatabaseMetadata::get(OperationContext* opCtx) {

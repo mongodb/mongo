@@ -45,7 +45,6 @@
 #include "mongo/db/global_catalog/ddl/move_primary_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
-#include "mongo/db/global_catalog/ddl/shardsvr_commit_create_database_metadata_command.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/namespace_string_util.h"
@@ -62,6 +61,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
+#include "mongo/db/shard_role/shard_catalog/commit_database_metadata_locally.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/drop_collection.h"
 #include "mongo/db/shard_role/shard_catalog/participant_block_gen.h"
@@ -826,7 +826,8 @@ void MovePrimaryCoordinator::cloneAuthoritativeDatabaseMetadata(OperationContext
                         thisShardId.toString()),
             thisShardId == dbMetadata.getPrimary());
 
-    commitCreateDatabaseMetadataLocally(opCtx, dbMetadata, true /* fromClone */);
+    shard_catalog_commit::commitCreateDatabaseMetadataLocally(
+        opCtx, dbMetadata, true /* fromClone */);
 }
 
 void MovePrimaryCoordinator::cloneAuthoritativeCollectionsMetadata(

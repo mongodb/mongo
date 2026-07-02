@@ -29,13 +29,12 @@
 
 #include "mongo/base/initializer.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/global_catalog/ddl/shardsvr_commit_create_database_metadata_command.h"
-#include "mongo/db/global_catalog/ddl/shardsvr_commit_drop_database_metadata_command.h"
 #include "mongo/db/global_catalog/sharding_catalog_client_mock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/router_role/router_role.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
+#include "mongo/db/shard_role/shard_catalog/commit_database_metadata_locally.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_role_loop.h"
@@ -668,9 +667,9 @@ private:
                 }
                 shard_catalog_commit::commitChunklessCollectionMetadataLocally(opCtx, nss);
             }
-            commitCreateDatabaseMetadataLocally(opCtx, currDbEntry);
+            shard_catalog_commit::commitCreateDatabaseMetadataLocally(opCtx, currDbEntry);
         } else {
-            commitDropDatabaseMetadataLocally(opCtx, kTargetNss.dbName());
+            shard_catalog_commit::commitDropDatabaseMetadataLocally(opCtx, kTargetNss.dbName());
         }
 
         isCurrentPrimary = (op.to == kThisShard);
@@ -792,7 +791,8 @@ private:
             });
 
         // The shard is now back to being the primary.
-        commitCreateDatabaseMetadataLocally(actualFixture->getFixtureOpCtx(), dbEntry);
+        shard_catalog_commit::commitCreateDatabaseMetadataLocally(actualFixture->getFixtureOpCtx(),
+                                                                  dbEntry);
     };
 
     void executeDDLOperations(const std::vector<DDL>& ddls, std::atomic_flag& doneSignal) {

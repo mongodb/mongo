@@ -33,9 +33,9 @@
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/convert_shard_refs_in_namespace_metadata_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
-#include "mongo/db/global_catalog/ddl/shardsvr_commit_create_database_metadata_command.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
+#include "mongo/db/shard_role/shard_catalog/commit_database_metadata_locally.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
@@ -242,7 +242,8 @@ void CloneAuthoritativeMetadataCoordinator::_cloneSingleDatabaseWithShardRole(
         BypassDatabaseMetadataAccess bypassDbMetadataAccess(
             opCtx, BypassDatabaseMetadataAccess::Type::kWriteOnly);  // NOLINT
 
-        commitCreateDatabaseMetadataLocally(opCtx, dbMetadata, true /* fromClone */);
+        shard_catalog_commit::commitCreateDatabaseMetadataLocally(
+            opCtx, dbMetadata, true /* fromClone */);
     }
 
     // Now that the database metadata is cloned, clone the metadata of its tracked collections by
