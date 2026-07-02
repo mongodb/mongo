@@ -74,7 +74,6 @@
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -4618,7 +4617,6 @@ TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromMultipleShardsForUpdat
 }
 
 TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromShardResponseForDelete) {
-    unittest::ServerParameterGuard controller("featureFlagQueryStatsDelete", true);
     auto& limiter =
         query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
     limiter.configureWindowBased(-1);
@@ -4671,7 +4669,6 @@ TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromShardResponseForDelete
 }
 
 TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromMultipleShardsForDelete) {
-    unittest::ServerParameterGuard controller("featureFlagQueryStatsDelete", true);
     auto& limiter =
         query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
     limiter.configureWindowBased(-1);
@@ -4756,10 +4753,9 @@ TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromMultipleShardsForDelet
     ASSERT_EQ(*metrics0.docsExamined, 13);  // 5 + 8
 }
 
-// Verifies that when featureFlagQueryStatsDelete is enabled, each outgoing delete op entry is
-// stamped with includeQueryStatsMetricsForOpIndex, instructing the shard to return per-op metrics.
+// Verifies each outgoing delete op entry is stamped with includeQueryStatsMetricsForOpIndex,
+// instructing the shard to return per-op metrics.
 TEST_F(BatchWriteExecTest, QueryStatsMetricsFieldSetOnOutgoingDeleteRequest) {
-    unittest::ServerParameterGuard controller("featureFlagQueryStatsDelete", true);
     auto& limiter =
         query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
     limiter.configureWindowBased(-1);

@@ -2,7 +2,7 @@
  * This test confirms that the nDeleteOps metric (tracking the number of delete operation entries
  * in a single delete command) is correctly recorded in query stats for each delete op entry.
  *
- * @tags: [featureFlagQueryStatsDelete]
+ * @tags: [requires_fcv_90]
  */
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {

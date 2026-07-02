@@ -1,12 +1,9 @@
 /**
  * Test to confirm queryShapeHash from $queryStats on mongos matches queryShapeHash from mongod
  * slow query logs for update and delete commands.
- *
- * @tags: [requires_fcv_90]
  */
 
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     getQueryShapeHashFromSlowLogs,
     getQueryShapeHashSetFromSlowLogs,
@@ -318,11 +315,6 @@ describe("QueryShapeHash Consistency: mongos $queryStats vs mongod slow query lo
 
     describe("Single Deletes", function () {
         it("single delete on unsharded collection: queryStats hash matches mongod slow log hash", function () {
-            // TODO SERVER-123427 remove once the feature flag is enabled.
-            if (!FeatureFlagUtil.isEnabled(this.routerDB, "featureFlagQueryStatsDelete")) {
-                jsTest.log.info(`Skipping test featureFlagQueryStatsDelete is disabled`);
-                return;
-            }
             const comment = `single_delete_unsharded_${UUID().toString()}`;
 
             assert.commandWorked(
@@ -344,11 +336,6 @@ describe("QueryShapeHash Consistency: mongos $queryStats vs mongod slow query lo
         });
 
         it("single delete on sharded collection: queryStats hash matches mongod slow log hash", function () {
-            // TODO SERVER-123427 remove once the feature flag is enabled.
-            if (!FeatureFlagUtil.isEnabled(this.routerDB, "featureFlagQueryStatsDelete")) {
-                jsTest.log.info(`Skipping test featureFlagQueryStatsDelete is disabled`);
-                return;
-            }
             const comment = `single_delete_sharded_${UUID().toString()}`;
 
             assert.commandWorked(
@@ -372,11 +359,6 @@ describe("QueryShapeHash Consistency: mongos $queryStats vs mongod slow query lo
 
     describe("Batched Deletes", function () {
         it("batched delete: every queryStats entry has a matching queryShapeHash in mongod slow logs", function () {
-            // TODO SERVER-123427 remove once the feature flag is enabled.
-            if (!FeatureFlagUtil.isEnabled(this.routerDB, "featureFlagQueryStatsDelete")) {
-                jsTest.log.info(`Skipping test featureFlagQueryStatsDelete is disabled`);
-                return;
-            }
             // Clear the query stats cache so we only see entries from this test.
             resetQueryStatsStore(this.st.s, "1%");
 

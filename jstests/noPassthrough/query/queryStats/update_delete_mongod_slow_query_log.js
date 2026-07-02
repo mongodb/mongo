@@ -1,12 +1,8 @@
 /**
  * Test to confirm queryShapeHash is outputted on mongod slow query logs for write commands on
- * sharded clusters. Updates should always be collected, but deletes are only collected when
- * featureFlagQueryStatsDelete is enabled.
- *
- * @tags: [requires_fcv_90]
+ * sharded clusters.
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {
     getQueryShapeHashFromSlowLogs,
@@ -115,15 +111,6 @@ describe("Query Shape Hash Output Tests", function () {
                 `Shard1 queryShapeHash should not be null: ${testDescription}`,
             );
         }
-    }
-
-    // TODO SERVER-123427 remove once the feature flag is enabled.
-    function skipIfDeleteFlagIsDisabled(routerDB) {
-        if (!FeatureFlagUtil.isEnabled(routerDB, "featureFlagQueryStatsDelete")) {
-            jsTest.log.info(`Skipping delete slow-log test (QueryStatsDelete disabled)`);
-            return true;
-        }
-        return false;
     }
 
     // ============================================
@@ -286,9 +273,6 @@ describe("Query Shape Hash Output Tests", function () {
     // ============================================
     describe("Unsharded Collection Deletes", function () {
         it("basic delete", function () {
-            if (skipIfDeleteFlagIsDisabled(this.routerDB)) {
-                return;
-            }
             runCmdAndAssertHashOnMongod({
                 ctx: this,
                 collName: this.collNames.unsharded,
@@ -298,9 +282,6 @@ describe("Query Shape Hash Output Tests", function () {
         });
 
         it("complex delete with multiple features", function () {
-            if (skipIfDeleteFlagIsDisabled(this.routerDB)) {
-                return;
-            }
             runCmdAndAssertHashOnMongod({
                 ctx: this,
                 collName: this.collNames.unsharded,
@@ -331,9 +312,6 @@ describe("Query Shape Hash Output Tests", function () {
     // ============================================
     describe("Sharded Collection Deletes", function () {
         it("basic delete targeting both shards", function () {
-            if (skipIfDeleteFlagIsDisabled(this.routerDB)) {
-                return;
-            }
             runCmdAndAssertHashOnMongod({
                 ctx: this,
                 collName: this.collNames.sharded,
@@ -344,9 +322,6 @@ describe("Query Shape Hash Output Tests", function () {
         });
 
         it("complex delete with multiple features targeting both shards", function () {
-            if (skipIfDeleteFlagIsDisabled(this.routerDB)) {
-                return;
-            }
             runCmdAndAssertHashOnMongod({
                 ctx: this,
                 collName: this.collNames.sharded,
@@ -377,9 +352,6 @@ describe("Query Shape Hash Output Tests", function () {
     // ============================================
     describe("Batched Deletes", function () {
         it("batched deletes on unsharded collections", function () {
-            if (skipIfDeleteFlagIsDisabled(this.routerDB)) {
-                return;
-            }
             const comment = `batched_delete_unsharded_${UUID().toString()}`;
 
             assert.commandWorked(
@@ -402,9 +374,6 @@ describe("Query Shape Hash Output Tests", function () {
         });
 
         it("batched deletes on sharded collection", function () {
-            if (skipIfDeleteFlagIsDisabled(this.routerDB)) {
-                return;
-            }
             const comment = `batched_delete_sharded_${UUID().toString()}`;
 
             // Use queries with distinct shapes that each target both shards.

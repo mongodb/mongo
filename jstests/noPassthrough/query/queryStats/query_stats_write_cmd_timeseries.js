@@ -10,10 +10,7 @@
  * 3. Deletes on time-series collections should be recorded as delete commands in query stats on
  *    mongos.
  *
- * @tags: [
- *   featureFlagQueryStatsDelete,
- *   requires_fcv_90,
- * ]
+ * @tags: [requires_fcv_90]
  */
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {

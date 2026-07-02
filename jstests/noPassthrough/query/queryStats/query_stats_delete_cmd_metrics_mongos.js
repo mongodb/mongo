@@ -1,6 +1,7 @@
 /**
  * Tests query stats for delete commands that go through various mongos dispatch paths.
- * @tags: [featureFlagQueryStatsDelete]
+ *
+ * @tags: [requires_fcv_90]
  */
 import {getQueryStatsDeleteCmd} from "jstests/libs/query/query_stats_utils.js";
 import {runMongosWriteMetricsTests} from "jstests/libs/query/query_stats_write_cmd_utils.js";

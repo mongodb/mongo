@@ -151,15 +151,9 @@ function assertDeleteCommandRecordedOnShardsExceptRouter(primaryConn) {
     );
 }
 
-/**
- * featureFlagQueryStatsDelete is fcv-gated. We expect that delete commands are only recorded when
- * FCV is bumped.
- */
 testPerformUpgradeReplSet({
     upgradeNodeOptions: {
         setParameter: {
-            // TODO SERVER-123427 remove enabling featureFlagQueryStatsDelete.
-            featureFlagQueryStatsDelete: true,
             internalQueryStatsSampleRate: 1,
             internalQueryStatsWriteCmdSampleRate: 1,
         },
@@ -172,17 +166,15 @@ testPerformUpgradeReplSet({
 });
 
 /**
- * featureFlagQueryStatsDelete is FCV-gated, but mongos pins itself to the latest FCV, so once
- * mongos is on the latest binary a delete routed through it is recorded in the router's query stats
- * even while the cluster FCV is still last-LTS. After the FCV is bumped, the shards take over
- * recording instead of the router. This also checks that there is no regression when shard servers
- * send cursor metrics using the latest DeleteCommandReply.
+ * Mongos pins itself to the latest FCV, so once mongos is on the latest binary a delete routed
+ * through it is recorded in the router's query stats even while the cluster FCV is still last-LTS.
+ * After the FCV is bumped, the shards take over recording instead of the router. This also checks
+ * that there is no regression when shard servers send cursor metrics using the latest
+ * DeleteCommandReply.
  */
 testPerformUpgradeSharded({
     upgradeNodeOptions: {
         setParameter: {
-            // TODO SERVER-123427 remove enabling featureFlagQueryStatsDelete.
-            featureFlagQueryStatsDelete: true,
             internalQueryStatsSampleRate: 1,
             internalQueryStatsWriteCmdSampleRate: 1,
         },

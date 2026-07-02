@@ -5,9 +5,8 @@
  *
  * @tags: [requires_fcv_90]
  */
-
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
+import {describe, it} from "jstests/libs/mochalite.js";
 import {
     assertAggregatedMetricsSingleExec,
     getLatestQueryStatsEntry,
@@ -58,7 +57,6 @@ function testReplacementUpdate(testDB, coll, collName) {
 // Simple _id queries skip parsing during normal update processing (IDHACK optimization),
 // but should still record metrics correctly.
 function testIdUpdate(testDB, coll, collName) {
-    assert.commandWorked(coll.insert({_id: 999, v: 1}));
     assert.commandWorked(
         testDB.runCommand({
             update: collName,
@@ -84,7 +82,6 @@ function testIdUpdate(testDB, coll, collName) {
             keysDeleted: 0,
         },
     });
-    assert.commandWorked(coll.remove({_id: 999}));
 }
 
 function testModifierUpdate(testDB, coll, collName) {
@@ -155,6 +152,8 @@ function testIndexedFieldUpdate(testDB, coll, collName) {
     // insert run before the update command, so they don't contribute to the update's metrics.
     assert.commandWorked(coll.createIndex({w: 1}));
     assert.commandWorked(coll.insert({_id: 9999, w: 1}));
+    // Reset the query stats store so the insert doesn't appear when validating the entry.
+    resetQueryStatsStore(testDB.getMongo(), "1MB");
     assert.commandWorked(
         testDB.runCommand({
             update: collName,

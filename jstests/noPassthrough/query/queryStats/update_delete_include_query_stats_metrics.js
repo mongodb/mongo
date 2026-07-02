@@ -1,13 +1,8 @@
 /**
  * Tests that includeQueryStatsMetricsForOpIndex is processed correctly for write commands (update
  * and delete), and that query stats metrics are included in the command response when requested.
- *
- * Delete tests run only when featureFlagQueryStatsDelete is enabled.
- *
- * @tags: [requires_fcv_90]
  */
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     assertAggregatedMetricsSingleExec,
     getQueryExecMetrics,
@@ -36,7 +31,8 @@ function disableQueryStatsSampling(conn) {
 /**
  * Spec object describing how to build and validate a write command for a single command type.
  *
- *   featureFlag       - Optional flag name; tests skip at runtime when this flag is disabled.
+ *   label             - Human-readable name for the command type, used in test descriptions
+ *                     and assertions.
  *   getQueryStats     - Function(conn, opts) that fetches query stats for this command type.
  *   makeCmd(opIndex)  - Returns the write command object with includeQueryStatsMetricsForOpIndex
  *                       set to 'opIndex'. The command should match all 8 docs in the collection.
@@ -48,7 +44,7 @@ function disableQueryStatsSampling(conn) {
  *   verifyShardMetrics(metrics) - Asserts the per-op metrics returned from the primary shard.
  */
 const updateSpec = {
-    featureFlag: null,
+    label: "update",
     getQueryStats: getQueryStatsUpdateCmd,
     makeCmd: (opIndex) => ({
         update: collName,
@@ -92,7 +88,7 @@ const updateSpec = {
 };
 
 const deleteSpec = {
-    featureFlag: "featureFlagQueryStatsDelete",
+    label: "delete",
     getQueryStats: getQueryStatsDeleteCmd,
     makeCmd: (opIndex) => ({
         delete: collName,
@@ -127,14 +123,6 @@ const deleteSpec = {
  *   - If sampling is enabled, verifies the aggregated metrics in the query stats store.
  */
 function runIncludeMetricsTest(testDB, opIndex, isStandalone, enabledSampling, spec) {
-    if (spec.featureFlag && !FeatureFlagUtil.isEnabled(testDB, spec.featureFlag)) {
-        jsTest.log.info(
-            "Skipping runIncludeMetricsTest because this feature flag is off: ",
-            spec.featureFlag,
-        );
-        return;
-    }
-
     const res = assert.commandWorked(testDB.runCommand(spec.makeCmd(opIndex)));
 
     if (isStandalone) {
@@ -152,7 +140,7 @@ function runIncludeMetricsTest(testDB, opIndex, isStandalone, enabledSampling, s
         // docsFetched is the number of documents that were fetched again. As a result, on sharded
         // clusters each document may be re-fetched, so we assert that docsExamined is between 8
         // and 16.
-        const isShardedDelete = !isStandalone && spec.featureFlag !== null;
+        const isShardedDelete = !isStandalone && spec.label === "delete";
         const docsExamined = isShardedDelete
             ? getQueryExecMetrics(entry.metrics).docsExamined.sum
             : 8;
@@ -186,7 +174,7 @@ function runIncludeMetricsTest(testDB, opIndex, isStandalone, enabledSampling, s
 }
 
 function registerIncludeMetricsTests(getConn, getDB, isStandalone, spec) {
-    describe(`Enable sampling (${spec.featureFlag ?? "update"})`, () => {
+    describe(`Enable sampling (${spec.label})`, () => {
         before(() => enableQueryStatsSampling(getConn()));
         beforeEach(() => resetQueryStatsStore(getConn(), "1MB"));
 
@@ -196,7 +184,7 @@ function registerIncludeMetricsTests(getConn, getDB, isStandalone, spec) {
             runIncludeMetricsTest(getDB(), 42, isStandalone, true, spec));
     });
 
-    describe(`Disable sampling (${spec.featureFlag ?? "update"})`, () => {
+    describe(`Disable sampling (${spec.label})`, () => {
         before(() => disableQueryStatsSampling(getConn()));
 
         it(`opIndex=0: metrics absent from query stats store`, () =>
@@ -211,14 +199,6 @@ function registerIncludeMetricsTests(getConn, getDB, isStandalone, spec) {
  * that the shard returns queryStatsMetrics with the right opIndex and write metrics.
  */
 function runPrimaryShardTest(fixture, testDB, opIndex, spec) {
-    if (spec.featureFlag && !FeatureFlagUtil.isEnabled(testDB, spec.featureFlag)) {
-        jsTest.log.info(
-            "Skipping runPrimaryShardTest because this feature flag is disabled: ",
-            spec.featureFlag,
-        );
-        return;
-    }
-
     const dbName = testDB.getName();
     const databaseVersion = assert.commandWorked(
         fixture.s.adminCommand({getDatabaseVersion: dbName}),

@@ -51,13 +51,22 @@ export function assertWriteCmdQueryStatsSingleExec(
 }
 
 /**
- * Drops and re-populates a collection with 8 documents {v: 1} through {v: 8}, used as a standard
- * starting state for write command query stats tests.
+ * Drops and re-populates a collection with 8 documents {_id: 999, v: 1} through {_id: 992, v: 8},
+ * used as a standard starting state for write command query stats tests.
  */
 export function resetQueryStatsCollection(coll) {
     coll.drop();
     assert.commandWorked(
-        coll.insert([{v: 1}, {v: 2}, {v: 3}, {v: 4}, {v: 5}, {v: 6}, {v: 7}, {v: 8}]),
+        coll.insert([
+            {_id: 999, v: 1},
+            {_id: 998, v: 2},
+            {_id: 997, v: 3},
+            {_id: 996, v: 4},
+            {_id: 995, v: 5},
+            {_id: 994, v: 6},
+            {_id: 993, v: 7},
+            {_id: 992, v: 8},
+        ]),
     );
 }
 
@@ -160,8 +169,10 @@ export function describeWriteCmdQueryStatsReplicaSetTests(label, bodyFn) {
         });
 
         beforeEach(function () {
-            resetQueryStatsStore(conn, "1MB");
+            // resetQueryStatsCollection must run first because its insert creates an extra query
+            // stats entry.
             resetQueryStatsCollection(coll);
+            resetQueryStatsStore(conn, "1MB");
         });
 
         bodyFn(() => ({conn, testDB, coll, collName}));
@@ -200,6 +211,8 @@ export function describeWriteCmdQueryStatsShardedTests(label, bodyFn) {
         });
 
         beforeEach(function () {
+            // resetQueryStatsCollection must run first because its insert creates an extra query
+            // stats entry.
             resetQueryStatsCollection(coll);
             resetQueryStatsStore(st.s, "1MB");
         });

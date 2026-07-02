@@ -333,7 +333,8 @@ feature_flags:
     featureFlagQueryStatsDelete:
         description: "Feature flag to enable query stats for the delete command."
         cpp_varname: gFeatureFlagQueryStatsDelete
-        default: false
+        default: true
+        version: 9.0
         fcv_gated: true
 
     featureFlagQueryStatsCBRMetrics:

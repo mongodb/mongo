@@ -78,12 +78,6 @@ public:
 
     ServiceContext::UniqueOperationContext opCtxHolder;
     OperationContext* opCtx;
-    // Enable collection of query stats for updates.
-    unittest::ServerParameterGuard controller{"featureFlagQueryStatsUpdateCommand", true};
-    // Enable collection of query stats for inserts.
-    unittest::ServerParameterGuard insertController{"featureFlagQueryStatsInsert", true};
-    // Enable collection of query stats for deletes.
-    unittest::ServerParameterGuard deleteFlag{"featureFlagQueryStatsDelete", true};
 };
 
 /**

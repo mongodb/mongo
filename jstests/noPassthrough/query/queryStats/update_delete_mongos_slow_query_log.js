@@ -5,12 +5,9 @@
  *   - Single write (one op): queryShapeHash is present in slow query logs on mongos.
  *   - Batched write (multiple ops): queryShapeHash is not present in slow query logs on mongos.
  *
- * Covers: update (always), delete (when featureFlagQueryStatsDelete is enabled).
- *
- * @tags: [requires_fcv_90]
+ * Covers: update and delete.
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {
     getQueryShapeHashFromSlowLogs,
@@ -30,19 +27,7 @@ const testDocuments = [
     {v: 8, x: 80, y: "b"},
 ];
 
-// TODO SERVER-123427 remove once the feature flag is enabled.
-function skipIfFlagDisabled(routerDB, featureFlag) {
-    if (featureFlag && !FeatureFlagUtil.isEnabled(routerDB, featureFlag)) {
-        jsTest.log.info(`Skipping slow-log test: ${featureFlag} disabled`);
-        return true;
-    }
-    return false;
-}
-
-function testMongosHasQueryShapeHash(routerDB, featureFlag, command, comment) {
-    if (skipIfFlagDisabled(routerDB, featureFlag)) {
-        return;
-    }
+function testMongosHasQueryShapeHash(routerDB, command, comment) {
     assert.commandWorked(routerDB.runCommand(command));
     const hash = getQueryShapeHashFromSlowLogs({
         testDB: routerDB,
@@ -51,10 +36,7 @@ function testMongosHasQueryShapeHash(routerDB, featureFlag, command, comment) {
     assert.neq(hash, null, "queryShapeHash should be present on mongos for single write");
 }
 
-function testMongosHasNoQueryShapeHashBatch(routerDB, featureFlag, command, comment) {
-    if (skipIfFlagDisabled(routerDB, featureFlag)) {
-        return;
-    }
+function testMongosHasNoQueryShapeHashBatch(routerDB, command, comment) {
     assert.commandWorked(routerDB.runCommand(command));
     const mongosLogs = getSlowQueryLogs(routerDB, comment, {includeInProgress: true});
     assert.gte(mongosLogs.length, 1, "At least one log entry expected");
@@ -116,7 +98,6 @@ describe("Mongos - Single vs Batched Write Cmd Query Shape Hash", function () {
             const comment = "single update unsharded";
             testMongosHasQueryShapeHash(
                 this.routerDB,
-                null,
                 {
                     update: this.collNames.unsharded,
                     updates: [{q: {v: 1}, u: {$set: {updated: true}}}],
@@ -130,7 +111,6 @@ describe("Mongos - Single vs Batched Write Cmd Query Shape Hash", function () {
             const comment = "batched update unsharded";
             testMongosHasNoQueryShapeHashBatch(
                 this.routerDB,
-                null,
                 {
                     update: this.collNames.unsharded,
                     updates: [
@@ -148,7 +128,6 @@ describe("Mongos - Single vs Batched Write Cmd Query Shape Hash", function () {
             const comment = "single update sharded";
             testMongosHasQueryShapeHash(
                 this.routerDB,
-                null,
                 {
                     update: this.collNames.sharded,
                     updates: [{q: {v: 1}, u: {$set: {updated: true}}}],
@@ -162,7 +141,6 @@ describe("Mongos - Single vs Batched Write Cmd Query Shape Hash", function () {
             const comment = "batched update sharded";
             testMongosHasNoQueryShapeHashBatch(
                 this.routerDB,
-                null,
                 {
                     update: this.collNames.sharded,
                     updates: [
@@ -182,7 +160,6 @@ describe("Mongos - Single vs Batched Write Cmd Query Shape Hash", function () {
             const comment = "single delete unsharded";
             testMongosHasQueryShapeHash(
                 this.routerDB,
-                "QueryStatsDelete",
                 {
                     delete: this.collNames.unsharded,
                     deletes: [{q: {v: 1}, limit: 1}],
@@ -196,7 +173,6 @@ describe("Mongos - Single vs Batched Write Cmd Query Shape Hash", function () {
             const comment = "batched delete unsharded";
             testMongosHasNoQueryShapeHashBatch(
                 this.routerDB,
-                "QueryStatsDelete",
                 {
                     delete: this.collNames.unsharded,
                     deletes: [
@@ -214,7 +190,6 @@ describe("Mongos - Single vs Batched Write Cmd Query Shape Hash", function () {
             const comment = "single delete sharded";
             testMongosHasQueryShapeHash(
                 this.routerDB,
-                "QueryStatsDelete",
                 {
                     delete: this.collNames.sharded,
                     deletes: [{q: {v: 1}, limit: 1}],
@@ -228,7 +203,6 @@ describe("Mongos - Single vs Batched Write Cmd Query Shape Hash", function () {
             const comment = "batched delete sharded";
             testMongosHasNoQueryShapeHashBatch(
                 this.routerDB,
-                "QueryStatsDelete",
                 {
                     delete: this.collNames.sharded,
                     deletes: [
