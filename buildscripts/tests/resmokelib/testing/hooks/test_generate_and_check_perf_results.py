@@ -6,9 +6,10 @@ import logging
 import unittest
 
 import mock
+import requests
 
 import buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results as cbr
-from buildscripts.resmokelib.errors import CedarReportError, ServerFailure
+from buildscripts.resmokelib.errors import ServerFailure
 from buildscripts.util.cedar_report import CedarMetric
 
 _BM_CONTEXT = {
@@ -209,8 +210,8 @@ class GenerateAndCheckPerfResultsFixture(unittest.TestCase):
     def setUp(self, MockHook):
         self.bm_threads_report = cbr._BenchmarkThreadsReport(_BM_CONTEXT)
 
-        self.cbr_hook = cbr.GenerateAndCheckPerfResults(None, None)
-        self.cbr_hook.logger = mock.MagicMock()
+        self.cbr_hook = cbr.GenerateAndCheckPerfResults(logging.getLogger("hook_logger"), None)
+        self.cbr_hook.logger = logging.getLogger("hook_logger")
         self.cbr_hook.fixture = None
 
         self.cbr_hook.create_time = datetime.datetime.fromtimestamp(
@@ -236,18 +237,25 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
         # After we parse the same report twice we have duplicated metrics
         report = self.cbr_hook._parse_report(_BM_FULL_REPORT_WITH_DUPS)
 
-        # self.assertRaises(Exception, self.cbr_hook._generate_cedar_report)
-        with self.assertRaisesRegex(CedarReportError, _BM_REPORT_1["name"]):
-            self.cbr_hook._generate_cedar_report(report)
+        with self.assertLogs("hook_logger", level="ERROR") as cm:
+            cedar_report = self.cbr_hook._generate_cedar_report(report)
 
-    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+        self.assertTrue(
+            any(_BM_REPORT_1["name"] in msg for msg in cm.output),
+            f"Expected error about duplicated metric names in {cm.output}",
+        )
+        # The duplicated benchmark should be skipped, but other benchmarks should still be present.
+        self.assertEqual(len(cedar_report), 1)
+        self.assertEqual(cedar_report[0].test_name, "BM_Name2")
+
     @mock.patch(
         "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.CheckPerfResultTestCase"
     )
-    def test_check_pass_fail_uses_config_project_name(
-        self, MockCheckPerfResultTestCase, mock_config
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    def test_check_pass_fail_handles_missing_project_name(
+        self, mock_config, MockCheckPerfResultTestCase
     ):
-        mock_config.EVERGREEN_PROJECT_NAME = "mongodb-mongo-v8.3-staging"
+        mock_config.EVERGREEN_PROJECT_NAME = None
         mock_config.EVERGREEN_REQUESTER = "github_pr"
         mock_config.EVERGREEN_REVISION = "abc123"
 
@@ -258,12 +266,74 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
                     {
                         "thread_level": 1,
                         "metrics": [
-                            {"name": "latency", "bound_direction": "upper", "threshold_limit": 500}
+                            {
+                                "name": "latency",
+                                "bound_direction": "upper",
+                                "threshold_limit": 500,
+                            }
                         ],
                     }
                 ]
             }
         }
+
+        benchmark_reports = self.cbr_hook._parse_report(_BM_FULL_REPORT)
+        cedar_formatted_results = self.cbr_hook._generate_cedar_report(benchmark_reports)
+
+        with self.assertLogs("hook_logger", level="ERROR") as cm:
+            self.cbr_hook._check_pass_fail(
+                benchmark_reports,
+                cedar_formatted_results,
+                mock.MagicMock(),
+                mock.MagicMock(),
+            )
+
+        self.assertTrue(
+            any("Unable to determine the Evergreen project name" in msg for msg in cm.output),
+            f"Expected error about missing project name in {cm.output}",
+        )
+        # A dynamic test case is still created but with an empty thresholds list, so it passes.
+        MockCheckPerfResultTestCase.create_after_test.assert_called_once()
+        mock_hook_test_case = MockCheckPerfResultTestCase.create_after_test.return_value
+        mock_hook_test_case.run_dynamic_test.assert_called_once()
+
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.CheckPerfResultTestCase"
+    )
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.evergreen_conn.get_evergreen_api"
+    )
+    def test_check_pass_fail_resolves_version_id(
+        self, mock_get_api, MockCheckPerfResultTestCase, mock_config
+    ):
+        # The version ID is resolved from the Evergreen API so that it is correct for any project,
+        # including staging projects whose identifiers Evergreen sanitizes in non-obvious ways.
+        mock_config.EVERGREEN_PROJECT_NAME = "mongodb-mongo-master-v8.3-staging"
+        mock_config.EVERGREEN_REQUESTER = "github_pr"
+        mock_config.EVERGREEN_REVISION = "abc123"
+
+        self.cbr_hook.variant = "test-variant"
+        self.cbr_hook.performance_thresholds = {
+            "BM_Name1/arg1/arg with space": {
+                "test-variant": [
+                    {
+                        "thread_level": 1,
+                        "metrics": [
+                            {
+                                "name": "latency",
+                                "bound_direction": "upper",
+                                "threshold_limit": 500,
+                            }
+                        ],
+                    }
+                ]
+            }
+        }
+
+        mock_task = mock.MagicMock()
+        mock_task.version_id = "mongodb_mongo_master_v8_3_staging_abc123"
+        mock_get_api.return_value.tasks_by_project_and_commit.return_value = [mock_task]
 
         mock_hook_test_case = mock.MagicMock()
         MockCheckPerfResultTestCase.create_after_test.return_value = mock_hook_test_case
@@ -281,25 +351,31 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
                 mock.MagicMock(),
             )
 
+            mock_get_api.return_value.tasks_by_project_and_commit.assert_called_once_with(
+                "mongodb-mongo-master-v8.3-staging", "abc123"
+            )
             mock_retrieve.assert_called_once_with(
-                url=cbr.GET_TIMESERIES_URL,
                 test_name="BM_Name1/arg1/arg with space",
                 task_name=cbr.SEP_BENCHMARKS_TASK_NAME,
                 variant="test-variant",
                 measurement="latency",
                 args={"thread_level": 1},
-                base_commit="abc123",
-                project="mongodb-mongo-v8.3-staging",
+                project="mongodb-mongo-master-v8.3-staging",
+                version_id="mongodb_mongo_master_v8_3_staging_abc123",
             )
 
     @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
     @mock.patch(
         "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.CheckPerfResultTestCase"
     )
-    def test_check_pass_fail_raises_when_project_name_is_none(
-        self, MockCheckPerfResultTestCase, mock_config
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.evergreen_conn.get_evergreen_api"
+    )
+    def test_check_pass_fail_handles_version_resolution_failure(
+        self, mock_get_api, MockCheckPerfResultTestCase, mock_config
     ):
-        mock_config.EVERGREEN_PROJECT_NAME = None
+        # If the Evergreen API lookup fails, version_id is None and the retrieve step falls back.
+        mock_config.EVERGREEN_PROJECT_NAME = "mongodb-mongo-master"
         mock_config.EVERGREEN_REQUESTER = "github_pr"
         mock_config.EVERGREEN_REVISION = "abc123"
 
@@ -310,12 +386,18 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
                     {
                         "thread_level": 1,
                         "metrics": [
-                            {"name": "latency", "bound_direction": "upper", "threshold_limit": 500}
+                            {
+                                "name": "latency",
+                                "bound_direction": "upper",
+                                "threshold_limit": 500,
+                            }
                         ],
                     }
                 ]
             }
         }
+
+        mock_get_api.side_effect = Exception("API error")
 
         mock_hook_test_case = mock.MagicMock()
         MockCheckPerfResultTestCase.create_after_test.return_value = mock_hook_test_case
@@ -323,15 +405,287 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
         benchmark_reports = self.cbr_hook._parse_report(_BM_FULL_REPORT)
         cedar_formatted_results = self.cbr_hook._generate_cedar_report(benchmark_reports)
 
-        with self.assertRaisesRegex(
-            ServerFailure, "Unable to determine the Evergreen project name"
-        ):
+        with mock.patch.object(
+            self.cbr_hook, "_retrieve_base_commit_value", return_value=50
+        ) as mock_retrieve:
+            # The resolution failure must be logged at ERROR so it reaches alerting.
+            with self.assertLogs("hook_logger", level="ERROR") as log_ctx:
+                self.cbr_hook._check_pass_fail(
+                    benchmark_reports,
+                    cedar_formatted_results,
+                    mock.MagicMock(),
+                    mock.MagicMock(),
+                )
+
+            mock_retrieve.assert_called_once_with(
+                test_name="BM_Name1/arg1/arg with space",
+                task_name=cbr.SEP_BENCHMARKS_TASK_NAME,
+                variant="test-variant",
+                measurement="latency",
+                args={"thread_level": 1},
+                project="mongodb-mongo-master",
+                version_id=None,
+            )
+            self.assertTrue(
+                any("Failed to resolve base commit" in line for line in log_ctx.output),
+                f"expected an ERROR for the resolution failure, got: {log_ctx.output}",
+            )
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.evergreen_conn.get_evergreen_api"
+    )
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    def test_check_pass_fail_passes_when_no_thresholds_set(self, mock_config, mock_get_api):
+        # The hook should pass when no thresholds are set for any benchmark, even if the project
+        # name is unavailable. The project-name failure (and the base-version resolution) must be
+        # deferred until at least one threshold check will actually run.
+        mock_config.EVERGREEN_PROJECT_NAME = None
+
+        self.cbr_hook.variant = "test-variant"
+        self.cbr_hook.performance_thresholds = {}
+
+        benchmark_reports = self.cbr_hook._parse_report(_BM_FULL_REPORT)
+        cedar_formatted_results = self.cbr_hook._generate_cedar_report(benchmark_reports)
+
+        # Should not raise even though the project name is None, because no checks run.
+        self.cbr_hook._check_pass_fail(
+            benchmark_reports,
+            cedar_formatted_results,
+            mock.MagicMock(),
+            mock.MagicMock(),
+        )
+
+        self.assertFalse(self.cbr_hook.has_checked_results)
+        # No threshold check ran, so the base version (an Evergreen API call) was never resolved.
+        mock_get_api.assert_not_called()
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.evergreen_conn.get_evergreen_api"
+    )
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    def test_check_pass_fail_passes_when_no_thresholds_for_variant(self, mock_config, mock_get_api):
+        # Thresholds exist for the benchmark but not for the variant being run, so no check runs and
+        # the hook should pass without resolving the project or base version.
+        mock_config.EVERGREEN_PROJECT_NAME = None
+
+        self.cbr_hook.variant = "test-variant"
+        self.cbr_hook.performance_thresholds = {
+            "BM_Name1/arg1/arg with space": {
+                "some-other-variant": [
+                    {
+                        "thread_level": 1,
+                        "metrics": [
+                            {
+                                "name": "latency",
+                                "bound_direction": "upper",
+                                "threshold_limit": 500,
+                            }
+                        ],
+                    }
+                ]
+            }
+        }
+
+        benchmark_reports = self.cbr_hook._parse_report(_BM_FULL_REPORT)
+        cedar_formatted_results = self.cbr_hook._generate_cedar_report(benchmark_reports)
+
+        # Should not raise even though the project name is None, because no checks run.
+        self.cbr_hook._check_pass_fail(
+            benchmark_reports,
+            cedar_formatted_results,
+            mock.MagicMock(),
+            mock.MagicMock(),
+        )
+
+        self.assertFalse(self.cbr_hook.has_checked_results)
+        mock_get_api.assert_not_called()
+
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.CheckPerfResultTestCase"
+    )
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.evergreen_conn.get_evergreen_api"
+    )
+    def test_check_pass_fail_missing_baseline_logs_error(
+        self, mock_get_api, MockCheckPerfResultTestCase, mock_config
+    ):
+        # The commit-queue use case: a missing base value must not fail the task, but must emit a
+        # clear ERROR-level log that alerting can match on.
+        mock_config.EVERGREEN_PROJECT_NAME = "mongodb-mongo-master"
+        mock_config.EVERGREEN_REQUESTER = "github_pr"
+        mock_config.EVERGREEN_REVISION = "abc123"
+
+        self.cbr_hook.variant = "test-variant"
+        self.cbr_hook.performance_thresholds = {
+            "BM_Name1/arg1/arg with space": {
+                "test-variant": [
+                    {
+                        "thread_level": 1,
+                        "metrics": [
+                            {
+                                "name": "latency",
+                                "bound_direction": "upper",
+                                "threshold_limit": 500,
+                            }
+                        ],
+                    }
+                ]
+            }
+        }
+
+        mock_task = mock.MagicMock()
+        mock_task.version_id = "mongodb_mongo_master_abc123"
+        mock_get_api.return_value.tasks_by_project_and_commit.return_value = [mock_task]
+        MockCheckPerfResultTestCase.create_after_test.return_value = mock.MagicMock()
+
+        benchmark_reports = self.cbr_hook._parse_report(_BM_FULL_REPORT)
+        cedar_formatted_results = self.cbr_hook._generate_cedar_report(benchmark_reports)
+
+        with mock.patch.object(self.cbr_hook, "_retrieve_base_commit_value", return_value=None):
+            with self.assertLogs("hook_logger", level="ERROR") as log_ctx:
+                self.cbr_hook._check_pass_fail(
+                    benchmark_reports,
+                    cedar_formatted_results,
+                    mock.MagicMock(),
+                    mock.MagicMock(),
+                )
+
+        self.assertTrue(
+            any("no raw perf result found" in line for line in log_ctx.output),
+            f"expected an alertable 'no raw perf result found' error, got: {log_ctx.output}",
+        )
+
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.CheckPerfResultTestCase"
+    )
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.evergreen_conn.get_evergreen_api"
+    )
+    def test_missing_baseline_does_not_fail_suite(
+        self, mock_get_api, MockCheckPerfResultTestCase, mock_config
+    ):
+        # End-to-end: even with check_result=True (as in benchmarks_sep, which runs in the commit
+        # queue), a missing base value must not block the task. The metric still counts as checked
+        # so the after_suite reconciliation passes; alerting is expected to key off the ERROR log.
+        mock_config.EVERGREEN_PROJECT_NAME = "mongodb-mongo-master"
+        mock_config.EVERGREEN_REQUESTER = "github_pr"
+        mock_config.EVERGREEN_REVISION = "abc123"
+
+        self.cbr_hook.variant = "test-variant"
+        self.cbr_hook.check_result = True
+        self.cbr_hook.cedar_report_file = None
+        self.cbr_hook.performance_thresholds = {
+            "BM_Name1/arg1/arg with space": {
+                "test-variant": [
+                    {
+                        "thread_level": 1,
+                        "metrics": [
+                            {
+                                "name": "latency",
+                                "bound_direction": "upper",
+                                "threshold_limit": 500,
+                            }
+                        ],
+                    }
+                ]
+            }
+        }
+
+        mock_task = mock.MagicMock()
+        mock_task.version_id = "mongodb_mongo_master_abc123"
+        mock_get_api.return_value.tasks_by_project_and_commit.return_value = [mock_task]
+        MockCheckPerfResultTestCase.create_after_test.return_value = mock.MagicMock()
+
+        benchmark_reports = self.cbr_hook._parse_report(_BM_FULL_REPORT)
+        cedar_formatted_results = self.cbr_hook._generate_cedar_report(benchmark_reports)
+
+        with mock.patch.object(self.cbr_hook, "_retrieve_base_commit_value", return_value=None):
             self.cbr_hook._check_pass_fail(
                 benchmark_reports,
                 cedar_formatted_results,
                 mock.MagicMock(),
                 mock.MagicMock(),
             )
+
+        # A skipped-for-missing-baseline metric still counts as checked, so after_suite must not raise.
+        self.assertTrue(self.cbr_hook.has_checked_results)
+        self.cbr_hook.after_suite(mock.MagicMock())
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.evergreen_conn.get_evergreen_api"
+    )
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    def test_resolve_base_version_skips_api_when_no_base_commit(self, mock_config, mock_get_api):
+        # When there is no base commit to resolve (e.g. EVERGREEN_REVISION unset, as in a local run),
+        # don't call the Evergreen API with a None revision. Return version_id None so the caller
+        # skips the comparison, but avoid the pointless 404.
+        mock_config.EVERGREEN_PROJECT_NAME = "mongodb-mongo-master"
+        mock_config.EVERGREEN_REQUESTER = "patch"  # not a mainline requester
+        mock_config.EVERGREEN_REVISION = None
+        self.cbr_hook.variant = "test-variant"
+
+        project, version_id = self.cbr_hook._resolve_base_version()
+
+        self.assertEqual(project, "mongodb-mongo-master")
+        self.assertIsNone(version_id)
+        mock_get_api.assert_not_called()
+
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.CheckPerfResultTestCase"
+    )
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.evergreen_conn.get_evergreen_api"
+    )
+    def test_base_version_resolved_once_across_benchmark_files(
+        self, mock_get_api, MockCheckPerfResultTestCase, mock_config
+    ):
+        # _check_pass_fail runs once per benchmark file (via after_test). The base commit is constant
+        # for the whole run, so the Evergreen version is resolved once and cached across calls.
+        mock_config.EVERGREEN_PROJECT_NAME = "mongodb-mongo-master"
+        mock_config.EVERGREEN_REQUESTER = "github_pr"
+        mock_config.EVERGREEN_REVISION = "abc123"
+
+        self.cbr_hook.variant = "test-variant"
+        self.cbr_hook.performance_thresholds = {
+            "BM_Name1/arg1/arg with space": {
+                "test-variant": [
+                    {
+                        "thread_level": 1,
+                        "metrics": [
+                            {
+                                "name": "latency",
+                                "bound_direction": "upper",
+                                "threshold_limit": 500,
+                            }
+                        ],
+                    }
+                ]
+            }
+        }
+
+        mock_task = mock.MagicMock()
+        mock_task.version_id = "mongodb_mongo_master_abc123"
+        mock_get_api.return_value.tasks_by_project_and_commit.return_value = [mock_task]
+        MockCheckPerfResultTestCase.create_after_test.return_value = mock.MagicMock()
+
+        benchmark_reports = self.cbr_hook._parse_report(_BM_FULL_REPORT)
+        cedar_formatted_results = self.cbr_hook._generate_cedar_report(benchmark_reports)
+
+        with mock.patch.object(self.cbr_hook, "_retrieve_base_commit_value", return_value=50):
+            # Two benchmark files in the same run -> two _check_pass_fail calls.
+            self.cbr_hook._check_pass_fail(
+                benchmark_reports, cedar_formatted_results, mock.MagicMock(), mock.MagicMock()
+            )
+            self.cbr_hook._check_pass_fail(
+                benchmark_reports, cedar_formatted_results, mock.MagicMock(), mock.MagicMock()
+            )
+
+        mock_get_api.return_value.tasks_by_project_and_commit.assert_called_once_with(
+            "mongodb-mongo-master", "abc123"
+        )
 
 
 class TestBenchmarkThreadsReport(GenerateAndCheckPerfResultsFixture):
@@ -486,6 +840,303 @@ class TestBenchmarkThreadsReport(GenerateAndCheckPerfResultsFixture):
         collected_types = (m.type for m in cedar_metrics[2])
         self.assertIn("LATENCY", collected_types)
         self.assertIn("MEAN", collected_types)
+
+
+class TestRetrieveBaseCommitValue(GenerateAndCheckPerfResultsFixture):
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.requests.get"
+    )
+    def test_retrieve_base_commit_value_success(self, mock_get):
+        """Test successful retrieval of an exact parent value from raw perf results."""
+        mock_response = mock.MagicMock()
+        mock_response.json.return_value = [
+            {
+                "info": {
+                    "project": "mongodb-mongo-master",
+                    "variant": "my-variant",
+                    "task_name": "benchmarks_sep",
+                    "test_name": "BM_Test",
+                    "args": {"thread_level": 1},
+                },
+                "rollups": {
+                    "stats": [
+                        {"name": "latency", "val": 42},
+                    ]
+                },
+            }
+        ]
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+
+        value = self.cbr_hook._retrieve_base_commit_value(
+            test_name="BM_Test",
+            task_name="benchmarks_sep",
+            variant="my-variant",
+            measurement="latency",
+            args={"thread_level": 1},
+            project="mongodb-mongo-master",
+            version_id="some_version_id",
+        )
+
+        self.assertEqual(value, 42)
+        mock_get.assert_called_once()
+        call_args = mock_get.call_args
+        self.assertIn("some_version_id", call_args[0][0])
+        self.assertEqual(call_args[1]["params"]["test_name"], "BM_Test")
+        self.assertEqual(call_args[1]["params"]["filter_stats_name"], "latency")
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.requests.get"
+    )
+    def test_retrieve_base_commit_value_uses_latest_execution(self, mock_get):
+        """Test that the value from the latest execution is used when there are retries."""
+        info = {
+            "project": "mongodb-mongo-master",
+            "variant": "my-variant",
+            "task_name": "benchmarks_sep",
+            "test_name": "BM_Test",
+            "args": {"thread_level": 1},
+        }
+        mock_response = mock.MagicMock()
+        # Deliberately out of execution order to prove selection is by execution, not list position.
+        mock_response.json.return_value = [
+            {
+                "info": {**info, "execution": 0},
+                "rollups": {"stats": [{"name": "latency", "val": 10}]},
+            },
+            {
+                "info": {**info, "execution": 2},
+                "rollups": {"stats": [{"name": "latency", "val": 30}]},
+            },
+            {
+                "info": {**info, "execution": 1},
+                "rollups": {"stats": [{"name": "latency", "val": 20}]},
+            },
+        ]
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+
+        value = self.cbr_hook._retrieve_base_commit_value(
+            test_name="BM_Test",
+            task_name="benchmarks_sep",
+            variant="my-variant",
+            measurement="latency",
+            args={"thread_level": 1},
+            project="mongodb-mongo-master",
+            version_id="some_version_id",
+        )
+
+        self.assertEqual(value, 30)
+
+    def test_retrieve_base_commit_value_no_version_id(self):
+        """Test that None is returned when no version_id is provided."""
+        with mock.patch(
+            "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.requests.get"
+        ) as mock_get:
+            value = self.cbr_hook._retrieve_base_commit_value(
+                test_name="BM_Test",
+                task_name="benchmarks_sep",
+                variant="my-variant",
+                measurement="latency",
+                args={"thread_level": 1},
+                project="mongodb-mongo-master",
+                version_id=None,
+            )
+
+            self.assertIsNone(value)
+            mock_get.assert_not_called()
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.requests.get"
+    )
+    def test_retrieve_base_commit_value_no_match(self, mock_get):
+        """Test that None is returned when no matching result is found."""
+        mock_response = mock.MagicMock()
+        mock_response.json.return_value = [
+            {
+                "info": {
+                    "project": "other-project",
+                    "variant": "other-variant",
+                    "task_name": "other_task",
+                    "test_name": "Other_Test",
+                    "args": {"thread_level": 2},
+                },
+                "rollups": {
+                    "stats": [
+                        {"name": "throughput", "val": 100},
+                    ]
+                },
+            }
+        ]
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+
+        value = self.cbr_hook._retrieve_base_commit_value(
+            test_name="BM_Test",
+            task_name="benchmarks_sep",
+            variant="my-variant",
+            measurement="latency",
+            args={"thread_level": 1},
+            project="mongodb-mongo-master",
+            version_id="some_version_id",
+        )
+
+        self.assertIsNone(value)
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.requests.get"
+    )
+    def test_retrieve_base_commit_value_null_rollups(self, mock_get):
+        """Test that null rollups in API response does not crash."""
+        mock_response = mock.MagicMock()
+        mock_response.json.return_value = [
+            {
+                "info": {
+                    "project": "mongodb-mongo-master",
+                    "variant": "my-variant",
+                    "task_name": "benchmarks_sep",
+                    "test_name": "BM_Test",
+                    "args": {"thread_level": 1},
+                },
+                "rollups": None,
+            }
+        ]
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+
+        value = self.cbr_hook._retrieve_base_commit_value(
+            test_name="BM_Test",
+            task_name="benchmarks_sep",
+            variant="my-variant",
+            measurement="latency",
+            args={"thread_level": 1},
+            project="mongodb-mongo-master",
+            version_id="some_version_id",
+        )
+
+        self.assertIsNone(value)
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.requests.get"
+    )
+    def test_retrieve_base_commit_value_null_info(self, mock_get):
+        """Test that null info in API response does not crash."""
+        mock_response = mock.MagicMock()
+        mock_response.json.return_value = [
+            {
+                "info": None,
+                "rollups": {"stats": [{"name": "latency", "val": 42}]},
+            }
+        ]
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+
+        value = self.cbr_hook._retrieve_base_commit_value(
+            test_name="BM_Test",
+            task_name="benchmarks_sep",
+            variant="my-variant",
+            measurement="latency",
+            args={"thread_level": 1},
+            project="mongodb-mongo-master",
+            version_id="some_version_id",
+        )
+
+        self.assertIsNone(value)
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.requests.get"
+    )
+    def test_retrieve_base_commit_value_request_failure(self, mock_get):
+        """A request failure is non-blocking: it logs an ERROR and returns None rather than raising."""
+        mock_get.side_effect = requests.RequestException("Connection error")
+
+        with self.assertLogs("hook_logger", level="ERROR") as log_ctx:
+            value = self.cbr_hook._retrieve_base_commit_value(
+                test_name="BM_Test",
+                task_name="benchmarks_sep",
+                variant="my-variant",
+                measurement="latency",
+                args={"thread_level": 1},
+                project="mongodb-mongo-master",
+                version_id="some_version_id",
+            )
+
+        self.assertIsNone(value)
+        self.assertTrue(
+            any("Connection error" in line for line in log_ctx.output),
+            f"expected an alertable error mentioning the failure, got: {log_ctx.output}",
+        )
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.requests.get"
+    )
+    def test_retrieve_base_commit_value_non_list_response(self, mock_get):
+        """Test that a non-list (e.g. error-envelope) JSON body does not crash.
+
+        raise_for_status only catches HTTP error codes; the endpoint can still return HTTP 200 with
+        a dict body (e.g. {"message": ...}) when a version has no data. That must be treated as
+        "no matching result" and return None, not raise AttributeError while iterating dict keys.
+        """
+        mock_response = mock.MagicMock()
+        mock_response.json.return_value = {"message": "no results for this version"}
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+
+        value = self.cbr_hook._retrieve_base_commit_value(
+            test_name="BM_Test",
+            task_name="benchmarks_sep",
+            variant="my-variant",
+            measurement="latency",
+            args={"thread_level": 1},
+            project="mongodb-mongo-master",
+            version_id="some_version_id",
+        )
+
+        self.assertIsNone(value)
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.requests.get"
+    )
+    def test_retrieve_base_commit_value_null_execution(self, mock_get):
+        """Test that a result with execution explicitly null does not crash latest-execution selection.
+
+        info.get("execution", -1) only substitutes the default when the key is absent, so a
+        present-but-null execution leaves None in the max() key and would compare None against an
+        int. A null execution must be treated as the oldest, with the real numbered execution
+        winning.
+        """
+        info = {
+            "project": "mongodb-mongo-master",
+            "variant": "my-variant",
+            "task_name": "benchmarks_sep",
+            "test_name": "BM_Test",
+            "args": {"thread_level": 1},
+        }
+        mock_response = mock.MagicMock()
+        mock_response.json.return_value = [
+            {
+                "info": {**info, "execution": None},
+                "rollups": {"stats": [{"name": "latency", "val": 10}]},
+            },
+            {
+                "info": {**info, "execution": 1},
+                "rollups": {"stats": [{"name": "latency", "val": 20}]},
+            },
+        ]
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+
+        value = self.cbr_hook._retrieve_base_commit_value(
+            test_name="BM_Test",
+            task_name="benchmarks_sep",
+            variant="my-variant",
+            measurement="latency",
+            args={"thread_level": 1},
+            project="mongodb-mongo-master",
+            version_id="some_version_id",
+        )
+
+        self.assertEqual(value, 20)
 
 
 class TestCheckPerfResultTestCase(unittest.TestCase):
@@ -873,8 +1524,8 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
     @mock.patch(
         "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
     )
-    def test_missing_pr_number_raises_error(self, mock_get_expansion, mock_config):
-        """Test that missing PR number raises an error in merge queue."""
+    def test_missing_pr_number_logs_error(self, mock_get_expansion, mock_config):
+        """Test that missing PR number logs an error but the threshold failure is still raised."""
         mock_config.EVERGREEN_REQUESTER = "github_merge_queue"
         mock_get_expansion.side_effect = lambda key, default=None: {
             "github_token_mongo": "fake_token",
@@ -905,9 +1556,14 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
             reported_metrics,
         )
 
-        # Should raise an exception about missing PR number
-        with self.assertRaisesRegex(ServerFailure, "github_pr_number"):
-            test_case.run_test()
+        with self.assertLogs("hook_logger", level="ERROR") as cm:
+            with self.assertRaisesRegex(ServerFailure, "threshold check"):
+                test_case.run_test()
+
+        self.assertTrue(
+            any("github_pr_number" in msg for msg in cm.output),
+            f"Expected error about missing PR number in {cm.output}",
+        )
 
     def test_metric_doesnt_exist(self):
         thresholds_to_check: list[cbr.IndividualMetricThreshold] = [
