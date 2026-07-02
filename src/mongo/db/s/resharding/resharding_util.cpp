@@ -626,7 +626,10 @@ std::shared_ptr<ThreadPool> makeThreadPoolForMarkKilledExecutor(const std::strin
     }());
 }
 
-void validatePerformVerification(const VersionContext& vCtx, OptionalBool performVerification) {
+namespace {
+// Common validation once we know whether the verification feature flag is enabled.
+void validatePerformVerificationImpl(bool verificationFeatureFlagEnabled,
+                                     OptionalBool performVerification) {
     if (!performVerification.value_or(false)) {
         return;
     }
@@ -634,13 +637,27 @@ void validatePerformVerification(const VersionContext& vCtx, OptionalBool perfor
             str::stream() << "Cannot set '"
                           << CommonReshardingMetadata::kPerformVerificationFieldName
                           << "' to true when featureFlagReshardingVerification is not enabled",
-            resharding::gFeatureFlagReshardingVerification.isEnabled(
-                vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+            verificationFeatureFlagEnabled);
     uassert(ErrorCodes::InvalidOptions,
             str::stream() << "Cannot set '"
                           << CommonReshardingMetadata::kPerformVerificationFieldName
                           << "' to true when reshardingDocumentVerification is false",
             resharding::gReshardingDocumentVerification.load());
+}
+}  // namespace
+
+void validatePerformVerification(const boost::optional<ForwardableOperationMetadata>& fom,
+                                 OptionalBool performVerification) {
+    validatePerformVerificationImpl(
+        resharding::isEnabledWithPinnedVersion(fom, resharding::gFeatureFlagReshardingVerification),
+        performVerification);
+}
+
+void validatePerformVerification(const VersionContext& vCtx, OptionalBool performVerification) {
+    validatePerformVerificationImpl(
+        resharding::gFeatureFlagReshardingVerification.isEnabled(
+            vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot()),
+        performVerification);
 }
 
 ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
@@ -693,13 +710,15 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     // entire operation lifetime, even across FCV transitions. If the opCtx already carries an OFCV,
     // capture that; otherwise fall back to the global snapshot.
     const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    ForwardableOperationMetadata fom(opCtx);
-    if (!fom.getVersionContext() &&
-        feature_flags::gSnapshotFCVInDDLCoordinators.isEnabled(kVersionContextIgnored_UNSAFE,
-                                                               fcv)) {
-        fom.setVersionContext(VersionContext{fcv});
+    {
+        ForwardableOperationMetadata fom(opCtx);
+        if (!fom.getVersionContext() &&
+            feature_flags::gSnapshotFCVInDDLCoordinators.isEnabled(kVersionContextIgnored_UNSAFE,
+                                                                   fcv)) {
+            fom.setVersionContext(VersionContext{fcv});
+        }
+        commonMetadata.setForwardableOpMetadata(std::move(fom));
     }
-    commonMetadata.setForwardableOpMetadata(std::move(fom));
 
     coordinatorDoc.setSourceKey(collEntry.getKeyPattern().toBSON());
     coordinatorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
@@ -711,10 +730,12 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     coordinatorDoc.setUnique(request.getUnique());
     coordinatorDoc.setCollation(request.getCollation());
 
+    const auto forwardableMetadata =
+        coordinatorDoc.getCommonReshardingMetadata().getForwardableOpMetadata();
     auto performVerification = request.getPerformVerification();
     if (!performVerification.has_value() &&
-        resharding::gFeatureFlagReshardingVerification.isEnabled(
-            VersionContext::getDecoration(opCtx), fcv) &&
+        isEnabledWithPinnedVersion(forwardableMetadata,
+                                   resharding::gFeatureFlagReshardingVerification) &&
         resharding::gReshardingDocumentVerification.load()) {
         performVerification = true;
     }
@@ -748,8 +769,8 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     coordinatorDoc.setRecipientOplogBatchTaskCount(request.getRecipientOplogBatchTaskCount());
     coordinatorDoc.setRelaxed(request.getRelaxed());
 
-    if (!resharding::gfeatureFlagReshardingNumSamplesPerChunk.isEnabled(
-            VersionContext::getDecoration(opCtx), fcv)) {
+    if (!isEnabledWithPinnedVersion(forwardableMetadata,
+                                    resharding::gfeatureFlagReshardingNumSamplesPerChunk)) {
         uassert(ErrorCodes::InvalidOptions,
                 "Resharding with numSamplesPerChunk is not enabled, reject numSamplesPerChunk "
                 "parameter",
@@ -765,17 +786,21 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
         coordinatorDoc.setTelemetryContext(telemetryCtxBSON);
     }
 
-    if (const auto& vCtx = VersionContext::getDecoration(opCtx);
-        feature_flags::gAuthoritativeShardsDDL.isEnabled(vCtx, fcv)) {
+    if (isEnabledWithPinnedVersion(forwardableMetadata, feature_flags::gAuthoritativeShardsDDL)) {
         tassert(ErrorCodes::IllegalOperation,
                 "Authoritative shards requires no shard refreshes to be executed",
-                resharding::gFeatureFlagReshardingCloneNoRefresh.isEnabled(vCtx, fcv) &&
-                    resharding::gFeatureFlagReshardingInitNoRefresh.isEnabled(vCtx, fcv) &&
-                    resharding::gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites.isEnabled(
-                        vCtx, fcv) &&
-                    resharding::gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable.isEnabled(
-                        vCtx, fcv));
-        auto authoritativeLevel = feature_flags::gAuthoritativeShardsCRUD.isEnabled(vCtx, fcv)
+                isEnabledWithPinnedVersion(forwardableMetadata,
+                                           resharding::gFeatureFlagReshardingCloneNoRefresh) &&
+                    isEnabledWithPinnedVersion(forwardableMetadata,
+                                               resharding::gFeatureFlagReshardingInitNoRefresh) &&
+                    isEnabledWithPinnedVersion(
+                        forwardableMetadata,
+                        resharding::gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites) &&
+                    isEnabledWithPinnedVersion(
+                        forwardableMetadata,
+                        resharding::gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable));
+        auto authoritativeLevel =
+            isEnabledWithPinnedVersion(forwardableMetadata, feature_flags::gAuthoritativeShardsCRUD)
             ? ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed
             : ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
         coordinatorDoc.setAuthoritativeMetadataAccessLevel(authoritativeLevel);

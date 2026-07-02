@@ -42,12 +42,15 @@
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/resharding/reshard_collection_coordinator.h"
 #include "mongo/db/s/resharding/reshard_collection_coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/cluster_parameters/sharding_cluster_parameters_gen.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/version_context.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/util/assert_util.h"
@@ -100,8 +103,17 @@ public:
 
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
-            resharding::validatePerformVerification(VersionContext::getDecoration(opCtx),
-                                                    request().getPerformVerification());
+            // No coordinator exists yet so there is no pinned FCV to inherit. We construct a
+            // FOM with the current global FCV explicitly for feature flag checks — safe because
+            // resharding never starts in a transitional FCV and is aborted before an FCV
+            // transition fully completes, so the coordinator and participants will pin and use the
+            // same version.
+            const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+            ForwardableOperationMetadata fom(opCtx);
+            if (!fom.getVersionContext()) {
+                fom.setVersionContext(VersionContext{fcv});
+            }
+            resharding::validatePerformVerification(fom, request().getPerformVerification());
 
             if (resharding::isMoveCollection(request().getProvenance())) {
                 bool clusterHasTwoOrMoreShards = [&]() {

@@ -40,6 +40,7 @@
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
+#include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/resharding/shardsvr_resharding_commands_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -47,7 +48,6 @@
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/sharding_state.h"
-#include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
@@ -108,24 +108,25 @@ public:
                         shards.find(ShardingState::get(opCtx)->shardId()) == shards.end();
                 }
 
-                const auto& vCtx = VersionContext::getDecoration(opCtx);
-                auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+                const auto fom = req.getCommonReshardingMetadata().getForwardableOpMetadata();
                 if (noChunksOnThisShard) {
-                    if (resharding::gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable
-                            .isEnabled(vCtx, fcvSnapshot)) {
+                    if (resharding::isEnabledWithPinnedVersion(
+                            fom,
+                            resharding::gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable)) {
                         recipientDoc.setSkipCloningAndApplying(true);
                     }
-                    if (resharding::gFeatureFlagReshardingSkipCloningIfApplicable.isEnabled(
-                            vCtx, fcvSnapshot)) {
+                    if (resharding::isEnabledWithPinnedVersion(
+                            fom, resharding::gFeatureFlagReshardingSkipCloningIfApplicable)) {
                         recipientDoc.setSkipCloning(true);
                     }
-                    if (resharding::gFeatureFlagReshardingSkipBuildingIndexesIfApplicable.isEnabled(
-                            vCtx, fcvSnapshot)) {
+                    if (resharding::isEnabledWithPinnedVersion(
+                            fom,
+                            resharding::gFeatureFlagReshardingSkipBuildingIndexesIfApplicable)) {
                         recipientDoc.setSkipBuildingIndexes(true);
                     }
                 }
-                if (resharding::gFeatureFlagReshardingStoreOplogFetcherProgress.isEnabled(
-                        vCtx, fcvSnapshot)) {
+                if (resharding::isEnabledWithPinnedVersion(
+                        fom, resharding::gFeatureFlagReshardingStoreOplogFetcherProgress)) {
                     recipientDoc.setStoreOplogFetcherProgress(true);
                 }
 

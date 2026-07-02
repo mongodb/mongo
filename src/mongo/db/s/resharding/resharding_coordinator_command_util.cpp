@@ -55,8 +55,13 @@ void tellAllParticipantsToJoinMigrations(
     CancellationToken stepdownToken,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     ShardsvrJoinMigrations joinMigrationsCmd;
-    sendReshardingCommand(
-        opCtx, osi, joinMigrationsCmd, stepdownToken, executor, getAllParticipantShardIds(doc));
+    sendReshardingCommand(opCtx,
+                          osi,
+                          joinMigrationsCmd,
+                          stepdownToken,
+                          executor,
+                          getAllParticipantShardIds(doc),
+                          doc.getCommonReshardingMetadata().getForwardableOpMetadata());
 }
 
 void tellAllShardsToCleanupStaleChunks(
@@ -66,11 +71,12 @@ void tellAllShardsToCleanupStaleChunks(
     const NamespaceString& nss,
     const UUID& oldUUID,
     CancellationToken stepdownToken,
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    boost::optional<ForwardableOperationMetadata> fom) {
     ShardsvrReshardCleanupStaleChunks cmd(nss);
     cmd.setOldUUID(oldUUID);
 
-    sendReshardingCommand(opCtx, osi, cmd, stepdownToken, executor, shardIds);
+    sendReshardingCommand(opCtx, osi, cmd, stepdownToken, executor, shardIds, fom);
 }
 
 void tellAllParticipantsToCommit(OperationContext* opCtx,
@@ -81,7 +87,13 @@ void tellAllParticipantsToCommit(OperationContext* opCtx,
     ShardsvrCommitReshardCollection cmd(doc.getSourceNss());
     cmd.setReshardingUUID(doc.getReshardingUUID());
 
-    sendReshardingCommand(opCtx, osi, cmd, stepdownToken, executor, getAllParticipantShardIds(doc));
+    sendReshardingCommand(opCtx,
+                          osi,
+                          cmd,
+                          stepdownToken,
+                          executor,
+                          getAllParticipantShardIds(doc),
+                          doc.getCommonReshardingMetadata().getForwardableOpMetadata());
 }
 
 void tellAllParticipantsToAbort(OperationContext* opCtx,
@@ -92,8 +104,13 @@ void tellAllParticipantsToAbort(OperationContext* opCtx,
                                 bool isUserAborted) {
     ShardsvrAbortReshardCollection abortCmd(doc.getReshardingUUID(), isUserAborted);
 
-    sendReshardingCommand(
-        opCtx, osi, abortCmd, stepdownToken, executor, getAllParticipantShardIds(doc));
+    sendReshardingCommand(opCtx,
+                          osi,
+                          abortCmd,
+                          stepdownToken,
+                          executor,
+                          getAllParticipantShardIds(doc),
+                          doc.getCommonReshardingMetadata().getForwardableOpMetadata());
 }
 
 void tellAllDonorsToInitialize(OperationContext* opCtx,
@@ -111,7 +128,8 @@ void tellAllDonorsToInitialize(OperationContext* opCtx,
                           cmd,
                           stepdownToken,
                           executor,
-                          resharding::extractShardIdsFromParticipantEntries(doc.getDonorShards()));
+                          resharding::extractShardIdsFromParticipantEntries(doc.getDonorShards()),
+                          doc.getCommonReshardingMetadata().getForwardableOpMetadata());
 }
 
 void tellAllRecipientsToInitialize(OperationContext* opCtx,
@@ -140,7 +158,8 @@ void tellAllRecipientsToInitialize(OperationContext* opCtx,
         cmd,
         stepdownToken,
         executor,
-        resharding::extractShardIdsFromParticipantEntries(doc.getRecipientShards()));
+        resharding::extractShardIdsFromParticipantEntries(doc.getRecipientShards()),
+        doc.getCommonReshardingMetadata().getForwardableOpMetadata());
 }
 
 void tellAllDonorsToStartChangeStreamsMonitor(
@@ -161,6 +180,7 @@ void tellAllDonorsToStartChangeStreamsMonitor(
                           stepdownToken,
                           executor,
                           resharding::extractShardIdsFromParticipantEntries(doc.getDonorShards()),
+                          doc.getCommonReshardingMetadata().getForwardableOpMetadata(),
                           false /* setWriteConcern */);
 }
 
@@ -183,7 +203,8 @@ void tellAllRecipientsToClone(OperationContext* opCtx,
                           cmd,
                           stepdownToken,
                           executor,
-                          {shardsOwningChunks.begin(), shardsOwningChunks.end()});
+                          {shardsOwningChunks.begin(), shardsOwningChunks.end()},
+                          doc.getCommonReshardingMetadata().getForwardableOpMetadata());
 
     if (!shardsNotOwningChunks.empty()) {
         ReshardingApproxCopySize approxCopySize;
@@ -196,7 +217,8 @@ void tellAllRecipientsToClone(OperationContext* opCtx,
                               cmd,
                               stepdownToken,
                               executor,
-                              {shardsNotOwningChunks.begin(), shardsNotOwningChunks.end()});
+                              {shardsNotOwningChunks.begin(), shardsNotOwningChunks.end()},
+                              doc.getCommonReshardingMetadata().getForwardableOpMetadata());
     }
 }
 
@@ -214,7 +236,8 @@ void tellAllRecipientsCriticalSectionStarted(
         cmd,
         abortToken,
         executor,
-        resharding::extractShardIdsFromParticipantEntries(doc.getRecipientShards()));
+        resharding::extractShardIdsFromParticipantEntries(doc.getRecipientShards()),
+        doc.getCommonReshardingMetadata().getForwardableOpMetadata());
 }
 
 }  // namespace resharding

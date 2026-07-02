@@ -409,7 +409,10 @@ TEST_F(ReshardingUtilTest, SetNumSamplesPerChunkThroughConfigsvrReshardCollectio
 }
 
 TEST_F(ReshardingUtilTest, ValidatePerformVerification) {
-    auto vCtx = VersionContext::getDecoration(operationContext());
+    VersionContext::ScopedSetDecoration scopedVersionContext(
+        operationContext(),
+        VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
+    const auto fom = ForwardableOperationMetadata{operationContext()};
 
     // false is always a no-op.
     {
@@ -417,10 +420,36 @@ TEST_F(ReshardingUtilTest, ValidatePerformVerification) {
                                                              false);
         unittest::ServerParameterGuard serverParamController("reshardingDocumentVerification",
                                                              false);
-        ASSERT_DOES_NOT_THROW(validatePerformVerification(vCtx, false));
+        ASSERT_DOES_NOT_THROW(validatePerformVerification(fom, false));
     }
 
     // true is valid only when both gates are on.
+    {
+        unittest::ServerParameterGuard featureFlagController("featureFlagReshardingVerification",
+                                                             true);
+        unittest::ServerParameterGuard serverParamController("reshardingDocumentVerification",
+                                                             true);
+        ASSERT_DOES_NOT_THROW(validatePerformVerification(fom, true));
+    }
+    {
+        unittest::ServerParameterGuard featureFlagController("featureFlagReshardingVerification",
+                                                             false);
+        unittest::ServerParameterGuard serverParamController("reshardingDocumentVerification",
+                                                             true);
+        ASSERT_THROWS_CODE(
+            validatePerformVerification(fom, true), DBException, ErrorCodes::InvalidOptions);
+    }
+    {
+        unittest::ServerParameterGuard featureFlagController("featureFlagReshardingVerification",
+                                                             true);
+        unittest::ServerParameterGuard serverParamController("reshardingDocumentVerification",
+                                                             false);
+        ASSERT_THROWS_CODE(
+            validatePerformVerification(fom, true), DBException, ErrorCodes::InvalidOptions);
+    }
+
+    // The VersionContext overload (used by the refresh path) behaves the same as the FOM overload.
+    const auto& vCtx = VersionContext::getDecoration(operationContext());
     {
         unittest::ServerParameterGuard featureFlagController("featureFlagReshardingVerification",
                                                              true);
@@ -433,14 +462,6 @@ TEST_F(ReshardingUtilTest, ValidatePerformVerification) {
                                                              false);
         unittest::ServerParameterGuard serverParamController("reshardingDocumentVerification",
                                                              true);
-        ASSERT_THROWS_CODE(
-            validatePerformVerification(vCtx, true), DBException, ErrorCodes::InvalidOptions);
-    }
-    {
-        unittest::ServerParameterGuard featureFlagController("featureFlagReshardingVerification",
-                                                             true);
-        unittest::ServerParameterGuard serverParamController("reshardingDocumentVerification",
-                                                             false);
         ASSERT_THROWS_CODE(
             validatePerformVerification(vCtx, true), DBException, ErrorCodes::InvalidOptions);
     }

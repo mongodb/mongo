@@ -526,6 +526,8 @@ std::shared_ptr<ThreadPool> makeThreadPoolForMarkKilledExecutor(const std::strin
  * If 'performVerification' is true, asserts that both featureFlagReshardingVerification and the
  * reshardingDocumentVerification server parameter are enabled.
  */
+void validatePerformVerification(const boost::optional<ForwardableOperationMetadata>& fom,
+                                 OptionalBool performVerification);
 void validatePerformVerification(const VersionContext& vCtx, OptionalBool performVerification);
 
 /**

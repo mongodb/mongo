@@ -191,8 +191,6 @@ public:
                 resharding::validateShardDistribution(
                     *shardDistribution, opCtx, ShardKeyPattern(request().getKey()));
             }
-            resharding::validatePerformVerification(VersionContext::getDecoration(opCtx),
-                                                    request().getPerformVerification());
 
             // Returns boost::none if there isn't any work to be done by the resharding operation.
             auto instance = ([&]()
@@ -243,6 +241,11 @@ public:
 
                 auto coordinatorDoc = resharding::createReshardingCoordinatorDoc(
                     opCtx, request(), collEntry, dbPrimary, nss, setProvenance);
+
+                resharding::validatePerformVerification(
+                    coordinatorDoc.getCommonReshardingMetadata().getForwardableOpMetadata(),
+                    request().getPerformVerification());
+
                 auto instance = getOrCreateReshardingCoordinator(opCtx, coordinatorDoc);
                 instance->getCoordinatorDocWrittenFuture().get(opCtx);
                 return instance;

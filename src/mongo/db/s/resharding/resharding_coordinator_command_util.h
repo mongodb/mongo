@@ -30,6 +30,7 @@
 
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/resharding/resharding_coordinator.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/sharding_environment/shard_id.h"
@@ -49,13 +50,13 @@ void sendReshardingCommand(OperationContext* opCtx,
                            CancellationToken token,
                            const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
                            const std::vector<ShardId>& shardIds,
+                           boost::optional<ForwardableOperationMetadata> fom = boost::none,
                            bool setWriteConcern = true) {
     if (cmd.getDbName().isEmpty()) {
         cmd.setDbName(DatabaseName::kAdmin);
     }
-    if (resharding::gFeatureFlagReshardingInitNoRefresh.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    if (resharding::isEnabledWithPinnedVersion(fom,
+                                               resharding::gFeatureFlagReshardingInitNoRefresh)) {
         generic_argument_util::setOperationSessionInfo(cmd, osi);
     }
     if (setWriteConcern) {
@@ -84,7 +85,8 @@ void tellAllShardsToCleanupStaleChunks(
     const NamespaceString& nss,
     const UUID& oldUUID,
     CancellationToken stepdownToken,
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    boost::optional<ForwardableOperationMetadata> fom = boost::none);
 
 void tellAllParticipantsToCommit(OperationContext* opCtx,
                                  const OperationSessionInfo& osi,
