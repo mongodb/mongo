@@ -604,6 +604,14 @@ server_parameters:
         default: false
         redact: false
 
+    internalQueryEnablePlanShapeAnalysis:
+        description: "Knob to control whether we collect plan shape counters for query stats."
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryEnablePlanShapeAnalysis"
+        cpp_vartype: AtomicWord<bool>
+        default: true
+        redact: false
+
     internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin:
         description: >-
             Up to what number of documents do we choose the hash join algorithm when $lookup

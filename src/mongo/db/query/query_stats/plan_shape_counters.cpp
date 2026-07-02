@@ -214,11 +214,17 @@ const QuerySolutionNode* getFindRoot(const QuerySolution& solution) {
     if (!solution.hasExtension()) {
         return node;
     }
-    while (node->nodeId() != solution.unextendedRootId()) {
+    // The unextended root can be removed by some optimizations, so we can't
+    // search for the exact node ID.
+    while (node->nodeId() > solution.unextendedRootId()) {
         tassert(11907602,
                 "Extension chain ended before reaching the unextended root",
                 !node->children.empty());
-        node = node->children[0].get();
+        const QuerySolutionNode* child = node->children[0].get();
+        tassert(11907603,
+                "Node ids do not strictly decrease down the extension branch",
+                child->nodeId() < node->nodeId());
+        node = child;
     }
     return node;
 }

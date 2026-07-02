@@ -38,6 +38,8 @@
 #include "mongo/db/query/engine_selection.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_stats/plan_shape_counters.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
@@ -83,6 +85,12 @@ public:
         }
 
         auto solution = std::move(_rankingResult.solutions[0]);
+        tassert(11974310, "Expected a non-null query solution for non-idhack queries", solution);
+
+        // TODO SERVER-130428 remove `internalQueryEnablePlanShapeAnalysis`
+        if (internalQueryEnablePlanShapeAnalysis.load()) {
+            planShape = plan_shape_counters::identifyPlanShapeForCounters(*solution);
+        }
 
         tassert(9735001,
                 "Expected engine selection to be performed during planning",
@@ -332,6 +340,7 @@ private:
     const MultipleCollectionAccessor& _collections;
     PlanYieldPolicy::YieldPolicy _yieldPolicy;
     Pipeline* _pipeline;
+    boost::optional<plan_shape_counters::PlanShapeCounter> planShape;
 };
 
 }  // namespace
