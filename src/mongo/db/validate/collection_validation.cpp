@@ -43,6 +43,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -927,6 +928,18 @@ Status validate(OperationContext* opCtx,
     };
 
     SnapshotGuard snapshotGuard(opCtx);
+
+    // Before acquiring locks in the ValidateState constructor, ensure this node has applied up to
+    // the requested read timestamp (e.g. atClusterTime). This mirrors the atClusterTime handling in
+    // applyReadConcern(). Without this wait, a secondary could open a read transaction at a
+    // timestamp greater than its appliedOpTime, potentially triggering an invariant.
+    if (auto readTimestamp = options.getReadTimestamp()) {
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        if (replCoord->getSettings().isReplSet()) {
+            uassertStatusOK(replCoord->waitUntilOpTimeForRead(
+                opCtx, repl::ReadConcernArgs::snapshot(*readTimestamp)));
+        }
+    }
 
     // This is deliberately outside of the try-catch block, so that any errors thrown in the
     // constructor fail the cmd, as opposed to returning OK with valid:false.
