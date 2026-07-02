@@ -13,7 +13,7 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 describe("_configsvr commit chunk operations are idempotent", function () {
     before(() => {
         this.st = new ShardingTest({shards: 1});
-        this.dbName = "split_merge_allow_migrations_db";
+        this.dbName = "split_merge_allow_chunk_operations_db";
         this.config = this.st.configRS.getPrimary().getDB("config");
 
         assert.commandWorked(
@@ -22,16 +22,6 @@ describe("_configsvr commit chunk operations are idempotent", function () {
                 primaryShard: this.st.shard0.shardName,
             }),
         );
-
-        this.setAllowMigrations = (ns, allow) => {
-            assert.commandWorked(
-                this.config.adminCommand({
-                    _configsvrSetAllowMigrations: ns,
-                    allowMigrations: allow,
-                    writeConcern: {w: "majority"},
-                }),
-            );
-        };
 
         this.setAllowChunkOperations = (ns, allow) => {
             assert.commandWorked(
@@ -46,7 +36,7 @@ describe("_configsvr commit chunk operations are idempotent", function () {
         this.countChunks = (ns) =>
             findChunksUtil.findChunksByNs(this.st.s.getDB("config"), ns).itcount();
 
-        this.checkSplitChunk = (setAllowFn) => {
+        this.checkSplitChunk = () => {
             const command = {
                 _configsvrCommitChunkSplit: this.ns,
                 collEpoch: this.collEpoch,
@@ -59,7 +49,7 @@ describe("_configsvr commit chunk operations are idempotent", function () {
 
             assert.eq(1, this.countChunks(this.ns));
 
-            setAllowFn.call(this, this.ns, false);
+            this.setAllowChunkOperations(this.ns, false);
 
             assert.commandFailedWithCode(
                 this.config.adminCommand(command),
@@ -67,14 +57,14 @@ describe("_configsvr commit chunk operations are idempotent", function () {
             );
             assert.eq(1, this.countChunks(this.ns), "split must not have committed");
 
-            // After re-enabling migrations the same split must succeed, proving the failure was
-            // attributable solely to the allowMigrations/allowChunkOperations flag.
-            setAllowFn.call(this, this.ns, true);
+            // After re-enabling chunk operations the same split must succeed, proving the failure
+            // was attributable solely to the allowChunkOperations flag.
+            this.setAllowChunkOperations(this.ns, true);
             assert.commandWorked(this.config.adminCommand(command));
             assert.eq(2, this.countChunks(this.ns));
         };
 
-        this.checkSplitChunkIdempotency = (setAllowFn) => {
+        this.checkSplitChunkIdempotency = () => {
             const command = {
                 _configsvrCommitChunkSplit: this.ns,
                 collEpoch: this.collEpoch,
@@ -94,7 +84,7 @@ describe("_configsvr commit chunk operations are idempotent", function () {
             );
             assert.eq(2, this.countChunks(this.ns));
 
-            setAllowFn.call(this, this.ns, false);
+            this.setAllowChunkOperations(this.ns, false);
 
             // The same split operation under allowChunkOperations = false returns OK.
             assert.commandWorked(
@@ -119,10 +109,10 @@ describe("_configsvr commit chunk operations are idempotent", function () {
             );
             assert.eq(2, this.countChunks(this.ns), "split must not have committed");
 
-            setAllowFn.call(this, this.ns, true);
+            this.setAllowChunkOperations(this.ns, true);
         };
 
-        this.checkMergeChunks = (setAllowFn) => {
+        this.checkMergeChunks = () => {
             const command = {
                 _configsvrCommitChunksMerge: this.ns,
                 collEpoch: this.collEpoch,
@@ -137,7 +127,7 @@ describe("_configsvr commit chunk operations are idempotent", function () {
             assert.commandWorked(this.st.s.adminCommand({split: this.ns, middle: {x: 10}}));
             assert.eq(3, this.countChunks(this.ns));
 
-            setAllowFn.call(this, this.ns, false);
+            this.setAllowChunkOperations(this.ns, false);
 
             assert.commandFailedWithCode(
                 this.config.adminCommand(command),
@@ -145,12 +135,12 @@ describe("_configsvr commit chunk operations are idempotent", function () {
             );
             assert.eq(3, this.countChunks(this.ns), "mergeChunks must not have committed");
 
-            setAllowFn.call(this, this.ns, true);
+            this.setAllowChunkOperations(this.ns, true);
             assert.commandWorked(this.config.adminCommand(command));
             assert.eq(2, this.countChunks(this.ns));
         };
 
-        this.checkMergeChunksIdempotency = (setAllowFn) => {
+        this.checkMergeChunksIdempotency = () => {
             const command = {
                 _configsvrCommitChunksMerge: this.ns,
                 collEpoch: this.collEpoch,
@@ -172,7 +162,7 @@ describe("_configsvr commit chunk operations are idempotent", function () {
             );
             assert.eq(2, this.countChunks(this.ns));
 
-            setAllowFn.call(this, this.ns, false);
+            this.setAllowChunkOperations(this.ns, false);
 
             // The same merge operation under allowChunkOperations = false returns OK.
             assert.commandWorked(
@@ -193,7 +183,7 @@ describe("_configsvr commit chunk operations are idempotent", function () {
             );
             assert.eq(2, this.countChunks(this.ns), "mergeChunks must not have committed");
 
-            setAllowFn.call(this, this.ns, true);
+            this.setAllowChunkOperations(this.ns, true);
         };
     });
 
@@ -202,7 +192,7 @@ describe("_configsvr commit chunk operations are idempotent", function () {
     });
 
     beforeEach(() => {
-        // Per-test namespace so chunk state and the allowMigrations flag are isolated.
+        // Per-test namespace so chunk state and the allowChunkOperations flag are isolated.
         this.collName = "coll_" + new ObjectId().str;
         this.ns = this.dbName + "." + this.collName;
         assert.commandWorked(this.st.s.adminCommand({shardCollection: this.ns, key: {x: 1}}));
@@ -219,40 +209,23 @@ describe("_configsvr commit chunk operations are idempotent", function () {
     afterEach(() => {
         // Re-enable chunk operations before dropping so the collection document is in the default state
         // for any other tooling that inspects history. Then drop to release resources.
-        this.setAllowMigrations(this.ns, true);
         this.setAllowChunkOperations(this.ns, true);
         assert.commandWorked(this.st.s.getDB(this.dbName).runCommand({drop: this.collName}));
     });
 
-    it("rejects splitChunk when allowMigrations is false", () => {
-        this.checkSplitChunk(this.setAllowMigrations);
-    });
-
     it("rejects splitChunk when allowChunkOperations is false", () => {
-        this.checkSplitChunk(this.setAllowChunkOperations);
-    });
-
-    it("rejects mergeChunks when allowMigrations is false", () => {
-        this.checkMergeChunks(this.setAllowMigrations);
+        this.checkSplitChunk();
     });
 
     it("rejects mergeChunks when allowChunkOperations is false", () => {
-        this.checkMergeChunks(this.setAllowChunkOperations);
-    });
-
-    it("allows a retried splitChunk when allowMigrations is false", () => {
-        this.checkSplitChunkIdempotency(this.setAllowMigrations);
+        this.checkMergeChunks();
     });
 
     it("allows a retried splitChunk when allowChunkOperations is false", () => {
-        this.checkSplitChunkIdempotency(this.setAllowChunkOperations);
-    });
-
-    it("allows a retried mergeChunks when allowMigrations is false", () => {
-        this.checkMergeChunksIdempotency(this.setAllowMigrations);
+        this.checkSplitChunkIdempotency();
     });
 
     it("allows a retried mergeChunks when allowChunkOperations is false", () => {
-        this.checkMergeChunksIdempotency(this.setAllowChunkOperations);
+        this.checkMergeChunksIdempotency();
     });
 });

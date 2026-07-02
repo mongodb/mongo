@@ -1449,14 +1449,29 @@ ShardServerCatalogCacheLoaderImpl::_forcePrimaryCollectionRefreshAndWaitForRepli
             Seconds{30},
             Shard::RetryPolicy::kIdempotent));
 
-        uassertStatusOK(cmdResponse.commandStatus);
+        // If the error is `MetadataRefreshCanceledDueToFCVTransition` it means that the primary is
+        // already relying on the authoritative model to acknowledge filtering metadata and will not
+        // serve more refreshes. In order to follow the same protocol, this node has to wait for the
+        // seen opTime from the last call (same behaviour as today), and then fail, so an upper
+        // layer will retry this refresh using the authoritative protocol.
 
-        uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->waitUntilOpTimeForRead(
-            opCtx,
-            {repl::OpTime{
-                 cmdResponse.response.getField(LogicalTime::kOperationTimeFieldName).timestamp(),
-                 term},
-             boost::none}));
+        auto status = cmdResponse.commandStatus;
+        auto waitForOptime = [&]() {
+            uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->waitUntilOpTimeForRead(
+                opCtx,
+                {repl::OpTime{cmdResponse.response.getField(LogicalTime::kOperationTimeFieldName)
+                                  .timestamp(),
+                              term},
+                 boost::none}));
+        };
+
+        if (status == ErrorCodes::MetadataRefreshCanceledDueToFCVTransition) {
+            waitForOptime();
+        }
+
+        uassertStatusOK(status);
+
+        waitForOptime();
         return notif;
     });
 }

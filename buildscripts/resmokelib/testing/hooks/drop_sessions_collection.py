@@ -226,6 +226,19 @@ class _DropSessionsCollectionThread(threading.Thread):
             client = node.mongo_client()
             client.admin.command(failpoint_cmd)
 
+    def _is_authoritative_shards_crud_enabled(self, mongo_client):
+        # TODO (SERVER-98118): Remove this once 9.0 becomes last LTS.
+        try:
+            flag_doc = mongo_client.admin.command(
+                {"getParameter": 1, "featureFlagAuthoritativeShardsCRUD": 1}
+            )
+        except pymongo.errors.OperationFailure:
+            # The parameter doesn't exist on this binary version; treat it as disabled.
+            return False
+        return bool(
+            flag_doc.get("featureFlagAuthoritativeShardsCRUD", {}).get("currentlyEnabled", False)
+        )
+
     def _sc_drop_collection(self, sc_fixture, uuid):
         config_primary = sc_fixture.configsvr.get_primary().mongo_client()
         config_db = config_primary.get_database(
@@ -238,12 +251,16 @@ class _DropSessionsCollectionThread(threading.Thread):
         config_db.chunks.delete_many({"uuid": uuid})
         # Drop collection on all replica sets
         config_db.system.sessions.drop()
-        config_primary.admin.command(
-            {
-                "_flushRoutingTableCacheUpdatesWithWriteConcern": "config.system.sessions",
-                "writeConcern": {"w": "majority"},
-            }
-        )
+        # _flushRoutingTableCacheUpdatesWithWriteConcern is deprecated and rejected once shards are
+        # authoritative for collection metadata (config.cache collections are no longer relied
+        # upon), so only issue it against the legacy (non-authoritative) refresh protocol.
+        if not self._is_authoritative_shards_crud_enabled(config_primary):
+            config_primary.admin.command(
+                {
+                    "_flushRoutingTableCacheUpdatesWithWriteConcern": "config.system.sessions",
+                    "writeConcern": {"w": "majority"},
+                }
+            )
         for shard in sc_fixture.shards:
             shard_primary = shard.get_primary().mongo_client()
             shard_primary.get_database(
@@ -251,12 +268,13 @@ class _DropSessionsCollectionThread(threading.Thread):
                 read_concern=pymongo.read_concern.ReadConcern(level="majority"),
                 write_concern=pymongo.write_concern.WriteConcern(w="majority"),
             ).system.sessions.drop()
-            shard_primary.admin.command(
-                {
-                    "_flushRoutingTableCacheUpdatesWithWriteConcern": "config.system.sessions",
-                    "writeConcern": {"w": "majority"},
-                }
-            )
+            if not self._is_authoritative_shards_crud_enabled(shard_primary):
+                shard_primary.admin.command(
+                    {
+                        "_flushRoutingTableCacheUpdatesWithWriteConcern": "config.system.sessions",
+                        "writeConcern": {"w": "majority"},
+                    }
+                )
 
     def _drop_sessions_collection(self, fixture):
         self.logger.info("Starting drop of the sessions collection.")

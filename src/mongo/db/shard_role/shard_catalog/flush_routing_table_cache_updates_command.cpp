@@ -49,7 +49,6 @@
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/future.h"
@@ -134,14 +133,33 @@ public:
                                   << " on collections",
                     !ns().coll().empty());
 
-            // TODO(SERVER-127444): Tighten to any client once all refreshes are authoritative
-            const auto* meta = ClientMetadata::getForClient(opCtx->getClient());
-            const bool isMongoShell = meta && meta->getApplicationName() == "MongoDB Shell";
             if (feature_flags::gAuthoritativeShardsCRUD.isEnabled(
                     kVersionContextIgnored_UNSAFE,
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-                isMongoShell) {
-                tasserted(12937400,
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                // When the `AuthoritativeShardsCRUD` feature flag is enabled, this method
+                // should no longer be used, as nodes start relying on the `config.shard.catalog`
+                // authoritative collections rather than the config server (primary node) or
+                // contacting the primary to replicate filtering metadata in the `config.cache`
+                // collections (secondary nodes).
+                //
+                // However, there is a scenario where a lagging secondary node attempts to contact
+                // the primary node of the replica set while the secondary is still operating
+                // under 8.0 FCV, but the primary has already transitioned to 9.0 FCV. In this case,
+                // the lagging secondary will attempt to refresh using this command as part of the
+                // old protocol.
+                //
+                // In that situation, we will first make the secondary node wait for the latest
+                // opTime so that it becomes aware of the FCV change. This is no worse than the
+                // current behavior, as the existing protocol also relies on the `config.cache`
+                // collections for replication.
+                //
+                // After that, the command will fail, making the secondary aware that it needs
+                // to switch to the authoritative model.
+
+                repl::ReplClientInfo::forClient(opCtx->getClient())
+                    .setLastOpToSystemLastOpTime(opCtx);
+
+                uasserted(ErrorCodes::MetadataRefreshCanceledDueToFCVTransition,
                           "This command is deprecated, as shards are authoritative for collection "
                           "metadata. The secondary node must transition to the authoritative "
                           "refresh model.");

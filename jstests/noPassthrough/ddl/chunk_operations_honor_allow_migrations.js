@@ -4,17 +4,26 @@
  * while turned off is accepted as a no-op.
  *
  * Coverage for the allowChunkOperations flag lives in chunk_operations_honor_allow_chunk_operations.js.
+ *
+ * TODO (SERVER-98118): Remove this test once 9.0 becomes last LTS.
+ * _configsvrSetAllowMigrations belongs to the legacy (non-authoritative) protocol and relies on
+ * tellShardsToRefresh (i.e. the deprecated _flushRoutingTableCacheUpdates command) to propagate the
+ * change to shards. Once shards are authoritative for collection metadata, that command is no
+ * longer served, so this test no longer applies.
  */
 import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 describe("commit chunk operations honor allowMigrations under the chunk lock", function () {
     before(() => {
         this.st = new ShardingTest({shards: 1});
         this.dbName = "split_merge_allow_migrations_db";
+
+        skipTestIfAuthoritativeShardsEnabled(this.st.s, () => this.st.stop());
 
         this.authoritativeShardsDDLEnabled = FeatureFlagUtil.isEnabled(
             this.st.configRS.getPrimary().getDB("admin"),

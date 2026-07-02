@@ -1,9 +1,16 @@
 /**
  * Tests the idempotency of the _configsvrSetAllowMigrations command.
+ *
+ * TODO (SERVER-98118): Remove this test once 9.0 becomes last LTS.
+ * _configsvrSetAllowMigrations belongs to the legacy (non-authoritative) protocol: it bumps the
+ * collection placement version and relies on tellShardsToRefresh (i.e. the deprecated
+ * _flushRoutingTableCacheUpdates(WithWriteConcern) commands) to propagate the change to shards.
+ * Once shards are authoritative for collection metadata, that command is no longer served, so this
+ * test no longer applies.
  */
 import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 function runConfigsvrSetAllowMigrationsWithRetries(st, ns, lsid, txnNumber, allowMigrations) {
     let res;
@@ -34,14 +41,7 @@ function runConfigsvrSetAllowMigrationsWithRetries(st, ns, lsid, txnNumber, allo
 
 const st = new ShardingTest({shards: 1});
 
-if (FeatureFlagUtil.isPresentAndEnabled(st.s, "AuthoritativeShardsDDL")) {
-    // This test intentionally calls the configsvr command directly to validate its idempotency. The
-    // normal setAllowMigrations coordinator follows that global catalog commit with a shard catalog
-    // commit; bypassing the coordinator leaves authoritative shard-local metadata without the
-    // allowMigrations field.
-    TestData.skipCheckMetadataConsistency = true;
-    TestData.skipCheckShardFilteringMetadata = true;
-}
+skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
 
 const dbName = "test";
 const collName = "foo";
