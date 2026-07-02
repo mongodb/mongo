@@ -1035,8 +1035,6 @@ void collectEDCServerInfo(std::vector<EDCServerPayloadInfo>* pFields,
                           ConstDataRange cdr,
                           std::string_view fieldPath) {
 
-    // TODO: SERVER-127454 - validate field is actually indexed in the schema
-
     auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
     auto encryptedType = encryptedTypeBinding;
 
