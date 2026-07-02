@@ -27,7 +27,8 @@ MALFORMED_OCSP_STAPLE = b"\x00"
 
 def run(port, tls_cert_key_file, bind_ip):
     """Run the malformed-staple TLS server until interrupted."""
-    ctx = SSL.Context(SSL.TLS_SERVER_METHOD)
+    method = getattr(SSL, "TLS_SERVER_METHOD", SSL.SSLv23_METHOD)
+    ctx = SSL.Context(method)
     ctx.use_certificate_chain_file(tls_cert_key_file)
     ctx.use_privatekey_file(tls_cert_key_file)
 
