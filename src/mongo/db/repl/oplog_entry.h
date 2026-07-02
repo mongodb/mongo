@@ -233,6 +233,17 @@ public:
     }
 
     /**
+     * In-memory tag identifying a group of operations that should be kept together when packing
+     * operations into applyOps entries.
+     */
+    boost::optional<int32_t> getAtomicGroupId() const {
+        return _atomicGroupId;
+    }
+    void setAtomicGroupId(boost::optional<int32_t> value) {
+        _atomicGroupId = value;
+    }
+
+    /**
      * Sets the statement ids for this ReplOperation to 'stmtIds' if it does not contain any
      * kUninitializedStmtId (i.e. placeholder statement id).
      */
@@ -299,6 +310,9 @@ private:
     // Whether a pre-image must be recorded for this operation since it is in a retryable internal
     // transaction.
     bool _preImageRecordedForRetryableInternalTransaction{false};
+
+    // In-memory tag for grouping operations during applyOps packing.
+    boost::optional<int32_t> _atomicGroupId;
 };
 
 /**
