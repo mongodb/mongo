@@ -372,6 +372,14 @@ private:
     // Caller must hold no JSAutoRealm and _parentGlobal must be initialized.
     err_code_t _setupChildRealm(ExecutionCheck& chk, wasm_mozjs_error_t* err);
 
+    // Freeze standard built-ins and MongoDB custom types so user JS mutations do not survive
+    // reset() or leak across realms. Enumerates every own property of _global, freezes each
+    // object and walks its full .prototype chain, so all types installed by installTypes()
+    // (plus any future additions) are covered without being named. Shared with both setup
+    // paths. Must run after types.js has attached its prototype extensions and after the
+    // Array helpers are installed. Caller must hold a JSAutoRealm on _global.
+    err_code_t _freezeBuiltins(ExecutionCheck& chk, wasm_mozjs_error_t* err);
+
     bool _initialized = false;
     bool _javascriptProtection = false;
 

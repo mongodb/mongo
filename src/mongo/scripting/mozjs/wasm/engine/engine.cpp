@@ -60,6 +60,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 
 #include "error.h"
 #include "jsapi.h"
@@ -103,74 +104,6 @@ constexpr int64_t kDefaultEmitByteLimitBytes = 16 * 1024 * 1024;
 
 static const JSClass kGlobalClass = {"global", JSCLASS_GLOBAL_FLAGS, &JS::DefaultGlobalClassOps};
 
-// Freeze script shared between parent realm and child realms. Freezing standard
-// constructors and prototypes prevents user JS from mutating them across resets.
-static const char* const kFreezeBuiltinsScript =
-    "(function() {"
-    "  var TypedArrayProto = Object.getPrototypeOf(Uint8Array.prototype);"
-    "  var targets = ["
-    "    Object, Array, Function,"
-    "    String, Number, Boolean,"
-    "    RegExp, Date, Error,"
-    "    TypeError, RangeError, SyntaxError, ReferenceError, URIError, EvalError,"
-    "    Object.prototype, Array.prototype, Function.prototype,"
-    "    String.prototype, Number.prototype, Boolean.prototype,"
-    "    RegExp.prototype, Date.prototype, Error.prototype,"
-    "    TypeError.prototype, RangeError.prototype, SyntaxError.prototype,"
-    "    ReferenceError.prototype, URIError.prototype, EvalError.prototype,"
-    "    Math, JSON,"
-    "    Map, Set, WeakMap, WeakSet,"
-    "    Map.prototype, Set.prototype,"
-    "    WeakMap.prototype, WeakSet.prototype,"
-    "    Promise, Promise.prototype,"
-    "    Symbol, Symbol.prototype,"
-    "    Proxy, Reflect,"
-    "    Int8Array, Uint8Array, Uint8ClampedArray,"
-    "    Int16Array, Uint16Array,"
-    "    Int32Array, Uint32Array,"
-    "    Float32Array, Float64Array,"
-    "    BigInt64Array, BigUint64Array,"
-    "    Int8Array.prototype, Uint8Array.prototype, Uint8ClampedArray.prototype,"
-    "    Int16Array.prototype, Uint16Array.prototype,"
-    "    Int32Array.prototype, Uint32Array.prototype,"
-    "    Float32Array.prototype, Float64Array.prototype,"
-    "    BigInt64Array.prototype, BigUint64Array.prototype,"
-    "    TypedArrayProto,"
-    "    ArrayBuffer, ArrayBuffer.prototype,"
-    "    DataView, DataView.prototype"
-    "  ];"
-    // Guard ES2020+ globals: the embedded SM build may not expose all of them.
-    // Using typeof avoids a ReferenceError on absent globals.
-    "  if (typeof BigInt !== 'undefined') { targets.push(BigInt, BigInt.prototype); }"
-    "  if (typeof WeakRef !== 'undefined') { targets.push(WeakRef, WeakRef.prototype); }"
-    "  if (typeof FinalizationRegistry !== 'undefined') {"
-    "    targets.push(FinalizationRegistry, FinalizationRegistry.prototype);"
-    "  }"
-    "  if (typeof Atomics !== 'undefined') { targets.push(Atomics); }"
-    // Freezing a target only locks its own property slots (no add/remove/reconfigure);
-    // it does NOT freeze the object/function *values* those slots hold. Extension methods
-    // types.js attaches to these built-ins (Array.tojson, RegExp.escape, ...) and copyProps()
-    // mirrors by reference into every realm are therefore left mutable: one realm could add
-    // an own property to e.g. Array.tojson and every other realm sharing that same function
-    // object — including future ones — would see it. Freeze each own value (function or
-    // object) one level deep, in addition to the container, to close that hole. Descriptors
-    // are used (not direct gets) so accessor properties are skipped without invoking them.
-    "  var keysOf = function(o) {"
-    "    return Object.getOwnPropertyNames(o).concat(Object.getOwnPropertySymbols(o));"
-    "  };"
-    "  for (var i = 0; i < targets.length; i++) {"
-    "    var t = targets[i];"
-    "    var keys = keysOf(t);"
-    "    for (var j = 0; j < keys.length; j++) {"
-    "      var desc = Object.getOwnPropertyDescriptor(t, keys[j]);"
-    "      if (!desc || !('value' in desc) || desc.value === null) continue;"
-    "      if (typeof desc.value !== 'function' && typeof desc.value !== 'object') continue;"
-    "      try { Object.freeze(desc.value); } catch (e) {}"
-    "    }"
-    "    Object.freeze(t);"
-    "  }"
-    "})();";
-
 FunctionSlot* MozJSScriptEngine::resolveHandle(uint64_t handle, wasm_mozjs_error_t* err) {
     if (handle == 0 || handle > _slots.size()) {
         if (err) {
@@ -200,6 +133,106 @@ MozJSScriptEngine::~MozJSScriptEngine() {
     }
 }
 
+err_code_t MozJSScriptEngine::_freezeBuiltins(ExecutionCheck& chk, wasm_mozjs_error_t* err) {
+    // Freezing standard constructors and prototypes prevents user JS from mutating them
+    // across resets. This also covers MongoDB custom-type prototypes (Timestamp.prototype,
+    // ObjectId.prototype, ...): reset()'s scrubbing pass only tracks own properties of the
+    // engine-installed *constructors* (_initFnProps), not their prototypes, so e.g.
+    // Timestamp.prototype.custom = 'leak' would otherwise survive reset() indefinitely.
+    //
+    // Rather than naming built-ins in a JS string (fragile — every new type installed by
+    // installTypes() would need a matching edit, invisible to the type system), enumerate
+    // every own property of _global, freeze each object, and walk its full .prototype chain.
+    // A visited set drives termination and prevents re-processing shared objects
+    // (Object.prototype, the shared TypedArray prototype, ...). This automatically covers all
+    // types installed by installTypes(), all standard built-ins, and any future additions.
+    //
+    // Must run after types.js has attached its prototype extensions (tojson, toString, ...)
+    // and after the Array helpers are installed; freezing any earlier would silently drop the
+    // members those install passes still need to attach.
+    std::unordered_set<JSObject*> visited;
+    visited.insert(_global.get());
+
+    // Freeze `obj` plus its own object/function *values* one level deep. Freezing `obj` only
+    // locks its own property slots (no add/remove/reconfigure); it does NOT freeze the objects
+    // those slots hold. Extension methods types.js attaches (Array.tojson, ...) and mirrors by
+    // reference into every realm would otherwise stay mutable: one realm could add an own
+    // property to e.g. Array.tojson and every realm sharing that same function object would see
+    // it. Descriptors (not direct gets) are used so accessor properties are skipped without
+    // invoking them (some standard accessors are poison pills that throw on get).
+    auto freezeWithValues = [&](JS::HandleObject obj) -> bool {
+        if (!visited.insert(obj.get()).second)
+            return true;
+        JS::RootedVector<JS::PropertyKey> ownIds(_cx);
+        if (!js::GetPropertyKeys(
+                _cx, obj, JSITER_OWNONLY | JSITER_HIDDEN | JSITER_SYMBOLS, &ownIds))
+            return false;
+        JS::Rooted<mozilla::Maybe<JS::PropertyDescriptor>> maybeDesc(_cx);
+        JS::RootedId ownId(_cx);
+        for (size_t i = 0; i < ownIds.length(); ++i) {
+            ownId.set(ownIds[i]);
+            if (!JS_GetOwnPropertyDescriptorById(_cx, obj, ownId, &maybeDesc) ||
+                maybeDesc.isNothing())
+                continue;
+            if (!maybeDesc->hasValue())
+                continue;
+            JS::Value v = maybeDesc->value();
+            if (!v.isObject())
+                continue;
+            JS::RootedObject vObj(_cx, &v.toObject());
+            if (!JS_FreezeObject(_cx, vObj))
+                return false;
+        }
+        return JS_FreezeObject(_cx, obj);
+    };
+
+    auto freezeProtoChain = [&](JS::HandleObject start) -> bool {
+        JS::RootedObject cur(_cx, start);
+        while (cur) {
+            if (!freezeWithValues(cur))
+                return false;
+            JS::RootedObject next(_cx);
+            if (!JS_GetPrototype(_cx, cur, &next))
+                return false;
+            cur = next;
+        }
+        return true;
+    };
+
+    JS::RootedVector<JS::PropertyKey> globalIds(_cx);
+    if (!chk.ok(js::GetPropertyKeys(_cx, _global, JSITER_OWNONLY | JSITER_HIDDEN, &globalIds),
+                SM_E_JSAPI_FAIL))
+        return err ? err->code : SM_E_JSAPI_FAIL;
+
+    JS::RootedId gid(_cx);
+    JS::RootedValue gval(_cx);
+    JS::RootedValue proto(_cx);
+    for (size_t i = 0; i < globalIds.length(); ++i) {
+        gid.set(globalIds[i]);
+        if (!gid.isString())
+            continue;
+        if (!chk.ok(JS_GetPropertyById(_cx, _global, gid, &gval), SM_E_JSAPI_FAIL))
+            return err ? err->code : SM_E_JSAPI_FAIL;
+        if (!gval.isObject())
+            continue;
+        // MaxKey/MinKey are singletons: postInstall() replaces the installed constructor with
+        // the shared instance itself, so globalThis.MaxKey has no .prototype to freeze. The
+        // freezeWithValues() call below freezes the singleton object directly.
+        JS::RootedObject obj(_cx, &gval.toObject());
+        if (!chk.ok(freezeWithValues(obj), SM_E_JSAPI_FAIL))
+            return err ? err->code : SM_E_JSAPI_FAIL;
+        // Walk the .prototype chain of every constructor so instance-shared prototypes
+        // (Foo.prototype, Foo.prototype.__proto__, ...) are frozen too.
+        if (JS_GetProperty(_cx, obj, "prototype", &proto) && proto.isObject()) {
+            JS::RootedObject protoObj(_cx, &proto.toObject());
+            if (!chk.ok(freezeProtoChain(protoObj), SM_E_JSAPI_FAIL))
+                return err ? err->code : SM_E_JSAPI_FAIL;
+        }
+    }
+
+    return SM_OK;
+}
+
 err_code_t MozJSScriptEngine::_setupNewGlobal(ExecutionCheck& chk, wasm_mozjs_error_t* err) {
     JS::RealmOptions ro;
     {
@@ -227,9 +260,8 @@ err_code_t MozJSScriptEngine::_setupNewGlobal(ExecutionCheck& chk, wasm_mozjs_er
         JSAutoRealm ar(_cx, _global);
         _internedStrings = std::make_unique<InternedStringTable>(_cx);
         _prototypeInstaller->installTypes(_global);
-        // TODO (SERVER-129747): Freeze MongoDB custom-type prototypes (Timestamp.prototype,
-        // ObjectId.prototype, etc.) here after installTypes() so user JS cannot add properties
-        // that survive reset(). Same freeze needed in _setupChildRealm() after its installTypes().
+        // MongoDB custom-type prototypes (Timestamp.prototype, ObjectId.prototype, etc.) are
+        // frozen below by _freezeBuiltins(), after types.js has attached its extensions.
 
         if (!chk.ok(installParseJSFunctionHelper(_cx, _global), SM_E_INTERNAL))
             return err ? err->code : SM_E_INTERNAL;
@@ -412,18 +444,8 @@ err_code_t MozJSScriptEngine::_setupNewGlobal(ExecutionCheck& chk, wasm_mozjs_er
         }
 
         // Freeze after Array helpers so Array.sum etc. become permanently immutable.
-        // kFreezeBuiltinsScript is shared with _setupChildRealm.
-        JS::CompileOptions freezeOpts(_cx);
-        freezeOpts.setFileAndLine("wasm:init-freeze", 1);
-        JS::SourceText<mozilla::Utf8Unit> freezeSrc;
-        JS::RootedValue freezeRval(_cx);
-        if (!chk.ok(freezeSrc.init(_cx,
-                                   kFreezeBuiltinsScript,
-                                   strlen(kFreezeBuiltinsScript),
-                                   JS::SourceOwnership::Borrowed),
-                    SM_E_INTERNAL) ||
-            !chk.ok(JS::Evaluate(_cx, freezeOpts, freezeSrc, &freezeRval), SM_E_INTERNAL))
-            return err ? err->code : SM_E_INTERNAL;
+        if (err_code_t rc = _freezeBuiltins(chk, err); rc != SM_OK)
+            return rc;
     }
 
     return SM_OK;
@@ -593,21 +615,11 @@ err_code_t MozJSScriptEngine::_setupChildRealm(ExecutionCheck& chk, wasm_mozjs_e
         // Freeze standard constructors and prototypes so mutations don't survive reset().
         // The child realm is dropped on resetRealm(); within a realm's lifetime, reset()
         // is the fast path so freezing is the only protection against cross-request leakage.
-        JS::CompileOptions freezeOpts(_cx);
-        freezeOpts.setFileAndLine("wasm:child-freeze", 1);
-        JS::SourceText<mozilla::Utf8Unit> freezeSrc;
-        JS::RootedValue freezeRval(_cx);
-        if (!chk.ok(freezeSrc.init(_cx,
-                                   kFreezeBuiltinsScript,
-                                   strlen(kFreezeBuiltinsScript),
-                                   JS::SourceOwnership::Borrowed),
-                    SM_E_INTERNAL) ||
-            !chk.ok(JS::Evaluate(_cx, freezeOpts, freezeSrc, &freezeRval), SM_E_INTERNAL))
-            return err ? err->code : SM_E_INTERNAL;
+        if (err_code_t rc = _freezeBuiltins(chk, err); rc != SM_OK)
+            return rc;
 
-        // Remove internal helpers from the child's user-visible scope. This runs after
-        // the freeze script so that kFreezeBuiltinsScript can reference Reflect by name without
-        // getting a ReferenceError.
+        // Remove internal helpers from the child's user-visible scope. Freezing above locks
+        // each object's own slots but not _global itself, so these deletions still succeed.
         {
             JS::ObjectOpResult ignored;
             JS_DeleteProperty(_cx, _global, "__parseJSFunctionOrExpression", ignored);
