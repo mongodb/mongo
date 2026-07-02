@@ -88,6 +88,23 @@ mkdir -p "$SRC_ROOT"
 cp -a "$SPIDER_ROOT/." "$SRC_ROOT/"
 SRC_ROOT_REAL="$(cd "$SRC_ROOT" && pwd -P)"
 
+# Neutralize Mozilla's "begin all files as hidden" force-include. It does
+# `#pragma GCC visibility push(hidden)`, which stamps *explicit* hidden
+# visibility onto libc++'s bare forward declaration of `class error_condition`
+# (in <__system_error/error_category.h>, which is missing the
+# _LIBCPP_EXPORTED_FROM_ABI macro). libc++ then defines that class with an
+# explicit default-visibility attribute, and clang >= 22 (shipped by the WASI
+# SDK) rejects the mismatch as a hard error ("visibility does not match previous
+# declaration"). We still pass -fvisibility=hidden on the command line (see
+# WASM_SIZE_FLAGS and Mozilla's OS_CXXFLAGS), which hides symbols by default
+# without being treated as an explicit attribute, so dropping the pragma keeps
+# the size benefit while avoiding the conflict.
+GCC_HIDDEN_H="$SRC_ROOT_REAL/config/gcc_hidden.h"
+if [ -f "$GCC_HIDDEN_H" ]; then
+    printf '/* Emptied by build_spidermonkey_wasip2.sh: the visibility pragma\n   conflicts with libc++ ABI-visibility attributes under clang >= 22.\n   -fvisibility=hidden on the command line covers symbol hiding. */\n' \
+        >"$GCC_HIDDEN_H"
+fi
+
 MOZCONFIG="$SRC_ROOT_REAL/mozconfig-release"
 OBJDIR="$WORK_DIR/obj-release-wasip2"
 mkdir -p "$OBJDIR"
@@ -132,6 +149,10 @@ case "$HOST_CC" in
 /*) ;; # already absolute
 *) HOST_CC="$EXECROOT/$HOST_CC" ;;
 esac
+HOST_CC_DIR="$(dirname "$HOST_CC")"
+if [[ "$HOST_CC" == *clang ]] && [[ -x "$HOST_CC_DIR/gcc" ]]; then
+    HOST_CC="$HOST_CC_DIR/gcc"
+fi
 case "$HOST_CC" in
 *gcc) export HOST_CXX="${HOST_CC/%gcc/g++}" ;;
 *clang) export HOST_CXX="${HOST_CC}++" ;;
@@ -142,8 +163,9 @@ esac
 # Enable per-function/data sections so the linker's --gc-sections can remove
 # unused code.  Also hide internal symbols to aid dead-code elimination.
 WASM_SIZE_FLAGS="-ffunction-sections -fdata-sections -fvisibility=hidden"
-export CFLAGS="${CFLAGS:-} $WASM_SIZE_FLAGS"
-export CXXFLAGS="${CXXFLAGS:-} $WASM_SIZE_FLAGS"
+WASM_WARNING_FLAGS="-Wno-error"
+export CFLAGS="${CFLAGS:-} $WASM_SIZE_FLAGS $WASM_WARNING_FLAGS"
+export CXXFLAGS="${CXXFLAGS:-} $WASM_SIZE_FLAGS $WASM_WARNING_FLAGS"
 
 # Let cargo/rustc know what target to build for when SpiderMonkey builds Rust support code.
 export RUST_TARGET=wasm32-wasip2
