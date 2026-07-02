@@ -76,6 +76,7 @@
 #include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/idl/idl_command_parser.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"

@@ -39,6 +39,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/platform/atomic.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/unittest/benchmark_util.h"
 

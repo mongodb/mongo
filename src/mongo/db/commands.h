@@ -58,6 +58,7 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/generic_argument_gen.h"
+#include "mongo/idl/idl_command_parser.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/otel/traces/span/span_names.h"
 #include "mongo/platform/source_location.h"

@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/auth/validated_tenancy_scope_factory.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"

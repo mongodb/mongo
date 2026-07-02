@@ -48,6 +48,7 @@
 #include "mongo/db/query/tailable_mode.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
+#include "mongo/idl/idl_command_parser.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/util/assert_util.h"

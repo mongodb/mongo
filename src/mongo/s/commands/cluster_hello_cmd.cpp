@@ -57,6 +57,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/mongos_topology_coordinator.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/idl/idl_command_parser.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"

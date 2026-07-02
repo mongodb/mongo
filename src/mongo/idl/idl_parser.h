@@ -38,7 +38,6 @@
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -635,36 +634,6 @@ template <typename E>
 MONGO_MOD_PUBLIC constexpr inline size_t idlEnumCount = 0;
 
 namespace idl {
-/**
- * Parse an IDL-defined command from a command request document.
- * If the request includes apiStrict: true along with any unstable fields, an exception will be
- * thrown.
- */
-template <typename T>
-MONGO_MOD_PUBLIC T parseCommandDocument(const BSONObj& cmdObj, const IDLParserContext& ctx) {
-    DeserializationContext dctx;
-    auto cmd = T::parse(cmdObj, ctx, &dctx);
-    if (cmd.getGenericArguments().getApiStrict().value_or(false)) {
-        dctx.validateApiStrict();
-    }
-    return cmd;
-}
-
-/**
- * Parse an IDL-defined command from a command request.
- * If the request includes apiStrict: true along with any unstable fields, an exception will be
- * thrown.
- */
-template <typename T>
-MONGO_MOD_PUBLIC T parseCommandRequest(const OpMsgRequest& req, const IDLParserContext& ctx) {
-    DeserializationContext dctx;
-    auto cmd = T::parse(req, ctx, &dctx);
-    if (cmd.getGenericArguments().getApiStrict().value_or(false)) {
-        dctx.validateApiStrict();
-    }
-    return cmd;
-}
-
 template <typename E>
 concept EnumWithStringSerializer = requires(E e) {
     { idlSerialize(e) } -> std::same_as<std::string_view>;

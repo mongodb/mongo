@@ -60,6 +60,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor_pool.h"
+#include "mongo/idl/idl_command_parser.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/async_requests_sender.h"

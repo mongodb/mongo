@@ -49,6 +49,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/idl/idl_command_parser.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
 #include "mongo/util/decorable.h"
