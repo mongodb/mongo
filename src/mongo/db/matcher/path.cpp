@@ -232,7 +232,6 @@ bool BSONElementIterator::more() {
         return false;
     }
 
-    bool emptyArray = false;
     if (_state == BEGIN) {
         if (_traversalStart.type() != BSONType::array) {
             _next.reset(_traversalStart, BSONElement());
@@ -241,7 +240,6 @@ bool BSONElementIterator::more() {
         }
 
         // It's an array.
-        emptyArray = true;
 
         _arrayIterationState.reset(_path->fieldRef(), _traversalStartIndex + 1);
 
@@ -297,7 +295,6 @@ bool BSONElementIterator::more() {
                 if (subCursorHasMore()) {
                     return true;
                 }
-                emptyArray = false;
             } else if (_arrayIterationState.isArrayOffsetMatch(eltInArray.fieldName())) {
                 // The path we're traversing has an array offset component, and the current
                 // array element corresponds to the offset we're looking for (for example: our
@@ -336,26 +333,11 @@ bool BSONElementIterator::more() {
                     if (subCursorHasMore()) {
                         return true;
                     }
-                    emptyArray = false;
                 }
-            } else if (!_path->legacyDottedPathNullSemantics() &&
-                       !_arrayIterationState.nextPieceOfPathIsNumber &&
-                       eltInArray.type() != BSONType::array) {
-                // We cannot traverse the path of this element, so return an empty element
-                // to check for a match against eoo.
-                // Do not set done, we will go to the next element next time if no match.
-                _next.reset(BSONElement(), BSONElement());
-                return true;
             }
         }
 
         if (_arrayIterationState.hasMore) {
-            if (!_path->legacyDottedPathNullSemantics() && emptyArray) {
-                // An empty array, but we have more path to check.
-                // Return true so that the matcher can check whether eoo matches.
-                _state = DONE;
-                return true;
-            }
             return false;
         }
 

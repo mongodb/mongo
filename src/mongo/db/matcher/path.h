@@ -34,7 +34,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
@@ -97,7 +96,6 @@ public:
                 NonLeafArrayBehavior nonLeafArrayBehavior = NonLeafArrayBehavior::kTraverse)
         : _leafArrayBehavior(leafArrayBehavior),
           _nonLeafArrayBehavior(nonLeafArrayBehavior),
-          _legacyDottedPathNullSemantics(internalQueryLegacyDottedPathNullSemantics.loadRelaxed()),
           _fieldRef(path) {}
 
     /**
@@ -124,10 +122,6 @@ public:
         return _nonLeafArrayBehavior;
     }
 
-    bool legacyDottedPathNullSemantics() const {
-        return _legacyDottedPathNullSemantics;
-    }
-
     const FieldRef& fieldRef() const {
         return _fieldRef;
     }
@@ -135,7 +129,6 @@ public:
 private:
     LeafArrayBehavior _leafArrayBehavior;
     NonLeafArrayBehavior _nonLeafArrayBehavior;
-    bool _legacyDottedPathNullSemantics;
 
     FieldRef _fieldRef;
 };

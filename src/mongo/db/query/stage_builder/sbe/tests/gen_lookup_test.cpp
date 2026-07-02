@@ -550,10 +550,10 @@ TEST_F(LookupStageBuilderTest, NestedLoopJoin_DeepForeignPath_ScalarsOnPath) {
          {
              fdocs[0],
              fdocs[1],
-             fdocs[2],
+             // fdocs[2], is expected and different from matching in local!
              fdocs[3],
              fdocs[4],
-             fdocs[5],
+             // fdocs[5], is expected and different from matching in local!
              fdocs[6],
              fdocs[7],
          }},

@@ -1,11 +1,7 @@
 /**
  * Tests for $lookup with localField/foreignField syntax using hash join algorithm.
  *
- * @tags: [
- *   featureFlagSbeFull,
- *   # SERVER-36681 changed the behavior of SBE and classic engines
- *   requires_fcv_90,
- * ]
+ * @tags: [featureFlagSbeFull]
  */
 import {
     JoinAlgorithm,

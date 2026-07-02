@@ -8,8 +8,6 @@
  *   uses_change_streams,
  *   # This test runs too long to be included in code coverage:
  *   incompatible_with_gcov,
- *   # SERVER-36681 changed the behavior of SBE and classic engines
- *   requires_fcv_90,
  * ]
  */
 import {
