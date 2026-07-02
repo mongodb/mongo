@@ -83,6 +83,15 @@
 
 namespace mongo {
 
+// Pauses the MaxKey orphan inventory scan just before it upserts the state document, so tests
+// can deterministically trigger stepdown while the scan is mid-flight.
+MONGO_FAIL_POINT_DEFINE(hangBeforePersistingMaxKeyOrphanScanState);
+
+// Pauses the MaxKey orphan inventory scan while it is iterating collections (before it inspects the
+// next one), so tests can run operations such as chunk migrations concurrently with the scan's
+// detection phase rather than only with the final state-doc upsert.
+MONGO_FAIL_POINT_DEFINE(hangDuringMaxKeyOrphanScan);
+
 namespace {
 
 constexpr std::string_view kMaxKeyOrphanScanStateId = "scanState";
@@ -212,6 +221,8 @@ bool detectMaxKeyOrphanForCollection(OperationContext* opCtx,
     if (!rightmostMaxKeyPrefixedShardKey(opCtx, nss.dbName(), collUuid, shardKeyPattern)) {
         return false;
     }
+
+    hangDuringMaxKeyOrphanScan.pauseWhileSet(opCtx);
 
     MigrationBlockingGuard guard(
         opCtx, str::stream() << "MaxKey orphan detection for collection " << collUuid);
@@ -460,6 +471,8 @@ void runMaxKeyOrphanDetection(OperationContext* opCtx, long long term) {
     setBob.append(MaxKeyOrphanScanState::kScanCompletedAtFieldName, scanCompletedAt);
     setBob.append(MaxKeyOrphanScanState::kFoundMaxKeyFieldName, foundMaxKey);
     setBob.append(MaxKeyOrphanScanState::kAlertEmittedFieldName, priorAlertEmitted || emitAlert);
+
+    hangBeforePersistingMaxKeyOrphanScanState.pauseWhileSet(opCtx);
 
     PersistentTaskStore<MaxKeyOrphanScanState> store(
         NamespaceString::kConfigMaxKeyOrphanScanStateNamespace);

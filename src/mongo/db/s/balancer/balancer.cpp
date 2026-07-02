@@ -138,6 +138,10 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(forceBalancerWarningChecks);
 
+// Pauses the MaxKey zone inventory scan just before it upserts the state document, so tests
+// can deterministically trigger stepdown while the scan is mid-flight.
+MONGO_FAIL_POINT_DEFINE(hangBeforePersistingMaxKeyZoneScanState);
+
 const Milliseconds kBalanceRoundDefaultInterval(10 * 1000);
 
 /**
@@ -1621,6 +1625,8 @@ void Balancer::_runMaxKeyZoneScan(OperationContext* opCtx) {
     setBob.append(MaxKeyZoneScanState::kFcvAtScanFieldName,
                   multiversion::toString(
                       serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion()));
+
+    hangBeforePersistingMaxKeyZoneScanState.pauseWhileSet(opCtx);
 
     store.upsert(opCtx, BSON("_id" << "scanState"), BSON("$set" << setBob.obj()));
 

@@ -18,13 +18,18 @@
  *      compound {a: 1, b: 1} index): flagged. Exercises reading shard-key values from a wider index
  *      and discarding the extra trailing field to recover the shard key.
  *   9. Empty sharded collection: not flagged (the backward index scan finds nothing).
+ *  10. Failover before persist: pause the scan just before it upserts the state doc, stepdown to
+ *      interrupt it, disable the failpoint, and confirm the next primary re-runs the scan to
+ *      completion (one-shot re-run after an interrupted sweep).
  *
  * @tags: [
  *  featureFlagMaxKeyDetection,
+ *  multiversion_incompatible,
  *  does_not_support_stepdowns,
  * ]
  */
 
+import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Cases 3, 4, and 5 intentionally leave MaxKey orphans on shard0, so suppress the teardown
@@ -45,7 +50,30 @@ function stepDownAndUp(rs) {
 }
 
 function readOrphanScanStats(rs) {
-    return rs.getPrimary().adminCommand({serverStatus: 1}).shardingStatistics;
+    return assert.commandWorked(rs.getPrimary().adminCommand({serverStatus: 1})).shardingStatistics;
+}
+
+// Asserts the FTDC counters reflect a completed scan with the given outcome. Cases wait on the state
+// doc for completion (scanCompletedAt) and assert the classification here, so it is checked once.
+function assertOrphanScanStats(rs, {foundMaxKey, alertEmitted}, message) {
+    let stats;
+    assert.soon(
+        () => {
+            stats = readOrphanScanStats(rs);
+            return (
+                stats.maxKeyOrphanScanComplete == 1 &&
+                stats.maxKeyOrphanScanFoundMaxKey == (foundMaxKey ? 1 : 0) &&
+                stats.maxKeyOrphanScanAlertEmitted == (alertEmitted ? 1 : 0)
+            );
+        },
+        () => `${message}; got ${tojson(stats)}`,
+    );
+}
+
+function configureFailCommandAllConfigNodes(rs, cmd) {
+    rs.nodes.forEach((node) => {
+        assert.commandWorked(node.adminCommand(cmd));
+    });
 }
 
 // Always fetch a collection handle bound to the *current* primary. Caching a handle across a
@@ -127,6 +155,12 @@ assert.commandWorked(
     adminDB.runCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
 );
 
+st.rs0.nodes.forEach((node) =>
+    assert.commandWorked(
+        node.adminCommand({setParameter: 1, logComponentVerbosity: {sharding: {verbosity: 2}}}),
+    ),
+);
+
 function resetClusterState(collNames) {
     for (const collName of collNames) {
         assert.commandWorked(testDB.runCommand({drop: collName}));
@@ -142,52 +176,35 @@ jsTest.log.info("Case 1: clean cluster, expect foundMaxKey=false after stepup");
 
 const cleanState = stepUpAndAwaitScanState(
     st.rs0,
-    (doc) =>
-        doc.scanCompletedAt !== undefined &&
-        doc.foundMaxKey === false &&
-        doc.alertEmitted === false,
-    "Detector should persist scanCompletedAt with foundMaxKey=false, alertEmitted=false on a clean cluster",
+    (doc) => doc.scanCompletedAt !== undefined,
+    "Detector should persist scanCompletedAt on a clean cluster",
 );
-
-let cleanOrphanStats;
-assert.soon(
-    () => {
-        cleanOrphanStats = readOrphanScanStats(st.rs0);
-        return (
-            cleanOrphanStats.maxKeyOrphanScanComplete == 1 &&
-            cleanOrphanStats.maxKeyOrphanScanFoundMaxKey == 0 &&
-            cleanOrphanStats.maxKeyOrphanScanAlertEmitted == 0
-        );
-    },
-    () => `maxKeyOrphanScan stats must reflect clean scan outcome; got ${tojson(cleanOrphanStats)}`,
+assertOrphanScanStats(
+    st.rs0,
+    {foundMaxKey: false, alertEmitted: false},
+    "maxKeyOrphanScan stats must reflect clean scan outcome",
 );
 
 // One-shot guard: a second stepup with scanCompletedAt persisted must not rewrite the doc.
 // Assert byte-equality (including timestamps) to confirm no upsert ran.
 jsTest.log.info("Case 1 follow-up: second stepup must short-circuit");
 stepDownAndUp(st.rs0);
-// Give the would-be scan executor a moment to run if the guard is missing.
-sleep(2 * 1000);
-const guardedState = awaitScanStateDoc(st.rs0, 15 * 1000);
-assert.neq(null, guardedState, "State doc must still be present after re-stepup");
+// Wait for the scan's short-circuit log (this term) -- proof it ran and skipped -- then assert it
+// left the doc untouched.
+const guardTerm = assert.commandWorked(
+    st.rs0.getPrimary().adminCommand({replSetGetStatus: 1}),
+).term;
+checkLog.containsJson(st.rs0.getPrimary(), 12799006, {term: Number(guardTerm)});
 assert.docEq(
     cleanState,
-    guardedState,
+    readScanState(st.rs0.getPrimary()),
     "State doc must be unchanged after re-stepup once scanCompletedAt is persisted",
 );
-
-let lastOrphanStats;
-assert.soon(
-    () => {
-        lastOrphanStats = readOrphanScanStats(st.rs0);
-        return (
-            lastOrphanStats.maxKeyOrphanScanComplete == 1 &&
-            lastOrphanStats.maxKeyOrphanScanFoundMaxKey == 0 &&
-            lastOrphanStats.maxKeyOrphanScanAlertEmitted == 0
-        );
-    },
-    () =>
-        `Short-circuit must republish prior scan outcome to FTDC stats; got ${tojson(lastOrphanStats)}`,
+// The short-circuit path re-publishes the prior outcome to FTDC (distinct from the initial publish).
+assertOrphanScanStats(
+    st.rs0,
+    {foundMaxKey: false, alertEmitted: false},
+    "short-circuit must republish the prior clean outcome to FTDC stats",
 );
 
 // --- Case 2: non-findings (owned all-MaxKey doc, hashed key, range-deletion-covered doc) --------
@@ -237,10 +254,12 @@ assert.soon(
 clearScanStateAndWaitMajority(st.rs0);
 stepUpAndAwaitScanState(
     st.rs0,
-    (doc) =>
-        doc.scanCompletedAt !== undefined &&
-        doc.foundMaxKey === false &&
-        doc.alertEmitted === false,
+    (doc) => doc.scanCompletedAt !== undefined,
+    "Detector should complete on a cluster with only non-findings",
+);
+assertOrphanScanStats(
+    st.rs0,
+    {foundMaxKey: false, alertEmitted: false},
     "Detector must not flag an owned all-MaxKey doc, a hashed shard key, or a covered doc",
 );
 
@@ -293,23 +312,13 @@ assert.eq(
 clearScanStateAndWaitMajority(st.rs0);
 stepUpAndAwaitScanState(
     st.rs0,
-    (doc) =>
-        doc.scanCompletedAt !== undefined && doc.foundMaxKey === true && doc.alertEmitted === true,
-    "Detector should flag the already-orphan MaxKey doc and record alertEmitted=true",
+    (doc) => doc.scanCompletedAt !== undefined,
+    "Detector should complete after an already-orphan MaxKey doc is left on shard0",
 );
-
-let foundOrphanStats;
-assert.soon(
-    () => {
-        foundOrphanStats = readOrphanScanStats(st.rs0);
-        return (
-            foundOrphanStats.maxKeyOrphanScanComplete == 1 &&
-            foundOrphanStats.maxKeyOrphanScanFoundMaxKey == 1 &&
-            foundOrphanStats.maxKeyOrphanScanAlertEmitted == 1
-        );
-    },
-    () =>
-        `maxKeyOrphanScan stats must reflect orphan detection outcome; got ${tojson(foundOrphanStats)}`,
+assertOrphanScanStats(
+    st.rs0,
+    {foundMaxKey: true, alertEmitted: true},
+    "Detector should flag the already-orphan MaxKey doc and record alertEmitted=true",
 );
 
 checkLog.containsJson(st.rs0.getPrimary(), warningLogId);
@@ -351,8 +360,12 @@ st.rs0.awaitReplication();
 clearScanStateAndWaitMajority(st.rs0);
 stepUpAndAwaitScanState(
     st.rs0,
-    (doc) =>
-        doc.scanCompletedAt !== undefined && doc.foundMaxKey === true && doc.alertEmitted === true,
+    (doc) => doc.scanCompletedAt !== undefined,
+    "Detector should complete after an already-orphan compound-shard-key MaxKey doc is left on shard0",
+);
+assertOrphanScanStats(
+    st.rs0,
+    {foundMaxKey: true, alertEmitted: true},
     "Detector should flag the already-orphan compound-shard-key MaxKey doc",
 );
 
@@ -400,8 +413,12 @@ assert.eq(
 clearScanStateAndWaitMajority(st.rs0);
 stepUpAndAwaitScanState(
     st.rs0,
-    (doc) =>
-        doc.scanCompletedAt !== undefined && doc.foundMaxKey === true && doc.alertEmitted === true,
+    (doc) => doc.scanCompletedAt !== undefined,
+    "Detector should complete after a partial-MaxKey (leading field only) orphan is left on shard0",
+);
+assertOrphanScanStats(
+    st.rs0,
+    {foundMaxKey: true, alertEmitted: true},
     "Detector should flag an orphan whose leading shard-key field is MaxKey but trailing field is not",
 );
 
@@ -459,10 +476,12 @@ assert.eq(
 clearScanStateAndWaitMajority(st.rs0);
 stepUpAndAwaitScanState(
     st.rs0,
-    (doc) =>
-        doc.scanCompletedAt !== undefined &&
-        doc.foundMaxKey === false &&
-        doc.alertEmitted === false,
+    (doc) => doc.scanCompletedAt !== undefined,
+    "Detector should complete with an owned partial-MaxKey doc behind an intra-MaxKey-region split",
+);
+assertOrphanScanStats(
+    st.rs0,
+    {foundMaxKey: false, alertEmitted: false},
     "Detector must not flag a partial-MaxKey doc this shard legitimately owns",
 );
 
@@ -545,10 +564,12 @@ assert.eq(
 clearScanStateAndWaitMajority(st.rs0);
 stepUpAndAwaitScanState(
     st.rs0,
-    (doc) =>
-        doc.scanCompletedAt !== undefined &&
-        doc.foundMaxKey === false &&
-        doc.alertEmitted === false,
+    (doc) => doc.scanCompletedAt !== undefined,
+    "Detector should complete with a partial-MaxKey orphan covered by a pending range-deletion task",
+);
+assertOrphanScanStats(
+    st.rs0,
+    {foundMaxKey: false, alertEmitted: false},
     "Detector must not flag a partial-MaxKey orphan covered by a pending range-deletion task",
 );
 
@@ -616,8 +637,12 @@ assert.eq(
 clearScanStateAndWaitMajority(st.rs0);
 stepUpAndAwaitScanState(
     st.rs0,
-    (doc) =>
-        doc.scanCompletedAt !== undefined && doc.foundMaxKey === true && doc.alertEmitted === true,
+    (doc) => doc.scanCompletedAt !== undefined,
+    "Detector should complete after an orphan reachable only through a wider compound index",
+);
+assertOrphanScanStats(
+    st.rs0,
+    {foundMaxKey: true, alertEmitted: true},
     "Detector should flag an orphan whose shard key is read through a wider compound index",
 );
 
@@ -633,11 +658,89 @@ assert.commandWorked(adminDB.runCommand({shardCollection: emptyNs, key: {a: 1}})
 clearScanStateAndWaitMajority(st.rs0);
 stepUpAndAwaitScanState(
     st.rs0,
-    (doc) =>
-        doc.scanCompletedAt !== undefined &&
-        doc.foundMaxKey === false &&
-        doc.alertEmitted === false,
+    (doc) => doc.scanCompletedAt !== undefined,
+    "Detector should complete on an empty sharded collection",
+);
+assertOrphanScanStats(
+    st.rs0,
+    {foundMaxKey: false, alertEmitted: false},
     "Detector must not flag an empty sharded collection",
 );
+
+// --- Case 10: stepdown while the scan is paused just before persisting --------------------------
+// Arm the failpoint on the next primary so its scan parks just before the upsert, then stepdown to
+// interrupt the parked scan (pauseWhileSet honours the opCtx interrupt from killOpForStepdown). The
+// next primary must observe the doc still absent and re-run the scan to completion.
+jsTest.log.info("Case 10: stepdown while the scan is paused mid-flight");
+
+clearScanStateAndWaitMajority(st.rs0);
+
+const nextPrimaryNode = st.rs0.getSecondary();
+const hangFp = configureFailPoint(nextPrimaryNode, "hangBeforePersistingMaxKeyOrphanScanState");
+
+st.rs0.stepUp(nextPrimaryNode);
+st.rs0.waitForPrimary();
+hangFp.wait({maxTimeMS: kDefaultWaitForFailPointTimeout});
+
+assert.eq(
+    st.rs0.getPrimary().host,
+    nextPrimaryNode.host,
+    "Expected the explicitly stepped-up node to be primary",
+);
+
+stepDownAndUp(st.rs0);
+
+// Only nextPrimaryNode was armed, so disable via the handle.
+hangFp.off();
+
+// Clear any doc written meanwhile so the next stepup re-runs from an absent doc.
+clearScanStateAndWaitMajority(st.rs0);
+
+// Earlier cases left MaxKey orphans on shard0, so foundMaxKey may be true; only require that
+// scanCompletedAt is persisted (the one-shot re-run succeeded after the interrupted sweep).
+stepUpAndAwaitScanState(
+    st.rs0,
+    (doc) => doc.scanCompletedAt !== undefined,
+    "Expected the next primary to re-run the scan to completion after the in-flight scan was " +
+        "interrupted by stepdown",
+);
+
+// --- Case 11: a non-retryable catalog read error increments maxKeyOrphanScanErrors -------------
+jsTest.log.info("Case 11: non-retryable catalog read error increments maxKeyOrphanScanErrors");
+
+const errNs = `${dbName}.err_coll`;
+assert.commandWorked(adminDB.runCommand({shardCollection: errNs, key: {a: 1}}));
+
+clearScanStateAndWaitMajority(st.rs0);
+
+configureFailCommandAllConfigNodes(st.configRS, {
+    configureFailPoint: "failCommand",
+    mode: "alwaysOn",
+    data: {
+        failCommands: ["find"],
+        namespace: "config.collections",
+        errorCode: ErrorCodes.BadValue,
+        failInternalCommands: true,
+    },
+});
+
+stepUpAndAwaitScanState(
+    st.rs0,
+    (doc) => doc.scanCompletedAt !== undefined,
+    "Scan should still complete despite a non-retryable per-collection config read error",
+);
+
+let erroredOrphanStats;
+assert.soon(
+    () => {
+        erroredOrphanStats = readOrphanScanStats(st.rs0);
+        return erroredOrphanStats.maxKeyOrphanScanErrors >= 1;
+    },
+    () =>
+        `maxKeyOrphanScanErrors must increment when a per-collection catalog read hits a ` +
+        `non-retryable error; got ${tojson(erroredOrphanStats)}`,
+);
+
+configureFailCommandAllConfigNodes(st.configRS, {configureFailPoint: "failCommand", mode: "off"});
 
 st.stop();

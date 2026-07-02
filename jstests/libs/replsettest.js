@@ -3302,6 +3302,12 @@ export class ReplSetTest {
         if (olderThan90) {
             delete options.setParameter
                 .initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs;
+            // The MaxKey scan failpoints and the featureFlagMaxKeyDetection parameter were
+            // introduced in 9.0. Older binaries do not know them and would fail to start if they
+            // were passed as startup parameters.
+            delete options.setParameter["failpoint.hangBeforePersistingMaxKeyOrphanScanState"];
+            delete options.setParameter["failpoint.hangBeforePersistingMaxKeyZoneScanState"];
+            delete options.setParameter.featureFlagMaxKeyDetection;
         }
 
         if (tojson(options) != tojson({})) jsTest.log.info({options});
