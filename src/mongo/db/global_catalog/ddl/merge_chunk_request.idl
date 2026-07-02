@@ -115,6 +115,15 @@ structs:
                 description: "Latest data placement of the shard."
                 optional: false
 
+    ConfigSvrCommitMergeChunksResponse:
+        description: "Response of the _configsvrCommitMergeChunks command."
+        strict: false
+        is_command_reply: true
+        fields:
+            changedChunks:
+                type: array<object>
+                description: "The list of the chunks changed by the merge commit, in config BSON format."
+
 commands:
     _configsvrCommitChunksMerge:
         command_name: _configsvrCommitChunksMerge
@@ -145,6 +154,28 @@ commands:
                 description: "The expected timestamp of the collection that is being committed."
                 type: timestamp
                 optional: true
+
+    _configsvrCommitMergeChunks:
+        command_name: _configsvrCommitMergeChunks
+        cpp_name: ConfigSvrCommitMergeChunksRequest
+        description:
+            "Internal command that commits a chunk merge to the global catalog and returns the
+            chunks it changed."
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        strict: false
+        reply_type: ConfigSvrCommitMergeChunksResponse
+        fields:
+            shard:
+                type: shard_ref
+                description: "Shard that owns the chunks being merged."
+            chunkRange:
+                type: chunk_range
+                description: "Bounds of the contiguous chunks to merge."
+            shardVersionPreMerge:
+                type: ChunkVersion
+                description: "Shard version captured before the merge."
 
     clusterMergeChunks:
         command_name: mergeChunks

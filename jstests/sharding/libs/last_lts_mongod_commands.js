@@ -96,7 +96,9 @@ export const commandsAddedToMongodSinceLastLTS = [
     "_shardsvrSetAllowChunkOperations",
     "_configsvrSetAllowChunkOperations",
     "_configsvrCommitMergeAllPrecomputedChunksOnShard",
+    "_configsvrCommitMergeChunks",
     "_configsvrCommitMoveRange",
+    "_configsvrCommitSplitChunk",
     "_configsvrConvertShardRefsInNamespaceMetadata",
     "_shardsvrCheckMetadataConsistencySecondaryParticipant",
 ];

@@ -52,6 +52,18 @@ idl_generator(
 )
 
 idl_generator(
+    name = "commit_split_chunk_gen",
+    src = "commit_split_chunk.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog:chunk_range_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
+        "//src/mongo/db/versioning_protocol:chunk_version_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
     name = "coordinator_session_gen",
     src = "coordinator_session.idl",
     deps = [

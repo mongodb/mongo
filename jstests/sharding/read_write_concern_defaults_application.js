@@ -101,11 +101,13 @@ let testCases = {
     _configsvrCommitChunkSplit: {skip: "internal command"},
     _configsvrCommitMergeAllChunksOnShard: {skip: "internal command"},
     _configsvrCommitMergeAllPrecomputedChunksOnShard: {skip: "internal command"},
+    _configsvrCommitMergeChunks: {skip: "internal command"},
     _configsvrCommitMovePrimary: {skip: "internal command"}, // Can be removed once 6.0 is last LTS
     _configsvrCommitMoveRange: {skip: "internal command"},
     _configsvrCommitRefineCollectionShardKey: {skip: "internal command"},
     _configsvrCommitReshardCollection: {skip: "internal command"},
     _configsvrCommitShardRemoval: {skip: "internal command"},
+    _configsvrCommitSplitChunk: {skip: "internal command"},
     _configsvrConfigureCollectionBalancing: {skip: "internal command"},
     _configsvrConvertShardRefsInNamespaceMetadata: {skip: "internal command"},
     _configsvrCreateDatabase: {skip: "internal command"},

@@ -52,6 +52,7 @@
 #include "mongo/db/global_catalog/type_tags.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/repl/read_concern_level.h"
@@ -1423,6 +1424,175 @@ TEST_F(MergeAllChunksOnShardTest, RetryCommittedMergeAllChunksOnShardSucceedsDur
     ASSERT_EQ(shardId, chunks.front().getShard());
     ASSERT_BSONOBJ_EQ(_keyPattern.globalMin(), chunks.front().getMin());
     ASSERT_BSONOBJ_EQ(_keyPattern.globalMax(), chunks.front().getMax());
+}
+
+// Returns the field names of 'obj' in sorted order. Used to compare the shape (not the values) of
+// two chunk documents.
+std::vector<std::string> sortedFieldNames(const BSONObj& obj) {
+    std::vector<std::string> names;
+    for (const auto& element : obj) {
+        names.push_back(element.fieldName());
+    }
+    std::sort(names.begin(), names.end());
+    return names;
+}
+
+class CommitMergeTest : public MergeChunkTest {
+protected:
+    // Returns the highest chunk version owned by 'shard', i.e. its shard placement version.
+    ChunkVersion getShardVersion(const UUID& collUuid,
+                                 const OID& collEpoch,
+                                 const Timestamp& collTimestamp,
+                                 const ShardId& shard) {
+        auto doc = uassertStatusOK(findOneOnConfigCollection(
+            operationContext(),
+            NamespaceString::kConfigsvrChunksNamespace,
+            BSON(ChunkType::collectionUUID << collUuid << ChunkType::shard(shard.toString())),
+            BSON(ChunkType::lastmod << -1)));
+        return uassertStatusOK(ChunkType::parseFromConfigBSON(doc, collEpoch, collTimestamp))
+            .getVersion();
+    }
+
+    std::vector<ChunkType> commitMerge(const NamespaceString& nss,
+                                       const ChunkVersion& shardVersionPreMerge,
+                                       const ChunkRange& chunkRange,
+                                       const ShardId& shardId) {
+        return assertGet(
+            ShardingCatalogManager::get(operationContext())
+                ->commitMerge(operationContext(), nss, shardVersionPreMerge, chunkRange, shardId));
+    }
+
+    // Asserts two changed-chunks lists describe the same chunks (keyed by chunk min).
+    void assertSameChangedChunks(std::vector<ChunkType> lhs, std::vector<ChunkType> rhs) {
+        ASSERT_EQ(lhs.size(), rhs.size());
+        const auto byMin = [](const ChunkType& l, const ChunkType& r) {
+            return l.getMin().woCompare(r.getMin()) < 0;
+        };
+        std::sort(lhs.begin(), lhs.end(), byMin);
+        std::sort(rhs.begin(), rhs.end(), byMin);
+        for (size_t i = 0; i < lhs.size(); ++i) {
+            ASSERT_BSONOBJ_EQ(lhs[i].getMin(), rhs[i].getMin());
+            ASSERT_BSONOBJ_EQ(lhs[i].getMax(), rhs[i].getMax());
+            ASSERT_EQ(lhs[i].getShard(), rhs[i].getShard());
+            ASSERT_EQ(lhs[i].getVersion(), rhs[i].getVersion());
+        }
+    }
+
+    // Simulates a concurrent DDL disabling chunk operations on the collection by clearing the
+    // allowChunkOperations flag on its config.collections document.
+    void disallowChunkOperations(const NamespaceString& nss) {
+        DBDirectClient client(operationContext());
+        client.update(
+            NamespaceString::kConfigsvrCollectionsNamespace,
+            BSON(CollectionType::kNssFieldName
+                 << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
+            BSON("$set" << BSON(CollectionType::kAllowChunkOperationsFieldName << false)));
+    }
+
+    // Sets up a collection with two contiguous chunks on '_shardId' spanning [1, 5) and [5, 10).
+    void setupTwoContiguousChunks(const NamespaceString& nss,
+                                  const UUID& collUuid,
+                                  const OID& collEpoch,
+                                  const Timestamp& collTimestamp) {
+        ChunkType chunk1;
+        chunk1.setName(OID::gen());
+        chunk1.setCollectionUUID(collUuid);
+        chunk1.setVersion(ChunkVersion({collEpoch, collTimestamp}, {1, 0}));
+        chunk1.setShard(_shardId);
+        chunk1.setRange({BSON("a" << 1), BSON("a" << 5)});
+        chunk1.setOnCurrentShardSince(Timestamp(100, 0));
+        chunk1.setHistory({ChunkHistory(Timestamp(100, 0), _shardId)});
+
+        ChunkType chunk2;
+        chunk2.setName(OID::gen());
+        chunk2.setCollectionUUID(collUuid);
+        chunk2.setVersion(ChunkVersion({collEpoch, collTimestamp}, {1, 1}));
+        chunk2.setShard(_shardId);
+        chunk2.setRange({BSON("a" << 5), BSON("a" << 10)});
+        chunk2.setOnCurrentShardSince(Timestamp(200, 0));
+        chunk2.setHistory({ChunkHistory(Timestamp(200, 0), _shardId)});
+
+        setupCollection(nss, _keyPattern, {chunk1, chunk2});
+    }
+};
+
+TEST_F(CommitMergeTest, CommitMergeReturnsMergedChunk) {
+    const auto collEpoch = OID::gen();
+    const Timestamp collTimestamp(42);
+    const auto collUuid = UUID::gen();
+    setupTwoContiguousChunks(_nss1, collUuid, collEpoch, collTimestamp);
+
+    const auto shardVersionPreMerge = ChunkVersion({collEpoch, collTimestamp}, {1, 1});
+    auto changedChunks = commitMerge(
+        _nss1, shardVersionPreMerge, ChunkRange(BSON("a" << 1), BSON("a" << 10)), _shardId);
+
+    ASSERT_EQ(1U, changedChunks.size());
+    ASSERT_BSONOBJ_EQ(BSON("a" << 1), changedChunks[0].getMin());
+    ASSERT_BSONOBJ_EQ(BSON("a" << 10), changedChunks[0].getMax());
+    ASSERT_EQ(_shardId, changedChunks[0].getShard());
+    ASSERT_EQ(std::partial_ordering::less, shardVersionPreMerge <=> changedChunks[0].getVersion());
+}
+
+TEST_F(CommitMergeTest, IdempotentRetryReturnsSameChangedChunks) {
+    const auto collEpoch = OID::gen();
+    const Timestamp collTimestamp(42);
+    const auto collUuid = UUID::gen();
+    setupTwoContiguousChunks(_nss1, collUuid, collEpoch, collTimestamp);
+
+    const auto shardVersionPreMerge = ChunkVersion({collEpoch, collTimestamp}, {1, 1});
+    const ChunkRange range(BSON("a" << 1), BSON("a" << 10));
+
+    auto firstResult = commitMerge(_nss1, shardVersionPreMerge, range, _shardId);
+    const auto versionAfterFirst = getShardVersion(collUuid, collEpoch, collTimestamp, _shardId);
+
+    // Retry with the same arguments; the merge is already committed.
+    auto secondResult = commitMerge(_nss1, shardVersionPreMerge, range, _shardId);
+
+    assertSameChangedChunks(firstResult, secondResult);
+
+    // The retry must not bump any version.
+    ASSERT_EQ(versionAfterFirst, getShardVersion(collUuid, collEpoch, collTimestamp, _shardId));
+}
+
+// An idempotent retry of an already-applied commit must return OK even when chunk operations have
+// since been disallowed on the collection. The allowChunkOperations check runs only on the
+// non-retry path.
+TEST_F(CommitMergeTest, IdempotentRetrySucceedsWhenChunkOperationsDisallowed) {
+    const auto collEpoch = OID::gen();
+    const Timestamp collTimestamp(42);
+    const auto collUuid = UUID::gen();
+    setupTwoContiguousChunks(_nss1, collUuid, collEpoch, collTimestamp);
+
+    const auto shardVersionPreMerge = ChunkVersion({collEpoch, collTimestamp}, {1, 1});
+    const ChunkRange range(BSON("a" << 1), BSON("a" << 10));
+
+    auto firstResult = commitMerge(_nss1, shardVersionPreMerge, range, _shardId);
+
+    disallowChunkOperations(_nss1);
+
+    auto secondResult = commitMerge(_nss1, shardVersionPreMerge, range, _shardId);
+
+    assertSameChangedChunks(firstResult, secondResult);
+}
+
+// The commit returns a chunk that participants store alongside chunks they load from the global
+// catalog, so both must expose the same set of fields. This compares the field set (format), not
+// the values, of the merged chunk against the durable chunk for the same range.
+TEST_F(CommitMergeTest, ChangedChunksHaveSameFormatAsDurableChunks) {
+    const auto collEpoch = OID::gen();
+    const Timestamp collTimestamp(42);
+    const auto collUuid = UUID::gen();
+    setupTwoContiguousChunks(_nss1, collUuid, collEpoch, collTimestamp);
+
+    const auto shardVersionPreMerge = ChunkVersion({collEpoch, collTimestamp}, {1, 1});
+    auto changedChunks = commitMerge(
+        _nss1, shardVersionPreMerge, ChunkRange(BSON("a" << 1), BSON("a" << 10)), _shardId);
+    ASSERT_EQ(1U, changedChunks.size());
+
+    auto fromCatalog = uassertStatusOK(getChunkDoc(
+        operationContext(), collUuid, changedChunks[0].getMin(), collEpoch, collTimestamp));
+    ASSERT_EQ(sortedFieldNames(changedChunks[0].toConfigBSON()),
+              sortedFieldNames(fromCatalog.toConfigBSON()));
 }
 
 }  // namespace

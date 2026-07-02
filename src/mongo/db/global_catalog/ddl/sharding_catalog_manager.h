@@ -302,6 +302,23 @@ public:
         const std::string& shardName);
 
     /**
+     * Commits a chunk split to the global catalog (config server).
+     *
+     * Returns the chunk documents changed by the commit (the new sub-chunks). Participants use this
+     * list to update their shard catalog.
+     *
+     * 'shardVersionPreSplit' is the requesting shard's shard version captured before the split. It
+     * provides the collection generation (epoch/timestamp) used to validate the commit and, on
+     * idempotent retries, bounds the read that reconstructs the list of changed chunks.
+     */
+    StatusWith<std::vector<ChunkType>> commitSplit(OperationContext* opCtx,
+                                                   const NamespaceString& nss,
+                                                   const ChunkVersion& shardVersionPreSplit,
+                                                   const ChunkRange& range,
+                                                   const std::vector<BSONObj>& splitPoints,
+                                                   const std::string& shardName);
+
+    /**
      * Updates metadata in the config.chunks collection so the chunks within the specified key range
      * are seen merged into a single larger chunk.
      *
@@ -318,6 +335,22 @@ public:
         const UUID& requestCollectionUUID,
         const ChunkRange& chunkRange,
         const ShardId& shardId);
+
+    /**
+     * Commits a chunk merge to the global catalog (config server).
+     *
+     * Returns the chunk documents changed by the commit (the single merged chunk). Participants use
+     * this list to update their shard catalog.
+     *
+     * 'shardVersionPreMerge' is the requesting shard's shard version captured before the merge. It
+     * provides the collection generation (epoch/timestamp) used to validate the commit and, on
+     * idempotent retries, the collection generation used to reconstruct the changed chunk.
+     */
+    StatusWith<std::vector<ChunkType>> commitMerge(OperationContext* opCtx,
+                                                   const NamespaceString& nss,
+                                                   const ChunkVersion& shardVersionPreMerge,
+                                                   const ChunkRange& chunkRange,
+                                                   const ShardId& shardId);
 
     /**
      * Updates metadata in the config.chunks collection so that all mergeable chunks belonging to
@@ -937,6 +970,48 @@ private:
         const CollectionType& coll,
         const ShardId& shard,
         const ChunkVersion& shardVersionPreOp);
+
+    /**
+     * Shared core of a chunk-split commit. Acquires the chunk-operation lock, validates the request
+     * against the durable catalog, and either detects that the split was already committed
+     * (idempotent retry) or splits the chunk into the requested sub-chunks and commits them durably
+     * in a single transaction.
+     *
+     * On a fresh commit the new sub-chunks are returned as the changed chunks. On an idempotent
+     * retry, when 'shardVersionPreSplitForRebuild' is set the changed chunks are rebuilt from the
+     * durable catalog (see _rebuildChangedChunksOnShard); when unset only the placement versions
+     * are returned. See ChunkOpCommitOutcome.
+     */
+    StatusWith<ChunkOpCommitOutcome> _commitChunkSplitImpl(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const OID& requestEpoch,
+        const boost::optional<Timestamp>& requestTimestamp,
+        const ChunkRange& range,
+        const std::vector<BSONObj>& splitPoints,
+        const std::string& shardName,
+        const boost::optional<ChunkVersion>& shardVersionPreSplitForRebuild);
+
+    /**
+     * Shared core of a chunk-merge commit. Acquires the chunk-operation lock, validates the request
+     * against the durable catalog, and either detects that the merge was already committed
+     * (idempotent retry) or merges the chunks within the range into a single chunk and commits it
+     * durably in a single transaction.
+     *
+     * On a fresh commit the merged chunk is returned as the changed chunks (when requested). On an
+     * idempotent retry, when 'shardVersionPreMergeForRebuild' is set the merged chunk is returned
+     * as the changed chunks; when unset only the placement versions are returned. See
+     * ChunkOpCommitOutcome.
+     */
+    StatusWith<ChunkOpCommitOutcome> _commitChunksMergeImpl(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const boost::optional<OID>& epoch,
+        const boost::optional<Timestamp>& timestamp,
+        const boost::optional<UUID>& requestCollectionUUID,
+        const ChunkRange& chunkRange,
+        const ShardId& shardId,
+        const boost::optional<ChunkVersion>& shardVersionPreMergeForRebuild);
 
     /**
      * Reconstructs the list of chunks changed by an already-committed migration. Combines the
