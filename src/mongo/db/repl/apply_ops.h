@@ -43,7 +43,9 @@
 #include <vector>
 
 namespace MONGO_MOD_PUB mongo {
+class AuthorizationSession;
 class BSONObjBuilder;
+class NamespaceString;
 class OperationContext;
 
 namespace repl {
@@ -72,5 +74,28 @@ Status applyOps(OperationContext* opCtx,
 Status applyApplyOpsOplogEntry(OperationContext* opCtx,
                                const OplogEntry& entry,
                                repl::OplogApplication::Mode oplogApplicationMode);
+
+namespace detail {
+/**
+ * Returns whether 'authSession' is authorized for the access that the UUID-targeted DDL command
+ * 'cmdType' (drop, dropIndexes, collMod, renameCollection) performs against the collection 'nss' it
+ * targets. Returns true if 'authSession' is null or 'cmdType' is not a UUID-targeted DDL command.
+ *
+ * Exposed for unit testing; not intended for use outside apply_ops.cpp.
+ */
+bool isAuthorizedForUUIDTargetedCommand(AuthorizationSession* authSession,
+                                        OplogEntry::CommandType cmdType,
+                                        const NamespaceString& nss);
+
+/**
+ * For a UUID-targeted DDL command op ('entry') applied through the applyOps command, throws
+ * ErrorCodes::Unauthorized unless the client on 'opCtx' is authorized for the command's action on
+ * the collection the op's UUID resolves to. Does nothing if the op carries no UUID, is not a
+ * UUID-targeted DDL command, or its UUID does not resolve to a namespace.
+ *
+ * Exposed for unit testing; not intended for use outside apply_ops.cpp.
+ */
+void checkAuthForUUIDTargetedCommand(OperationContext* opCtx, const OplogEntry& entry);
+}  // namespace detail
 }  // namespace repl
 }  // namespace MONGO_MOD_PUB mongo
