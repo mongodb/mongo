@@ -957,6 +957,24 @@ certs:
         DNS: localhost
         IP: 127.0.0.1
 
+  # Expired counterpart of trusted-server.pem with an identical subject. Used to verify
+  # that a subject= certificate selector skips an expired certificate when another
+  # certificate with the same subject is valid (SERVER-129942).
+  - name: "trusted-server-expired.pem"
+    description: Expired server certificate sharing trusted-server.pem's subject.
+    Subject: {CN: "Trusted Kernel Test Server"}
+    Issuer: "trusted-ca.pem"
+    not_before: -10000000
+    not_after: -1000000
+    pkcs12:
+      passphrase: "qwerty"
+      name: "trusted-server-expired.pfx"
+    extensions:
+      extendedKeyUsage: [serverAuth]
+      subjectAltName:
+        DNS: localhost
+        IP: 127.0.0.1
+
   # trusted-cluster-server.pfx created by mkspecial.sh
   - name: "trusted-cluster-server.pem"
     description: Server cluster certificate for trusted chain.

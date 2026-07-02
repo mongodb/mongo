@@ -498,6 +498,8 @@ using namespace std::literals::string_view_literals;
 
 StatusWith<std::vector<std::string>> getSubjectAlternativeNames(PCCERT_CONTEXT cert);
 
+unsigned long long FiletimeToULL(FILETIME ft);
+
 SSLManagerWindows::SSLManagerWindows(const SSLParams& params,
                                      const boost::optional<TransientSSLParams>& transientSSLParams,
                                      bool isServer)
@@ -1297,13 +1299,68 @@ StatusWith<UniqueCertificate> loadCertificateSelectorFromStore(
     if (!selector.subject.empty()) {
         std::wstring wstr = toNativeString(selector.subject.c_str());
 
-        PCCERT_CONTEXT cert = CertFindCertificateInStore(storeHolder,
-                                                         X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
-                                                         0,
-                                                         CERT_FIND_SUBJECT_STR,
-                                                         wstr.c_str(),
-                                                         NULL);
-        if (!cert) {
+        FILETIME currentTime;
+        GetSystemTimeAsFileTime(&currentTime);
+        unsigned long long currentTimeLong = FiletimeToULL(currentTime);
+
+        // Iterate all certs matching the subject string. The subject is not unique, so the
+        // store may contain both an expired cert and a valid renewal with the same subject.
+        // CertFindCertificateInStore transfers ownership of pPrevCertContext on each call.
+        PCCERT_CONTEXT previous = nullptr;
+        bool anyFound = false;
+
+        while (true) {
+            PCCERT_CONTEXT cert =
+                CertFindCertificateInStore(storeHolder,
+                                           X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
+                                           0,
+                                           CERT_FIND_SUBJECT_STR,
+                                           wstr.c_str(),
+                                           previous);
+            // CertFindCertificateInStore frees previous (if non-null).
+            if (!cert) {
+                break;
+            }
+
+            anyFound = true;
+            previous = cert;
+
+            // Skip expired or not-yet-valid certificates.
+            if ((FiletimeToULL(cert->pCertInfo->NotBefore) > currentTimeLong) ||
+                (currentTimeLong > FiletimeToULL(cert->pCertInfo->NotAfter))) {
+                continue;
+            }
+
+            // Skip certificates that have no accessible private key.
+            DWORD dwKeySpec;
+            BOOL freeProvider;
+            HCRYPTPROV hCryptProv;
+            if (!CryptAcquireCertificatePrivateKey(cert,
+                                                   CRYPT_ACQUIRE_ALLOW_NCRYPT_KEY_FLAG,
+                                                   NULL,
+                                                   &hCryptProv,
+                                                   &dwKeySpec,
+                                                   &freeProvider)) {
+                continue;
+            }
+
+            // CRYPT_ACQUIRE_ALLOW_NCRYPT_KEY_FLAG means hCryptProv may be either a legacy CAPI
+            // HCRYPTPROV or a CNG NCRYPT_KEY_HANDLE, distinguished by dwKeySpec. Free it with the
+            // matching API; calling CryptReleaseContext on a CNG key handle is incorrect.
+            if (freeProvider) {
+                if (dwKeySpec == CERT_NCRYPT_KEY_SPEC) {
+                    UniqueNcryptKey prov(static_cast<NCRYPT_KEY_HANDLE>(hCryptProv));
+                } else {
+                    UniqueCryptProvider prov(hCryptProv);
+                }
+            }
+
+            // cert is currently valid and has an accessible private key. Return it.
+            // previous is a raw pointer alias to cert; it goes out of scope harmlessly.
+            return UniqueCertificate(cert);
+        }
+
+        if (!anyFound) {
             auto ec = lastSystemError();
             return Status(
                 ErrorCodes::InvalidSSLConfiguration,
@@ -1313,7 +1370,12 @@ StatusWith<UniqueCertificate> loadCertificateSelectorFromStore(
                     << "': " << errorMessage(ec));
         }
 
-        return UniqueCertificate(cert);
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      str::stream()
+                          << "Could not find a valid certificate with subject name '"
+                          << selector.subject.c_str() << "' in 'My' store in '" << storeName
+                          << "': all matching certificates were expired, not yet valid, or lacked "
+                             "an accessible private key");
     } else {
         CRYPT_HASH_BLOB hashBlob = {static_cast<DWORD>(selector.thumbprint.size()),
                                     selector.thumbprint.data()};
@@ -1388,8 +1450,15 @@ StatusWith<UniqueCertificate> loadAndValidateCertificateSelector(
         }
     }
 
+    // CRYPT_ACQUIRE_ALLOW_NCRYPT_KEY_FLAG means hCryptProv may be either a legacy CAPI
+    // HCRYPTPROV or a CNG NCRYPT_KEY_HANDLE, distinguished by dwKeySpec. Free it with the
+    // matching API; calling CryptReleaseContext on a CNG key handle is incorrect.
     if (freeProvider) {
-        UniqueCryptProvider prov(hCryptProv);
+        if (dwKeySpec == CERT_NCRYPT_KEY_SPEC) {
+            UniqueNcryptKey prov(static_cast<NCRYPT_KEY_HANDLE>(hCryptProv));
+        } else {
+            UniqueCryptProvider prov(hCryptProv);
+        }
     }
 
     return std::move(swCert.getValue());
