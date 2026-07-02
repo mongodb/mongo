@@ -98,6 +98,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/query/cluster_query_knobs_gen.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
+#include "mongo/s/query/exec/cluster_client_cursor_params.h"
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
 #include "mongo/s/query/exec/establish_cursors.h"
 #include "mongo/s/query/shard_targeting_helpers.h"
@@ -1373,11 +1374,7 @@ AsyncResultsMergerParams buildArmParams(boost::intrusive_ptr<ExpressionContext> 
     armParams.setSort(std::move(shardCursorsSortSpec));
     armParams.setTailableMode(expCtx->getTailableMode());
     armParams.setNss(expCtx->getNamespaceString());
-    armParams.setRequestQueryStatsFromRemotes(remoteMetricsToInclude.getQueryStats());
-    if (hasAnyMetricsRequested(remoteMetricsToInclude)) {
-        // Set 'remoteMetricsToInclude' conditionally only when at least one of the flags is set.
-        armParams.setRequestRemoteMetrics(remoteMetricsToInclude);
-    }
+    setRequestRemoteMetrics(remoteMetricsToInclude, armParams, expCtx->getOperationContext());
 
     if (auto lsid = expCtx->getOperationContext()->getLogicalSessionId()) {
         OperationSessionInfoFromClient sessionInfo(*lsid,

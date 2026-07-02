@@ -51,6 +51,7 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic.h"
+#include "mongo/s/query/exec/cluster_client_cursor_params.h"
 #include "mongo/s/query/exec/next_high_watermark_determining_strategy.h"
 #include "mongo/s/query/exec/results_merger_test_fixture.h"
 #include "mongo/s/query/exec/shard_tag.h"
@@ -3636,7 +3637,9 @@ TEST_F(AsyncResultsMergerTest, IncludeMetricsQueryStatsIncludedInGetMoreWithFeat
             kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 5, {})));
 
         auto params = makeARMParamsFromExistingCursors(std::move(cursors), findCmd);
-        params.setRequestQueryStatsFromRemotes(requestParams);
+        IncludeMetrics im;
+        im.setQueryStats(requestParams);
+        setRequestRemoteMetrics(im, params, operationContext());
 
         auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
 

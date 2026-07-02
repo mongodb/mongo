@@ -307,7 +307,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     //
     // extractARMParams() moves 'remotes' out of params. The remaining fields in params are still
     // needed by ClusterClientCursorImpl for auth, session, and metrics bookkeeping.
-    auto armParams = params.extractARMParams();
+    auto armParams = params.extractARMParams(opCtx);
     auto mergeStage = std::make_unique<RouterStageMerge>(opCtx, executor, std::move(armParams));
     auto transformStage = std::make_unique<RouterStageTransform>(
         opCtx, std::move(mergeStage), std::move(documentTransform));

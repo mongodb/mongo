@@ -35,6 +35,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
@@ -51,6 +52,17 @@
 #include <boost/optional.hpp>
 
 namespace mongo {
+
+/**
+ * Sets 'armParams.requestRemoteMetrics' from 'remoteMetricsToInclude', but only if at least one
+ * metric has actually been requested. Falls back to the deprecated
+ * 'armParams.requestQueryStatsFromRemotes' bool when 'featureFlagIncludeMetricsObjectOption' is
+ * not yet enabled, to preserve wire compatibility with shards that do not recognize
+ * 'requestRemoteMetrics'.
+ */
+void setRequestRemoteMetrics(const IncludeMetrics& remoteMetricsToInclude,
+                             AsyncResultsMergerParams& armParams,
+                             OperationContext* opCtx);
 
 /**
  * The resulting ClusterClientCursor will take ownership of the existing remote cursor, generating
@@ -71,7 +83,7 @@ struct MONGO_MOD_PUBLIC ClusterClientCursorParams {
      * Extracts the subset of fields here needed by the AsyncResultsMerger. The returned
      * AsyncResultsMergerParams will assume ownership of 'remotes'.
      */
-    AsyncResultsMergerParams extractARMParams();
+    AsyncResultsMergerParams extractARMParams(OperationContext* opCtx);
 
     // Namespace against which the cursors exist.
     NamespaceString nsString;

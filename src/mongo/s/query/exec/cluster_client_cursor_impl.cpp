@@ -370,7 +370,7 @@ std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
     const auto limit = params->limit;
 
     std::unique_ptr<RouterExecStage> root =
-        std::make_unique<RouterStageMerge>(opCtx, executor, params->extractARMParams());
+        std::make_unique<RouterStageMerge>(opCtx, executor, params->extractARMParams(opCtx));
 
     if (skip) {
         root = std::make_unique<RouterStageSkip>(opCtx, std::move(root), *skip);

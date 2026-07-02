@@ -29,7 +29,32 @@
 
 #include "mongo/s/query/exec/cluster_client_cursor_params.h"
 
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/version_context.h"
+
 namespace mongo {
+
+void setRequestRemoteMetrics(const IncludeMetrics& remoteMetricsToInclude,
+                             AsyncResultsMergerParams& armParams,
+                             OperationContext* opCtx) {
+    if (!hasAnyMetricsRequested(remoteMetricsToInclude)) {
+        return;
+    }
+    // Use the new 'requestRemoteMetrics' field only when the feature flag is enabled, to avoid
+    // sending an unrecognized field to shards that predate SERVER-127991. Fall back to the
+    // deprecated 'requestQueryStatsFromRemotes' bool otherwise.
+    // TODO (SERVER-126099): Remove the 'requestQueryStatsFromRemotes' field and always use
+    // 'requestRemoteMetrics' once the feature flag is removed.
+    if (feature_flags::gFeatureFlagIncludeMetricsObjectOption
+            .isEnabledUseLastLTSFCVWhenUninitialized(
+                opCtx ? VersionContext::getDecoration(opCtx) : VersionContext{},
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        armParams.setRequestRemoteMetrics(remoteMetricsToInclude);
+    } else {
+        armParams.setRequestQueryStatsFromRemotes(remoteMetricsToInclude.getQueryStats());
+    }
+}
 
 ClusterClientCursorParams::ClusterClientCursorParams(
     NamespaceString nss,
@@ -43,7 +68,7 @@ ClusterClientCursorParams::ClusterClientCursorParams(
       readConcern(std::move(readConcern)),
       osi(std::move(osi)) {}
 
-AsyncResultsMergerParams ClusterClientCursorParams::extractARMParams() {
+AsyncResultsMergerParams ClusterClientCursorParams::extractARMParams(OperationContext* opCtx) {
     AsyncResultsMergerParams armParams;
     if (!sortToApplyOnRouter.isEmpty()) {
         armParams.setSort(sortToApplyOnRouter);
@@ -55,11 +80,7 @@ AsyncResultsMergerParams ClusterClientCursorParams::extractARMParams() {
     armParams.setNss(nsString);
     armParams.setAllowPartialResults(isAllowPartialResults);
     armParams.setOperationSessionInfo(osi);
-    armParams.setRequestQueryStatsFromRemotes(remoteMetricsToInclude.getQueryStats());
-    if (hasAnyMetricsRequested(remoteMetricsToInclude)) {
-        // Set 'remoteMetricsToInclude' conditionally only when at least one of the flags is set.
-        armParams.setRequestRemoteMetrics(remoteMetricsToInclude);
-    }
+    setRequestRemoteMetrics(remoteMetricsToInclude, armParams, opCtx);
 
     return armParams;
 }
