@@ -1452,7 +1452,7 @@ class _AddRemoveShardThread(threading.Thread):
                     # placementVersion == Timestamp(0, 0) means that this shard owns no chunk for the
                     # collection.
 
-                    # TODO (SERVER-90810): Re-enable this check for resharding temporary collections.
+                    # TODO (SERVER-130196): Re-enable this check for resharding temporary collections.
                     if "system.resharding" in nss or "system.buckets.resharding" in nss:
                         continue
 
