@@ -472,9 +472,11 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
 
             // If the metadata was reset, or the collection was dropped and recreated since the
             // metadata manager was created, return an error.
-            if (self->_metadataType != MetadataType::kTracked ||
-                !self->_metadataManager->getCollectionUuid().has_value() ||
-                collectionUuid != self->_metadataManager->getCollectionUuid().get()) {
+            const bool metadataIsOk = self->_metadataType == MetadataType::kUnowned ||
+                (self->_metadataType == MetadataType::kTracked &&
+                 self->_metadataManager->getCollectionUuid().has_value() &&
+                 collectionUuid == self->_metadataManager->getCollectionUuid().get());
+            if (!metadataIsOk) {
                 return SemiFuture<void>::makeReady(
                            Status(ErrorCodes::ConflictingOperationInProgress,
                                   "Collection being migrated was dropped and created or otherwise "
@@ -482,8 +484,8 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
                     .share();
             }
 
-            return rangeDeleterService->getOverlappingRangeDeletionsFuture(
-                self->_metadataManager->getCollectionUuid().get(), orphanRange);
+            return rangeDeleterService->getOverlappingRangeDeletionsFuture(collectionUuid,
+                                                                           orphanRange);
         }();
 
         if (orphanCleanupFuture.isReady()) {

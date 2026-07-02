@@ -40,33 +40,26 @@ const expectedMigrationCommitFailureCodes = usesMoveRangeCoordinatorPath
     ? [ErrorCodes.StaleEpoch, ErrorCodes.OperationFailed]
     : [ErrorCodes.StaleEpoch];
 
-if (usesMoveRangeCoordinatorPath && st.isConfigShardMode) {
-    // TODO SERVER-130176: Investigate why these failpoints are not triggering.
-    jsTest.log(
-        "Skipping legacy moveChunk step failpoints with config shard and MoveRangeCoordinator",
-    );
-} else {
-    runMoveChunkMakeDonorStepDownAfterFailpoint(
-        st,
-        dbName,
-        "moveChunkHangAtStep3",
-        false /* shouldMakeMigrationFailToCommitOnConfig */,
-    );
+runMoveChunkMakeDonorStepDownAfterFailpoint(
+    st,
+    dbName,
+    "moveChunkHangAtStep3",
+    false /* shouldMakeMigrationFailToCommitOnConfig */,
+);
 
-    runMoveChunkMakeDonorStepDownAfterFailpoint(
-        st,
-        dbName,
-        "moveChunkHangAtStep4",
-        false /* shouldMakeMigrationFailToCommitOnConfig */,
-    );
+runMoveChunkMakeDonorStepDownAfterFailpoint(
+    st,
+    dbName,
+    "moveChunkHangAtStep4",
+    false /* shouldMakeMigrationFailToCommitOnConfig */,
+);
 
-    runMoveChunkMakeDonorStepDownAfterFailpoint(
-        st,
-        dbName,
-        "moveChunkHangAtStep5",
-        false /* shouldMakeMigrationFailToCommitOnConfig */,
-    );
-}
+runMoveChunkMakeDonorStepDownAfterFailpoint(
+    st,
+    dbName,
+    "moveChunkHangAtStep5",
+    false /* shouldMakeMigrationFailToCommitOnConfig */,
+);
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
     st,

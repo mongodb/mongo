@@ -1499,6 +1499,25 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
 }
 
 TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
+       WaitForCleanReturnsOKWhenCollectionIsUnowned) {
+    // When the CSR has no routing table but is marked kUnowned, waitForClean must still succeed
+    // (using the caller-provided UUID) rather than reporting a metadata reset.
+    OperationContext* opCtx = operationContext();
+    csr()->setCollectionMetadata(opCtx,
+                                 CollectionMetadata::UNTRACKED(),
+                                 CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
+
+    auto status = CollectionShardingRuntime::waitForClean(
+        opCtx,
+        kTestNss,
+        uuid(),
+        ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
+        Date_t::max());
+
+    ASSERT_OK(status);
+}
+
+TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
        WaitForCleanBlocksBehindOneScheduledDeletion) {
     // Enable fail point to suspendRangeDeletion.
     globalFailPointRegistry().find("suspendRangeDeletion")->setMode(FailPoint::alwaysOn);
