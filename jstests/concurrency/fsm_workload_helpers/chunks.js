@@ -116,11 +116,11 @@ export var ChunkHelper = (function () {
                 res.code === ErrorCodes.ConflictingOperationInProgress ||
                 res.code === ErrorCodes.ChunkRangeCleanupPending ||
                 res.code === ErrorCodes.LockTimeout ||
-                // The chunk migration has surely been aborted if the startCommit of the
-                // procedure was interrupted by a stepdown.
-                ((runningWithStepdowns || isSlowBuild()) &&
-                    res.code === ErrorCodes.CommandFailed &&
-                    res.errmsg.includes("startCommit")) ||
+                // The chunk migration has surely been aborted if startCommit failed. This can
+                // happen for a variety of reasons: the system is slow (e.g. TSAN), a stepdown
+                // interrupted the commit, or a session being cloned on the recipient was killed
+                // before it could enter the critical section.
+                (res.code === ErrorCodes.CommandFailed && res.errmsg.includes("startCommit")) ||
                 // The chunk migration has surely been aborted if the recipient shard didn't
                 // believe there was an active chunk migration.
                 (runningWithStepdowns &&
