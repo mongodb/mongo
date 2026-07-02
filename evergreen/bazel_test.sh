@@ -47,10 +47,25 @@ echo "${ALL_FLAGS}" >.bazel_build_flags
 # to capture exit codes
 set +o errexit
 
-# Fetch then test with retries.
+# Build then test with retries. `bazel build` fetches all external dependencies as a
+# prerequisite of compiling, so this retrying phase subsumes a separate `bazel fetch` and also
+# retries genuine build failures. `bazel test` builds and runs in one command, so without a
+# dedicated build phase a build failure would slip into the test phase below, which runs with
+# RETRY_ON_FAIL=0 (so test failures fail fast and are reported faithfully) and would not be
+# retried. The build outputs land in the same output_base, so `bazel test` reuses them from
+# cache and only executes the tests. Keep the flags identical (minus the cache-neutral BEP
+# file) so the test phase does not re-analyze and rebuild. The `test` command runs with
+# --build_tests_only (set under the test: config in .bazelrc), which limits the build to test
+# targets and their deps; pass it explicitly here so this `build` builds the same set rather
+# than every target in the ${targets} pattern (e.g. //src/...). Also force
+# --remote_download_outputs=minimal: this phase only needs to confirm the targets compile, so
+# on a remote build it should leave outputs in the CAS rather than download test binaries to
+# this host. Tests execute remotely, so the test phase consumes them straight from the CAS and
+# downloads only what its own policy requires. The default is "all" outside the remote_test
+# config, hence the explicit override; it is a no-op for local exec (no remote executor).
 export RETRY_ON_FAIL=1
 bazel_evergreen_shutils::retry_bazel_cmd 3 "$BAZEL_BINARY" \
-    fetch ${ALL_FLAGS} ${targets}
+    build --build_tests_only --remote_download_outputs=minimal ${ALL_FLAGS} ${targets}
 RET=$?
 
 if [[ "$RET" == "0" ]]; then
