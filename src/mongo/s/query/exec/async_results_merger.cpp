@@ -1416,8 +1416,28 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
                     return;
                 }
 
+                // The retry captured a copy of the original 'RemoteCommandRequest', which holds a
+                // raw OperationContext pointer. By the time this callback runs, the originating
+                // getMore may have returned and the ARM been detached from its OperationContext
+                // (which may since have been destroyed - e.g. the cursor was checked in between
+                // getMores). Never re-dispatch using the captured opCtx:
+                //  - If detached, leave the remote reschedulable and defer the retry to the next
+                //    '_scheduleGetMores()' after reattach. A failed (e.g. rate-limited) getMore did
+                //    not advance the shard cursor, so this neither loses nor duplicates results.
+                //  - If attached, retarget the request at the OperationContext we are attached to
+                //    now (which may differ from the one the request was originally built with).
+                if (!self->_opCtx) {
+                    remote->retryStrategy.recordBackoff(delay);
+                    remote->outstandingRequest = false;
+                    remote->cbHandle = executor::TaskExecutor::CallbackHandle();
+                    self->_signalCurrentEventIfReady(lk);
+                    return;
+                }
+                auto refreshedRequest = request;
+                refreshedRequest.opCtx = self->_opCtx;
+
                 remote->retryStrategy.recordBackoff(delay);
-                auto status = self->_sendRequestWithRetries(lk, request, remote);
+                auto status = self->_sendRequestWithRetries(lk, refreshedRequest, remote);
                 if (!status.isOK()) {
                     self->_signalCurrentEventIfReady(lk);
                 }
