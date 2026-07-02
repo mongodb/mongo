@@ -48,7 +48,7 @@ structs:
         # before the upgrade or downgrade can complete.
         strict: false
         fields:
-            id: shard_ref
+            id: shard_id
             # We intentionally have the mutable state nested in a subobject to make it easy to
             # overwrite with a single $set.
             mutableState: DonorShardContext
@@ -74,7 +74,7 @@ structs:
         # before the upgrade or downgrade can complete.
         strict: false
         fields:
-            id: shard_ref
+            id: shard_id
             # We intentionally have the mutable state nested in a subobject to make it easy to
             # overwrite with a single $set.
             mutableState: RecipientShardContext

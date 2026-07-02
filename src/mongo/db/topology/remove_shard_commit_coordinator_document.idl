@@ -58,10 +58,6 @@ structs:
             shardId:
                 type: shard_id
                 description: "The shard id to be removed."
-            shardUuid:
-                type: uuid
-                description: "The unique identifier of the shard to be removed."
-                optional: true
             replicaSetName:
                 type: string
                 description: "The replica set name of the shard to be removed."

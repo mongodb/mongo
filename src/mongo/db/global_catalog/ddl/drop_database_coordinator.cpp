@@ -470,11 +470,11 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                         if (feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabled(
                                 VersionContext::getDecoration(opCtx),
                                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                            auto dataBearingShardRef =
+                            auto dataBearingShardId =
                                 sharding_ddl_util::pickShardOwningCollectionChunks(opCtx,
                                                                                    coll.getUuid());
-                            if (dataBearingShardRef) {
-                                changeStreamsNotifier = *dataBearingShardRef;
+                            if (dataBearingShardId) {
+                                changeStreamsNotifier = *dataBearingShardId;
                             } else {
                                 LOGV2_WARNING(10488700,
                                               "Unable to retrieve the identity of a data bearing "
@@ -484,7 +484,9 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                                               "nss"_attr = nss);
                             }
                         }
-                        return changeStreamsNotifier;
+
+                        // TODO SERVER-128569: Remove getShardId() call
+                        return changeStreamsNotifier.getShardId();
                     }());
                     _updateStateDocument(opCtx, std::move(newStateDoc));
 

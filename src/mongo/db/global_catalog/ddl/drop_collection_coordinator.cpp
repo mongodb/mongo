@@ -315,14 +315,14 @@ void DropCollectionCoordinator::_commitDropCollection(
     // shard (prior to the DDL commit) as the notifier and this information may no longer be
     // available in the routing table in case of stepdown and retry of this coordinator.
     const auto changeStreamsNotifierShardId = [&]() {
-        auto primaryShardRef = ShardingState::get(opCtx)->asShardRef(opCtx);
+        auto primaryShardId = ShardingState::get(opCtx)->shardId();
 
         // TODO SERVER-73741 remove the feature flag once 9.0 becomes last LTS.
         if (!feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabled(
                 VersionContext::getDecoration(opCtx),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
             !collIsTracked) {
-            return primaryShardRef;
+            return primaryShardId;
         }
 
         if (_doc.getChangeStreamsNotifier()) {
@@ -336,7 +336,7 @@ void DropCollectionCoordinator::_commitDropCollection(
                           "Unable to retrieve the identity of a data bearing shard for the "
                           "collection being dropped (possibly due to a metadata inconsistency)",
                           "nss"_attr = nss());
-            dataBearingShard = primaryShardRef;
+            dataBearingShard = primaryShardId;
         }
 
         auto newDoc = _doc;

@@ -1237,8 +1237,8 @@ ShardIdentificationTypeEnum getGrantedShardIdentificationType(
     return ShardIdentificationTypeEnum::kUuid;
 }
 
-boost::optional<ShardRef> pickShardOwningCollectionChunks(OperationContext* opCtx,
-                                                          const UUID& collUuid) {
+boost::optional<ShardId> pickShardOwningCollectionChunks(OperationContext* opCtx,
+                                                         const UUID& collUuid) {
     const Timestamp dummyTimestamp;
     const OID dummyEpoch;
     auto chunks = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getChunks(
@@ -1250,7 +1250,7 @@ boost::optional<ShardRef> pickShardOwningCollectionChunks(OperationContext* opCt
         dummyEpoch,
         dummyTimestamp,
         repl::ReadConcernLevelEnum::kMajorityReadConcern));
-    return chunks.empty() ? boost::none : boost::optional<ShardRef>(chunks[0].getShard());
+    return chunks.empty() ? boost::none : boost::optional<ShardId>(chunks[0].getShard());
 }
 
 std::vector<ShardRef> getListOfShardsOwningChunksForCollection(OperationContext* opCtx,

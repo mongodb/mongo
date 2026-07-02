@@ -670,10 +670,10 @@ private:
     BSONObj _buildValidationStats() const;
 
     /**
-     * Returns the identity of the shard in charge of generating the pre-post commit control
+     * Returns the identity of the shard ID in charge of generating the pre-post commit control
      * events for change stream readers.
      */
-    const ShardRef& _getChangeStreamNotifierShardRef() const;
+    const ShardId& _getChangeStreamNotifierShardId() const;
 
     /**
      * If the resharding operation has been aborted, override the given status with the abort

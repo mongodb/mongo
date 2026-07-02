@@ -63,9 +63,8 @@ structs:
                 description: "Current coordinator phase."
                 default: kUnset
             # TODO (SERVER-82812): Chain MovePrimaryRequestBase and use its `to` field instead.
-            # TODO (SERVER-129239): Details in ticket description
             toShardId:
-                type: shard_ref
+                type: shard_id
                 description: "Destination shard of the database."
             collectionsToClone:
                 type: array<namespacestring>

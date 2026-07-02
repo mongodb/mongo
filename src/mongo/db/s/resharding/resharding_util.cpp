@@ -256,7 +256,7 @@ Timestamp getHighestMinFetchTimestamp(const std::vector<DonorShardEntry>& donorS
         auto donorFetchTimestamp = donor.getMutableState().getMinFetchTimestamp();
         uassert(4957300,
                 fmt::format("All donors must have a minFetchTimestamp, but donor {} does not.",
-                            std::string_view{donor.getId().toString()}),
+                            std::string_view{donor.getId()}),
                 donorFetchTimestamp.has_value());
         if (maxMinFetchTimestamp < donorFetchTimestamp.value()) {
             maxMinFetchTimestamp = donorFetchTimestamp.value();
