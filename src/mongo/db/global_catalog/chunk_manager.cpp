@@ -243,6 +243,66 @@ ChunkMap::ChunkMapIterator ChunkMap::find(const BSONObj& shardKey) const {
     return ChunkMapIterator(_chunkVectorMap, it, chunkIt);
 }
 
+ChunkMap::ChunkMapIterator ChunkMap::findClosestInDirection(const BSONObj& shardKey,
+                                                            Direction direction) const {
+    if (_chunkVectorMap.empty()) {
+        return end();
+    }
+
+    const auto shardKeyString = ShardKeyPattern::toKeyString(shardKey);
+    auto it = _chunkVectorMap.upper_bound(shardKeyString);
+
+    if (it == _chunkVectorMap.end()) {
+        // upper_bound() will miss the last ChunkVector if 'shardKey' is actually the MaxKey,
+        // thus we need to check explicitly if 'shardKey' is contained in the last chunk.
+        auto lastVectorIt = std::prev(_chunkVectorMap.end());
+        if (ChunkVector::const_iterator lastChunk = std::prev(lastVectorIt->second->end());
+            (*lastChunk)->containsKey(shardKey) || direction == Direction::Backward) {
+            return ChunkMapIterator(_chunkVectorMap, lastVectorIt, lastChunk);
+        }
+        return end();
+    }
+
+    const auto& chunkVector = *(it->second);
+    const auto chunkIt = std::upper_bound(
+        chunkVector.begin(),
+        chunkVector.end(),
+        shardKeyString,
+        [](const std::string& key, const auto& chunk) { return key < chunk->getMaxKeyString(); });
+
+    // Key falls in a gap, chunkIt is the first chunk past it.
+    if (_allowGaps && chunkIt != chunkVector.end() &&
+        MONGO_unlikely((*chunkIt)->getMinKeyString() > shardKeyString)) {
+        if (direction == Direction::Forward) {
+            return ChunkMapIterator(_chunkVectorMap, it, chunkIt);
+        }
+        if (chunkIt != chunkVector.begin()) {
+            return ChunkMapIterator(_chunkVectorMap, it, std::prev(chunkIt));
+        }
+        // Gap precedes this vector's first chunk is nearest chunk in backward direction is in the
+        // previous map entry.
+        if (it != _chunkVectorMap.begin()) {
+            --it;
+            return ChunkMapIterator(_chunkVectorMap, it, std::prev(it->second->cend()));
+        }
+        return end();
+    }
+
+    // No chunk in this vector has maxKey > shardKeyString.
+    if (chunkIt == chunkVector.end()) {
+        if (it != _chunkVectorMap.begin() && direction == Direction::Backward) {
+            it--;
+            return ChunkMapIterator(_chunkVectorMap, it, std::prev(it->second->cend()));
+        }
+        if (it != std::prev(_chunkVectorMap.end()) && direction == Direction::Forward) {
+            it++;
+            return ChunkMapIterator(_chunkVectorMap, it, it->second->cbegin());
+        }
+        return end();
+    }
+    return ChunkMapIterator(_chunkVectorMap, it, chunkIt);
+}
+
 ChunkMap ChunkMap::createMerged(std::vector<std::shared_ptr<ChunkInfo>> changedChunks) const {
     auto updatedChunkMap = _makeUpdated(std::move(changedChunks));
     tassert(6752900,
@@ -664,6 +724,7 @@ bool ChunkMap::allElementsAreOfType(BSONType type, const BSONObj& obj) {
     return true;
 }
 
+
 ChunkVector::const_iterator ChunkMap::_findIntersectingChunkIterator(
     const std::string& shardKeyString,
     ChunkVector::const_iterator first,
@@ -796,37 +857,44 @@ ChunkManager::ChunkOwnership ChunkManager::nearestOwnedChunk(OperationContext*,
     }
 
     const auto& chunkMap = _rt->optRt->_chunkMap;
-    auto it = chunkMap.find(shardKey);
+    const auto rawIt = chunkMap.find(shardKey);
+    const bool keyIsInGap = rawIt == chunkMap.end() && chunkMap.allowGaps();
+    auto it = keyIsInGap ? chunkMap.findClosestInDirection(shardKey, direction) : rawIt;
     if (it == chunkMap.end()) {
-        // No chunk could be found for this shard key.
         return {false, boost::none};
     }
 
     boost::optional<Chunk> nearestOwnedChunk;
-    const bool isOwned = (*it)->getShardIdAt(_clusterTime) == shardId;
+    const bool isOwned = !keyIsInGap && ((*it)->getShardIdAt(_clusterTime) == shardId);
     if (isOwned) {
         // The nearest owned chunk is the one that includes the 'shardKey'.
         nearestOwnedChunk.emplace(*(*it).get(), _clusterTime);
     } else {
         // Find the nearest owned chunk.
         auto end = chunkMap.end();
-        do {
-            switch (direction) {
-                case ChunkMap::Direction::Forward: {
-                    it++;
-                    break;
-                }
-                case ChunkMap::Direction::Backward: {
-                    it--;
-                    break;
-                }
-                default:
-                    MONGO_UNREACHABLE_TASSERT(9526306);
-            }
-        } while (it != end && it->getShardIdAt(_clusterTime) != shardId);
-
-        if (it != end) {
+        // For a gap key, findClosestInDirection already positioned 'it' at the first
+        // candidate chunk. If it is already owned, no further walk is needed.
+        if (keyIsInGap && (*it)->getShardIdAt(_clusterTime) == shardId) {
             nearestOwnedChunk.emplace(*(*it).get(), _clusterTime);
+        } else {
+            do {
+                switch (direction) {
+                    case ChunkMap::Direction::Forward: {
+                        it++;
+                        break;
+                    }
+                    case ChunkMap::Direction::Backward: {
+                        it--;
+                        break;
+                    }
+                    default:
+                        MONGO_UNREACHABLE_TASSERT(9526306);
+                }
+            } while (it != end && it->getShardIdAt(_clusterTime) != shardId);
+
+            if (it != end) {
+                nearestOwnedChunk.emplace(*(*it).get(), _clusterTime);
+            }
         }
     }
 

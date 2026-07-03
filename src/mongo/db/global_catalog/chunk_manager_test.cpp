@@ -249,5 +249,111 @@ TEST_F(CurrentChunkManagerUpdateTest, MakeUpdatedForwardsDeltaAndCarriesAttribut
     ASSERT_EQ(updated.allowMigrations(), cm.allowMigrations());
 }
 
+TEST_F(CurrentChunkManagerUpdateTest, NearestOwnedChunkOwnedKeyReturnsContainsShardKey) {
+    auto cm = makeCmAllowingGaps({makeChunk(key(10), key(20), chunkVersion(1, 0))});
+    auto result = cm.nearestOwnedChunk(nullptr, key(15), kThisShard, ChunkMap::Direction::Forward);
+    ASSERT_TRUE(result.containsShardKey);
+    ASSERT_TRUE(result.nearestOwnedChunk.has_value());
+}
+
+TEST_F(CurrentChunkManagerUpdateTest, NearestOwnedChunkForwardFromLeadingGap) {
+    auto cm = makeCmAllowingGaps({makeChunk(key(10), key(20), chunkVersion(1, 0))});
+    auto result = cm.nearestOwnedChunk(nullptr, key(5), kThisShard, ChunkMap::Direction::Forward);
+    ASSERT_FALSE(result.containsShardKey);
+    ASSERT_TRUE(result.nearestOwnedChunk.has_value());
+    ASSERT_BSONOBJ_EQ(result.nearestOwnedChunk->getMin(), key(10));
+}
+
+TEST_F(CurrentChunkManagerUpdateTest, NearestOwnedChunkBackwardEqualsLeftChunkBorder) {
+    auto cm = makeCmAllowingGaps({makeChunk(key(5), key(20), chunkVersion(1, 0))});
+    auto result = cm.nearestOwnedChunk(nullptr, key(5), kThisShard, ChunkMap::Direction::Backward);
+    ASSERT_TRUE(result.containsShardKey);
+    ASSERT_TRUE(result.nearestOwnedChunk.has_value());
+    ASSERT_BSONOBJ_EQ(result.nearestOwnedChunk->getMin(), key(5));
+}
+
+TEST_F(CurrentChunkManagerUpdateTest, NearestOwnedChunkBackwardFromLeadingGap) {
+    auto cm = makeCmAllowingGaps({makeChunk(key(10), key(20), chunkVersion(1, 0))});
+    auto result = cm.nearestOwnedChunk(nullptr, key(5), kThisShard, ChunkMap::Direction::Backward);
+    ASSERT_FALSE(result.containsShardKey);
+    ASSERT_FALSE(result.nearestOwnedChunk.has_value());
+}
+
+TEST_F(CurrentChunkManagerUpdateTest, NearestOwnedChunkForwardFromTrailingGap) {
+    auto cm = makeCmAllowingGaps({makeChunk(key(0), key(10), chunkVersion(1, 0))});
+    auto result = cm.nearestOwnedChunk(nullptr, key(15), kThisShard, ChunkMap::Direction::Forward);
+    ASSERT_FALSE(result.containsShardKey);
+    ASSERT_FALSE(result.nearestOwnedChunk.has_value());
+}
+
+TEST_F(CurrentChunkManagerUpdateTest, NearestOwnedChunkForwardFromGapBetweenChunks) {
+    const ShardId kOtherShard{"otherShard"};
+    auto cm = makeCmAllowingGaps({makeChunk(key(0), key(10), chunkVersion(1, 0), kOtherShard),
+                                  makeChunk(key(20), key(30), chunkVersion(1, 1))});
+    auto result = cm.nearestOwnedChunk(nullptr, key(15), kThisShard, ChunkMap::Direction::Forward);
+    ASSERT_FALSE(result.containsShardKey);
+    ASSERT_TRUE(result.nearestOwnedChunk.has_value());
+    ASSERT_BSONOBJ_EQ(result.nearestOwnedChunk->getMin(), key(20));
+}
+
+TEST_F(CurrentChunkManagerUpdateTest, NearestOwnedChunkBackwardFromGapBetweenChunks) {
+    const ShardId kOtherShard{"otherShard"};
+    auto cm = makeCmAllowingGaps({makeChunk(key(0), key(10), chunkVersion(1, 0)),
+                                  makeChunk(key(20), key(30), chunkVersion(1, 1), kOtherShard)});
+    auto result = cm.nearestOwnedChunk(nullptr, key(15), kThisShard, ChunkMap::Direction::Backward);
+    ASSERT_FALSE(result.containsShardKey);
+    ASSERT_TRUE(result.nearestOwnedChunk.has_value());
+    ASSERT_BSONOBJ_EQ(result.nearestOwnedChunk->getMax(), key(10));
+}
+
+class ChunkMapFindClosestTest : public unittest::Test {
+public:
+    ChunkVersion chunkVersion(uint32_t major, uint32_t minor) const {
+        return ChunkVersion{{_epoch, _collTimestamp}, {major, minor}};
+    }
+
+    BSONObj key(int value) const {
+        return BSON("a" << value);
+    }
+
+    ChunkType makeChunk(const BSONObj& min, const BSONObj& max, const ChunkVersion& version) const {
+        return ChunkType{_collUUID, ChunkRange{min, max}, version, kThisShard};
+    }
+
+    // Creates a gap-allowing ChunkMap with chunkVectorSize=2, so 4 chunks produce two map entries:
+    //   Entry A (key=10): [0,5), [5,10)
+    //   Entry B (key=35): [20,25), [30,35)   <- gap at 25-30 within Entry B
+    ChunkMap makeMapWithMidVectorGapInSecondEntry() const {
+        ChunkMap::ChunkVector chunkInfos;
+        for (const auto& c : {makeChunk(key(0), key(5), chunkVersion(1, 0)),
+                              makeChunk(key(5), key(10), chunkVersion(1, 1)),
+                              makeChunk(key(20), key(25), chunkVersion(1, 2)),
+                              makeChunk(key(30), key(35), chunkVersion(1, 3))}) {
+            chunkInfos.push_back(std::make_shared<ChunkInfo>(c));
+        }
+        return ChunkMap{_epoch, _collTimestamp, 2 /*chunkVectorSize*/, true /*allowGaps*/}
+            .createMerged(std::move(chunkInfos));
+    }
+
+private:
+    const OID _epoch{OID::gen()};
+    const Timestamp _collTimestamp{1, 1};
+    const UUID _collUUID{UUID::gen()};
+};
+
+TEST_F(ChunkMapFindClosestTest, BackwardFromMidVectorGapInNonFirstEntry) {
+    auto chunkMap = makeMapWithMidVectorGapInSecondEntry();
+    auto it = chunkMap.findClosestInDirection(key(27), ChunkMap::Direction::Backward);
+    ASSERT(it != chunkMap.end());
+    ASSERT_BSONOBJ_EQ((*it)->getRange().getMax(), key(25));
+}
+
+TEST_F(ChunkMapFindClosestTest, ForwardFromMidVectorGapInNonFirstEntry) {
+    auto chunkMap = makeMapWithMidVectorGapInSecondEntry();
+    auto it = chunkMap.findClosestInDirection(key(27), ChunkMap::Direction::Forward);
+    ASSERT(it != chunkMap.end());
+    ASSERT_BSONOBJ_EQ((*it)->getRange().getMin(), key(30));
+}
+
 }  // namespace
 }  // namespace mongo

@@ -305,6 +305,12 @@ public:
                     : boost::make_optional(_chunkVectorMap.cbegin()->second->cbegin())};
     }
     ChunkMapIterator find(const BSONObj& shardKey) const;
+    /**
+     * Returns the closest chunk to 'shardKey' in 'direction', without requiring 'shardKey' to be
+     * contained in the returned chunk. Intended for gap-allowing maps where 'shardKey' may fall
+     * between chunks. Returns end() if no chunk exists in the given direction from 'shardKey'.
+     */
+    ChunkMapIterator findClosestInDirection(const BSONObj& shardKey, Direction direction) const;
     ChunkMapIterator end() const {
         auto chunkVectorMapEnd = _chunkVectorMap.cend();
         return {_chunkVectorMap,
@@ -321,6 +327,10 @@ public:
     std::string toString() const;
 
     static bool allElementsAreOfType(BSONType type, const BSONObj& obj);
+
+    bool allowGaps() const {
+        return _allowGaps;
+    }
 
 private:
     ChunkVector::const_iterator _findIntersectingChunkIterator(const std::string& shardKeyString,

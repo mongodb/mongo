@@ -550,4 +550,24 @@ TEST_F(OrphanChunkSkipperTest, MakeSeekPointSingleShardKeyCompoundIndexReverseSc
     }
 }
 
+TEST_F(OrphanChunkSkipperTest, MakeSeekPointOrphanInLeadingGapWithOwnedChunkAhead) {
+    // Simulates the gap-map scenario: an orphan {x:5} on a shard whose partial routing table
+    // only contains [10, 20). nearestOwnedChunk (after the fix) returns
+    // {containsShardKey:false, nearestOwnedChunk:[10,20)}, so makeSeekPointIfOrphan must produce
+    // CanSkipOrphans with a seek point at the chunk minimum {a:10}.
+    auto shardKey = BSON("a" << 1);
+    auto nearestInfo = makeChunkInfo(BSON("a" << 10), BSON("a" << 20));
+    Chunk nearest(nearestInfo, boost::none);
+    MockNearestOwnedChunkFilter shardFilter(
+        shardKey, {.containsShardKey = false, .nearestOwnedChunk = nearest});
+
+    auto cs = getOrphanChunkSkipper(
+        shardFilter, shardKey, BSON("a" << 1) /* indexKeyPattern */, 1 /* scanDir */);
+    ASSERT_CHUNK_SKIPPER(cs, 1 /* expectedScanDirection */, "1"sv /* expectedBitSet */);
+    ASSERT_EXPECTED_SEEK_POINT_EXCLUSIVE(cs,
+                                         BSON("a" << 5) /* currentShardKeyValue */,
+                                         0 /* expectedPrefixLen */,
+                                         BSON("a" << 10) /* expectedKeySuffix */);
+}
+
 }  // namespace mongo
