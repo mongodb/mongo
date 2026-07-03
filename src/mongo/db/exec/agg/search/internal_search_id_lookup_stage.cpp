@@ -33,12 +33,13 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/curop_metrics.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
-#include "mongo/db/exec/agg/pipeline_builder.h"
+#include "mongo/db/exec/agg/search/internal_search_id_lookup_local_read_executor.h"
 #include "mongo/db/exec/single_doc_lookup/collection_acquirer.h"
 #include "mongo/db/exec/single_doc_lookup/express_single_document_lookup_executor.h"
 #include "mongo/db/exec/single_doc_lookup/local_lookup_eligibility.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
-#include "mongo/db/pipeline/pipeline_factory.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 
@@ -55,14 +56,17 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalSearchIdLookupToSta
 
     tassert(10807804, "expected 'DocumentSourceInternalSearchIdLookUp' type", documentSource);
 
+    auto lookupExecutor = exec::agg::buildIdLookupExecutor(documentSource->getExpCtx(),
+                                                           documentSource->_catalogResourceHandle,
+                                                           documentSource->_spec.getViewPipeline());
+
     return make_intrusive<exec::agg::InternalSearchIdLookUpStage>(
         documentSource->kStageName,
         documentSource->_spec,
         documentSource->getExpCtx(),
         documentSource->_catalogResourceHandle,
         documentSource->_searchIdLookupMetrics,
-        exec::agg::buildIdLookupExecutor(documentSource->getExpCtx(),
-                                         documentSource->_catalogResourceHandle));
+        std::move(lookupExecutor));
 }
 
 namespace exec::agg {
@@ -74,16 +78,27 @@ REGISTER_AGG_STAGE_MAPPING(internalSearchIdLookupStage,
 std::unique_ptr<SingleDocumentLookupExecutor> buildIdLookupExecutor(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const boost::intrusive_ptr<DSInternalSearchIdLookUpCatalogResourceHandle>&
-        catalogResourceHandle) {
-    // idLookup is always local (mongot returns _ids for documents on this shard), so use
-    // AlwaysLocalEligibility. Those _ids can include orphans, which Express drops by applying the
-    // acquisition's shard filter. Reuse the stage's upfront acquisition via
-    // PreAcquiredCollectionAcquirer rather than re-acquiring per document.
-    return std::make_unique<ExpressSingleDocumentLookupExecutor>(
-        std::make_unique<PreAcquiredCollectionAcquirer>(
-            catalogResourceHandle->getStasher(),
-            catalogResourceHandle->getCollectionForLookupExecutor()),
-        std::make_unique<AlwaysLocalEligibility>());
+        catalogResourceHandle,
+    boost::optional<std::vector<BSONObj>> viewPipeline) {
+    const auto& ifrContext = expCtx->getIfrContext();
+    const bool optimizedLookupEnabled = ifrContext &&
+        ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagSearchOptimizedIdLookup);
+
+    // Express fast path: flag on and no view. idLookup is always local, so Express uses
+    // AlwaysLocalEligibility, drops orphans via the acquisition's shard filter, and reuses the
+    // stage's upfront acquisition through PreAcquiredCollectionAcquirer.
+    if (optimizedLookupEnabled && !viewPipeline) {
+        return std::make_unique<ExpressSingleDocumentLookupExecutor>(
+            std::make_unique<PreAcquiredCollectionAcquirer>(
+                catalogResourceHandle->getStasher(),
+                catalogResourceHandle->getCollectionForLookupExecutor()),
+            std::make_unique<AlwaysLocalEligibility>());
+    }
+
+    // Local-read path: `$match`-on-_id (optionally + view pipeline) against the stashed
+    // acquisition.
+    return std::make_unique<InternalSearchIdLookUpLocalReadExecutor>(catalogResourceHandle,
+                                                                     std::move(viewPipeline));
 }
 
 InternalSearchIdLookUpStage::InternalSearchIdLookUpStage(
@@ -99,7 +114,12 @@ InternalSearchIdLookUpStage::InternalSearchIdLookUpStage(
       _spec(std::move(spec)),
       _catalogResourceHandle(catalogResourceHandle),
       _searchIdLookupMetrics(searchIdLookupMetrics),
-      _lookupExecutor(std::move(lookupExecutor)) {}
+      _lookupExecutor(std::move(lookupExecutor)) {
+    tassert(13006200, "expected a non-null id lookup executor", _lookupExecutor);
+    // Point the installed executor's per-lookup stats at this stage's SpecificStats so explain
+    // reports totalDocs/KeysExamined. Executors that don't surface stats no-op this.
+    _lookupExecutor->setPlanSummaryStatsSink(&_stats.planSummaryStats);
+}
 
 Document InternalSearchIdLookUpStage::getExplainOutput(
     const query_shape::SerializationOptions& opts) const {
@@ -176,51 +196,21 @@ GetNextResult InternalSearchIdLookUpStage::doGetNext() {
                     "Collection should exist when using $_internalSearchIdLookup",
                     pExpCtx->getUUID().has_value());
 
-            // Find the document by performing a local read.
-            pipeline_factory::MakePipelineOptions pipelineOpts;
-            pipelineOpts.attachCursorSource = false;
-            pipelineOpts.desugar = true;
-            auto pipeline = pipeline_factory::makePipeline(
-                {BSON("$match" << documentKey)}, pExpCtx, pipelineOpts);
-
-            if (_spec.getViewPipeline()) {
-                // When search query is being run on a view, we append the view pipeline to
-                // the end of the idLookup's subpipeline. This allows idLookup to retrieve
-                // the full/unmodified documents (from the _id values returned by mongot),
-                // apply the view's data transforms, and pass said transformed documents
-                // through the rest of the user pipeline.
-                pipeline->appendPipeline(pipeline_factory::makePipeline(
-                    _spec.getViewPipeline().get(), pExpCtx, pipelineOpts));
+            // Resolve the _id via the installed strategy. documentKey always carries an _id, so the
+            // result is found or not found, never kNotHandled; a miss is dropped like an empty
+            // read.
+            using HandledStatus = SingleDocumentLookupExecutor::LookupResult::HandledStatus;
+            auto lookupResult = _lookupExecutor->performLookup(pExpCtx,
+                                                               pExpCtx->getNamespaceString(),
+                                                               pExpCtx->getUUID(),
+                                                               documentKey,
+                                                               boost::none /* afterClusterTime */);
+            tassert(13006201,
+                    "$_internalSearchIdLookup executor did not handle an _id lookup",
+                    lookupResult.status != HandledStatus::kNotHandled);
+            if (lookupResult.status == HandledStatus::kDocumentFound) {
+                result = std::move(lookupResult.document);
             }
-
-            // Scope ScopedSetShardRole to ensure it's cleaned up before any future execution.
-            {
-                _catalogResourceHandle->acquire(pExpCtx->getOperationContext());
-                auto collection = _catalogResourceHandle->getCollection();
-                pipeline = pExpCtx->getMongoProcessInterface()
-                               ->attachCursorSourceToPipelineForLocalReadWithCatalog(
-                                   std::move(pipeline),
-                                   MultipleCollectionAccessor{collection},
-                                   _catalogResourceHandle);
-                _catalogResourceHandle->release();
-                // release() opened a non-ticketed interval; immediately close it to suppress it.
-                // Time between consecutive local id lookups includes mongot network I/O (not
-                // local server work) and must not be counted. The interval for subsequent
-                // in-memory stages is opened explicitly when the search source is exhausted.
-                auto opCtx = pExpCtx->getOperationContext();
-                closeAggNonTicketedIntervalIfOpen(getAggNonTicketedIntervalTracker(opCtx), opCtx);
-            }
-
-            auto execPipeline = buildPipeline(pipeline->freeze());
-            result = execPipeline->getNext();
-            if (auto next = execPipeline->getNext()) {
-                uasserted(ErrorCodes::TooManyMatchingDocuments,
-                          str::stream() << "found more than one document with document key "
-                                        << documentKey.toString() << ": [" << result->toString()
-                                        << ", " << next->toString() << "]");
-            }
-
-            execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
         }
     }
 

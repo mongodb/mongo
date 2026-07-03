@@ -567,6 +567,16 @@ feature_flags:
         fcv_gated: false
         incremental_rollout_phase: in_development
 
+    featureFlagSearchOptimizedIdLookup:
+        description:
+            "Feature flag to enable the Express fast path for $search / $vectorSearch
+            $_internalSearchIdLookup local _id point lookups, falling back to the existing
+            local-read aggregation path when Express declines."
+        cpp_varname: gFeatureFlagSearchOptimizedIdLookup
+        default: false
+        fcv_gated: false
+        incremental_rollout_phase: in_development
+
     featureFlagIncludeMetricsObjectOption:
         description: "Use includeMetrics.queryStats field instead of deprecated includeQueryStatsMetrics when forwarding to shards."
         cpp_varname: gFeatureFlagIncludeMetricsObjectOption

@@ -42,6 +42,10 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
+namespace mongo {
+struct PlanSummaryStats;
+}  // namespace mongo
+
 namespace mongo::exec::agg {
 
 /**
@@ -77,6 +81,13 @@ public:
         boost::optional<UUID> collectionUUID,
         const Document& documentKey,
         boost::optional<Timestamp> afterClusterTime) = 0;
+
+    /**
+     * Opt-in: when set, each lookup's PlanSummaryStats (docs/keysExamined, indexesUsed, ...) are
+     * accumulated into 'sink'. Strategies that surface execution stats override this; the default
+     * is a no-op for those that don't (e.g. change-stream updateLookup).
+     */
+    virtual void setPlanSummaryStatsSink(PlanSummaryStats* sink) {}
 
     /**
      * Lifecycle hooks invoked by the parent stage at batch boundaries. A strategy that caches
@@ -122,6 +133,11 @@ public:
         // Release any resources before running the fallback executor.
         _primary->releaseResources();
         return _fallback->performLookup(expCtx, nss, collectionUUID, documentKey, afterClusterTime);
+    }
+
+    void setPlanSummaryStatsSink(PlanSummaryStats* sink) override {
+        _primary->setPlanSummaryStatsSink(sink);
+        _fallback->setPlanSummaryStatsSink(sink);
     }
 
     void detachFromOperationContext() override {

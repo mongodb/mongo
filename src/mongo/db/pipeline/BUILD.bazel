@@ -1039,6 +1039,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "search_id_lookup_stage",
     srcs = [
+        "//src/mongo/db/exec/agg/search:internal_search_id_lookup_local_read_executor.cpp",
         "//src/mongo/db/exec/agg/search:internal_search_id_lookup_stage.cpp",
     ],
     deps = [

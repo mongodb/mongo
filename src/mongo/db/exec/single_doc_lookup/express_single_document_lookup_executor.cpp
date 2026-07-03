@@ -115,16 +115,25 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutor(
 }
 
 /**
- * Record index usage so $indexStats reflects the lookup..
+ * Publish this lookup's execution stats: record index usage so $indexStats reflects the lookup and,
+ * when 'statsSink' is set, accumulate the point-lookup stats into it (no-op otherwise) so the
+ * owning stage's explain and the operation-level PlanSummaryStats match the local-read path.
  */
-void recordIndexUsage(const CollectionAcquirer::Handle& coll, PlanExecutor& exec) {
-    PlanSummaryStats summary;
-    exec.getPlanExplainer().getSummaryStats(&summary);
+void recordIndexUsage(const CollectionAcquirer::Handle& coll,
+                      const PlanSummaryStats& summary,
+                      PlanSummaryStats* statsSink) {
     CollectionIndexUsageTrackerDecoration::recordCollectionIndexUsage(
         coll.getCollectionPtr().get(),
         summary.collectionScans,
         summary.collectionScansNonTailable,
         summary.indexesUsed);
+
+    if (statsSink) {
+        statsSink->nReturned += summary.nReturned;
+        statsSink->totalKeysExamined += summary.totalKeysExamined;
+        statsSink->totalDocsExamined += summary.totalDocsExamined;
+        statsSink->indexesUsed.insert(summary.indexesUsed.begin(), summary.indexesUsed.end());
+    }
 }
 }  // namespace
 
@@ -166,7 +175,10 @@ SingleDocumentLookupExecutor::LookupResult ExpressSingleDocumentLookupExecutor::
 
                 Document out;
                 const auto execState = exec->getNextDocument(out);
-                recordIndexUsage(coll, *exec);
+
+                PlanSummaryStats summary;
+                exec->getPlanExplainer().getSummaryStats(&summary);
+                recordIndexUsage(coll, summary, _planSummaryStatsSink);
 
                 switch (execState) {
                     case PlanExecutor::ExecState::ADVANCED:

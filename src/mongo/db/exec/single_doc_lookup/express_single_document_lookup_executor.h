@@ -32,6 +32,7 @@
 #include "mongo/db/exec/single_doc_lookup/collection_acquirer.h"
 #include "mongo/db/exec/single_doc_lookup/local_lookup_eligibility.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
+#include "mongo/db/query/plan_summary_stats.h"
 
 #include <memory>
 
@@ -78,9 +79,16 @@ public:
                                const Document& documentKey,
                                boost::optional<Timestamp> afterClusterTime) override;
 
+    void setPlanSummaryStatsSink(PlanSummaryStats* sink) override {
+        _planSummaryStatsSink = sink;
+    }
+
 private:
     std::unique_ptr<CollectionAcquirer> _collectionAcquirer;
     std::unique_ptr<LocalLookupEligibility> _localEligibility;
+
+    // Non-owning; owned by the caller. Stats are accumulated here when set.
+    PlanSummaryStats* _planSummaryStatsSink = nullptr;
 };
 
 }  // namespace mongo::exec::agg
