@@ -44,7 +44,6 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/client/config_shard_wrapper.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/sharding_environment/shard_handle.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/topology/vector_clock/vector_clock_metadata_hook.h"
@@ -642,8 +641,9 @@ std::unique_ptr<Shard> ShardRegistry::createConnection(const ConnectionString& c
 
 std::shared_ptr<Shard> ShardRegistry::createLocalConfigShard() const {
     invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
-    std::shared_ptr<Shard> configShard =
-        _shardFactory->createShard(ShardHandle::kConfigServerHandle, ConnectionString::forLocal());
+    // TODO (SERVER-127407): Use config server's uuid when creating the local config shard.
+    std::shared_ptr<Shard> configShard = _shardFactory->createShard(
+        ShardHandle(ShardId::kConfigServerId, boost::none), ConnectionString::forLocal());
     return std::make_shared<ConfigShardWrapper>(configShard);
 }
 
@@ -939,8 +939,9 @@ void ShardRegistry::_scheduleLookupIfRequired() {
 }
 
 void ShardRegistry::_initConfigShard(WithLock wl, const ConnectionString& configCS) {
+    // TODO (SERVER-127407): Use config server's uuid when creating the local config shard.
     _configShardData = ShardRegistryData::createWithConfigShardOnly(
-        _shardFactory->createShard(ShardHandle::kConfigServerHandle, configCS));
+        _shardFactory->createShard(ShardHandle(ShardId::kConfigServerId, boost::none), configCS));
     _latestConnStrings[configCS.getSetName()] = configCS;
 }
 

@@ -209,7 +209,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:storage_interface_impl",
         "//src/mongo/db/s:sharding_runtime_d",
         "//src/mongo/db/shard_role/shard_catalog:catalog_helpers",
-        "//src/mongo/db/sharding_environment:shard_handle",
         "//src/mongo/db/sharding_environment:sharding_mongos_test_fixture",
         "//src/mongo/util:signal_handlers",
     ],

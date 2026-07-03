@@ -56,7 +56,7 @@ private:
         if (!role || !role->has(ClusterRole::ConfigServer)) {
             return;
         }
-        if (feature_flags::gFeatureFlagUniqueShardIdentifiersDDL.isEnabledOnVersion(
+        if (feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabledOnVersion(
                 requestedVersion)) {
             return;
         }

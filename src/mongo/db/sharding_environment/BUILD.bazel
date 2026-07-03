@@ -60,20 +60,6 @@ idl_generator(
     src = "sharding_feature_flags.idl",
 )
 
-# TODO (SERVER-126212): Move the shard handle to server_base once it no longer depends on the
-# sharding feature flags.
-mongo_cc_library(
-    name = "shard_handle",
-    srcs = [
-        "shard_handle.cpp",
-    ],
-    deps = [
-        ":sharding_feature_flags",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",
-    ],
-)
-
 mongo_cc_library(
     name = "sharding_feature_flags",
     srcs = [

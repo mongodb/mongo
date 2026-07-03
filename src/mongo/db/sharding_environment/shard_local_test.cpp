@@ -45,7 +45,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/sharding_environment/shard_handle.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -76,7 +75,7 @@ protected:
         _opCtx = getGlobalServiceContext()->makeOperationContext(&cc());
         auto& shardSharedStateCache = ShardSharedStateCache::get(_opCtx.get());
         _shardLocal = std::make_unique<ShardLocal>(
-            ShardHandle::kConfigServerHandle,
+            ShardHandle(ShardId::kConfigServerId, UUID::gen()),
             shardSharedStateCache.getShardState(ShardId::kConfigServerId));
         const repl::ReplSettings replSettings = {};
         repl::ReplicationCoordinator::set(

@@ -48,9 +48,6 @@ namespace mongo {
  */
 class MONGO_MOD_PUBLIC ShardHandle {
 public:
-    // Hardcoded identifier for the config server.
-    static const ShardHandle kConfigServerHandle;
-
     ShardHandle() = default;
 
     ShardHandle(ShardId name, boost::optional<UUID> uuid)

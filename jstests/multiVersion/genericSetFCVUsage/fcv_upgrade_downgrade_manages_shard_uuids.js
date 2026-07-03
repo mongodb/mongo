@@ -1,20 +1,16 @@
 /**
  * Tests that setFeatureCompatibilityVersion correctly populates 'uuid' fields
- * across config.shards and shard identity documents, including the fixed config
- * server UUID defined in ShardHandle::kConfigServerHandle.
+ * across config.shards and shard identity documents.
  * TODO SERVER-126212 Remove this file once 9.0 becomes last LTS.
  *
  * @tags: [
- *   featureFlagUniqueShardIdentifiersDDL,
+ *   featureFlagUniqueShardIdentifiers,
  * ]
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 describe("[Dedicated CSRS] FCV upgrade/downgrade uuid fields", function () {
-    // Must match ShardHandle::kConfigServerHandle in shard_handle.cpp.
-    const kConfigServerUuid = UUID("636f6e66-6967-4000-8000-000000000000");
-
     let st;
 
     before(function () {
@@ -168,21 +164,6 @@ describe("[Dedicated CSRS] FCV upgrade/downgrade uuid fields", function () {
         }, {});
     }
 
-    function assertConfigServerHasFixedUuid() {
-        const configServer = st.configRS.getPrimary();
-        const identityDoc = configServer
-            .getDB("admin")
-            .system.version.findOne({_id: "shardIdentity"});
-        assert.neq(null, identityDoc, "shardIdentity document must exist on config server");
-        assertIsUUID(identityDoc.uuid);
-        assert.eq(
-            identityDoc.uuid,
-            kConfigServerUuid,
-            "config server shardIdentity uuid must match ShardHandle::kConfigServerHandle",
-        );
-        verifyShardMetadataOnShardingState(configServer, "config", kConfigServerUuid);
-    }
-
     // Checks that each shard's shardIdentity document contains a 'uuid' field that matches the corresponding config.shards doc.
     // The same value should be visible through the shardingState command on each shard.
     function assertShardIdentityDocsHaveConsistentUuids() {
@@ -206,7 +187,13 @@ describe("[Dedicated CSRS] FCV upgrade/downgrade uuid fields", function () {
             );
         }
 
-        assertConfigServerHasFixedUuid();
+        // The shardIdentity doc on the config server should also have a uuid field.
+        const configServer = st.configRS.getPrimary();
+        const configServerIdentityDoc = configServer
+            .getDB("admin")
+            .system.version.findOne({_id: "shardIdentity"});
+        assertIsUUID(configServerIdentityDoc.uuid);
+        verifyShardMetadataOnShardingState(configServer, "config", configServerIdentityDoc.uuid);
     }
 
     it("Should set consistent metadata in 'config.shards' on FCV upgrade", function () {
@@ -250,14 +237,12 @@ describe("[Dedicated CSRS] FCV upgrade/downgrade uuid fields", function () {
             st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
         );
         const generatedUUIDsOnFirstUpgrade = assertConfigShardsHaveUuids();
-        assertConfigServerHasFixedUuid();
 
         // Downgrade preserves the uuid fields (while dropping the related index).
         assert.commandWorked(
             st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
         );
         assertConfigShardsHaveUuids(generatedUUIDsOnFirstUpgrade);
-        assertConfigServerHasFixedUuid();
         checkIndexOnShardUuid(false /* expectedToBePresent */);
 
         // Verify the expected state upon a re-upgrade.

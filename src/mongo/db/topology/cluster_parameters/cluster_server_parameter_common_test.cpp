@@ -34,7 +34,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/ddl/create_gen.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
-#include "mongo/db/sharding_environment/shard_handle.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_local.h"
 #include "mongo/db/sharding_environment/shard_retry_server_parameters_gen.h"
 #include "mongo/db/sharding_environment/shard_shared_state_cache.h"
@@ -59,7 +59,7 @@ public:
         serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
         auto& shardSharedStateCache = ShardSharedStateCache::get(getServiceContext());
         _shardLocal = std::make_unique<ShardLocal>(
-            ShardHandle::kConfigServerHandle,
+            ShardHandle(ShardId::kConfigServerId, UUID::gen()),
             shardSharedStateCache.getShardState(ShardId::kConfigServerId));
     }
 
