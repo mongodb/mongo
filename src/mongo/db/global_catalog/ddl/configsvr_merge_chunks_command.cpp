@@ -71,6 +71,8 @@ namespace {
  *   writeConcern: <BSONObj>
  * }
  */
+
+// TODO (SERVER-127253) Remove this command once v9.0 branches out
 class ConfigSvrMergeChunksCommand : public TypedCommand<ConfigSvrMergeChunksCommand> {
 public:
     using Request = ConfigSvrMergeChunks;

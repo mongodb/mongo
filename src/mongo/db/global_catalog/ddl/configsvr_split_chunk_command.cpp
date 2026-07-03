@@ -86,6 +86,7 @@ using std::string;
 
 constexpr std::string_view kCollectionVersionField = "collectionVersion"sv;
 
+// TODO (SERVER-127253) Remove this command once v9.0 branches out
 class ConfigSvrSplitChunkCommand : public BasicCommand {
 public:
     ConfigSvrSplitChunkCommand() : BasicCommand("_configsvrCommitChunkSplit") {}

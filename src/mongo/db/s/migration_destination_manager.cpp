@@ -1940,8 +1940,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                 // down, the critical section is kept taken while the donor commits the migration.
                 // The donor decides whether the metadata must be cleared: the legacy path clears
                 // it, the authoritative path installs the post-migration metadata directly.
-                // TODO (SERVER-128466): Remove the clearShardCatalogCache flag once
-                // migrations are authoritative.
+                // TODO (SERVER-98118): Remove the clearShardCatalogCache flag once v9.0 becomes
+                // last-LTS.
                 ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
                     opCtx,
                     _nss,
@@ -2012,8 +2012,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
         // where the critical section had (potentially) already been granted previously.
         // The behavior persisted in the recovery document is honored so that the value chosen by
         // the donor before failover is preserved.
-        // TODO (SERVER-128466): Remove the clearShardCatalogCache flag once migrations are
-        // authoritative.
+        // TODO (SERVER-98118): Remove the clearShardCatalogCache flag once v9.0 becomes last-LTS.
         ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
             opCtx,
             _nss,

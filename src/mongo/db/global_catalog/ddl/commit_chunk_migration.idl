@@ -63,6 +63,7 @@ structs:
                 description: "A list with the changed chunks by the migration commit, in config BSON form."
 
 commands:
+    # TODO (SERVER-127253) Remove this command once v9.0 branches out
     _configsvrCommitChunkMigration:
         command_name: _configsvrCommitChunkMigration
         cpp_name: CommitChunkMigrationRequest
@@ -89,8 +90,6 @@ commands:
                 type: ChunkVersion
                 description: "{ shardVersionField: <version> }"
 
-            # TODO (SERVER-127213, SERVER-129536): Remove the authoritative parameter once
-            # MoveRangeCoordinator starts using the new configsvr command
             authoritative:
                 type: bool
                 description: >-

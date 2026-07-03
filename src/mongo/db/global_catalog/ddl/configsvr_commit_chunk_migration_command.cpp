@@ -104,7 +104,7 @@ ChunkType toChunkType(const MigratedChunkType& migratedChunk) {
     return chunk;
 }
 
-// TODO (SERVER-127253): Remove this command
+// TODO (SERVER-127253): Remove this command once v9.0 branches out
 class ConfigSvrCommitChunkMigrationCommand
     : public TypedCommand<ConfigSvrCommitChunkMigrationCommand> {
 public:
@@ -191,9 +191,6 @@ public:
                 // returns. Run the commit under an ACR so the session id stays held; the dummy
                 // write below bumps the session's txnNumber so a stale request cannot replay onto a
                 // newer state.
-                //
-                // TODO (SERVER-127213, SERVER-129536): Remove this branch once MoveRangeCoordinator
-                // starts using the new configsvr command
                 {
                     auto newClient = opCtx->getServiceContext()->getService()->makeClient(
                         "CommitChunkMigration");

@@ -125,6 +125,7 @@ structs:
                 description: "The list of the chunks changed by the merge commit, in config BSON format."
 
 commands:
+    # TODO (SERVER-127253) Remove this command once v9.0 branches out)
     _configsvrCommitChunksMerge:
         command_name: _configsvrCommitChunksMerge
         cpp_name: ConfigSvrMergeChunks
