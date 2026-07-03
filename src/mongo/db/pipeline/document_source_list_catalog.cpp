@@ -135,9 +135,9 @@ DocumentSourceContainer DocumentSourceListCatalog::createFromBson(
                 $and: [
                     {db: {$nin: ["config", "local"]}},
                     {$or: [
-                        {name: {$not: /^system\./}},
+                        {name: {$not: /^system\\./}},
                         {name: "system.js"},
-                        {name: /^system\.buckets\./}
+                        {name: /^system\\.buckets\\./}
                     ]}
                 ]
             })");

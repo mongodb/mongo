@@ -52,6 +52,12 @@ function runFilterTest(conn) {
         }),
     );
 
+    // A collection whose name starts with "system" but is not a "system." namespace.
+    assert.commandWorked(conn.getDB("testdb").createCollection("system_foo"));
+
+    // A user collection resembling the system.buckets.* carve-out but not a "system." namespace.
+    assert.commandWorked(conn.getDB("testdb").createCollection("system_buckets_foo"));
+
     // Always create a timeseries collection. Under FCV < 9.0 (legacy timeseries) it produces
     // system.buckets.* catalog which is tested below.
     // TODO(SERVER-129907): remove the FCV downgrade block in the outer scope once 9.0 becomes
@@ -99,6 +105,17 @@ function runFilterTest(conn) {
     // testdb.system.js must be visible (explicit carve-out, db-agnostic).
     const hasSystemJs = readerEntries.some((e) => e.db === "testdb" && e.name === "system.js");
     assert(hasSystemJs, "reader should see testdb.system.js", {readerEntries});
+
+    // A "system"-prefixed but non-"system." collection is a user collection and must be visible.
+    const hasUserSystemFoo = readerEntries.some(
+        (e) => e.db === "testdb" && e.name === "system_foo",
+    );
+    assert(hasUserSystemFoo, "reader should see testdb.system_foo", {readerEntries});
+
+    const hasUserSystemBuckets = readerEntries.some(
+        (e) => e.db === "testdb" && e.name === "system_buckets_foo",
+    );
+    assert(hasUserSystemBuckets, "reader should see testdb.system_buckets_foo", {readerEntries});
 
     // If system.buckets.* entries exist in the catalog (legacy timeseries, FCV < 9.0), they must
     // be visible to the reader via the explicit carve-out.
