@@ -69,8 +69,8 @@ struct MONGO_MOD_NEEDS_REPLACEMENT RenameCollectionOptions {
     boost::optional<UUID> expectedSourceUUID;
     boost::optional<UUID> expectedTargetUUID;
     boost::optional<UUID> newTargetCollectionUuid;
-    boost::optional<std::vector<BSONObj>> originalIndexes;
-    boost::optional<BSONObj> originalCollectionOptions;
+    boost::optional<std::vector<BSONObj>> expectedIndexes;
+    boost::optional<BSONObj> expectedCollectionOptions;
 };
 
 MONGO_MOD_NEEDS_REPLACEMENT void doLocalRenameIfOptionsAndIndexesHaveNotChanged(

@@ -3124,6 +3124,7 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
     // Save the pre-state idents so we can capture the specific ident related to index
     // creation.
     std::vector<std::string> origIdents = mdbCatalog->getAllIdents(_opCtx);
+    shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
 
     // Rename collection.
     BSONObj renameResult;
