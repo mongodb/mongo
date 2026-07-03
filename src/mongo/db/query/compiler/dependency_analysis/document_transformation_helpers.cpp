@@ -106,9 +106,10 @@ void describeProjectedPath(DocumentOperationVisitor& visitor,
  * If the Expression type is not supported, isOK() returns false, and the DocumentOperationVisitor
  * is not called.
  */
-class SpecializedExpressionOperationVisitor : public SelectiveConstExpressionVisitorBase {
+class SpecializedExpressionOperationVisitor
+    : public SelectiveConstExpressionVisitorBase<SpecializedExpressionOperationVisitor> {
 public:
-    using SelectiveConstExpressionVisitorBase::visit;
+    using SelectiveConstExpressionVisitorBase<SpecializedExpressionOperationVisitor>::visit;
 
     explicit SpecializedExpressionOperationVisitor(DocumentOperationVisitor& visitor,
                                                    std::string_view path,

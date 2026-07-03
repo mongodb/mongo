@@ -1362,18 +1362,17 @@ TEST_F(DocumentSourceLookUpTest,
     ASSERT(subPipeline);
 
     // Note that the second $match stage should be moved up to before the $group stage, since $group
-    // should swap with $match when filtering on $_id. Follow up: currently blocked because all
-    // $expr predicates disable the swap; a follow-up will re-enable it for constant comparisons.
-    auto expectedPipe = fromjson(
-        str::stream() << "[{$mock: {}},"
-                         " {$match: {x:{$eq: 1}}},"
-                         " {$sort: {sortKey: {x: 1}}},"
-                      << sequentialCacheStageObj()
-                      << ",{$facet: {facetPipe: ["
-                         "   {$internalFacetTeeConsumer: {}},"
-                         "   {$group: {_id: '$_id', $willBeMerged: false}},"
-                         "   {$match: {$and: [{_id: {$_internalExprEq: 5}},"
-                         "                    {$expr: {$eq: ['$_id', {$const: 5}]}}]}}]}}]");
+    // should swap with $match when filtering on $_id.
+    auto expectedPipe =
+        fromjson(str::stream() << "[{$mock: {}},"
+                                  " {$match: {x:{$eq: 1}}},"
+                                  " {$sort: {sortKey: {x: 1}}},"
+                               << sequentialCacheStageObj()
+                               << ",{$facet: {facetPipe: ["
+                                  "   {$internalFacetTeeConsumer: {}},"
+                                  "   {$match: {$and: [{_id: {$_internalExprEq: 5}},"
+                                  "                    {$expr: {$eq: ['$_id', {$const: 5}]}}]}},"
+                                  "   {$group: {_id: '$_id', $willBeMerged: false}}]}}]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
 }

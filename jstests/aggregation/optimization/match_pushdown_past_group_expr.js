@@ -174,3 +174,46 @@ describe("complex expressions", function () {
         expected: [{_id: 1, n: 2}],
     });
 });
+
+it("$expr against a $lookup let variable is evaluated per document", () => {
+    // Regression test for bug which resulted in the let variable in the shared pipeline used
+    // by $lookup being optimized away and affecting the caching logic.
+    const local = db[jsTestName() + "_local"];
+    const foreign = db[jsTestName() + "_foreign"];
+    local.drop();
+    foreign.drop();
+
+    assert.commandWorked(foreign.insertMany([{_id: 0}, {_id: 1}]));
+    assert.commandWorked(local.insertMany([{_id: 0}, {_id: 1}]));
+
+    const groupOnForeign = {$group: {_id: "$_id"}};
+    const matchOnLetVar = {$match: {$expr: {$eq: ["$_id", {$add: ["$$sel", 0]}]}}};
+
+    function lookup(subPipeline) {
+        return {
+            $lookup: {
+                from: foreign.getName(),
+                let: {sel: "$_id"},
+                pipeline: subPipeline,
+                as: "matched",
+            },
+        };
+    }
+
+    const optimized = local.aggregate([lookup([groupOnForeign, matchOnLetVar])]).toArray();
+    const unoptimized = local
+        .aggregate([lookup([groupOnForeign, {$_internalInhibitOptimization: {}}, matchOnLetVar])])
+        .toArray();
+    assertArrayEq({
+        actual: optimized,
+        expected: unoptimized,
+        extraErrorMsg: `\noptimized=${tojson(optimized)}, unoptimized=${tojson(unoptimized)}`,
+    });
+    assertArrayEq({
+        actual: unoptimized,
+        expected: [
+            {_id: 0, matched: [{_id: 0}]},
+            {_id: 1, matched: [{_id: 1}]},
+        ],
+    });
+});
