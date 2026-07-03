@@ -76,6 +76,18 @@ public:
         }
     }
 
+    void visit(const ExpressionAnd* expr) override {
+        visitLogicOperands(expr->getOperandList());
+    }
+
+    void visit(const ExpressionOr* expr) override {
+        visitLogicOperands(expr->getOperandList());
+    }
+
+    void visit(const ExpressionNot* expr) override {
+        visitLogicOperands(expr->getOperandList());
+    }
+
     template <typename T>
     void visitDefault(const T* expr) {
         // Everything else is disallowed by default.
@@ -146,6 +158,15 @@ private:
             }
         }
         return true;
+    }
+
+    void visitLogicOperands(const Expression::ExpressionVector& operands) {
+        for (auto&& op : operands) {
+            if (!isValid) {
+                return;
+            }
+            op->acceptVisitor(this);
+        }
     }
 };
 
