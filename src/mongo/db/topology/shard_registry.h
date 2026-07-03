@@ -145,25 +145,6 @@ public:
     std::vector<ShardId> getAllShardIds() const;
 
     /**
-     * Returns a vector of all known shards as ShardRefs.
-     * The order of the elements is not guaranteed.
-     *
-     * Each shard is rendered as its UUID when the registry holds one for that shard, falling back
-     * to its ShardId string otherwise.
-     *
-     * CAVEAT: do NOT use this method for doing set operations between ShardRefs. There's generally
-     * no guarantee that two sets if ShardRefs will use a consistent variant for each individual
-     * shard. Use getAllShardHandles() instead.
-     */
-    std::vector<ShardRef> getAllShardRefs() const;
-
-    /**
-     * Returns a vector of all known shards as ShardHandles.
-     * The order of the elements is not guaranteed.
-     */
-    std::vector<ShardHandle> getAllShardHandles() const;
-
-    /**
      * Returns a vector of all known shard objects.
      * The order of the elements is not guaranteed.
      */
@@ -350,29 +331,15 @@ public:
 
     /**
      * Returns a vector containing all known shards as ShardRefs.
-     * The order of the elements is not guaranteed.
+     * The order of the elements is not guaranteed. Do not add any usage of this method; Contact the
+     * Catalog And Routing team when in doubt.
      *
-     * CAVEAT: Each shard is rendered as its UUID when the registry holds one for that shard,
-     * falling back to its ShardId string otherwise.
-     *
-     * CAVEAT: do not use the result set for comparing it with another set of ShardRef's. There's
-     *         generally no guarantee that both sets will use a consistent variant for each
-     *         individual shard.
+     * TODO SERVER-127411: temporary convenience until ShardRegistry data exposes ShardRefs
+     * directly. Always returns string-variant refs, so the results must NOT be compared against
+     * feature-flag-aware refs (e.g. ShardHandle::toShardRef(opCtx)), which may hold the UUID
+     * variant.
      */
-    std::vector<ShardRef> getAllShardRefs(OperationContext* opCtx);
-
-    /**
-     * Returns a vector of all known shards as ShardHandles.
-     * The order of the elements is not guaranteed.
-     */
-    std::vector<ShardHandle> getAllShardHandles(OperationContext* opCtx);
-
-    /**
-     * Same as getAllShardRefs(), but additionally ensures the config server is present exactly
-     * once: if the config server is itself a shard (embedded config server), it is already
-     * included.
-     */
-    std::vector<ShardRef> getAllShardRefsIncludingConfigServer(OperationContext* opCtx);
+    std::vector<ShardRef> getAllShardRefs_UNSAFE(OperationContext* opCtx);
 
     /**
      * Returns the number of shards.

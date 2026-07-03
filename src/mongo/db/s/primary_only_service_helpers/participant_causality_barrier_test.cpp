@@ -94,7 +94,7 @@ TEST_F(ParticipantCausalityBarrierTest, NoopWriteRequestIncludesProvidedOSI) {
         "NoopWriteRequestIncludesProvidedOSI");
 
     ParticipantCausalityBarrier barrier{
-        std::vector<ShardRef>{kShardId}, _executor, operationContext()->getCancellationToken()};
+        {kShardId}, _executor, operationContext()->getCancellationToken()};
     barrier.perform(operationContext(), osi);
 
     expectation.get();

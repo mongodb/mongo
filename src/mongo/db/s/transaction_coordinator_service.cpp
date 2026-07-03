@@ -177,7 +177,7 @@ boost::optional<SharedSemiFuture<txn::CommitDecision>>
 TransactionCoordinatorService::coordinateCommit(OperationContext* opCtx,
                                                 LogicalSessionId lsid,
                                                 TxnNumberAndRetryCounter txnNumberAndRetryCounter,
-                                                const std::set<ShardRef>& participantList) {
+                                                const std::set<ShardId>& participantList) {
     auto cas = getCatalogAndScheduler(opCtx);
     auto& catalog = cas->catalog;
 
@@ -187,7 +187,7 @@ TransactionCoordinatorService::coordinateCommit(OperationContext* opCtx,
     }
 
     coordinator->runCommit(opCtx,
-                           std::vector<ShardRef>{participantList.begin(), participantList.end()});
+                           std::vector<ShardId>{participantList.begin(), participantList.end()});
 
     return coordinateCommitReturnImmediatelyAfterPersistingDecision.load()
         ? coordinator->getDecision()

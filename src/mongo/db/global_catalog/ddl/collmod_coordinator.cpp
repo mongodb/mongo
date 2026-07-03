@@ -236,7 +236,6 @@ void CollModCoordinator::_saveShardingInfoOnCoordinatorIfNecessary(OperationCont
         // Coordinator is guaranteed to be running on primary shard
         info.primaryShard = ShardingState::get(opCtx)->shardId();
 
-        // TODO SERVER-129331: convert shardIdsSet to shardRefs.
         std::set<ShardId> shardIdsSet;
         chunkManager.getAllShardIds(&shardIdsSet);
         std::vector<ShardId> participantsNotOwningChunks;
@@ -251,9 +250,8 @@ void CollModCoordinator::_saveShardingInfoOnCoordinatorIfNecessary(OperationCont
             }
         }
 
-        auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardRefs(opCtx);
+        auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
         for (const auto& shard : allShards) {
-            // TODO SERVER-129331: make the below variant-correct.
             if (std::find(shardIdsVec.begin(), shardIdsVec.end(), shard) == shardIdsVec.end() &&
                 shard != info.primaryShard) {
                 participantsNotOwningChunks.push_back(shard);

@@ -50,10 +50,16 @@ void joinDDLCoordinators(OperationContext* opCtx) {
     ShardsvrJoinDDLCoordinators joinDDLsRequest;
     joinDDLsRequest.setDbName(DatabaseName::kAdmin);
 
-    // A dedicated config server can also coordinate DDL operations;
-    // getAllShardRefsIncludingConfigServer ensures it is included exactly once.
-    const auto allReplicaSets =
-        Grid::get(opCtx)->shardRegistry()->getAllShardRefsIncludingConfigServer(opCtx);
+    const auto allReplicaSets = [&] {
+        auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+        // A dedicated config server can also coordinate DDL operations; include it if not already
+        // present.
+        if (auto configShardId = Grid::get(opCtx)->shardRegistry()->getConfigShard()->getId();
+            std::find(shardIds.begin(), shardIds.end(), configShardId) == shardIds.end()) {
+            shardIds.emplace_back(std::move(configShardId));
+        }
+        return shardIds;
+    }();
 
     const auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     sharding_util::sendCommandToShards(
@@ -103,7 +109,7 @@ void broadcastPlacementHistoryChangedNotification(
     const OperationSessionInfo& osi,
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) {
-    auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardRefs(opCtx);
+    auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
 
     ShardsvrNotifyShardingEventRequest request(
         notify_sharding_event::kPlacementHistoryMetadataChanged,

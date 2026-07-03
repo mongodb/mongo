@@ -500,8 +500,7 @@ TransactionCoordinator::~TransactionCoordinator() {
     invariant(!_scheduler);
 }
 
-void TransactionCoordinator::runCommit(OperationContext* opCtx,
-                                       std::vector<ShardRef> participants) {
+void TransactionCoordinator::runCommit(OperationContext* opCtx, std::vector<ShardId> participants) {
     if (!_reserveKickOffCommitPromise())
         return;
     invariant(opCtx != nullptr);

@@ -554,34 +554,19 @@ void broadcastDropCollection(OperationContext* opCtx,
                              bool isAuthoritative) {
     const auto primaryShardRef = ShardingState::get(opCtx)->asShardRef(opCtx);
 
-    // Obtain the set of all shards' handles, and remove the primary shard and the data shard (if
-    // specified) from the list of participants. Using a set of shard handles ensures correct,
-    // variant-aware participant removal.
-    auto participantHandles = Grid::get(opCtx)->shardRegistry()->getAllShardHandles(opCtx);
+    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
     // Remove primary shard from participants
-    std::erase(participantHandles, primaryShardRef);
+    std::erase(participants, primaryShardRef);
     if (excludedDataShard) {
         // Remove data shard from participants. If the collection existed prior to this operation,
-        // we do not want to drop the user's collection. Note the removal of data shard is safe
-        // across concurrent upgrade/downgrade because: across upgrade, the excludedDataShard may
-        // have snapshotted the original ShardId variant, and the participantHandles will contain
-        // the ShardId variant at a minimum; across downgrade, where the excludedDataShard may have
-        // snapshotted the UUID variant, the downgrade guarantees preserving the UUID, and
-        // participantHandles will be able to identify the excludedDataShard.
-        std::erase(participantHandles, *excludedDataShard);
+        // we do not want to drop the user's collection.
+        std::erase(participants, *excludedDataShard);
     }
-
-    std::vector<ShardRef> participantRefs;
-    participantRefs.reserve(participantHandles.size());
-    std::transform(participantHandles.begin(),
-                   participantHandles.end(),
-                   std::back_inserter(participantRefs),
-                   [&](const ShardHandle& h) { return h.toShardRef(opCtx); });
 
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
         opCtx,
         nss,
-        participantRefs,
+        participants,
         executor,
         token,
         osi,
@@ -1690,33 +1675,25 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
 
             // If a shard has been removed, remove it from the list of involved shards.
             if (_doc.getShardIds() && status == ErrorCodes::ShardNotFound) {
-                auto involvedShardRefs = *_doc.getShardIds();
-                auto allShardHandles = Grid::get(opCtx)->shardRegistry()->getAllShardHandles(opCtx);
+                auto involvedShardIds = *_doc.getShardIds();
+                auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
-                // Note the involvedShardRefs cleanup and error handling below are safe across
-                // concurrent upgrade/downgrade because: across upgrade, the involvedShardRefs and
-                // getDataShard() may have snapshotted the original ShardId variant, and the
-                // allShardHandles will contain the ShardId variant at a minimum; across downgrade,
-                // where the involvedShardRefs/getDataShard() may have snapshotted the UUID variant,
-                // the downgrade guarantees preserving the UUID, and allShardHandles will be able to
-                // identify the involvedShardRefs/getDataShard().
-                std::erase_if(involvedShardRefs, [&](auto&& shard) {
-                    return std::find(allShardHandles.begin(), allShardHandles.end(), shard) ==
-                        allShardHandles.end();
+                std::erase_if(involvedShardIds, [&](auto&& shard) {
+                    return std::find(allShardIds.begin(), allShardIds.end(), shard) ==
+                        allShardIds.end();
                 });
 
                 // If the shard being removed is the requested data shard, throw an error.
                 // TODO (SERVER-83880): If the data shard was selected by the coordinator rather
                 // than the user, choose a new data shard rather than throwing.
                 if (_request.getDataShard() &&
-                    std::find(allShardHandles.begin(),
-                              allShardHandles.end(),
-                              *_doc.getDataShard()) == allShardHandles.end()) {
+                    std::find(allShardIds.begin(), allShardIds.end(), *_doc.getDataShard()) ==
+                        allShardIds.end()) {
                     triggerCleanup(opCtx, status);
                     MONGO_UNREACHABLE_TASSERT(10083520);
                 }
 
-                _doc.setShardIds(std::move(involvedShardRefs));
+                _doc.setShardIds(std::move(involvedShardIds));
                 _updateStateDocument(opCtx, CreateCollectionCoordinatorDocument(_doc));
             }
 
@@ -1758,8 +1735,6 @@ void CreateCollectionCoordinator::_checkPreconditions(OperationContext* opCtx) {
     // which is sent to a random shard, could otherwise execute on a config server that is no longer
     // a data-bearing shard.
     if (ShardingState::get(opCtx)->pollClusterRole()->has(ClusterRole::ConfigServer)) {
-        // TODO SERVER-129691: convert allShardIds to allShardHandles and perform a
-        // ShardingState::asShardRef find.
         const auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
         bool amIAConfigShard = std::find(allShardIds.begin(),
                                          allShardIds.end(),
@@ -1770,9 +1745,6 @@ void CreateCollectionCoordinator::_checkPreconditions(OperationContext* opCtx) {
     }
 
     if (_request.getDataShard() && _request.getDataShard() == ShardId::kConfigServerId) {
-        // TODO SERVER-129691: convert allShardIds to allShardHandles and perform a ShardRef find
-        // with the config server.
-        // TODO SERVER-128153: refer to config server by shard ref.
         const auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
         bool isConfigShardAvailable =
             std::find(allShardIds.begin(), allShardIds.end(), ShardId::kConfigServerId) !=
@@ -2520,8 +2492,6 @@ ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
             // If a shard has been removed, remove it from the list of involved shards.
             if (_doc.getShardIds() && status == ErrorCodes::ShardNotFound) {
                 auto involvedShardIds = *_doc.getShardIds();
-                // TODO SERVER-129691 convert to getAllShardHandles(), and perform a
-                // ShardHandle-to-ShardRef variant-aware erase.
                 auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
                 std::erase_if(involvedShardIds, [&](auto&& shard) {

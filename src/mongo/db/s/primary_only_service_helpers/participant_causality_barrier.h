@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/db/s/primary_only_service_helpers/operation_session_tracker.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/executor/task_executor.h"
 
 namespace mongo {
@@ -41,11 +40,6 @@ namespace mongo {
  */
 class MONGO_MOD_PUBLIC ParticipantCausalityBarrier : public CausalityBarrier {
 public:
-    ParticipantCausalityBarrier(std::vector<ShardRef> participants,
-                                std::shared_ptr<executor::TaskExecutor> executor,
-                                CancellationToken token);
-
-    // TODO SERVER-127411: remove this ShardId overload once all callers pass ShardRef.
     ParticipantCausalityBarrier(std::vector<ShardId> participants,
                                 std::shared_ptr<executor::TaskExecutor> executor,
                                 CancellationToken token);
@@ -54,12 +48,12 @@ public:
 
 private:
     void _performNoopRetryableWriteOnShards(OperationContext* opCtx,
-                                            const std::vector<ShardRef>& shardRefs,
+                                            const std::vector<ShardId>& shardIds,
                                             const OperationSessionInfo& osi,
                                             const std::shared_ptr<executor::TaskExecutor>& executor,
                                             const CancellationToken& token);
 
-    std::vector<ShardRef> _participants;
+    std::vector<ShardId> _participants;
     std::shared_ptr<executor::TaskExecutor> _executor;
     CancellationToken _token;
 };

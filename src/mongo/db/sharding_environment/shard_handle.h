@@ -80,28 +80,6 @@ public:
         }
     }
 
-    bool operator<(const ShardHandle& other) const {
-        if (_name != other._name)
-            return _name < other._name;
-        // Consistent with == operator -> if names are equal and one of them has no uuid, they are
-        // equal.
-        if (!_uuid.has_value() || !other._uuid.has_value())
-            return false;
-        return *_uuid < *other._uuid;
-    }
-
-    bool operator>(const ShardHandle& other) const {
-        return other < *this;
-    }
-
-    bool operator<=(const ShardHandle& other) const {
-        return !(other < *this);
-    }
-
-    bool operator>=(const ShardHandle& other) const {
-        return !(*this < other);
-    }
-
     bool operator==(const ShardHandle& other) const {
         // If one shard handle is missing a UUID, it compares as equal to another shard handle with
         // a UUID to allow for comparisons across FCV upgrade/downgrade.
@@ -132,32 +110,5 @@ private:
     // The Shard internal UUID. Declared as optional for backward compatibility.
     boost::optional<UUID> _uuid;
 };
-
-/**
- * Cross-type comparisons between ShardHandle and ShardRef.
- *
- * If the ShardRef holds a UUID, compare against the handle's UUID (false if the handle has none).
- * If the ShardRef holds a ShardId, compare against the handle's name.
- */
-MONGO_MOD_PUBLIC inline bool operator==(const ShardHandle& handle, const ShardRef& ref) {
-    if (ref.isUUID()) {
-        return handle.uuid().has_value() && *handle.uuid() == ref.getUUID();
-    }
-    return handle.name() == ref.getShardId();
-}
-
-MONGO_MOD_PUBLIC inline bool operator==(const ShardRef& ref, const ShardHandle& handle) {
-    return handle == ref;
-}
-
-MONGO_MOD_PUBLIC inline bool operator!=(const ShardHandle& handle, const ShardRef& ref) {
-    return !(handle == ref);
-}
-
-MONGO_MOD_PUBLIC inline bool operator!=(const ShardRef& ref, const ShardHandle& handle) {
-    return !(handle == ref);
-}
-
-using ShardRefToHandleMap = stdx::unordered_map<ShardRef, ShardHandle, ShardRef::Hasher>;
 
 }  // namespace mongo

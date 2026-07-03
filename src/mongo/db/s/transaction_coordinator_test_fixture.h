@@ -40,7 +40,6 @@
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/s/transaction_coordinator.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/sharding_environment/shard_handle.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 
@@ -91,45 +90,12 @@ protected:
      */
     static void associateClientMetadata(Client* client, std::string appName);
 
-    /**
-     * Converts a list of ShardHandles into a list of ShardRefs using the test's OperationContext,
-     * so it can be passed to the transaction coordinator APIs.
-     */
-    std::vector<ShardRef> transformToShardRefs(const std::vector<ShardHandle>& handles) const {
-        std::vector<ShardRef> shardRefs;
-        shardRefs.reserve(handles.size());
-        for (const auto& handle : handles) {
-            shardRefs.push_back(handle.toShardRef(operationContext()));
-        }
-        return shardRefs;
-    }
-
-    /**
-     * Converts a set of ShardHandles into a set of ShardRefs using the test's OperationContext, so
-     * it can be passed to the transaction coordinator APIs.
-     */
-    std::set<ShardRef> transformToShardRefs(const std::set<ShardHandle>& handles) const {
-        std::set<ShardRef> shardRefs;
-        for (const auto& handle : handles) {
-            shardRefs.insert(handle.toShardRef(operationContext()));
-        }
-        return shardRefs;
-    }
-
-    // TODO SERVER-128815: use non empty optionals for UUIDs once feature is ready
-
-    const std::vector<ShardHandle> kOneShardHandleList{ShardHandle{ShardId{"s1"}, boost::none}};
-    const std::set<ShardHandle> kOneShardHandleSet{ShardHandle{ShardId{"s1"}, boost::none}};
-    const std::vector<ShardHandle> kTwoShardHandleList{ShardHandle{ShardId{"s1"}, boost::none},
-                                                       ShardHandle{ShardId{"s2"}, boost::none}};
-    const std::set<ShardHandle> kTwoShardHandleSet{ShardHandle{ShardId{"s1"}, boost::none},
-                                                   ShardHandle{ShardId{"s2"}, boost::none}};
-    const std::vector<ShardHandle> kThreeShardHandleList{ShardHandle{ShardId{"s1"}, boost::none},
-                                                         ShardHandle{ShardId{"s2"}, boost::none},
-                                                         ShardHandle{ShardId{"s3"}, boost::none}};
-    const std::set<ShardHandle> kThreeShardHandleSet{ShardHandle{ShardId{"s1"}, boost::none},
-                                                     ShardHandle{ShardId{"s2"}, boost::none},
-                                                     ShardHandle{ShardId{"s3"}, boost::none}};
+    const std::vector<ShardId> kOneShardIdList{{"s1"}};
+    const std::set<ShardId> kOneShardIdSet{{"s1"}};
+    const std::vector<ShardId> kTwoShardIdList{{"s1"}, {"s2"}};
+    const std::set<ShardId> kTwoShardIdSet{{"s1"}, {"s2"}};
+    const std::vector<ShardId> kThreeShardIdList{{"s1"}, {"s2"}, {"s3"}};
+    const std::set<ShardId> kThreeShardIdSet{{"s1"}, {"s2"}, {"s3"}};
 
     const Status kRetryableError{ErrorCodes::HostUnreachable,
                                  "Retryable error for coordinator test"};

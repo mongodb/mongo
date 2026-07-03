@@ -53,7 +53,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/sharding_environment/client/shard.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/write_concern_options.h"
@@ -167,7 +167,7 @@ public:
         const BSONObj& sort = BSONObj()) override;
 
     StatusWith<std::vector<DatabaseName>> getDatabasesForShard(OperationContext* opCtx,
-                                                               const ShardRef& shardRef) override;
+                                                               const ShardId& shardName) override;
 
     StatusWith<std::vector<ChunkType>> getChunks(
         OperationContext* opCtx,

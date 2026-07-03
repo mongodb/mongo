@@ -786,18 +786,15 @@ StatusWith<VersionType> ShardingCatalogClientImpl::getConfigVersion(
 }
 
 StatusWith<std::vector<DatabaseName>> ShardingCatalogClientImpl::getDatabasesForShard(
-    OperationContext* opCtx, const ShardRef& shardRef) {
-
-    BSONObjBuilder filterBuilder;
-    shardRef.serialize(DatabaseType::kPrimaryFieldName, &filterBuilder);
-
-    auto findStatus = _exhaustiveFindOnConfig(opCtx,
-                                              getConfigReadPreference(opCtx),
-                                              repl::ReadConcernLevel::kMajorityReadConcern,
-                                              NamespaceString::kConfigDatabasesNamespace,
-                                              filterBuilder.obj(),
-                                              BSONObj(),
-                                              boost::none);  // no limit
+    OperationContext* opCtx, const ShardId& shardId) {
+    auto findStatus =
+        _exhaustiveFindOnConfig(opCtx,
+                                getConfigReadPreference(opCtx),
+                                repl::ReadConcernLevel::kMajorityReadConcern,
+                                NamespaceString::kConfigDatabasesNamespace,
+                                BSON(DatabaseType::kPrimaryFieldName << shardId.toString()),
+                                BSONObj(),
+                                boost::none);  // no limit
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
     }

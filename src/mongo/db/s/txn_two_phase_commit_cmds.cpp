@@ -272,19 +272,19 @@ public:
 };
 MONGO_REGISTER_COMMAND(PrepareTransactionCmd).forShard();
 
-std::set<ShardRef> validateParticipants(OperationContext* opCtx,
-                                        const std::vector<mongo::CommitParticipant>& participants) {
+std::set<ShardId> validateParticipants(OperationContext* opCtx,
+                                       const std::vector<mongo::CommitParticipant>& participants) {
     StringBuilder ss;
-    std::set<ShardRef> participantsSet;
+    std::set<ShardId> participantsSet;
 
     ss << '[';
     for (const auto& participant : participants) {
-        const auto& shardRef = participant.getShardId();
-        const bool inserted = participantsSet.emplace(shardRef).second;
+        const auto& shardId = participant.getShardId();
+        const bool inserted = participantsSet.emplace(shardId).second;
         uassert(51162,
-                str::stream() << "Participant list contains duplicate shard " << shardRef,
+                str::stream() << "Participant list contains duplicate shard " << shardId,
                 inserted);
-        ss << shardRef.toString() << ", ";
+        ss << shardId << ", ";
     }
     ss << ']';
 

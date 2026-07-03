@@ -3195,7 +3195,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:change_stream_pipeline",
         "//src/mongo/db/pipeline:search_id_lookup_stage",
         "//src/mongo/db/sharding_environment:shard_handle",
-        "//src/mongo/db/sharding_environment:sharding_feature_flags",
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
         "//src/mongo/unittest:server_parameter_guard",
         "//src/third_party/asio",

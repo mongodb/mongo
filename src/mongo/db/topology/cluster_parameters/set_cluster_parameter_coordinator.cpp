@@ -210,26 +210,13 @@ void SetClusterParameterCoordinator::_sendSetClusterParameterToAllShards(
     OperationContext* opCtx,
     const OperationSessionInfo& session,
     std::shared_ptr<executor::ScopedTaskExecutor> executor) {
-    auto shardHandles = Grid::get(opCtx)->shardRegistry()->getAllShardHandles(opCtx);
+    auto shards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
     // In case the config server acts as a config shard, there is no need to send the update because
     // it will be handled in the _commit phase.
-    // TODO SERVER-128153: handle the case of the embedded config server being referred to by its
-    // uuid.
-    shardHandles.erase(
-        std::remove_if(shardHandles.begin(),
-                       shardHandles.end(),
-                       [](const auto& shard) { return shard.name() == ShardId::kConfigServerId; }),
-        shardHandles.end());
+    shards.erase(std::remove(shards.begin(), shards.end(), ShardId::kConfigServerId), shards.end());
 
-    std::vector<ShardRef> shardRefs;
-    shardRefs.reserve(shardHandles.size());
-    std::transform(shardHandles.begin(),
-                   shardHandles.end(),
-                   std::back_inserter(shardRefs),
-                   [&](const ShardHandle& h) { return h.toShardRef(opCtx); });
-
-    LOGV2_DEBUG(6387001, 1, "Sending setClusterParameter to shards:", "shards"_attr = shardRefs);
+    LOGV2_DEBUG(6387001, 1, "Sending setClusterParameter to shards:", "shards"_attr = shards);
 
     ShardsvrSetClusterParameter request(_doc.getParameter());
     request.setDbName(DatabaseNameUtil::deserialize(_doc.getTenantId(),
@@ -240,7 +227,7 @@ void SetClusterParameterCoordinator::_sendSetClusterParameterToAllShards(
     generic_argument_util::setMajorityWriteConcern(request);
 
     sharding_util::sendCommandToShards(
-        opCtx, DatabaseName::kAdmin, request.toBSON(), shardRefs, **executor);
+        opCtx, DatabaseName::kAdmin, request.toBSON(), shards, **executor);
 }
 
 void SetClusterParameterCoordinator::_commit(OperationContext* opCtx) {

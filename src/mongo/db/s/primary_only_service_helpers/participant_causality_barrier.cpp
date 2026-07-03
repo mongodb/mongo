@@ -35,21 +35,12 @@
 namespace mongo {
 
 ParticipantCausalityBarrier::ParticipantCausalityBarrier(
-    std::vector<ShardRef> participants,
+    std::vector<ShardId> participants,
     std::shared_ptr<executor::TaskExecutor> executor,
     CancellationToken token)
     : _participants{std::move(participants)},
       _executor{std::move(executor)},
       _token{std::move(token)} {}
-
-// TODO SERVER-127411: remove this ShardId overload once all callers pass ShardRef.
-ParticipantCausalityBarrier::ParticipantCausalityBarrier(
-    std::vector<ShardId> participants,
-    std::shared_ptr<executor::TaskExecutor> executor,
-    CancellationToken token)
-    : ParticipantCausalityBarrier(std::vector<ShardRef>(participants.begin(), participants.end()),
-                                  std::move(executor),
-                                  std::move(token)) {}
 
 void ParticipantCausalityBarrier::perform(OperationContext* opCtx,
                                           const OperationSessionInfo& osi) {
@@ -58,7 +49,7 @@ void ParticipantCausalityBarrier::perform(OperationContext* opCtx,
 
 void ParticipantCausalityBarrier::_performNoopRetryableWriteOnShards(
     OperationContext* opCtx,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::TaskExecutor>& executor,
     const CancellationToken& token) {
@@ -67,7 +58,9 @@ void ParticipantCausalityBarrier::_performNoopRetryableWriteOnShards(
     generic_argument_util::setMajorityWriteConcern(updateOp);
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<write_ops::UpdateCommandRequest>>(
         executor, token, updateOp);
-    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardRefs);
+    // TODO SERVER-127411: remove conversion once callers pass ShardRef.
+    sharding_ddl_util::sendAuthenticatedCommandToShards(
+        opCtx, opts, std::vector<ShardRef>(shardIds.begin(), shardIds.end()));
 }
 
 

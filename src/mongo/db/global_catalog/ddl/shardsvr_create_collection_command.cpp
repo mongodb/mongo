@@ -352,10 +352,10 @@ public:
 
             auto clusterRole = ShardingState::get(opCtx)->pollClusterRole();
             if (clusterRole->has(ClusterRole::ConfigServer)) {
-                auto allShardHandles = Grid::get(opCtx)->shardRegistry()->getAllShardHandles(opCtx);
-                std::sort(allShardHandles.begin(), allShardHandles.end());
-                if (allShardHandles.size() > 0 &&
-                    allShardHandles[0] != ShardingState::get(opCtx)->asShardRef(opCtx)) {
+                auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+                std::sort(allShardIds.begin(), allShardIds.end());
+                if (allShardIds.size() > 0 &&
+                    allShardIds[0] != ShardingState::get(opCtx)->shardId()) {
                     ShardsvrCreateCollection requestToForward(ns());
                     requestToForward.setShardsvrCreateCollectionRequest(request);
                     requestToForward.setDbName(ns().dbName());

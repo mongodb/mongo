@@ -226,7 +226,7 @@ public:
                 opCtx,
                 DatabaseName::kAdmin,
                 replSetGetConfigCmd,
-                Grid::get(opCtx)->shardRegistry()->getAllShardRefs(opCtx),
+                Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
                 executor);
             stdx::unordered_set<ShardId> shardsMissingWCDef;
             for (auto&& response : responses) {

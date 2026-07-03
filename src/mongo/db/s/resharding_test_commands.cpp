@@ -174,7 +174,7 @@ public:
             // The ReshardingCollectionCloner expects there to already be a Client associated with
             // the thread from the thread pool. We set up the ThreadPoolTaskExecutor identically to
             // how the recipient's primary-only service is set up.
-            auto donorShards = Grid::get(opCtx)->shardRegistry()->getAllShardRefs(opCtx).size();
+            auto donorShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx).size();
 
             auto metrics =
                 ReshardingMetrics::makeInstance_forTest(request().getUuid(),

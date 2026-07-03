@@ -79,23 +79,14 @@ namespace sharding_util {
 const auto kLogRetryAttemptThreshold = 20;
 
 void tellShardsToRefreshCollection(OperationContext* opCtx,
-                                   const std::vector<ShardRef>& shardRefs,
+                                   const std::vector<ShardId>& shardIds,
                                    const NamespaceString& nss,
                                    const std::shared_ptr<executor::TaskExecutor>& executor) {
     auto cmd = FlushRoutingTableCacheUpdatesWithWriteConcern(nss);
     cmd.setSyncFromConfig(true);
     cmd.setDbName(nss.dbName());
     generic_argument_util::setMajorityWriteConcern(cmd);
-    sendCommandToShards(opCtx, DatabaseName::kAdmin, cmd.toBSON(), shardRefs, executor);
-}
-
-// TODO SERVER-127411: remove this ShardId overload once all callers pass ShardRef.
-void tellShardsToRefreshCollection(OperationContext* opCtx,
-                                   const std::vector<ShardId>& shardIds,
-                                   const NamespaceString& nss,
-                                   const std::shared_ptr<executor::TaskExecutor>& executor) {
-    tellShardsToRefreshCollection(
-        opCtx, std::vector<ShardRef>(shardIds.begin(), shardIds.end()), nss, executor);
+    sendCommandToShards(opCtx, DatabaseName::kAdmin, cmd.toBSON(), shardIds, executor);
 }
 
 void triggerFireAndForgetShardRefreshes(OperationContext* opCtx,
@@ -170,31 +161,15 @@ std::vector<AsyncRequestsSender::Response> sendCommandToShards(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     const BSONObj& command,
-    const std::vector<ShardRef>& shardRefs,
-    const std::shared_ptr<executor::TaskExecutor>& executor,
-    const bool throwOnError) {
-    std::vector<AsyncRequestsSender::Request> requests;
-    for (const auto& shardRef : shardRefs) {
-        requests.emplace_back(shardRef, command);
-    }
-
-    return processShardResponses(opCtx, dbName, command, requests, executor, throwOnError);
-}
-
-// TODO SERVER-127411: remove this ShardId overload once all callers pass ShardRef.
-std::vector<AsyncRequestsSender::Response> sendCommandToShards(
-    OperationContext* opCtx,
-    const DatabaseName& dbName,
-    const BSONObj& command,
     const std::vector<ShardId>& shardIds,
     const std::shared_ptr<executor::TaskExecutor>& executor,
     const bool throwOnError) {
-    return sendCommandToShards(opCtx,
-                               dbName,
-                               command,
-                               std::vector<ShardRef>(shardIds.begin(), shardIds.end()),
-                               executor,
-                               throwOnError);
+    std::vector<AsyncRequestsSender::Request> requests;
+    for (const auto& shardId : shardIds) {
+        requests.emplace_back(shardId, command);
+    }
+
+    return processShardResponses(opCtx, dbName, command, requests, executor, throwOnError);
 }
 
 Status createIndexOnCollection(OperationContext* opCtx,

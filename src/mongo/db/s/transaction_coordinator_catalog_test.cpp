@@ -158,7 +158,7 @@ TEST_F(TransactionCoordinatorCatalogTest,
     createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
     auto coordinator1InCatalog =
         _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter1);
-    coordinator1InCatalog->runCommit(operationContext(), transformToShardRefs(kOneShardHandleList));
+    coordinator1InCatalog->runCommit(operationContext(), kOneShardIdList);
     assertCommandSentAndRespondWith("prepareTransaction", kNoSuchTransaction, boost::none);
     coordinator1InCatalog->getDecision().wait();
 
@@ -230,7 +230,7 @@ TEST_F(TransactionCoordinatorCatalogTest,
     createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
     auto coordinator1InCatalog =
         _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter1);
-    coordinator1InCatalog->runCommit(operationContext(), transformToShardRefs(kOneShardHandleList));
+    coordinator1InCatalog->runCommit(operationContext(), kOneShardIdList);
     assertCommandSentAndRespondWith("prepareTransaction", kNoSuchTransaction, boost::none);
     coordinator1InCatalog->getDecision().wait();
 
@@ -304,7 +304,7 @@ TEST_F(
     createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
     auto coordinator1InCatalog =
         _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter1);
-    coordinator1InCatalog->runCommit(operationContext(), transformToShardRefs(kOneShardHandleList));
+    coordinator1InCatalog->runCommit(operationContext(), kOneShardIdList);
     assertCommandSentAndRespondWith("prepareTransaction", kNoSuchTransaction, boost::none);
     coordinator1InCatalog->getDecision().wait();
 
@@ -337,7 +337,7 @@ TEST_F(
     createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
     auto coordinator1 =
         _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter1);
-    coordinator1->runCommit(operationContext(), transformToShardRefs(kOneShardHandleList));
+    coordinator1->runCommit(operationContext(), kOneShardIdList);
 
     auto coordinator2 = std::make_shared<TransactionCoordinator>(
         operationContext(),
@@ -375,7 +375,7 @@ TEST_F(TransactionCoordinatorCatalogTest,
     createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
     auto coordinator1 =
         _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter1);
-    coordinator1->runCommit(operationContext(), transformToShardRefs(kOneShardHandleList));
+    coordinator1->runCommit(operationContext(), kOneShardIdList);
     assertCommandSentAndRespondWith("prepareTransaction", kPrepareOk, boost::none);
     coordinator1->getDecision().get();
 

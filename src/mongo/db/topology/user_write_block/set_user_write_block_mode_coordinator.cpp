@@ -88,7 +88,7 @@ void sendSetUserWriteBlockModeCmdToAllShards(OperationContext* opCtx,
                                              bool block,
                                              ShardsvrSetUserWriteBlockModePhaseEnum phase,
                                              const OperationSessionInfo& osi) {
-    const auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardRefs(opCtx);
+    const auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
     auto shardsvrSetUserWriteBlockModeCmd = makeShardsvrSetUserWriteBlockModeCommand(block, phase);
 

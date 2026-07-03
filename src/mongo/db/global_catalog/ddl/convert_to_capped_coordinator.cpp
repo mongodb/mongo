@@ -282,7 +282,8 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                     // data (getting rid of possible stale incarnations due to SERVER-87010).
                     std::vector<ShardRef> participantsNotOwningData;
 
-                    auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardRefs(opCtx);
+                    auto allShards =
+                        Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
                     const auto& dataShardRef = *_doc.getDataShard();
                     const auto& selfShardRef = ShardingState::get(opCtx)->asShardRef(opCtx);
                     for (const auto& shardRef : allShards) {
@@ -393,7 +394,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                             opCtx,
                             nss(),
                             _doc.getOriginalCollection()->getUuid(),
-                            Grid::get(opCtx)->shardRegistry()->getAllShardRefs(opCtx),
+                            Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx),
                             session,
                             executor,
                             token);

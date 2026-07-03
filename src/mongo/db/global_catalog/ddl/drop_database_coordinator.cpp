@@ -282,7 +282,7 @@ void DropDatabaseCoordinator::_dropTrackedCollection(
         sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
             opCtx,
             nss,
-            Grid::get(opCtx)->shardRegistry()->getAllShardRefs(opCtx),
+            Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx),
             mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites,
             getReasonForDropCollection(nss),
             _doc.getAuthoritativeMetadataAccessLevel(),
@@ -315,7 +315,7 @@ void DropDatabaseCoordinator::_dropTrackedCollection(
             opCtx,
             nss,
             coll.getUuid(),
-            Grid::get(opCtx)->shardRegistry()->getAllShardRefs(opCtx),
+            Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx),
             session,
             executor,
             token);
@@ -343,10 +343,8 @@ void DropDatabaseCoordinator::_dropTrackedCollection(
             boost::none /* collectionUUID */,
             false /* requireCollectionEmpty */);
     };
-    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardRefs(opCtx);
+    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
     // Remove primary shard from participants
-    // TODO SERVER-129691 convert changeStreamsNotifierShardId to ShardRef, participants to
-    // ShardHandles, and handle the mixed-variant case correctly.
     participants.erase(std::remove_if(participants.begin(),
                                       participants.end(),
                                       [&](const auto& shard) {
@@ -391,7 +389,7 @@ void DropDatabaseCoordinator::_dropTrackedCollection(
         sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
             opCtx,
             nss,
-            Grid::get(opCtx)->shardRegistry()->getAllShardRefs(opCtx),
+            Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx),
             CriticalSectionBlockTypeEnum::kUnblock,
             getReasonForDropCollection(nss),
             _doc.getAuthoritativeMetadataAccessLevel(),
@@ -438,7 +436,6 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 // collection drop; if so, resume the step.
                 if (_doc.getCollInfo()) {
                     const auto coll = _doc.getCollInfo().value();
-                    // TODO SERVER-129691 convert collChangeStreamsNotifierShardId.
                     const auto& collChangeStreamsNotifierShardId =
                         _doc.getCollChangeStreamsNotifier().value_or(primaryShardRef);
                     LOGV2_DEBUG(5494504,
@@ -532,7 +529,8 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                                                                    std::move(unshardedCollUUIDs));
                 }
 
-                const auto allShardRefs = Grid::get(opCtx)->shardRegistry()->getAllShardRefs(opCtx);
+                const auto allShardRefs =
+                    Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
                 {
                     // Acquire the database critical section in order to disallow implicit
                     // collection creations from happening concurrently with dropDatabase
@@ -692,13 +690,11 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
 
             if (_doc.getAuthoritativeMetadataAccessLevel() ==
                 AuthoritativeMetadataAccessLevelEnum::kNone) {
-                const auto primaryShardRef = ShardingState::get(opCtx)->asShardRef(opCtx);
-                auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardRefs(opCtx);
-                // TODO SERVER-129691 Convert participants to ShardHandles and perform
-                // primaryShardRef removal correctly for the mixed-variant case (shardids and shard
-                // refs).
+                const auto primaryShardId = ShardingState::get(opCtx)->shardId();
+                auto participants =
+                    Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
                 participants.erase(
-                    std::remove(participants.begin(), participants.end(), primaryShardRef),
+                    std::remove(participants.begin(), participants.end(), primaryShardId),
                     participants.end());
                 // Send _flushDatabaseCacheUpdates to all shards
                 const auto db = DatabaseNameUtil::serialize(

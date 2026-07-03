@@ -112,7 +112,7 @@ const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
 const ReadPreferenceSetting kPrimaryReadPreference{ReadPreference::PrimaryOnly};
 
-BSONArray buildParticipantListMatchesConditions(const std::vector<ShardRef>& participantList) {
+BSONArray buildParticipantListMatchesConditions(const std::vector<ShardId>& participantList) {
     BSONArrayBuilder barr;
     for (const auto& participant : participantList) {
         barr.append(participant.toString());
@@ -128,11 +128,11 @@ BSONArray buildParticipantListMatchesConditions(const std::vector<ShardRef>& par
     return BSON_ARRAY(participantListContains << participantListHasSize);
 }
 
-std::string buildParticipantListString(const std::vector<ShardRef>& participantList) {
+std::string buildParticipantListString(const std::vector<ShardId>& participantList) {
     StringBuilder ss;
     ss << "[";
     for (const auto& participant : participantList) {
-        ss << participant.toString() << " ";
+        ss << participant << " ";
     }
     ss << "]";
     return ss.str();
@@ -151,7 +151,7 @@ repl::OpTime persistParticipantListBlocking(
     OperationContext* opCtx,
     const LogicalSessionId& lsid,
     const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
-    const std::vector<ShardRef>& participantList) {
+    const std::vector<ShardId>& participantList) {
     LOGV2_DEBUG(22463,
                 3,
                 "Going to write participant list",
@@ -377,7 +377,7 @@ namespace {
 repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
                                      const LogicalSessionId& lsid,
                                      const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
-                                     std::vector<ShardRef> participantList,
+                                     std::vector<ShardId> participantList,
                                      const txn::CoordinatorCommitDecision& decision,
                                      std::vector<NamespaceString> affectedNamespaces) {
     const bool isCommit = decision.getDecision() == txn::CommitDecision::kCommit;
