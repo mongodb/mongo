@@ -229,3 +229,44 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline/process_interface:stub_mongo_process_interface",
     ],
 )
+
+# Per-(consumer x engine) OTEL metrics cells + recorder for change stream single-document lookups.
+# Infrastructure only: registers the landed updateLookup express/aggregation cells at load time; no
+# executor records into them yet.
+mongo_cc_library(
+    name = "single_document_lookup_stats",
+    srcs = [
+        "single_document_lookup_stats.cpp",
+    ],
+    deps = [
+        "//src/mongo/otel/metrics:otel_metrics_service",
+    ],
+)
+
+# Shared test helper: snapshots an updateLookup cell's counters + latency totals via
+# OtelMetricsCapturer, so tests assert deltas against a before-snapshot. Linked only into test
+# binaries.
+mongo_cc_library(
+    name = "single_document_lookup_stats_test_util",
+    testonly = True,
+    hdrs = [
+        "single_document_lookup_stats_test_util.h",
+    ],
+    deps = [
+        "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "single_document_lookup_stats_test",
+    srcs = [
+        "single_document_lookup_stats_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":single_document_lookup_stats",
+        ":single_document_lookup_stats_test_util",
+        "//src/mongo/otel/metrics:metrics_test_util",
+    ],
+)

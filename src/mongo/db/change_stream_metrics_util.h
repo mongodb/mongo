@@ -135,6 +135,48 @@ inline otel::metrics::UpDownCounter<int64_t>& createCursorsOpenPinned() {
         kCursorsOpenPinnedOpts);
 }
 
+inline otel::metrics::Counter<int64_t>& createUpdateLookupCounter(otel::metrics::MetricName name,
+                                                                  std::string dottedPath,
+                                                                  std::string description) {
+    otel::metrics::CounterOptions opts{};
+    opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+        .dottedPath = std::move(dottedPath),
+        .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
+    };
+    return otel::metrics::MetricsService::instance().createInt64Counter(
+        name, std::move(description), otel::metrics::MetricUnit::kEvents, opts);
+}
+
+inline otel::metrics::Histogram<int64_t>& createUpdateLookupLatency(otel::metrics::MetricName name,
+                                                                    std::string dottedPath) {
+    otel::metrics::HistogramOptions opts{};
+    opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+        .dottedPath = std::move(dottedPath),
+        .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
+    };
+
+    // Latency buckets span ~50us..1s, the expected range for a local or remote post-image fetch.
+    opts.explicitBucketBoundaries = {{50,
+                                      100,
+                                      250,
+                                      500,
+                                      1000,
+                                      2500,
+                                      5000,
+                                      10000,
+                                      25000,
+                                      50000,
+                                      100000,
+                                      250000,
+                                      500000,
+                                      1000000}};
+    return otel::metrics::MetricsService::instance().createInt64Histogram(
+        name,
+        "Latency of change stream updateLookup single-document lookups in microseconds.",
+        otel::metrics::MetricUnit::kMicroseconds,
+        opts);
+}
+
 inline otel::metrics::Counter<int64_t>& errorNonRetriableHistoryLost() {
     static auto& counter = []() -> otel::metrics::Counter<int64_t>& {
         otel::metrics::CounterOptions opts{};
