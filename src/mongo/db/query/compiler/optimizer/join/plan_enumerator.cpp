@@ -123,6 +123,12 @@ void PlanEnumeratorContext::enumerateINLJPlan(EdgeId edge,
         return;
     }
 
+    // TODO SERVER-130392: Remove once we support projections on IndexProbe in stage builders.
+    if (_ctx.joinGraph.accessPathAt(rightNodeId)->getProj()) {
+        // For now, we don't support lowering this plan, so don't enumerate it.
+        return;
+    }
+
     auto inljCost = _coster
         ? _coster->costINLJFragment(_registry.get(leftPlan), rightNodeId, ie, edge)
         : zeroCost;

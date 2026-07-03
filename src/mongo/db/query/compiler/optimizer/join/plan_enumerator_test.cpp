@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator.h"
 
-#include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_test_utils.h"
 #include "mongo/db/query/compiler/optimizer/join/cardinality_estimator.h"
 #include "mongo/db/query/compiler/optimizer/join/join_cost_estimator_impl.h"
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator_helpers.h"
@@ -493,6 +492,47 @@ TEST_F(JoinPlanEnumeratorTest, ZigZag3NodesINLJ) {
                                         .enableHJOrderPruning = false},
                     3,
                     true /* withIndexes */);
+}
+
+// TODO SERVER-130392: delete this test.
+TEST_F(JoinPlanEnumeratorTest, INLJNotEnumeratedWithProjectionOnRHS) {
+    initGraph(2, true /* withIndexes */);
+    graph.addSimpleEqualityEdge(NodeId(0), NodeId(1), 0, 1);
+
+    // Attach a projection to Node 1 to test if this prevents an INLJRHSNode from being generated.
+    auto& node1 = graph.getNode(NodeId(1));
+    auto filterBSON = bsonStorage.emplace_back(BSON("a1" << BSON("$gt" << 0)));
+    auto projBSON = bsonStorage.emplace_back(BSON("a1" << 1));
+    auto node1Cq = makeCanonicalQuery(node1.collectionName, filterBSON, projBSON);
+    // Re-key the single-table access plan onto the new CanonicalQuery before replacing the old one.
+    auto qsn = cbrCqQsns.extract(node1.accessPath.get());
+    qsn.key() = node1Cq.get();
+    cbrCqQsns.insert(std::move(qsn));
+    node1.accessPath = std::move(node1Cq);
+
+    auto jCtx = makeContext();
+    auto ctx = makeEnumeratorContext(
+        jCtx, strategy(PlanTreeShape::ZIG_ZAG, false /* HJ pruning */, PlanEnumerationMode::ALL));
+    ctx.enumerateJoinSubsets();
+
+    // Ensure we can still generate INLJs, but that the RHS is not Node 1.
+    auto& level2 = ctx.getSubsets(1);
+    ASSERT_EQ(level2.size(), 1);
+    ASSERT_FALSE(level2[0].plans.empty());
+
+    size_t inljCount = 0;
+    for (auto&& planId : level2[0].plans) {
+        ASSERT(ctx.registry().isOfType<JoiningNode>(planId));
+        auto& node = ctx.registry().getAs<JoiningNode>(planId);
+        if (node.method == JoinMethod::INLJ) {
+            inljCount++;
+            // Ensure we never have 1 on the right.
+            ASSERT(ctx.registry().isOfType<INLJRHSNode>(node.right));
+            ASSERT_EQ(ctx.registry().getAs<INLJRHSNode>(node.right).node, 0);
+        }
+    }
+    // We should only be able to generate one INLJ node.
+    ASSERT_EQ(1, inljCount);
 }
 
 TEST_F(JoinPlanEnumeratorTest, InitialzeLargeSubsets) {
