@@ -36,6 +36,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <tuple>
+#include <utility>
 
 namespace mongo {
 namespace {
@@ -159,6 +160,108 @@ TEST_F(QueryLifespanTest, LifespanSurvivesSequentialGetMores) {
     auto getMore2 = makeScopedOperationContext("getMore2");
     handle->bind(getMore2.get());
     ASSERT_EQ(counterDecoration(getMore2.get()).value, 2);
+}
+
+TEST_F(QueryLifespanTest, RegionInstallsOverAPrePopulatedSlotAndRestoresIt) {
+    // Regression: before a getMore body runs, other work on the same opCtx (e.g. an auth privilege
+    // lookup via DBDirectClient) can already have created a different lifespan on it. The region
+    // must install the cursor's lifespan over that slot for its scope, then restore the original.
+    auto cursorOp = makeScopedOperationContext("cursorOp");
+    counterDecoration(cursorOp.get()).value = 7;
+    auto cursorLifespan = QueryLifespan::get(cursorOp.get()).handle();
+
+    auto getMore = makeScopedOperationContext("getMore");
+    // Simulate the pre-amble lazily creating a different lifespan on the getMore's opCtx.
+    auto* preexisting = &QueryLifespan::get(getMore.get());
+    ASSERT_NE(preexisting, cursorLifespan.get());
+
+    {
+        QueryLifespan::AlternativeQueryRegion region(getMore.get(), cursorLifespan);
+        // Within the region the getMore resolves to the cursor's lifespan and sees its state.
+        ASSERT_EQ(&QueryLifespan::get(getMore.get()), cursorLifespan.get());
+        ASSERT_EQ(counterDecoration(getMore.get()).value, 7);
+    }
+
+    // On exit the opCtx's original lifespan is restored, with its own state intact.
+    ASSERT_EQ(&QueryLifespan::get(getMore.get()), preexisting);
+}
+
+TEST_F(QueryLifespanTest, NestedRegionsRestoreLifo) {
+    auto opCtx = makeScopedOperationContext("opCtx");
+    auto* original = &QueryLifespan::get(opCtx.get());
+
+    auto opB = makeScopedOperationContext("opB");
+    auto lifespanB = QueryLifespan::get(opB.get()).handle();
+    auto opC = makeScopedOperationContext("opC");
+    auto lifespanC = QueryLifespan::get(opC.get()).handle();
+    ASSERT_NE(lifespanB.get(), lifespanC.get());
+
+    {
+        QueryLifespan::AlternativeQueryRegion outer(opCtx.get(), lifespanB);
+        ASSERT_EQ(&QueryLifespan::get(opCtx.get()), lifespanB.get());
+        {
+            QueryLifespan::AlternativeQueryRegion inner(opCtx.get(), lifespanC);
+            ASSERT_EQ(&QueryLifespan::get(opCtx.get()), lifespanC.get());
+        }
+        // Inner region restores the outer region's lifespan.
+        ASSERT_EQ(&QueryLifespan::get(opCtx.get()), lifespanB.get());
+    }
+    // Outer region restores the opCtx's original lifespan.
+    ASSERT_EQ(&QueryLifespan::get(opCtx.get()), original);
+}
+
+TEST_F(QueryLifespanTest, MoveConstructedRegionDisarmsSource) {
+    auto opCtx = makeScopedOperationContext("opCtx");
+    auto* original = &QueryLifespan::get(opCtx.get());
+
+    auto other = makeScopedOperationContext("other");
+    auto lifespan = QueryLifespan::get(other.get()).handle();
+    ASSERT_NE(original, lifespan.get());
+
+    {
+        QueryLifespan::AlternativeQueryRegion region(opCtx.get(), lifespan);
+        ASSERT_EQ(&QueryLifespan::get(opCtx.get()), lifespan.get());
+
+        // Move ownership; the destination keeps the cursor's lifespan installed.
+        QueryLifespan::AlternativeQueryRegion moved(std::move(region));
+        ASSERT_EQ(&QueryLifespan::get(opCtx.get()), lifespan.get());
+    }
+    // 'moved' restored the original; the moved-from 'region' was disarmed and did not swap again,
+    // so the slot is restored exactly once (a double-restore would leave 'lifespan' installed).
+    ASSERT_EQ(&QueryLifespan::get(opCtx.get()), original);
+}
+
+TEST_F(QueryLifespanTest, MoveAssignmentEagerlyRestoresLhsThenAdoptsRhs) {
+    auto opA = makeScopedOperationContext("opA");
+    auto* originalA = &QueryLifespan::get(opA.get());
+    auto opB = makeScopedOperationContext("opB");
+    auto* originalB = &QueryLifespan::get(opB.get());
+
+    auto c1Op = makeScopedOperationContext("c1");
+    auto c1 = QueryLifespan::get(c1Op.get()).handle();
+    auto c2Op = makeScopedOperationContext("c2");
+    auto c2 = QueryLifespan::get(c2Op.get()).handle();
+
+    {
+        QueryLifespan::AlternativeQueryRegion region1(opA.get(), c1);
+        {
+            QueryLifespan::AlternativeQueryRegion region2(opB.get(), c2);
+            ASSERT_EQ(&QueryLifespan::get(opA.get()), c1.get());
+            ASSERT_EQ(&QueryLifespan::get(opB.get()), c2.get());
+
+            region1 = std::move(region2);
+
+            // Assigning over region1 eagerly restored opA; region1 now owns opB's obligation, and
+            // the moved-from region2 is disarmed.
+            ASSERT_EQ(&QueryLifespan::get(opA.get()), originalA);
+            ASSERT_EQ(&QueryLifespan::get(opB.get()), c2.get());
+        }
+        // region2 leaving scope does nothing (disarmed); opB stays installed until region1 ends.
+        ASSERT_EQ(&QueryLifespan::get(opB.get()), c2.get());
+    }
+    // region1's destruction restores opB exactly once; opA was already restored at assignment.
+    ASSERT_EQ(&QueryLifespan::get(opA.get()), originalA);
+    ASSERT_EQ(&QueryLifespan::get(opB.get()), originalB);
 }
 
 // Death tests use a distinct fixture (and therefore a distinct test suite) because gtest requires

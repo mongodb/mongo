@@ -120,6 +120,34 @@ public:
     [[nodiscard]] Handle handle();
 
     /**
+     * Scoped guard that runs the current scope under 'lifespan' -- installing it on 'opCtx' -- and
+     * restores whatever lifespan 'opCtx' previously carried on destruction, leaving 'opCtx' as it
+     * was found. Obtain one from 'ClientCursor::bindQueryLifespan'.
+     *
+     * A getMore uses this to run under its cursor's lifespan without clobbering a transient
+     * lifespan the opCtx already carried -- e.g. one lazily created by auth's localhost-bypass
+     * 'usersInfo' check run via DBDirectClient during startRequest. Restoring on destruction also
+     * protects a parent operation when the getMore runs on a shared OperationContext (via
+     * DBDirectClient).
+     */
+    class [[nodiscard]] AlternativeQueryRegion {
+    public:
+        AlternativeQueryRegion(OperationContext* opCtx, const Handle& lifespan);
+        ~AlternativeQueryRegion();
+
+        AlternativeQueryRegion(const AlternativeQueryRegion&) = delete;
+        AlternativeQueryRegion& operator=(const AlternativeQueryRegion&) = delete;
+        AlternativeQueryRegion(AlternativeQueryRegion&&) noexcept;
+        AlternativeQueryRegion& operator=(AlternativeQueryRegion&&) noexcept;
+
+    private:
+        // Pointer (not reference) so a moved-from region can be disarmed by nulling it; the
+        // destructor only restores when '_slot' is non-null.
+        Handle* _slot;
+        Handle _saved;
+    };
+
+    /**
      * A decoration that is always reached through an OperationContext. Hides the lifespan lookup so
      * consumers never name QueryLifespan: declare one with 'declareOpCtxDecoration<T>()' and access
      * it as 'decoration(opCtx)'.

@@ -311,18 +311,20 @@ void setUpOperationDeadline(OperationContext* opCtx,
 }
 /**
  * Sets up the OperationContext in order to correctly inherit options like the read concern from the
- * cursor to this operation.
+ * cursor to this operation. Returns a guard that runs the rest of the getMore under the cursor's
+ * QueryLifespan (restoring the opCtx's previous lifespan on destruction); the caller must hold it
+ * for the duration of the operation.
  */
-void setUpOperationContextAndCurOpStateForGetMore(OperationContext* opCtx,
-                                                  CurOp* curOp,
-                                                  const ClientCursor& cursor,
-                                                  const GetMoreCommandRequest& cmd,
-                                                  bool disableAwaitDataFailpointActive) {
-    // Make the originating query's lifespan state available on this getMore's 'opCtx'.
-    cursor.bindQueryLifespan(opCtx);
+[[nodiscard]] QueryLifespan::AlternativeQueryRegion setUpOperationContextAndCurOpStateForGetMore(
+    OperationContext* opCtx,
+    CurOp* curOp,
+    const ClientCursor& cursor,
+    const GetMoreCommandRequest& cmd,
+    bool disableAwaitDataFailpointActive) {
+    // Run the rest of the setup (and the getMore) under the cursor's lifespan.
+    auto queryLifespanRegion = cursor.bindQueryLifespan(opCtx);
 
-    // TODO(SERVER-130398): Migrate the remaining per-getMore state setup below onto QueryLifespan.
-
+    // TODO(SERVER-130398): Migrate the per-getMore state setup below onto QueryLifespan.
     applyConcernsAndReadPreference(opCtx, cursor);
 
     // Restore rawData onto the opCtx.
@@ -355,6 +357,8 @@ void setUpOperationContextAndCurOpStateForGetMore(OperationContext* opCtx,
             opCtx->setComment(comment.wrap());
         }
     }
+
+    return queryLifespanRegion;
 }
 
 /**
@@ -566,14 +570,9 @@ public:
         void acquireLocksAndIterateCursor(OperationContext* opCtx,
                                           rpc::ReplyBuilderInterface* reply,
                                           ClientCursorPin& cursorPin,
-                                          CurOp* curOp) {
+                                          CurOp* curOp,
+                                          bool disableAwaitDataFailpointActive) {
             const auto& cmd = request();
-            const bool disableAwaitDataFailpointActive =
-                MONGO_unlikely(disableAwaitDataForGetMoreCmd.shouldFail());
-
-            // Inherit properties like readConcern and maxTimeMS from our originating cursor.
-            setUpOperationContextAndCurOpStateForGetMore(
-                opCtx, curOp, *cursorPin.getCursor(), cmd, disableAwaitDataFailpointActive);
 
             NamespaceString nss = ns();
             CursorLocks locks{opCtx, nss, cursorPin};
@@ -922,7 +921,18 @@ public:
             // later checking of whether this invocation performed a write.
             boost::optional<size_t> numTxnOpsPre = getNumTxnOps();
 
-            acquireLocksAndIterateCursor(opCtx, reply, cursorPin, curOp);
+            const bool disableAwaitDataFailpointActive =
+                MONGO_unlikely(disableAwaitDataForGetMoreCmd.shouldFail());
+
+            // Inherit properties like readConcern and maxTimeMS from our originating cursor. The
+            // returned guard runs the rest of the getMore under the cursor's lifespan (restoring
+            // the opCtx's previous lifespan on return); it is held to the end of the invocation so
+            // late steps (read-concern waits, unpin failpoints) still run under it.
+            auto queryLifespanRegion = setUpOperationContextAndCurOpStateForGetMore(
+                opCtx, curOp, *cursorPin.getCursor(), cmd, disableAwaitDataFailpointActive);
+
+            acquireLocksAndIterateCursor(
+                opCtx, reply, cursorPin, curOp, disableAwaitDataFailpointActive);
 
             if (MONGO_unlikely(getMoreHangAfterPinCursor.shouldFail())) {
                 LOGV2(20477,

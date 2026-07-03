@@ -380,12 +380,14 @@ public:
 
     /**
      * Binds this cursor's query lifespan onto 'opCtx', making the originating query's resolved
-     * state (query settings, knob configuration) available for the duration of the operation.
-     * Called when a getMore adopts the cursor.
+     * state (query settings, knob configuration) available while the returned guard is alive, and
+     * restoring the opCtx's previous lifespan when it goes out of scope. Called when a getMore
+     * adopts the cursor; hold the returned guard for the duration of the operation.
      */
-    void bindQueryLifespan(OperationContext* opCtx) const {
+    [[nodiscard]] QueryLifespan::AlternativeQueryRegion bindQueryLifespan(
+        OperationContext* opCtx) const {
         tassert(13020603, "ClientCursor should always have a QueryLifespan", _queryLifespan);
-        _queryLifespan->bind(opCtx);
+        return QueryLifespan::AlternativeQueryRegion(opCtx, _queryLifespan);
     }
 
 private:
