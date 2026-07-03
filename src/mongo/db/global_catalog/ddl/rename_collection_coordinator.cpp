@@ -1054,6 +1054,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         _doc.getSourceUUID(),
                         _doc.getTargetUUID(),
                         _doc.getNewTargetCollectionUuid(),
+                        _doc.getAuthoritativeMetadataAccessLevel(),
                         Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx),
                         session,
                         executor,

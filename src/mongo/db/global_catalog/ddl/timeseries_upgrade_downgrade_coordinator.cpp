@@ -507,6 +507,7 @@ ExecutorFuture<void> TimeseriesUpgradeDowngradeCoordinator::_runImpl(
                     collUuid,
                     boost::none /* targetUUID */,
                     boost::none /* newTargetUUID */,
+                    _doc.getAuthoritativeMetadataAccessLevel(),
                     Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx),
                     session,
                     executor,

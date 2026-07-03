@@ -512,6 +512,7 @@ MONGO_MOD_PRIVATE void commitRenameCollectionMetadataToShardCatalog(
     const boost::optional<UUID>& sourceUuid,
     const boost::optional<UUID>& targetUuid,
     const boost::optional<UUID>& newTargetUuid,
+    AuthoritativeMetadataAccessLevelEnum authoritativeAccessLevel,
     const std::vector<ShardRef>& shardRefs,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,

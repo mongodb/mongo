@@ -42,6 +42,7 @@
 #include "mongo/db/sharding_environment/shard_server_op_observer.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
+#include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -1410,6 +1411,141 @@ TEST_F(CommitCollectionMetadataLocallyTest, RenameShardedToShardedNoReplacement)
 
     auto collDocs = findLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace);
     ASSERT_EQ(UUID::fromCDR(collDocs[0].getField("uuid").uuid()), fromCollType.getUuid());
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest,
+       RenameShardedToShardedNoReplacementDoesNotRewritePersistedChunks) {
+    // UUID-preserving rename leaves durable chunk documents untouched; only the collection entry
+    // moves to toNss.
+    auto [fromCollType, fromChunks] = makeCollectionMetadata(kFromNss, 2);
+    seedShardCatalog(fromCollType, fromChunks);
+    const auto chunkDocsBefore = findLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace);
+    auto writeOrderObserver = installWriteOrderObserver();
+
+    CollectionType renamedColl{kToNss,
+                               fromCollType.getEpoch(),
+                               fromCollType.getTimestamp(),
+                               Date_t::now(),
+                               fromCollType.getUuid(),
+                               kShardKeyPattern};
+    mockCatalogClient()->setCollectionMetadata(renamedColl, fromChunks);
+
+    shard_catalog_commit::commitRenameOfCollectionMetadata(operationContext(),
+                                                           kFromNss,
+                                                           fromCollType.getUuid(),
+                                                           kToNss,
+                                                           boost::none,
+                                                           boost::none,
+                                                           false /* isUpgrading */,
+                                                           false /* isDbPrimary */);
+
+    ASSERT_EQ(writeOrderObserver->writes().size(), 1u);
+    ASSERT_EQ(writeOrderObserver->writes()[0],
+              NamespaceString::kConfigShardCatalogCollectionsNamespace);
+
+    const auto chunkDocsAfter = findLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace);
+    ASSERT_EQ(chunkDocsBefore.size(), chunkDocsAfter.size());
+    for (size_t i = 0; i < chunkDocsBefore.size(); ++i) {
+        ASSERT_BSONOBJ_EQ(chunkDocsBefore[i], chunkDocsAfter[i]);
+    }
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, RenameRecoversTargetFilteringMetadataInMemory) {
+    // fromNss is sharded with chunks owned by this shard; toNss did not exist before the rename.
+    auto [fromCollType, fromChunks] = makeCollectionMetadata(kFromNss, 2);
+    for (auto& chunk : fromChunks) {
+        chunk.setShard(ShardingState::get(operationContext())->shardId());
+    }
+    seedShardCatalog(fromCollType, fromChunks);
+
+    // The CSRS now shows the renamed collection under toNss with fromNss's UUID.
+    CollectionType renamedColl{kToNss,
+                               fromCollType.getEpoch(),
+                               fromCollType.getTimestamp(),
+                               Date_t::now(),
+                               fromCollType.getUuid(),
+                               kShardKeyPattern};
+    mockCatalogClient()->setCollectionMetadata(renamedColl, fromChunks);
+
+    shard_catalog_commit::commitRenameOfCollectionMetadata(operationContext(),
+                                                           kFromNss,
+                                                           fromCollType.getUuid(),
+                                                           kToNss,
+                                                           boost::none,
+                                                           boost::none,
+                                                           false /* isUpgrading */,
+                                                           false /* isDbPrimary */);
+
+    // The target filtering metadata is recovered in-memory right away instead of being deferred to
+    // the first query.
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kToNss);
+    auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadata) << "target metadata should have been recovered eagerly after the rename";
+    ASSERT_TRUE(metadata->isSharded());
+    ASSERT_EQ(metadata->getChunkManager()->getUUID(), fromCollType.getUuid());
+    ASSERT_TRUE(metadata->getShardPlacementVersion().isSet());
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest,
+       RenameDbPrimaryWithoutOwnedChunksRecoversTrackedMetadata) {
+    // toNss is tracked but this shard owns no chunks for it. As the db-primary it still installs
+    // tracked (unowned) metadata in-memory rather than deferring to the first query.
+    auto [fromCollType, unused] = makeCollectionMetadata(kFromNss, 0);
+
+    CollectionType renamedColl{kToNss,
+                               fromCollType.getEpoch(),
+                               fromCollType.getTimestamp(),
+                               Date_t::now(),
+                               fromCollType.getUuid(),
+                               kShardKeyPattern};
+    mockCatalogClient()->setCollectionMetadata(renamedColl, {});
+
+    shard_catalog_commit::commitRenameOfCollectionMetadata(operationContext(),
+                                                           kFromNss,
+                                                           fromCollType.getUuid(),
+                                                           kToNss,
+                                                           boost::none,
+                                                           boost::none,
+                                                           false /* isUpgrading */,
+                                                           true /* isDbPrimary */);
+
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 1);
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 0);
+
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kToNss);
+    auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadata);
+    ASSERT_TRUE(metadata->hasRoutingTable());
+    // The db-primary owns no real chunks for this collection, so its placement version is unset.
+    ASSERT_FALSE(metadata->getShardPlacementVersion().isSet());
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, RenameUnownedNonPrimaryClearsTargetMetadata) {
+    // toNss is tracked but this shard neither owns chunks nor is the db-primary, so it must not
+    // hold any in-memory metadata for it nor persist a collection entry.
+    auto [fromCollType, unused] = makeCollectionMetadata(kFromNss, 0);
+
+    CollectionType renamedColl{kToNss,
+                               fromCollType.getEpoch(),
+                               fromCollType.getTimestamp(),
+                               Date_t::now(),
+                               fromCollType.getUuid(),
+                               kShardKeyPattern};
+    mockCatalogClient()->setCollectionMetadata(renamedColl, {});
+
+    shard_catalog_commit::commitRenameOfCollectionMetadata(operationContext(),
+                                                           kFromNss,
+                                                           fromCollType.getUuid(),
+                                                           kToNss,
+                                                           boost::none,
+                                                           boost::none,
+                                                           false /* isUpgrading */,
+                                                           false /* isDbPrimary */);
+
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 0);
+
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kToNss);
+    ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown());
 }
 
 }  // namespace

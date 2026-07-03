@@ -1109,6 +1109,7 @@ void commitRenameCollectionMetadataToShardCatalog(
     const boost::optional<UUID>& sourceUuid,
     const boost::optional<UUID>& targetUuid,
     const boost::optional<UUID>& newTargetUuid,
+    AuthoritativeMetadataAccessLevelEnum authoritativeAccessLevel,
     const std::vector<ShardRef>& shardRefs,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
@@ -1120,14 +1121,13 @@ void commitRenameCollectionMetadataToShardCatalog(
     request.setTargetUUID(targetUuid);
     request.setNewTargetUUID(newTargetUuid);
 
-    // TODO SERVER-127216: Replace with the CRUD feature flag to check if we're upgrading or not.
-    //
     // In the event the cluster is undergoing an FCV upgrade then metadata cannot be
     // assumed to be present on the shard since it may or may not yet contain the
     // authoritative catalog. As such the commit has to fetch the data. This is an
     // idempotent operation so it poses no issues with the concurrent
     // AuthoritativeCloningCoordinator.
-    const bool isUpgrading = true;
+    const bool isUpgrading =
+        authoritativeAccessLevel == AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
     request.setShouldCloneEverything(isUpgrading);
 
     generic_argument_util::setMajorityWriteConcern(request);

@@ -1017,23 +1017,12 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
 
         if (_metadata.getAuthoritativeMetadataAccessLevel() >=
             ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
-            // TODO SERVER-127215: Mark this as not upgrading once rename recovers from disk once it
-            // finishes.
-            //
-            // Force the rename to act as if it is upgrading in order to force a recovery at the
-            // end. Ideally this should be false since:
-            // 1. Resharding cannot commit during an FCV upgrade
-            // 2. The shard already contains the metadata for both "from" and "to" collections and
-            //    thus can assume it's living in a fully authoritative world.
-            bool isUpgrading = true;
-
             shard_catalog_commit_for_resharding::commitRenameOfTemporaryCollection(
                 opCtx.get(),
                 _metadata.getTempReshardingNss(),
                 _metadata.getReshardingUUID(),
                 _metadata.getSourceNss(),
                 _metadata.getSourceUUID(),
-                isUpgrading,
                 _metadata.getPrimaryShardId() == ShardingState::get(opCtx.get())->shardId());
         }
     } else {

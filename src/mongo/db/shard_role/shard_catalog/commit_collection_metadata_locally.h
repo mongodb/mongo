@@ -60,8 +60,11 @@ void commitDropOfStaleChunksForRename(OperationContext* opCtx, const UUID& uuid)
 /**
  * Modifies the shard catalog for both fromNss and toNss in order to durably persist the decision to
  * rename the collection.
- * The command will invalidate the collection metadata for both namespaces and clear the in-memory
- * state in order to repopulate it on the next query.
+ * The source namespace metadata is invalidated and cleared. The target namespace filtering metadata
+ * is recovered in-memory from the (already durable) local shard catalog so that it does not have to
+ * be repopulated on the next query, while secondaries are signalled to recover it lazily. When the
+ * commit is forced to behave as an FCV upgrade, the full metadata is instead re-fetched from the
+ * global catalog.
  */
 void commitRenameOfCollectionMetadata(OperationContext* opCtx,
                                       const NamespaceString& fromNss,
@@ -141,7 +144,6 @@ void commitRenameOfTemporaryCollection(OperationContext* opCtx,
                                        const UUID& tempReshardingUUID,
                                        const NamespaceString& sourceNss,
                                        const UUID& sourceUUID,
-                                       bool isUpgrading,
                                        bool isDbPrimaryShard);
 
 void commitDropOfStaleChunksForRename(OperationContext* opCtx,
