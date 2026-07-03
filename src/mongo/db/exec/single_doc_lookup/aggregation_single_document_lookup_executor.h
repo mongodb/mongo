@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
+#include "mongo/db/exec/single_doc_lookup/single_document_lookup_stats.h"
 
 namespace mongo::exec::agg {
 
@@ -41,11 +42,17 @@ namespace mongo::exec::agg {
  */
 class AggregationSingleDocumentLookupExecutor : public SingleDocumentLookupExecutor {
 public:
+    explicit AggregationSingleDocumentLookupExecutor(SingleDocumentLookupStatsRecorder recorder)
+        : _recorder(std::move(recorder)) {}
+
     LookupResult performLookup(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                const NamespaceString& nss,
                                boost::optional<UUID> collectionUUID,
                                const Document& documentKey,
                                boost::optional<Timestamp> afterClusterTime) override;
+
+private:
+    SingleDocumentLookupStatsRecorder _recorder;
 };
 
 }  // namespace mongo::exec::agg

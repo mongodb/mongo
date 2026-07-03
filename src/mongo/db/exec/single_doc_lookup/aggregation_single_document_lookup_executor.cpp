@@ -30,6 +30,7 @@
 #include "mongo/db/exec/single_doc_lookup/aggregation_single_document_lookup_executor.h"
 
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/util/timer.h"
 
 namespace mongo::exec::agg {
 
@@ -48,12 +49,17 @@ SingleDocumentLookupExecutor::LookupResult AggregationSingleDocumentLookupExecut
                                    << "afterClusterTime" << *afterClusterTime);
     }
 
+    // Time the lookup itself. A throw (e.g. TooManyMatchingDocuments) records nothing: the outcome
+    // is neither found nor not-found, and the timer simply unwinds.
+    Timer timer;
     auto result = expCtx->getMongoProcessInterface()->lookupSingleDocument(
         expCtx, nss, std::move(collectionUUID), documentKey, std::move(readConcern));
 
     if (result) {
+        _recorder.recordFound(timer.elapsed());
         return {LookupResult::HandledStatus::kDocumentFound, std::move(*result)};
     }
+    _recorder.recordNotFound(timer.elapsed());
     return {LookupResult::HandledStatus::kDocumentNotFound, boost::none};
 }
 

@@ -1,3 +1,42 @@
+// The single-document-lookup engine that enriched an updateLookup change event with its post-image.
+// The serverStatus key under 'changeStreams.updateLookup' is the value of each constant.
+export const UpdateLookupExecutor = Object.freeze({
+    kAggregation: "aggregation",
+    kExpress: "express",
+    kSBE: "sbe",
+});
+
+/**
+ * Computes numeric difference of server status metrics between 'after' and 'before'.
+ */
+function _metricsDelta(before, after) {
+    if (typeof after === "number") {
+        // Treat a missing before-leaf as 0 so lazily-created metrics (absent in before-snapshot)
+        // produce a correct delta rather than NaN.
+        return after - (typeof before === "number" ? before : 0);
+    }
+
+    if (typeof after === "object" && after !== null) {
+        // NumberLong / NumberInt override valueOf() to return a primitive JS number.
+        if (typeof after.valueOf() === "number") {
+            const beforeVal =
+                before != null && typeof before.valueOf() === "number" ? before.valueOf() : 0;
+            return after.valueOf() - beforeVal;
+        }
+
+        // BSON leaf types with no sensible before/after delta (point-in-time values, not counters).
+        const kNonDiffableTypes = [Timestamp, Date, ObjectId, BinData, NumberDecimal];
+        if (!kNonDiffableTypes.some((BsonType) => after instanceof BsonType)) {
+            const delta = {};
+            for (const key of Object.keys(after)) {
+                delta[key] = _metricsDelta(before != null ? before[key] : undefined, after[key]);
+            }
+            return delta;
+        }
+    }
+    return after;
+}
+
 // Helper object for retrieving change stream metrics from the 'serverStatus' command's output.
 export class ServerStatusMetrics {
     static getCsCursorTotalOpened(db) {
@@ -26,6 +65,16 @@ export class ServerStatusMetrics {
 
     static getCsErrorMetrics(db) {
         return this.getCsMetrics(db).error;
+    }
+
+    // Snapshots the full serverStatus metrics before fn(), runs fn(), and returns the delta
+    // (after - before), treating a missing before-leaf as 0. Non-plain-object and non-numeric
+    // leaves hold the after value unchanged.
+    static withServerStatusMetrics(db, fn) {
+        const before = this.getSsMetrics(db);
+        fn();
+        const after = this.getSsMetrics(db);
+        return _metricsDelta(before, after);
     }
 }
 

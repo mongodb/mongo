@@ -35,6 +35,7 @@
 #include "mongo/db/exec/single_doc_lookup/express_single_document_lookup_executor.h"
 #include "mongo/db/exec/single_doc_lookup/local_lookup_eligibility_factory_impl.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
+#include "mongo/db/exec/single_doc_lookup/single_document_lookup_stats.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
@@ -50,7 +51,8 @@ namespace {
 std::unique_ptr<exec::agg::SingleDocumentLookupExecutor> buildUpdateLookupExecutor(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     using namespace exec::agg;
-    auto aggExecutor = std::make_unique<AggregationSingleDocumentLookupExecutor>();
+    auto aggExecutor = std::make_unique<AggregationSingleDocumentLookupExecutor>(
+        exec::SingleDocumentLookupStatsRecorder::makeUpdateLookupAggregationRecorder());
 
     const auto& ifrContext = expCtx->getIfrContext();
     const bool optimizedLookupEnabled = ifrContext &&

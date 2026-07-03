@@ -213,6 +213,7 @@ mongo_cc_library(
     ],
     deps = [
         ":single_document_lookup_executor",
+        ":single_document_lookup_stats",
         "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
     ],
 )
@@ -225,8 +226,10 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":aggregation_single_document_lookup_executor",
+        ":single_document_lookup_stats_test_util",
         "//src/mongo/db/pipeline:aggregation_context_fixture",
         "//src/mongo/db/pipeline/process_interface:stub_mongo_process_interface",
+        "//src/mongo/otel/metrics:metrics_test_util",
     ],
 )
 
