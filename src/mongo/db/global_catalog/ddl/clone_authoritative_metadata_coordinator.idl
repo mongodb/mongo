@@ -58,3 +58,7 @@ structs:
                 type: array<database_name>
                 description: "The list of databases that needs to be cloned."
                 optional: true
+            lastClonedCollectionForCurrentDb:
+                type: namespacestring
+                description: "The last cloned collection of the database currently being cloned. Used to resume after a failover."
+                optional: true

@@ -29,6 +29,9 @@ filters:
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "authoritative_metadata_clone_failover.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
   - "authoritative_shards_setfcv_blocks_chunk_operations.js":
     approvers:
       - 10gen/server-catalog-and-routing-ddl

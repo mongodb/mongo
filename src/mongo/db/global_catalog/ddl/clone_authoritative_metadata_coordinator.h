@@ -105,6 +105,11 @@ private:
      * Removes a database from the list of databases to be cloned.
      */
     void _removeDbFromCloningList(OperationContext* opCtx, const DatabaseName& dbName);
+
+    /**
+     * Persists the last collection cloned for the current database.
+     */
+    void _updateLastClonedCollection(OperationContext* opCtx, const NamespaceString& nss);
 };
 
 }  // namespace mongo
