@@ -525,6 +525,30 @@ void issueConfigCollectionsUpdate(OperationContext* opCtx,
 
     assertNumDocsMatchedEqualsExpected(request, res, 1 /* expected */);
 }
+
+// Runs changeMetadataFunc in a transaction. On the non-authoritative path, also bumps the
+// placement version for each namespace in namespacesToBump so that participants learn about
+// resharding state changes via shard-version refreshes. On the authoritative path, participants
+// receive explicit commands instead, so the bump is skipped to avoid advancing the config server
+// version ahead of the owning shard's authoritative catalog (which would cause it to reject the
+// next chunk migration).
+void runCoordinatorCatalogTxn(
+    OperationContext* opCtx,
+    ReshardingAuthoritativeMetadataAccessLevelEnum authoritativeLevel,
+    std::vector<NamespaceString> namespacesToBump,
+    unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc) {
+    if (authoritativeLevel >= ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
+        executeMetadataChangesInTxn(opCtx, std::move(changeMetadataFunc));
+    } else {
+        // TODO (SERVER-98118): remove once featureFlagAuthoritativeShardsDDL is last LTS.
+        ShardingCatalogManager::get(opCtx)
+            ->bumpMultipleCollectionPlacementVersionsAndChangeMetadataInTxn(
+                opCtx,
+                std::move(namespacesToBump),
+                std::move(changeMetadataFunc),
+                ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+    }
+}
 }  // namespace
 
 void updateConfigCollectionsForOriginalNss(OperationContext* opCtx,
@@ -729,9 +753,10 @@ void updateTagsDocsForTempNss(OperationContext* opCtx,
 void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
                                           ReshardingMetrics* metrics,
                                           const ReshardingCoordinatorDocument& coordinatorDoc) {
-    ShardingCatalogManager::get(opCtx)->bumpCollectionPlacementVersionAndChangeMetadataInTxn(
+    runCoordinatorCatalogTxn(
         opCtx,
-        coordinatorDoc.getSourceNss(),
+        coordinatorDoc.getAuthoritativeMetadataAccessLevel(),
+        {coordinatorDoc.getSourceNss()},
         [&](OperationContext* opCtx, TxnNumber txnNumber) {
             auto doc = ShardingCatalogManager::get(opCtx)->findOneConfigDocumentInTxn(
                 opCtx,
@@ -758,8 +783,7 @@ void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
             // 'reshardingFields'
             updateConfigCollectionsForOriginalNss(
                 opCtx, coordinatorDoc, boost::none, boost::none, txnNumber);
-        },
-        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+        });
 }
 
 void writeParticipantShardsAndTempCollInfo(OperationContext* opCtx,
@@ -775,9 +799,10 @@ void writeParticipantShardsAndTempCollInfo(OperationContext* opCtx,
     removeChunkAndTagsDocs(opCtx, tagsQuery, coordinatorDoc.getReshardingUUID());
     insertChunksForTempNss(opCtx, initialChunks);
 
-    ShardingCatalogManager::get(opCtx)->bumpCollectionPlacementVersionAndChangeMetadataInTxn(
+    runCoordinatorCatalogTxn(
         opCtx,
-        coordinatorDoc.getSourceNss(),
+        coordinatorDoc.getAuthoritativeMetadataAccessLevel(),
+        {coordinatorDoc.getSourceNss()},
         [&](OperationContext* opCtx, TxnNumber txnNumber) {
             // Update on-disk state to reflect latest state transition.
             ReshardingCoordinatorDocument updatedCoordinatorDoc =
@@ -796,8 +821,7 @@ void writeParticipantShardsAndTempCollInfo(OperationContext* opCtx,
 
             updateConfigCollectionsForOriginalNss(
                 opCtx, updatedCoordinatorDoc, boost::none, boost::none, txnNumber);
-        },
-        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+        });
 
     setupZonesForTempNss(opCtx, coordinatorDoc.getTempReshardingNss(), zones);
 }
@@ -815,40 +839,35 @@ void writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
         collNames.emplace_back(coordinatorDoc.getTempReshardingNss());
     }
 
-    ShardingCatalogManager::get(opCtx)
-        ->bumpMultipleCollectionPlacementVersionsAndChangeMetadataInTxn(
-            opCtx,
-            collNames,
-            [&](OperationContext* opCtx, TxnNumber txnNumber) {
-                // Update the config.reshardingOperations entry
+    runCoordinatorCatalogTxn(
+        opCtx,
+        coordinatorDoc.getAuthoritativeMetadataAccessLevel(),
+        std::move(collNames),
+        [&](OperationContext* opCtx, TxnNumber txnNumber) {
+            // Update the config.reshardingOperations entry
 
-                // TODO SERVER-103243 - once this ticket is done we can remove if statement and
-                // directly call the phase transition function.
-                ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
-                if (phaseTransitionFn) {
-                    updatedCoordinatorDoc = (*phaseTransitionFn)(opCtx, txnNumber);
-                } else {
-                    writeToCoordinatorStateNss(opCtx, metrics, coordinatorDoc, txnNumber);
-                }
+            // TODO SERVER-103243 - once this ticket is done we can remove if statement and
+            // directly call the phase transition function.
+            ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
+            if (phaseTransitionFn) {
+                updatedCoordinatorDoc = (*phaseTransitionFn)(opCtx, txnNumber);
+            } else {
+                writeToCoordinatorStateNss(opCtx, metrics, coordinatorDoc, txnNumber);
+            }
 
-                // Update the config.collections entry for the original collection
-                updateConfigCollectionsForOriginalNss(
-                    opCtx, updatedCoordinatorDoc, boost::none, boost::none, txnNumber);
+            // Update the config.collections entry for the original collection
+            updateConfigCollectionsForOriginalNss(
+                opCtx, updatedCoordinatorDoc, boost::none, boost::none, txnNumber);
 
-                // Update the config.collections entry for the temporary resharding collection. If
-                // we've already successfully committed that the operation will succeed, we've
-                // removed the entry for the temporary collection and updated the entry with
-                // original namespace to have the new shard key, UUID, and epoch
-                if (nextState < CoordinatorStateEnum::kCommitting) {
-                    writeToConfigCollectionsForTempNss(opCtx,
-                                                       updatedCoordinatorDoc,
-                                                       boost::none,
-                                                       boost::none,
-                                                       boost::none,
-                                                       txnNumber);
-                }
-            },
-            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+            // Update the config.collections entry for the temporary resharding collection. If
+            // we've already successfully committed that the operation will succeed, we've
+            // removed the entry for the temporary collection and updated the entry with
+            // original namespace to have the new shard key, UUID, and epoch.
+            if (nextState < CoordinatorStateEnum::kCommitting) {
+                writeToConfigCollectionsForTempNss(
+                    opCtx, updatedCoordinatorDoc, boost::none, boost::none, boost::none, txnNumber);
+            }
+        });
 }
 
 ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
@@ -899,39 +918,18 @@ ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFi
 
         removeChunkAndTagsDocs(opCtx, tagsQuery, coordinatorDoc.getReshardingUUID());
     }
-    auto changeMetadataFunc = [&](OperationContext* opCtx, TxnNumber txnNumber) {
-        // Remove entry for this resharding operation from config.reshardingOperations
-        writeToCoordinatorStateNss(opCtx, metrics, updatedCoordinatorDoc, txnNumber);
+    runCoordinatorCatalogTxn(
+        opCtx,
+        updatedCoordinatorDoc.getAuthoritativeMetadataAccessLevel(),
+        {updatedCoordinatorDoc.getSourceNss()},
+        [&](OperationContext* opCtx, TxnNumber txnNumber) {
+            // Remove entry for this resharding operation from config.reshardingOperations
+            writeToCoordinatorStateNss(opCtx, metrics, updatedCoordinatorDoc, txnNumber);
 
-        // Remove the resharding fields from the config.collections entry
-        updateConfigCollectionsForOriginalNss(
-            opCtx, updatedCoordinatorDoc, boost::none, boost::none, txnNumber);
-    };
-
-    const bool isAuthoritative = updatedCoordinatorDoc.getAuthoritativeMetadataAccessLevel() >=
-        ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
-
-    if (isAuthoritative) {
-        // In the authoritative model the owning shards already hold the final,
-        // reshardingFields-free filtering metadata, committed directly to them during the temporary
-        // collection rename, and no participant acts on reshardingFields once the decision has been
-        // committed. Bumping the collection placement version here would only advance the config
-        // server ahead of the owning shard's authoritative version, which then rejects the next
-        // chunk migration. So remove the resharding state without bumping. Routers learn of the
-        // reshardingFields removal lazily; they never act on the field, so observing it one refresh
-        // late (or unbumped) is harmless.
-        ShardingCatalogManager::withTransaction(
-            opCtx,
-            NamespaceString::kConfigReshardingOperationsNamespace,
-            std::move(changeMetadataFunc),
-            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
-    } else {
-        ShardingCatalogManager::get(opCtx)->bumpCollectionPlacementVersionAndChangeMetadataInTxn(
-            opCtx,
-            updatedCoordinatorDoc.getSourceNss(),
-            std::move(changeMetadataFunc),
-            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
-    }
+            // Remove the resharding fields from the config.collections entry
+            updateConfigCollectionsForOriginalNss(
+                opCtx, updatedCoordinatorDoc, boost::none, boost::none, txnNumber);
+        });
 
     metrics->onStateTransition(coordinatorDoc.getState(), updatedCoordinatorDoc.getState());
     return updatedCoordinatorDoc;

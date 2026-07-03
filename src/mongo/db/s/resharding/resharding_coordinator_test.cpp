@@ -1420,5 +1420,128 @@ TEST_F(ReshardingCoordinatorNoRefreshPersistenceTest,
     assertTempEntryHasNoReshardingFields("after kBlockingWrites transition");
 }
 
+/**
+ * Verifies that writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions skips the
+ * placement-version bump when the coordinator doc has an authoritative metadata access level.
+ */
+class ReshardingCoordinatorAuthoritativePersistenceTest
+    : public ReshardingCoordinatorNoRefreshPersistenceTest {
+public:
+    ReshardingCoordinatorAuthoritativePersistenceTest()
+        : _authDDLOn{"featureFlagAuthoritativeShardsDDL", true},
+          _authCRUDOn{"featureFlagAuthoritativeShardsCRUD", true} {}
+
+protected:
+    ReshardingCoordinatorDocument makeAuthoritativeCoordinatorDoc(CoordinatorStateEnum state) {
+        auto doc = makeCoordinatorDoc(state, false, boost::none);
+        doc.setAuthoritativeMetadataAccessLevel(
+            ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed);
+        return doc;
+    }
+
+    ReshardingCoordinatorDocument insertAuthoritativeStateAndCatalogEntries(
+        CoordinatorStateEnum state) {
+        auto opCtx = operationContext();
+        DBDirectClient client(opCtx);
+
+        auto coordinatorDoc = makeAuthoritativeCoordinatorDoc(state);
+        client.insert(NamespaceString::kConfigReshardingOperationsNamespace,
+                      coordinatorDoc.toBSON());
+        return coordinatorDoc;
+    }
+
+    // Inserts a bare config.collections entry for the source nss without reshardingFields
+    // (authoritative path).
+    void insertSourceCollectionEntry(const ReshardingCoordinatorDocument& coordinatorDoc) {
+        auto opCtx = operationContext();
+        DBDirectClient client(opCtx);
+        auto entry = makeOriginalCollectionCatalogEntry(
+            coordinatorDoc,
+            boost::none /* reshardingFields */,
+            _originalEpoch,
+            opCtx->getServiceContext()->getPreciseClockSource()->now());
+        client.insert(NamespaceString::kConfigsvrCollectionsNamespace, entry.toBSON());
+    }
+
+private:
+    unittest::ServerParameterGuard _authDDLOn;
+    unittest::ServerParameterGuard _authCRUDOn;
+};
+
+TEST_F(ReshardingCoordinatorAuthoritativePersistenceTest,
+       InsertCoordDocSkipsPlacementVersionBumpWhenAuthoritative) {
+    auto coordinatorDoc = makeAuthoritativeCoordinatorDoc(CoordinatorStateEnum::kInitializing);
+    insertSourceCollectionEntry(coordinatorDoc);
+
+    // A bump attempt would fail because there are no chunks in config.chunks.
+    ASSERT_DOES_NOT_THROW(
+        insertCoordDocAndChangeOrigCollEntry(operationContext(), _metrics.get(), coordinatorDoc));
+}
+
+TEST_F(ReshardingCoordinatorAuthoritativePersistenceTest,
+       WriteParticipantShardsSkipsPlacementVersionBumpWhenAuthoritative) {
+    auto coordinatorDoc =
+        insertAuthoritativeStateAndCatalogEntries(CoordinatorStateEnum::kPreparingToDonate);
+
+    auto initialChunks =
+        makeChunks(_reshardingUUID, _tempEpoch, _newShardKey, {OID::gen(), OID::gen()});
+
+    auto phaseTransitionFn = [&](OperationContext* opCtx, TxnNumber txnNumber) {
+        auto updatedDoc = coordinatorDoc;
+        updatedDoc.setState(CoordinatorStateEnum::kCloning);
+        writeToCoordinatorStateNss(opCtx, _metrics.get(), updatedDoc, txnNumber);
+        return updatedDoc;
+    };
+
+    // A bump attempt would fail because there are no chunks in config.chunks.
+    ASSERT_DOES_NOT_THROW(writeParticipantShardsAndTempCollInfo(operationContext(),
+                                                                _metrics.get(),
+                                                                coordinatorDoc,
+                                                                std::move(phaseTransitionFn),
+                                                                std::move(initialChunks),
+                                                                {} /* zones */,
+                                                                boost::none));
+}
+
+TEST_F(ReshardingCoordinatorAuthoritativePersistenceTest,
+       StateTransitionSkipsPlacementVersionBumpWhenAuthoritative) {
+    auto coordinatorDoc =
+        insertAuthoritativeStateAndCatalogEntries(CoordinatorStateEnum::kApplying);
+
+    auto nextDoc = coordinatorDoc;
+    nextDoc.setState(CoordinatorStateEnum::kBlockingWrites);
+
+    // A bump attempt would fail because there are no chunks in config.chunks.
+    ASSERT_DOES_NOT_THROW(writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
+        operationContext(), _metrics.get(), nextDoc, boost::none));
+}
+
+TEST_F(ReshardingCoordinatorAuthoritativePersistenceTest,
+       AbortTransitionSkipsPlacementVersionBumpWhenAuthoritative) {
+    auto coordinatorDoc = insertAuthoritativeStateAndCatalogEntries(CoordinatorStateEnum::kCloning);
+
+    auto abortDoc = coordinatorDoc;
+    abortDoc.setState(CoordinatorStateEnum::kAborting);
+    emplaceTruncatedAbortReasonIfExists(abortDoc,
+                                        Status(ErrorCodes::ReshardCollectionAborted, "test abort"));
+
+    // A bump attempt would fail because there are no chunks in config.chunks.
+    ASSERT_DOES_NOT_THROW(writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
+        operationContext(), _metrics.get(), abortDoc, boost::none));
+}
+
+TEST_F(ReshardingCoordinatorAuthoritativePersistenceTest,
+       RemoveCoordinatorDocSkipsPlacementVersionBumpWhenAuthoritative) {
+    auto coordinatorDoc =
+        insertAuthoritativeStateAndCatalogEntries(CoordinatorStateEnum::kCommitting);
+
+    // A bump attempt would fail because there are no chunks in config.chunks.
+    ASSERT_DOES_NOT_THROW(removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
+        operationContext(),
+        _metrics.get(),
+        coordinatorDoc,
+        Status(ErrorCodes::ReshardCollectionAborted, "test abort")));
+}
+
 }  // namespace
 }  // namespace mongo
