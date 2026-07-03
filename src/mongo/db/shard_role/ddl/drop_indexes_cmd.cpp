@@ -197,7 +197,7 @@ public:
         }
 
         auto acquisition = [&] {
-            auto collOrViewAcquisition = acquireCollectionOrView(
+            auto [collOrViewAcquisition, _] = timeseries::acquireCollectionOrViewWithBucketsLookup(
                 opCtx,
                 CollectionOrViewAcquisitionRequest::fromOpCtx(
                     opCtx, toReIndexNss, AcquisitionPrerequisites::OperationType::kWrite),
@@ -208,6 +208,10 @@ public:
             return CollectionAcquisition(std::move(collOrViewAcquisition));
         }();
         uassert(ErrorCodes::NamespaceNotFound, "collection does not exist", acquisition.exists());
+
+        uassert(ErrorCodes::CommandNotSupported,
+                "reIndex is not supported on timeseries collections",
+                !acquisition.getCollectionPtr()->isTimeseriesCollection());
 
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
             acquisition.uuid());
