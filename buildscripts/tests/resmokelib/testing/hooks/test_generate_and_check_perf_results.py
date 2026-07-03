@@ -7,6 +7,7 @@ import unittest
 
 import mock
 import requests
+from github import GithubException
 
 import buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results as cbr
 from buildscripts.resmokelib.errors import ServerFailure
@@ -842,6 +843,90 @@ class TestBenchmarkThreadsReport(GenerateAndCheckPerfResultsFixture):
         self.assertIn("MEAN", collected_types)
 
 
+def _make_comment(body, login):
+    """Build a mock PR comment with the given body and author login."""
+    comment = mock.MagicMock()
+    comment.body = body
+    comment.user.login = login
+    return comment
+
+
+def _build_override_github(
+    *,
+    issue_comments=(),
+    review_comments=(),
+    commit_comments=(),
+    active_members=(),
+    pending_members=(),
+    membership_error=None,
+):
+    """Build a mock Github client for exercising the override-check path.
+
+    active_members:   logins resolved as active members of the approver team.
+    pending_members:  logins resolved as having a non-active ('pending') membership.
+    membership_error: if set, every get_team_membership call raises this exception.
+    Any other login raises GithubException(404), i.e. "not a member".
+    """
+    mock_github = mock.MagicMock()
+    mock_pr = mock.MagicMock()
+    mock_repo = mock.MagicMock()
+    mock_pr.number = 12345
+    mock_pr.get_issue_comments.return_value = list(issue_comments)
+    mock_pr.get_review_comments.return_value = list(review_comments)
+    mock_pr.get_comments.return_value = list(commit_comments)
+    mock_repo.get_pull.return_value = mock_pr
+    mock_github.get_repo.return_value = mock_repo
+
+    active = set(active_members)
+    pending = set(pending_members)
+
+    def _get_team_membership(login):
+        if membership_error is not None:
+            raise membership_error
+        if login in active:
+            membership = mock.MagicMock()
+            membership.state = "active"
+            return membership
+        if login in pending:
+            membership = mock.MagicMock()
+            membership.state = "pending"
+            return membership
+        raise GithubException(404, data={"message": "Not Found"}, headers={})
+
+    mock_team = mock.MagicMock()
+    mock_team.get_team_membership.side_effect = _get_team_membership
+    mock_github.get_organization.return_value.get_team_by_slug.return_value = mock_team
+    return mock_github
+
+
+def _build_failing_test_case():
+    """Build a CheckPerfResultTestCase whose single metric exceeds its threshold."""
+    thresholds_to_check: list[cbr.IndividualMetricThreshold] = [
+        cbr.IndividualMetricThreshold(
+            metric_name="latency",
+            thread_level=1,
+            test_name="fake-test",
+            value=10,
+            bound_direction="upper",
+            threshold_limit=20,
+        )
+    ]
+    reported_metrics: dict[cbr.ReportedMetric, CedarMetric] = {
+        cbr.ReportedMetric(
+            test_name="fake-test", thread_level=1, metric_name="latency"
+        ): CedarMetric(name="latency", type="LATENCY", value=100)
+    }
+    return cbr.CheckPerfResultTestCase(
+        logging.getLogger("hook_logger"),
+        "my-test",
+        None,
+        None,
+        None,
+        thresholds_to_check,
+        reported_metrics,
+    )
+
+
 class TestRetrieveBaseCommitValue(GenerateAndCheckPerfResultsFixture):
     @mock.patch(
         "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.requests.get"
@@ -1203,52 +1288,20 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
         "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
     )
     def test_override_comment_allows_failure_issue_comment(self, mock_get_expansion, mock_config):
-        """Test that an override comment from an approved user allows a metric failure (issue comment)."""
+        """Test that an override comment from a team member allows a metric failure (issue comment)."""
         mock_config.EVERGREEN_REQUESTER = "github_merge_queue"
         mock_get_expansion.side_effect = lambda key, default=None: {
             "github_pr_number": "12345",
             "github_token_mongo": "fake_token",
         }.get(key, default)
 
-        # Mock GitHub API
-        mock_github = mock.MagicMock()
-        mock_pr = mock.MagicMock()
-        mock_repo = mock.MagicMock()
-        mock_comment = mock.MagicMock()
-        mock_comment.body = "This is a perf threshold check override comment"
-        mock_comment.user.login = "brad-devlugt"
-
-        mock_pr.number = 12345
-        mock_pr.get_issue_comments.return_value = [mock_comment]
-        mock_pr.get_review_comments.return_value = []
-        mock_pr.get_comments.return_value = []
-        mock_repo.get_pull.return_value = mock_pr
-        mock_github.get_repo.return_value = mock_repo
-
-        thresholds_to_check: list[cbr.IndividualMetricThreshold] = [
-            cbr.IndividualMetricThreshold(
-                metric_name="latency",
-                thread_level=1,
-                test_name="fake-test",
-                value=10,
-                bound_direction="upper",
-                threshold_limit=20,
-            )
-        ]
-        reported_metrics: dict[cbr.ReportedMetric, CedarMetric] = {
-            cbr.ReportedMetric(
-                test_name="fake-test", thread_level=1, metric_name="latency"
-            ): CedarMetric(name="latency", type="LATENCY", value=100)
-        }
-        test_case = cbr.CheckPerfResultTestCase(
-            logging.getLogger("hook_logger"),
-            "my-test",
-            None,
-            None,
-            None,
-            thresholds_to_check,
-            reported_metrics,
+        mock_github = _build_override_github(
+            issue_comments=[
+                _make_comment("This is a perf threshold check override comment", "team-member")
+            ],
+            active_members=["team-member"],
         )
+        test_case = _build_failing_test_case()
         test_case.github = mock_github
 
         # Should not raise an exception due to override comment
@@ -1259,52 +1312,19 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
         "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
     )
     def test_override_comment_allows_failure_review_comment(self, mock_get_expansion, mock_config):
-        """Test that an override comment from an approved user allows a metric failure (review comment)."""
+        """Test that an override comment from a team member allows a metric failure (review comment)."""
         mock_config.EVERGREEN_REQUESTER = "github_merge_queue"
         mock_get_expansion.side_effect = lambda key, default=None: {
             "github_pr_number": "12345",
             "github_token_mongo": "fake_token",
         }.get(key, default)
 
-        # Mock GitHub API
-        mock_github = mock.MagicMock()
-        mock_pr = mock.MagicMock()
-        mock_repo = mock.MagicMock()
-        mock_comment = mock.MagicMock()
-        mock_comment.body = "PERF THRESHOLD CHECK OVERRIDE"  # Test case insensitive
-        mock_comment.user.login = "alicedoherty"
-
-        mock_pr.number = 12345
-        mock_pr.get_issue_comments.return_value = []
-        mock_pr.get_review_comments.return_value = [mock_comment]
-        mock_pr.get_comments.return_value = []
-        mock_repo.get_pull.return_value = mock_pr
-        mock_github.get_repo.return_value = mock_repo
-
-        thresholds_to_check: list[cbr.IndividualMetricThreshold] = [
-            cbr.IndividualMetricThreshold(
-                metric_name="latency",
-                thread_level=1,
-                test_name="fake-test",
-                value=10,
-                bound_direction="upper",
-                threshold_limit=20,
-            )
-        ]
-        reported_metrics: dict[cbr.ReportedMetric, CedarMetric] = {
-            cbr.ReportedMetric(
-                test_name="fake-test", thread_level=1, metric_name="latency"
-            ): CedarMetric(name="latency", type="LATENCY", value=100)
-        }
-        test_case = cbr.CheckPerfResultTestCase(
-            logging.getLogger("hook_logger"),
-            "my-test",
-            None,
-            None,
-            None,
-            thresholds_to_check,
-            reported_metrics,
+        mock_github = _build_override_github(
+            # Mixed case verifies the override phrase match is case-insensitive.
+            review_comments=[_make_comment("PERF THRESHOLD CHECK OVERRIDE", "team-member")],
+            active_members=["team-member"],
         )
+        test_case = _build_failing_test_case()
         test_case.github = mock_github
 
         # Should not raise an exception due to override comment
@@ -1315,52 +1335,20 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
         "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
     )
     def test_override_comment_allows_failure_commit_comment(self, mock_get_expansion, mock_config):
-        """Test that an override comment from an approved user allows a metric failure (commit comment)."""
+        """Test that an override comment from a team member allows a metric failure (commit comment)."""
         mock_config.EVERGREEN_REQUESTER = "github_merge_queue"
         mock_get_expansion.side_effect = lambda key, default=None: {
             "github_pr_number": "12345",
             "github_token_mongo": "fake_token",
         }.get(key, default)
 
-        # Mock GitHub API
-        mock_github = mock.MagicMock()
-        mock_pr = mock.MagicMock()
-        mock_repo = mock.MagicMock()
-        mock_comment = mock.MagicMock()
-        mock_comment.body = "perf threshold check override - approved"
-        mock_comment.user.login = "samanca"
-
-        mock_pr.number = 12345
-        mock_pr.get_issue_comments.return_value = []
-        mock_pr.get_review_comments.return_value = []
-        mock_pr.get_comments.return_value = [mock_comment]
-        mock_repo.get_pull.return_value = mock_pr
-        mock_github.get_repo.return_value = mock_repo
-
-        thresholds_to_check: list[cbr.IndividualMetricThreshold] = [
-            cbr.IndividualMetricThreshold(
-                metric_name="latency",
-                thread_level=1,
-                test_name="fake-test",
-                value=10,
-                bound_direction="upper",
-                threshold_limit=20,
-            )
-        ]
-        reported_metrics: dict[cbr.ReportedMetric, CedarMetric] = {
-            cbr.ReportedMetric(
-                test_name="fake-test", thread_level=1, metric_name="latency"
-            ): CedarMetric(name="latency", type="LATENCY", value=100)
-        }
-        test_case = cbr.CheckPerfResultTestCase(
-            logging.getLogger("hook_logger"),
-            "my-test",
-            None,
-            None,
-            None,
-            thresholds_to_check,
-            reported_metrics,
+        mock_github = _build_override_github(
+            commit_comments=[
+                _make_comment("perf threshold check override - approved", "team-member")
+            ],
+            active_members=["team-member"],
         )
+        test_case = _build_failing_test_case()
         test_case.github = mock_github
 
         # Should not raise an exception due to override comment
@@ -1371,52 +1359,19 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
         "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
     )
     def test_override_comment_from_unauthorized_user_fails(self, mock_get_expansion, mock_config):
-        """Test that an override comment from an unauthorized user does not prevent failure."""
+        """Test that an override comment from a non-team-member does not prevent failure."""
         mock_config.EVERGREEN_REQUESTER = "github_merge_queue"
         mock_get_expansion.side_effect = lambda key, default=None: {
             "github_pr_number": "12345",
             "github_token_mongo": "fake_token",
         }.get(key, default)
 
-        # Mock GitHub API
-        mock_github = mock.MagicMock()
-        mock_pr = mock.MagicMock()
-        mock_repo = mock.MagicMock()
-        mock_comment = mock.MagicMock()
-        mock_comment.body = "perf threshold check override"
-        mock_comment.user.login = "unauthorized-user"
-
-        mock_pr.number = 12345
-        mock_pr.get_issue_comments.return_value = [mock_comment]
-        mock_pr.get_review_comments.return_value = []
-        mock_pr.get_comments.return_value = []
-        mock_repo.get_pull.return_value = mock_pr
-        mock_github.get_repo.return_value = mock_repo
-
-        thresholds_to_check: list[cbr.IndividualMetricThreshold] = [
-            cbr.IndividualMetricThreshold(
-                metric_name="latency",
-                thread_level=1,
-                test_name="fake-test",
-                value=10,
-                bound_direction="upper",
-                threshold_limit=20,
-            )
-        ]
-        reported_metrics: dict[cbr.ReportedMetric, CedarMetric] = {
-            cbr.ReportedMetric(
-                test_name="fake-test", thread_level=1, metric_name="latency"
-            ): CedarMetric(name="latency", type="LATENCY", value=100)
-        }
-        test_case = cbr.CheckPerfResultTestCase(
-            logging.getLogger("hook_logger"),
-            "my-test",
-            None,
-            None,
-            None,
-            thresholds_to_check,
-            reported_metrics,
+        mock_github = _build_override_github(
+            # Not a member of any approver team, so the membership lookup 404s.
+            issue_comments=[_make_comment("perf threshold check override", "unauthorized-user")],
+            active_members=[],
         )
+        test_case = _build_failing_test_case()
         test_case.github = mock_github
 
         # Should raise an exception since user is not authorized
@@ -1428,55 +1383,145 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
         "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
     )
     def test_no_override_comment_fails(self, mock_get_expansion, mock_config):
-        """Test that a failure without override comment still fails."""
+        """Test that a failure without override comment still fails, even from a team member."""
         mock_config.EVERGREEN_REQUESTER = "github_merge_queue"
         mock_get_expansion.side_effect = lambda key, default=None: {
             "github_pr_number": "12345",
             "github_token_mongo": "fake_token",
         }.get(key, default)
 
-        # Mock GitHub API
+        mock_github = _build_override_github(
+            # A team member, but the comment lacks the override phrase.
+            issue_comments=[
+                _make_comment("This is a regular comment without override", "team-member")
+            ],
+            active_members=["team-member"],
+        )
+        test_case = _build_failing_test_case()
+        test_case.github = mock_github
+
+        # Should raise an exception since there's no override comment
+        with self.assertRaisesRegex(ServerFailure, "threshold check"):
+            test_case.run_test()
+
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    def test_override_queries_configured_org_and_team(self, mock_get_expansion, mock_config):
+        """Test that membership is checked against the configured org and team slug."""
+        mock_config.EVERGREEN_REQUESTER = "github_merge_queue"
+        mock_get_expansion.side_effect = lambda key, default=None: {
+            "github_pr_number": "12345",
+            "github_token_mongo": "fake_token",
+        }.get(key, default)
+
+        mock_github = _build_override_github(
+            issue_comments=[_make_comment("perf threshold check override", "team-member")],
+            active_members=["team-member"],
+        )
+        test_case = _build_failing_test_case()
+        test_case.github = mock_github
+
+        test_case.run_test()
+
+        mock_github.get_organization.assert_called_once_with(cbr.OVERRIDE_APPROVER_ORG)
+        mock_github.get_organization.return_value.get_team_by_slug.assert_called_once_with(
+            "performance"
+        )
+
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    def test_override_member_of_any_configured_team_allows_failure(
+        self, mock_get_expansion, mock_config
+    ):
+        """Test that membership in any one of several configured teams grants override."""
+        mock_config.EVERGREEN_REQUESTER = "github_merge_queue"
+        mock_get_expansion.side_effect = lambda key, default=None: {
+            "github_pr_number": "12345",
+            "github_token_mongo": "fake_token",
+        }.get(key, default)
+
+        # The user is only a member of "second-team"; lookups against other teams 404.
+        def get_team_by_slug(slug):
+            team = mock.MagicMock()
+
+            def membership(login):
+                if slug == "second-team" and login == "team-member":
+                    active = mock.MagicMock()
+                    active.state = "active"
+                    return active
+                raise GithubException(404, data={"message": "Not Found"}, headers={})
+
+            team.get_team_membership.side_effect = membership
+            return team
+
         mock_github = mock.MagicMock()
         mock_pr = mock.MagicMock()
         mock_repo = mock.MagicMock()
-        mock_comment = mock.MagicMock()
-        mock_comment.body = "This is a regular comment without override"
-        mock_comment.user.login = "brad-devlugt"
-
         mock_pr.number = 12345
-        mock_pr.get_issue_comments.return_value = [mock_comment]
+        mock_pr.get_issue_comments.return_value = [
+            _make_comment("perf threshold check override", "team-member")
+        ]
         mock_pr.get_review_comments.return_value = []
         mock_pr.get_comments.return_value = []
         mock_repo.get_pull.return_value = mock_pr
         mock_github.get_repo.return_value = mock_repo
+        mock_github.get_organization.return_value.get_team_by_slug.side_effect = get_team_by_slug
 
-        thresholds_to_check: list[cbr.IndividualMetricThreshold] = [
-            cbr.IndividualMetricThreshold(
-                metric_name="latency",
-                thread_level=1,
-                test_name="fake-test",
-                value=10,
-                bound_direction="upper",
-                threshold_limit=20,
-            )
-        ]
-        reported_metrics: dict[cbr.ReportedMetric, CedarMetric] = {
-            cbr.ReportedMetric(
-                test_name="fake-test", thread_level=1, metric_name="latency"
-            ): CedarMetric(name="latency", type="LATENCY", value=100)
-        }
-        test_case = cbr.CheckPerfResultTestCase(
-            logging.getLogger("hook_logger"),
-            "my-test",
-            None,
-            None,
-            None,
-            thresholds_to_check,
-            reported_metrics,
-        )
+        test_case = _build_failing_test_case()
         test_case.github = mock_github
 
-        # Should raise an exception since there's no override comment
+        with mock.patch.object(
+            cbr, "OVERRIDE_APPROVER_TEAMS", frozenset(["first-team", "second-team"])
+        ):
+            # Should not raise: the user is an active member of one of the teams.
+            test_case.run_test()
+
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    def test_override_pending_membership_denied(self, mock_get_expansion, mock_config):
+        """Test that a 'pending' (non-active) team membership does not grant override."""
+        mock_config.EVERGREEN_REQUESTER = "github_merge_queue"
+        mock_get_expansion.side_effect = lambda key, default=None: {
+            "github_pr_number": "12345",
+            "github_token_mongo": "fake_token",
+        }.get(key, default)
+
+        mock_github = _build_override_github(
+            issue_comments=[_make_comment("perf threshold check override", "invitee")],
+            pending_members=["invitee"],
+        )
+        test_case = _build_failing_test_case()
+        test_case.github = mock_github
+
+        with self.assertRaisesRegex(ServerFailure, "threshold check"):
+            test_case.run_test()
+
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    def test_override_membership_api_error_is_failsafe(self, mock_get_expansion, mock_config):
+        """Test that a non-404 membership API error is treated as not authorized (fail-safe)."""
+        mock_config.EVERGREEN_REQUESTER = "github_merge_queue"
+        mock_get_expansion.side_effect = lambda key, default=None: {
+            "github_pr_number": "12345",
+            "github_token_mongo": "fake_token",
+        }.get(key, default)
+
+        mock_github = _build_override_github(
+            issue_comments=[_make_comment("perf threshold check override", "team-member")],
+            membership_error=GithubException(403, data={"message": "Forbidden"}, headers={}),
+        )
+        test_case = _build_failing_test_case()
+        test_case.github = mock_github
+
+        # The threshold failure must stand, surfaced as ServerFailure (not the raw API error).
         with self.assertRaisesRegex(ServerFailure, "threshold check"):
             test_case.run_test()
 

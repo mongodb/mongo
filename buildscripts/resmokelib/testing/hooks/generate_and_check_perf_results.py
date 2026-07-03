@@ -11,7 +11,7 @@ from typing import Any, Optional, Union
 import requests
 import tenacity
 import yaml
-from github import Github
+from github import Github, GithubException
 from opentelemetry import trace
 from opentelemetry.trace.status import StatusCode
 
@@ -30,14 +30,8 @@ GET_RAW_RESULTS_URL = (
 )
 # Include both expansion and API requester values for mainline builds, just to be safe.
 MAINLINE_REQUESTERS = frozenset(["commit", "gitter_request", "github_tag", "git_tag_request"])
-OVERRIDE_APPROVERS = frozenset(
-    [
-        "brad-devlugt",  # Brad de Vlugt
-        "alicedoherty",  # Alice Doherty
-        "samanca",  # Amirsaman Memaripour
-        "hilldani",  # Daniel Hill,
-    ]
-)
+OVERRIDE_APPROVER_ORG = "10gen"
+OVERRIDE_APPROVER_TEAMS = frozenset(["performance"])
 THRESHOLD_OVERRIDE_COMMENT = "perf threshold check override"
 
 TRACER = trace.get_tracer("resmoke")
@@ -513,6 +507,35 @@ class CheckPerfResultTestCase(interface.DynamicTestCase):
         self.reported_metrics: dict[ReportedMetric, CedarMetric] = reported_metrics
         self.github: Github = Github(get_expansion("github_token_mongo"))
 
+    def _is_authorized_override_user(self, login: str) -> bool:
+        """Return whether `login` may override a failed threshold check.
+
+        A user is authorized if they are an active member of any team in OVERRIDE_APPROVER_TEAMS,
+        as resolved via the GitHub API.
+
+        A definitive "not a member" response (HTTP 404) means the user is not on that team, so we
+        move on to the next team. Any other GitHub API error (e.g. permissions, rate limit) is
+        logged and treated as "not authorized" (fail-safe): a transient failure can never silently
+        grant an override.
+        """
+        org = self.github.get_organization(OVERRIDE_APPROVER_ORG)
+        for team_slug in OVERRIDE_APPROVER_TEAMS:
+            try:
+                membership = org.get_team_by_slug(team_slug).get_team_membership(login)
+                if membership.state == "active":
+                    return True
+            except GithubException as exc:
+                if exc.status == 404:
+                    # Not a member of this team; check the remaining teams.
+                    continue
+                _log_perf_error(
+                    self.logger,
+                    f"Could not verify membership of '{login}' in team "
+                    f"'{OVERRIDE_APPROVER_ORG}/{team_slug}' due to a GitHub API error: {exc}. "
+                    "Treating user as not authorized to override.",
+                )
+        return False
+
     def run_test(self):
         """
         Check the values reported by this performance run.
@@ -547,13 +570,13 @@ class CheckPerfResultTestCase(interface.DynamicTestCase):
                 if metric_to_check.bound_direction == BoundDirection.LOWER:
                     self.logger.error(
                         f"Metric {metric_to_check.metric_name} in {metric_to_check.test_name} with thread_level of {metric_to_check.thread_level} has failed the threshold check. The reported value of {reported_metric.value} is lower than the base commit value of {metric_to_check.value} by more than the threshold limit of {metric_to_check.threshold_limit}."
-                        " For more information on this failure and how to resolve it, please see the documentation at https://docs.devprod.prod.corp.mongodb.com/performance/workloads/instruction_microbenchmarks"
+                        " For more information on this failure and how to resolve it, please see the documentation at https://docs.devprod.prod.corp.mongodb.com/performance-testing/workloads/benchmarks/instruction_microbenchmarks"
                     )
                     any_metric_has_failed = True
                 else:
                     self.logger.error(
                         f"Metric {metric_to_check.metric_name} in {metric_to_check.test_name} with thread_level of {metric_to_check.thread_level} has failed the threshold check. The reported value of {reported_metric.value} is higher than the base commit value of {metric_to_check.value} by more than the threshold limit of {metric_to_check.threshold_limit}."
-                        " For more information on this failure and how to resolve it, please see the documentation at https://docs.devprod.prod.corp.mongodb.com/performance/workloads/instruction_microbenchmarks"
+                        " For more information on this failure and how to resolve it, please see the documentation at https://docs.devprod.prod.corp.mongodb.com/performance-testing/workloads/benchmarks/instruction_microbenchmarks"
                     )
                     any_metric_has_failed = True
             else:
@@ -583,7 +606,7 @@ class CheckPerfResultTestCase(interface.DynamicTestCase):
                     for comment in pr.get_issue_comments():
                         if (
                             THRESHOLD_OVERRIDE_COMMENT in comment.body.lower()
-                            and comment.user.login in OVERRIDE_APPROVERS
+                            and self._is_authorized_override_user(comment.user.login)
                         ):
                             self.logger.info(
                                 f"Found override comment by {comment.user.login}, skipping failure for threshold check."
@@ -594,7 +617,7 @@ class CheckPerfResultTestCase(interface.DynamicTestCase):
                     for comment in pr.get_review_comments():
                         if (
                             THRESHOLD_OVERRIDE_COMMENT in comment.body.lower()
-                            and comment.user.login in OVERRIDE_APPROVERS
+                            and self._is_authorized_override_user(comment.user.login)
                         ):
                             self.logger.info(
                                 f"Found override comment by {comment.user.login}, skipping failure for threshold check."
@@ -605,16 +628,15 @@ class CheckPerfResultTestCase(interface.DynamicTestCase):
                     for comment in pr.get_comments():
                         if (
                             THRESHOLD_OVERRIDE_COMMENT in comment.body.lower()
-                            and comment.user.login in OVERRIDE_APPROVERS
+                            and self._is_authorized_override_user(comment.user.login)
                         ):
                             self.logger.info(
                                 f"Found override comment by {comment.user.login}, skipping failure for threshold check."
                             )
                             return
-
             raise ServerFailure(
                 f"One or more of the metrics reported by this task have failed the threshold check. These thresholds can be found in {THRESHOLD_LOCATION}."
-                " For more information on this failure and how to resolve it, please see the documentation at https://docs.devprod.prod.corp.mongodb.com/performance/workloads/instruction_microbenchmarks"
+                " For more information on this failure and how to resolve it, please see the documentation at https://docs.devprod.prod.corp.mongodb.com/performance-testing/workloads/benchmarks/instruction_microbenchmarks"
             )
 
 
