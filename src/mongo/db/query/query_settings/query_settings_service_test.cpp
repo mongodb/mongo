@@ -315,7 +315,7 @@ public:
 
         // Ensure empty settings are returned if no settings are present in the system.
         ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
-                      expCtx(), hashForShape(deferredShape), nss, QuerySettings()),
+                      expCtx(), hashForShape(deferredShape), nss, boost::none),
                   QuerySettings());
 
         // Set { queryFramework: 'classic' } settings to 'cmdForSettingsBSON'.
@@ -634,6 +634,35 @@ TEST_F(QuerySettingsServiceTest, MergeClusterAndUserQuerySettingsOnShard) {
     ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
                   expCtx(), hashForShape(deferredShape), nss(), boost::none),
               forceClassicEngineSettings);
+}
+
+// User-supplied querySettings are validated during lookup before being merged and applied.
+TEST_F(QuerySettingsServiceTest, LookupValidatesUserSuppliedQuerySettings) {
+    QuerySettingsService::initializeForRouter(getServiceContext());
+
+    auto findCmdBSON = fromjson("{find: 'exampleColl', '$db': 'foo'}");
+    auto findCmd = query_request_helper::makeFromFindCommandForTests(findCmdBSON, nss());
+    auto parsedRequest =
+        uassertStatusOK(parsed_find_command::parse(expCtx(), {.findCommand = std::move(findCmd)}));
+    query_shape::DeferredQueryShape deferredShape{[&]() {
+        return shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedRequest, expCtx());
+    }};
+    const auto hash = hashForShape(deferredShape);
+
+    // Unlike setQuerySettings, empty/default user settings are a no-op rather than an error.
+    ASSERT_EQ(
+        service().lookupQuerySettingsWithRejectionCheck(expCtx(), hash, nss(), QuerySettings()),
+        QuerySettings());
+
+    // Two index hints for the same collection are rejected.
+    QuerySettings duplicateHints =
+        makeQuerySettings({IndexHintSpec(makeNsSpec("testCollA"sv), {IndexHint(BSON("a" << 1))}),
+                           IndexHintSpec(makeNsSpec("testCollA"sv), {IndexHint(BSON("b" << 1))})},
+                          false /* setFramework */);
+    ASSERT_THROWS_CODE(
+        service().lookupQuerySettingsWithRejectionCheck(expCtx(), hash, nss(), duplicateHints),
+        DBException,
+        7746608);
 }
 }  // namespace
 }  // namespace mongo::query_settings

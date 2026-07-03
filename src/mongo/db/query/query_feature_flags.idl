@@ -380,7 +380,7 @@ feature_flags:
     featureFlagAllowUserFacingQuerySettings:
         description: "Allow users to pass querySettings directly in commands as runtime hints without persistence."
         cpp_varname: gFeatureFlagAllowUserFacingQuerySettings
-        default: false
+        default: true
         fcv_gated: false
 
     featureFlagEnableTestingAggregateRewriteRules:

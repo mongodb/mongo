@@ -316,12 +316,8 @@ public:
             const boost::optional<QueryInstance> representativeQuery,
             const boost::optional<const RepresentativeQueryInfo&> representativeQueryInfo,
             const query_shape::QueryShapeHash& queryShapeHash) {
-            uassert(12324800,
-                    "Unknown field 'queryKnobs' in setQuerySettings",
-                    !request().getSettings().getQueryKnobs() ||
-                        feature_flags::gFeatureFlagPqsQueryKnobs.isEnabled(
-                            VersionContext::getDecoration(opCtx),
-                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+            auto& querySettingsService = QuerySettingsService::get(opCtx);
+            querySettingsService.validateQueryKnobsEnabled(opCtx, request().getSettings());
 
             // Validate that both 'representativeQuery' and 'representativeQueryInfo' are either
             // empty or not empty.
@@ -329,7 +325,7 @@ public:
 
             // Assert that query settings will be set on a valid query.
             if (representativeQuery) {
-                QuerySettingsService::get(opCtx).validateQueryCompatibleWithAnyQuerySettings(
+                querySettingsService.validateQueryCompatibleWithAnyQuerySettings(
                     *representativeQueryInfo);
             }
 

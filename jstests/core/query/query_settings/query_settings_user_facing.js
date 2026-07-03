@@ -10,6 +10,8 @@
  *   # TODO(SERVER-113800): Enable setClusterParameters with replicaset started with --shardsvr
  *   transitioning_replicaset_incompatible,
  *   requires_fcv_90,
+ *   # Uses runWithParamsAllNonConfigNodes which requires a stable shard list.
+ *   assumes_stable_shard_list,
  * ]
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
@@ -18,6 +20,7 @@ import {describe, it} from "jstests/libs/mochalite.js";
 import {getEngine} from "jstests/libs/query/analyze_plan.js";
 import {QuerySettingsIndexHintsTests} from "jstests/libs/query/query_settings_index_hints_tests.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
+import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 assert.commandWorked(
@@ -133,6 +136,134 @@ describe("User-facing querySettings when flag is on", function () {
             qstests.assertDistinctScanStage(cmd, {a: 1});
         });
     }
+
+    // Unlike setQuerySettings, empty/default user settings on a query command are a no-op, not an
+    // error.
+    it("accepts empty settings as a no-op", function () {
+        assert.commandWorked(
+            db.runCommand({find: coll.getName(), filter: {a: 1}, querySettings: {}}),
+        );
+    });
+
+    it("accepts settings that simplify to default as a no-op", function () {
+        assert.commandWorked(
+            db.runCommand({find: coll.getName(), filter: {a: 1}, querySettings: {reject: false}}),
+        );
+    });
+
+    it("rejects two index hints targeting the same collection", function () {
+        assert.commandFailedWithCode(
+            db.runCommand({
+                find: coll.getName(),
+                filter: {a: 1},
+                querySettings: {
+                    indexHints: [
+                        {ns, allowedIndexes: [{a: 1}]},
+                        {ns, allowedIndexes: [{b: 1}]},
+                    ],
+                },
+            }),
+            [7746608],
+        );
+    });
+
+    it("rejects an index hint with an empty key pattern", function () {
+        assert.commandFailedWithCode(
+            db.runCommand({
+                find: coll.getName(),
+                filter: {a: 1},
+                querySettings: {indexHints: {ns, allowedIndexes: [{}]}},
+            }),
+            [9646000, 9646001],
+        );
+    });
+
+    // The 'queryKnobs' field is itself gated behind featureFlagPqsQueryKnobs. When that flag is
+    // disabled, passing it inline must be rejected by the shared validation.
+    const knobsFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "PqsQueryKnobs");
+    if (!knobsFlagEnabled) {
+        it("rejects queryKnobs when featureFlagPqsQueryKnobs is disabled", function () {
+            assert.commandFailedWithCode(
+                db.runCommand({
+                    find: coll.getName(),
+                    filter: {a: 1},
+                    querySettings: {queryKnobs: {samplingMarginOfError: 3.0}},
+                }),
+                [12324800],
+            );
+        });
+    }
+});
+
+// Queries that are ineligible for query settings (IDHACK/Express, FLE, internal/system
+// namespaces) must ignore client-side settings entirely, neither validating nor applying them.
+describe("Client-side querySettings on ineligible queries are ignored", function () {
+    if (!flagEnabled) {
+        return;
+    }
+
+    // Settings that would be rejected on an eligible query (duplicate index hints for the same
+    // collection -> 7746608). On an ineligible query the command must still succeed, proving the
+    // settings were skipped rather than validated/applied.
+    const ineligibleSettings = {
+        indexHints: [
+            {ns, allowedIndexes: [{a: 1}]},
+            {ns, allowedIndexes: [{b: 1}]},
+        ],
+    };
+
+    it("ignores settings on IDHACK queries", function () {
+        // A point predicate on {_id} is an IDHACK/Express query, ineligible for query settings.
+        assert.commandWorked(
+            db.runCommand({
+                find: coll.getName(),
+                filter: {_id: 1},
+                querySettings: ineligibleSettings,
+            }),
+        );
+    });
+
+    it("ignores settings on internal-database / system-collection queries", function () {
+        // 'admin.system.version' lives on an internal database and is a system collection, so it
+        // is ineligible for query settings.
+        assert.commandWorked(
+            db.getSiblingDB("admin").runCommand({
+                find: "system.version",
+                filter: {},
+                querySettings: ineligibleSettings,
+            }),
+        );
+    });
+
+    it("ignores settings on FLE queries", function () {
+        // A command carrying 'encryptionInformation' is an FLE query, ineligible for query
+        // settings.
+        const encryptionInformation = {
+            type: 1,
+            schema: {
+                [ns.db + "." + ns.coll]: {
+                    escCollection: "enxcol_." + coll.getName() + ".esc",
+                    ecocCollection: "enxcol_." + coll.getName() + ".ecoc",
+                    fields: [
+                        {
+                            path: "secret",
+                            keyId: UUID("11d58b8a-0c6c-4d69-a0bd-70c6d9befae9"),
+                            bsonType: "string",
+                            queries: {queryType: "equality"},
+                        },
+                    ],
+                },
+            },
+        };
+        assert.commandWorked(
+            db.runCommand({
+                find: coll.getName(),
+                filter: {a: 1},
+                encryptionInformation,
+                querySettings: ineligibleSettings,
+            }),
+        );
+    });
 });
 
 // Merge tests: cluster PQS wins on conflict, user settings fill gaps.
@@ -158,17 +289,23 @@ describe("Merging cluster PQS with user-supplied querySettings", function () {
         });
 
         it("user settings fill gaps when no cluster conflict", function () {
-            const findCmd = {find: coll.getName(), filter: {a: 1, b: 1}};
-            assertEngine(findCmd, "classic");
+            runWithParamsAllNonConfigNodes(
+                db,
+                {internalQueryFrameworkControl: "forceClassicEngine"},
+                () => {
+                    const findCmd = {find: coll.getName(), filter: {a: 1, b: 1}};
+                    assertEngine(findCmd, "classic");
 
-            const findQuery = qsutils.makeFindQueryInstance({filter: {a: 1, b: 1}});
-            const clusterSettings = {queryFramework: "sbe"};
-            const userSettings = {indexHints: {ns, allowedIndexes: [{a: 1}]}};
-            qsutils.withQuerySettings(findQuery, clusterSettings, () => {
-                const cmd = {...findCmd, querySettings: userSettings};
-                qstests.assertIndexScanStage(cmd, {a: 1}, ns);
-                assertEngine(cmd, "sbe");
-            });
+                    const findQuery = qsutils.makeFindQueryInstance({filter: {a: 1, b: 1}});
+                    const clusterSettings = {queryFramework: "sbe"};
+                    const userSettings = {indexHints: {ns, allowedIndexes: [{a: 1}]}};
+                    qsutils.withQuerySettings(findQuery, clusterSettings, () => {
+                        const cmd = {...findCmd, querySettings: userSettings};
+                        qstests.assertIndexScanStage(cmd, {a: 1}, ns);
+                        assertEngine(cmd, "sbe");
+                    });
+                },
+            );
         });
     });
 
@@ -191,23 +328,29 @@ describe("Merging cluster PQS with user-supplied querySettings", function () {
         });
 
         it("user settings fill gaps when no cluster conflict", function () {
-            const aggCmd = {
-                aggregate: coll.getName(),
-                pipeline: [{$match: {a: 1, b: 1}}],
-                cursor: {},
-            };
-            assertEngine(aggCmd, "classic");
+            runWithParamsAllNonConfigNodes(
+                db,
+                {internalQueryFrameworkControl: "forceClassicEngine"},
+                () => {
+                    const aggCmd = {
+                        aggregate: coll.getName(),
+                        pipeline: [{$match: {a: 1, b: 1}}],
+                        cursor: {},
+                    };
+                    assertEngine(aggCmd, "classic");
 
-            const aggQuery = qsutils.makeAggregateQueryInstance({
-                pipeline: [{$match: {a: 1, b: 1}}],
-            });
-            const clusterSettings = {queryFramework: "sbe"};
-            const userSettings = {indexHints: {ns, allowedIndexes: [{a: 1}]}};
-            qsutils.withQuerySettings(aggQuery, clusterSettings, () => {
-                const cmd = {...aggCmd, querySettings: userSettings};
-                qstests.assertIndexScanStage(cmd, {a: 1}, ns);
-                assertEngine(cmd, "sbe");
-            });
+                    const aggQuery = qsutils.makeAggregateQueryInstance({
+                        pipeline: [{$match: {a: 1, b: 1}}],
+                    });
+                    const clusterSettings = {queryFramework: "sbe"};
+                    const userSettings = {indexHints: {ns, allowedIndexes: [{a: 1}]}};
+                    qsutils.withQuerySettings(aggQuery, clusterSettings, () => {
+                        const cmd = {...aggCmd, querySettings: userSettings};
+                        qstests.assertIndexScanStage(cmd, {a: 1}, ns);
+                        assertEngine(cmd, "sbe");
+                    });
+                },
+            );
         });
     });
 

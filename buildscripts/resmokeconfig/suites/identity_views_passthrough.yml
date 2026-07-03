@@ -20,6 +20,7 @@ selector:
     - jstests/core/query/query_settings/query_settings_index_application_aggregate.js
     - jstests/core/query/query_settings/query_settings_reject_application.js
     - jstests/core/query/query_settings/query_settings_strict_api.js
+    - jstests/core/query/query_settings/query_settings_user_facing.js
     - jstests/core/query/query_settings/query_shape_hash_in_current_op.js
     - jstests/core/query/queryable_encryption/**/*.js
     - jstests/core/query/release_memory/getmore_retries.js

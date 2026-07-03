@@ -50,6 +50,7 @@
 #include "mongo/db/query/query_utils.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/topology/cluster_parameters/cluster_server_parameter_cmds_gen.h"
+#include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log_and_backoff.h"
@@ -642,16 +643,25 @@ public:
         const query_shape::QueryShapeHash& queryShapeHash,
         const NamespaceString& nss,
         const boost::optional<QuerySettings>& querySettingsFromOriginalCommand) const override {
-        if (expCtx->isIdHackQuery()) {
-            return QuerySettings();
-        }
-
         // Always perform cluster lookup (includes rejection check for cluster PQS).
         auto settings = lookupQuerySettingsFromInternalStorage(expCtx, queryShapeHash, nss);
         if (querySettingsFromOriginalCommand.has_value()) {
-            // Merge: user settings as base, cluster settings override on conflict.
-            settings = mergeQuerySettings(*querySettingsFromOriginalCommand, settings);
+            // The settings were supplied directly by the user, so validate them before applying.
+            // Unlike setQuerySettings, empty/default user settings are a no-op rather than an
+            // error.
+            auto userSettings = *querySettingsFromOriginalCommand;
+            validateQueryKnobsEnabled(expCtx->getOperationContext(), userSettings);
+
+            settings = mergeQuerySettings(userSettings, settings);
+            simplifyQuerySettings(settings);
+            if (!isDefault(settings)) {
+                validateQuerySettings(settings);
+            }
         }
+
+        // Fail the current command, if 'reject: true' flag is present.
+        failIfRejectedBySettings(expCtx, settings);
+
         return settings;
     }
 
@@ -703,39 +713,28 @@ protected:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const query_shape::QueryShapeHash& queryShapeHash,
         const NamespaceString& nss) const {
-        QuerySettings settings = [&]() {
-            try {
-                if (!isEligbleForQuerySettings(expCtx, nss)) {
-                    return QuerySettings();
-                }
-
-                // Return the found query settings or an empty one.
-                auto result =
-                    _manager.getQuerySettingsForQueryShapeHash(queryShapeHash, nss.tenantId());
-                if (!result.has_value()) {
-                    return QuerySettings();
-                }
-
-                // Backfill the representative query if needed.
-                auto* opCtx = expCtx->getOperationContext();
-                if (BackfillCoordinator::shouldBackfill(expCtx, result->hasRepresentativeQuery)) {
-                    _backfillCoordinator->markForBackfillAndScheduleIfNeeded(
-                        opCtx, queryShapeHash, CurOp::get(opCtx)->opDescription().getOwned());
-                }
-                return std::move(result->querySettings);
-            } catch (const DBException& ex) {
-                LOGV2_WARNING_OPTIONS(10153400,
-                                      {logv2::LogComponent::kQuery},
-                                      "Failed to perform query settings lookup",
-                                      "error"_attr = ex.toString());
+        try {
+            // Return the found query settings or an empty one.
+            auto result =
+                _manager.getQuerySettingsForQueryShapeHash(queryShapeHash, nss.tenantId());
+            if (!result.has_value()) {
                 return QuerySettings();
             }
-        }();
 
-        // Fail the current command, if 'reject: true' flag is present.
-        failIfRejectedBySettings(expCtx, settings);
-
-        return settings;
+            // Backfill the representative query if needed.
+            auto* opCtx = expCtx->getOperationContext();
+            if (BackfillCoordinator::shouldBackfill(expCtx, result->hasRepresentativeQuery)) {
+                _backfillCoordinator->markForBackfillAndScheduleIfNeeded(
+                    opCtx, queryShapeHash, CurOp::get(opCtx)->opDescription().getOwned());
+            }
+            return std::move(result->querySettings);
+        } catch (const DBException& ex) {
+            LOGV2_WARNING_OPTIONS(10153400,
+                                  {logv2::LogComponent::kQuery},
+                                  "Failed to perform query settings lookup",
+                                  "error"_attr = ex.toString());
+            return QuerySettings();
+        }
     }
 
 private:
@@ -753,10 +752,6 @@ public:
         const query_shape::QueryShapeHash& queryShapeHash,
         const NamespaceString& nss,
         const boost::optional<QuerySettings>& querySettingsFromOriginalCommand) const override {
-        if (expCtx->isIdHackQuery()) {
-            return QuerySettings();
-        }
-
         auto* opCtx = expCtx->getOperationContext();
         if (isInternalOrDirectClient(opCtx->getClient())) {
             // Mongos already looked up and merged - return forwarded settings as-is.
@@ -764,11 +759,24 @@ public:
         }
 
         // Replica set: perform cluster lookup (includes rejection check) and merge with user
-        // settings.
+        // settings. These settings come directly from an external client, so validate them first.
         auto settings = lookupQuerySettingsFromInternalStorage(expCtx, queryShapeHash, nss);
         if (querySettingsFromOriginalCommand.has_value()) {
-            settings = mergeQuerySettings(*querySettingsFromOriginalCommand, settings);
+            // Unlike setQuerySettings, empty/default user settings are a no-op rather than an
+            // error.
+            auto& userSettings = *querySettingsFromOriginalCommand;
+            validateQueryKnobsEnabled(opCtx, userSettings);
+
+            settings = mergeQuerySettings(userSettings, settings);
+            simplifyQuerySettings(settings);
+            if (!isDefault(settings)) {
+                validateQuerySettings(settings);
+            }
         }
+
+        // Fail the current command, if 'reject: true' flag is present.
+        failIfRejectedBySettings(expCtx, settings);
+
         return settings;
     }
 
@@ -1036,6 +1044,16 @@ QuerySettings mergeQuerySettings(const QuerySettings& lhs, const QuerySettings& 
     }
 
     return querySettings;
+}
+
+void QuerySettingsService::validateQueryKnobsEnabled(OperationContext* opCtx,
+                                                     const QuerySettings& querySettings) const {
+    uassert(12324800,
+            "Unknown field 'queryKnobs' in querySettings",
+            !querySettings.getQueryKnobs() ||
+                feature_flags::gFeatureFlagPqsQueryKnobs.isEnabled(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 }
 
 void QuerySettingsService::validateQuerySettings(const QuerySettings& querySettings) const {

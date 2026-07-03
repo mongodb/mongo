@@ -180,6 +180,12 @@ public:
         const boost::optional<query_shape::QueryShapeHash>& queryShapeHash,
         const NamespaceString& nss,
         const boost::optional<QuerySettings>& querySettingsFromOriginalCommand) const {
+        // Ineligible queries (IDHACK/Express, FLE, internal/system namespaces) never receive query
+        // settings, whether from persisted settings or supplied directly by the user.
+        if (!isEligbleForQuerySettings(expCtx, nss)) {
+            return QuerySettings();
+        }
+
         if (!queryShapeHash) {
             return querySettingsFromOriginalCommand.value_or(QuerySettings());
         }
@@ -280,6 +286,13 @@ public:
      * sentinels).
      */
     void validateQuerySettings(const QuerySettings& querySettings) const;
+
+    /**
+     * Rejects 'queryKnobs' in 'querySettings' unless featureFlagPqsQueryKnobs is enabled.
+     * TODO SERVER-122103: Remove this guard once featureFlagPqsQueryKnobs is removed (SPM-4364).
+     */
+    void validateQueryKnobsEnabled(OperationContext* opCtx,
+                                   const QuerySettings& querySettings) const;
 
     /**
      * Validates that QuerySettings can be applied to the query represented by 'queryInfo'.
