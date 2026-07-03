@@ -37,7 +37,7 @@ const usesMoveRangeCoordinatorPath = FeatureFlagUtil.isPresentAndEnabled(
     "AuthoritativeShardsDDL",
 );
 const expectedMigrationCommitFailureCodes = usesMoveRangeCoordinatorPath
-    ? [ErrorCodes.StaleEpoch, ErrorCodes.OperationFailed]
+    ? [ErrorCodes.ConflictingOperationInProgress]
     : [ErrorCodes.StaleEpoch];
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
@@ -65,21 +65,25 @@ runMoveChunkMakeDonorStepDownAfterFailpoint(
     st,
     dbName,
     usesMoveRangeCoordinatorPath
-        ? "hangInMoveRangeCoordinatorDetermineOutcome"
+        ? "hangInMoveRangeCoordinatorGlobalCatalogCommit"
         : "hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible",
     true /* shouldMakeMigrationFailToCommitOnConfig */,
     expectedMigrationCommitFailureCodes,
 );
 
-runMoveChunkMakeDonorStepDownAfterFailpoint(
-    st,
-    dbName,
-    usesMoveRangeCoordinatorPath
-        ? "hangInMoveRangeCoordinatorShardCatalogCommit"
-        : "hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible",
-    true /* shouldMakeMigrationFailToCommitOnConfig */,
-    expectedMigrationCommitFailureCodes,
-);
+if (!usesMoveRangeCoordinatorPath) {
+    // This scenario forces the migration commit to fail after the donor has refreshed its filtering
+    // metadata. The authoritative MoveRangeCoordinator rejects a disallowed commit at the earlier global
+    // catalog commit phase (covered by the kGlobalCatalogCommit scenario above) and aborts before ever
+    // reaching the shard catalog commit, so this scenario only applies to the legacy path.
+    runMoveChunkMakeDonorStepDownAfterFailpoint(
+        st,
+        dbName,
+        "hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible",
+        true /* shouldMakeMigrationFailToCommitOnConfig */,
+        expectedMigrationCommitFailureCodes,
+    );
+}
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
     st,

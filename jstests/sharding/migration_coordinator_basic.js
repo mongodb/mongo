@@ -10,6 +10,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
+import {setAllowChunkOperationsOnConfigsvr} from "jstests/sharding/libs/set_allow_chunk_operations_util.js";
 
 function is81orAbove() {
     // Requires all primary shard nodes to be running the fcvRequired version.
@@ -255,18 +256,26 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
         true /* waitForRefresh */,
     );
 
-    // Turn on a failpoint to make the migration commit fail on the config server.
-    let migrationCommitVersionErrorFailpoint = configureFailPoint(
-        st.configRS.getPrimary(),
-        "migrationCommitVersionError",
-    );
+    // Make the migration commit fail on the config server. The authoritative path only aborts the
+    // commit for an error that proves the commit did not take effect: disallowing chunk operations
+    // makes the commit fail with ConflictingOperationInProgress. The legacy path infers the abort
+    // from placement, so a forced version error (StaleEpoch) is enough.
+    let migrationCommitVersionErrorFailpoint;
+    if (usesMoveRangeCoordinatorPath) {
+        setAllowChunkOperationsOnConfigsvr(st, ns, false);
+    } else {
+        migrationCommitVersionErrorFailpoint = configureFailPoint(
+            st.configRS.getPrimary(),
+            "migrationCommitVersionError",
+        );
+    }
 
     // Run the moveChunk asynchronously, pausing during cloning to allow the test to make
     // assertions.
     let step4Failpoint = configureFailPoint(st.shard0, "moveChunkHangAtStep4");
     let step5Failpoint = configureFailPoint(st.shard0, "moveChunkHangAtStep5");
     const expectedMigrationCommitFailureCodes = usesMoveRangeCoordinatorPath
-        ? [ErrorCodes.StaleEpoch, ErrorCodes.OperationFailed]
+        ? [ErrorCodes.ConflictingOperationInProgress]
         : [ErrorCodes.StaleEpoch];
     const awaitResult = startParallelShell(
         funWithArgs(
@@ -325,28 +334,38 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
     assertEventuallyDoesNotHaveRangeDeletionDoc(st.shard0);
     assertEventuallyDoesNotHaveRangeDeletionDoc(st.shard1);
 
-    migrationCommitVersionErrorFailpoint.off();
+    if (usesMoveRangeCoordinatorPath) {
+        setAllowChunkOperationsOnConfigsvr(st, ns, true);
+    } else {
+        migrationCommitVersionErrorFailpoint.off();
+    }
 })();
 
-(() => {
-    const [collName, ns] = getNewNs(dbName);
-    jsTest.log(
-        "Test end-to-end migration when migration commit fails to due to invalid chunk query, ns is " +
-            ns,
-    );
+// The authoritative MoveRangeCoordinator only aborts the commit for an error that proves the commit
+// did not take effect (a missing recipient or disallowed chunk operations). A failed chunk update
+// inside the commit transaction is not one of those, so the idempotent commit is retried rather than
+// aborted, and this scenario only applies to the legacy path.
+if (!usesMoveRangeCoordinatorPath) {
+    (() => {
+        const [collName, ns] = getNewNs(dbName);
+        jsTest.log(
+            "Test end-to-end migration when migration commit fails to due to invalid chunk query, ns is " +
+                ns,
+        );
 
-    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
-    const invalidChunkQueryFailPoint = configureFailPoint(
-        st.configRS.getPrimary(),
-        "migrateCommitInvalidChunkQuery",
-    );
+        assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
+        const invalidChunkQueryFailPoint = configureFailPoint(
+            st.configRS.getPrimary(),
+            "migrateCommitInvalidChunkQuery",
+        );
 
-    assert.commandFailedWithCode(
-        st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard1.shardName}),
-        ErrorCodes.UpdateOperationFailed,
-    );
+        assert.commandFailedWithCode(
+            st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard1.shardName}),
+            ErrorCodes.UpdateOperationFailed,
+        );
 
-    invalidChunkQueryFailPoint.off();
-})();
+        invalidChunkQueryFailPoint.off();
+    })();
+}
 
 st.stop();

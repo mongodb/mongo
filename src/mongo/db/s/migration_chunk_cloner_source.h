@@ -356,6 +356,13 @@ public:
             static_cast<bool>(_jumboChunkCloneState->clonerExec) && _forceJumbo;
     }
 
+    /* Whether the cloner has finished: it has either committed the clone on the recipient or been
+     * cancelled. */
+    bool isDone() const {
+        std::lock_guard<std::mutex> lk(_mutex);
+        return _state == kDone;
+    }
+
     /**
      * Called by the recipient shard. Transfers the accummulated local mods from source to
      * destination. Must not be called before all cloned objects have been fetched through calls to

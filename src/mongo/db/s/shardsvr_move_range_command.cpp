@@ -131,7 +131,14 @@ boost::optional<FixedFCVRegion> tryRunMoveRangeCoordinator(OperationContext* opC
             service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON(), fcvRegion));
     }
 
-    coordinator->getCompletionFuture().get(opCtx);
+    try {
+        coordinator->getCompletionFuture().get(opCtx);
+    } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
+        // A migration that times out acquiring the critical-section lock is counted so the count is
+        // observable through serverStatus.
+        ShardingStatistics::get(opCtx).countDonorMoveChunkLockTimeout.addAndFetch(1);
+        throw;
+    }
     return boost::none;
 }
 

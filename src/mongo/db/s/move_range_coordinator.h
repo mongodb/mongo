@@ -82,41 +82,29 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
+    // Run by the framework when the coordinator aborts. Releases the donor critical section and
+    // completes the migration as aborted from the persisted document, without the in-memory
+    // migration attempt. Idempotent: the framework may retry it.
+    ExecutorFuture<void> _cleanupOnAbort(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                         const CancellationToken& token,
+                                         const Status& status) noexcept override;
+
     ExecutorFuture<void> _joinExistingExecution(
         std::shared_ptr<executor::ScopedTaskExecutor> executor);
 
-    enum class MigrationOutcome { kCommitted, kAborted };
+    // Drives the kGlobalCatalogCommit phase: sends the idempotent commit command, built from
+    // durable state so it can be re-sent after a failover.
+    void _commitToGlobalCatalog(OperationContext* opCtx);
 
-    // Drives the kDetermineOutcome phase: establishes a causality barrier on re-entry, resolves the
-    // migration outcome, persists the decision into the coordinator document, and writes the
-    // migration result. This is also the single place that emits the change-stream "chunk migrated"
-    // event for a committed migration, on both the same-term and recovery paths.
-    void _determineAndRecordOutcome(OperationContext* opCtx,
-                                    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-                                    const CancellationToken& token);
+    // Drives the kPostGlobalCatalogCommit phase: runs the post-commit bookkeeping after the
+    // global-catalog commit (change-stream event, in-memory bookkeeping via the migration attempt
+    // when present, and persisting the committed decision).
+    void _postGlobalCatalogCommit(OperationContext* opCtx);
 
-    // Resolves whether the migration committed or aborted. `result` is the current migration
-    // result; an OK result means a known commit, a missing result on the same term means a known
-    // abort, and any uncertain case is determined authoritatively from the config server.
-    MigrationOutcome _resolveMigrationOutcome(OperationContext* opCtx,
-                                              const boost::optional<Status>& result);
-
-    // Returns true when the migration outcome cannot be known locally and must be read from the
-    // authoritative placement on the config server. This is the case whenever the commit was
-    // attempted but its success is not recorded on this node: either a failover into this phase
-    // (_recoveredFromDisk) or, on the same term, an ambiguous commit error whose reply was lost
-    // (e.g. a config primary stepdown). When this returns true a causality barrier must precede the
-    // config read so the donor observes the possibly-already-durable commit.
-    bool _mustResolveOutcomeFromConfig() const;
-
-    // Sets the decision on the coordinator document (if it still exists) and persists it. No-op
-    // when the document was never persisted.
+    // Sets the decision on the coordinator document and persists it durably.
     void _persistMigrationDecision(OperationContext* opCtx,
-                                   boost::optional<MigrationCoordinatorDocument>& doc,
+                                   MigrationCoordinatorDocument& doc,
                                    DecisionEnum decision);
-
-    // Determines the outcome from the authoritative global-catalog placement on the config server.
-    MigrationOutcome _determineMigrationOutcome(OperationContext* opCtx);
 
     // Returns the persisted MigrationCoordinatorDocument for this migration, if present. Used by
     // the recovery finalization path to reconstruct the migration coordinator after a failover.
@@ -128,10 +116,13 @@ private:
     // its persisted document on the recovery path.
     void _finalizeMigration(OperationContext* opCtx);
 
-    boost::optional<Status> _getMigrationResult() const;
-    void _writeMigrationResult(OperationContext* opCtx, Status result);
-    void _overwriteMigrationResultWithOk(OperationContext* opCtx);
-    void _writeCommitAttempted(OperationContext* opCtx);
+    // Final teardown shared by the success and abort paths. Releases the donor critical section,
+    // completes the migration coordinator from its persisted decision (releasing the recipient
+    // critical section, scheduling range deletion, forgetting the on-disk document), notifies the
+    // range-deleter recovery job after failover, and unblocks joined migrations with `outcome`. The
+    // caller must have persisted the migration decision (committed earlier, aborted just before
+    // calling). Idempotent.
+    void _releaseCriticalSectionAndFinalize(OperationContext* opCtx, const Status& outcome);
 
     // Commits the post-migration collection and chunk metadata to the authoritative local shard
     // catalog on the donor and recipient. Must run while the critical section is held.
@@ -151,7 +142,16 @@ private:
         Status migrate(OperationContext* opCtx);
         // Promotes the donor critical section to also block reads, just before the config commit.
         void promoteCriticalSection(OperationContext* opCtx);
-        Status commit(OperationContext* opCtx, const OperationSessionInfo& session);
+        // The donor shard's placement version captured when the clone started. The coordinator
+        // persists it so the global-catalog commit can be re-issued from durable state.
+        ChunkVersion donorShardVersionPreMigration() const;
+        // Marks that the global-catalog commit is about to be issued, so a teardown is treated as
+        // uncertain rather than aborted.
+        void markCommitInProgress();
+        // Post-commit bookkeeping once the global-catalog commit has succeeded: clears the
+        // time-series bucket catalog if needed, records the committed decision, and writes the
+        // moveChunk.commit changelog entry.
+        void recordCommitSuccess(OperationContext* opCtx);
         // Completes the migration coordinator on the same term that ran the commit (releasing the
         // recipient critical section). Honours waitForDelete.
         void finalize(OperationContext* opCtx);
@@ -190,7 +190,6 @@ private:
         CloneMetricsSnapshot _cloneMetrics;
         std::unique_ptr<MigrationSourceManager> _msm;
         boost::optional<Status> _migrateResult;
-        boost::optional<Status> _commitResult;
     };
 
     const ShardsvrMoveRangeRequest _request;

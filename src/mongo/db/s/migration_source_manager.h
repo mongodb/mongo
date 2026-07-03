@@ -189,31 +189,41 @@ public:
     void promoteCriticalSectionToBlockReads();
 
     /**
-     * Sends the CommitChunkMigration command to the config server and returns its status. The
-     * provided session id is attached to the command so the config server can run the commit as a
-     * retryable write, making coordinator retries idempotent and protecting against replay of stale
-     * requests. Unlike commitChunkMetadataOnConfig(), this does NOT release any critical section,
-     * refresh filtering metadata, launch async recovery, or complete the migration; the caller
-     * drives those steps.
+     * Marks that the global-catalog commit is about to be issued. From here on the migration may
+     * already be committed, so a teardown must treat it as uncertain rather than as a clean abort;
+     * the coordinator's recovery resolves the outcome.
      *
      * Expected state: kCloneCompleted
      * Resulting state: kCommittingOnConfig
      */
-    Status commitMigrationToGlobalCatalog(const OperationSessionInfo& session);
+    void markCommitInProgress();
 
     /**
-     * Post-commit bookkeeping that must run once the config commit has succeeded: emits the change
-     * stream "chunk migrated" event, clears the time-series bucket catalog if needed, and records
-     * the committed decision on the migration coordinator. Does NOT refresh filtering metadata.
+     * Records that the global-catalog commit has succeeded: clears the time-series bucket catalog
+     * if needed, records the committed decision in memory, and writes the moveChunk.commit
+     * changelog entry. Idempotent across same-term retries. Does not issue the commit or complete
+     * the migration; the coordinator drives those steps.
+     *
+     * Expected state: kCommittingOnConfig
      */
-    void recordCommitSuccess();
+    void recordCommitSuccess(OperationContext* opCtx);
 
     /**
      * Completes a committed migration: releases the recipient critical section, completes the
-     * migration coordinator (range deletion + forgets the doc), and honours waitForDelete. Used by
-     * the MoveRangeCoordinator kFinalizeMigration phase on the same term that ran the commit.
+     * migration coordinator (range deletion + forgets the doc), and honours waitForDelete. Called
+     * from the kFinalizeMigration phase while the migration attempt is still in memory; otherwise
+     * the coordinator completes from the persisted coordinator document.
      */
     void finishCommit();
+
+    /**
+     * The donor shard's placement version captured at the start of the migration (in startClone).
+     * The coordinator persists it so the global-catalog commit can be re-sent from durable state
+     * after a failover. Only valid after startClone.
+     */
+    ChunkVersion getDonorShardVersionPreMigration() const {
+        return *_donorShardVersionPreMigration;
+    }
 
     /**
      * Aborts the migration after observing a concurrent index operation by marking its operation
@@ -269,9 +279,8 @@ private:
 
     CollectionMetadata _getCurrentMetadataAndCheckForConflictingErrors();
 
-    // Serializes the shared CommitChunkMigration command body (migrated chunk + collection version
-    // + write concern) into `builder`. The collection version is supplied by the caller because the
-    // standalone and coordinator paths read it from different sources.
+    // Serializes the CommitChunkMigration command body (migrated chunk + collection version + write
+    // concern) into `builder`.
     void _buildCommitChunkMigrationRequest(BSONObjBuilder* builder,
                                            const ChunkVersion& collVersion,
                                            bool isAuthoritative);
@@ -284,11 +293,8 @@ private:
 
     /**
      * May be called at any time. Unregisters the migration source manager from the collection,
-     * restores the committed metadata (if in critical section) and logs error in the change log to
-     * indicate that the migration has failed.
-     *
-     * Only valid on the standalone path. The MoveRangeCoordinator drives cleanup through the
-     * coordinator's kFinalizeMigration phase (finishCommit()).
+     * restores the committed metadata (if in critical section) and logs the failure in the change
+     * log.
      *
      * Expected state: Any
      * Resulting state: kDone
@@ -297,8 +303,7 @@ private:
 
     /**
      * Writes a "moveChunk.error" entry to the sharding change log, attaching the recorded _errMsg
-     * (if any). Used by both the standalone _cleanupOnError() and the MoveRangeCoordinator abort
-     * path in finishCommit().
+     * (if any).
      */
     void _logMoveChunkErrorToChangelog();
 
@@ -380,6 +385,11 @@ private:
 
     // The version of the chunk at the time the migration started.
     boost::optional<ChunkVersion> _chunkVersion;
+
+    // The donor shard's placement version at the time the migration started. Captured in
+    // startClone() and exposed so the MoveRangeCoordinator can persist it for the global-catalog
+    // commit.
+    boost::optional<ChunkVersion> _donorShardVersionPreMigration;
 
     // The chunk cloner source. Only available if there is an active migration going on. To set and
     // remove it, the CSRLock needs to be acquired in exclusive mode. To access it, the CSRlock has

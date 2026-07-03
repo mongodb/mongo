@@ -1739,6 +1739,10 @@ ShardingCatalogManager::_commitChunkMigrationImpl(
     // Must hold the shard lock until the entire commit finishes to serialize with removeShard.
     Lock::SharedLock shardLock(opCtx, _kShardMembershipLock);
 
+    // Read the recipient shard under the membership lock now, but defer rejecting a missing or
+    // draining recipient until after the idempotency check below. A retry of an already-committed
+    // migration must still return OK even if the recipient was removed or started draining in the
+    // meantime.
     auto shardResult = uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
         opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
@@ -1747,14 +1751,9 @@ ShardingCatalogManager::_commitChunkMigrationImpl(
         BSON(ShardType::name(toShard.toString())),
         {},
         boost::none));
-    uassert(ErrorCodes::ShardNotFound,
-            str::stream() << "Shard " << toShard << " does not exist",
-            !shardResult.docs.empty());
-
-    auto shard = uassertStatusOK(ShardType::fromBSON(shardResult.docs.front()));
-    uassert(ErrorCodes::ShardNotFound,
-            str::stream() << "Shard " << toShard << " is currently draining",
-            !shard.getDraining());
+    const bool toShardExists = !shardResult.docs.empty();
+    const bool toShardDraining = toShardExists &&
+        uassertStatusOK(ShardType::fromBSON(shardResult.docs.front())).getDraining();
 
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
     // strictly monotonously increasing collection placement versions
@@ -1869,6 +1868,16 @@ ShardingCatalogManager::_commitChunkMigrationImpl(
         repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         return outcome;
     }
+
+    // Reject a missing or draining recipient only after confirming this is not an idempotent retry,
+    // so a retry of an already-committed migration still returns OK even if the recipient was
+    // removed or started draining in the meantime.
+    uassert(ErrorCodes::ShardNotFound,
+            str::stream() << "Shard " << toShard << " does not exist",
+            toShardExists);
+    uassert(ErrorCodes::ShardNotFound,
+            str::stream() << "Shard " << toShard << " is currently draining",
+            !toShardDraining);
 
     // Only check for kUpgrading or kDowngrading after we know that the operation is not a retry for
     // idempotency.

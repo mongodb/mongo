@@ -52,7 +52,7 @@ const usesMoveRangeCoordinatorPath = FeatureFlagUtil.isPresentAndEnabled(
     "AuthoritativeShardsDDL",
 );
 const recoveryFailPointName = usesMoveRangeCoordinatorPath
-    ? "hangInMoveRangeCoordinatorDetermineOutcome"
+    ? "hangInMoveRangeCoordinatorGlobalCatalogCommit"
     : "hangInEnsureChunkVersionIsGreaterThanInterruptible";
 
 function getPendingMigrationRecoveryNss() {
@@ -72,49 +72,80 @@ function getPendingMigrationRecoveryNss() {
         .map((doc) => doc.nss);
 }
 
-// Hang before commit migration
-let moveChunkHangAtStep5Failpoint = configureFailPoint(st.rs0.getPrimary(), "moveChunkHangAtStep5");
-let joinMoveChunk1 = moveChunkParallel(
-    staticMongod,
-    st.s0.host,
-    {_id: 0},
-    null,
-    nsA,
-    st.shard1.shardName,
-    true /* expectSuccess */,
-);
-
-moveChunkHangAtStep5Failpoint.wait();
-
-let migrationCommitNetworkErrorFailpoint = configureFailPoint(
-    st.rs0.getPrimary(),
-    "migrationCommitNetworkError",
-);
-let skipShardFilteringMetadataRefreshFailpoint = configureFailPoint(
-    st.rs0.getPrimary(),
-    "skipShardFilteringMetadataRefresh",
-);
-
-// Don't let the migration recovery finish on the secondary that will next be stepped up.
+let joinMoveChunk1;
+let recoveryFailpoints;
 const rs0Secondary = st.rs0.getSecondary();
-let recoveryFailpoints = [configureFailPoint(rs0Secondary, recoveryFailPointName)];
+
 if (usesMoveRangeCoordinatorPath) {
-    // The MoveRangeCoordinator may advance to its recovery phase before the step-up interrupts the
-    // old primary, so hang it there too.
-    recoveryFailpoints.push(configureFailPoint(st.rs0.getPrimary(), recoveryFailPointName));
+    // The MoveRangeCoordinator is itself the migration recovery mechanism. Hang it at the global
+    // catalog commit so the migration is left unfinished, then step the donor over so the new
+    // primary recovers the coordinator. The soon-to-be primary is hung at the same phase so
+    // recovery stalls there, leaving the migration pending recovery. The commit has not happened
+    // yet, so the original moveChunk command only returns once recovery is allowed to complete; it
+    // is joined at the end.
+    const commitFailpointOldPrimary = configureFailPoint(
+        st.rs0.getPrimary(),
+        recoveryFailPointName,
+    );
+    const commitFailpointNewPrimary = configureFailPoint(rs0Secondary, recoveryFailPointName);
+
+    joinMoveChunk1 = moveChunkParallel(
+        staticMongod,
+        st.s0.host,
+        {_id: 0},
+        null,
+        nsA,
+        st.shard1.shardName,
+        true /* expectSuccess */,
+    );
+
+    commitFailpointOldPrimary.wait();
+
+    st.rs0.stepUp(rs0Secondary);
+    commitFailpointNewPrimary.wait();
+    // The old primary has stepped down; its failpoint is no longer relevant.
+    commitFailpointOldPrimary.off();
+
+    recoveryFailpoints = [commitFailpointNewPrimary];
+} else {
+    // Hang before commit migration
+    let moveChunkHangAtStep5Failpoint = configureFailPoint(
+        st.rs0.getPrimary(),
+        "moveChunkHangAtStep5",
+    );
+    joinMoveChunk1 = moveChunkParallel(
+        staticMongod,
+        st.s0.host,
+        {_id: 0},
+        null,
+        nsA,
+        st.shard1.shardName,
+        true /* expectSuccess */,
+    );
+
+    moveChunkHangAtStep5Failpoint.wait();
+
+    let migrationCommitNetworkErrorFailpoint = configureFailPoint(
+        st.rs0.getPrimary(),
+        "migrationCommitNetworkError",
+    );
+    let skipShardFilteringMetadataRefreshFailpoint = configureFailPoint(
+        st.rs0.getPrimary(),
+        "skipShardFilteringMetadataRefresh",
+    );
+
+    // Don't let the migration recovery finish on the secondary that will next be stepped up.
+    recoveryFailpoints = [configureFailPoint(rs0Secondary, recoveryFailPointName)];
+
+    moveChunkHangAtStep5Failpoint.off();
+    migrationCommitNetworkErrorFailpoint.wait();
+
+    st.rs0.stepUp(rs0Secondary);
+
+    joinMoveChunk1();
+    migrationCommitNetworkErrorFailpoint.off();
+    skipShardFilteringMetadataRefreshFailpoint.off();
 }
-
-moveChunkHangAtStep5Failpoint.off();
-migrationCommitNetworkErrorFailpoint.wait();
-
-st.rs0.stepUp(rs0Secondary);
-if (usesMoveRangeCoordinatorPath) {
-    recoveryFailpoints[0].wait();
-}
-
-joinMoveChunk1();
-migrationCommitNetworkErrorFailpoint.off();
-skipShardFilteringMetadataRefreshFailpoint.off();
 
 // The migration is left pending recovery.
 {
@@ -159,6 +190,11 @@ sleep(5 * 1000);
 
 // Let the migration recovery complete
 recoveryFailpoints.forEach((failpoint) => failpoint.off());
+if (usesMoveRangeCoordinatorPath) {
+    // With recovery unblocked, the recovered coordinator commits and the original moveChunk command
+    // finally returns.
+    joinMoveChunk1();
+}
 moveChunkHangAtStep3Failpoint.wait();
 
 // Check that the first migration has been recovered. There must be only one pending recovery

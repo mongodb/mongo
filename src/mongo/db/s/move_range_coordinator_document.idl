@@ -39,6 +39,7 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/global_catalog/ddl/sharding_coordinator.idl"
+    - "mongo/db/versioning_protocol/chunk_version.idl"
     - "mongo/db/write_concern_options.idl"
     - "mongo/s/request_types/move_range_request.idl"
 
@@ -51,9 +52,8 @@ enums:
             kMigrate: "migrate"
             kEnterCriticalSection: "enterCriticalSection"
             kGlobalCatalogCommit: "globalCatalogCommit"
-            kDetermineOutcome: "determineOutcome"
+            kPostGlobalCatalogCommit: "postGlobalCatalogCommit"
             kShardCatalogCommit: "shardCatalogCommit"
-            kReleaseCriticalSectionOnDonor: "releaseCriticalSectionOnDonor"
             kFinalizeMigration: "finalizeMigration"
 
 structs:
@@ -83,15 +83,7 @@ structs:
             writeConcern:
                 type: WriteConcern
                 optional: true
-            commitAttempted:
-                type: bool
+            donorShardVersionPreMigration:
+                type: ChunkVersion
                 optional: true
-                description: "Set to true immediately before committing chunk metadata on the config server."
-            migrationSuccess:
-                type: bool
-                optional: true
-                description: "Set to true when the migration completes successfully."
-            migrationFailure:
-                type: error_status
-                optional: true
-                description: "Set to the error status when the migration fails."
+                description: "Donor shard placement version captured before the migration."

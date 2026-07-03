@@ -34,6 +34,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/global_catalog/ddl/commit_chunk_migration_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
 #include "mongo/db/persistent_task_store.h"
@@ -42,11 +43,11 @@
 #include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/migration_util.h"
-#include "mongo/db/s/primary_only_service_helpers/all_shards_and_config_causality_barrier.h"
 #include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
+#include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/shard_registry.h"
@@ -67,8 +68,19 @@ namespace mongo {
 
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(hangInMoveRangeCoordinatorDetermineOutcome);
+MONGO_FAIL_POINT_DEFINE(hangInMoveRangeCoordinatorGlobalCatalogCommit);
 MONGO_FAIL_POINT_DEFINE(hangInMoveRangeCoordinatorShardCatalogCommit);
+
+// Errors the commit raises before it changes the global catalog. They prove the commit did not take
+// effect, so the coordinator can safely abort. Other errors are ambiguous, but the commit is
+// idempotent, so the coordinator keeps retrying instead.
+//
+// - ConflictingOperationInProgress: allowChunkOperations has been disabled concurrently.
+// - ShardNotFound: the recipient shard no longer exists or has started draining.
+bool isFatalGlobalCatalogCommitError(const Status& status) {
+    return status == ErrorCodes::ConflictingOperationInProgress ||
+        status == ErrorCodes::ShardNotFound;
+}
 
 // Rebuild the wire-format ShardsvrMoveRange command from the request struct stored on the
 // coordinator. Required because MigrationSourceManager::createMigrationSourceManager still takes a
@@ -231,75 +243,39 @@ ExecutorFuture<void> MoveRangeCoordinator::_runImpl(
                         _migrationAttempt.has_value());
 
                 _migrationAttempt->promoteCriticalSection(opCtx);
+
+                // Persist the donor's pre-migration shard version for using it to build the global
+                // catalog commit on kGlobalCatalogCommit.
+                // We cannot read it during kGlobalCatalogCommit because, after a failover, it may
+                // no longer reflect the pre-migration shard version.
+
+                auto newDoc = MoveRangeCoordinatorDocument(_doc);
+                newDoc.setDonorShardVersionPreMigration(
+                    _migrationAttempt->donorShardVersionPreMigration());
+                _updateStateDocument(opCtx, std::move(newDoc));
+
+                // Mark the commit as in progress before issuing it, so a MigrationSourceManager
+                // doesn't cancel the clone driver.
+                _migrationAttempt->markCommitInProgress();
             }))
         .then(_buildPhaseHandler(Phase::kGlobalCatalogCommit,
                                  [this, anchor = shared_from_this()](OperationContext* opCtx) {
                                      LOGV2(12894208,
                                            "MoveRangeCoordinator executing kGlobalCatalogCommit",
                                            getCoordinatorLogAttrs());
-                                     uassert(ErrorCodes::InterruptedDueToReplStateChange,
-                                             "MoveRangeCoordinator interrupted during commit",
-                                             _firstExecution);
-                                     tassert(
-                                         12894200,
-                                         "Migrate and commit must only run during the same term",
-                                         _migrationAttempt.has_value());
+                                     hangInMoveRangeCoordinatorGlobalCatalogCommit.pauseWhileSet(
+                                         opCtx);
 
-                                     auto session = getNewSession(opCtx);
-                                     _writeCommitAttempted(opCtx);
-                                     uassertStatusOK(_migrationAttempt->commit(opCtx, session));
+                                     _commitToGlobalCatalog(opCtx);
                                  }))
-        .onCompletion([this, anchor = shared_from_this()](Status migrateStatus) {
-            // The kMigrate, kEnterCriticalSection, and kGlobalCatalogCommit phases always run in
-            // the same term, since the migration machinery aborts on any error. Persist the
-            // resulting Status for these three phases in the coordinator document here. After
-            // failover, those phases are skipped and this handler instead receives
-            // InterruptedDueToReplStateChange. In either ways, the actual migration outcome is
-            // resolved in the kDetermineOutcome phase.
-
-            auto opCtx = makeOperationContext(/*deprioritizable=*/false);
-            if (!migrateStatus.isOK()) {
-                // If the state document was never persisted (e.g. the coordinator was
-                // interrupted before the first phase write committed), there is nothing on disk to
-                // record the result into. Propagate the (retryable) failure directly; attempting to
-                // update a non-existent document would hit the tripwire 10644540.
-                if (_doc.getPhase() == Phase::kUnset) {
-                    uassertStatusOK(migrateStatus);
-                }
-
-                LOGV2_WARNING(
-                    12697303,
-                    "Error while doing moveChunk",
-                    logv2::DynamicAttributes{getCoordinatorLogAttrs(),
-                                             "error"_attr = redact(migrateStatus),
-                                             "errorCode"_attr = migrateStatus.codeString()});
-                if (migrateStatus.code() == ErrorCodes::LockTimeout) {
-                    ShardingStatistics::get(opCtx.get())
-                        .countDonorMoveChunkLockTimeout.addAndFetch(1);
-                }
-            }
-            _writeMigrationResult(opCtx.get(), migrateStatus);
-        })
-        .then(_buildPhaseHandler(
-            Phase::kDetermineOutcome,
-            [this, anchor = shared_from_this(), executor, token](OperationContext* opCtx) {
-                LOGV2(12894209,
-                      "MoveRangeCoordinator executing kDetermineOutcome",
-                      logv2::DynamicAttributes{getCoordinatorLogAttrs(),
-                                               "commitAttempted"_attr = _doc.getCommitAttempted()});
-                hangInMoveRangeCoordinatorDetermineOutcome.pauseWhileSet(opCtx);
-                // On a retry or recovery, the config commit may have been issued by a previous
-                // execution whose effect this node does not yet observe. Establish a causality
-                // barrier so the placement read below reflects that commit; otherwise the outcome
-                // could be wrongly determined as aborted. (Replay protection of the commit itself
-                // is handled separately, via the session id.)
-                if (_mustResolveOutcomeFromConfig()) {
-                    AllShardsAndConfigCausalityBarrier barrier{**executor, token};
-                    performCausalityBarrier(opCtx, barrier);
-                }
-
-                _determineAndRecordOutcome(opCtx, executor, token);
-            }))
+        .then(_buildPhaseHandler(Phase::kPostGlobalCatalogCommit,
+                                 [this, anchor = shared_from_this()](OperationContext* opCtx) {
+                                     LOGV2(
+                                         12953604,
+                                         "MoveRangeCoordinator executing kPostGlobalCatalogCommit",
+                                         getCoordinatorLogAttrs());
+                                     _postGlobalCatalogCommit(opCtx);
+                                 }))
         .then(_buildPhaseHandler(
             Phase::kShardCatalogCommit,
             [this, anchor = shared_from_this(), executor, token](OperationContext* opCtx) {
@@ -308,86 +284,55 @@ ExecutorFuture<void> MoveRangeCoordinator::_runImpl(
                       getCoordinatorLogAttrs());
                 hangInMoveRangeCoordinatorShardCatalogCommit.pauseWhileSet(opCtx);
 
-                // Only commit to the shard catalog if the config-server commit actually happened.
-                // An aborted or failed migration leaves an error result and must not touch the
-                // local shard catalog.
-                const auto result = _getMigrationResult();
-                if (result.has_value() && result->isOK()) {
-                    // Both critical sections are still held here, so the shard catalog commit on
-                    // the donor and recipient is protected from concurrent migrations.
-                    _commitToShardCatalog(opCtx, executor, token);
-                }
+                _commitToShardCatalog(opCtx, executor, token);
             }))
-        .then(_buildPhaseHandler(
-            Phase::kReleaseCriticalSectionOnDonor,
-            [this, anchor = shared_from_this()](OperationContext* opCtx) {
-                LOGV2(12795318,
-                      "MoveRangeCoordinator executing kReleaseCriticalSectionOnDonor",
-                      getCoordinatorLogAttrs());
+        .then(_buildPhaseHandler(Phase::kFinalizeMigration,
+                                 [this, anchor = shared_from_this()](OperationContext* opCtx) {
+                                     LOGV2(12894210,
+                                           "MoveRangeCoordinator executing kFinalizeMigration",
+                                           getCoordinatorLogAttrs());
 
-                // Release the donor critical section now that the shard catalog has been committed.
-                // The recipient critical section and the coordinator document are completed later
-                // by kFinalizeMigration. throwIfReasonDiffers=false makes this a no-op if the
-                // section was never acquired or was already released by a prior attempt.
-                ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
-                    opCtx,
-                    nss(),
-                    migrationutil::makeCriticalSectionReasonForMoveRange(_request,
-                                                                         _doc.getMigrationId()),
-                    defaultMajorityWriteConcernDoNotUse(),
-                    ShardingRecoveryService::NoCustomAction(),
-                    false /* throwIfReasonDiffers */);
-            }))
-        .then(_buildPhaseHandler(
-            Phase::kFinalizeMigration,
-            [this, anchor = shared_from_this(), executor](OperationContext* opCtx) {
-                LOGV2(12894210,
-                      "MoveRangeCoordinator executing kFinalizeMigration",
-                      getCoordinatorLogAttrs());
-                tassert(12894202,
-                        "migrationResult must be set before kFinalizeMigration",
-                        _getMigrationResult().has_value());
-                const auto completionStatus = *_getMigrationResult();
+                                     // Release the donor critical section, then
+                                     // complete the migration (release the recipient critical
+                                     // section, schedule range deletion, forget the on-disk
+                                     // document) and signal joiners with success.
+                                     _releaseCriticalSectionAndFinalize(opCtx, Status::OK());
+                                 }))
+        .onError([this, anchor = shared_from_this()](const Status& status) {
+            const auto phase = _doc.getPhase();
 
-                // Release the recipient critical section and complete the migration coordinator
-                // (range deletion + forgetting the on-disk document). On the same term that ran the
-                // commit the live MigrationSourceManager drives this; after a failover we
-                // reconstruct the migration coordinator from its persisted document.
-                try {
-                    _finalizeMigration(opCtx);
-                } catch (const ExceptionFor<ErrorCodes::OrphanedRangeCleanUpFailed>& ex) {
-                    // The migration committed; only the _waitForDelete orphan cleanup failed.
-                    // Legacy semantics return OK for any committed migration, so log and continue
-                    // with the committed completionStatus.
-                    LOGV2_WARNING(12795319,
-                                  "Migration committed but failed to clean up orphans for a "
-                                  "waitForDelete request",
-                                  logv2::DynamicAttributes{getCoordinatorLogAttrs(),
-                                                           "error"_attr = redact(ex.toStatus())});
+            // The data clone cannot be resumed, so any error in these phases aborts the migration.
+            if (phase <= Phase::kEnterCriticalSection) {
+                if (phase == Phase::kUnset) {
+                    // If nothing is persisted yet (kUnset) there is no document to record an abort
+                    // reason on, so just propagate the error and let the framework retry.
+                    return status;
                 }
+                auto opCtxHolder = makeOperationContext(/*deprioritizable=*/false);
+                triggerCleanup(opCtxHolder.get(), status);
+                MONGO_UNREACHABLE_TASSERT(12953605);
+            }
 
-                PersistentTaskStore<MigrationCoordinatorDocument> store(
-                    NamespaceString::kMigrationCoordinatorsNamespace);
-                tassert(
-                    12723002,
-                    "Expected no MigrationCoordinator document on disk after completing migration",
-                    store.count(opCtx,
-                                BSON(MigrationCoordinatorDocument::kIdFieldName
-                                     << _doc.getMigrationId())) == 0);
-                if (_recoveredFromDisk) {
-                    const auto term = repl::ReplicationCoordinator::get(opCtx)->getTerm();
-                    RangeDeleterService::get(opCtx)->notifyRecoveryJobComplete(term);
-                }
-                _scopedDonateChunk->signalComplete(completionStatus);
-                _completeOnError = true;
-                uassertStatusOK(completionStatus);
-            }))
+            // During the commit, abort only for an error that is expected and proves the commit did
+            // not take effect like a disabled allowChunkOperations flag.
+            // For other errors keep retrying.
+            if (phase == Phase::kGlobalCatalogCommit && isFatalGlobalCatalogCommitError(status)) {
+                auto opCtxHolder = makeOperationContext(/*deprioritizable=*/false);
+                triggerCleanup(opCtxHolder.get(), status);
+                MONGO_UNREACHABLE_TASSERT(12953606);
+            }
+
+            // From kGlobalCatalogCommit onwards the migration is (or will be) committed, so the
+            // coordinator keeps retrying to completion rather than aborting;
+            // _mustAlwaysMakeProgress() keeps the retry loop running even for non-retryable errors.
+            return status;
+        })
         .thenRunOn(_cleanupExecutor)
         .onCompletion([this, anchor = shared_from_this()](Status status) {
-            // Ensure the MigrationSourceManager is released after all phases that need the live
-            // migration attempt have completed. We cannot rely on the MoveRangeCoordinator
-            // destructor because the coordinator may remain alive after stepdown until the node
-            // steps up again.
+            // Drop the migration attempt at the end of each execution attempt. Its cleanup runs
+            // only once, so a retry (or the abort cleanup) completes from the persisted document
+            // instead. The destructor is not enough because the coordinator can stay alive after a
+            // stepdown until the node steps up again.
             _migrationAttempt.reset();
             return status;
         });
@@ -442,41 +387,27 @@ void MoveRangeCoordinator::MigrationAttempt::promoteCriticalSection(OperationCon
     _msm->promoteCriticalSectionToBlockReads();
 }
 
-Status MoveRangeCoordinator::MigrationAttempt::commit(OperationContext* opCtx,
-                                                      const OperationSessionInfo& session) {
-    tassert(12894203, "commit() called before migrate() completed", _migrateResult.has_value());
-    if (!_migrateResult->isOK())
-        return *_migrateResult;
+ChunkVersion MoveRangeCoordinator::MigrationAttempt::donorShardVersionPreMigration() const {
+    return _msm->getDonorShardVersionPreMigration();
+}
 
-    if (_commitResult)
-        return *_commitResult;
-
+void MoveRangeCoordinator::MigrationAttempt::markCommitInProgress() {
     AlternativeClientRegion acr(_ownedClient);
-    try {
-        // Any failure after this point may have committed on the config server, so the recovery
-        // flow is required to determine the actual outcome.
-        uassertStatusOK(_msm->commitMigrationToGlobalCatalog(session));
+    _msm->markCommitInProgress();
+}
 
-        // The config commit succeeded: emit the change stream event, clear the time-series bucket
-        // catalog and record the committed decision. The critical sections are released later, by
-        // the kReleaseCriticalSectionOnDonor and kFinalizeMigration phases, after the authoritative
-        // shard catalog commit.
-        _msm->recordCommitSuccess();
+void MoveRangeCoordinator::MigrationAttempt::recordCommitSuccess(OperationContext* opCtx) {
+    // Don't use AlternativeClientRegion here because we want to go ahead even if _ownedClient was
+    // interrupted by an external client.
+    _msm->recordCommitSuccess(opCtx);
 
-        LOGV2(12697302,
-              "Migration finished",
-              "migrationId"_attr = _migrationId.toString(),
-              "totalTimeMillis"_attr = _msm->getOpTimeMillis(),
-              "docsCloned"_attr = _cloneMetrics.docsCloned(opCtx),
-              "bytesCloned"_attr = _cloneMetrics.bytesCloned(opCtx),
-              "cloneTime"_attr = _cloneMetrics.cloneTimeMillis(opCtx));
-
-        _commitResult = Status::OK();
-    } catch (const DBException& ex) {
-        _commitResult = ex.toStatus();
-    }
-
-    return *_commitResult;
+    LOGV2(12697302,
+          "Migration finished",
+          "migrationId"_attr = _migrationId.toString(),
+          "totalTimeMillis"_attr = _msm->getOpTimeMillis(),
+          "docsCloned"_attr = _cloneMetrics.docsCloned(opCtx),
+          "bytesCloned"_attr = _cloneMetrics.bytesCloned(opCtx),
+          "cloneTime"_attr = _cloneMetrics.cloneTimeMillis(opCtx));
 }
 
 void MoveRangeCoordinator::MigrationAttempt::finalize(OperationContext* opCtx) {
@@ -484,41 +415,74 @@ void MoveRangeCoordinator::MigrationAttempt::finalize(OperationContext* opCtx) {
     _msm->finishCommit();
 }
 
-boost::optional<Status> MoveRangeCoordinator::_getMigrationResult() const {
-    if (_doc.getMigrationSuccess().value_or(false))
-        return Status::OK();
-    if (const auto& failure = _doc.getMigrationFailure())
-        return *failure;
-    return boost::none;
+void MoveRangeCoordinator::_commitToGlobalCatalog(OperationContext* opCtx) {
+    auto doc = _getMigrationCoordinatorDocumentIfExists(opCtx);
+    tassert(12953607,
+            "MigrationCoordinator document must exist before committing to the global catalog",
+            doc.has_value());
+    tassert(12953608,
+            "MigrationCoordinator document can't be kAborted at this point",
+            doc->getDecision() != DecisionEnum::kAborted);
+
+    tassert(12953609,
+            "donorShardVersionPreMigration must have been persisted in kEnterCriticalSection",
+            _doc.getDonorShardVersionPreMigration().has_value());
+
+    const auto& range = doc->getRange();
+
+    // Build the command from durable state so it can be re-sent after a failover. The command is
+    // idempotent: if the chunk already belongs to the recipient it no-ops and returns the same
+    // changed chunks.
+    CommitMoveRangeRequest request(
+        nss(),
+        _request.getFromShard(),
+        _request.getToShard(),
+        MigratedChunkType(doc->getPreMigrationChunkVersion(), range.getMin(), range.getMax()),
+        *_doc.getDonorShardVersionPreMigration());
+
+    BSONObjBuilder builder;
+    request.serialize(&builder);
+    builder.append(WriteConcernOptions::kWriteConcernField,
+                   defaultMajorityWriteConcernDoNotUse().toBSON());
+    // Issue as a retryable write so the config server fences replays of stale requests.
+    getNewSession(opCtx).serialize(&builder);
+
+
+    const auto response = Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        DatabaseName::kAdmin,
+        builder.obj(),
+        Shard::RetryPolicy::kIdempotent);
+    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));
 }
 
-void MoveRangeCoordinator::_writeMigrationResult(OperationContext* opCtx, Status result) {
-    if (_doc.getMigrationSuccess().value_or(false) || _doc.getMigrationFailure()) {
-        return;
+
+void MoveRangeCoordinator::_postGlobalCatalogCommit(OperationContext* opCtx) {
+    // The config commit succeeded. Run the post-commit bookkeeping
+    auto doc = _getMigrationCoordinatorDocumentIfExists(opCtx);
+    tassert(12953611, "MigrationCoordinatorDocument must exist", doc.has_value());
+
+    // Emit the change-stream "chunk migrated" event.
+    migrationutil::notifyChangeStreamsOnChunkMigrationCommitted(
+        opCtx,
+        nss(),
+        doc->getCollectionUuid(),
+        _request.getFromShard(),
+        _request.getToShard(),
+        doc->getTransfersFirstCollectionChunkToRecipient().value_or(false));
+
+    // On the committing term, let the migration attempt do the in-memory bookkeeping: clear the
+    // time-series bucket catalog, write the moveChunk.commit changelog, and record the committed
+    // decision so finalize completes as committed. Skipped after a failover, where the bucket
+    // catalog is rebuilt on the new primary and the changelog is best-effort.
+    if (_migrationAttempt) {
+        _migrationAttempt->recordCommitSuccess(opCtx);
     }
-    auto newDoc = MoveRangeCoordinatorDocument(_doc);
-    if (result.isOK()) {
-        newDoc.setMigrationSuccess(true);
-    } else {
-        newDoc.setMigrationFailure(result);
-    }
-    _updateStateDocument(opCtx, std::move(newDoc));
-}
 
-void MoveRangeCoordinator::_writeCommitAttempted(OperationContext* opCtx) {
-    auto newDoc = MoveRangeCoordinatorDocument(_doc);
-    newDoc.setCommitAttempted(true);
-    _updateStateDocument(opCtx, std::move(newDoc));
-}
-
-void MoveRangeCoordinator::_overwriteMigrationResultWithOk(OperationContext* opCtx) {
-    tassert(12894204,
-            "Cannot overwrite a migration result with success if no commit was attempted",
-            _doc.getCommitAttempted().value_or(false));
-    auto newDoc = MoveRangeCoordinatorDocument(_doc);
-    newDoc.setMigrationSuccess(true);
-    newDoc.setMigrationFailure(boost::none);
-    _updateStateDocument(opCtx, std::move(newDoc));
+    // Persist the committed decision last: it is both the durable record that finalization reads
+    // and the marker that fences the bookkeeping above on a retry.
+    _persistMigrationDecision(opCtx, *doc, DecisionEnum::kCommitted);
 }
 
 void MoveRangeCoordinator::_commitToShardCatalog(
@@ -541,124 +505,16 @@ void MoveRangeCoordinator::_commitToShardCatalog(
         token);
 }
 
-void MoveRangeCoordinator::_determineAndRecordOutcome(
-    OperationContext* opCtx,
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& token) {
+void MoveRangeCoordinator::_persistMigrationDecision(OperationContext* opCtx,
+                                                     MigrationCoordinatorDocument& doc,
+                                                     DecisionEnum decision) {
 
-    const auto result = _getMigrationResult();
-    const bool committedKnown = result.has_value() && result->isOK();
-
-    const auto outcome = _resolveMigrationOutcome(opCtx, result);
-
-    LOGV2(12795321,
-          "MoveRangeCoordinator resolved migration outcome",
-          logv2::DynamicAttributes{
-              getCoordinatorLogAttrs(),
-              "outcome"_attr = (outcome == MigrationOutcome::kCommitted ? "committed" : "aborted"),
-              // True when the commit result was already known on this term; false when the outcome
-              // had to be determined authoritatively from the config server (failover or uncertain
-              // commit).
-              "commitResultKnown"_attr = committedKnown,
-              "commitAttempted"_attr = _doc.getCommitAttempted(),
-              "recoveredFromDisk"_attr = _recoveredFromDisk});
-
-    // The coordinator document is needed to persist the resolved decision (so kFinalizeMigration
-    // can complete the migration from a durable decision even after a failover into a later phase,
-    // where there is no live MigrationSourceManager) and to emit the change-stream event below.
-    auto doc = _getMigrationCoordinatorDocumentIfExists(opCtx);
-
-    if (outcome == MigrationOutcome::kCommitted) {
-        // Emit the change-stream "chunk migrated" event.
-        if (doc.has_value()) {
-            migrationutil::notifyChangeStreamsOnChunkMigrationCommitted(
-                opCtx,
-                nss(),
-                doc->getCollectionUuid(),
-                _request.getFromShard(),
-                _request.getToShard(),
-                doc->getTransfersFirstCollectionChunkToRecipient().value_or(false));
-        }
-        if (!committedKnown) {
-            // The commit was resolved via the config server rather than the live commit() path, so
-            // the success was not recorded yet. No-op if it was already recorded.
-            _overwriteMigrationResultWithOk(opCtx);
-        }
-    } else {
-        // The migration aborted. The onCompletion handler always records a (failure) result before
-        // this phase runs, and a committed result never coexists with an aborted outcome, so a
-        // failure result is already present.
-        tassert(12795325,
-                "an aborted migration must have a failure result recorded",
-                result.has_value() && !result->isOK());
-    }
-
-    const auto decision =
-        outcome == MigrationOutcome::kCommitted ? DecisionEnum::kCommitted : DecisionEnum::kAborted;
-    _persistMigrationDecision(opCtx, doc, decision);
-}
-
-bool MoveRangeCoordinator::_mustResolveOutcomeFromConfig() const {
-    const auto result = _getMigrationResult();
-    const bool committedKnown = result.has_value() && result->isOK();
-    const bool commitAttempted = _doc.getCommitAttempted().value_or(false);
-
-    // The outcome is known locally when the commit clearly succeeded (result OK) or was never
-    // attempted on this term (a clean abort during migrate). It must be resolved from the config
-    // server only when the commit was attempted but its result is uncertain (a failover, or an
-    // ambiguous commit error on this same term).
-    return !committedKnown && (commitAttempted || _recoveredFromDisk);
-}
-
-MoveRangeCoordinator::MigrationOutcome MoveRangeCoordinator::_resolveMigrationOutcome(
-    OperationContext* opCtx, const boost::optional<Status>& result) {
-    if (result.has_value() && result->isOK()) {
-        return MigrationOutcome::kCommitted;
-    }
-    if (!_mustResolveOutcomeFromConfig()) {
-        tassert(12795312, "At this point migrationResult should have a value", result.has_value());
-        return MigrationOutcome::kAborted;
-    }
-    LOGV2(12795320,
-          "MoveRangeCoordinator determining migration outcome from the config server",
-          logv2::DynamicAttributes{getCoordinatorLogAttrs(),
-                                   "commitAttempted"_attr = _doc.getCommitAttempted(),
-                                   "recoveredFromDisk"_attr = _recoveredFromDisk});
-    return _determineMigrationOutcome(opCtx);
-}
-
-void MoveRangeCoordinator::_persistMigrationDecision(
-    OperationContext* opCtx,
-    boost::optional<MigrationCoordinatorDocument>& doc,
-    DecisionEnum decision) {
-    // The coordinator document may not exist yet (e.g. a clean abort before it was persisted),
-    // so there is nothing to persist.
-    if (!doc.has_value()) {
-        return;
-    }
-    doc->setDecision(decision);
     // Persist the decision for durability/recovery only, using the stat-free primitive. Do NOT use
     // persistCommitDecision / persistAbortDecision here: those bump countDonorMoveChunkCommitted /
     // countDonorMoveChunkAborted, and the migration is counted once when completeMigration()
     // persists the decision in the kFinalizeMigration phase. Using them here would double-count.
-    migrationutil::updateMigrationCoordinatorDoc(opCtx, *doc);
-}
-
-MoveRangeCoordinator::MigrationOutcome MoveRangeCoordinator::_determineMigrationOutcome(
-    OperationContext* opCtx) {
-    // Resolve the outcome from the authoritative global-catalog placement on the config server: if
-    // the migrated range's min key now belongs to the recipient the commit happened, otherwise it
-    // aborted.
-    //
-    // getMin() is always set here: the moveChunk/moveRange command resolves any find-key to an
-    // explicit min/max before sending _shardsvrMoveRange to the shard.
-    const auto& min = _request.getMoveRangeRequestBase().getMin().value();
-    const auto cm = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss()));
-
-    const auto owningShard = cm.findIntersectingChunkWithSimpleCollation(min).getShardId();
-    return owningShard == _request.getToShard() ? MigrationOutcome::kCommitted
-                                                : MigrationOutcome::kAborted;
+    doc.setDecision(decision);
+    migrationutil::updateMigrationCoordinatorDoc(opCtx, doc);
 }
 
 boost::optional<MigrationCoordinatorDocument>
@@ -690,8 +546,8 @@ void MoveRangeCoordinator::_finalizeMigration(OperationContext* opCtx) {
 
     // Otherwise complete the migration coordinator from its persisted document. The two paths are
     // mutually exclusive on the document's existence: if finalize() above forgot it, none is found
-    // here. This path covers failover recovery (no live MigrationSourceManager) and the same-term
-    // uncertain-commit case (finalize() ran but had no in-memory decision).
+    // here. This path covers failover recovery (no live MigrationSourceManager) and the abort
+    // cleanup driven by _cleanupOnAbort.
     auto doc = _getMigrationCoordinatorDocumentIfExists(opCtx);
     if (!doc) {
         // Nothing left to do: finalize() already completed it, or the migration aborted before a
@@ -699,9 +555,10 @@ void MoveRangeCoordinator::_finalizeMigration(OperationContext* opCtx) {
         return;
     }
 
-    // kDetermineOutcome persists the decision before advancing, so any document that survives here
-    // always carries one. completeMigration uses it to release the recipient critical section,
-    // schedule range deletion and forget the document.
+    // The decision is persisted before this runs (by kGlobalCatalogCommit on commit, by
+    // _cleanupOnAbort on abort), so any document that survives here always carries one.
+    // completeMigration uses it to release the recipient critical section, schedule range deletion
+    // and forget the document.
     tassert(12795313,
             "Migration coordinator document must have a persisted decision before finalization",
             doc->getDecision().has_value());
@@ -715,6 +572,71 @@ void MoveRangeCoordinator::_finalizeMigration(OperationContext* opCtx) {
     coordinator.setShardKeyPattern(
         rangedeletionutil::getShardKeyPatternFromRangeDeletionTask(opCtx, doc->getId()));
     coordinator.completeMigration(opCtx, false);
+}
+
+void MoveRangeCoordinator::_releaseCriticalSectionAndFinalize(OperationContext* opCtx,
+                                                              const Status& outcome) {
+    // Release the donor critical section (no-op if never acquired / already released).
+    ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
+        opCtx,
+        nss(),
+        migrationutil::makeCriticalSectionReasonForMoveRange(_request, _doc.getMigrationId()),
+        defaultMajorityWriteConcernDoNotUse(),
+        ShardingRecoveryService::NoCustomAction(),
+        false /* throwIfReasonDiffers */);
+
+    // Complete the migration from its persisted decision: release the recipient critical section,
+    // schedule range deletion / orphan cleanup, and forget the on-disk coordinator document.
+    try {
+        _finalizeMigration(opCtx);
+    } catch (const ExceptionFor<ErrorCodes::OrphanedRangeCleanUpFailed>& ex) {
+        // Only the committed waitForDelete path can raise this; the migration still succeeds. The
+        // aborted path never schedules a cleanup future, so it never reaches here.
+        LOGV2_WARNING(12795319,
+                      "Migration committed but failed to clean up orphans for a "
+                      "waitForDelete request",
+                      logv2::DynamicAttributes{getCoordinatorLogAttrs(),
+                                               "error"_attr = redact(ex.toStatus())});
+    }
+
+    PersistentTaskStore<MigrationCoordinatorDocument> store(
+        NamespaceString::kMigrationCoordinatorsNamespace);
+    tassert(12723002,
+            "Expected no MigrationCoordinator document on disk after completing migration",
+            store.count(
+                opCtx, BSON(MigrationCoordinatorDocument::kIdFieldName << _doc.getMigrationId())) ==
+                0);
+
+    if (_recoveredFromDisk) {
+        const auto term = repl::ReplicationCoordinator::get(opCtx)->getTerm();
+        RangeDeleterService::get(opCtx)->notifyRecoveryJobComplete(term);
+    }
+
+    _scopedDonateChunk->signalComplete(outcome);
+}
+
+ExecutorFuture<void> MoveRangeCoordinator::_cleanupOnAbort(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token,
+    const Status& status) noexcept {
+    return ExecutorFuture<void>(**executor).then([this, anchor = shared_from_this(), status] {
+        auto opCtxHolder = makeOperationContext(/*deprioritizable=*/false);
+        auto* opCtx = opCtxHolder.get();
+
+        LOGV2(12953610,
+              "MoveRangeCoordinator cleaning up aborted migration",
+              logv2::DynamicAttributes{getCoordinatorLogAttrs(), "reason"_attr = redact(status)});
+
+        // Persist the aborted decision first so finalize reads it and it survives a failover
+        // mid-cleanup. The shared teardown then releases the donor critical section, completes the
+        // migration as aborted (releasing the recipient critical section, scheduling orphan
+        // cleanup, forgetting the coordinator document) and signals joiners with the failure
+        // status.
+        if (auto doc = _getMigrationCoordinatorDocumentIfExists(opCtx)) {
+            _persistMigrationDecision(opCtx, *doc, DecisionEnum::kAborted);
+        }
+        _releaseCriticalSectionAndFinalize(opCtx, status);
+    });
 }
 
 }  // namespace mongo
