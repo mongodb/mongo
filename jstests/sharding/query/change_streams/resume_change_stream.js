@@ -83,7 +83,6 @@ function testResume(mongosColl, collToWatch) {
     let changeStream = cst.startWatchingChanges({
         pipeline: [{$changeStream: {}}],
         collection: collToWatch,
-        includeToken: true,
     });
 
     // We awaited the replication of the first writes, so the change stream shouldn't return
@@ -242,7 +241,6 @@ function testResume(mongosColl, collToWatch) {
     let allChangesCursor = cst.startWatchingChanges({
         pipeline: [{$changeStream: {}}],
         collection: collToWatch,
-        includeToken: true,
     });
 
     // Perform the multi-update that will induce timestamp collisions

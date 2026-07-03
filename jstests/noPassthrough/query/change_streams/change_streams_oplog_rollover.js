@@ -33,7 +33,6 @@ assert.commandWorked(testColl.insert({_id: 1}, {writeConcern: {w: "majority"}}))
 let changeStream = cst.startWatchingChanges({
     pipeline: [{$changeStream: {}}],
     collection: testColl.getName(),
-    includeToken: true,
 });
 
 // We awaited the replication of the insert, so the change stream shouldn't return them.
