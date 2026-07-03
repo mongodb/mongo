@@ -439,4 +439,46 @@ assert.commandWorked(bulk.execute());
     setParam(chunkSizeKnob, chunkOriginalVal);
 })();
 
+(function testReplaceAllExpressionMemoryLimit() {
+    // featureFlagExpressionMemoryTracking turns on the expression evaluation tracking.
+    if (!FeatureFlagUtil.isEnabled(db, "ExpressionMemoryTracking")) {
+        return;
+    }
+
+    // TODO SERVER-130003: remove once SBE tracks $replaceAll.
+    if (sbeFullyEnabled) {
+        jsTest.log.info(
+            "Skipping test because $replaceAll memory tracking is not yet implemented in SBE",
+        );
+        return;
+    }
+    const knob = "internalQueryMaxMemoryUsageBytesPerOperation";
+    const chunkSizeKnob = "internalQueryMaxWriteToCurOpMemoryUsageBytes";
+
+    const big = "x".repeat(2000);
+    const pipeline = [
+        {$limit: 1},
+        {$project: {a: {$replaceAll: {input: "$y", find: "", replacement: big}}}},
+    ];
+
+    assert.doesNotThrow(() => coll.aggregate(pipeline).toArray());
+
+    const originalVal = setParam(knob, 1024);
+    // TODO SERVER-129201: Remove this explicit knob set.
+    const chunkOriginalVal = setParam(chunkSizeKnob, 256);
+
+    const err = assert.throwsWithCode(
+        () => coll.aggregate(pipeline).toArray(),
+        ErrorCodes.ExceededMemoryLimit,
+    );
+    assert(
+        err.message.includes("$replaceAll needs too much memory"),
+        "Expected error message to mention $replaceAll, but got: " + err.message,
+        {err},
+    );
+
+    setParam(knob, originalVal);
+    setParam(chunkSizeKnob, chunkOriginalVal);
+})();
+
 MongoRunner.stopMongod(conn);

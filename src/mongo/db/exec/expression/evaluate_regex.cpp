@@ -29,6 +29,7 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/expression/evaluate.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/pcre_util.h"
 
@@ -577,6 +578,16 @@ Value evaluateReplace(
     // find.getType() == BSONType::string
     return replaceOpStr(input.getStringData(), find.getStringData(), replacement.getStringData());
 }
+
+void trackReplaceOutput(const EvaluationContext& ctx,
+                        SimpleMemoryUsageToken& memToken,
+                        int64_t currentLength,
+                        std::string_view opName) {
+    if (ctx.tracker) {
+        memToken.set(currentLength);
+        ctx.tracker->assertWithinMemoryLimit(opName, ctx.stageName);
+    }
+}
 }  // namespace
 
 Value evaluate(const ExpressionReplaceOne& expr,
@@ -619,11 +630,19 @@ Value evaluate(const ExpressionReplaceAll& expr,
                Variables* variables,
                const EvaluationContext& ctx) {
     auto replaceAllOpStr =
-        [](std::string_view input, std::string_view find, std::string_view replacement) -> Value {
+        [&](std::string_view input, std::string_view find, std::string_view replacement) -> Value {
+        SimpleMemoryUsageToken memToken =
+            ctx.tracker ? SimpleMemoryUsageToken{0, ctx.tracker} : SimpleMemoryUsageToken{};
+
         // An empty string matches at every position, so replaceAll should insert 'replacement'
         // at every position when 'find' is empty. Handling this as a special case lets us
         // assume 'find' is nonempty in the usual case.
         if (find.size() == 0) {
+            const int64_t inputSize = static_cast<int64_t>(input.size());
+            const int64_t replacementSize = static_cast<int64_t>(replacement.size());
+            const int64_t expectedSize = (inputSize + 1) * replacementSize + inputSize;
+            trackReplaceOutput(ctx, memToken, expectedSize, expr.getOpName());
+
             StringBuilder output;
             for (char c : input) {
                 output << replacement << c;
@@ -643,15 +662,19 @@ Value evaluate(const ExpressionReplaceAll& expr,
             size_t endIndex = startIndex + find.size();
             output << input.substr(0, startIndex);
             output << replacement;
+            trackReplaceOutput(ctx, memToken, output.len(), expr.getOpName());
             // This step assumes 'find' is nonempty. If 'find' were empty then input.find would
             // always find a match at position 0, and the input would never shrink.
             input = input.substr(endIndex);
         }
+        trackReplaceOutput(ctx, memToken, output.len(), expr.getOpName());
         return Value(output.stringData());
     };
     auto replaceAllOpRegEx = [&](std::string_view input,
                                  RegexExecutionState executionState,
                                  std::string_view replacement) -> Value {
+        SimpleMemoryUsageToken memToken =
+            ctx.tracker ? SimpleMemoryUsageToken{0, ctx.tracker} : SimpleMemoryUsageToken{};
         StringBuilder output;
 
         // Condition uses <= instead of < to also capture possible empty matches at the end of the
@@ -664,8 +687,10 @@ Value evaluate(const ExpressionReplaceAll& expr,
                 break;
             }
             output << beforeMatch << replacement;
+            trackReplaceOutput(ctx, memToken, output.len(), expr.getOpName());
         }
         output << input.substr(executionState.beforeMatchStrStart);
+        trackReplaceOutput(ctx, memToken, output.len(), expr.getOpName());
 
         return Value(output.stringData());
     };

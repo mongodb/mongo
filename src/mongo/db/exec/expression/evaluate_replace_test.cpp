@@ -31,6 +31,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -266,6 +267,91 @@ TEST(ExpressionEvaluateReplaceTest, ReplacesWithVariableRegExPattern) {
                     Value("<--><-->ij"sv));
     ASSERT_VALUE_EQ(replaceAll("xyzxx"sv, BSONRegEx("x+"), "abc"sv).second, Value("abcyzabc"sv));
     ASSERT_VALUE_EQ(replaceAll("abc->defg->hij"sv, BSONRegEx(".*"), "a"sv).second, Value("aa"sv));
+}
+
+TEST(ExpressionEvaluateReplaceTest, TracksOutputMemoryAndReleasesAfterEvaluation) {
+    auto [expCtx, expression] = parse(
+        "$replaceAll", Document{{"input", "aaaa"sv}, {"find", ""sv}, {"replacement", "XY"sv}});
+
+    SimpleMemoryUsageTracker tracker{1024};
+    EvaluationContext ctx{.tracker = &tracker};
+
+    ASSERT_VALUE_EQ(expression->evaluate({}, &expCtx->variables, ctx), Value("XYaXYaXYaXYaXY"sv));
+
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(tracker.peakTrackedMemoryBytes(), 0);
+}
+
+TEST(ExpressionEvaluateReplaceTest, ThrowsExceededMemoryLimitWhenOutputTooLarge) {
+    auto [expCtx, expression] = parse("$replaceAll",
+                                      Document{{"input", std::string(1000, 'a')},
+                                               {"find", ""sv},
+                                               {"replacement", std::string(100, 'X')}});
+
+    SimpleMemoryUsageTracker tracker{256};
+    EvaluationContext ctx{.tracker = &tracker};
+
+    try {
+        expression->evaluate({}, &expCtx->variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$replaceAll");
+    }
+
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
+}
+
+TEST(ExpressionEvaluateReplaceTest, ThrowsExceededMemoryLimitWhenNonEmptyFindGrowsOutput) {
+    auto [expCtx, expression] = parse("$replaceAll",
+                                      Document{{"input", std::string(1000, 'a')},
+                                               {"find", "a"sv},
+                                               {"replacement", std::string(100, 'X')}});
+
+    SimpleMemoryUsageTracker tracker{256};
+    EvaluationContext ctx{.tracker = &tracker};
+
+    try {
+        expression->evaluate({}, &expCtx->variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$replaceAll");
+    }
+
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
+}
+
+TEST(ExpressionEvaluateReplaceTest, ThrowsExceededMemoryLimitWhenQueryLimitExceeded) {
+    auto [expCtx, expression] = parse("$replaceAll",
+                                      Document{{"input", std::string(1000, 'a')},
+                                               {"find", ""sv},
+                                               {"replacement", std::string(100, 'X')}});
+
+    // The operation-wide (root) tracker holds the small cap; the stage tracker reporting into it
+    // has a generous local limit, so the throw must come from the per-operation cap via the base
+    // chain rollup, not the local stage limit.
+    SimpleMemoryUsageTracker operationTracker{256};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, 100 * 1024 * 1024};
+    EvaluationContext ctx{.tracker = &stageTracker};
+
+    try {
+        expression->evaluate({}, &expCtx->variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$replaceAll");
+    }
+}
+
+TEST(ExpressionEvaluateReplaceTest, NoTrackerDoesNotThrow) {
+    auto [expCtx, expression] = parse("$replaceAll",
+                                      Document{{"input", std::string(1000, 'a')},
+                                               {"find", ""sv},
+                                               {"replacement", std::string(100, 'X')}});
+
+    // No tracker, must evaluate normally regardless of output size.
+    ASSERT_DOES_NOT_THROW(expression->evaluate({}, &expCtx->variables));
 }
 
 }  // namespace expression_evaluation_test
