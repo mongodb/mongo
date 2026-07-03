@@ -198,6 +198,8 @@ overrides:
       exec_timeout: 600 # 10 hours
     - task: update_timeseries_fuzzer
       exec_timeout: 600 # 10 hours
+    - task: query_fuzzer_plan_cache
+      exec_timeout: 600 # 10 hours
     - task: read_concern_linearizable_passthrough
       exec_timeout: 270 # 4.5 hours
     - task: sharding
