@@ -1253,10 +1253,18 @@ void InitialSyncer::_initializeOplogFetcherAndDbCloners(
             onCompletionGuard.reset();
         });
     _setPhase(lock, Phase::kCloningData);
+    // Capture the cloner executor while still holding the lock. _clonerAttemptExec is an (X)
+    // member, so this read is already serialized by running in an _exec callback; reading it into
+    // a local before unlocking keeps the access under the lock as well. The raw pointer stays
+    // valid past the unlock below because _clonerAttemptExec is only replaced or reset when the
+    // current attempt finishes, and attempt completion is gated on every outstanding
+    // onCompletionGuard reference being dropped; we are holding one for the lifetime of this
+    // function, so the underlying ScopedTaskExecutor cannot be destroyed out from under us.
+    auto* clonerAttemptExec = _clonerAttemptExec.get();
     lock.unlock();
     // Start (and therefore finish) the cloners outside the lock.  This ensures onCompletion
     // is not run with the mutex held, which would result in self-deadlock.
-    (*_clonerAttemptExec)->signalEvent(startCloner);
+    (*clonerAttemptExec)->signalEvent(startCloner);
 }
 
 void InitialSyncer::_initiatingSetStableTimestampCallback(
