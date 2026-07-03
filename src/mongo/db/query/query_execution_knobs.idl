@@ -1122,15 +1122,18 @@ server_parameters:
 
     internalOperationResponseMaxMS:
         description: >-
-            Limits the time that individual find/getMore requests are allowed to spend inside the plan
-            executor for a single operation.
+            Limits the time that individual aggregate or getMore command requests are allowed to spend inside
+            the plan executor.
             Limiting the operation time allows a query to return periodic updates during lengthy operations
-            that do not produce intermediate results or do not fill an entire result batch.
-            Honoring the time limit is currently only implemented for change stream queries that scan
-            the oplog, but not for any other types of queries.
-            Execution is only interrupted when the query yields, so the time configured here is only
+            that do not produce any intermediate results or do not fill an entire result batch.
+            A value of 0 means that the operation time is not limited. Using a value greater than 0 will make
+            the query interrupt the execution without failing it, so it can return whatever intermediate
+            results it has already produced (including an empty result).
+            Execution is only interrupted when the query yields, so the time limit configured here is only
             approximate.
-            A value of 0 means that the operation time is not bounded.
+            Important: honoring the time limit is currently only implemented for change stream queries during
+            oplog scanning. Setting the knob value will not have any effect for other, non-change stream
+            queries.
         set_at: [startup, runtime]
         cpp_varname: "internalOperationResponseMaxMS"
         cpp_vartype: AtomicWord<long long>
