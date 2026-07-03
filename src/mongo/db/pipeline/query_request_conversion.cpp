@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/query_request_conversion.h"
 
 #include "mongo/db/pipeline/aggregation_request_helper.h"
-#include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 
@@ -166,10 +165,7 @@ AggregateCommandRequest asAggregateCommandRequest(const FindCommandRequest& find
     if (!findCommand.getStartAt().isEmpty()) {
         result.setStartAt(findCommand.getStartAt().getOwned());
     }
-    result.setIncludeMetrics(findCommand.getIncludeMetrics());
-    // TODO (SERVER-129518): Pass 'opCtx' from the caller here.
-    setRemoteMetricsToInclude(
-        result, findCommand.getIncludeQueryStatsMetrics().value_or(false), nullptr);
+    result.setIncludeQueryStatsMetrics(findCommand.getIncludeQueryStatsMetrics());
 
     if (hasExplain) {
         result.setExplain(true);
@@ -235,10 +231,7 @@ AggregateCommandRequest asAggregateCommandRequest(const CountCommandRequest& cou
     }
 
     result.setDbName(nss.dbName());
-    result.setIncludeMetrics(countCommand.getIncludeMetrics());
-    // TODO (SERVER-129518): Pass 'opCtx' from the caller here.
-    setRemoteMetricsToInclude(
-        result, countCommand.getIncludeQueryStatsMetrics().value_or(false), nullptr);
+    result.setIncludeQueryStatsMetrics(countCommand.getIncludeQueryStatsMetrics());
     result.setSerializationContext(countCommand.getSerializationContext());
     result.setGenericArguments(countCommand.getGenericArguments());
 

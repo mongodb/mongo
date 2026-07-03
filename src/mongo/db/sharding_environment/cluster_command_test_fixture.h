@@ -123,14 +123,9 @@ protected:
                                                      BSONObj scatterGatherCmd = BSONObj());
 
     /**
-     * Verifies that the legacy includeQueryStatsMetrics is added or not added as needed.
+     * Verifies that includeQueryStatsMetrics is added or not added as needed.
      */
     void testIncludeQueryStatsMetrics(BSONObj cmd, bool isTargeted);
-
-    /**
-     * Verifies that the new includeMetrics.queryStats is added or not added as needed.
-     */
-    void testIncludeMetricsQueryStats(BSONObj cmd, bool isTargeted);
 
     /**
      * Verifies that the opcounters change by the given delta values after a command is run.

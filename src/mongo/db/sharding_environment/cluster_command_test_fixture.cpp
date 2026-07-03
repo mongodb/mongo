@@ -363,14 +363,10 @@ void ClusterCommandTestFixture::testSnapshotReadConcernWithAfterClusterTime(
 }
 
 void ClusterCommandTestFixture::testIncludeQueryStatsMetrics(BSONObj cmd, bool isTargeted) {
-    // Test that the legacy option is set correctly when the feature flag is disabled.
-    // TODO (SERVER-123320): Remove this test completely when the feature flag is removed.
-    unittest::ServerParameterGuard controller("featureFlagIncludeMetricsObjectOption", false);
     const std::string fieldName = "includeQueryStatsMetrics";
 
     // The given command should not set includeQueryStatsMetrics.
     ASSERT(cmd[fieldName].eoo());
-    ASSERT(cmd["includeMetrics"].eoo());
 
     BSONObj cmdIncludeTrue = cmd.addField(BSON(fieldName << true).firstElement());
     BSONObj cmdIncludeFalse = cmd.addField(BSON(fieldName << false).firstElement());
@@ -379,7 +375,7 @@ void ClusterCommandTestFixture::testIncludeQueryStatsMetrics(BSONObj cmd, bool i
         return [value, &fieldName](const executor::RemoteCommandRequest& request) {
             auto elt = request.cmdObj[fieldName];
             ASSERT(!elt.eoo());
-            ASSERT_EQ(value, elt.boolean());
+            ASSERT_EQ(elt.boolean(), value);
         };
     };
 
@@ -408,59 +404,6 @@ void ClusterCommandTestFixture::testIncludeQueryStatsMetrics(BSONObj cmd, bool i
         // If the user passed us includeQueryStatsMetrics, we'll pass it through.
         runCommandInspectRequests(cmdIncludeTrue, expectFieldIs(true), isTargeted);
         runCommandInspectRequests(cmdIncludeFalse, expectFieldIs(false), isTargeted);
-    }
-}
-
-void ClusterCommandTestFixture::testIncludeMetricsQueryStats(BSONObj cmd, bool isTargeted) {
-    // Test that the new option is set correctly when the feature flag is enabled.
-    unittest::ServerParameterGuard controller("featureFlagIncludeMetricsObjectOption", true);
-
-    // The given command should not set includeQueryStatsMetrics or includeMetrics.
-    ASSERT(cmd["includeQueryStatsMetrics"].eoo());
-    ASSERT(cmd["includeMetrics"].eoo());
-
-    // Build variants with the legacy field; command handling converts it to includeMetrics.
-    BSONObj cmdIncludeTrue = cmd.addField(BSON("includeQueryStatsMetrics" << true).firstElement());
-    BSONObj cmdIncludeFalse =
-        cmd.addField(BSON("includeQueryStatsMetrics" << false).firstElement());
-
-    auto expectMetricsEnabled = [](const executor::RemoteCommandRequest& request) {
-        auto im = request.cmdObj["includeMetrics"];
-        ASSERT(!im.eoo()) << "expected includeMetrics to be present";
-        ASSERT_EQ(true, im["queryStats"].boolean());
-        ASSERT(request.cmdObj["includeQueryStatsMetrics"].eoo());
-    };
-
-    auto expectNoMetrics = [](const executor::RemoteCommandRequest& request) {
-        auto im = request.cmdObj["includeMetrics"];
-        ASSERT(im.eoo() || !im["queryStats"].boolean())
-            << "expected includeMetrics.queryStats to be absent or false";
-        ASSERT(request.cmdObj["includeQueryStatsMetrics"].eoo());
-    };
-
-    {
-        // No rate limit i.e., no requests are rate limited and each one is allowed to gather
-        // stats. We'll always request metrics, even if the user set includeQueryStatsMetrics
-        // to false.
-        unittest::ServerParameterGuard rateLimit("internalQueryStatsRateLimit", -1);
-
-        runCommandInspectRequests(cmd, expectMetricsEnabled, isTargeted);
-        runCommandInspectRequests(cmdIncludeTrue, expectMetricsEnabled, isTargeted);
-        runCommandInspectRequests(cmdIncludeFalse, expectMetricsEnabled, isTargeted);
-    }
-
-    {
-        // Rate limit is 0 i.e., every request is rate-limited.
-        unittest::ServerParameterGuard rateLimit("internalQueryStatsRateLimit", 0);
-
-        // If the user doesn't request metrics, we won't set includeMetrics.
-        runCommandInspectRequests(cmd, expectNoMetrics, isTargeted);
-
-        // If the user passed includeQueryStatsMetrics=true, convert to includeMetrics.queryStats.
-        runCommandInspectRequests(cmdIncludeTrue, expectMetricsEnabled, isTargeted);
-
-        // If the user passed includeQueryStatsMetrics=false, metrics are not requested.
-        runCommandInspectRequests(cmdIncludeFalse, expectNoMetrics, isTargeted);
     }
 }
 

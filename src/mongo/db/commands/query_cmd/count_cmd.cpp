@@ -550,9 +550,7 @@ public:
                         collectionOrView.getCollectionType());
                 });
 
-                const auto& includeMetricsOption = req.getIncludeMetrics();
-                if (req.getIncludeQueryStatsMetrics().value_or(false) ||
-                    (includeMetricsOption && includeMetricsOption->getQueryStats())) {
+                if (req.getIncludeQueryStatsMetrics()) {
                     curOp->debug().getQueryStatsInfo().metricsRequested = true;
                 }
             }

@@ -176,9 +176,7 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
                 collOrViewAcquisition.getCollectionType());
         });
 
-        const auto& includeMetricsOption = distinctReq.getIncludeMetrics();
-        if (distinctReq.getIncludeQueryStatsMetrics().value_or(false) ||
-            (includeMetricsOption && includeMetricsOption->getQueryStats())) {
+        if (distinctReq.getIncludeQueryStatsMetrics()) {
             CurOp::get(opCtx)->debug().getQueryStatsInfo().metricsRequested = true;
         }
     }
