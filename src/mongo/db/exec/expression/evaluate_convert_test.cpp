@@ -29,6 +29,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -1164,6 +1165,80 @@ TEST_F(EvaluateConvertTest, ConvertAnyNestedValueToString) {
         Document inputDoc{{"path1", std::move(arr)}};
         ASSERT_VALUE_CONTENTS_AND_TYPE(
             convertExp->evaluate(inputDoc, &expCtx->variables), expected, BSONType::string);
+    }
+}
+
+TEST_F(EvaluateConvertTest, ConvertDeeplyNestedObjectsToString) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "string"));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    auto makeNestedArray = [](size_t depth) {
+        Value val{std::vector<Value>{}};
+        for (size_t i = 1; i < depth; ++i) {
+            val = Value(std::vector<Value>{val});
+        }
+        return val;
+    };
+
+    auto makeNestedObject = [](size_t depth) {
+        Value val{Document{}};
+        for (size_t i = 1; i < depth; ++i) {
+            val = Value(Document{{"f", val}});
+        }
+        return val;
+    };
+
+    auto makeNestedObjectWithArrays = [](size_t depth) {
+        Value val{Document{}};
+        for (size_t i = 1; i < depth; ++i) {
+            if (i % 2 == 0) {
+                val = Value(std::vector<Value>{val});
+            } else {
+                val = Value(Document{{"f", val}});
+            }
+        }
+        return val;
+    };
+
+
+    const auto depthLimit = 2 * BSONDepth::getMaxAllowableDepth();
+
+    // Nesting at the limit converts successfully.
+    {
+        Document inputArray{{"path1", makeNestedArray(depthLimit)}};
+        Document inputObject{{"path1", makeNestedObject(depthLimit)}};
+        Document inputObjectWithArrays{{"path1", makeNestedObjectWithArrays(depthLimit)}};
+        ASSERT_EQ(convertExp->evaluate(inputArray, &expCtx->variables).getType(), BSONType::string);
+        ASSERT_EQ(convertExp->evaluate(inputObject, &expCtx->variables).getType(),
+                  BSONType::string);
+        ASSERT_EQ(convertExp->evaluate(inputObjectWithArrays, &expCtx->variables).getType(),
+                  BSONType::string);
+    }
+
+    // Nesting one past the limit throws.
+    {
+        Document inputArray{{"path1", makeNestedArray(depthLimit + 1)}};
+        Document inputObject{{"path1", makeNestedObject(depthLimit + 1)}};
+        Document inputObjectWithArrays{{"path1", makeNestedObjectWithArrays(depthLimit + 1)}};
+
+        const auto assertDepthConversionFailure = [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+            ASSERT_STRING_CONTAINS(exception.reason(), "Result exceeds maximum depth limit"_sd);
+        };
+
+        ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(inputArray, &expCtx->variables),
+                                 AssertionException,
+                                 assertDepthConversionFailure);
+        ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(inputObject, &expCtx->variables),
+                                 AssertionException,
+                                 assertDepthConversionFailure);
+        ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(inputObjectWithArrays, &expCtx->variables),
+                                 AssertionException,
+                                 assertDepthConversionFailure);
     }
 }
 
