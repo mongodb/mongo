@@ -481,4 +481,56 @@ assert.commandWorked(bulk.execute());
     setParam(chunkSizeKnob, chunkOriginalVal);
 })();
 
+(function testZipExpressionMemoryLimit() {
+    // featureFlagExpressionMemoryTracking turns on the expression evaluation tracking.
+    if (!FeatureFlagUtil.isEnabled(db, "ExpressionMemoryTracking")) {
+        jsTest.log.info("Skipping test because ExpressionMemoryTracking is not enabled");
+        return;
+    }
+    // TODO SERVER-129975: remove once SBE tracks $zip.
+    if (sbeFullyEnabled) {
+        jsTest.log.info("Skipping test because $zip memory tracking is not yet implemented in SBE");
+        return;
+    }
+    const knob = "internalQueryMaxMemoryUsageBytesPerOperation";
+    const chunkSizeKnob = "internalQueryMaxWriteToCurOpMemoryUsageBytes";
+
+    const pipeline = [
+        {$limit: 1},
+        {
+            $project: {
+                a: {
+                    $zip: {
+                        inputs: [
+                            {$range: [0, {$add: ["$_id", 50]}]},
+                            {$range: [{$add: ["$_id", 50]}, {$add: ["$_id", 100]}]},
+                        ],
+                    },
+                },
+            },
+        },
+    ];
+
+    // The operation succeeds with the default limit.
+    assert.doesNotThrow(() => coll.aggregate(pipeline).toArray());
+
+    // Lower the operation-wide limit so the $zip result exceeds it.
+    const originalVal = setParam(knob, 1024);
+    // TODO SERVER-129201: Remove this explicit knob set.
+    const chunkOriginalVal = setParam(chunkSizeKnob, 256);
+
+    const err = assert.throwsWithCode(
+        () => coll.aggregate(pipeline).toArray(),
+        ErrorCodes.ExceededMemoryLimit,
+    );
+    assert(
+        err.message.includes("$zip needs too much memory"),
+        "Expected error message to mention $zip, but got: " + err.message,
+        {err},
+    );
+
+    setParam(knob, originalVal);
+    setParam(chunkSizeKnob, chunkOriginalVal);
+})();
+
 MongoRunner.stopMongod(conn);

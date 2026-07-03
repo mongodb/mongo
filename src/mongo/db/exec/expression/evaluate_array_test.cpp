@@ -1138,5 +1138,198 @@ TEST(ExpressionSetUnionTest, NoTrackerDoesNotThrow) {
     ASSERT_DOES_NOT_THROW(expr->evaluate({}, &expCtx.variables));
 }
 
+/* ----------------------- ExpressionZip memory tracking ----------------------- */
+
+TEST(ExpressionZipTest, MemoryTrackerAccumulatesOutputSize) {
+    auto expCtx = ExpressionContextForTest{};
+    auto expr = Expression::parseExpression(
+        &expCtx,
+        BSON("$zip" << BSON("inputs"
+                            << BSON_ARRAY(BSON_ARRAY(1 << 2 << 3) << BSON_ARRAY(4 << 5 << 6)))),
+        expCtx.variablesParseState);
+
+    SimpleMemoryUsageTracker tracker{1024 * 1024};
+    EvaluationContext ctx{.tracker = &tracker};
+    ASSERT_DOES_NOT_THROW(expr->evaluate({}, &expCtx.variables, ctx));
+    // The token tracking $zip's transient memory is released when evaluate() returns, so
+    // inUseTrackedMemoryBytes() is back to 0 here. Assert on the retained high-water mark instead.
+    ASSERT_GT(tracker.peakTrackedMemoryBytes(), 0);
+}
+
+TEST(ExpressionZipTest, MemoryTrackerThrowsWhenInputExceedsLimit) {
+    auto expCtx = ExpressionContextForTest{};
+    // Two 10-element integer arrays; each exceeds the limit on its own.
+    std::vector<Value> arr1, arr2;
+    for (int i = 0; i < 10; ++i)
+        arr1.push_back(Value(i));
+    for (int i = 10; i < 20; ++i)
+        arr2.push_back(Value(i));
+    auto expr =
+        Expression::parseExpression(&expCtx,
+                                    BSON("$zip" << BSON("inputs" << BSON_ARRAY("$a"sv << "$b"sv))),
+                                    expCtx.variablesParseState);
+    Document doc{{"a", Value(arr1)}, {"b", Value(arr2)}};
+
+    SimpleMemoryUsageTracker tracker{100};
+    EvaluationContext ctx{.tracker = &tracker};
+    try {
+        expr->evaluate(doc, &expCtx.variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$zip");
+    }
+}
+
+TEST(ExpressionZipTest, MemoryTrackerThrowsWhenQueryLimitExceeded) {
+    auto expCtx = ExpressionContextForTest{};
+    // Two 10-element integer arrays; each exceeds the operation-wide limit on its own.
+    std::vector<Value> arr1, arr2;
+    for (int i = 0; i < 10; ++i)
+        arr1.push_back(Value(i));
+    for (int i = 10; i < 20; ++i)
+        arr2.push_back(Value(i));
+    auto expr =
+        Expression::parseExpression(&expCtx,
+                                    BSON("$zip" << BSON("inputs" << BSON_ARRAY("$a"sv << "$b"sv))),
+                                    expCtx.variablesParseState);
+    Document doc{{"a", Value(arr1)}, {"b", Value(arr2)}};
+
+    // Root (operation-wide) tracker carries the limited cap; the stage tracker reports into it but
+    // has a large local limit of its own. Usage rolls up via the base chain.
+    SimpleMemoryUsageTracker operationTracker{100};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, 100 * 1024 * 1024};
+    EvaluationContext ctx{.tracker = &stageTracker};
+    try {
+        expr->evaluate(doc, &expCtx.variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$zip");
+    }
+}
+
+TEST(ExpressionZipTest, NoTrackerDoesNotThrow) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONArrayBuilder arr1, arr2;
+    for (int i = 0; i < 10; ++i)
+        arr1.append(i);
+    for (int i = 10; i < 20; ++i)
+        arr2.append(i);
+    auto expr = Expression::parseExpression(
+        &expCtx,
+        BSON("$zip" << BSON("inputs" << BSON_ARRAY(arr1.arr() << arr2.arr()))),
+        expCtx.variablesParseState);
+
+    // No tracker, must evaluate normally regardless of output size.
+    ASSERT_DOES_NOT_THROW(expr->evaluate({}, &expCtx.variables));
+}
+
+TEST(ExpressionZipTest, MemoryTrackerThrowsWhenDefaultExceedsLimit) {
+    auto expCtx = ExpressionContextForTest{};
+    // arr1 has 1 element, arr2 has 5 (different lengths force a default to be evaluated).
+    // The default is a 10 000-char string; the inputs (6 integers) fit within the limit
+    // but the default does not.
+    std::string largeDefault(10000, 'x');
+    auto expr = Expression::parseExpression(
+        &expCtx,
+        BSON("$zip" << BSON("inputs" << BSON_ARRAY("$a"sv << "$b"sv) << "defaults"
+                                     << BSON_ARRAY(largeDefault << 0) << "useLongestLength"
+                                     << true)),
+        expCtx.variablesParseState);
+    Document doc{
+        {"a", Value(std::vector<Value>{Value(1)})},
+        {"b", Value(std::vector<Value>{Value(1), Value(2), Value(3), Value(4), Value(5)})}};
+
+    SimpleMemoryUsageTracker tracker{2000};
+    EvaluationContext ctx{.tracker = &tracker};
+    try {
+        expr->evaluate(doc, &expCtx.variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$zip");
+    }
+}
+
+TEST(ExpressionZipTest, MemoryTrackerThrowsWhenInputAndDefaultCombinationExceedsLimit) {
+    auto expCtx = ExpressionContextForTest{};
+    // arr1 has 3 elements, arr2 has 5 (different lengths force a default to be evaluated).
+    // Compute the exact limit so that inputs and default each fit individually but not together.
+    std::string moderateDefault(300, 'x');
+
+    int64_t inputsSize =
+        static_cast<int64_t>(
+            Value(std::vector<Value>{Value(1), Value(2), Value(3)}).getApproximateSize()) +
+        static_cast<int64_t>(
+            Value(std::vector<Value>{Value(1), Value(2), Value(3), Value(4), Value(5)})
+                .getApproximateSize());
+    int64_t defaultSize = static_cast<int64_t>(Value(moderateDefault).getApproximateSize());
+    int64_t nullSize = static_cast<int64_t>(Value(BSONNULL).getApproximateSize());
+
+    // token at the failing assert = inputsSize + nullSize + defaultSize (one null replaced by
+    // default)
+    int64_t limit = inputsSize + nullSize + defaultSize - 1;
+    ASSERT_GT(limit, inputsSize + 2 * nullSize);  // inputs + placeholder nulls fit
+    ASSERT_GT(limit, defaultSize);                // default alone fits
+
+    BSONArrayBuilder bArr1, bArr2;
+    bArr1.append(1).append(2).append(3);
+    bArr2.append(1).append(2).append(3).append(4).append(5);
+    auto expr = Expression::parseExpression(
+        &expCtx,
+        BSON("$zip" << BSON("inputs" << BSON_ARRAY(bArr1.arr() << bArr2.arr()) << "defaults"
+                                     << BSON_ARRAY(moderateDefault << 0) << "useLongestLength"
+                                     << true)),
+        expCtx.variablesParseState);
+
+    SimpleMemoryUsageTracker tracker{limit};
+    EvaluationContext ctx{.tracker = &tracker};
+    try {
+        expr->evaluate({}, &expCtx.variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$zip");
+    }
+}
+
+TEST(ExpressionZipTest, MemoryTrackerThrowsWhenOutputExceedsLimit) {
+    auto expCtx = ExpressionContextForTest{};
+    // Three equal-length arrays of integers: inputs and placeholder defaults fit under the limit,
+    // but the output allocation (outputChild scratch buffer + per-row RCVector<Value> header +
+    // element slots) pushes the total over it.
+    const int N = 100;
+    std::vector<Value> vArr1, vArr2, vArr3;
+    for (int i = 0; i < N; ++i) {
+        vArr1.push_back(Value(i));
+        vArr2.push_back(Value(i + N));
+        vArr3.push_back(Value(i + 2 * N));
+    }
+    auto expr = Expression::parseExpression(
+        &expCtx,
+        BSON("$zip" << BSON("inputs" << BSON_ARRAY("$a"sv << "$b"sv << "$c"sv))),
+        expCtx.variablesParseState);
+
+    // Compute input cost: three N-element integer arrays.
+    int64_t oneArraySize =
+        static_cast<int64_t>(Value(std::vector<Value>(N, Value(0))).getApproximateSize());
+    int64_t inputsSize = 3 * oneArraySize;
+    int64_t nullSize = static_cast<int64_t>(Value(BSONNULL).getApproximateSize());
+    // Set limit to exactly inputs + placeholder defaults: these pass, then output allocation fails.
+    int64_t limit = inputsSize + 3 * nullSize;
+
+    Document doc{{"a", Value(vArr1)}, {"b", Value(vArr2)}, {"c", Value(vArr3)}};
+    SimpleMemoryUsageTracker tracker{limit};
+    EvaluationContext ctx{.tracker = &tracker};
+    try {
+        expr->evaluate(doc, &expCtx.variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$zip");
+    }
+}
+
 }  // namespace expression_evaluation_test
 }  // namespace mongo

@@ -1496,6 +1496,11 @@ Value evaluate(const ExpressionZip& expr,
     auto& inputs = expr.getInputs();
     inputValues.reserve(inputs.size());
 
+    SimpleMemoryUsageToken token;
+    if (ctx.tracker) {
+        token = SimpleMemoryUsageToken(0, ctx.tracker);
+    }
+
     size_t minArraySize = 0;
     size_t maxArraySize = 0;
     for (size_t i = 0; i < inputs.size(); i++) {
@@ -1505,9 +1510,14 @@ Value evaluate(const ExpressionZip& expr,
         }
 
         uassert(34468,
-                str::stream() << "$zip found a non-array expression in input: "
-                              << evalExpr.toString(),
+                str::stream() << expr.getOpName()
+                              << " found a non-array expression in input: " << evalExpr.toString(),
                 evalExpr.isArray());
+
+        if (ctx.tracker) {
+            token.add(static_cast<int64_t>(evalExpr.getApproximateSize()));
+            ctx.tracker->assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
+        }
 
         inputValues.push_back(evalExpr.getArray());
 
@@ -1524,12 +1534,23 @@ Value evaluate(const ExpressionZip& expr,
     }
 
     std::vector<Value> evaluatedDefaults(inputs.size(), Value(BSONNULL));
+    int64_t defaultsSize =
+        inputs.size() ? static_cast<int64_t>(evaluatedDefaults[0].getApproximateSize()) : 0;
+    if (ctx.tracker) {
+        token.add(static_cast<int64_t>(inputs.size()) * defaultsSize);
+        ctx.tracker->assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
+    }
 
     // If we need default values, evaluate each expression.
     if (minArraySize != maxArraySize) {
         auto& defaults = expr.getDefaults();
         for (size_t i = 0; i < defaults.size(); i++) {
             evaluatedDefaults[i] = defaults[i].get()->evaluate(root, variables, ctx);
+            if (ctx.tracker) {
+                token.add(static_cast<int64_t>(evaluatedDefaults[i].getApproximateSize()) -
+                          defaultsSize);
+                ctx.tracker->assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
+            }
         }
     }
 
@@ -1541,6 +1562,23 @@ Value evaluate(const ExpressionZip& expr,
     // Used to construct each array in the output, e.g. [1, 2, 3].
     std::vector<Value> outputChild;
 
+    if (ctx.tracker) {
+        // Track the memory for the output and outputChild vectors. Per-element tracking is
+        // unnecessary: large heap-allocated values (strings, arrays, documents) were already
+        // accounted for when evaluating inputs and defaults above, and a copy merely bumps
+        // their ref-count. Inline scalars are bounded by sizeof(Value) per slot.
+
+        // outputChild memory usage
+        token.add(static_cast<int64_t>(inputs.size()) * static_cast<int64_t>(sizeof(Value)));
+        // Per-row output memory: one Value slot in the outer vector, one RCVector<Value> heap
+        // allocation, and inputs.size() Value slots inside it.
+        // Total: outputLength * (sizeof(Value) + sizeof(RCVector<Value>) + inputs.size() *
+        // sizeof(Value))
+        token.add(static_cast<int64_t>(outputLength) *
+                  (static_cast<int64_t>(sizeof(Value) + sizeof(RCVector<Value>)) +
+                   static_cast<int64_t>(inputs.size()) * static_cast<int64_t>(sizeof(Value))));
+        ctx.tracker->assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
+    }
     output.reserve(outputLength);
     outputChild.reserve(inputs.size());
 

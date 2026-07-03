@@ -3845,6 +3845,10 @@ const char* ExpressionIsNumber::getOpName() const {
 /* -------------------------- ExpressionZip ------------------------------ */
 
 REGISTER_STABLE_EXPRESSION(zip, ExpressionZip::parse);
+const char* ExpressionZip::getOpName() const {
+    return "$zip";
+}
+
 intrusive_ptr<Expression> ExpressionZip::parse(ExpressionContext* const expCtx,
                                                BSONElement expr,
                                                const VariablesParseState& vps) {

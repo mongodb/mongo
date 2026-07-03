@@ -5012,6 +5012,7 @@ public:
                                                   BSONElement expr,
                                                   const VariablesParseState& vpsIn);
     Value serialize(const query_shape::SerializationOptions& options = {}) const final;
+    const char* getOpName() const;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
