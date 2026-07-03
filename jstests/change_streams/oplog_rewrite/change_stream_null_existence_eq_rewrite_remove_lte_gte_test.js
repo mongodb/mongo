@@ -1,6 +1,7 @@
 /**
- * Tests that change streams correctly handle rewrites of null, existence and equality checks, for
- * both existent and non-existent fields and subfields.
+ * Tests that change streams correctly handle rewrites of less-than-or-equal and
+ * greater-than-or-equal checks against $$REMOVE, for both existent and non-existent fields and
+ * subfields.
  * @tags: [
  *   # The test runs a lot of queries and is massively slower when running against a secondary.
  *   assumes_read_preference_unchanged,
@@ -26,8 +27,6 @@ function generateExprFilters(fieldPath) {
 
     const exprFieldPath = "$" + fieldPath;
     const exprs = [
-        {$expr: {$eq: [exprFieldPath, "$$REMOVE"]}},
-        {$expr: {$ne: [exprFieldPath, "$$REMOVE"]}},
         {$expr: {$lte: [exprFieldPath, "$$REMOVE"]}},
         {$expr: {$gte: [exprFieldPath, "$$REMOVE"]}},
     ];
@@ -47,7 +46,7 @@ const {startPoint, fieldsToBeTested} = generateEventsAndFieldsToBeTestedForOplog
 
 let predicatesToTest = [];
 for (let fieldToTest in fieldsToBeTested) {
-    predicatesToTest = predicatesToTest.concat(generateExprFilters(fieldToTest, fieldsToBeTested));
+    predicatesToTest.push(...generateExprFilters(fieldToTest));
 }
 
 const failedTestCases = compareOptimizedAndNonOptimizedChangeStreamResults(
