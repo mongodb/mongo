@@ -87,7 +87,11 @@ export const $config = (function () {
         }
         const idx = Random.randInt(this.trackedDocs.length);
         const tracked = this.trackedDocs[idx];
-        const res = db[collName].update({_id: tracked._id}, {$inc: {counter: 1}});
+
+        const res = db[collName].update(
+            {_id: tracked._id, skey: tracked.skey, otherKey: tracked.otherKey},
+            {$inc: {counter: 1}},
+        );
         if (res.nModified === 1) {
             tracked.counter++;
         }
