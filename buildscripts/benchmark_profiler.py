@@ -3,9 +3,9 @@
 On-CPU flamegraph profiling for a whole benchmark task, using `perf record`. Currently this only supports benchmarks_sep.
 
 Invoked from Evergreen as two steps: `start-task` (before the benchmark suite) starts a detached,
-system-wide recording (`perf record -a -g -F 99`) so every benchmark child process is captured and `process-task` (after) stops it and turns the perf.data
-into a flamegraph SVG and a bundle tarball. Both are gated on the run's `enable_linux_perf` param,
-so they no-op on ordinary (non-profiling) runs.
+system-wide recording (`perf record -e instructions:u -a -g -F max`) so every benchmark child process is captured
+and `process-task` (after) stops it and turns the perf.data into a flamegraph SVG and a bundle tarball.
+Both are gated on the run's `enable_linux_perf` param, so they no-op on ordinary (non-profiling) runs.
 """
 
 import argparse
@@ -13,6 +13,7 @@ import gzip
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -23,34 +24,31 @@ import time
 FLAMEGRAPH_REPO_URL = "https://github.com/mongodb-forks/flamegraph.git"
 _FLAMEGRAPH_SCRIPTS = ("flamegraph.pl", "stackcollapse-perf.pl")
 
-PERF_SAMPLING_HZ = "99"
 PERF_DATA_FILENAME = "perf.data"
 PROFILING_LINKS_FILENAME = "profiling_links.json"
 # Currently on-CPU profiling is only supported on the benchmarks_sep task.
 TASK_NAME = "benchmarks_sep"
-
-# mongod names each client-connection thread `connNNN` (and some sharding threads `Shardin.<name>-N`),
-# so a system-wide profile shows each connection. Collapsing the ids makes it more readable.
-_CONN_RE = re.compile(r"conn\d+")
-_SHARDIN_RE = re.compile(r"Shardin\.[a-zA-Z]+-\d+")
 
 
 def build_perf_record_cmd(*, perf_data: str) -> list[str]:
     """Build a system-wide `perf record` command for whole-task profiling.
 
     Records the whole machine (`-a`) for the duration of an externally-run workload (e.g. the resmoke
-    benchmark suite), so every benchmark child process is captured. On-CPU sampling uses perf's default
-    event; `-F 99` keeps perf.data manageable over a full run.
+    benchmark suite), so every benchmark child process is captured. Sampling is weighted by the
+    `instructions:u` event (user-space instructions only), matching the benchmarks'
+    `instructions_per_iteration` metric (which excludes kernel instructions).
     """
     return [
         "sudo",
         "perf",
         "record",
+        "-e",
+        "instructions:u",
         "-a",
         "-g",
         "--buildid-all",
         "-F",
-        PERF_SAMPLING_HZ,
+        "max",
         "-o",
         perf_data,
     ]
@@ -80,16 +78,31 @@ def ensure_flamegraph_dir() -> str:
     return cache_dir
 
 
-def _merge_connection_line(line: str) -> str:
-    """Collapse per-connection thread names in a single line: `connNNN` -> `conn`, `Shardin.<name>-N` -> `Shardin.Fixed`."""
-    return _SHARDIN_RE.sub("Shardin.Fixed", _CONN_RE.sub("conn", line))
+# Only keep folded stacks whose first frame is a benchmark process (``*_bm``); this excludes system
+# noise (mandb, systemd, etc.) captured by the system-wide recording.
+_BENCHMARK_RE = re.compile(r"^[a-zA-Z_0-9]+_bm;")
 
 
-def merge_connection_frames(src_path: str, dst_path: str) -> None:
-    """Stream `src_path` to `dst_path`, collapsing per-connection thread names line by line."""
-    with open(src_path) as src, open(dst_path, "w") as dst:
-        for line in src:
-            dst.write(_merge_connection_line(line))
+def _merge_folded_files(folded_parts: list[str], merged_path: str) -> None:
+    """Merge multiple folded-stack files by summing counts for identical stacks.
+
+    Only stacks from benchmark processes (``*_bm``) are kept; system noise captured by the
+    system-wide recording is filtered out. Ideally, we perf record the benchmark binary
+    directly rather than the whole system but that requires a more complex benchmark
+    setup. As a first iteration, we filter out non-benchmark stacks here.
+    """
+    totals: dict[str, int] = {}
+    for path in folded_parts:
+        if not os.path.isfile(path) or os.path.getsize(path) == 0:
+            continue
+        with open(path) as f:
+            for line in f:
+                stack, _, count_str = line.rpartition(" ")
+                if stack and _BENCHMARK_RE.match(stack):
+                    totals[stack] = totals.get(stack, 0) + int(count_str)
+    with open(merged_path, "w") as f:
+        for stack, count in totals.items():
+            f.write(f"{stack} {count}\n")
 
 
 def render_flamegraph(
@@ -101,24 +114,38 @@ def render_flamegraph(
 ) -> str:
     """Post-process a perf.data file into a flamegraph SVG.
 
-    Per-connection mongod thread names are collapsed and the SVG
-    is left uncompressed so Evergreen can render it inline.
+    Runs one pipeline per CPU (``perf script -C <cpu> | perl merge | stackcollapse-perf.pl``) so
+    both the perf-to-text conversion and the stack folding are parallelised, avoiding a
+    single-threaded bottleneck over a large perf.data. Per-connection thread names are collapsed
+    inline via perl. The per-CPU folded outputs are merged and rendered into the final SVG.
     """
-
-    stacks = output_prefix + ".stacks"
     folded = output_prefix + ".folded"
     svg = output_prefix + ".svg"
 
-    _run_to_file(["perf", "script", "-i", perf_data], stacks)
+    ncpu = min(os.cpu_count() or 1, 16)
+    collapse = os.path.join(flamegraph_dir, "stackcollapse-perf.pl")
+    # Merge per-connection thread names inline (mirrors _merge_connection_line).
+    merge_expr = r"s/conn\d+/conn/g; s/Shardin\.[a-zA-Z]+-\d+/Shardin.Fixed/g"
 
-    merged = stacks + ".tmp"
-    merge_connection_frames(stacks, merged)
-    os.replace(merged, stacks)
+    procs: list[subprocess.Popen] = []
+    folded_parts: list[str] = []
+    for cpu in range(ncpu):
+        part = f"{folded}.cpu{cpu}"
+        folded_parts.append(part)
+        cmd = (
+            f"perf script -i {shlex.quote(perf_data)} -C {cpu} "
+            f"| perl -pe {shlex.quote(merge_expr)} "
+            f"| {shlex.quote(collapse)} --kernel --mongo > {shlex.quote(part)}"
+        )
+        procs.append(subprocess.Popen(cmd, shell=True))
 
-    _run_to_file(
-        [os.path.join(flamegraph_dir, "stackcollapse-perf.pl"), "--kernel", "--mongo", stacks],
-        folded,
-    )
+    for p in procs:
+        p.wait()
+
+    _merge_folded_files(folded_parts, folded)
+    for part in folded_parts:
+        if os.path.isfile(part):
+            os.remove(part)
 
     _run_to_file([os.path.join(flamegraph_dir, "flamegraph.pl"), "--title", title, folded], svg)
 
@@ -285,7 +312,6 @@ def process_task(
         output_dir,
         f"{TASK_NAME}_profiling.tar.gz",
         [
-            f"{TASK_NAME}.stacks",
             f"{TASK_NAME}.folded",
             f"{TASK_NAME}.svg",
             PERF_DATA_FILENAME + ".gz",

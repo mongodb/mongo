@@ -44,46 +44,89 @@ class BuildPerfRecordCmdTest(unittest.TestCase):
                 "sudo",
                 "perf",
                 "record",
+                "-e",
+                "instructions:u",
                 "-a",
                 "-g",
                 "--buildid-all",
                 "-F",
-                "99",
+                "max",
                 "-o",
                 "/tmp/perf.data",
             ],
         )
 
 
-class MergeConnectionFramesTest(unittest.TestCase):
-    def test_collapses_connection_ids(self):
-        # Each mongod connection thread connNNN folds into a single `conn` so connections merge.
-        self.assertEqual(
-            benchmark_profiler._merge_connection_line("conn123;__schedule;run"),
-            "conn;__schedule;run",
-        )
-
-    def test_collapses_sharding_thread_names(self):
-        self.assertEqual(
-            benchmark_profiler._merge_connection_line("Shardin.TaskExecutor-42;poll"),
-            "Shardin.Fixed;poll",
-        )
-
-    def test_leaves_unrelated_frames_unchanged(self):
-        # "conn" without a trailing number (e.g. connection_pool) must not be rewritten.
-        line = "mongod;mongo::connection_pool;tcmalloc::alloc"
-        self.assertEqual(benchmark_profiler._merge_connection_line(line), line)
-
-    def test_streams_file_to_file(self):
-        # The file-level helper streams line by line (no whole-file slurp) and applies the collapse.
+class MergeFoldedFilesTest(unittest.TestCase):
+    def test_sums_counts_for_identical_stacks(self):
         with tempfile.TemporaryDirectory() as tmp:
-            src = os.path.join(tmp, "in.stacks")
-            dst = os.path.join(tmp, "out.stacks")
-            with open(src, "w") as f:
-                f.write("conn123;__schedule;run\nconn4567;foo\nShardin.Net-1;poll\n")
-            benchmark_profiler.merge_connection_frames(src, dst)
-            with open(dst) as f:
-                self.assertEqual(f.read(), "conn;__schedule;run\nconn;foo\nShardin.Fixed;poll\n")
+            part1 = os.path.join(tmp, "folded.cpu0")
+            part2 = os.path.join(tmp, "folded.cpu1")
+            with open(part1, "w") as f:
+                f.write("crud_bm;foo 10\ncrud_bm;bar 5\n")
+            with open(part2, "w") as f:
+                f.write("crud_bm;foo 3\ncrud_bm;baz 7\n")
+            merged = os.path.join(tmp, "folded")
+            benchmark_profiler._merge_folded_files([part1, part2], merged)
+            with open(merged) as f:
+                result = {
+                    line.rpartition(" ")[0]: int(line.rpartition(" ")[2])
+                    for line in f
+                    if line.strip()
+                }
+            self.assertEqual(result, {"crud_bm;foo": 13, "crud_bm;bar": 5, "crud_bm;baz": 7})
+
+    def test_skips_missing_and_empty_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            part1 = os.path.join(tmp, "folded.cpu0")
+            part2 = os.path.join(tmp, "folded.cpu1")
+            with open(part1, "w") as f:
+                f.write("crud_bm;foo 10\n")
+            open(part2, "w").close()
+            merged = os.path.join(tmp, "folded")
+            benchmark_profiler._merge_folded_files(
+                [part1, part2, os.path.join(tmp, "nonexistent")], merged
+            )
+            with open(merged) as f:
+                self.assertEqual(f.read(), "crud_bm;foo 10\n")
+
+    def test_filters_out_non_benchmark_processes(self):
+        # System noise (mandb, systemd, etc.) captured by system-wide recording must be excluded.
+        with tempfile.TemporaryDirectory() as tmp:
+            part = os.path.join(tmp, "folded.cpu0")
+            with open(part, "w") as f:
+                f.write("crud_bm;main;foo 10\n")
+                f.write("mandb;update;index 99\n")
+                f.write("systemd-journal;write 50\n")
+                f.write("service_entry_point_shard_role_bm;run 5\n")
+            merged = os.path.join(tmp, "folded")
+            benchmark_profiler._merge_folded_files([part], merged)
+            with open(merged) as f:
+                result = {
+                    line.rpartition(" ")[0]: int(line.rpartition(" ")[2])
+                    for line in f
+                    if line.strip()
+                }
+            self.assertEqual(
+                result, {"crud_bm;main;foo": 10, "service_entry_point_shard_role_bm;run": 5}
+            )
+
+    def test_keeps_benchmark_processes_with_digits(self):
+        # Benchmark names may contain digits (e.g. storage2_bm); the filter must keep them.
+        with tempfile.TemporaryDirectory() as tmp:
+            part = os.path.join(tmp, "folded.cpu0")
+            with open(part, "w") as f:
+                f.write("storage2_bm;main;foo 10\n")
+                f.write("mandb;write 99\n")
+            merged = os.path.join(tmp, "folded")
+            benchmark_profiler._merge_folded_files([part], merged)
+            with open(merged) as f:
+                result = {
+                    line.rpartition(" ")[0]: int(line.rpartition(" ")[2])
+                    for line in f
+                    if line.strip()
+                }
+            self.assertEqual(result, {"storage2_bm;main;foo": 10})
 
 
 class ProfilingEnabledTest(unittest.TestCase):
