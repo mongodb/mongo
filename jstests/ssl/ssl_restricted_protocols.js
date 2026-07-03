@@ -41,14 +41,11 @@ function runTestWithoutSubset(subset) {
 runTestWithoutSubset(["TLS1_0"]);
 runTestWithoutSubset(["TLS1_0", "TLS1_1"]);
 
-const sslProvider = determineSSLProvider();
-
-if (sslProvider === "openssl" && (!supportsTLS1_2 || supportsTLS1_3)) {
+if (determineSSLProvider() === "openssl" && (!supportsTLS1_2 || supportsTLS1_3)) {
     runTestWithoutSubset(["TLS1_2"]);
 }
 
-// TLS 1.3 tests - run for OpenSSL and Windows (SChannel) when TLS 1.3 is supported
-if ((sslProvider === "openssl" || sslProvider === "windows") && supportsTLS1_3) {
+if (determineSSLProvider() === "openssl" && supportsTLS1_3) {
     runTestWithoutSubset(["TLS1_3"]);
     runTestWithoutSubset(["TLS1_0", "TLS1_1", "TLS1_2"]);
 }

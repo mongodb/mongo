@@ -47,7 +47,7 @@ namespace ssl {
 class context : public context_base, private noncopyable {
 public:
     /// The native handle type of the SSL context.
-    typedef SCH_CREDENTIALS* native_handle_type;
+    typedef SCHANNEL_CRED* native_handle_type;
 
     /// Constructor.
     ASIO_DECL explicit context(method m);
@@ -92,8 +92,7 @@ public:
     ASIO_DECL native_handle_type native_handle();
 
 private:
-    TLS_PARAMETERS _tlsParams;
-    SCH_CREDENTIALS _cred;
+    SCHANNEL_CRED _cred;
 
     // The underlying native implementation.
     native_handle_type handle_;
