@@ -41,6 +41,7 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_settings/query_settings_backfill.h"
 #include "mongo/db/query/query_settings/query_settings_cluster_parameter_gen.h"
+#include "mongo/db/query/query_settings/query_settings_context.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/query/query_settings/query_settings_service_dependencies.h"
@@ -607,6 +608,37 @@ private:
 };
 
 }  // namespace
+
+void QuerySettingsService::initializeSettingsForQuery(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const boost::optional<query_shape::QueryShapeHash>& queryShapeHash,
+    const NamespaceString& nss,
+    const boost::optional<QuerySettings>& querySettingsFromOriginalCommand) const {
+    using namespace query_settings_details;
+    // A nested command running through DBDirectClient is part of the user command's execution: it
+    // must not resolve query settings on the user command's behalf, and instead observes the
+    // settings the user command resolved.
+    auto opCtx = expCtx->getOperationContext();
+    if (opCtx->getClient()->isInDirectClient()) {
+        return;
+    }
+    // Only resolve while the operation is still 'Pending' (an eligible command has begun via
+    // 'QuerySettingsCommandHooks' and settings have not been resolved yet). Once resolved
+    // (e.g. a view re-dispatched onto the same opCtx), this is a no-op. 'NotStarted' is also left
+    // alone: no eligible command was dispatched, so there is nothing to resolve against.
+    auto&& state = getQuerySettingsStateForOp(opCtx);
+    if (std::holds_alternative<Pending>(state)) {
+        auto settings = lookupQuerySettingsWithRejectionCheck(
+            expCtx, queryShapeHash, nss, querySettingsFromOriginalCommand);
+        // Collapse a default (no-op) resolution to 'Empty' so it is distinguishable from an
+        // operation that actually installed settings.
+        // TODO SERVER-XXXXXX: avoid re-inspecting the result here by having
+        // 'lookupQuerySettingsWithRejectionCheck' return the resolved state ('Empty' vs installed
+        // settings) directly.
+        state = isDefault(settings) ? QuerySettingsOperationState{Empty{}}
+                                    : QuerySettingsOperationState{std::move(settings)};
+    }
+}
 
 class QuerySettingsRouterService : public QuerySettingsService {
 public:

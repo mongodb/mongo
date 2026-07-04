@@ -195,6 +195,23 @@ public:
     }
 
     /**
+     * Resolves the query settings for the current query and makes them the active settings on the
+     * operation: looks them up by 'queryShapeHash' (running the rejection check) and stores the
+     * result so that 'query_settings::forOp(opCtx)' returns it. When 'queryShapeHash' is
+     * boost::none the query is not eligible for settings and default settings are resolved.
+     *
+     * Resolution only runs while the operation is still 'Pending' (eligibility is decided lazily by
+     * 'query_settings_details::getQuerySettingsStateForOp'). An ineligible operation or a
+     * re-entrant resolution (view re-dispatch or a nested query against the same 'opCtx') is a
+     * no-op. Not yet wired into any command.
+     */
+    void initializeSettingsForQuery(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const boost::optional<query_shape::QueryShapeHash>& queryShapeHash,
+        const NamespaceString& nss,
+        const boost::optional<QuerySettings>& querySettingsFromOriginalCommand) const;
+
+    /**
      * Returns all the query shape configurations and the timestamp of the last modification.
      */
     virtual QueryShapeConfigurationsWithTimestamp getAllQueryShapeConfigurations(
