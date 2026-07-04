@@ -152,7 +152,7 @@ REGISTER_QUERY_KNOBS_LISTENER(QueryKnobSnapshotCacheUpdater, [](const QueryKnobC
 
 MONGO_INITIALIZER_GENERAL(QueryKnobSnapshotCacheInit,
                           ("QueryKnobRegistryInit"),
-                          ("QueryKnobChangeNotifierInit"))(InitializerContext*) {
+                          ("EndQueryKnobChangeListenerRegistration"))(InitializerContext*) {
     auto&& entries = QueryKnobRegistry::instance().entries();
     QueryKnobSnapshotBuilder builder(entries.size());
     for (auto&& entry : entries) {

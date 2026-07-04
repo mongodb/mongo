@@ -101,7 +101,9 @@ void registerQueryKnobListener(QueryKnobChangeNotifier::Listener&& listener);
 // (Status(const QueryKnobChange&)). Place at namespace scope in a .cpp.
 #define REGISTER_QUERY_KNOBS_LISTENER(name, listener)                                           \
     namespace {                                                                                 \
-    MONGO_INITIALIZER_GENERAL(name, ("QueryKnobRegistryInit"), ("QueryKnobChangeNotifierInit")) \
+    MONGO_INITIALIZER_GENERAL(name,                                                              \
+                              ("BeginQueryKnobChangeListenerRegistration"),                      \
+                              ("EndQueryKnobChangeListenerRegistration"))                        \
         (InitializerContext*) {                                                                 \
             detail::registerQueryKnobListener(listener);                                        \
         }                                                                                       \
