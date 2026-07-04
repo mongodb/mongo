@@ -35,12 +35,16 @@
 #include "mongo/db/query/query_knobs/query_knob.h"
 #include "mongo/db/query/query_knobs/query_knob_registry.h"
 #include "mongo/db/query/query_knobs/query_knob_snapshot.h"
+#include "mongo/db/query/query_lifespan.h"
+#include "mongo/db/query/query_settings/query_settings.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 
 namespace mongo {
 using namespace std::literals::string_view_literals;
 
 namespace {
+
+auto decoration = QueryLifespan::declareOpCtxDecoration<boost::optional<QueryKnobConfiguration>>();
 
 // Source labels emitted for each knob in 'serializeForExplain'.
 constexpr std::string_view kSetParameterSource = "setParameter"sv;
@@ -74,7 +78,45 @@ QueryKnobSnapshot makeQueryKnobSnapshot(const query_settings::QuerySettings& que
 }  // namespace
 
 QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettings& querySettings)
-    : _snapshot(makeQueryKnobSnapshot(querySettings)) {}
+    : _snapshot(makeQueryKnobSnapshot(querySettings)),
+      _overrideResult(query_settings::KnobOverrideResult::kApplied) {}
+
+QueryKnobConfiguration::QueryKnobConfiguration()
+    : _snapshot(QueryKnobSnapshotCache::instance().getThreadLocalSnapshot()) {}
+
+const QueryKnobConfiguration& QueryKnobConfiguration::get(OperationContext* opCtx) {
+    auto&& instance = decoration(opCtx);
+    // Initialize a new QueryKnobConfiguration if needed.
+    if (!instance) {
+        instance = QueryKnobConfiguration();
+    }
+
+    // Early exit if the settings have already been installed.
+    if (instance->_overrideResult == query_settings::KnobOverrideResult::kApplied) {
+        return *instance;
+    }
+
+    // Try to install the query settings if available, or leave it for the next get() call.
+    instance->_overrideResult =
+        query_settings::tryOverrideQueryKnobValues(opCtx, instance->_snapshot);
+    return *instance;
+}
+
+bool QueryKnobConfiguration::_isKnobReadAllowed(QueryKnobId id) const {
+    // Any read is allowed once the overrides are applied, or before the query starts (eligibility
+    // not yet known). Only the pending window, where settings may still override a knob, restricts
+    // reads to non-PQS-settable knobs.
+    if (_overrideResult != query_settings::KnobOverrideResult::kPending) {
+        return true;
+    }
+    // TODO SERVER-129207 The query framework control knob is not marked 'pqs_settable', yet
+    // query settings may override it via 'queryFramework'. Treat it as overridable until it is
+    // migrated to QueryKnobs.
+    if (id == query_knobs::kQueryFrameworkControl.id) {
+        return false;
+    }
+    return !QueryKnobRegistry::instance().entry(id).pqsSettable;
+}
 
 BSONObj QueryKnobConfiguration::serializeForExplain() const {
     BSONObjBuilder bob;

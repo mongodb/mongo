@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_knob_descriptors_execution.h"
@@ -36,7 +37,9 @@
 #include "mongo/db/query/query_knobs/query_knob.h"
 #include "mongo/db/query/query_knobs/query_knob_snapshot.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/query/query_settings/query_settings.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
@@ -51,14 +54,22 @@ public:
     /**
      * NOTE: QueryKnobConfiguration construction requires 'querySettings', because settings may
      * override the query knob values.
+     *
+     * TODO SERVER-108400: Remove this constructor.
      */
     QueryKnobConfiguration(const query_settings::QuerySettings& querySettings);
+
+    /**
+     * Returns the QueryKnobConfiguration for 'opCtx'.
+     */
+    static const QueryKnobConfiguration& get(OperationContext* opCtx);
 
     /**
      * Read a knob value from the snapshot. T is deduced from the descriptor.
      */
     template <typename T>
     T get(const QueryKnob<T>& knob) const {
+        dassert(_isKnobReadAllowed(knob.id));
         return _snapshot.get<T>(knob.id);
     }
 
@@ -89,6 +100,25 @@ public:
     bool canPushDownFullyCompatibleStages() const;
 
 private:
+    /**
+     * Constructs a configuration from the current global knob values, with no per-query overrides
+     * applied yet. Used when the configuration lives on the operation and overrides are applied
+     * later via 'query_settings::tryOverrideQueryKnobValues()'.
+     */
+    QueryKnobConfiguration();
+
+    /**
+     * Returns true if 'id' may be read on this configuration. While query settings are pending
+     * resolution, a PQS-settable knob must not be read, otherwise the caller would observe a value
+     * that the settings are about to override. Reads before the query starts (eligibility not yet
+     * known) and after the overrides are applied are unrestricted.
+     */
+    bool _isKnobReadAllowed(QueryKnobId id) const;
+
     QueryKnobSnapshot _snapshot;
+    // Outcome of the last query-settings override attempt, refreshed on each 'get()' call until it
+    // reaches 'kApplied'.
+    query_settings::KnobOverrideResult _overrideResult =
+        query_settings::KnobOverrideResult::kNotStarted;
 };
 }  // namespace mongo

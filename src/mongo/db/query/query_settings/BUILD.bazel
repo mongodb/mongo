@@ -43,6 +43,7 @@ mongo_cc_library(
         "//src/mongo/db:namespace_spec",
         "//src/mongo/db:server_base",
         "//src/mongo/db/query:index_hint",
+        "//src/mongo/db/query:query_knobs",
         "//src/mongo/db/query:query_lifespan",
         "//src/mongo/db/query/query_knobs:query_knob",
         "//src/mongo/db/query/query_shape:query_shape_hash",

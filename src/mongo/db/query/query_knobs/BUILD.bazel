@@ -40,6 +40,8 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db/query:query_knobs",
+        "//src/mongo/db/query:query_lifespan",
+        "//src/mongo/db/query/query_settings",
     ],
 )
 
@@ -89,6 +91,19 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_third_group"],
     deps = [
         ":query_knob_test_knobs",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "query_knob_configuration_test",
+    srcs = [
+        "query_knob_configuration_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":query_knob_configuration",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/query/query_settings",
     ],
 )
 

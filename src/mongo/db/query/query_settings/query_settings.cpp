@@ -29,6 +29,9 @@
 
 #include "mongo/db/query/query_settings/query_settings.h"
 
+#include "mongo/db/query/query_knob_descriptors_execution.h"
+#include "mongo/db/query/query_knobs/query_knob.h"
+#include "mongo/db/query/query_knobs/query_knob_snapshot.h"
 #include "mongo/db/query/query_settings/query_settings_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"
@@ -54,6 +57,43 @@ const QuerySettings& forOp(OperationContext* opCtx) {
             [&](const QuerySettings& settings) -> const QuerySettings& { return settings; },
         },
         getQuerySettingsStateForOp(opCtx));
+}
+
+KnobOverrideResult tryOverrideQueryKnobValues(OperationContext* opCtx,
+                                              QueryKnobSnapshot& snapshot) {
+    using namespace query_settings_details;
+    return std::visit(OverloadedVisitor{
+                          // No eligible command has begun yet; the caller must retry later.
+                          [&](const NotStarted&) { return KnobOverrideResult::kNotStarted; },
+                          // Settings are still pending resolution; the caller must retry later.
+                          [&](const Pending&) { return KnobOverrideResult::kPending; },
+                          // Not eligible, or resolution matched nothing: no overrides to apply.
+                          [&](const Empty&) { return KnobOverrideResult::kApplied; },
+                          [&](const QuerySettings& settings) {
+                              const bool hasOverrides =
+                                  settings.getQueryKnobs() || settings.getQueryFramework();
+                              if (!hasOverrides) {
+                                  // Nothing to override.
+                                  return KnobOverrideResult::kApplied;
+                              }
+                              QueryKnobSnapshotBuilder builder(std::move(snapshot));
+                              if (auto&& knobs = settings.getQueryKnobs()) {
+                                  for (auto&& [id, value] : knobs->entries()) {
+                                      builder.set(id, value, KnobSource::kQuerySettings);
+                                  }
+                              }
+                              // TODO SERVER-129207 Migrate query framework control from
+                              // QuerySettings to QueryKnobs and remove this special case.
+                              if (auto&& framework = settings.getQueryFramework()) {
+                                  builder.set(query_knobs::kQueryFrameworkControl.id,
+                                              QueryKnobValue(static_cast<int>(*framework)),
+                                              KnobSource::kQuerySettings);
+                              }
+                              snapshot = std::move(builder).build();
+                              return KnobOverrideResult::kApplied;
+                          },
+                      },
+                      getQuerySettingsStateForOp(opCtx));
 }
 
 }  // namespace mongo::query_settings

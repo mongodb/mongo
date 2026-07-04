@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/query_knobs/query_knob_snapshot.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/util/modules.h"
 
@@ -43,5 +44,29 @@ namespace mongo::query_settings {
  * instead.
  */
 MONGO_MOD_PUBLIC const QuerySettings& forOp(OperationContext* opCtx);
+
+/**
+ * Outcome of 'tryOverrideQueryKnobValues'. Distinguishes the two "retry later" phases because they
+ * imply different knob-read restrictions:
+ *
+ * kApplied    - Overrides (if any) are installed; 'snapshot' is final and all knob reads are
+ *               allowed.
+ * kNotStarted - No query-settings-eligible command has begun on the operation; all knob reads are
+ *               allowed, but the caller must retry later.
+ * kPending    - An eligible command has begun but settings have not been resolved yet; reading a
+ *               PQS-settable knob now would observe a value the settings may be about to override,
+ *               so such reads are forbidden until a retry returns 'kApplied'.
+ */
+enum class KnobOverrideResult { kApplied, kNotStarted, kPending };
+
+/**
+ * Applies any query-settings knob overrides for 'opCtx' onto 'snapshot' in place. Returns
+ * 'kApplied' once the overrides have been resolved and applied (or there are none to apply, i.e.
+ * the operation is not query-settings-eligible), meaning 'snapshot' is final. Otherwise leaves
+ * 'snapshot' unchanged and returns 'kNotStarted' or 'kPending' (see 'KnobOverrideResult'); the
+ * caller must retry later.
+ */
+MONGO_MOD_PUBLIC KnobOverrideResult tryOverrideQueryKnobValues(OperationContext* opCtx,
+                                                               QueryKnobSnapshot& snapshot);
 
 }  // namespace mongo::query_settings
