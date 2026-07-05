@@ -41,6 +41,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/interval_evaluation_tree.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/wildcard_test_utils.h"
@@ -157,11 +158,14 @@ TEST(PlannerWildcardHelpersTest, FinalizeBasicPatternInCompoundWildcardIndexScan
     auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     IndexScanNode idxScan{testNss, expandedIndex};
 
+    std::vector<interval_evaluation_tree::Builder> ietBuilders;
+    ietBuilders.resize(3);
     idxScan.bounds.fields = {{"a"}, {"b"}, {"c"}};
-    finalizeWildcardIndexScanConfiguration(&idxScan);
+    finalizeWildcardIndexScanConfiguration(&idxScan, &ietBuilders);
 
     auto expectedPattern = BSON("a" << 1 << "$_path" << 1 << "b" << 1 << "c" << 1);
     ASSERT_EQ(expectedPattern.woCompare(idxScan.index.keyPattern), 0);
+    ASSERT_EQ(4, ietBuilders.size());
     ASSERT_EQ(4, idxScan.bounds.fields.size());
     ASSERT_EQ("$_path", idxScan.bounds.fields[idxScan.index.wildcardFieldPos - 1].name);
     ASSERT_EQ(2, idxScan.index.wildcardFieldPos);
@@ -184,10 +188,12 @@ TEST(PlannerWildcardHelpersTest, AddSubpathBoundsIfBoundsOverlapWithObjects) {
     auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     IndexScanNode idxScan{testNss, expandedIndex};
 
+    std::vector<interval_evaluation_tree::Builder> ietBuilders;
+    ietBuilders.resize(2);
     idxScan.bounds.fields = {{"a"}, {"b"}};
     auto objectPointInterval = fromjson("{'': {a: 1}, '': {a: 1}}");
     idxScan.bounds.fields[0].intervals.push_back({objectPointInterval, true, true});
-    finalizeWildcardIndexScanConfiguration(&idxScan);
+    finalizeWildcardIndexScanConfiguration(&idxScan, &ietBuilders);
 
     // Because the interval "[{a: 1}, {a: 1}]" overlaps with the Object type bracket we should add
     // all sub-paths to $_path's interval by adding a range interval - ["a.", "a/")

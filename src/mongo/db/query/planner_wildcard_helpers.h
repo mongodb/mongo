@@ -31,6 +31,7 @@
 
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/interval_evaluation_tree.h"
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/util/modules.h"
@@ -80,7 +81,8 @@ bool canOnlyAnswerWildcardPrefixQuery(
  * - Adds a new, empty entry to 'multikeyPaths' for '$_path'.
  * - Updates shouldDedup for index scan node.
  */
-void finalizeWildcardIndexScanConfiguration(IndexScanNode* scan);
+void finalizeWildcardIndexScanConfiguration(
+    IndexScanNode* scan, std::vector<interval_evaluation_tree::Builder>* ietBuilders);
 
 /**
  * This helper generates index intervals for the "$_path" field to scan all keys indexing a
