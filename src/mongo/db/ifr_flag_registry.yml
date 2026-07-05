@@ -41,6 +41,7 @@ rollout:
   featureFlagSbeEqLookupUnwindLocalIxscanFetch: {}
   featureFlagSbeEqLookupUnwindNestedLoopJoin: {}
   featureFlagSbeNonLeadingMatch: {}
+  featureFlagSbeTransformStages: {}
   featureFlagUnifiedWriteExecutor: {}
 
 release:

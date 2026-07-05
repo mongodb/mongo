@@ -515,8 +515,8 @@ feature_flags:
         description: "Feature flag to enable transform stages in SBE, including $addFields, $replaceRoot, $replaceWith, $project."
         cpp_varname: gFeatureFlagSbeTransformStages
         fcv_gated: false
-        default: false
-        incremental_rollout_phase: in_development
+        default: true
+        incremental_rollout_phase: rollout
 
     featureFlagLookupWithPipelinesInSbe:
         description: "Feature flag to enable SBE to execute eligible $lookup stages containing subpipelines."
