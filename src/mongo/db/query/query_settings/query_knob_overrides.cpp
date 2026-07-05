@@ -85,6 +85,17 @@ QuerySettingsKnobOverrides QuerySettingsKnobOverrides::merge(
     return result;
 }
 
+bool QuerySettingsKnobOverrides::removeKnobsRequiringHigherFcv(
+    multiversion::FeatureCompatibilityVersion fcv) {
+    const auto& reg = QueryKnobRegistry::instance();
+    const auto sizeBefore = _entries.size();
+    _entries.erase(std::remove_if(_entries.begin(),
+                                  _entries.end(),
+                                  [&](const Entry& e) { return *reg.entry(e.id).minFcv > fcv; }),
+                   _entries.end());
+    return _entries.size() != sizeBefore;
+}
+
 void QuerySettingsKnobOverrides::simplify() {
     auto isDelete = [](const Entry& e) {
         return std::holds_alternative<DeleteQueryKnobOverride>(e.value);

@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/query_knobs/query_knob.h"
+#include "mongo/util/version/releases.h"
 
 #include <span>
 #include <string_view>
@@ -79,6 +80,12 @@ public:
      * before calling validateQuerySettings() to ensure no sentinel survives into stored settings.
      */
     void simplify();
+
+    /**
+     * Removes all overrides for knobs whose 'minFcv' is greater than 'fcv', i.e. knobs not
+     * supported on that FCV. Returns true if any entry was removed.
+     */
+    bool removeKnobsRequiringHigherFcv(multiversion::FeatureCompatibilityVersion fcv);
 
     BSONObj toBSON() const;
     void toBSON(std::string_view fieldName, BSONObjBuilder* builder) const {

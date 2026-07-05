@@ -31,9 +31,12 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/query/query_fcv_environment_for_test.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/ensure_fcv.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo::query_settings {
 namespace {
@@ -259,6 +262,51 @@ TEST(QuerySettingsKnobOverridesTest, SimplifyPreservesRealKnobs) {
     overrides.simplify();
     ASSERT_BSONOBJ_EQ(overrides.toBSON(),
                       BSON("testIntKnobWire" << 7 << "testBoolKnobWire" << true));
+}
+
+// FCV-related tests. The test knobs have minFcv "9.0" (== kLatest), except testLowFcvKnob which
+// has minFcv "8.0" (== kLastLTS). Initializes the global FCV first, as EnsureFCV requires it.
+
+// Parsing must not FCV-validate: this path also handles forwarded (mongos to shard) and stored
+// settings, which may legitimately contain knobs above the current FCV mid-downgrade or after an
+// interrupted one. FCV validation of user input is covered by validateQueryKnobs().
+TEST(QuerySettingsKnobOverridesTest, ParseAcceptsKnobAboveCurrentFcv) {
+    QueryFCVEnvironmentForTest::setUp();
+    // (Generic FCV reference): FCV-related query knob parse test.
+    unittest::EnsureFCV fcv(multiversion::GenericFCV::kLastLTS);
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(
+        BSON("testIntKnobWire" << 5 << "testLowFcvKnobWire" << 5));
+    ASSERT_EQ(overrides.entries().size(), 2u);
+}
+
+TEST(QuerySettingsKnobOverridesTest, RemoveKnobsRequiringHigherFcvKeepsSupportedKnobs) {
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(
+        BSON("testIntKnobWire" << 5 << "testLowFcvKnobWire" << 5));
+    // (Generic FCV reference): FCV-gated query knob removal test.
+    ASSERT_TRUE(overrides.removeKnobsRequiringHigherFcv(multiversion::GenericFCV::kLastLTS));
+    ASSERT_BSONOBJ_EQ(overrides.toBSON(), BSON("testLowFcvKnobWire" << 5));
+}
+
+TEST(QuerySettingsKnobOverridesTest, RemoveKnobsRequiringHigherFcvNoopWhenAllSupported) {
+    auto bson = BSON("testIntKnobWire" << 5 << "testLowFcvKnobWire" << 5);
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(bson);
+    // (Generic FCV reference): FCV-gated query knob removal test.
+    ASSERT_FALSE(overrides.removeKnobsRequiringHigherFcv(multiversion::GenericFCV::kLatest));
+    ASSERT_BSONOBJ_EQ(overrides.toBSON(), bson);
+}
+
+TEST(QuerySettingsKnobOverridesTest, RemoveKnobsRequiringHigherFcvAllRemovedYieldsEmpty) {
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 5));
+    // (Generic FCV reference): FCV-gated query knob removal test.
+    ASSERT_TRUE(overrides.removeKnobsRequiringHigherFcv(multiversion::GenericFCV::kLastLTS));
+    ASSERT_TRUE(overrides.empty());
+}
+
+TEST(QuerySettingsKnobOverridesTest, RemoveKnobsRequiringHigherFcvRemovesDeleteSentinels) {
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << BSONNULL));
+    // (Generic FCV reference): FCV-gated query knob removal test.
+    ASSERT_TRUE(overrides.removeKnobsRequiringHigherFcv(multiversion::GenericFCV::kLastLTS));
+    ASSERT_TRUE(overrides.empty());
 }
 
 }  // namespace

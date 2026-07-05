@@ -91,6 +91,20 @@ server_parameters:
                 fcv:
                     min: "9.0"
 
+    testLowFcvKnob:
+        set_at: [startup, runtime]
+        description: "Synthetic int knob with a low minimum FCV for FCV-gating tests."
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gTestLowFcvKnob
+        default: 5
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: testLowFcvKnobWire
+                pqs_settable: true
+                fcv:
+                    min: "8.0"
+
     testLLKnob:
         set_at: [startup, runtime]
         description: "Synthetic long long knob for QueryKnob descriptor tests."

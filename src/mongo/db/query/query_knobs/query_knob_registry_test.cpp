@@ -143,8 +143,8 @@ TEST(QueryKnobRegistryTest, CountsReflectPqsSplitOverTestSubset) {
             ++testPqs;
         }
     }
-    ASSERT_EQ(testTotal, 5u);
-    ASSERT_EQ(testPqs, 3u);
+    ASSERT_EQ(testTotal, 6u);
+    ASSERT_EQ(testPqs, 4u);
 }
 
 // -----------------------------------------------------------------------------

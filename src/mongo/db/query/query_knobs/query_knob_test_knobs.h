@@ -37,6 +37,7 @@
     KNOB(testIntKnob, "testIntKnob", gTestIntKnob, getTestInt) \
     KNOB(testDoubleKnob, "testDoubleKnob", gTestDoubleKnob, getTestDouble) \
     KNOB(testBoolKnob, "testBoolKnob", gTestBoolKnob, getTestBool) \
+    KNOB(testLowFcvKnob, "testLowFcvKnob", gTestLowFcvKnob, getTestLowFcv) \
     KNOB(testLLKnob, "testLLKnob", gTestLLKnob, getTestLL) \
     KNOB(testEnumKnob, "testEnumKnob", TestEnumKnob, getTestEnum)
     /**/

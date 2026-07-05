@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_knobs/query_knob_registry.h"
 #include "mongo/db/query/query_settings/query_settings_backfill.h"
 #include "mongo/db/query/query_settings/query_settings_cluster_parameter_gen.h"
 #include "mongo/db/query/query_settings/query_settings_context.h"
@@ -438,7 +439,7 @@ public:
     // these flags; 'run()' executes the present operations in a fixed, safe order.
     enum class Op : uint8_t {
         kNone = 0,
-        kRemoveQueryKnobs = 1 << 0,
+        kRemoveUnsupportedQueryKnobs = 1 << 0,
         kCreateCollection = 1 << 1,
         kMoveQueriesToCollection = 1 << 2,
         kMoveQueriesToParameter = 1 << 3,
@@ -457,7 +458,9 @@ public:
 
     QuerySettingsMigration(const QuerySettingsService* service) : _service(service) {}
 
-    void run(OperationContext* opCtx, Op plan) {
+    void run(OperationContext* opCtx,
+             Op plan,
+             multiversion::FeatureCompatibilityVersion targetFCV) {
         // Create the collection up front, before the retry loop populates it. The create is
         // idempotent and unrelated to the cluster parameter conflict being retried below.
         if (contains(plan, Op::kCreateCollection)) {
@@ -472,8 +475,8 @@ public:
                         "Running query settings migration pass",
                         "numQueryShapeConfigurations"_attr =
                             _config.queryShapeConfigurations.size());
-            if (contains(plan, Op::kRemoveQueryKnobs)) {
-                removeQueryKnobs();
+            if (contains(plan, Op::kRemoveUnsupportedQueryKnobs)) {
+                removeUnsupportedQueryKnobs(targetFCV);
             }
             if (contains(plan, Op::kMoveQueriesToCollection)) {
                 moveQueriesToCollection(opCtx);
@@ -499,30 +502,34 @@ public:
     }
 
 private:
-    void removeQueryKnobs() {
+    void removeUnsupportedQueryKnobs(multiversion::FeatureCompatibilityVersion targetFCV) {
         auto& configs = _config.queryShapeConfigurations;
         configs.erase(std::remove_if(configs.begin(),
                                      configs.end(),
                                      [&](auto&& entry) -> bool {
                                          auto&& settings = entry.getSettings();
-                                         if (auto&& knobs = settings.getQueryKnobs()) {
-                                             _dirty = true;
-                                             // TODO SERVER-129571: Scope down query knob downgrades
-                                             // only to knobs below the minimum FCV
-                                             settings.setQueryKnobs(boost::none);
-                                             const bool becameDefault = isDefault(settings);
-                                             LOGV2_DEBUG(
-                                                 12826802,
-                                                 3,
-                                                 "Stripping query knobs from query settings",
-                                                 "queryShapeHash"_attr =
-                                                     entry.getQueryShapeHash().toHexString(),
-                                                 "removedEntry"_attr = becameDefault);
-                                             if (becameDefault) {
-                                                 return true;
-                                             }
-                                             entry.setSettings(settings);
+                                         auto knobs = settings.getQueryKnobs();
+                                         if (!knobs ||
+                                             !knobs->removeKnobsRequiringHigherFcv(targetFCV)) {
+                                             return false;
                                          }
+                                         _dirty = true;
+                                         if (knobs->empty()) {
+                                             knobs = boost::none;
+                                         }
+                                         settings.setQueryKnobs(knobs);
+                                         const bool becameDefault = isDefault(settings);
+                                         LOGV2_DEBUG(12826802,
+                                                     3,
+                                                     "Stripping query knobs not supported on the "
+                                                     "target FCV from query settings",
+                                                     "queryShapeHash"_attr =
+                                                         entry.getQueryShapeHash().toHexString(),
+                                                     "removedEntry"_attr = becameDefault);
+                                         if (becameDefault) {
+                                             return true;
+                                         }
+                                         entry.setSettings(settings);
                                          return false;
                                      }),
                       configs.end());
@@ -682,7 +689,7 @@ public:
             // Unlike setQuerySettings, empty/default user settings are a no-op rather than an
             // error.
             auto userSettings = *querySettingsFromOriginalCommand;
-            validateQueryKnobsEnabled(expCtx->getOperationContext(), userSettings);
+            validateQueryKnobs(expCtx->getOperationContext(), userSettings);
 
             settings = mergeQuerySettings(userSettings, settings);
             simplifyQuerySettings(settings);
@@ -797,7 +804,7 @@ public:
             // Unlike setQuerySettings, empty/default user settings are a no-op rather than an
             // error.
             auto& userSettings = *querySettingsFromOriginalCommand;
-            validateQueryKnobsEnabled(opCtx, userSettings);
+            validateQueryKnobs(opCtx, userSettings);
 
             settings = mergeQuerySettings(userSettings, settings);
             simplifyQuerySettings(settings);
@@ -867,7 +874,7 @@ public:
                     "migrateRepresentativeQueriesToCollection"_attr =
                         QuerySettingsMigration::contains(plan, Op::kMoveQueriesToCollection));
         if (plan != Op::kNone) {
-            QuerySettingsMigration(this).run(opCtx, plan);
+            QuerySettingsMigration(this).run(opCtx, plan, targetFCV);
         }
     }
 
@@ -876,28 +883,21 @@ public:
         multiversion::FeatureCompatibilityVersion targetFCV) const override {
         using Op = QuerySettingsMigration::Op;
 
-        auto plan = Op::kNone;
+        // Query knob overrides not supported on the target FCV must be stripped on every
+        // downgrade.
+        auto plan = Op::kRemoveUnsupportedQueryKnobs;
         // Move representative queries back to the cluster parameter once backfill is disabled.
         if (!feature_flags::gFeatureFlagPQSBackfill.isEnabledOnVersion(targetFCV)) {
             plan |= Op::kMoveQueriesToParameter | Op::kDropCollection;
         }
-        // Strip query knobs once the target FCV no longer supports them.
-        if (!feature_flags::gFeatureFlagPqsQueryKnobs.isEnabledOnVersion(targetFCV)) {
-            plan |= Op::kRemoveQueryKnobs;
-        }
-
         LOGV2_DEBUG(12826804,
                     2,
                     "Planning query settings FCV downgrade",
                     "targetFCV"_attr = multiversion::toString(targetFCV),
-                    "removeQueryKnobs"_attr =
-                        QuerySettingsMigration::contains(plan, Op::kRemoveQueryKnobs),
                     "migrateRepresentativeQueriesToClusterParameter"_attr =
                         QuerySettingsMigration::contains(plan, Op::kMoveQueriesToParameter));
 
-        if (plan != Op::kNone) {
-            QuerySettingsMigration(this).run(opCtx, plan);
-        }
+        QuerySettingsMigration(this).run(opCtx, plan, targetFCV);
     }
 
     void upsertRepresentativeQueries(
@@ -1078,14 +1078,36 @@ QuerySettings mergeQuerySettings(const QuerySettings& lhs, const QuerySettings& 
     return querySettings;
 }
 
-void QuerySettingsService::validateQueryKnobsEnabled(OperationContext* opCtx,
-                                                     const QuerySettings& querySettings) const {
+void QuerySettingsService::validateQueryKnobs(OperationContext* opCtx,
+                                              const QuerySettings& querySettings) const {
+    const auto& knobs = querySettings.getQueryKnobs();
+    if (!knobs) {
+        return;
+    }
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     uassert(12324800,
             "Unknown field 'queryKnobs' in querySettings",
-            !querySettings.getQueryKnobs() ||
-                feature_flags::gFeatureFlagPqsQueryKnobs.isEnabled(
-                    VersionContext::getDecoration(opCtx),
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+            feature_flags::gFeatureFlagPqsQueryKnobs.isEnabled(VersionContext::getDecoration(opCtx),
+                                                               fcvSnapshot));
+
+    // Reject knobs that are not supported on the current FCV, including transitional versions:
+    // during a downgrade the knobs being removed must not be re-settable behind the migration's
+    // stripping pass. Skip the check if the FCV is not initialized (mongos, early startup).
+    if (!fcvSnapshot.isVersionInitialized()) {
+        return;
+    }
+    const auto& reg = QueryKnobRegistry::instance();
+    for (const auto& entry : knobs->entries()) {
+        // Deletions are always allowed so that stale overrides can be removed.
+        if (std::holds_alternative<DeleteQueryKnobOverride>(entry.value)) {
+            continue;
+        }
+        const auto& knobEntry = reg.entry(entry.id);
+        uassert(12955401,
+                str::stream() << "query knob not settable via QuerySettings: "
+                              << knobEntry.wireName,
+                fcvSnapshot.isGreaterThanOrEqualTo(*knobEntry.minFcv));
+    }
 }
 
 void QuerySettingsService::validateQuerySettings(const QuerySettings& querySettings) const {

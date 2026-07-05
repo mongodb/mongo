@@ -305,11 +305,15 @@ public:
     void validateQuerySettings(const QuerySettings& querySettings) const;
 
     /**
-     * Rejects 'queryKnobs' in 'querySettings' unless featureFlagPqsQueryKnobs is enabled.
-     * TODO SERVER-122103: Remove this guard once featureFlagPqsQueryKnobs is removed (SPM-4364).
+     * Validates user-provided query knob overrides in 'querySettings': rejects 'queryKnobs'
+     * unless featureFlagPqsQueryKnobs is enabled, and rejects individual knobs whose minimum FCV
+     * is above the current FCV. Must be called at every entry point accepting external query
+     * settings; parsing (QuerySettingsKnobOverrides::fromBSON()) deliberately performs no FCV
+     * validation, as it also handles internal traffic and stored settings.
+     * TODO SERVER-122103: Remove the feature flag guard once featureFlagPqsQueryKnobs is removed
+     * (SPM-4364).
      */
-    void validateQueryKnobsEnabled(OperationContext* opCtx,
-                                   const QuerySettings& querySettings) const;
+    void validateQueryKnobs(OperationContext* opCtx, const QuerySettings& querySettings) const;
 
     /**
      * Validates that QuerySettings can be applied to the query represented by 'queryInfo'.
