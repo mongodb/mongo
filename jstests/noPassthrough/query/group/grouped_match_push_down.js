@@ -145,7 +145,7 @@ assertPipelineOptimizationAndResult({
         {$match: {m: {$eq: 2}}},
     ],
     expectedStageSequence: {
-        [MultiStageSBE]: ["$cursor", "$match"],
+        [MultiStageSBE]: ["$cursor", "$project", "$match"],
         [MultiStageClassic]: ["$cursor", "$group", "$project", "$match"],
         [SingleStage]: ["MATCH", "PROJECTION_DEFAULT", "GROUP", "COLLSCAN"],
     },
