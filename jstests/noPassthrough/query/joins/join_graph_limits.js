@@ -8,7 +8,8 @@
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeEqLookupUnwindEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod({setParameter: {featureFlagPathArrayness: true}});
 const db = conn.getDB(`${jsTestName()}_db`);
@@ -24,8 +25,15 @@ function setServerParameters(knobs) {
 
 function assertNonOptimizedLookups(coll, pipeline, expectedLookupStages) {
     const explain = coll.explain().aggregate(pipeline);
-    const lookupStages = getPlanStages(explain, "$lookup");
-    assert.eq(lookupStages.length, expectedLookupStages);
+    const winningPlan = getWinningPlanFromExplain(explain);
+
+    // We construct the join model and then push remaining eligible stages into SBE.
+    // So to find the non-reordered $lookups, we have to search for the SBE names.
+    const nonOptimizedLookupStages = [
+        ...getPlanStages(winningPlan, "EQ_LOOKUP"),
+        ...getPlanStages(winningPlan, "EQ_LOOKUP_UNWIND"),
+    ];
+    assert.eq(nonOptimizedLookupStages.length, expectedLookupStages);
 }
 
 function assertJoinPlanResults(coll, pipeline, expectedResults) {
@@ -101,7 +109,13 @@ setServerParameters({
     assertJoinPlanResults(coll, pipeline, noJoinOptResults);
 
     // Due to the limit one $lookup stages is expected to be left unoptimized.
-    assertNonOptimizedLookups(coll, pipeline, 1);
+    assertNonOptimizedLookups(
+        coll,
+        pipeline,
+        checkSbeEqLookupUnwindEnabled(db)
+            ? 1 /* need SBE fully enabled to pushdown lookup unwind*/
+            : 0,
+    );
 }
 
 // 4. Join optimization enabled: number of edges limit hit.
@@ -115,7 +129,13 @@ setServerParameters({
     assertJoinPlanResults(coll, pipeline, noJoinOptResults);
 
     // Due to the limit one $lookup stages is expected to be left unoptimized.
-    assertNonOptimizedLookups(coll, pipeline, 1);
+    assertNonOptimizedLookups(
+        coll,
+        pipeline,
+        checkSbeEqLookupUnwindEnabled(db)
+            ? 1 /* need SBE fully enabled to pushdown lookup unwind*/
+            : 0,
+    );
 }
 
 MongoRunner.stopMongod(conn);

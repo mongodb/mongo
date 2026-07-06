@@ -64,12 +64,12 @@ INLJ only, all plans
 ```
 Num orders: 6
 ```json
+(INLJ _ = (INLJ _ = COLLSCAN [test.hint_md_c], bar = FETCH [test.hint_md_b]), foo = FETCH [test.hint_md_a])
 (INLJ _ = (INLJ _ = COLLSCAN [test.hint_md_c], foo = FETCH [test.hint_md_a]), bar = FETCH [test.hint_md_b])
 (INLJ _ = (INLJ bar = COLLSCAN [test.hint_md_b], _ = FETCH [test.hint_md_c]), foo = FETCH [test.hint_md_a])
 (INLJ _ = (INLJ bar = COLLSCAN [test.hint_md_b], foo = FETCH [test.hint_md_a]), _ = FETCH [test.hint_md_c])
 (INLJ _ = (INLJ foo = COLLSCAN [test.hint_md_a], _ = FETCH [test.hint_md_c]), bar = FETCH [test.hint_md_b])
 (INLJ _ = (INLJ foo = COLLSCAN [test.hint_md_a], bar = FETCH [test.hint_md_b]), _ = FETCH [test.hint_md_c])
-SORT
 ```
 
 HJ only, all plans
@@ -89,6 +89,7 @@ HJ only, all plans
 Num orders: 12
 ```json
 (HJ _ = (HJ _ = COLLSCAN [test.hint_md_c], bar = COLLSCAN [test.hint_md_b]), foo = COLLSCAN [test.hint_md_a])
+(HJ _ = (HJ _ = COLLSCAN [test.hint_md_c], foo = COLLSCAN [test.hint_md_a]), bar = COLLSCAN [test.hint_md_b])
 (HJ _ = (HJ bar = COLLSCAN [test.hint_md_b], _ = COLLSCAN [test.hint_md_c]), foo = COLLSCAN [test.hint_md_a])
 (HJ _ = (HJ bar = COLLSCAN [test.hint_md_b], foo = COLLSCAN [test.hint_md_a]), _ = COLLSCAN [test.hint_md_c])
 (HJ _ = (HJ foo = COLLSCAN [test.hint_md_a], _ = COLLSCAN [test.hint_md_c]), bar = COLLSCAN [test.hint_md_b])
@@ -99,7 +100,6 @@ Num orders: 12
 (HJ bar = COLLSCAN [test.hint_md_b], _ = (HJ foo = COLLSCAN [test.hint_md_a], _ = COLLSCAN [test.hint_md_c]))
 (HJ foo = COLLSCAN [test.hint_md_a], _ = (HJ _ = COLLSCAN [test.hint_md_c], bar = COLLSCAN [test.hint_md_b]))
 (HJ foo = COLLSCAN [test.hint_md_a], _ = (HJ bar = COLLSCAN [test.hint_md_b], _ = COLLSCAN [test.hint_md_c]))
-SORT
 ```
 
 Fixed methods: HJ then NLJ, all plans
@@ -130,11 +130,11 @@ Fixed methods: HJ then NLJ, all plans
 Num orders: 6
 ```json
 (NLJ _ = (HJ _ = COLLSCAN [test.hint_md_c], bar = COLLSCAN [test.hint_md_b]), foo = COLLSCAN [test.hint_md_a])
+(NLJ _ = (HJ _ = COLLSCAN [test.hint_md_c], foo = COLLSCAN [test.hint_md_a]), bar = COLLSCAN [test.hint_md_b])
 (NLJ _ = (HJ bar = COLLSCAN [test.hint_md_b], _ = COLLSCAN [test.hint_md_c]), foo = COLLSCAN [test.hint_md_a])
 (NLJ _ = (HJ bar = COLLSCAN [test.hint_md_b], foo = COLLSCAN [test.hint_md_a]), _ = COLLSCAN [test.hint_md_c])
 (NLJ _ = (HJ foo = COLLSCAN [test.hint_md_a], _ = COLLSCAN [test.hint_md_c]), bar = COLLSCAN [test.hint_md_b])
 (NLJ _ = (HJ foo = COLLSCAN [test.hint_md_a], bar = COLLSCAN [test.hint_md_b]), _ = COLLSCAN [test.hint_md_c])
-SORT
 ```
 
 Syntactic join order, left-deep, all plans
@@ -168,6 +168,7 @@ Syntactic join order, left-deep, all plans
 ```
 Num orders: 18
 ```json
+(HJ _ = (HJ _ = COLLSCAN [test.hint_md_c], foo = COLLSCAN [test.hint_md_a]), bar = COLLSCAN [test.hint_md_b])
 (HJ _ = (HJ foo = COLLSCAN [test.hint_md_a], _ = COLLSCAN [test.hint_md_c]), bar = COLLSCAN [test.hint_md_b])
 (HJ _ = (INLJ _ = COLLSCAN [test.hint_md_c], foo = FETCH [test.hint_md_a]), bar = COLLSCAN [test.hint_md_b])
 (HJ _ = (INLJ foo = COLLSCAN [test.hint_md_a], _ = FETCH [test.hint_md_c]), bar = COLLSCAN [test.hint_md_b])
@@ -185,7 +186,6 @@ Num orders: 18
 (NLJ _ = (INLJ foo = COLLSCAN [test.hint_md_a], _ = FETCH [test.hint_md_c]), bar = COLLSCAN [test.hint_md_b])
 (NLJ _ = (NLJ _ = COLLSCAN [test.hint_md_c], foo = COLLSCAN [test.hint_md_a]), bar = COLLSCAN [test.hint_md_b])
 (NLJ _ = (NLJ foo = COLLSCAN [test.hint_md_a], _ = COLLSCAN [test.hint_md_c]), bar = COLLSCAN [test.hint_md_b])
-SORT
 ```
 
 Syntactic join order, right-deep, all plans
@@ -219,12 +219,12 @@ Syntactic join order, right-deep, all plans
 ```
 Num orders: 6
 ```json
+(HJ bar = COLLSCAN [test.hint_md_b], _ = (HJ _ = COLLSCAN [test.hint_md_c], foo = COLLSCAN [test.hint_md_a]))
 (HJ bar = COLLSCAN [test.hint_md_b], _ = (HJ foo = COLLSCAN [test.hint_md_a], _ = COLLSCAN [test.hint_md_c]))
 (HJ bar = COLLSCAN [test.hint_md_b], _ = (INLJ _ = COLLSCAN [test.hint_md_c], foo = FETCH [test.hint_md_a]))
 (HJ bar = COLLSCAN [test.hint_md_b], _ = (INLJ foo = COLLSCAN [test.hint_md_a], _ = FETCH [test.hint_md_c]))
 (HJ bar = COLLSCAN [test.hint_md_b], _ = (NLJ _ = COLLSCAN [test.hint_md_c], foo = COLLSCAN [test.hint_md_a]))
 (HJ bar = COLLSCAN [test.hint_md_b], _ = (NLJ foo = COLLSCAN [test.hint_md_a], _ = COLLSCAN [test.hint_md_c]))
-SORT
 ```
 
 Reverse-syntactic order, right-deep using 'isLeftChild', all plans
@@ -259,9 +259,9 @@ Reverse-syntactic order, right-deep using 'isLeftChild', all plans
 ```
 Num orders: 3
 ```json
+(HJ _ = COLLSCAN [test.hint_md_c], _ = (HJ foo = COLLSCAN [test.hint_md_a], bar = COLLSCAN [test.hint_md_b]))
 (HJ _ = COLLSCAN [test.hint_md_c], _ = (INLJ foo = COLLSCAN [test.hint_md_a], bar = FETCH [test.hint_md_b]))
 (HJ _ = COLLSCAN [test.hint_md_c], _ = (NLJ foo = COLLSCAN [test.hint_md_a], bar = COLLSCAN [test.hint_md_b]))
-SORT
 ```
 
 Specify another order, right-deep using 'isLeftChild', cheapest plan (note: should appear in previous list!)
@@ -296,6 +296,6 @@ Specify another order, right-deep using 'isLeftChild', cheapest plan (note: shou
 ```
 Num orders: 1
 ```json
-SORT
+(HJ _ = COLLSCAN [test.hint_md_c], _ = (HJ foo = COLLSCAN [test.hint_md_a], bar = COLLSCAN [test.hint_md_b]))
 ```
 

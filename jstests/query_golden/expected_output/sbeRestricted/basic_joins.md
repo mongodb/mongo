@@ -379,13 +379,8 @@ rightEmbeddingField: "x"
 usedJoinOptimization: true
 
 ```
-SORT
-sortPattern: { "count" : -1 }
-memLimit: 104857600
-type: "default"
-  |
-  GROUP
-  
+GROUP
+
   |
   HASH_JOIN_EMBEDDING [a = a]
   leftEmbeddingField: "none"
@@ -411,13 +406,8 @@ type: "default"
 usedJoinOptimization: true
 
 ```
-SORT
-sortPattern: { "count" : -1 }
-memLimit: 104857600
-type: "default"
-  |
-  GROUP
-  
+GROUP
+
   |
   HASH_JOIN_EMBEDDING [a = a]
   leftEmbeddingField: "x"
@@ -443,13 +433,8 @@ type: "default"
 usedJoinOptimization: true
 
 ```
-SORT
-sortPattern: { "count" : -1 }
-memLimit: 104857600
-type: "default"
-  |
-  GROUP
-  
+GROUP
+
   |
   HASH_JOIN_EMBEDDING [a = a]
   leftEmbeddingField: "none"
@@ -475,13 +460,8 @@ type: "default"
 usedJoinOptimization: true
 
 ```
-SORT
-sortPattern: { "count" : -1 }
-memLimit: 104857600
-type: "default"
-  |
-  GROUP
-  
+GROUP
+
   |
   NESTED_LOOP_JOIN_EMBEDDING [b = b]
   leftEmbeddingField: "none"
@@ -507,13 +487,8 @@ type: "default"
 usedJoinOptimization: true
 
 ```
-SORT
-sortPattern: { "count" : -1 }
-memLimit: 104857600
-type: "default"
-  |
-  GROUP
-  
+GROUP
+
   |
   HASH_JOIN_EMBEDDING [a = a]
   leftEmbeddingField: "none"
@@ -539,13 +514,8 @@ type: "default"
 usedJoinOptimization: true
 
 ```
-SORT
-sortPattern: { "count" : -1 }
-memLimit: 104857600
-type: "default"
-  |
-  GROUP
-  
+GROUP
+
   |
   HASH_JOIN_EMBEDDING [a = a]
   leftEmbeddingField: "none"
@@ -571,13 +541,8 @@ type: "default"
 usedJoinOptimization: true
 
 ```
-SORT
-sortPattern: { "count" : -1 }
-memLimit: 104857600
-type: "default"
-  |
-  GROUP
-  
+GROUP
+
   |
   HASH_JOIN_EMBEDDING [a = a]
   leftEmbeddingField: "none"
@@ -658,13 +623,8 @@ type: "default"
 usedJoinOptimization: true
 
 ```
-SORT
-sortPattern: { "count" : -1 }
-memLimit: 104857600
-type: "default"
-  |
-  GROUP
-  
+GROUP
+
   |
   HASH_JOIN_EMBEDDING [b = b]
   leftEmbeddingField: "none"
@@ -692,13 +652,8 @@ type: "default"
 usedJoinOptimization: true
 
 ```
-SORT
-sortPattern: { "count" : -1 }
-memLimit: 104857600
-type: "default"
-  |
-  GROUP
-  
+GROUP
+
   |
   HASH_JOIN_EMBEDDING [b = b]
   leftEmbeddingField: "y"
@@ -726,13 +681,8 @@ type: "default"
 usedJoinOptimization: true
 
 ```
-SORT
-sortPattern: { "count" : -1 }
-memLimit: 104857600
-type: "default"
-  |
-  GROUP
-  
+GROUP
+
   |
   HASH_JOIN_EMBEDDING [b = b]
   leftEmbeddingField: "none"
@@ -760,13 +710,8 @@ type: "default"
 usedJoinOptimization: true
 
 ```
-SORT
-sortPattern: { "count" : -1 }
-memLimit: 104857600
-type: "default"
-  |
-  GROUP
-  
+GROUP
+
   |
   NESTED_LOOP_JOIN_EMBEDDING [b = b]
   leftEmbeddingField: "none"
@@ -794,13 +739,8 @@ type: "default"
 usedJoinOptimization: true
 
 ```
-SORT
-sortPattern: { "count" : -1 }
-memLimit: 104857600
-type: "default"
-  |
-  GROUP
-  
+GROUP
+
   |
   HASH_JOIN_EMBEDDING [a = a]
   leftEmbeddingField: "none"
@@ -828,13 +768,8 @@ type: "default"
 usedJoinOptimization: true
 
 ```
-SORT
-sortPattern: { "count" : -1 }
-memLimit: 104857600
-type: "default"
-  |
-  GROUP
-  
+GROUP
+
   |
   HASH_JOIN_EMBEDDING [a = a]
   leftEmbeddingField: "none"
@@ -862,13 +797,8 @@ type: "default"
 usedJoinOptimization: true
 
 ```
-SORT
-sortPattern: { "count" : -1 }
-memLimit: 104857600
-type: "default"
-  |
-  GROUP
-  
+GROUP
+
   |
   HASH_JOIN_EMBEDDING [b = b]
   leftEmbeddingField: "none"
@@ -1172,13 +1102,8 @@ rightEmbeddingField: "y"
 usedJoinOptimization: true
 
 ```
-SORT
-sortPattern: { "count" : -1 }
-memLimit: 104857600
-type: "default"
-  |
-  GROUP
-  
+GROUP
+
   |
   NESTED_LOOP_JOIN_EMBEDDING [b = b]
   leftEmbeddingField: "none"
@@ -1207,13 +1132,8 @@ type: "default"
 usedJoinOptimization: true
 
 ```
-SORT
-sortPattern: { "count" : -1 }
-memLimit: 104857600
-type: "default"
-  |
-  GROUP
-  
+GROUP
+
   |
   HASH_JOIN_EMBEDDING [b = b]
   leftEmbeddingField: "y"
@@ -1242,13 +1162,8 @@ type: "default"
 usedJoinOptimization: true
 
 ```
-SORT
-sortPattern: { "count" : -1 }
-memLimit: 104857600
-type: "default"
-  |
-  GROUP
-  
+GROUP
+
   |
   NESTED_LOOP_JOIN_EMBEDDING [b = b]
   leftEmbeddingField: "none"
@@ -1277,13 +1192,8 @@ type: "default"
 usedJoinOptimization: true
 
 ```
-SORT
-sortPattern: { "count" : -1 }
-memLimit: 104857600
-type: "default"
-  |
-  GROUP
-  
+GROUP
+
   |
   NESTED_LOOP_JOIN_EMBEDDING [b = b]
   leftEmbeddingField: "none"
@@ -1312,13 +1222,8 @@ type: "default"
 usedJoinOptimization: true
 
 ```
-SORT
-sortPattern: { "count" : -1 }
-memLimit: 104857600
-type: "default"
-  |
-  GROUP
-  
+GROUP
+
   |
   HASH_JOIN_EMBEDDING [a = a]
   leftEmbeddingField: "none"
@@ -1347,13 +1252,8 @@ type: "default"
 usedJoinOptimization: true
 
 ```
-SORT
-sortPattern: { "count" : -1 }
-memLimit: 104857600
-type: "default"
-  |
-  GROUP
-  
+GROUP
+
   |
   HASH_JOIN_EMBEDDING [a = a]
   leftEmbeddingField: "none"
@@ -1382,13 +1282,8 @@ type: "default"
 usedJoinOptimization: true
 
 ```
-SORT
-sortPattern: { "count" : -1 }
-memLimit: 104857600
-type: "default"
-  |
-  GROUP
-  
+GROUP
+
   |
   NESTED_LOOP_JOIN_EMBEDDING [b = b]
   leftEmbeddingField: "none"
@@ -3325,12 +3220,9 @@ rightEmbeddingField: "coll12"
 usedJoinOptimization: true
 
 ```
-PROJECTION_DEFAULT
-transformBy: { "d" : true, "_id" : false }
-  |
-  HASH_JOIN_EMBEDDING [d = a]
-  leftEmbeddingField: "x"
-  rightEmbeddingField: "none"
+HASH_JOIN_EMBEDDING [d = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
   |  transformBy: { "a" : true, "d" : true, "_id" : false }
@@ -3345,12 +3237,9 @@ transformBy: { "d" : true, "_id" : false }
 usedJoinOptimization: true
 
 ```
-PROJECTION_DEFAULT
-transformBy: { "d" : true, "_id" : false }
-  |
-  HASH_JOIN_EMBEDDING [d = a]
-  leftEmbeddingField: "x"
-  rightEmbeddingField: "none"
+HASH_JOIN_EMBEDDING [d = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
   |  transformBy: { "a" : true, "d" : true, "_id" : false }
@@ -3365,12 +3254,9 @@ transformBy: { "d" : true, "_id" : false }
 usedJoinOptimization: true
 
 ```
-PROJECTION_DEFAULT
-transformBy: { "d" : true, "_id" : false }
-  |
-  HASH_JOIN_EMBEDDING [d = a]
-  leftEmbeddingField: "x"
-  rightEmbeddingField: "none"
+HASH_JOIN_EMBEDDING [d = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
   |  transformBy: { "a" : true, "d" : true, "_id" : false }
@@ -3385,12 +3271,9 @@ transformBy: { "d" : true, "_id" : false }
 usedJoinOptimization: true
 
 ```
-PROJECTION_DEFAULT
-transformBy: { "d" : true, "_id" : false }
-  |
-  HASH_JOIN_EMBEDDING [a = d]
-  leftEmbeddingField: "none"
-  rightEmbeddingField: "x"
+HASH_JOIN_EMBEDDING [a = d]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
   |  direction: "forward"
@@ -3405,12 +3288,9 @@ transformBy: { "d" : true, "_id" : false }
 usedJoinOptimization: true
 
 ```
-PROJECTION_DEFAULT
-transformBy: { "d" : true, "_id" : false }
-  |
-  NESTED_LOOP_JOIN_EMBEDDING [a = d]
-  leftEmbeddingField: "none"
-  rightEmbeddingField: "x"
+NESTED_LOOP_JOIN_EMBEDDING [a = d]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
   |  direction: "forward"
@@ -3425,12 +3305,9 @@ transformBy: { "d" : true, "_id" : false }
 usedJoinOptimization: true
 
 ```
-PROJECTION_DEFAULT
-transformBy: { "d" : true, "_id" : false }
-  |
-  NESTED_LOOP_JOIN_EMBEDDING [a = d]
-  leftEmbeddingField: "none"
-  rightEmbeddingField: "x"
+NESTED_LOOP_JOIN_EMBEDDING [a = d]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
   |  direction: "forward"
@@ -3445,12 +3322,9 @@ transformBy: { "d" : true, "_id" : false }
 usedJoinOptimization: true
 
 ```
-PROJECTION_DEFAULT
-transformBy: { "d" : true, "_id" : false }
-  |
-  HASH_JOIN_EMBEDDING [d = a]
-  leftEmbeddingField: "x"
-  rightEmbeddingField: "none"
+HASH_JOIN_EMBEDDING [d = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
   |  transformBy: { "a" : true, "d" : true, "_id" : false }
