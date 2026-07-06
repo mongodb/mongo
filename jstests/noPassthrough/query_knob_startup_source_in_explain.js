@@ -43,14 +43,18 @@ after(function () {
 });
 
 describe("Query knobs set at startup via --setParameter", function () {
+    const kKnobsUnderTest = [
+        "planRankerMode",
+        "samplingMarginOfError",
+        "samplingCEMethod",
+        "numWorksPerPlanForMPEstimation",
+        "samplingByStrides",
+    ];
+
     function getListQueryKnobs() {
-        const result = assert.commandWorked(
-            conn
-                .getDB("admin")
-                .runCommand({aggregate: 1, pipeline: [{$listQueryKnobs: {}}], cursor: {}}),
-        );
         const knobs = {};
-        for (const doc of result.cursor.firstBatch) {
+        const pipeline = [{$listQueryKnobs: {}}, {$match: {wireName: {$in: kKnobsUnderTest}}}];
+        for (const doc of conn.getDB("admin").aggregate(pipeline).toArray()) {
             knobs[doc.wireName] = doc;
         }
         return knobs;
