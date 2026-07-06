@@ -67,24 +67,21 @@ constexpr Milliseconds RemoteCommandRequest::kNoTimeout;
 RemoteCommandRequest::RemoteCommandRequest()
     : id(requestIdCounter.addAndFetch(1)), operationKey(UUID::gen()) {}
 
-RemoteCommandRequest::RemoteCommandRequest(RequestId requestId_,
-                                           const HostAndPort& target_,
+RemoteCommandRequest::RemoteCommandRequest(const HostAndPort& target_,
                                            const DatabaseName& dbName_,
                                            const BSONObj& cmdObj_,
-                                           const BSONObj& metadataObj_,
+                                           const BSONObj& metadata_,
                                            OperationContext* opCtx_,
-                                           Milliseconds timeoutMillis_,
-                                           bool fireAndForget_,
-                                           boost::optional<UUID> opKey_)
-    : id(requestId_),
+                                           const RemoteCommandRequest::Options& options_)
+    : id(requestIdCounter.addAndFetch(1)),
       target(target_),
       dbname(dbName_),
       cmdObj(cmdObj_),
-      metadata(metadataObj_),
+      metadata(metadata_),
       opCtx(opCtx_),
-      timeout(timeoutMillis_),
-      fireAndForget(fireAndForget_),
-      operationKey(opKey_) {
+      timeout(options_.timeout),
+      fireAndForget(options_.fireAndForget),
+      operationKey(options_.operationKey) {
 
     // If there is a comment associated with the current operation, append it to the command that we
     // are about to dispatch to the shards.
@@ -130,20 +127,26 @@ RemoteCommandRequest::RemoteCommandRequest(RequestId requestId_,
 RemoteCommandRequest::RemoteCommandRequest(const HostAndPort& target_,
                                            const DatabaseName& dbName_,
                                            const BSONObj& cmdObj_,
+                                           OperationContext* opCtx_,
+                                           const RemoteCommandRequest::Options& options_)
+    : RemoteCommandRequest(target_, dbName_, cmdObj_, rpc::makeEmptyMetadata(), opCtx_, options_) {}
+
+RemoteCommandRequest::RemoteCommandRequest(const HostAndPort& target_,
+                                           const DatabaseName& dbName_,
+                                           const BSONObj& cmdObj_,
                                            const BSONObj& metadataObj_,
                                            OperationContext* opCtx_,
                                            Milliseconds timeoutMillis_,
                                            bool fireAndForget_,
                                            boost::optional<UUID> operationKey_)
-    : RemoteCommandRequest(requestIdCounter.addAndFetch(1),
-                           target_,
+    : RemoteCommandRequest(target_,
                            dbName_,
                            cmdObj_,
                            metadataObj_,
                            opCtx_,
-                           timeoutMillis_,
-                           fireAndForget_,
-                           operationKey_) {}
+                           {.timeout = timeoutMillis_,
+                            .fireAndForget = fireAndForget_,
+                            .operationKey = operationKey_}) {}
 
 RemoteCommandRequest::operator OpMsgRequest() const {
     const auto& tenantId = this->dbname.tenantId();

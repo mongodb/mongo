@@ -63,17 +63,28 @@ struct MONGO_MOD_PUBLIC RemoteCommandRequest {
     // Type to represent the internal id of this request
     typedef uint64_t RequestId;
 
+    struct Options {
+        Milliseconds timeout = kNoTimeout;
+        bool fireAndForget = false;
+        boost::optional<UUID> operationKey = boost::none;
+    };
+
     RemoteCommandRequest();
 
-    RemoteCommandRequest(RequestId requestId,
-                         const HostAndPort& hostAndPort,
+    /** Preferred constructor. */
+    RemoteCommandRequest(const HostAndPort& target,
                          const DatabaseName& dbName,
                          const BSONObj& cmdObj,
-                         const BSONObj& metadataObj,
+                         const BSONObj& metadata,
                          OperationContext* opCtx,
-                         Milliseconds timeoutMillis = kNoTimeout,
-                         bool fireAndForget = false,
-                         boost::optional<UUID> operationKey = boost::none);
+                         const Options& options);
+
+    /** Preferred constructor when there is no metadata. */
+    RemoteCommandRequest(const HostAndPort& target,
+                         const DatabaseName& dbName,
+                         const BSONObj& cmdObj,
+                         OperationContext* opCtx,
+                         const Options& options);
 
     RemoteCommandRequest(const HostAndPort& target,
                          const DatabaseName& dbName,
@@ -91,9 +102,12 @@ struct MONGO_MOD_PUBLIC RemoteCommandRequest {
                          OperationContext* opCtx,
                          bool fireAndForget,
                          boost::optional<UUID> operationKey = boost::none)
-        : RemoteCommandRequest(
-              target, dbName, cmdObj, metadataObj, opCtx, kNoTimeout, fireAndForget, operationKey) {
-    }
+        : RemoteCommandRequest(target,
+                               dbName,
+                               cmdObj,
+                               metadataObj,
+                               opCtx,
+                               {.fireAndForget = fireAndForget, .operationKey = operationKey}) {}
 
 
     RemoteCommandRequest(const HostAndPort& target,
@@ -106,11 +120,10 @@ struct MONGO_MOD_PUBLIC RemoteCommandRequest {
         : RemoteCommandRequest(target,
                                dbName,
                                cmdObj,
-                               rpc::makeEmptyMetadata(),
                                opCtx,
-                               timeoutMillis,
-                               fireAndForget,
-                               operationKey) {}
+                               {.timeout = timeoutMillis,
+                                .fireAndForget = fireAndForget,
+                                .operationKey = operationKey}) {}
 
     /**
      * Conversion function that performs the RemoteCommandRequest conversion into OpMsgRequest
