@@ -38,6 +38,7 @@ resmoke_suite_test(
         "auth",
         "ci-release-critical",
         "incompatible_with_bazel_remote_test",  # jstests/auth/buildinfo_auth_cmd.js fails related to the remote executor's hostname when determining if localhostAuthBypass should apply.
+        "requires_replicated_fast_count_recovery",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -85,6 +86,7 @@ resmoke_suite_test(
         "encrypt",
         "incompatible_with_bazel_remote_test",  # jstests/ssl/ssl_x509_SAN.js requires IPv6, which is disabled on remote executors.
         "patch_build",
+        "requires_replicated_fast_count_recovery",
         "ssl",
     ],
     deps = [
@@ -196,6 +198,7 @@ resmoke_suite_test(
         "ci-release-critical",
         "encrypt",
         "patch_build",
+        "requires_replicated_fast_count_recovery",
         "ssl",
     ],
     deps = [

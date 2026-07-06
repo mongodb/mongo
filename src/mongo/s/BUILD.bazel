@@ -837,6 +837,9 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/mongos_test.yml",
     tags = [
         "ci-release-critical",
+        "misc_js",
+        "non_live_record",
+        "non_read_maj",
     ],
     deps = [
         "//src/mongo/s:mongos",

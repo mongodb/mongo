@@ -45,8 +45,8 @@ resmoke_suite_test(
         "ci-release-critical",
         "common",
         "concurrency",
-        "cpu:2",
         "repl",
+        "resources:cpu:2",
     ],
     target_compatible_with = select({
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
@@ -68,10 +68,10 @@ resmoke_suite_test(
     tags = [
         "ci-release-critical",
         "concurrency",
-        "cpu:2",
         "large",
         "non_live_record",
         "repl",
+        "resources:cpu:2",
         "resources:memory:14336",
     ],
     target_compatible_with = select({
@@ -94,10 +94,10 @@ resmoke_suite_test(
     tags = [
         "ci-release-critical",
         "concurrency",
-        "cpu:2",
         "large",
         "non_live_record",
         "repl",
+        "resources:cpu:2",
         "resources:memory:14336",
     ],
     target_compatible_with = select({
@@ -124,9 +124,9 @@ resmoke_suite_test(
         "ci-release-critical",
         "common",
         "concurrency",
-        "cpu:2",
         "large",
         "read_concern_maj",
+        "resources:cpu:2",
         "sharded",
     ],
     target_compatible_with = select({
@@ -159,6 +159,7 @@ resmoke_suite_test(
         "incompatible_with_bazel_remote_test",  # Requires KMIP server infrastructure not available in remote executors.
         "large",
         "replica_sets",
+        "requires_replicated_fast_count_recovery",
         "resources:memory:14336",
         "san",
     ],
@@ -198,9 +199,9 @@ resmoke_suite_test(
     tags = [
         "ci-release-critical",
         "common",
-        "cpu:2",
         "large",
         "replica_sets",
+        "resources:cpu:2",
         "san",
     ],
     target_compatible_with = select({
@@ -220,9 +221,9 @@ resmoke_suite_test(
     tags = [
         "ci-release-critical",
         "common",
-        "cpu:2",
         "large",
         "replica_sets",
+        "resources:cpu:2",
         "san",
     ],
     deps = [
@@ -1048,6 +1049,7 @@ resmoke_suite_test(
         "concurrency",
         "config_fuzzer",
         "incompatible_inmemory",
+        "linux_only",
         "suggested_excluding_required__for_devprod_mitigation_only",
     ],
     target_compatible_with = select({

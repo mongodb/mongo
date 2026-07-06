@@ -176,6 +176,7 @@ resmoke_suite_test(
     shard_count = 40,
     tags = [
         "ci-release-critical",
+        "ingress_request_rate_limited",
         "jscore",
         "sharding",
     ],
@@ -201,8 +202,9 @@ resmoke_suite_test(
     tags = [
         "ci-release-critical",
         "common",
-        "cpu:2",
+        "ingress_request_rate_limited",
         "jscore",
+        "resources:cpu:2",
         "sharding",
     ],
     deps = [

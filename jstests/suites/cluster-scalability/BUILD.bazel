@@ -67,6 +67,7 @@ resmoke_suite_test(
     tags = [
         "ci-release-critical",
         "common",
+        "requires_replicated_fast_count_recovery",
         "resources:cpu:2",
         "sharding",
     ],
@@ -97,6 +98,7 @@ resmoke_suite_test(
         "common",
         "csrs",
         "non_live_record",
+        "requires_replicated_fast_count_recovery",
         "resources:cpu:2",
         "sharding",
     ],

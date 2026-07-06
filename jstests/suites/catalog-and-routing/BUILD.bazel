@@ -53,8 +53,8 @@ resmoke_suite_test(
     tags = [
         "ci-release-critical",
         "common",
-        "cpu:2",
         "jscore",
+        "resources:cpu:2",
         "sharding",
     ],
     deps = [
@@ -106,9 +106,9 @@ resmoke_suite_test(
     tags = [
         "ci-release-critical",
         "common",
-        "cpu:2",
         "large",
         "replica_sets",
+        "resources:cpu:2",
         "san",
     ],
     deps = [
@@ -221,6 +221,7 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "concurrency",
+        "no_debug_mode",
         "non_live_record",
         "resources:cpu:2",
         "sharded",
@@ -239,6 +240,7 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "concurrency",
+        "no_debug_mode",
         "non_live_record",
         "resources:cpu:2",
         "sharded",
@@ -258,6 +260,7 @@ resmoke_suite_test(
         "ci-default",
         "concurrency",
         "kill_terminate",
+        "no_debug_mode",
         "non_live_record",
         "resources:cpu:2",
         "sharded",
@@ -583,6 +586,7 @@ resmoke_suite_test(
         "concurrency",
         "kill_terminate",
         "large",
+        "no_debug_mode",
         "non_live_record",
         "resources:cpu:2",
         "sharded",

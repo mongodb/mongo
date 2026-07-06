@@ -461,6 +461,19 @@ py_binary(
 )
 
 py_binary(
+    name = "lint_resmoke_suite_tests",
+    srcs = ["lint_resmoke_suite_tests.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/util",
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+py_binary(
     name = "large_file_check",
     srcs = ["large_file_check.py"],
     deps = [

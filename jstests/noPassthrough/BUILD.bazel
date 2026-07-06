@@ -53,7 +53,7 @@ resmoke_suite_test(
         "ci-release-critical",
         "incompatible_with_bazel_remote_test",  # TODO(SERVER-122822), TODO(SERVER-122823), Many tests in this suite are currently incompatible with remote execution.
         "misc_js",
-        "requires-execution-on-windows-patch-build",
+        "requires_execution_on_windows_patch_build",
     ],
     target_compatible_with = select({
         "@platforms//cpu:ppc": ["@platforms//:incompatible"],

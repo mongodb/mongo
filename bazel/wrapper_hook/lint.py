@@ -337,6 +337,57 @@ class LintRunner:
         if self.run_bazel("//buildscripts/copybara:generate_evergreen", ["--check"]):
             print("Generated Copybara Evergreen yaml is up to date")
 
+    def lint_resmoke_suite_tests(self, *, fix: bool, dry_run: bool) -> None:
+        print("Checking Evergreen/Bazel resmoke tag parity...")
+        # Run the resmoke_suite_test tags query here (outside the sub-tool's `bazel run`) to avoid
+        # a nested bazel invocation, and hand the result to the checker as a file.
+        query = subprocess.run(
+            [
+                self.bazel_bin,
+                "query",
+                "attr('tags','resmoke_suite_test',//...)",
+                "--output=xml",
+                "--keep_going",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if not query.stdout.strip():
+            print("Failed to query resmoke_suite_test targets:")
+            print(query.stderr)
+            self.fail = True
+            if not self.keep_going:
+                raise LinterFail("bazel query for resmoke_suite_test targets failed")
+            return
+
+        if query.returncode != 0:
+            # With --keep_going, a BUILD that fails to load is skipped and its targets drop out of
+            # the results, surfacing as misleading "unknown target" violations. Make the broken
+            # BUILD the visible failure instead.
+            errors = "\n".join(line for line in query.stderr.splitlines() if "ERROR" in line)
+            print("A BUILD file failed to load, so some resmoke_suite_test targets are missing:")
+            print(errors or query.stderr)
+            self.fail = True
+            if not self.keep_going:
+                raise LinterFail("bazel query for resmoke_suite_test targets had load errors")
+            return
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".xml", delete=False, encoding="utf-8"
+        ) as tags_file:
+            tags_file.write(query.stdout)
+            tags_path = tags_file.name
+
+        try:
+            # The checker has no preview mode; under --dry-run just run the (read-only) check.
+            args = [f"--target-tags-xml={tags_path}"]
+            if fix and not dry_run:
+                args.append("--fix")
+            self.run_bazel("//buildscripts:lint_resmoke_suite_tests", args)
+        finally:
+            os.unlink(tags_path)
+
     def refresh_module_lockfile(
         self,
         *,
@@ -668,6 +719,35 @@ def _should_check_copybara_generated_evergreen(lint_all: bool, files_to_lint: li
     )
 
 
+def _file_defines_resmoke_suite_test(path: str) -> bool:
+    """Return whether the given BUILD file references a resmoke_suite_test target."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return "resmoke_suite_test" in fh.read()
+    except OSError:
+        return False
+
+
+def _should_check_evg_bazel_tag_parity(lint_all: bool, files_to_lint: list[str]) -> bool:
+    """Return whether lint should check Evergreen/Bazel resmoke tag parity.
+
+    resmoke_suite_test targets are not confined to jstests/suites (they also live under
+    buildscripts, src/mongo, etc.), so trigger on any changed BUILD file that defines one,
+    regardless of location, plus any change to the Evergreen resmoke task YAML.
+    """
+    if lint_all:
+        return True
+    tasks_prefix = "etc/evergreen_yml_components/tasks/"
+    for file in files_to_lint:
+        if file.startswith(tasks_prefix) and file.endswith(".yml"):
+            return True
+        if os.path.basename(file) in ("BUILD", "BUILD.bazel") and _file_defines_resmoke_suite_test(
+            file
+        ):
+            return True
+    return False
+
+
 def get_parsed_args(args):
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -825,6 +905,9 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
         )
         lr.run_bazel("//buildscripts:yamllinters")
         print("No errors found in evergreen yaml")
+
+    if _should_check_evg_bazel_tag_parity(lint_all, files_to_lint):
+        lr.lint_resmoke_suite_tests(fix=parsed_args.fix, dry_run=parsed_args.dry_run)
 
     if lint_all or any(
         "jstests/streams" in file or "modules/streams/suites/streams" in file

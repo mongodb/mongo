@@ -33,9 +33,10 @@ resmoke_suite_test(
     ],
     tags = [
         "ci-release-critical",
-        "ci-requires-execution-on-windows-patch-build",
         "incompatible_with_bazel_remote_test",
         "misc_js",
+        "requires_execution_on_windows_patch_build",
+        "requires_replicated_fast_count_recovery",
         "resources:cpu:2",
     ],
     target_compatible_with = select({

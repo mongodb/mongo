@@ -75,7 +75,12 @@ resmoke_suite_test(
     ],
     config = ":suites/jstestfuzz.yml",
     tags = [
+        "common",
+        "jstestfuzz",
         "manual",  # exclude from expansion of target pattern wildcards (..., :*, :all, etc.)
+        "non_deterministic",
+        "random_name",
+        "require_npm",
     ],
     deps = [
         "//src/mongo/db:mongod",

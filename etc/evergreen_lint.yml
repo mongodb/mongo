@@ -137,6 +137,7 @@ rules:
           - incompatible_debug_mode
           - incompatible_system_allocator
           - incompatible_inmemory
+          - incompatible_with_bazel_remote_test
           - incompatible_all_feature_flags
           - incompatible_development_variant
           - requires_replicated_fast_count_recovery

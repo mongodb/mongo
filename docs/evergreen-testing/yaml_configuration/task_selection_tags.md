@@ -69,6 +69,8 @@ task could be tagged with any number of the following tags:
 - `incompatible_all_feature_flags` - the task should be excluded from all-feature-flags variants.
 - `incompatible_development_variant` - the task should be excluded from the development variants.
 - `incompatible_oscrypto` - the task should be excluded from variants unsupported by oscrypto.
+- `incompatible_with_bazel_remote_test` - the task's Bazel suite cannot run on remote executors, so
+  tests must still run on an Evergreen host even though it has a Bazel target.
 - `requires_compile_variant` - the task can (or should) only run on variants that has compile
   releated expansions.
 - `requires_large_host` - the task requires a large host to run.

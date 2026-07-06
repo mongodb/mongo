@@ -71,3 +71,6 @@ filters:
   - "benchmark_profiler.py":
     approvers:
       - 10gen/performance
+  - "lint_resmoke_suite_tests.py":
+    approvers:
+      - 10gen/devprod-test-infrastructure
