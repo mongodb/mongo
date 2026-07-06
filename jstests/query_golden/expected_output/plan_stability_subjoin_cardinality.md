@@ -2195,36 +2195,37 @@ Orders of magnitude: 1
 ```
 ### >>> Subjoin 32-0
 ```
-db.nation.aggregate(EJSON.deserialize(
+db.region.aggregate(EJSON.deserialize(
 [
-{"$match":{"$nor":[{"n_name":{"$eq":"ALGERIA"}},{"n_regionkey":{"$eq":1}},{"n_name":{"$in":["EGYPT","INDONESIA"]}},{"n_name":{"$not":{"$in":["CHINA","ROMANIA","SAUDI ARABIA"]}}}]}}]
+{"$match":{"r_regionkey":4}}]
 ));
 ```
 Subjoin plan:
 ```
-COLLSCAN: plan_stability_subjoin_cardinality_md.nation {"$nor":[{"n_name":{"$eq":"ALGERIA"}},{"n_regionkey":{"$eq":1}},{"n_name":{"$in":["EGYPT","INDONESIA"]}},{"n_name":{"$not":{"$in":["CHINA","ROMANIA","SAUDI ARABIA"]}}}]}
+FETCH: plan_stability_subjoin_cardinality_md.region 
+  -> IXSCAN: plan_stability_subjoin_cardinality_md.region r_regionkey_1 {"r_regionkey":["[4.0, 4.0]"]}
 ```
-Estimated cardinality: 3  
-Actual cardinality: 3  
+Estimated cardinality: 1  
+Actual cardinality: 1  
 Orders of magnitude: 0
 
 ---
 ### >>> Subjoin 32-1
 ```
-db.nation.aggregate(EJSON.deserialize(
+db.region.aggregate(EJSON.deserialize(
 [
-{"$match":{"$nor":[{"n_name":{"$eq":"ALGERIA"}},{"n_regionkey":{"$eq":1}},{"n_name":{"$in":["EGYPT","INDONESIA"]}},{"n_name":{"$not":{"$in":["CHINA","ROMANIA","SAUDI ARABIA"]}}}]}},
-{"$lookup":{"from":"region","localField":"n_regionkey","foreignField":"r_regionkey","as":"region","pipeline":[
-{"$match":{"$and":[{"r_regionkey":{"$eq":4}},{}]}}]}},
-{"$unwind":"$region"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$region"]}}}]
+{"$match":{"r_regionkey":4}},
+{"$lookup":{"from":"nation","localField":"r_regionkey","foreignField":"n_regionkey","as":"nation","pipeline":[
+{"$match":{"$nor":[{"n_name":{"$eq":"ALGERIA"}},{"n_regionkey":{"$eq":1}},{"n_name":{"$in":["EGYPT","INDONESIA"]}},{"n_name":{"$not":{"$in":["CHINA","ROMANIA","SAUDI ARABIA"]}}}]}}]}},
+{"$unwind":"$nation"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$nation"]}}}]
 ));
 ```
 Subjoin plan:
 ```
-INLJ n_regionkey = r_regionkey
-  -> [nation_s] COLLSCAN: plan_stability_subjoin_cardinality_md.nation {"$nor":[{"n_name":{"$eq":"ALGERIA"}},{"n_regionkey":{"$eq":1}},{"n_name":{"$in":["EGYPT","INDONESIA"]}},{"n_name":{"$not":{"$in":["CHINA","ROMANIA","SAUDI ARABIA"]}}}]} 
-  -> [region_s] FETCH: plan_stability_subjoin_cardinality_md.region {"r_regionkey":{"$eq":4}} 
-      -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.region r_regionkey_1
+NLJ r_regionkey = n_regionkey
+  -> [region_s] FETCH: plan_stability_subjoin_cardinality_md.region 
+      -> IXSCAN: plan_stability_subjoin_cardinality_md.region r_regionkey_1 {"r_regionkey":["[4.0, 4.0]"]}
+  -> [nation_s] COLLSCAN: plan_stability_subjoin_cardinality_md.nation {"$nor":[{"n_name":{"$eq":"ALGERIA"}},{"n_regionkey":{"$eq":1}},{"n_name":{"$in":["EGYPT","INDONESIA"]}},{"n_name":{"$not":{"$in":["CHINA","ROMANIA","SAUDI ARABIA"]}}}]}
 ```
 Estimated cardinality: 1  
 Actual cardinality: 1  
@@ -2233,12 +2234,12 @@ Orders of magnitude: 0
 ---
 ### >>> Subjoin 32-2
 ```
-db.nation.aggregate(EJSON.deserialize(
+db.region.aggregate(EJSON.deserialize(
 [
-{"$match":{"$nor":[{"n_name":{"$eq":"ALGERIA"}},{"n_regionkey":{"$eq":1}},{"n_name":{"$in":["EGYPT","INDONESIA"]}},{"n_name":{"$not":{"$in":["CHINA","ROMANIA","SAUDI ARABIA"]}}}]}},
-{"$lookup":{"from":"region","localField":"n_regionkey","foreignField":"r_regionkey","as":"region","pipeline":[
-{"$match":{"$and":[{"r_regionkey":{"$eq":4}},{}]}}]}},
-{"$unwind":"$region"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$region"]}}},
+{"$match":{"r_regionkey":4}},
+{"$lookup":{"from":"nation","localField":"r_regionkey","foreignField":"n_regionkey","as":"nation","pipeline":[
+{"$match":{"$nor":[{"n_name":{"$eq":"ALGERIA"}},{"n_regionkey":{"$eq":1}},{"n_name":{"$in":["EGYPT","INDONESIA"]}},{"n_name":{"$not":{"$in":["CHINA","ROMANIA","SAUDI ARABIA"]}}}]}}]}},
+{"$unwind":"$nation"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$nation"]}}},
 {"$lookup":{"from":"supplier","localField":"n_nationkey","foreignField":"s_nationkey","as":"supplier","pipeline":[
 {"$match":{"$and":[{"$nor":[{"s_nationkey":{"$eq":1}},{"s_nationkey":{"$eq":14}},{"s_acctbal":{"$gte":2060.13}}]},{}]}}]}},
 {"$unwind":"$supplier"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$supplier"]}}}]
@@ -2247,10 +2248,10 @@ db.nation.aggregate(EJSON.deserialize(
 Subjoin plan:
 ```
 INLJ nation_s.n_nationkey = s_nationkey
-  -> [none] INLJ n_regionkey = r_regionkey
+  -> [none] NLJ r_regionkey = n_regionkey
+      -> [region_s] FETCH: plan_stability_subjoin_cardinality_md.region 
+          -> IXSCAN: plan_stability_subjoin_cardinality_md.region r_regionkey_1 {"r_regionkey":["[4.0, 4.0]"]}
       -> [nation_s] COLLSCAN: plan_stability_subjoin_cardinality_md.nation {"$nor":[{"n_name":{"$eq":"ALGERIA"}},{"n_regionkey":{"$eq":1}},{"n_name":{"$in":["EGYPT","INDONESIA"]}},{"n_name":{"$not":{"$in":["CHINA","ROMANIA","SAUDI ARABIA"]}}}]} 
-      -> [region_s] FETCH: plan_stability_subjoin_cardinality_md.region {"r_regionkey":{"$eq":4}} 
-          -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.region r_regionkey_1
   -> [supplier] FETCH: plan_stability_subjoin_cardinality_md.supplier {"$nor":[{"s_nationkey":{"$eq":1}},{"s_nationkey":{"$eq":14}},{"s_acctbal":{"$gte":2060.13}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.supplier s_nationkey_1
 ```
@@ -2261,12 +2262,12 @@ Orders of magnitude: 1
 ---
 ### >>> Subjoin 32-3
 ```
-db.nation.aggregate(EJSON.deserialize(
+db.region.aggregate(EJSON.deserialize(
 [
-{"$match":{"$nor":[{"n_name":{"$eq":"ALGERIA"}},{"n_regionkey":{"$eq":1}},{"n_name":{"$in":["EGYPT","INDONESIA"]}},{"n_name":{"$not":{"$in":["CHINA","ROMANIA","SAUDI ARABIA"]}}}]}},
-{"$lookup":{"from":"region","localField":"n_regionkey","foreignField":"r_regionkey","as":"region","pipeline":[
-{"$match":{"$and":[{"r_regionkey":{"$eq":4}},{}]}}]}},
-{"$unwind":"$region"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$region"]}}},
+{"$match":{"r_regionkey":4}},
+{"$lookup":{"from":"nation","localField":"r_regionkey","foreignField":"n_regionkey","as":"nation","pipeline":[
+{"$match":{"$nor":[{"n_name":{"$eq":"ALGERIA"}},{"n_regionkey":{"$eq":1}},{"n_name":{"$in":["EGYPT","INDONESIA"]}},{"n_name":{"$not":{"$in":["CHINA","ROMANIA","SAUDI ARABIA"]}}}]}}]}},
+{"$unwind":"$nation"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$nation"]}}},
 {"$lookup":{"from":"supplier","localField":"n_nationkey","foreignField":"s_nationkey","as":"supplier","pipeline":[
 {"$match":{"$and":[{"$nor":[{"s_nationkey":{"$eq":1}},{"s_nationkey":{"$eq":14}},{"s_acctbal":{"$gte":2060.13}}]},{}]}}]}},
 {"$unwind":"$supplier"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$supplier"]}}},
@@ -2279,10 +2280,10 @@ Subjoin plan:
 ```
 INLJ supplier.s_suppkey = ps_suppkey
   -> [none] INLJ nation_s.n_nationkey = s_nationkey
-      -> [none] INLJ n_regionkey = r_regionkey
+      -> [none] NLJ r_regionkey = n_regionkey
+          -> [region_s] FETCH: plan_stability_subjoin_cardinality_md.region 
+              -> IXSCAN: plan_stability_subjoin_cardinality_md.region r_regionkey_1 {"r_regionkey":["[4.0, 4.0]"]}
           -> [nation_s] COLLSCAN: plan_stability_subjoin_cardinality_md.nation {"$nor":[{"n_name":{"$eq":"ALGERIA"}},{"n_regionkey":{"$eq":1}},{"n_name":{"$in":["EGYPT","INDONESIA"]}},{"n_name":{"$not":{"$in":["CHINA","ROMANIA","SAUDI ARABIA"]}}}]} 
-          -> [region_s] FETCH: plan_stability_subjoin_cardinality_md.region {"r_regionkey":{"$eq":4}} 
-              -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.region r_regionkey_1
       -> [supplier] FETCH: plan_stability_subjoin_cardinality_md.supplier {"$nor":[{"s_nationkey":{"$eq":1}},{"s_nationkey":{"$eq":14}},{"s_acctbal":{"$gte":2060.13}}]} 
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.supplier s_nationkey_1
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^he"}} 

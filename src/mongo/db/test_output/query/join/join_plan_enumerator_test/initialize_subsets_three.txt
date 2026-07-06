@@ -308,7 +308,7 @@ Output plans (best plan 0):
      -> right:
         (0.0111135)[001][test.nss0] COLLSCAN
 
-24.(1066.4)[111] HJ
+24.(1114.25)[111] HJ
  -> left:
     (129.551)[110] HJ
      -> left:
@@ -318,7 +318,7 @@ Output plans (best plan 0):
  -> right:
     (0.0111135)[001][test.nss0] COLLSCAN
 
-25.(4632.8)[111] HJ
+25.(4680.65)[111] HJ
  -> left:
     (3695.95)[110] NLJ
      -> left:
@@ -328,7 +328,7 @@ Output plans (best plan 0):
  -> right:
     (0.0111135)[001][test.nss0] COLLSCAN
 
-26.(1066.4)[111] HJ
+26.(1114.25)[111] HJ
  -> left:
     (129.551)[110] HJ
      -> left:
@@ -338,7 +338,7 @@ Output plans (best plan 0):
  -> right:
     (0.0111135)[001][test.nss0] COLLSCAN
 
-27.(4628.57)[111] HJ
+27.(4676.42)[111] HJ
  -> left:
     (3691.72)[110] NLJ
      -> left:

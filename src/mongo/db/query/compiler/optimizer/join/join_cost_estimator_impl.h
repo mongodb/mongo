@@ -138,10 +138,12 @@ struct SortedSparseIO {
  *
  * 'numPagesAccessedColl' is the estimated number of distinct collection pages touched.
  * 'numLogicalPageRequests' is the number of RID-ordered groups.
- * 'mlCase' is the branch taken by 'estimateMackertLohmanRandIO'.
+ * 'mlCase' is the Mackert-Lohman formula branch taken for the same inputs.
+ * 'numPagesInStorageEngineCache' is the number of collection pages that can fit in the WT cache.
  */
 SortedSparseIO estimateSortedSparseIO(double numPagesAccessedColl,
                                       double numLogicalPageRequests,
-                                      MackertLohmanCase mlCase);
+                                      MackertLohmanCase mlCase,
+                                      double numPagesInStorageEngineCache);
 
 }  // namespace mongo::join_ordering

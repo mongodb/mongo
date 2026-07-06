@@ -411,29 +411,28 @@ TEST(MackerLohmanTest, CollectionDoesntFitInCacheResultSetDoesntFitInCache) {
 
 TEST(SortedSparseIOTest, NoTailWhenLogicalRequestsExceedPages) {
     // When the number of logical page requests exceeds the number of distinct pages accessed there
-    // is no sorted-sparse IO, so the helper returns {0, 0} regardless of the Mackert-Lohman
-    // branch.
-    auto result = estimateSortedSparseIO(10, 100, MackertLohmanCase::kPartialEviction);
+    // is no sorted-sparse IO, so the helper returns {0, 0} regardless of cache size.
+    auto result = estimateSortedSparseIO(10, 100, MackertLohmanCase::kPartialEviction, 1);
     ASSERT_EQ(0, result.numSeqIOs);
     ASSERT_EQ(0, result.numRandIOs);
 }
 
 TEST(SortedSparseIOTest, CollectionFitsCacheChargesNothing) {
-    auto result = estimateSortedSparseIO(100, 10, MackertLohmanCase::kCollectionFitsCache);
+    auto result = estimateSortedSparseIO(100, 10, MackertLohmanCase::kCollectionFitsCache, 1000);
     ASSERT_EQ(0, result.numSeqIOs);
     ASSERT_EQ(0, result.numRandIOs);
 }
 
-TEST(SortedSparseIOTest, ReturnedDocsFitCacheChargesSequential) {
-    auto result = estimateSortedSparseIO(100, 10, MackertLohmanCase::kReturnedDocsFitCache);
-    ASSERT_EQ(135, result.numSeqIOs);
-    ASSERT_EQ(0, result.numRandIOs);
+TEST(SortedSparseIOTest, SmallCacheOverflowChargesDampedRandom) {
+    auto result = estimateSortedSparseIO(100, 10, MackertLohmanCase::kReturnedDocsFitCache, 96);
+    ASSERT_EQ(0, result.numSeqIOs);
+    ASSERT_DOUBLE_EQ(9, result.numRandIOs);
 }
 
-TEST(SortedSparseIOTest, PartialEvictionChargesAdditionalRandom) {
-    auto result = estimateSortedSparseIO(100, 10, MackertLohmanCase::kPartialEviction);
+TEST(SortedSparseIOTest, LargerCacheOverflowChargesMoreRandom) {
+    auto result = estimateSortedSparseIO(100, 10, MackertLohmanCase::kReturnedDocsFitCache, 64);
     ASSERT_EQ(0, result.numSeqIOs);
-    ASSERT_EQ(90, result.numRandIOs);
+    ASSERT_DOUBLE_EQ(27, result.numRandIOs);
 }
 
 }  // namespace mongo::join_ordering
