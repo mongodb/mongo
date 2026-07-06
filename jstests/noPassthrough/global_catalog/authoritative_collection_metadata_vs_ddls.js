@@ -78,7 +78,6 @@ describe("Authoritative collection metadata vs DDLs", function () {
         node,
         ns,
         {expectedUuid, expectedKey, expectedChunks, expectedTimeseriesFields, expectedTimestamp},
-        skipLastModCheck = false,
     ) {
         const label = node.host;
         const meta = getShardCatalogCollMetadata(node, ns);
@@ -114,13 +113,11 @@ describe("Authoritative collection metadata vs DDLs", function () {
                 tojson(shardChunks[i].max),
                 `${label}: chunk ${i} max boundary mismatch`,
             );
-            if (!skipLastModCheck) {
-                assert.eq(
-                    tojson(expectedChunks[i].lastmod),
-                    tojson(shardChunks[i].lastmod),
-                    `${label}: chunk ${i} placement version (lastmod) mismatch`,
-                );
-            }
+            assert.eq(
+                tojson(expectedChunks[i].lastmod),
+                tojson(shardChunks[i].lastmod),
+                `${label}: chunk ${i} placement version (lastmod) mismatch`,
+            );
         }
     }
 
@@ -1728,16 +1725,11 @@ describe("Authoritative collection metadata vs DDLs", function () {
                     assertInMemoryMetadataNotSharded(rs.getPrimary(), ns);
                 } else {
                     rs.nodes.forEach((node) => {
-                        assertShardCatalogOnNode(
-                            node,
-                            ns,
-                            {
-                                expectedUuid: sourceUuid,
-                                expectedKey: sourceKey,
-                                expectedChunks: shardGlobalChunks,
-                            },
-                            true /* skipLastModCheck */,
-                        );
+                        assertShardCatalogOnNode(node, ns, {
+                            expectedUuid: sourceUuid,
+                            expectedKey: sourceKey,
+                            expectedChunks: shardGlobalChunks,
+                        });
                     });
                     assertInMemoryMetadataSharded(rs.getPrimary(), ns, sourceKey);
                 }
