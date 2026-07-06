@@ -61,6 +61,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/storage/snapshot.h"
@@ -75,6 +76,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
@@ -1276,6 +1278,23 @@ std::vector<MetadataInconsistencyItem> _checkInconsistenciesBetweenBothCatalogs(
                  << localColl->getCollectionOptions().collation),
             BSON(CollectionType::kDefaultCollationFieldName
                  << (catalogColl.getDefaultCollation()))));
+    }
+
+    if (catalogUUID == localUUID &&
+        feature_flags::gAuthoritativeShardsCRUD.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        TestingProctor::instance().isEnabled() &&
+        opCtx->getClient()->getPrng().trueWithProbability(0.5)) {
+        // Trigger a filtering metadata recovery if no data is present in memory since otherwise
+        // we'd be skipping some checks.
+        auto result =
+            FilteringMetadataCache::get(opCtx)->onShardVersionMismatch(opCtx, nss, boost::none);
+        if (!result.isOK()) {
+            LOGV2_WARNING(12922400,
+                          "Failed to recover collection filtering metadata from disk",
+                          "error"_attr = result);
+        }
     }
 
     // Check that the metadata type locally is compatible with the type of collection on the config
