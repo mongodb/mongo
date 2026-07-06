@@ -36,7 +36,9 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/scopeguard.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -173,6 +175,27 @@ TEST_F(SBEConcatTest, ComputesManyMoreStringsConcat) {
         auto compiledExpr = compileExpression(*concatExpr);
         runAndAssertExpression(compiledExpr.get(), std::string(arity, 'x'));
     }
+}
+
+TEST_F(SBEConcatTest, ConcatThrowsWhenMemoryLimitExceeded) {
+    SimpleMemoryUsageTracker tracker(5);
+    _vm.setMemoryTracker(&tracker);
+    ScopeGuard clearTracker([&] { _vm.setMemoryTracker(nullptr); });
+
+    value::OwnedValueAccessor slotAccessor1, slotAccessor2;
+    auto slot1 = bindAccessor(&slotAccessor1);
+    auto slot2 = bindAccessor(&slotAccessor2);
+    auto expr =
+        makeE<EFunction>(EFn::kConcat, makeEs(makeE<EVariable>(slot1), makeE<EVariable>(slot2)));
+    auto compiled = compileExpression(*expr);
+
+    auto [t1, v1] = value::makeNewString("hello");
+    auto [t2, v2] = value::makeNewString("world");
+    slotAccessor1.reset(t1, v1);
+    slotAccessor2.reset(t2, v2);
+
+    ASSERT_THROWS_CODE(
+        runCompiledExpression(compiled.get()), DBException, ErrorCodes::ExceededMemoryLimit);
 }
 
 TEST_F(SBEConcatTest, ReturnsNothingForNonStringsConcat) {

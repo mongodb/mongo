@@ -30,6 +30,7 @@
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/exec/str_trim_utils.h"
 #include "mongo/db/exec/substr_utils.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 
 #include <string_view>
 
@@ -308,13 +309,22 @@ value::TagValueMaybeOwned ByteCode::builtinCoerceToString(ArityType arity) {
 }
 
 value::TagValueMaybeOwned ByteCode::builtinConcat(ArityType arity) {
+    SimpleMemoryUsageToken token;
+    if (_memoryTracker) {
+        token = SimpleMemoryUsageToken(0, _memoryTracker);
+    }
     StringBuilder result;
     for (ArityType idx = 0; idx < arity; ++idx) {
         auto kv = viewFromStack(idx);
         if (!value::isString(kv.tag)) {
             return value::TagValueMaybeOwned::nothing();
         }
-        result << sbe::value::getStringView(kv.tag, kv.value);
+        auto sv = sbe::value::getStringView(kv.tag, kv.value);
+        if (_memoryTracker) {
+            token.add(sv.size());
+            _memoryTracker->assertWithinMemoryLimit("SBE concat builtin");
+        }
+        result << sv;
     }
 
     auto [strTag, strValue] = sbe::value::makeNewString(result.stringData());

@@ -83,6 +83,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe:query_sbe_makeobj_spec",
         "//src/mongo/db/fts:base_fts",
         "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/memory_tracking",
         "//src/mongo/db/query:random_utils",
         "//src/mongo/db/query/compiler/logical_model/sort_pattern",
         "//src/mongo/db/query/compiler/metadata:query_metadata",
@@ -366,6 +367,7 @@ mongo_cc_unit_test(
         ":sbe_unittest_base",
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/memory_tracking",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/collation:collator_interface_mock",
@@ -403,6 +405,20 @@ mongo_cc_benchmark(
         ":query_sbe",
         "//src/mongo/db/query/collation:collator_icu",
         "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "sbe_concat_bm",
+    srcs = [
+        "//src/mongo/db/exec/sbe/vm:concat_bm.cpp",
+    ],
+    tags = [
+        "first_half_bm",
+    ],
+    deps = [
+        ":query_sbe",
+        "//src/mongo/db/memory_tracking",
     ],
 )
 

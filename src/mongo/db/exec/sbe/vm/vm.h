@@ -67,6 +67,8 @@
 #endif
 
 namespace mongo {
+class SimpleMemoryUsageTracker;
+
 namespace sbe {
 namespace vm {
 /**
@@ -420,6 +422,10 @@ public:
 
     ByteCode(const ByteCode&) = delete;
     ByteCode& operator=(const ByteCode&) = delete;
+
+    void setMemoryTracker(SimpleMemoryUsageTracker* tracker) {
+        _memoryTracker = tracker;
+    }
 
     static std::pair<value::TypeTags, value::Value> genericInitializeDoubleDoubleSumState();
     static std::tuple<value::Array*, int64_t, int64_t, int64_t, int64_t, int64_t>
@@ -1287,6 +1293,9 @@ private:
 
     // Expression execution stack of (owned, tag, value) tuples each of 'sizeOfElement' bytes.
     uint8_t* _argStack{nullptr};
+
+    // Some builtins track their memory usage against per-query limits. nullptr disables this.
+    SimpleMemoryUsageTracker* _memoryTracker{nullptr};
 };
 
 class ByteCode::MakeObjImplBase {
