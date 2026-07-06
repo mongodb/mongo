@@ -52,38 +52,46 @@
         <<: *authOptions
         appName: Resmoke-Hook
 
-    # Internal-client appNames that bypass the ingress rate limiter once authenticated.
-    # Sourced from https://github.com/10gen/mongotune/blob/main/crates/mongotune-dynamic-rate-limiting-ingress/src/config.rs#L77-L119
+    # AppName prefixes for MongoDB-internal connections exempt from the ingress request rate limiter (IRRL) once authenticated.
+    # Authoritative upstream source (production config):
+    #   https://github.com/10gen/mongotune/blob/39ab8374c3a2a4018253cd0c8aba51818ccb0b03/configurations/dsi/mongotune_policies.yml#L371
+    #
+    # This list includes ops-tooling names (Resmoke-Hook, MongoDB Automation Agent, mongotune,
+    # mongot, etc.) that are only relevant in suite-level passthrough tests. The noPassthrough
+    # test subset (direct shard/config connections only, without those names) lives in:
+    #   jstests/noPassthrough/admission/libs/ingress_request_rate_limiter_helper.js
+    #   (kInternalConnectionAppNameExemptions)
+    #
+    # When adding a new internal executor, update both this anchor and the JS list above.
     appNameExemptions: &appNameExemptions >
-      {"appNames":["OplogFetcher",
+      {"appNames":["Cloner",
+                  "InitialSyncer",
+                  "MongoDB Automation Agent",
+                  "MongoDB Backup Module",
+                  "MongoDB CPS Module",
+                  "MongoDB CPS PIT Module",
+                  "MongoDB DB Check Module",
                   "MongoDB Internal Client",
+                  "MongoDB Lifecycle Management Module",
+                  "MongoDB Monitoring Module",
+                  "MongoDB Online Archive Module",
+                  "MongoDB PIT Restore Module",
+                  "mongot",
+                  "mongotune",
                   "NetworkInterfaceTL-AddShardCoordinator-TaskExecutor",
                   "NetworkInterfaceTL-ConfigsvrCoordinatorServiceNetwork",
                   "NetworkInterfaceTL-HelloMe-TaskExecutor",
                   "NetworkInterfaceTL-Repl",
                   "NetworkInterfaceTL-Reshard",
-                  "NetworkInterfaceTL-StandaloneNetwork",
-                  "NetworkInterfaceTL-ShardingCoordinatorNetwork",
                   "NetworkInterfaceTL-Sharding-Fixed",
-                  "MongoDB Automation Agent",
-                  "mongotune",
-                  "mongot",
-                  "ReplCoordExtern",
-                  "InitialSyncer",
+                  "NetworkInterfaceTL-ShardingCoordinatorNetwork",
+                  "NetworkInterfaceTL-StandaloneNetwork",
+                  "OplogFetcher",
                   "Reshard",
-                  "Rollback",
-                  "Cloner",
-                  "MongoDB Automation Agent",
-                  "MongoDB Monitoring Module",
-                  "MongoDB Backup Module",
-                  "MongoDB PIT Restore Module",
-                  "MongoDB CPS Module",
-                  "MongoDB CPS PIT Module",
-                  "MongoDB DB Check Module",
-                  "MongoDB Online Archive Module",
-                  "MongoDB Lifecycle Management Module",
                   "Resmoke-Admin",
-                  "Resmoke-Hook"]}
+                  "Resmoke-Hook",
+                  "ReplCoordExtern",
+                  "Rollback"]}
 
     rateLimiterParamsCommon: &rateLimiterParamsCommon
       defaultClientMaxRetryAttempts: 16

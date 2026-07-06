@@ -47,23 +47,23 @@ executor:
           mode:
             activationProbability: 0.25
         ingressRequestRateLimiterApplicationExemptions:
-          "{\"appNames\":[\"OplogFetcher\"\
-          ,\n            \"MongoDB Internal Client\",\n            \"NetworkInterfaceTL-AddShardCoordinator-TaskExecutor\"\
-          ,\n            \"NetworkInterfaceTL-ConfigsvrCoordinatorServiceNetwork\"\
-          ,\n            \"NetworkInterfaceTL-HelloMe-TaskExecutor\",\n          \
-          \  \"NetworkInterfaceTL-Repl\",\n            \"NetworkInterfaceTL-Reshard\"\
+          "{\"appNames\":[\"Cloner\"\
+          ,\n            \"InitialSyncer\",\n            \"MongoDB Automation Agent\"\
+          ,\n            \"MongoDB Backup Module\",\n            \"MongoDB CPS Module\"\
+          ,\n            \"MongoDB CPS PIT Module\",\n            \"MongoDB DB Check\
+          \ Module\",\n            \"MongoDB Internal Client\",\n            \"MongoDB\
+          \ Lifecycle Management Module\",\n            \"MongoDB Monitoring Module\"\
+          ,\n            \"MongoDB Online Archive Module\",\n            \"MongoDB\
+          \ PIT Restore Module\",\n            \"mongot\",\n            \"mongotune\"\
+          ,\n            \"NetworkInterfaceTL-AddShardCoordinator-TaskExecutor\",\n\
+          \            \"NetworkInterfaceTL-ConfigsvrCoordinatorServiceNetwork\",\n\
+          \            \"NetworkInterfaceTL-HelloMe-TaskExecutor\",\n            \"\
+          NetworkInterfaceTL-Repl\",\n            \"NetworkInterfaceTL-Reshard\",\n\
+          \            \"NetworkInterfaceTL-Sharding-Fixed\",\n            \"NetworkInterfaceTL-ShardingCoordinatorNetwork\"\
           ,\n            \"NetworkInterfaceTL-StandaloneNetwork\",\n            \"\
-          NetworkInterfaceTL-ShardingCoordinatorNetwork\",\n            \"NetworkInterfaceTL-Sharding-Fixed\"\
-          ,\n            \"MongoDB Automation Agent\",\n            \"mongotune\"\
-          ,\n            \"mongot\",\n            \"ReplCoordExtern\",\n         \
-          \   \"InitialSyncer\",\n            \"Reshard\",\n            \"Rollback\"\
-          ,\n            \"Cloner\",\n            \"MongoDB Automation Agent\",\n\
-          \            \"MongoDB Monitoring Module\",\n            \"MongoDB Backup\
-          \ Module\",\n            \"MongoDB PIT Restore Module\",\n            \"\
-          MongoDB CPS Module\",\n            \"MongoDB CPS PIT Module\",\n       \
-          \     \"MongoDB DB Check Module\",\n            \"MongoDB Online Archive\
-          \ Module\",\n            \"MongoDB Lifecycle Management Module\",\n    \
-          \        \"Resmoke-Admin\",\n            \"Resmoke-Hook\"]}\n"
+          OplogFetcher\",\n            \"Reshard\",\n            \"Resmoke-Admin\"\
+          ,\n            \"Resmoke-Hook\",\n            \"ReplCoordExtern\",\n   \
+          \         \"Rollback\"]}\n"
         internalQueryStatsErrorsAreCommandFatal: true
         internalQueryStatsRateLimit: -1
         internalQueryStatsWriteCmdSampleRate: 1.0

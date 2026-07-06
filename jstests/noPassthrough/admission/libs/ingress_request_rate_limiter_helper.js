@@ -35,10 +35,10 @@ export const kZeroBurstCapacitySecs = 5e-6;
 export const kRateLimiterExemptAppName = "testRateLimiter";
 
 /**
- * AppName prefixes for all MongoDB-internal connections that must be exempt from the ingress
- * request rate limiter in a sharded cluster test. Covers general cluster infrastructure
- * (replication, DDL coordination, sharding executors, initial sync, rollback, cloning, oplog
- * fetching) as well as resharding-specific connections.
+ * AppName prefixes for MongoDB-internal connections that must be exempt from the ingress request rate limiter (IRRL) in sharded
+ * cluster tests. This is the subset of exemptions that applies to direct shard/config node
+ * connections opened during noPassthrough tests. It deliberately excludes ops-tooling names
+ * (Resmoke-Hook, MongoDB Automation Agent, mongotune, mongot, etc.) that are irrelevant here.
  *
  * The server uses prefix (starts_with) matching, so "NetworkInterfaceTL-Repl" covers
  * ReplNetwork, ReplCoordExternNetwork, and ReplNodeDbWorkerNetwork;
@@ -46,8 +46,14 @@ export const kRateLimiterExemptAppName = "testRateLimiter";
  * "OplogFetcher" covers "OplogFetcher-{UUID}-{shard}"; and "NetworkInterfaceTL-Resharding"
  * covers all resharding NetworkInterfaceTL names.
  *
- * Sourced from:
- *   https://github.com/10gen/mongotune/blob/main/crates/mongotune-dynamic-rate-limiting-ingress/src/config.rs
+ * Authoritative upstream source (production config):
+ *   https://github.com/10gen/mongotune/blob/39ab8374c3a2a4018253cd0c8aba51818ccb0b03/configurations/dsi/mongotune_policies.yml#L371
+ *
+ * The suite-level counterpart (which adds Resmoke-Hook, MongoDB Automation Agent, mongotune,
+ * mongot, and other ops-tooling names not relevant here) is the appNameExemptions anchor in:
+ *   buildscripts/resmokeconfig/matrix_suites/overrides/rate_limiter_with_auth.yml
+ *
+ * When adding a new internal executor, update both this list and the YAML anchor referenced above.
  */
 export const kInternalConnectionAppNameExemptions = [
     "MongoDB Internal Client",
@@ -55,9 +61,10 @@ export const kInternalConnectionAppNameExemptions = [
     "NetworkInterfaceTL-ConfigsvrCoordinatorServiceNetwork",
     "NetworkInterfaceTL-HelloMe-TaskExecutor",
     "NetworkInterfaceTL-Repl",
-    "NetworkInterfaceTL-StandaloneNetwork",
+    "NetworkInterfaceTL-Reshard",
     "NetworkInterfaceTL-Sharding-Fixed",
     "NetworkInterfaceTL-ShardingCoordinatorNetwork",
+    "NetworkInterfaceTL-StandaloneNetwork",
     "ReplCoordExtern",
     "InitialSyncer",
     "Rollback",
