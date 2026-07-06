@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2025-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,39 +27,51 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/pipeline/pipeline_factory.h"
+#include "mongo/db/query/compiler/dependency_analysis/pipeline_dependency_graph.h"
+
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_optimization_bm_fixture.h"
 
-#include <vector>
+#include <cstddef>
+#include <iterator>
 
 #include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {
 
-BENCHMARK_DEFINE_F(PipelineOptimizationBMFixture, BM_OptimizePipeline)
+using DependencyGraph = pipeline::dependency_graph::DependencyGraph;
+
+class PipelineDependencyGraphBMFixture : public PipelineOptimizationBMFixture {};
+
+// Report the cost of building the dependency graph from scratch.
+BENCHMARK_DEFINE_F(PipelineDependencyGraphBMFixture, BM_BuildDependencyGraph)
 (benchmark::State& state) {
-    auto rawPipeline = generateRawPipeline(state.range(0));
-    benchmarkOptimizePipeline(state, rawPipeline, expCtx);
+    auto pipeline = makePipeline(state);
+    for (auto keepRunning : state) {
+        benchmark::DoNotOptimize(DependencyGraph(pipeline->getSources()));
+    }
 }
-BENCHMARK_REGISTER_F(PipelineOptimizationBMFixture, BM_OptimizePipeline)
+BENCHMARK_REGISTER_F(PipelineDependencyGraphBMFixture, BM_BuildDependencyGraph)
     ->Arg(10)
     ->Arg(50)
     ->Arg(100)
     ->Arg(1000)
     ->Unit(benchmark::kMicrosecond);
 
-// Report pipeline parsing time.
-BENCHMARK_DEFINE_F(PipelineOptimizationBMFixture, BM_ParsePipeline)
+// Report the cost of re-building the dependency graph from the middle of the pipeline.
+BENCHMARK_DEFINE_F(PipelineDependencyGraphBMFixture, BM_RebuildDependencyGraphFromMiddle)
 (benchmark::State& state) {
-    auto rawPipeline = generateRawPipeline(state.range(0));
+    auto pipeline = makePipeline(state);
+    size_t middle = state.range(0) / 2;
+    auto middleIt = std::next(pipeline->getSources().cbegin(), middle);
+
+    DependencyGraph graph(pipeline->getSources());
     for (auto keepRunning : state) {
-        benchmark::DoNotOptimize(
-            pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal));
+        graph.recompute_forTest(middleIt);
     }
 }
-BENCHMARK_REGISTER_F(PipelineOptimizationBMFixture, BM_ParsePipeline)
+BENCHMARK_REGISTER_F(PipelineDependencyGraphBMFixture, BM_RebuildDependencyGraphFromMiddle)
     ->Arg(10)
     ->Arg(50)
     ->Arg(100)

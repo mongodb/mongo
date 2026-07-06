@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2025-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,39 +27,62 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/pipeline/pipeline_factory.h"
+#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_optimization_bm_fixture.h"
-
-#include <vector>
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 
 #include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {
 
-BENCHMARK_DEFINE_F(PipelineOptimizationBMFixture, BM_OptimizePipeline)
+class PipelineDependenciesBMFixture : public PipelineOptimizationBMFixture {};
+
+// Report cost of Pipeline::getDependencies().
+BENCHMARK_DEFINE_F(PipelineDependenciesBMFixture, BM_PipelineGetDependencies)
 (benchmark::State& state) {
-    auto rawPipeline = generateRawPipeline(state.range(0));
-    benchmarkOptimizePipeline(state, rawPipeline, expCtx);
+    auto pipeline = makePipeline(state);
+    for (auto keepRunning : state) {
+        benchmark::DoNotOptimize(pipeline->getDependencies({}));
+    }
 }
-BENCHMARK_REGISTER_F(PipelineOptimizationBMFixture, BM_OptimizePipeline)
+BENCHMARK_REGISTER_F(PipelineDependenciesBMFixture, BM_PipelineGetDependencies)
     ->Arg(10)
     ->Arg(50)
     ->Arg(100)
     ->Arg(1000)
     ->Unit(benchmark::kMicrosecond);
 
-// Report pipeline parsing time.
-BENCHMARK_DEFINE_F(PipelineOptimizationBMFixture, BM_ParsePipeline)
+// Report the cost to of calling getModifiedPaths() for each stage.
+BENCHMARK_DEFINE_F(PipelineDependenciesBMFixture, BM_DocumentSourceGetModifiedPaths)
 (benchmark::State& state) {
-    auto rawPipeline = generateRawPipeline(state.range(0));
+    auto pipeline = makePipeline(state);
     for (auto keepRunning : state) {
-        benchmark::DoNotOptimize(
-            pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal));
+        for (auto&& stage : pipeline->getSources()) {
+            benchmark::DoNotOptimize(stage->getModifiedPaths());
+        }
     }
 }
-BENCHMARK_REGISTER_F(PipelineOptimizationBMFixture, BM_ParsePipeline)
+BENCHMARK_REGISTER_F(PipelineDependenciesBMFixture, BM_DocumentSourceGetModifiedPaths)
+    ->Arg(10)
+    ->Arg(50)
+    ->Arg(100)
+    ->Arg(1000)
+    ->Unit(benchmark::kMicrosecond);
+
+// Report the cost to of calling getDependencies() for each stage.
+BENCHMARK_DEFINE_F(PipelineDependenciesBMFixture, BM_DocumentSourceGetDependencies)
+(benchmark::State& state) {
+    auto pipeline = makePipeline(state);
+    for (auto keepRunning : state) {
+        for (auto&& stage : pipeline->getSources()) {
+            DepsTracker deps;
+            benchmark::DoNotOptimize(stage->getDependencies(&deps));
+        }
+    }
+}
+BENCHMARK_REGISTER_F(PipelineDependenciesBMFixture, BM_DocumentSourceGetDependencies)
     ->Arg(10)
     ->Arg(50)
     ->Arg(100)
