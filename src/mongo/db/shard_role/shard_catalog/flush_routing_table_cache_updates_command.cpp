@@ -182,7 +182,6 @@ public:
                 criticalSectionSignal->get(opCtx);
 
             if (Base::request().getSyncFromConfig()) {
-                // TODO (SERVER-97985): Fail once the authoritative shards feature flag is enabled.
                 LOGV2_DEBUG(21982, 1, "Forcing remote routing table refresh", logAttrs(ns()));
                 uassertStatusOK(FilteringMetadataCache::get(opCtx)->onShardVersionMismatch(
                     opCtx, ns(), boost::none));
