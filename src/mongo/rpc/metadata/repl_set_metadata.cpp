@@ -65,11 +65,11 @@ const char kIsPrimaryFieldName[] = "isPrimary";
 
 }  // unnamed namespace
 
-ReplSetMetadata::ReplSetMetadata(long long term,
+ReplSetMetadata::ReplSetMetadata(std::int64_t term,
                                  OpTimeAndWallTime committedOpTime,
                                  OpTime visibleOpTime,
-                                 long long configVersion,
-                                 long long configTerm,
+                                 std::int64_t configVersion,
+                                 std::int64_t configTerm,
                                  OID id,
                                  int currentSyncSourceIndex,
                                  bool isPrimary)
@@ -180,6 +180,24 @@ Status ReplSetMetadata::writeToMetadata(BSONObjBuilder* builder) const {
     replMetadataBuilder.doneFast();
 
     return Status::OK();
+}
+
+void ReplSetMetadata::appendTermOnly(BSONObjBuilder* builder, std::int64_t term) {
+    BSONObjBuilder replDataBuilder(builder->subobjStart(kReplSetMetadataFieldName));
+    replDataBuilder.append(kTermFieldName, term);
+    replDataBuilder.doneFast();
+}
+
+boost::optional<std::int64_t> ReplSetMetadata::readTermOnly(const BSONObj& reply) {
+    auto replDataElem = reply[kReplSetMetadataFieldName];
+    if (!replDataElem.isABSONObj()) {
+        return boost::none;
+    }
+    auto termElem = replDataElem.Obj()[kTermFieldName];
+    if (!termElem.isNumber()) {
+        return boost::none;
+    }
+    return termElem.safeNumberLong();
 }
 
 std::string ReplSetMetadata::toString() const {

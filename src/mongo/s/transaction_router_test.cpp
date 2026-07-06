@@ -864,8 +864,8 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         {shard1.toString(), false /* readOnly */}, {shard2.toString(), true /* readOnly */}};
     std::set<std::pair<std::string, bool>> seenAdditionalParticipants;
     for (const auto& p : *participants) {
-        ASSERT(p.second);
-        seenAdditionalParticipants.insert({p.first, *p.second});
+        ASSERT(p.second.readOnly);
+        seenAdditionalParticipants.insert({p.first, *p.second.readOnly});
     }
 
     ASSERT(expectedAdditionalParticipants == seenAdditionalParticipants);
@@ -899,7 +899,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, SubRouterReturnsAdditionalPartic
     ASSERT_EQ(participants->size(), 1);
     auto p = participants->find(shard1.toString());
     ASSERT(p != participants->end());
-    ASSERT(!p->second);
+    ASSERT(!p->second.readOnly);
 }
 
 TEST_F(
@@ -938,7 +938,7 @@ TEST_F(
         {shard3.toString(), boost::none /* readOnly */}};
     std::set<std::pair<std::string, boost::optional<bool>>> seenAdditionalParticipants;
     for (const auto& p : *participants) {
-        seenAdditionalParticipants.insert({p.first, p.second});
+        seenAdditionalParticipants.insert({p.first, p.second.readOnly});
     }
 
     ASSERT(expectedAdditionalParticipants == seenAdditionalParticipants);
@@ -1022,7 +1022,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, NotReadOnlyParticipantUnchangedO
     ASSERT(participants);
     auto shard3Res = participants->find(shard3.toString());
     ASSERT(shard3Res != participants->end());
-    ASSERT(shard3Res->second == boost::make_optional<bool>(false));
+    ASSERT(shard3Res->second.readOnly == boost::make_optional<bool>(false));
 
     // Shard1 targets shard3, and responds back to router before getting response from shard3.
     // Shard3 was previously marked as having done a write, so the readOnly value will not be
@@ -1038,7 +1038,207 @@ TEST_F(TransactionRouterTestWithDefaultSession, NotReadOnlyParticipantUnchangedO
     ASSERT(participants);
     shard3Res = participants->find(shard3.toString());
     ASSERT(shard3Res != participants->end());
-    ASSERT(shard3Res->second == boost::make_optional<bool>(false));
+    ASSERT(shard3Res->second.readOnly == boost::make_optional<bool>(false));
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession, ParticipantTermRecordedOnFirstResponse) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+    ASSERT_FALSE(txnRouter.getParticipant(shard1)->term);
+
+    txnRouter.processParticipantResponse(
+        operationContext(),
+        shard1,
+        TransactionRouter::Router::parseParticipantResponseMetadata(
+            BSON("ok" << 1 << "readOnly" << false << "$replData" << BSON("term" << 5LL))));
+
+    ASSERT(txnRouter.getParticipant(shard1)->term);
+    ASSERT_EQ(*txnRouter.getParticipant(shard1)->term, 5);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession, ParticipantTermSameOnSecondResponseSucceeds) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+    txnRouter.processParticipantResponse(
+        operationContext(),
+        shard1,
+        TransactionRouter::Router::parseParticipantResponseMetadata(
+            BSON("ok" << 1 << "readOnly" << false << "$replData" << BSON("term" << 5LL))));
+    txnRouter.processParticipantResponse(
+        operationContext(),
+        shard1,
+        TransactionRouter::Router::parseParticipantResponseMetadata(
+            BSON("ok" << 1 << "readOnly" << false << "$replData" << BSON("term" << 5LL))));
+
+    ASSERT_EQ(*txnRouter.getParticipant(shard1)->term, 5);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession, ParticipantTermMismatchOnSecondResponseThrows) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+    txnRouter.processParticipantResponse(
+        operationContext(),
+        shard1,
+        TransactionRouter::Router::parseParticipantResponseMetadata(
+            BSON("ok" << 1 << "readOnly" << false << "$replData" << BSON("term" << 5LL))));
+
+    // A different term on a later response means the participant's primary changed
+    // mid-transaction; the router must abort with a retryable error.
+    ASSERT_THROWS_CODE(
+        txnRouter.processParticipantResponse(
+            operationContext(),
+            shard1,
+            TransactionRouter::Router::parseParticipantResponseMetadata(
+                BSON("ok" << 1 << "readOnly" << false << "$replData" << BSON("term" << 6LL)))),
+        AssertionException,
+        ErrorCodes::NoSuchTransaction);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession, ParticipantTermAbsentIsNoOp) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+    txnRouter.processParticipantResponse(
+        operationContext(),
+        shard1,
+        TransactionRouter::Router::parseParticipantResponseMetadata(kOkReadOnlyFalseResponse));
+    ASSERT_FALSE(txnRouter.getParticipant(shard1)->term);
+
+    txnRouter.processParticipantResponse(
+        operationContext(),
+        shard1,
+        TransactionRouter::Router::parseParticipantResponseMetadata(
+            BSON("ok" << 1 << "readOnly" << false << "$replData" << BSON("term" << 5LL))));
+    ASSERT_EQ(*txnRouter.getParticipant(shard1)->term, 5);
+
+    // A later response without the field (e.g. mixed-version participant) leaves the
+    // recorded term untouched and does not throw.
+    txnRouter.processParticipantResponse(
+        operationContext(),
+        shard1,
+        TransactionRouter::Router::parseParticipantResponseMetadata(kOkReadOnlyFalseResponse));
+    ASSERT_EQ(*txnRouter.getParticipant(shard1)->term, 5);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession,
+       AdditionalParticipantTermRecordedForNewParticipant) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+    ASSERT_FALSE(txnRouter.getParticipant(shard3));
+
+    txnRouter.processParticipantResponse(
+        operationContext(),
+        shard1,
+        TransactionRouter::Router::parseParticipantResponseMetadata(
+            BSON("ok" << 1 << "readOnly" << false << "additionalParticipants"
+                      << BSONArray(BSON("0" << BSON("shardId" << ShardId("shard3") << "readOnly"
+                                                              << false << "term" << 7LL))))));
+
+    ASSERT(txnRouter.getParticipant(shard3));
+    ASSERT(txnRouter.getParticipant(shard3)->term);
+    ASSERT_EQ(*txnRouter.getParticipant(shard3)->term, 7);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession, AdditionalParticipantTermMismatchThrows) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+    txnRouter.processParticipantResponse(
+        operationContext(),
+        shard1,
+        TransactionRouter::Router::parseParticipantResponseMetadata(
+            BSON("ok" << 1 << "readOnly" << false << "additionalParticipants"
+                      << BSONArray(BSON("0" << BSON("shardId" << ShardId("shard3") << "readOnly"
+                                                              << false << "term" << 7LL))))));
+    ASSERT_EQ(*txnRouter.getParticipant(shard3)->term, 7);
+
+    // The sub-router reports a different term for shard3 on a later response: shard3's
+    // primary changed mid-transaction, so its pre-failover state is lost.
+    ASSERT_THROWS_CODE(
+        txnRouter.processParticipantResponse(
+            operationContext(),
+            shard1,
+            TransactionRouter::Router::parseParticipantResponseMetadata(
+                BSON("ok" << 1 << "readOnly" << false << "additionalParticipants"
+                          << BSONArray(BSON("0" << BSON("shardId" << ShardId("shard3") << "readOnly"
+                                                                  << false << "term" << 8LL)))))),
+        AssertionException,
+        ErrorCodes::NoSuchTransaction);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession, AdditionalParticipantTermValidatedOnErrorResponse) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+
+    // Terms carried on an error response are still recorded: the statement error may be
+    // swallowed upstream, making this the only observation before commit.
+    txnRouter.processParticipantResponse(
+        operationContext(),
+        shard1,
+        TransactionRouter::Router::parseParticipantResponseMetadata(
+            BSON("ok" << 0 << "additionalParticipants"
+                      << BSONArray(
+                             BSON("0" << BSON("shardId" << ShardId("shard3") << "term" << 7LL))))));
+    ASSERT(txnRouter.getParticipant(shard3));
+    ASSERT_EQ(*txnRouter.getParticipant(shard3)->term, 7);
+
+    // ... and validated: a mismatched term on an error response must still abort.
+    ASSERT_THROWS_CODE(txnRouter.processParticipantResponse(
+                           operationContext(),
+                           shard1,
+                           TransactionRouter::Router::parseParticipantResponseMetadata(BSON(
+                               "ok" << 0 << "additionalParticipants"
+                                    << BSONArray(BSON("0" << BSON("shardId" << ShardId("shard3")
+                                                                            << "term" << 8LL)))))),
+                       AssertionException,
+                       ErrorCodes::NoSuchTransaction);
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession, NoAdditionalParticipantsIfNotSubRouter) {

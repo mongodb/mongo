@@ -36,7 +36,10 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/util/modules.h"
 
+#include <cstdint>
 #include <string>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -53,11 +56,11 @@ extern const char kReplSetMetadataFieldName[];
 class ReplSetMetadata {
 public:
     ReplSetMetadata() = default;
-    ReplSetMetadata(long long term,
+    ReplSetMetadata(std::int64_t term,
                     repl::OpTimeAndWallTime committedOpTime,
                     repl::OpTime visibleOpTime,
-                    long long configVersion,
-                    long long configTerm,
+                    std::int64_t configVersion,
+                    std::int64_t configTerm,
                     OID id,
                     int currentSyncSourceIndex,
                     bool isPrimary);
@@ -83,6 +86,18 @@ public:
     Status writeToMetadata(BSONObjBuilder* builder) const;
 
     /**
+     * Helpers to carry ONLY the replication term in $replData, without the rest of ReplSetMetadata,
+     * for callers that need to convey the term without assembling or parsing a full
+     * ReplSetMetadata. appendTermOnly writes `$replData: {term: <term>}` into 'builder'.
+     * readTermOnly returns the term if 'reply' carries $replData.term, else boost::none; it does
+     * not require a full ReplSetMetadata, so it is safe on the partial object appendTermOnly
+     * produces.
+     * TODO SERVER-130332: Remove these helpers.
+     */
+    static void appendTermOnly(BSONObjBuilder* builder, std::int64_t term);
+    static boost::optional<std::int64_t> readTermOnly(const BSONObj& reply);
+
+    /**
      * Returns the OpTime of the most recent operation with which the client interacted.
      */
     repl::OpTime getLastOpVisible() const {
@@ -99,14 +114,14 @@ public:
     /**
      * Returns the ReplSetConfig version number of the sender.
      */
-    long long getConfigVersion() const {
+    std::int64_t getConfigVersion() const {
         return _configVersion;
     }
 
     /**
      * Returns the ReplSetConfig term number of the sender.
      */
-    long long getConfigTerm() const {
+    std::int64_t getConfigTerm() const {
         return _configTerm;
     }
 
@@ -142,7 +157,7 @@ public:
     /**
      * Returns the current term from the perspective of the sender.
      */
-    long long getTerm() const {
+    std::int64_t getTerm() const {
         return _currentTerm;
     }
 
@@ -154,9 +169,9 @@ public:
 private:
     repl::OpTimeAndWallTime _lastOpCommitted;
     repl::OpTime _lastOpVisible;
-    long long _currentTerm = -1;
-    long long _configVersion = -1;
-    long long _configTerm = repl::OpTime::kUninitializedTerm;
+    std::int64_t _currentTerm = -1;
+    std::int64_t _configVersion = -1;
+    std::int64_t _configTerm = repl::OpTime::kUninitializedTerm;
     OID _replicaSetId;
     int _currentSyncSourceIndex = -1;
     bool _isPrimary = false;

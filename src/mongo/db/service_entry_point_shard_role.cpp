@@ -441,17 +441,19 @@ void appendAdditionalParticipants(OperationContext* opCtx, BSONObjBuilder* comma
 
     std::vector<BSONObj> participantArray;
     for (const auto& p : *additionalParticipants) {
-        auto shardId = ShardId(p.first);
-
+        BSONObjBuilder entry;
+        entry.append(AdditionalParticipantInfo::kShardIdFieldName, ShardId(p.first));
         // The "readOnly" value is set for participants upon a successful response. If an error
         // occurred before getting a response from a participant, it will not have a readOnly value
         // set.
-        auto readOnly = p.second;
-        if (readOnly) {
-            participantArray.emplace_back(BSON("shardId" << shardId << "readOnly" << *readOnly));
-        } else {
-            participantArray.emplace_back(BSON("shardId" << shardId));
+        if (p.second.readOnly) {
+            entry.append(AdditionalParticipantInfo::kReadOnlyFieldName, *p.second.readOnly);
         }
+        // Forward the replication term observed for this participant.
+        if (p.second.term) {
+            entry.append(AdditionalParticipantInfo::kTermFieldName, *p.second.term);
+        }
+        participantArray.emplace_back(entry.obj());
     }
 
     commandBodyFieldsBob->appendElements(
@@ -860,7 +862,7 @@ void CheckoutSessionAndInvokeCommand::run() {
             txnParticipant.handleWouldChangeOwningShardError(opCtx, wouldChangeOwningShardInfo);
             _stashTransaction(txnParticipant);
 
-            auto txnResponseMetadata = txnParticipant.getResponseMetadata();
+            auto txnResponseMetadata = txnParticipant.getResponseMetadata(opCtx);
             (_ecd->getExtraFieldsBuilder())->appendElements(txnResponseMetadata);
             return ex.toStatus();
         } catch (const DBException& ex) {
@@ -1157,7 +1159,7 @@ void CheckoutSessionAndInvokeCommand::_commitInvocation() {
 
         if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
             serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-            auto txnResponseMetadata = txnParticipant.getResponseMetadata();
+            auto txnResponseMetadata = txnParticipant.getResponseMetadata(execContext.getOpCtx());
             auto bodyBuilder = replyBuilder->getBodyBuilder();
             bodyBuilder.appendElements(txnResponseMetadata);
             appendAdditionalParticipants(execContext.getOpCtx(), &bodyBuilder);

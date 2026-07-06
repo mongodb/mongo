@@ -770,7 +770,7 @@ public:
          * Returns an object containing the transaction-related metadata known by this participant
          * to append on responses.
          */
-        BSONObj getResponseMetadata();
+        BSONObj getResponseMetadata(OperationContext* opCtx);
 
         /**
          * Clears the stored operations for an multi-document (non-autocommit) transaction, marking

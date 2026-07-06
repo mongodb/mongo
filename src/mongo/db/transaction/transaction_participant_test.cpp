@@ -5433,38 +5433,38 @@ TEST_F(TxnParticipantTest, ResponseMetadataHasHasReadOnlyFalseIfNothingInProgres
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
     auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
-    ASSERT_FALSE(txnParticipant.getResponseMetadata().getBoolField("readOnly"));
+    ASSERT_FALSE(txnParticipant.getResponseMetadata(opCtx()).getBoolField("readOnly"));
 }
 
 TEST_F(TxnParticipantTest, ResponseMetadataHasReadOnlyFalseIfInRetryableWrite) {
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
     auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
-    ASSERT_FALSE(txnParticipant.getResponseMetadata().getBoolField("readOnly"));
+    ASSERT_FALSE(txnParticipant.getResponseMetadata(opCtx()).getBoolField("readOnly"));
 
     // Start a retryable write.
     txnParticipant.beginOrContinue(opCtx(),
                                    {*opCtx()->getTxnNumber()},
                                    boost::none /* autocommit */,
                                    TransactionParticipant::TransactionActions::kNone);
-    ASSERT_FALSE(txnParticipant.getResponseMetadata().getBoolField("readOnly"));
+    ASSERT_FALSE(txnParticipant.getResponseMetadata(opCtx()).getBoolField("readOnly"));
 }
 
 TEST_F(TxnParticipantTest, ResponseMetadataHasReadOnlyTrueIfInProgressAndOperationsVectorEmpty) {
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
     auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
-    ASSERT_FALSE(txnParticipant.getResponseMetadata().getBoolField("readOnly"));
+    ASSERT_FALSE(txnParticipant.getResponseMetadata(opCtx()).getBoolField("readOnly"));
 
     // Start a transaction.
     txnParticipant.beginOrContinue(opCtx(),
                                    {*opCtx()->getTxnNumber()},
                                    false /* autocommit */,
                                    TransactionParticipant::TransactionActions::kStart);
-    ASSERT_TRUE(txnParticipant.getResponseMetadata().getBoolField("readOnly"));
+    ASSERT_TRUE(txnParticipant.getResponseMetadata(opCtx()).getBoolField("readOnly"));
 
     txnParticipant.unstashTransactionResources(opCtx(), "find");
-    ASSERT_TRUE(txnParticipant.getResponseMetadata().getBoolField("readOnly"));
+    ASSERT_TRUE(txnParticipant.getResponseMetadata(opCtx()).getBoolField("readOnly"));
 }
 
 TEST_F(TxnParticipantTest,
@@ -5472,43 +5472,57 @@ TEST_F(TxnParticipantTest,
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
     auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
-    ASSERT_FALSE(txnParticipant.getResponseMetadata().getBoolField("readOnly"));
+    ASSERT_FALSE(txnParticipant.getResponseMetadata(opCtx()).getBoolField("readOnly"));
 
     // Start a transaction.
     txnParticipant.beginOrContinue(opCtx(),
                                    {*opCtx()->getTxnNumber()},
                                    false /* autocommit */,
                                    TransactionParticipant::TransactionActions::kStart);
-    ASSERT_TRUE(txnParticipant.getResponseMetadata().getBoolField("readOnly"));
+    ASSERT_TRUE(txnParticipant.getResponseMetadata(opCtx()).getBoolField("readOnly"));
 
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
-    ASSERT_TRUE(txnParticipant.getResponseMetadata().getBoolField("readOnly"));
+    ASSERT_TRUE(txnParticipant.getResponseMetadata(opCtx()).getBoolField("readOnly"));
 
     // Simulate an insert.
     auto operation = repl::DurableOplogEntry::makeInsertOperation(
         kNss, _uuid, BSON("_id" << 0), BSON("_id" << 0));
     txnParticipant.addTransactionOperation(opCtx(), operation);
-    ASSERT_FALSE(txnParticipant.getResponseMetadata().getBoolField("readOnly"));
+    ASSERT_FALSE(txnParticipant.getResponseMetadata(opCtx()).getBoolField("readOnly"));
 }
 
 TEST_F(TxnParticipantTest, ResponseMetadataHasReadOnlyFalseIfAborted) {
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
     auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
-    ASSERT_FALSE(txnParticipant.getResponseMetadata().getBoolField("readOnly"));
+    ASSERT_FALSE(txnParticipant.getResponseMetadata(opCtx()).getBoolField("readOnly"));
 
     // Start a transaction.
     txnParticipant.beginOrContinue(opCtx(),
                                    {*opCtx()->getTxnNumber()},
                                    false /* autocommit */,
                                    TransactionParticipant::TransactionActions::kStart);
-    ASSERT_TRUE(txnParticipant.getResponseMetadata().getBoolField("readOnly"));
+    ASSERT_TRUE(txnParticipant.getResponseMetadata(opCtx()).getBoolField("readOnly"));
 
     txnParticipant.unstashTransactionResources(opCtx(), "find");
-    ASSERT_TRUE(txnParticipant.getResponseMetadata().getBoolField("readOnly"));
+    ASSERT_TRUE(txnParticipant.getResponseMetadata(opCtx()).getBoolField("readOnly"));
 
     txnParticipant.abortTransaction(opCtx());
-    ASSERT_FALSE(txnParticipant.getResponseMetadata().getBoolField("readOnly"));
+    ASSERT_FALSE(txnParticipant.getResponseMetadata(opCtx()).getBoolField("readOnly"));
+}
+
+TEST_F(TxnParticipantTest, ResponseMetadataHasParticipantTermWhenReplSet) {
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+    auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    // The fixture runs a one-node replica set, so the metadata must carry the participant's
+    // current replication term for the router-side failover validation.
+    auto metadata = txnParticipant.getResponseMetadata(opCtx());
+    ASSERT_TRUE(metadata.hasField("$replData"));
+    ASSERT_TRUE(metadata["$replData"].Obj().hasField("term"));
+    ASSERT_EQ(metadata["$replData"]["term"].numberLong(),
+              repl::ReplicationCoordinator::get(opCtx())->getTerm());
 }
 
 TEST_F(TxnParticipantTest, OldestActiveTransactionTimestamp) {
