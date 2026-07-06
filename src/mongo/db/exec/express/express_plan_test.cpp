@@ -33,6 +33,8 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/exec/mutable_bson/document.h"
+#include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -50,6 +52,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -470,6 +473,72 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithCoveredProjection) {
     ASSERT_EQ(iteratorStats.indexName(), "a_1_b_1_c_1");
     ASSERT_BSONOBJ_EQ(iteratorStats.indexKeyPattern(), BSON("a" << 1 << "b" << 1 << "c" << 1));
     ASSERT_EQ(iteratorStats.projectionCovered(), true);
+}
+
+TEST_F(ExpressPlanTest, AssertFetchedRecordIsValidBsonAcceptsWellFormedDocument) {
+    auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    BSONObj obj = fromjson(R"({_id: 1, a: "hello", b: [1, 2, 3]})");
+    ASSERT_DOES_NOT_THROW(
+        assertFetchedRecordIsValidBson(obj.objdata(), obj.objsize(), nss, RecordId(1)));
+}
+
+TEST_F(ExpressPlanTest, AssertFetchedRecordIsValidBsonRejectsTruncatedRecord) {
+    // Simulate a torn or truncated page read (as can happen when a record is materialized from
+    // disaggregated storage): the buffer is shorter than the document's own embedded objsize, so
+    // an element overruns the buffer. This is the corruption that, left undetected, triggered an
+    // opaque mutablebson invariant deep inside the update machinery.
+    auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    BSONObj obj = fromjson(R"({_id: 1, a: "hello"})");
+    ASSERT_THROWS_CODE(
+        assertFetchedRecordIsValidBson(obj.objdata(), obj.objsize() - 4, nss, RecordId(2)),
+        DBException,
+        ErrorCodes::InvalidBSON);
+}
+
+TEST_F(ExpressPlanTest, AssertFetchedRecordIsValidBsonRejectsElementOverrunningObjsize) {
+    // Construct a record whose string element claims a length that extends past the document's own
+    // objsize -- exactly the inconsistency (offset + element size > objsize) that fired the
+    // invariant in mutablebson's getElementOffset().
+    auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    BSONObj obj = BSON("a" << "hello");
+
+    auto buffer = std::make_unique<char[]>(obj.objsize());
+    memcpy(buffer.get(), obj.objdata(), obj.objsize());
+
+    // 'BSONElement::value()' points at the 4-byte little-endian length prefix of the string value.
+    const auto valueOffset = obj["a"].value() - obj.objdata();
+    const int32_t corruptLength = 1 << 20;
+    memcpy(buffer.get() + valueOffset, &corruptLength, sizeof(corruptLength));
+
+    ASSERT_THROWS_CODE(
+        assertFetchedRecordIsValidBson(buffer.get(), obj.objsize(), nss, RecordId(3)),
+        DBException,
+        ErrorCodes::InvalidBSON);
+}
+
+DEATH_TEST_REGEX(ExpressUpdateMalformedRecord,
+                 MalformedFetchedRecordTripsUpdateInPlaceInvariant,
+                 R"(offset \+ elt\.size)") {
+    // Deterministic repro of the crash: a record whose string element length overruns objsize (as
+    // from a torn disagg page read) trips the getElementOffset() invariant once the update
+    // machinery builds an in-place mutablebson::Document over it. The boundary validation added in
+    // this change (see the AssertFetchedRecordIsValidBson* tests) rejects it before this point.
+    BSONObj obj = BSON("a" << "hello");
+
+    auto buffer = std::make_unique<char[]>(obj.objsize());
+    memcpy(buffer.get(), obj.objdata(), obj.objsize());
+
+    const auto valueOffset = obj["a"].value() - obj.objdata();
+    const int32_t corruptLength = 1 << 20;
+    memcpy(buffer.get() + valueOffset, &corruptLength, sizeof(corruptLength));
+    BSONObj corrupt(buffer.get());
+
+    // Mirror update::transformDocument(): build the in-place Document and walk children to force
+    // lazy materialization and the offset computation.
+    mutablebson::Document doc(corrupt, mutablebson::Document::kInPlaceEnabled);
+    for (auto child = doc.root().leftChild(); child.ok(); child = child.rightSibling()) {
+        (void)child.getFieldName();
+    }
 }
 
 }  // namespace

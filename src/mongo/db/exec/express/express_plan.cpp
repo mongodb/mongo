@@ -29,6 +29,7 @@
 
 #include "mongo/db/exec/express/express_plan.h"
 
+#include "mongo/bson/bson_validate.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/util/fail_point.h"
@@ -68,6 +69,18 @@ void releaseShardFilterResources(write_stage_common::PreWriteFilter& preWriteFil
 
 void restoreShardFilterResources(write_stage_common::PreWriteFilter& preWriteFilter) {
     preWriteFilter.restoreState();
+}
+
+void assertFetchedRecordIsValidBson(const char* data,
+                                    int size,
+                                    const NamespaceString& ns,
+                                    const RecordId& rid) {
+    auto status = validateBSON(data, static_cast<uint64_t>(size));
+    uassert(ErrorCodes::InvalidBSON,
+            str::stream() << "Invalid BSON fetched from storage for EXPRESS update on "
+                          << ns.toStringForErrorMsg() << " at RecordId " << rid.toString() << ": "
+                          << status.reason(),
+            status.isOK());
 }
 
 void logRecordNotFound(OperationContext* opCtx,

@@ -88,6 +88,16 @@ void logRecordNotFound(OperationContext* opCtx,
                        const BSONObj& keyPattern,
                        const NamespaceString& ns);
 
+/**
+ * uasserts (InvalidBSON) if a fetched record is not structurally valid BSON. Used on the
+ * non-cursor-reuse path (e.g. disaggregated storage), where a torn page read can yield a malformed
+ * document that would otherwise trip an opaque invariant deep inside mutablebson.
+ */
+void assertFetchedRecordIsValidBson(const char* data,
+                                    int size,
+                                    const NamespaceString& ns,
+                                    const RecordId& rid);
+
 void throwIfExpressWriteConflictFailpointEnabled();
 void throwIfExpressTemporarilyUnavailableFailpointEnabled();
 
@@ -382,6 +392,11 @@ public:
         // becomes invalid.
         if (!reuseCursor) {
             record->data.makeOwned();
+
+            // Guard against torn reads on the non-cursor-reuse path (e.g. disaggregated storage);
+            // the hot WiredTiger path skips this branch and is unaffected.
+            assertFetchedRecordIsValidBson(
+                record->data.data(), record->data.size(), accessCollection(collection).ns(), rid);
         }
         Snapshotted<BSONObj> obj(shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId(),
                                  record->data.releaseToBson());
