@@ -3,7 +3,7 @@
  *
  * @tags: [
  *  featureFlagExtensionsAPI,
- *  featureFlagExtensionsInsideHybridSearch,
+ *  requires_fcv_90,
  * ]
  */
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";

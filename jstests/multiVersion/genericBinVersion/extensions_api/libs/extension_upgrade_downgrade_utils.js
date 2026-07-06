@@ -69,12 +69,12 @@ export function wrapOptionsWithStubParserFeatureFlag(baseOptions) {
     };
 }
 
-export function wrapOptionsWithViewsAndUnionWithFeatureFlag(baseOptions) {
+export function wrapOptionsWithExtensionsInsideHybridSearchDisabled(baseOptions) {
     return {
         ...baseOptions,
         setParameter: {
             ...baseOptions.setParameter,
-            featureFlagExtensionsInsideHybridSearch: true,
+            featureFlagExtensionsInsideHybridSearch: false,
         },
     };
 }

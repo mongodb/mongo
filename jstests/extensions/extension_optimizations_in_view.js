@@ -9,8 +9,7 @@
  *
  * @tags: [
  *   featureFlagExtensionsAPI,
- *   featureFlagExtensionsInsideHybridSearch,
- *   requires_fcv_82,
+ *   requires_fcv_90,
  * ]
  */
 

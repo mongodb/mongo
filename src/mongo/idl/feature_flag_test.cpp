@@ -36,6 +36,8 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
+#include <array>
+
 namespace mongo {
 
 namespace {
@@ -575,6 +577,20 @@ TEST(IDLFeatureFlag, SerializeFlagValues) {
     ASSERT_EQ(serializedResult.size(), 1U);
     ASSERT_EQ(serializedResult[0]["name"].String(), "featureFlagReleaseForTest");
     ASSERT_TRUE(serializedResult[0]["value"].Bool());
+}
+
+TEST(IDLFeatureFlag, IncomingIfrFlagsDisableOmittedOutgoingFlags) {
+    // (Generic FCV reference): Used for testing.
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
+    feature_flags::gFeatureFlagSerializeForTest.setForServerParameter(true);
+    feature_flags::gFeatureFlagReleaseForTest.setForServerParameter(true);
+
+    auto ifrContext = IncrementalFeatureRolloutContext(std::array{
+        BSON("name" << feature_flags::gFeatureFlagReleaseForTest.getName() << "value" << true)});
+
+    ASSERT_TRUE(ifrContext.getSavedFlagValue(feature_flags::gFeatureFlagReleaseForTest));
+    ASSERT_FALSE(ifrContext.getSavedFlagValue(feature_flags::gFeatureFlagSerializeForTest));
+    ASSERT_TRUE(feature_flags::gFeatureFlagSerializeForTest.checkEnabled());
 }
 
 TEST(IDLFeatureFlag, ShouldSerializeOnOutgoingRequestsFalse) {

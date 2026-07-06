@@ -45,6 +45,7 @@ rollout:
 
 release:
   featureFlagCostBasedRanker: {}
+  featureFlagExtensionsInsideHybridSearch: {}
   featureFlagExtractFieldPathsSbeStage: {}
   featureFlagImprovedDepsAnalysis: {}
   featureFlagMultiPlanLimiter: {}

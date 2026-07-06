@@ -6,10 +6,10 @@
  *
  * @tags: [
  *   featureFlagExtensionsAPI,
- *   featureFlagExtensionsInsideHybridSearch,
  *   featureFlagSearchHybridScoringFull,
  *   featureFlagVectorSimilarityExpressions,
  *   requires_sharding,
+ *   requires_fcv_90,
  * ]
  */
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";

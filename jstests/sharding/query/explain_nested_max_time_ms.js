@@ -17,10 +17,13 @@ describe("explain maxTimeMS via raw db.runCommand on mongos", function () {
 
     let st;
     let db;
+    let mongosSupportsNestedMaxTimeMS;
 
     before(() => {
         st = new ShardingTest({shards: 1, mongos: 1});
         db = st.s.getDB("test");
+        const mongosVersion = assert.commandWorked(st.s.adminCommand({buildInfo: 1})).version;
+        mongosSupportsNestedMaxTimeMS = MongoRunner.compareBinVersions(mongosVersion, "9.0") >= 0;
         assert.commandWorked(db.getCollection(collName).insert([{i: 1}, {i: 2}]));
     });
 
@@ -36,6 +39,10 @@ describe("explain maxTimeMS via raw db.runCommand on mongos", function () {
                 db.runCommand({explain: {find: collName, filter: {i: 1}}, verbosity, maxTimeMS: 1}),
                 ErrorCodes.MaxTimeMSExpired,
             );
+            if (!mongosSupportsNestedMaxTimeMS) {
+                jsTestLog("Skipping nested maxTimeMS assertion on old mongos binary");
+                return;
+            }
             // Nested placement also times out.
             assert.commandFailedWithCode(
                 db.runCommand({explain: {find: collName, filter: {i: 1}, maxTimeMS: 1}, verbosity}),

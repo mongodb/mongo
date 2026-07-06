@@ -2201,10 +2201,10 @@ TEST_F(DocumentSourceExtensionOptimizableTest, StageWithDefaultStaticProperties)
     ASSERT_FALSE(staticProperties.getRequiredMetadataFields().has_value());
     ASSERT_FALSE(staticProperties.getProvidedMetadataFields().has_value());
     ASSERT_TRUE(staticProperties.getAllowedInUnionWith());
-    // MongoExtensionStaticProperties has these as 'default: true' in the IDL even though we're
-    // disabling them by default in constraints(). This is because we don't want to be making
-    // changes to the API regarding enabling/disabling these subpipeline stages, rather we handle it
-    // on the host side.
+    // MongoExtensionStaticProperties has allowedInLookup/allowedInFacet as 'default: true' in the
+    // IDL. The host controls actual lookup/facet allowance: lookup is gated by
+    // featureFlagExtensionsInsideHybridSearch (now default-on), facet remains disabled pending
+    // SERVER-117260.
     ASSERT_TRUE(staticProperties.getAllowedInLookup());
     ASSERT_TRUE(staticProperties.getAllowedInFacet());
 
@@ -2216,7 +2216,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest, StageWithDefaultStaticProperties)
     ASSERT_TRUE(constraints.requiresInputDocSource);
     ASSERT_TRUE(constraints.consumesLogicalCollectionData);
     ASSERT_EQ(constraints.unionRequirement, StageConstraints::UnionRequirement::kAllowed);
-    ASSERT_EQ(constraints.lookupRequirement, StageConstraints::LookupRequirement::kNotAllowed);
+    ASSERT_EQ(constraints.lookupRequirement, StageConstraints::LookupRequirement::kAllowed);
     ASSERT_EQ(constraints.facetRequirement, StageConstraints::FacetRequirement::kNotAllowed);
 }
 

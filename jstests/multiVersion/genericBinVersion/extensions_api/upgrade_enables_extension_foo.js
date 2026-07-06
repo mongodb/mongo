@@ -39,8 +39,8 @@ import {
     generateUpgradeEnablesExtensionConfigs,
     deleteMultiversionExtensionConfigs,
     wrapOptionsWithStubParserFeatureFlag,
+    wrapOptionsWithExtensionsInsideHybridSearchDisabled,
     multipleExtensionNodeOptions,
-    wrapOptionsWithViewsAndUnionWithFeatureFlag,
 } from "jstests/multiVersion/genericBinVersion/extensions_api/libs/extension_upgrade_downgrade_utils.js";
 import {testPerformUpgradeReplSet} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
 import {testPerformUpgradeSharded} from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
@@ -56,14 +56,18 @@ const ifrFlags = {
 };
 
 try {
-    for (var extensionUnionWithFeatureFlagValue of [true, false]) {
+    // Run the upgrade tests twice: once with featureFlagExtensionsInsideHybridSearch at its
+    // default (on), and once with it explicitly disabled. Both paths must remain correct until
+    // the flag is removed in SERVER-121094.
+    for (const extensionsInsideHybridSearchEnabled of [true, false]) {
         const baseUpgradeOptions = multipleExtensionNodeOptions([
             extensionNames[0],
             extensionNames[1],
         ]);
         var upgradeNodeOptions = wrapOptionsWithStubParserFeatureFlag(baseUpgradeOptions);
-        if (extensionUnionWithFeatureFlagValue) {
-            upgradeNodeOptions = wrapOptionsWithViewsAndUnionWithFeatureFlag(upgradeNodeOptions);
+        if (!extensionsInsideHybridSearchEnabled) {
+            upgradeNodeOptions =
+                wrapOptionsWithExtensionsInsideHybridSearchDisabled(upgradeNodeOptions);
         }
         testPerformUpgradeReplSet({
             upgradeNodeOptions,

@@ -9,8 +9,8 @@
  *
  * @tags: [
  *   featureFlagExtensionsAPI,
- *   featureFlagExtensionsInsideHybridSearch,
  *   featureFlagSearchExtension,
+ *   requires_fcv_90,
  * ]
  */
 import {

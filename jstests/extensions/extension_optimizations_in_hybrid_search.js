@@ -16,7 +16,7 @@
  *
  * @tags: [
  *   featureFlagExtensionsAPI,
- *   featureFlagExtensionsInsideHybridSearch,
+ *   requires_fcv_90,
  * ]
  */
 import {before, afterEach, describe, it} from "jstests/libs/mochalite.js";

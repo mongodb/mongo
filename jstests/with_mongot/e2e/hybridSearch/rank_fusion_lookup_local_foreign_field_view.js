@@ -5,11 +5,10 @@
  *
  * @tags: [
  *   featureFlagSearchHybridScoringFull,
- *   featureFlagExtensionsInsideHybridSearch,
- *   requires_fcv_82,
+ *   requires_fcv_90,
  * ]
  */
-import {createSearchIndex} from "jstests/libs/query_integration_search/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {before, describe, it} from "jstests/libs/mochalite.js";
 
 const productsName = jsTestName() + "_products";
@@ -22,13 +21,33 @@ const orders = db.getCollection(ordersName);
 
 describe("$rankFusion in $lookup with localField/foreignField on a view", function () {
     before(function () {
+        if (db.getCollectionNames().includes(viewName)) {
+            const view = db[viewName];
+            const leftover = view
+                .aggregate([{$listSearchIndexes: {name: searchIndexName}}])
+                .toArray();
+            if (leftover.length > 0) {
+                dropSearchIndex(view, {name: searchIndexName});
+                assert.soon(
+                    () =>
+                        view.aggregate([{$listSearchIndexes: {name: searchIndexName}}]).toArray()
+                            .length === 0,
+                    `Search index '${searchIndexName}' was not removed from mongot before recreation`,
+                );
+            }
+        }
+
         products.drop();
         orders.drop();
-        // Do not access db[viewName] before the view is created. In the sharded_collections
-        // passthrough, implicitly_shard_accessed_collections.js shards any accessed empty
-        // namespace, which would create the view's namespace as a collection and make the
-        // createView below fail with NamespaceExists. The fixture is fresh per test, so no
-        // pre-drop of the view is needed.
+        // Defensively drop the view: burn_in reruns tests in a shared fixture, so a view left by a
+        // previous run would make the createView below fail with NamespaceExists. Drop it via
+        // runCommand rather than db[viewName].drop() so we neither trigger
+        // implicitly_shard_accessed_collections.js (which shards an accessed empty namespace into a
+        // collection) nor its drop-reshard behavior.
+        assert.commandWorkedOrFailedWithCode(
+            db.runCommand({drop: viewName}),
+            ErrorCodes.NamespaceNotFound,
+        );
 
         assert.commandWorked(
             products.insertMany([

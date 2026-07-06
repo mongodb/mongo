@@ -7,7 +7,7 @@
  * legacy vector search via the IFR kickback retry mechanism when
  * featureFlagExtensionsInsideHybridSearch is disabled.
  *
- * @tags: [ featureFlagExtensionsAPI, featureFlagExtensionsInsideHybridSearch ]
+ * @tags: [ featureFlagExtensionsAPI, requires_fcv_90 ]
  */
 import {
     getParameter,

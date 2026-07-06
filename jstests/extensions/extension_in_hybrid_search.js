@@ -5,7 +5,7 @@
  *
  * @tags: [
  *   featureFlagExtensionsAPI,
- *   featureFlagExtensionsInsideHybridSearch,
+ *   requires_fcv_90,
  * ]
  */
 import {orderedArrayEq} from "jstests/aggregation/extras/utils.js";

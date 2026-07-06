@@ -1,18 +1,22 @@
 /**
- * Tests that $scoreFusion and $rankFusion inside a $lookup subpipeline are rejected when the
- * localField/foreignField join syntax is used.
+ * Tests that $scoreFusion and $rankFusion inside a $lookup subpipeline are rejected with error
+ * 12982600 when the localField/foreignField join syntax is used and
+ * featureFlagExtensionsInsideHybridSearch is disabled.
  *
- * TODO SERVER-121094 Remove this test when the feature flag is removed, since
- * featureFlagExtensionsInsideHybridSearch enables this functionality.
+ * TODO SERVER-121094 Remove this test when the feature flag is removed.
  *
  * @tags: [
+ *   assumes_stable_shard_list,
  *   featureFlagSearchHybridScoringFull,
- *   featureFlagExtensionsInsideHybridSearch_incompatible,
  *   requires_fcv_82,
  * ]
  */
 
-import {describe, it} from "jstests/libs/mochalite.js";
+import {
+    getParameter,
+    setParameterOnAllNonConfigNodes,
+} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {after, before, describe, it} from "jstests/libs/mochalite.js";
 
 const collName = jsTestName();
 const coll = db.getCollection(collName);
@@ -48,50 +52,59 @@ function makeRankFusionPipeline() {
     ];
 }
 
-try {
-    describe("$scoreFusion and $rankFusion in $lookup with localField/foreignField syntax are disallowed", function () {
-        it("$scoreFusion: fails with 12982600 when $lookup uses localField/foreignField", function () {
-            assert.commandFailedWithCode(
-                db.runCommand({
-                    aggregate: collName,
-                    pipeline: [
-                        {
-                            $lookup: {
-                                from: collName,
-                                localField: "_id",
-                                foreignField: "_id",
-                                pipeline: makeScoreFusionPipeline(),
-                                as: "results",
-                            },
-                        },
-                    ],
-                    cursor: {},
-                }),
-                12982600,
-            );
-        });
+describe("$scoreFusion and $rankFusion in $lookup with localField/foreignField syntax are disallowed", function () {
+    const kFlagName = "featureFlagExtensionsInsideHybridSearch";
+    let prevFlagValue;
 
-        it("$rankFusion: fails with 12982600 when $lookup uses localField/foreignField", function () {
-            assert.commandFailedWithCode(
-                db.runCommand({
-                    aggregate: collName,
-                    pipeline: [
-                        {
-                            $lookup: {
-                                from: collName,
-                                localField: "_id",
-                                foreignField: "_id",
-                                pipeline: makeRankFusionPipeline(),
-                                as: "results",
-                            },
-                        },
-                    ],
-                    cursor: {},
-                }),
-                12982600,
-            );
-        });
+    before(function () {
+        prevFlagValue = getParameter(db.getMongo(), kFlagName).value;
+        setParameterOnAllNonConfigNodes(db.getMongo(), kFlagName, false);
     });
-} finally {
-    coll.drop();
-}
+
+    after(function () {
+        coll.drop();
+        setParameterOnAllNonConfigNodes(db.getMongo(), kFlagName, prevFlagValue);
+    });
+
+    it("$scoreFusion: fails with 12982600 when $lookup uses localField/foreignField", function () {
+        assert.commandFailedWithCode(
+            db.runCommand({
+                aggregate: collName,
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: collName,
+                            localField: "_id",
+                            foreignField: "_id",
+                            pipeline: makeScoreFusionPipeline(),
+                            as: "results",
+                        },
+                    },
+                ],
+                cursor: {},
+            }),
+            12982600,
+        );
+    });
+
+    it("$rankFusion: fails with 12982600 when $lookup uses localField/foreignField", function () {
+        assert.commandFailedWithCode(
+            db.runCommand({
+                aggregate: collName,
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: collName,
+                            localField: "_id",
+                            foreignField: "_id",
+                            pipeline: makeRankFusionPipeline(),
+                            as: "results",
+                        },
+                    },
+                ],
+                cursor: {},
+            }),
+            12982600,
+        );
+    });
+});

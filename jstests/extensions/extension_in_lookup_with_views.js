@@ -8,7 +8,7 @@
  * @tags: [
  *   featureFlagExtensionsAPI,
  *   featureFlagExtensionStubParsers,
- *   featureFlagExtensionsInsideHybridSearch,
+ *   requires_fcv_90,
  * ]
  */
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";

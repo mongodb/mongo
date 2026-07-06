@@ -4,9 +4,9 @@
  *
  * @tags: [
  *   featureFlagExtensionsAPI,
- *   featureFlagExtensionsInsideHybridSearch,
  *   featureFlagSearchHybridScoringFull,
  *   featureFlagVectorSimilarityExpressions,
+ *   requires_fcv_90,
  * ]
  */
 import {before, describe, it} from "jstests/libs/mochalite.js";

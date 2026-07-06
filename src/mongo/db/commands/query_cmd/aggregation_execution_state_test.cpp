@@ -675,6 +675,9 @@ TEST_F(AggregationExecutionStateTest, UnshardedSecondaryViewfulTsNssRequiresExte
     // TODO SERVER-111172: Remove this test once view-ful timeseries are removed and 9.0 is LTS.
     unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
+    // Extensions inside hybrid search are not supported with viewful timeseries (throws
+    // IFRFlagRetry). Disable the flag for this viewful-ts test.
+    unittest::ServerParameterGuard extensionsFlag("featureFlagExtensionsInsideHybridSearch", false);
 
     std::string_view main{"coll"};
     std::string_view timeseriesColl{"timeseries"};
@@ -718,6 +721,9 @@ TEST_F(AggregationExecutionStateTest, ShardedSecondaryViewfulTsNssRequiresExtend
     // TODO SERVER-111172: Remove this test once view-ful timeseries are removed and 9.0 is LTS.
     unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
+    // Extensions inside hybrid search are not supported with viewful timeseries (throws
+    // IFRFlagRetry). Disable the flag for this viewful-ts test.
+    unittest::ServerParameterGuard extensionsFlag("featureFlagExtensionsInsideHybridSearch", false);
     std::string_view main{"coll"};
     std::string_view timeseriesColl{"timeseries"};
 
@@ -759,6 +765,9 @@ TEST_F(AggregationExecutionStateTest, SecondaryViewfulTsNssNoExtendedRangeSuppor
     // TODO SERVER-111172: Remove this test once view-ful timeseries are removed and 9.0 is LTS.
     unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
+    // Extensions inside hybrid search are not supported with viewful timeseries (throws
+    // IFRFlagRetry). Disable the flag for this viewful-ts test.
+    unittest::ServerParameterGuard extensionsFlag("featureFlagExtensionsInsideHybridSearch", false);
     std::string_view main{"coll"};
     std::string_view timeseriesColl{"timeseries"};
 
@@ -806,6 +815,9 @@ TEST_F(AggregationExecutionStateTest, ViewOnViewfulTsUsingExtendRangeAsSecondary
     // TODO SERVER-111172: Remove this test once view-ful timeseries are removed and 9.0 is LTS.
     unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
+    // Extensions inside hybrid search are not supported with viewful timeseries (throws
+    // IFRFlagRetry). Disable the flag for this viewful-ts test.
+    unittest::ServerParameterGuard extensionsFlag("featureFlagExtensionsInsideHybridSearch", false);
 
     std::string_view main{"main"};
     auto mainNss = createTestCollectionWithMetadata(main, false /*sharded*/);

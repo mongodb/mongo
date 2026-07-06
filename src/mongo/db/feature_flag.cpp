@@ -391,6 +391,17 @@ IncrementalFeatureRolloutContext::IncrementalFeatureRolloutContext(std::span<con
 
         _savedFlagValues[flag] = value.boolean();
     }
+
+    // If an older router serializes IFR flags but omits a newer flag, the older router did not know
+    // about the feature and therefore could not have planned using the new behavior. Treat omitted
+    // outgoing-serialized flags as disabled for this operation on the receiving shard, regardless
+    // of whether the receiving shard's current FCV would serialize that flag on its own outgoing
+    // requests.
+    for (auto* flag : getMutableAllIncrementalRolloutFeatureFlags()) {
+        if (flag->shouldSerializeOnOutgoingRequests() && !_savedFlagValues.contains(flag)) {
+            _savedFlagValues[flag] = false;
+        }
+    }
 }
 
 bool IncrementalFeatureRolloutContext::getSavedFlagValue(IncrementalRolloutFeatureFlag& flag) {

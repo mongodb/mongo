@@ -9,8 +9,7 @@
  *
  * @tags: [
  *   featureFlagMongotIndexedViews,
- *   featureFlagExtensionsInsideHybridSearch,
- *   requires_fcv_81,
+ *   requires_fcv_90,
  * ]
  */
 

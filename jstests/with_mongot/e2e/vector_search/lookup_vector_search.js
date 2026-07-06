@@ -1,7 +1,7 @@
 /**
  * Tests $vectorSearch inside a $lookup subpipeline.
  *
- * @tags: [ featureFlagExtensionsInsideHybridSearch ]
+ * @tags: [ requires_fcv_90 ]
  */
 
 import {after, before, describe, it} from "jstests/libs/mochalite.js";

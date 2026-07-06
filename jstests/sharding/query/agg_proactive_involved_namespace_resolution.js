@@ -8,7 +8,7 @@
  * @tags: [
  *   requires_sharding,
  *   requires_timeseries,
- *   featureFlagExtensionsInsideHybridSearch,
+ *   requires_fcv_90,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

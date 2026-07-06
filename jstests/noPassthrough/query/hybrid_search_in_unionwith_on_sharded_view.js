@@ -7,8 +7,7 @@
  * @tags: [
  *   featureFlagRankFusionFull,
  *   featureFlagSearchHybridScoringFull,
- *   featureFlagExtensionsInsideHybridSearch,
- *   requires_fcv_82,
+ *   requires_fcv_90,
  * ]
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
