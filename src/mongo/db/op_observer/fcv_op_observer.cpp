@@ -49,6 +49,7 @@
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/topology/sharding_state.h"
 #include "mongo/executor/egress_connection_closer_manager.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
@@ -133,7 +134,10 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
                 opCtx, matcherAllSessions, ErrorCodes::InterruptedDueToFCVChange);
         }
 
-        FilteringMetadataRefreshTracker::get(opCtx)->interruptIncompatibleRefreshes(opCtx);
+        auto role = ShardingState::get(opCtx)->pollClusterRole();
+        if (role && role->has(ClusterRole::ShardServer)) {
+            FilteringMetadataRefreshTracker::get(opCtx)->interruptIncompatibleRefreshes(opCtx);
+        }
     } catch (const DBException&) {
         // Swallow the error when running within a recovery unit to avoid process termination.
         // The failure can be ignored here, assuming that the setFCV command will also be

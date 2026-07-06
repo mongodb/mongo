@@ -69,6 +69,9 @@ public:
     void waitForDatabaseFlush(OperationContext* opCtx, const DatabaseName& dbName) override {
         MONGO_UNIMPLEMENTED_TASSERT(10083542);
     }
+    void interruptAfterAuthoritativeShardsTransition() override {
+        MONGO_UNIMPLEMENTED_TASSERT(13044001);
+    }
     void waitForAllFlushes(OperationContext* opCtx) override {
         MONGO_UNIMPLEMENTED_TASSERT(12797900);
     }

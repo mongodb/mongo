@@ -646,6 +646,11 @@ SemiFuture<DatabaseType> ShardServerCatalogCacheLoaderImpl::getDatabase(
         .semi();
 }
 
+void ShardServerCatalogCacheLoaderImpl::interruptAfterAuthoritativeShardsTransition() {
+    std::lock_guard<std::mutex> lg(_mutex);
+    _contexts.interrupt(ErrorCodes::MetadataRefreshCanceledDueToFCVTransition);
+}
+
 void ShardServerCatalogCacheLoaderImpl::waitForAllFlushes(OperationContext* opCtx) {
     std::vector<NamespaceString> collNssToFlush;
     std::vector<DatabaseName> dbNamesToFlush;

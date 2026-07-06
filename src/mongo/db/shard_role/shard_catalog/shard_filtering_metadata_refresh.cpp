@@ -313,7 +313,15 @@ void FilteringMetadataCache::shutDown() {
         _cache->shutDownAndJoin();
 }
 
-void FilteringMetadataCache::waitForAllFlushes(OperationContext* opCtx) {
+void FilteringMetadataCache::interruptLoaderAfterAuthoritativeShardsTransition() {
+    tassert(10727901,
+            "FilteringMetadataCache has not yet been initialized with a CatalogCacheLoader",
+            _loader);
+
+    _loader->interruptAfterAuthoritativeShardsTransition();
+}
+
+void FilteringMetadataCache::waitForAllLoaderFlushes(OperationContext* opCtx) {
     tassert(10727900,
             "FilteringMetadataCache has not yet been initialized with a CatalogCacheLoader",
             _loader);
@@ -1872,18 +1880,27 @@ void FilteringMetadataRefreshTracker::_release(
 }
 
 void FilteringMetadataRefreshTracker::interruptIncompatibleRefreshes(OperationContext* opCtx) {
-    std::unique_lock lk(_mutex);
-    const bool authoritativeEnabled = feature_flags::gAuthoritativeShardsCRUD.isEnabled(
+    bool authoritativeEnabled = feature_flags::gAuthoritativeShardsCRUD.isEnabled(
         VersionContext::getDecoration(opCtx),
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-    auto& list =
-        authoritativeEnabled ? _activeNonAuthoritativeRefreshes : _activeAuthoritativeRefreshes;
-    for (auto& source : list) {
-        source.cancel();
+
+    {
+        std::unique_lock lk(_mutex);
+        auto& list =
+            authoritativeEnabled ? _activeNonAuthoritativeRefreshes : _activeAuthoritativeRefreshes;
+        for (auto& source : list) {
+            source.cancel();
+        }
+        hangAfterCancelingIncompatibleRefreshes.pauseWhileSet();
+        // Wait for all incompatible refreshes to be canceled and drained.
+        opCtx->waitForConditionOrInterrupt(_canceled, lk, [&] { return list.empty(); });
     }
-    hangAfterCancelingIncompatibleRefreshes.pauseWhileSet();
-    // Wait for all incompatible refreshes to be canceled and drained.
-    opCtx->waitForConditionOrInterrupt(_canceled, lk, [&] { return list.empty(); });
+
+    // Interrupt in-flight loads on the ShardServerCatalogCacheLoader. (These loads use a separate
+    // pool, so they do not get interrupted when the filtering metadata refresh is).
+    if (authoritativeEnabled) {
+        FilteringMetadataCache::get(opCtx)->interruptLoaderAfterAuthoritativeShardsTransition();
+    }
 }
 
 }  // namespace mongo

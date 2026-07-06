@@ -313,7 +313,7 @@ void dropAuthoritativeShardCatalogCollectionsOnShards(OperationContext* opCtx) {
 // config.cache.collections and config.cache.chunks.*).
 void dropLegacyShardCacheCollections(OperationContext* opCtx) {
     // Wait for the SSCCL to finish any already-queued flush tasks before dropping the collections.
-    FilteringMetadataCache::get(opCtx)->waitForAllFlushes(opCtx);
+    FilteringMetadataCache::get(opCtx)->waitForAllLoaderFlushes(opCtx);
 
     DBDirectClient client(opCtx);
 
