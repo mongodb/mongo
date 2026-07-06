@@ -141,7 +141,7 @@ protected:
     /**
      * The caller takes ownership of the Value returned by this function and must call
      * 'releaseValue()' on it. The preferred way to ensure the Value is properly released is to
-     * immediately store it in a ValueGuard.
+     * immediately store it in a TagValueOwned.
      */
     std::pair<value::TypeTags, value::Value> runCompiledExpression(
         const vm::CodeFragment* compiledExpr) {
@@ -197,9 +197,9 @@ protected:
     }
 
     void runAndAssertNothing(const vm::CodeFragment* compiledExpression) {
-        auto [resultTag, resultValue] = runCompiledExpression(compiledExpression);
-        value::ValueGuard guard(resultTag, resultValue);
-        ASSERT_EQUALS(resultTag, sbe::value::TypeTags::Nothing);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpression));
+        ASSERT_EQUALS(result.tag(), sbe::value::TypeTags::Nothing);
     }
 
     static std::pair<value::TypeTags, value::Value> makeEmptyState(

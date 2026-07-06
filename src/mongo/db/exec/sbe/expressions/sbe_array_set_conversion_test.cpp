@@ -52,22 +52,22 @@ public:
      * Run the compiled expression and assert that the result is equal to Nothing.
      */
     void runAndAssertNothing(const vm::CodeFragment* compiledExpr) {
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(runTag, runVal);
-        ASSERT_EQUALS(runTag, sbe::value::TypeTags::Nothing);
-        ASSERT_EQUALS(runVal, 0);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
+        ASSERT_EQUALS(result.tag(), sbe::value::TypeTags::Nothing);
+        ASSERT_EQUALS(result.value(), 0);
     }
 
     /**
      * Run the compiled expression and assert that the result is equal to 'expectedValues'.
      */
     void runAndAssertExpression(const vm::CodeFragment* compiledExpr, BSONArray expectedValues) {
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
 
-        ASSERT_EQ(value::TypeTags::ArraySet, runTag);
+        ASSERT_EQ(value::TypeTags::ArraySet, result.tag());
 
-        value::ArraySet* arrSet = value::getArraySetView(runVal);
+        value::ArraySet* arrSet = value::getArraySetView(result.value());
         value::ValueSetType& values = arrSet->values();
 
         size_t expectedItems = 0;
@@ -78,7 +78,7 @@ public:
                 << "Value " << std::make_pair(tag, val) << " not found in result";
             expectedItems++;
         }
-        ASSERT_EQ(expectedItems, arrSet->size()) << std::make_pair(runTag, runVal);
+        ASSERT_EQ(expectedItems, arrSet->size()) << std::make_pair(result.tag(), result.value());
     }
 
     /**

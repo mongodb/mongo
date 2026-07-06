@@ -265,8 +265,10 @@ auto makeAggExprVector(Ts&&... pack) {
  */
 class EConstant final : public EExpression {
 public:
-    EConstant(value::TypeTags tag, value::Value val) : _val(tag, val) {}
-    EConstant(std::string_view str) : _val(value::makeNewString(str)) {}
+    EConstant(value::TypeTags tag, value::Value val)
+        : _val(value::TagValueOwned::fromRaw(tag, val)) {}
+    EConstant(std::string_view str)
+        : _val(value::TagValueOwned::fromRaw(value::makeNewString(str))) {}
 
     std::unique_ptr<EExpression> clone() const override;
 
@@ -635,7 +637,7 @@ private:
 class EFail final : public EExpression {
 public:
     EFail(ErrorCodes::Error code, std::string_view message)
-        : _code(code), _message(value::makeNewString(message)) {}
+        : _code(code), _message(value::TagValueOwned::fromRaw(value::makeNewString(message))) {}
 
     std::unique_ptr<EExpression> clone() const override;
 
