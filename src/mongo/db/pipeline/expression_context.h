@@ -1110,6 +1110,19 @@ public:
         return _params.nonArrayPathsForNss;
     }
 
+    /**
+     * Merges path arrayness knowledge from 'other' into this context. For each nss in 'other',
+     * any path confirmed non-array there is also recorded as non-array here.
+     */
+    void mergeNonArrayPathsForNss(const NonArrayPathsForNss& other) {
+        for (const auto& [nss, paths] : other) {
+            auto& dest = _params.nonArrayPathsForNss[nss];
+            for (const auto& path : paths) {
+                dest.insert(path);
+            }
+        }
+    }
+
 protected:
     struct ExpressionContextParams {
         OperationContext* opCtx = nullptr;

@@ -379,6 +379,8 @@ Status propagateSingleTablePredicate(absl::InlinedVector<PathId, 8> equivalenceC
         // logic above requires updating the root of the MatchExpression, updating the join node's
         // access path will require constructing an entirely new CQ with the newFilter.
         auto nss = targetNode.collectionName;
+        // TODO (SERVER-130378): Clone target.acessPath->getExpCtx() and pass that CQ construction
+        // below.
         auto expCtx = ExpressionContextBuilder{}
                           .opCtx(targetNode.accessPath->getExpCtx()->getOperationContext())
                           .ns(nss)

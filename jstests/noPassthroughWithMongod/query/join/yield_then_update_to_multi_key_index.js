@@ -1,8 +1,7 @@
 /**
- * This test ensures that the SBE plans join opt produces don't crash the server after unexpectedly
- * encountering an array in a join field after a yield during query execution. This "surprise" array
- * field is facilitated by updating an existing index to multi-key while the query is yielding during
- * query execution.
+ * This test ensures that when a join predicate field becomes multikey during a yield, the
+ * PathArraynessChecker kills the query with QueryPlanKilled. The multikey change is triggered by
+ * inserting a document with an array value into a join field while the query is yielding.
  * @tags: [
  *   requires_fcv_90,
  *   requires_sbe,
@@ -58,15 +57,21 @@ function runPipelineThroughAllJoinMethods({pipeline, localColl, foreignColl}) {
         assert.commandWorked(foreignColl.insert({a: 900, b: [2, 300]}));
         assert.commandWorked(localColl.insert({a: [5, 6, 7], b: 4}));
 
-        while (cursor.hasNext()) {
-            /**
-             * Exhaust the server's cursor to ensure the JOO query plan encounters the multikey document during execution
-             * without crashing the server. This loop is the essential assessment of the test because the join-opt
-             * infrastructure currently *assumes* that the join fields are always non-multikey without ever actually
-             * *verifying* it; hence why we want to make sure we don't crash!
-             */
-            cursor.next();
-        }
+        /**
+         * With path arrayness tracking, the PathArraynessChecker detects that a join predicate
+         * field became multikey during a yield and kills the query with QueryPlanKilled.
+         */
+        const err = assert.throws(() => {
+            while (cursor.hasNext()) {
+                cursor.next();
+            }
+        });
+        assert.eq(err.code, ErrorCodes.QueryPlanKilled, "expected QueryPlanKilled", {err});
+        assert(
+            err.message.includes("non-array path became multikey during yield"),
+            "expected path arrayness kill message",
+            {err},
+        );
     }
 }
 

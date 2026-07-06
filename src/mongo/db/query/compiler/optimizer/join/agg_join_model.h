@@ -68,19 +68,22 @@ public:
                  std::vector<ResolvedPath> resolvedPaths,
                  std::unique_ptr<Pipeline> prefix,
                  std::unique_ptr<Pipeline> suffix,
-                 std::vector<BSONObj> accessPathsBackingBson)
+                 std::vector<BSONObj> accessPathsBackingBson,
+                 boost::intrusive_ptr<ExpressionContext> joinExpCtx)
         : graph{std::move(graph)},
           resolvedPaths{std::move(resolvedPaths)},
           prefix{std::move(prefix)},
           suffix{std::move(suffix)},
-          accessPathsBackingBson{std::move(accessPathsBackingBson)} {}
+          accessPathsBackingBson{std::move(accessPathsBackingBson)},
+          _joinExpCtx{std::move(joinExpCtx)} {}
 
     AggJoinModel(AggJoinModel&& other)
         : graph{std::move(other.graph)},
           resolvedPaths{std::move(other.resolvedPaths)},
           prefix{std::move(other.prefix)},
           suffix{std::move(other.suffix)},
-          accessPathsBackingBson{std::move(other.accessPathsBackingBson)} {}
+          accessPathsBackingBson{std::move(other.accessPathsBackingBson)},
+          _joinExpCtx{std::move(other._joinExpCtx)} {}
 
     AggJoinModel& operator=(AggJoinModel&& other) {
         graph = std::move(other.graph);
@@ -88,6 +91,7 @@ public:
         prefix = std::move(other.prefix);
         suffix = std::move(other.suffix);
         accessPathsBackingBson = std::move(other.accessPathsBackingBson);
+        _joinExpCtx = std::move(other._joinExpCtx);
         return *this;
     }
 
@@ -111,6 +115,14 @@ public:
     Pipeline* getSuffix() const {
         return suffix.get();
     }
+    /**
+     * The ExpressionContext used throughout join optimization. It is a clone of the original
+     * pipeline's context, kept separate so that a fallback leaves the original untouched. All
+     * non-array path learnings from join-predicate eligibility checks accumulate here.
+     */
+    const boost::intrusive_ptr<ExpressionContext>& getJoinExpCtx() const {
+        return _joinExpCtx;
+    }
     std::unique_ptr<Pipeline> releaseSuffix() {
         return std::move(suffix);
     }
@@ -130,6 +142,9 @@ private:
     std::unique_ptr<Pipeline> suffix;
 
     std::vector<BSONObj> accessPathsBackingBson;
+
+    // Clone of the original pipeline's ExpressionContext used throughout join optimization.
+    boost::intrusive_ptr<ExpressionContext> _joinExpCtx;
 };
 
 }  // namespace mongo::join_ordering

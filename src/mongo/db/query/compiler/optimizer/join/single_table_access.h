@@ -37,11 +37,15 @@
 namespace mongo::join_ordering {
 
 /**
- * Constructor for sampling estimators per collection access.
+ * Constructor for sampling estimators per collection access. 'joinExpCtx' carries non-array path
+ * learnings for all fields checked during join optimization, enabling the PathArraynessChecker to
+ * detect arrayness changes during sampling yields.
  */
-SamplingEstimatorMap makeSamplingEstimators(const MultipleCollectionAccessor& collections,
-                                            const JoinGraph& model,
-                                            PlanYieldPolicy::YieldPolicy yieldPolicy);
+SamplingEstimatorMap makeSamplingEstimators(
+    const MultipleCollectionAccessor& collections,
+    const JoinGraph& model,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    const boost::intrusive_ptr<ExpressionContext>& joinExpCtx);
 
 /**
  * Given a JoinGraph 'model' where each node links to a CanonicalQuery and a map of

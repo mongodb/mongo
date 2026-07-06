@@ -44,6 +44,7 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/ce/ce_common.h"
@@ -594,7 +595,12 @@ void SamplingEstimatorImpl::generateSample(ce::ProjectionParams projectionParams
 
     // Test hook: pause here so tests can arm setYieldAllLocksHang after any multiplanning
     // trial phase is done, ensuring the yield fires inside the sampling executor.
-    hangBeforeCBRSamplingGenerateSample.pauseWhileSet(_opCtx);
+    hangBeforeCBRSamplingGenerateSample.executeIf(
+        [&](const BSONObj&) { hangBeforeCBRSamplingGenerateSample.pauseWhileSet(_opCtx); },
+        [&](const BSONObj& data) {
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "collectionNS");
+            return fpNss.isEmpty() || _nss == fpNss;
+        });
 
     if (boost::optional<SamplingTechniqueEnum> testOnlySamplingMode =
             getTestOnlySamplingModeIfSet()) {
@@ -618,7 +624,12 @@ void SamplingEstimatorImpl::generateSample(ce::ProjectionParams projectionParams
         _sampleCreatedAt = Date_t::now();
     }
     _isSampleGenerated = true;
-    hangAfterCBRSamplingGenerateSample.pauseWhileSet(_opCtx);
+    hangAfterCBRSamplingGenerateSample.executeIf(
+        [&](const BSONObj&) { hangAfterCBRSamplingGenerateSample.pauseWhileSet(_opCtx); },
+        [&](const BSONObj& data) {
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "collectionNS");
+            return fpNss.isEmpty() || _nss == fpNss;
+        });
 }
 
 void SamplingEstimatorImpl::generateSampleForTesting(SamplingTechniqueEnum technique) {

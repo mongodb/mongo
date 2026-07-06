@@ -63,6 +63,7 @@
 namespace mongo::join_ordering {
 
 MONGO_FAIL_POINT_DEFINE(sleepWhileJoinOptimizing);
+MONGO_FAIL_POINT_DEFINE(hangAfterJoinModelConstruction);
 
 namespace {
 PlanTreeShape getPlanTreeShape(JoinPlanTreeShapeEnum shape) {
@@ -328,7 +329,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     // Select access plans for each table in the join.
     auto yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
     SamplingEstimatorMap samplingEstimators =
-        makeSamplingEstimators(mca, model.getGraph(), yieldPolicy);
+        makeSamplingEstimators(mca, model.getGraph(), yieldPolicy, model.getJoinExpCtx());
     auto swAccessPlans = singleTableAccessPlans(opCtx, mca, model.getGraph(), samplingEstimators);
     if (!swAccessPlans.isOK()) {
         return swAccessPlans.getStatus();
@@ -448,6 +449,16 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         // stages in suffix will be executed in classic.
         finalizePipelineStages(suffix, &prefix);
     }
+
+    // Test hook: all sampling and join reordering is complete at this point.
+    hangAfterJoinModelConstruction.pauseWhileSet(opCtx);
+
+    auto& baseNodeCQ = *model.getGraph().accessPathAt(reordered.baseNode);
+
+    // Merge join-field non-array path learnings into the chosen base node's expCtx so the
+    // PathArraynessChecker monitors them during execution yields.
+    baseNodeCQ.getExpCtx()->mergeNonArrayPathsForNss(
+        model.getJoinExpCtx()->getNonArrayPathsForNss());
     // Lower to SBE.
     auto lower =
         [&model, &opCtx, yieldPolicy, &mca](NodeId baseNode,

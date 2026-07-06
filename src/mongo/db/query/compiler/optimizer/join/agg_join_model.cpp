@@ -311,6 +311,9 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
     // Try to create a CanonicalQuery. We begin by cloning the pipeline (this includes
     // sub-pipelines!) to ensure that if we bail out, this stays idempotent.
     // TODO SERVER-111383: We should see if we can make createCanonicalQuery() idempotent instead.
+    // 'expCtx' is the original pipeline's context; do not use it below except for the temporary
+    // plan cache adjustment around createCanonicalQuery. All join optimization work uses
+    // 'clonedExpCtx' so that bail-outs leave 'expCtx' unchanged.
     auto expCtx = pipeline.getContext();
 
     const auto& nss = expCtx->getNamespaceString();
@@ -354,8 +357,7 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
     }
     // Initialize the JoinGraph & base NodeId.
     MutableJoinGraph graph{buildParams.joinGraphBuildParams};
-    auto baseNodeId =
-        graph.addNode(expCtx->getNamespaceString(), std::move(swCQ.getValue()), boost::none);
+    auto baseNodeId = graph.addNode(nss, std::move(swCQ.getValue()), boost::none);
     if (!baseNodeId) {
         return Status(ErrorCodes::BadValue, "Failed to create a node for base collection");
     }
@@ -463,7 +465,7 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
     }
 
     auto swVec = addImplicitEdgesAndInferPredicates(
-        graph, resolvedPaths, buildParams.maxNumberNodesConsideredForImplicitEdges, expCtx);
+        graph, resolvedPaths, buildParams.maxNumberNodesConsideredForImplicitEdges, clonedExpCtx);
     if (!swVec.isOK()) {
         return swVec.getStatus();
     }
@@ -477,7 +479,8 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
                         std::move(resolvedPaths),
                         std::move(prefix),
                         std::move(suffix),
-                        std::move(swVec.getValue()));
+                        std::move(swVec.getValue()),
+                        std::move(clonedExpCtx));
 }
 
 BSONObj AggJoinModel::toBSON() const {
