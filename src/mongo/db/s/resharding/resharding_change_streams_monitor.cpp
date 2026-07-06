@@ -492,8 +492,8 @@ bool ReshardingChangeStreamsMonitor::EventBatch::shouldDispose() {
 
     auto batchSizeLimit =
         resharding::gReshardingVerificationChangeStreamsEventsBatchSizeLimit.load();
-    auto batchTimeLimit =
-        Seconds(resharding::gReshardingVerificationChangeStreamsEventsBatchTimeLimitSeconds.load());
+    auto batchTimeLimit = Milliseconds(
+        resharding::gReshardingVerificationChangeStreamsEventsBatchTimeLimitMillis.load());
     return _numEvents >= batchSizeLimit || (Date_t::now() - _createdAt) >= batchTimeLimit;
 }
 

@@ -570,7 +570,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorAfterCancellationAndExecuto
 TEST_F(ReshardingChangeStreamsMonitorTest, ExitsPromptlyWhenChangeStreamInvalidates) {
     // Short batchTimeLimit so a busy loop would be visibly slow.
     unittest::ServerParameterGuard batchTimeOverride{
-        "reshardingVerificationChangeStreamsEventsBatchTimeLimitSeconds", 3};
+        "reshardingVerificationChangeStreamsEventsBatchTimeLimitMillis", 3000};
 
     createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 0 /*maxDocValue*/);
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();

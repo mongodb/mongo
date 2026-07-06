@@ -152,7 +152,7 @@ export const $config = (function () {
             // Limit the critical section to 30 minutes (vs the 24-hour test default) with shorter batch limits
             // and a 1% verification wait. This allows resharding to skip validation if it takes too long.
             const validationParamsUnderStepdowns = {
-                reshardingVerificationChangeStreamsEventsBatchTimeLimitSeconds: 4,
+                reshardingVerificationChangeStreamsEventsBatchTimeLimitMillis: 4000,
                 reshardingCriticalSectionTimeoutMillis: 30 * 60 * 1000,
                 reshardingVerificationDeltaWaitRemainingCriticalSectionPercent: 1,
             };
