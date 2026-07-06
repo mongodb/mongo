@@ -69,7 +69,7 @@ output: {
                 "_id:4": {
                     "declaringScope": "scope:1",
                     "scope:2": {
-                        "exhaustiveScope": "scope:1",
+                        "exhaustiveScope": "scope:2",
                         "fields": {
                             "<missing>:5": {
                                 "declaringScope": "scope:2",
@@ -97,6 +97,9 @@ output: {
                             }
                         }
                     },
+                    "metadata": {
+                        "array": false
+                    },
                     "dependencies": [
                         "a:6",
                         "b:7"
@@ -112,7 +115,7 @@ output: {
     "$match:2": {
         "scope:1": "scope:1",
         "dependencies": [
-            "<missing>:3",
+            "<missing>:5",
             "a:6",
             "b:7"
         ]

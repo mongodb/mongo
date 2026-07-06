@@ -33,8 +33,6 @@ selector:
     - jstests/aggregation/sources/lookup/lookup_query_stats.js
     # TODO SERVER-127304
     - jstests/aggregation/sources/project/remove_redundant_projects.js
-    # TODO SERVER-128465
-    - jstests/aggregation/**/*pbt*.js
     # This test deliberately constructs pipelines at the 1000-stage limit; injecting
     # $_internalAssertDataAssumptions stages pushes them over the limit.
     - jstests/aggregation/exec/query_limits_test.js

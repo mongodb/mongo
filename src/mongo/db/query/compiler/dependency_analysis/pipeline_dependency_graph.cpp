@@ -935,13 +935,19 @@ private:
      * 'prefixPolicy' dictates whether the modification preserves arrays on the base field. When
      * kEnsureObjects, writing to 'a.b' modifies 'a' to a plain object: if 'a' can be an array,
      * 'a.c' from a prior stage may be discarded, so sibling subfields cannot be inherited.
+     * 'parentScope' (when provided) is the scope of the previous stage. It is used to recover the
+     * prior value of a dotted modification's prefix when the current scope is a fresh root produced
+     * by a ReplaceRoot (e.g. an inclusion projection): an array-preserving modification such as
+     * '{$project: {"a.b": "$x"}}' traverses 'a' element-wise, so 'a' keeps its prior arrayness even
+     * though the new root is otherwise empty.
      */
     FieldId declareField(ScopeId scope,
                          ParsedPathView path,
                          ModifiedPrefixPolicy prefixPolicy,
                          FieldDependencies dependencies,
                          FieldMetadata metadata = {},
-                         ParsedPathView collectionPathPrefix = {}) {
+                         ParsedPathView collectionPathPrefix = {},
+                         ScopeId parentScope = ScopeId::none()) {
         // Declaring 'a' should create field 'a' and exit.
         if (path.size() == 1) {
             auto field = _fields.append(
@@ -958,6 +964,21 @@ private:
         // Check if we already have 'a' in the current scope that we are building. If we do, we will
         // preserve any fields it may already contain.
         auto [existingBaseField, existingBaseFieldType] = lookupField(scope, basePath);
+
+        // Under an array-preserving operation, when declaring a new base field (the prefix is
+        // missing here) and we have a parent scope and we are in an exhaustive scope, we need to
+        // consider the parent scope's base field instead. This is because a kPreserveArrays
+        // modification does array-traversal of the previous value.
+        if (prefixPolicy == ModifiedPrefixPolicy::kPreserveArrays &&
+            existingBaseFieldType == FieldMatchType::kMissing && parentScope &&
+            _scopes[scope].exhaustiveScope == scope) {
+            auto parentMatch = lookupField(parentScope, basePath);
+            if (parentMatch.type != FieldMatchType::kShadowed) {
+                existingBaseField = parentMatch.fieldId;
+                existingBaseFieldType = parentMatch.type;
+            }
+        }
+
         bool canReuseBaseField = [&] {
             switch (existingBaseFieldType) {
                 case FieldMatchType::kExact:
@@ -973,6 +994,9 @@ private:
 
         // Scope for declaring 'b' field of 'a'.
         FieldId newBaseField;
+        // The parent scope to use when recursing so that nested prefixes can recover values from
+        // previous stage.
+        ScopeId parentEmbeddedScope = ScopeId::none();
         if (canReuseBaseField) {
             // We already have such base field in the current scope. We can mutate the scope in this
             // case.
@@ -984,7 +1008,8 @@ private:
             auto embeddedScope = _scopes.getNextId();
             newBaseField = _fields.append(Field{scope, embeddedScope});
 
-            auto [exhaustiveEmbeddedScope, parentEmbeddedScope] = resolveNewBaseFieldScopes(
+            ScopeId exhaustiveEmbeddedScope;
+            std::tie(exhaustiveEmbeddedScope, parentEmbeddedScope) = resolveNewBaseFieldScopes(
                 prefixPolicy, existingBaseField, embeddedScope, collectionPathPrefix, path.front());
 
             if (parentEmbeddedScope) {
@@ -1008,7 +1033,8 @@ private:
                                           prefixPolicy,
                                           std::move(dependencies),
                                           std::move(metadata),
-                                          nestedPrefix);
+                                          nestedPrefix,
+                                          parentEmbeddedScope);
         _fields[newBaseField].dependencies.insert(embeddedField);
         return newBaseField;
     }
@@ -1159,7 +1185,9 @@ private:
                          path,
                          ModifiedPrefixPolicy::kPreserveArrays,
                          {parentBaseField},
-                         std::move(metadata));
+                         std::move(metadata),
+                         {} /*collectionPathPrefix*/,
+                         parentScope);
             if (constant) {
                 setConstant(scope, path, *std::move(constant));
             }
@@ -1488,7 +1516,9 @@ private:
                                  parsedPath,
                                  p.getPrefixPolicy(),
                                  std::move(deps),
-                                 std::move(metadata));
+                                 std::move(metadata),
+                                 {} /*collectionPathPrefix*/,
+                                 parentScope);
                     if (constant) {
                         setConstant(scopeId, parsedPath, *std::move(constant));
                     }
@@ -1591,12 +1621,23 @@ private:
                         aliasCollectionPath.assign(parsedOldPath.begin(), parsedOldPath.end());
                     }
 
-                    // Each rename modifies the new field and depends on the previous field.
+                    // Each rename modifies the new field and depends on the previous field. When
+                    // the rename traverses the new path's prefix as an array (e.g. a dotted
+                    // computed projection like '{$project: {"a.b": "$x"}}'), the prefix keeps its
+                    // prior arrayness, recovered from the parent scope. When the rename instead
+                    // *constructs* the prefix (e.g. a $group compound key '{_id: {a: "$x"}}'), it
+                    // reports no array traversals on the new path, so the prefix becomes a plain
+                    // object (kEnsureObjects) and must not inherit the previous stage's arrayness.
+                    const ModifiedPrefixPolicy prefixPolicy = p.getNewPathMaxArrayTraversals() > 0
+                        ? ModifiedPrefixPolicy::kPreserveArrays
+                        : ModifiedPrefixPolicy::kEnsureObjects;
                     declareField(scopeId,
                                  parsedNewPath,
-                                 ModifiedPrefixPolicy::kPreserveArrays,
+                                 prefixPolicy,
                                  std::move(deps),
-                                 std::move(metadata));
+                                 std::move(metadata),
+                                 {} /*collectionPathPrefix*/,
+                                 parentScope);
 
                     // Store alias for the leaf field of the new path.
                     if (!aliasCollectionPath.empty()) {

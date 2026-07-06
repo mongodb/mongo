@@ -3101,15 +3101,15 @@ TEST_F(PipelineOptimizationTest, MatchCanMoveAcrossDottedRenameOnGroupingMixedPr
     assertPipelineOptimizesAndSerializesTo(inputPipeline, outputPipeline, serializedPipe);
 }
 
-TEST_F(PipelineOptimizationTest, AvoidPushingMatchOverGroupWithLongDottedRename) {
+TEST_F(PipelineOptimizationTest, MatchCanMoveAcrossLongDottedRenameOnGrouping) {
     std::string inputPipeline =
         "[{$group: {_id: {a: {b: '$a'}}}},"
         "{$project: {renamed: '$_id.a.b'}},"
         "{$match: {renamed: {$eq: 5}}}]";
     std::string outputPipeline =
-        "[{$group: {_id: {a: {b: '$a'}}, $willBeMerged: false}},"
-        "{$project: {_id: true, renamed: '$_id.a.b'}},"
-        "{$match: {renamed: {$eq: 5 }}}]";
+        "[{$match: {a: {$eq: 5}}},"
+        "{$group: {_id: {a: {b: '$a'}}, $willBeMerged: false}},"
+        "{$project: {_id: true, renamed: '$_id.a.b'}}]";
     assertPipelineOptimizesAndSerializesTo(inputPipeline, outputPipeline);
 }
 

@@ -1429,6 +1429,114 @@ TEST_F(PipelineDependencyGraphTest, CanRenamedWithProjectBeArray) {
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, CanInclusionProjectionDottedPrefixInheritAccumulatorArrayness) {
+    setPipeline(
+        "[{$group: {_id: null, m: {$minN: {input: '$a', n: 1}}}},"
+        " {$project: {'m.m2': '$a'}}]");
+    runTest([&] {
+        // The $minN accumulator output 'm' is always an array, and the dotted inclusion projection
+        // '{m.m2: ...}' must preserve that arrayness.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "m"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanRenamedAccumulatorResultBeArray) {
+    // $minN produces an array field 'm'. We move it to a new field 'n' via a rename.
+    setPipeline(
+        "[{$group: {_id: null, m: {$minN: {input: '$a', n: 1}}}},"
+        " {$set: {n: '$m'}}]");
+    runTest([&] {
+        // 'm' is the $minN accumulator result, which is an array.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "m"));
+        // 'n' is a rename of 'm', so it inherits the accumulator's arrayness and can be an array.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "n"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanInclusionProjectionDottedPrefixInheritDeclaredArrayness) {
+    setPipeline(
+        "[{$addFields: {m: {$literal: [1, 2]}}},"
+        " {$project: {'m.m2': '$a'}}]");
+    runTest([&] {
+        // 'm' has a declared array value that must be preserved across the dotted inclusion
+        // projection.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "m"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest,
+       CanInclusionProjectionComputedDottedPrefixInheritDeclaredArrayness) {
+    // Like the rename variant above, but the dotted projection uses a computed expression
+    // ('{m.m2: {$add: [2, 2]}}') so it exercises the non-RenamePath (ModifyPath) code path. The
+    // declared array value of the prefix 'm' must still be preserved.
+    setPipeline(
+        "[{$addFields: {m: {$literal: [1, 2]}}},"
+        " {$project: {'m.m2': {$add: [2, 2]}}}]");
+    runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "m")); });
+}
+
+TEST_F(PipelineDependencyGraphTest, InclusionProjectionDottedPrefixScalarStaysNonArray) {
+    setPipeline(
+        "[{$addFields: {m: {$literal: 5}}},"
+        " {$project: {'m.m2': '$a'}}]");
+    runTest([&] {
+        // A scalar prefix must not be reported as able to be an array by the dotted inclusion
+        // projection.
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "m"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, InclusionProjectionComputedDottedPrefixScalarStaysNonArray) {
+    // Like the rename variant above, but the dotted projection uses a computed expression so it
+    // exercises the non-RenamePath (ModifyPath) code path. A scalar prefix must not be reported as
+    // able to be an array.
+    setPipeline(
+        "[{$addFields: {m: {$literal: 5}}},"
+        " {$project: {'m.m2': {$add: [2, 2]}}}]");
+    runTest([&] { ASSERT_FALSE(graph->canPathBeArray(nullptr, "m")); });
+}
+
+TEST_F(PipelineDependencyGraphTest,
+       CanInclusionPreservePathDottedPrefixInheritAccumulatorArrayness) {
+    // A pure (non-computed) dotted inclusion '{m.x: 1}' is described as a PreservePath and handled
+    // by includeField(), a different code path than computed dotted projections. It must still
+    // preserve the prior arrayness of the prefix 'm' produced by the $minN accumulator.
+    setPipeline(
+        "[{$group: {_id: null, m: {$minN: {input: '$a', n: 1}}}},"
+        " {$project: {'m.x': 1}}]");
+    runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "m")); });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanInclusionPreservePathDottedPrefixInheritArrayLeafArrayness) {
+    // 'm' is a concrete array leaf from the previous stage. A pure dotted inclusion '{m.x: 1}'
+    // shadows the leaf and must still preserve 'm's array-ness across the fresh inclusion root.
+    setPipeline(
+        "[{$addFields: {m: {$literal: [1, 2]}}},"
+        " {$project: {'m.x': 1}}]");
+    runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "m")); });
+}
+
+TEST_F(PipelineDependencyGraphTest, GroupCompoundKeyDoesNotPreservePrefixArrayness) {
+    // '_id' is itself a concrete array [1, 2] from the $set stage, so its prefix arrayness is true.
+    // The $group compound key rewrites '_id' as a freshly constructed object '{a: "$x"}': the
+    // rename x -> _id.a *builds* the '_id' prefix rather than array-traversing it, so the
+    // reconstructed '_id' is a plain object and must NOT inherit the prior array-ness of '_id'.
+    setPipeline(
+        "[{$set: {_id: {$literal: [1, 2]}}},"
+        " {$group: {_id: {a: '$x'}}}]");
+    runTest([&] {
+        // Before the $group, '_id' is the array [1, 2].
+        ASSERT_TRUE(graph->canPathBeArray(stages[1].get(), "_id"));
+        // After the $group, the reconstructed '_id' is a plain object, not an array: the rename
+        // does not preserve the prior array-ness of '_id'.
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "_id"));
+        // '_id' and its compound-key subfield '_id.a' are declared by $group, not carried over
+        // from $set.
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "_id"), stages[1]);
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "_id.a"), stages[1]);
+    });
+}
+
 TEST_F(PipelineDependencyGraphTest, CanGroupAccumulatorFieldBeArray) {
     pathArrayness->addPath("c", {}, true);
     setPipeline("[{$set: {}}, {$group: { _id: '$a', b: { $avg: '$c' } }}, {$match: {b: 1}}]");
