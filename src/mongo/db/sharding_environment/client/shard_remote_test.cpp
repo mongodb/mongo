@@ -261,17 +261,17 @@ TEST_F(ShardRemoteTest, ShardRetryStrategy) {
               retryStrategy.getTargetingMetadata().deprioritizedServers.end());
 
     ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
-    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 0);
     ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.loadRelaxed(), 0);
     ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 1);
-    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 0);
     ASSERT_EQ(stats.totalBackoffTimeMillis.loadRelaxed(), 0);
 
     ASSERT(retryStrategy.recordFailureAndEvaluateShouldRetry(
         error, firstShardHostAndPort, errorLabelsSystemOverloaded));
 
     ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 2);
-    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 2);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 1);
 
     retryStrategy.recordBackoff(backoff);
     retryStrategy.recordSuccess(firstShardHostAndPort);
@@ -282,6 +282,180 @@ TEST_F(ShardRemoteTest, ShardRetryStrategy) {
     ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 2);
     ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 2);
     ASSERT_EQ(stats.totalBackoffTimeMillis.loadRelaxed(), backoff.count());
+}
+
+TEST_F(ShardRemoteTest, ShardRetryStrategyZeroBudgetNoRetries) {
+    auto attemptsGuard = unittest::ServerParameterGuard{"defaultClientMaxRetryAttempts", 0};
+
+    auto firstShard = kTestShards.front().id;
+    auto firstShardHostAndPort = kTestShards.front().hosts.front();
+
+    auto shardState = getShardState(firstShard);
+    auto& [retryBudget, stats] = *shardState;
+
+    auto shard = uassertStatusOK(shardRegistry()->getShard(operationContext(), firstShard));
+    auto retryStrategy = Shard::RetryStrategy{
+        *shard,
+        Shard::RetryPolicy::kIdempotent,
+        Shard::RetryStrategy::RequestStartTransactionState::kNotStartingTransaction};
+
+    auto error = Status(kSystemOverloadedErrorCode, "System overloaded");
+
+    ASSERT_FALSE(retryStrategy.recordFailureAndEvaluateShouldRetry(
+        error, firstShardHostAndPort, errorLabelsSystemOverloaded));
+
+    ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 0);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 0);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.loadRelaxed(), 0);
+}
+
+TEST_F(ShardRemoteTest, ShardRetryStrategyCapExhaustedTwoRetries) {
+    constexpr int kRetryAttempts = 2;
+    auto attemptsGuard =
+        unittest::ServerParameterGuard{"defaultClientMaxRetryAttempts", kRetryAttempts};
+
+    auto firstShard = kTestShards.front().id;
+    auto firstShardHostAndPort = kTestShards.front().hosts.front();
+
+    auto shardState = getShardState(firstShard);
+    auto& [retryBudget, stats] = *shardState;
+
+    auto shard = uassertStatusOK(shardRegistry()->getShard(operationContext(), firstShard));
+    auto retryStrategy = Shard::RetryStrategy{
+        *shard,
+        Shard::RetryPolicy::kIdempotent,
+        Shard::RetryStrategy::RequestStartTransactionState::kNotStartingTransaction};
+
+    auto error = Status(kSystemOverloadedErrorCode, "System overloaded");
+
+    // First kRetryAttempts (2) calls succeed
+    for (int i = 0; i < kRetryAttempts; ++i) {
+        ASSERT_TRUE(retryStrategy.recordFailureAndEvaluateShouldRetry(
+            error, firstShardHostAndPort, errorLabelsSystemOverloaded));
+    }
+    // Cap exhausted, no retry occurs
+    ASSERT_FALSE(retryStrategy.recordFailureAndEvaluateShouldRetry(
+        error, firstShardHostAndPort, errorLabelsSystemOverloaded));
+
+    ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), kRetryAttempts + 1);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), kRetryAttempts);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.loadRelaxed(), 0);
+}
+
+TEST_F(ShardRemoteTest, ShardRetryStrategyInterleavedNonOverloadError) {
+    auto firstShard = kTestShards.front().id;
+    auto firstShardHostAndPort = kTestShards.front().hosts.front();
+
+    auto shardState = getShardState(firstShard);
+    auto& [retryBudget, stats] = *shardState;
+
+    auto shard = uassertStatusOK(shardRegistry()->getShard(operationContext(), firstShard));
+    auto retryStrategy = Shard::RetryStrategy{
+        *shard,
+        Shard::RetryPolicy::kIdempotent,
+        Shard::RetryStrategy::RequestStartTransactionState::kNotStartingTransaction};
+
+    auto overloadError = Status(kSystemOverloadedErrorCode, "System overloaded");
+    auto connectionError = Status(ErrorCodes::HostUnreachable, "Connection refused");
+
+    // First attempt: fails with SystemOverloadedError — no retry metrics yet.
+    ASSERT_TRUE(retryStrategy.recordFailureAndEvaluateShouldRetry(
+        overloadError, firstShardHostAndPort, errorLabelsSystemOverloaded));
+
+    ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 0);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 0);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.loadRelaxed(), 0);
+
+    // Second attempt: fails with a non-overload connection error.
+    // numRetriesDueToOverloadAttempted incremented to 1 — this is the first retry after overload.
+    // AndSucceeded stays 0 because no command success has occurred yet.
+    ASSERT_TRUE(retryStrategy.recordFailureAndEvaluateShouldRetry(
+        connectionError, firstShardHostAndPort, {}));
+
+    ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.loadRelaxed(), 0);
+
+    // Third attempt: succeeds.
+    // numRetriesDueToOverloadAttempted stays at 1 because the previous attempt was not an overload.
+    // AndSucceeded increments to 1 now that the operation has succeeded.
+    retryStrategy.recordSuccess(firstShardHostAndPort);
+
+    ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.loadRelaxed(), 1);
+}
+
+TEST_F(ShardRemoteTest, ShardRetryStrategyInterleavedNonOverloadErrorThenOverloadError) {
+    auto firstShard = kTestShards.front().id;
+    auto firstShardHostAndPort = kTestShards.front().hosts.front();
+
+    auto shardState = getShardState(firstShard);
+    auto& [retryBudget, stats] = *shardState;
+
+    auto shard = uassertStatusOK(shardRegistry()->getShard(operationContext(), firstShard));
+    auto retryStrategy = Shard::RetryStrategy{
+        *shard,
+        Shard::RetryPolicy::kIdempotent,
+        Shard::RetryStrategy::RequestStartTransactionState::kNotStartingTransaction};
+
+    auto overloadError = Status(kSystemOverloadedErrorCode, "System overloaded");
+    auto connectionError = Status(ErrorCodes::HostUnreachable, "Connection refused");
+
+    // First attempt: fails with SystemOverloadedError — no retry metrics yet.
+    ASSERT_TRUE(retryStrategy.recordFailureAndEvaluateShouldRetry(
+        overloadError, firstShardHostAndPort, errorLabelsSystemOverloaded));
+
+    ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 0);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 0);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.loadRelaxed(), 0);
+
+    // Second attempt: fails with a non-overload connection error.
+    // numRetriesDueToOverloadAttempted incremented to 1 — this is the first retry after overload.
+    // AndSucceeded stays 0 because no command success has occurred yet.
+    ASSERT_TRUE(retryStrategy.recordFailureAndEvaluateShouldRetry(
+        connectionError, firstShardHostAndPort, {}));
+
+    ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.loadRelaxed(), 0);
+
+    // Third attempt: fails with SystemOverloadedError again.
+    // numRetriesDueToOverloadAttempted stays at 1 because the previous attempt was not an overload.
+    // numOperationsRetriedAtLeastOnceDueToOverload stays at 1 — counted at most once per operation.
+    ASSERT_TRUE(retryStrategy.recordFailureAndEvaluateShouldRetry(
+        overloadError, firstShardHostAndPort, errorLabelsSystemOverloaded));
+
+    ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 2);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.loadRelaxed(), 0);
+
+    // Fourth attempt: succeeds.
+    // numRetriesDueToOverloadAttempted increments to 2 because the previous attempt was an
+    // overload. AndSucceeded increments to 1 now that the operation has succeeded — counted once.
+    retryStrategy.recordSuccess(firstShardHostAndPort);
+
+    ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 2);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 2);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.loadRelaxed(), 1);
 }
 
 TEST_F(ShardRemoteTest, RunCommandResponseErrorOverloaded) {

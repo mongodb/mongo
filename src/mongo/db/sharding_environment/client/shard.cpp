@@ -207,18 +207,9 @@ bool Shard::RetryStrategy::recordFailureAndEvaluateShouldRetry(
 
     if (containsSystemOverloadedErrorLabel(errorLabels)) {
         _stats->numOverloadErrorsReceived.addAndFetch(1);
-
-        if (willRetry) {
-            _stats->numRetriesDueToOverloadAttempted.addAndFetch(1);
-        }
-
-        if (!_previousAttemptOverloaded) {
-            _stats->numOperationsRetriedAtLeastOnceDueToOverload.addAndFetch(1);
-        }
-
-        _previousAttemptOverloaded = true;
+        _precedingErrorWasOverload = true;
     } else {
-        _recordOperationNotOverloaded();
+        _precedingErrorWasOverload = false;
     }
 
     return willRetry;
@@ -228,7 +219,10 @@ void Shard::RetryStrategy::recordSuccess(const boost::optional<HostAndPort>& tar
     _underlyingStrategy.recordSuccess(target);
 
     _recordOperationAttempted();
-    _recordOperationNotOverloaded();
+
+    if (_retriedAtLeastOnceDueToOverload) {
+        _stats->numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.addAndFetch(1);
+    }
 }
 
 void Shard::RetryStrategy::recordBackoff(Milliseconds backoff) {
@@ -240,6 +234,14 @@ void Shard::RetryStrategy::_recordOperationAttempted() {
     if (!_recordedAttempted) {
         _recordedAttempted = true;
         _stats->numOperationsAttempted.addAndFetch(1);
+    } else if (_precedingErrorWasOverload) {
+        _stats->numRetriesDueToOverloadAttempted.addAndFetch(1);
+
+        // Prevent double counting of "at least once" metric.
+        if (!_retriedAtLeastOnceDueToOverload) {
+            _stats->numOperationsRetriedAtLeastOnceDueToOverload.addAndFetch(1);
+            _retriedAtLeastOnceDueToOverload = true;
+        }
     }
 
     if (getTargetingMetadata().stats) {
@@ -249,13 +251,6 @@ void Shard::RetryStrategy::_recordOperationAttempted() {
             _stats->numRetriesRetargetedDueToOverload.addAndFetch(_numRetargets -
                                                                   previousRetargetCounter);
         }
-    }
-}
-
-void Shard::RetryStrategy::_recordOperationNotOverloaded() {
-    if (_previousAttemptOverloaded) {
-        _stats->numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.addAndFetch(1);
-        _previousAttemptOverloaded = false;
     }
 }
 

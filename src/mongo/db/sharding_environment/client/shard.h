@@ -232,7 +232,6 @@ public:
 
     private:
         void _recordOperationAttempted();
-        void _recordOperationNotOverloaded();
 
         RetryStrategy(AdaptiveRetryStrategy::RetryCriteria retryCriteria,
                       AdaptiveRetryStrategy::RetryParameters parameters,
@@ -241,7 +240,15 @@ public:
         AdaptiveRetryStrategy _underlyingStrategy;
         ShardSharedStateCache::Stats* _stats;
         bool _recordedAttempted = false;
-        bool _previousAttemptOverloaded = false;
+
+        // Set when the most recent error observed was a SystemOverloadedError. Reset on any
+        // non-overload error.
+        bool _precedingErrorWasOverload = false;
+
+        // Set when the first retry due to a SystemOverloadedError is recorded. Set once and never
+        // reset.
+        bool _retriedAtLeastOnceDueToOverload = false;
+
         // The number of retries that avoided a server that previously returned an overload error.
         std::int64_t _numRetargets = 0;
     };

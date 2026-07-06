@@ -222,10 +222,7 @@ function runTestZeroRetries(commandName, command, mongos, shard) {
     assert.eq(shardStatsDiff.numOperationsAttempted, 1);
     assert.eq(shardStatsDiff.numOverloadErrorsReceived, 1);
     assert.eq(shardStatsDiff.numRetriesDueToOverloadAttempted, 0);
-    // The counter is incremented on the first overload error for an operation, even when no
-    // retry is performed (budget = 0).
-    // TODO SERVER-129657 Investigate numOperationsRetriedAtLeastOnceDueToOverload logic
-    assert.eq(shardStatsDiff.numOperationsRetriedAtLeastOnceDueToOverload, 1);
+    assert.eq(shardStatsDiff.numOperationsRetriedAtLeastOnceDueToOverload, 0);
     assert.eq(shardStatsDiff.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded, 0);
     assert.eq(shardStatsDiff.numRetriesRetargetedDueToOverload, 0);
 }
