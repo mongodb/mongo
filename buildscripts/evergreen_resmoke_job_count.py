@@ -47,6 +47,10 @@ _AUBSAN_TASK_FACTOR_OVERRIDES = [
     {"task": "sharded_causally_consistent_read_concern_snapshot_passthrough", "factor": 0.25},
     {"task": r"sharding_jscore_passthrough.*", "factor": 0.25},
     {"task": r"sharding.*stepdown.*jscore_passthrough.*", "factor": 0.125},
+    {
+        "task": r"sharded_collections_causally_consistent_jscore_txns_passthrough.*",
+        "factor": 0.125,
+    },
 ]
 # Apply factor for a task based on the build variant it is running on.
 VARIANT_TASK_FACTOR_OVERRIDES = {
@@ -85,12 +89,17 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
         # Lower the default resmoke_jobs_factor for TSAN to reduce memory pressure for this suite,
         # as otherwise TSAN variants occasionally run out of memory
         # Non-TSAN variants don't need this adjustment as they have a reasonable free memory margin
+        {
+            "task": r"sharded_collections_causally_consistent_jscore_txns_passthrough.*",
+            "factor": 0.125,
+        },
         {"task": r"sharding_kill_stepdown_terminate_jscore_passthrough.*", "factor": 0.125},
         {"task": r"sharding_stepdown_fcv_upgrade_downgrade_jscore_passthrough.*", "factor": 0.125},
         {"task": "sharding_jscore_passthrough_priority_ports", "factor": 0.25},
     ],
     "rhel8-debug-aubsan-classic-engine": _AUBSAN_TASK_FACTOR_OVERRIDES,
     "rhel8-debug-aubsan-all-feature-flags": _AUBSAN_TASK_FACTOR_OVERRIDES,
+    "rhel8-debug-aubsan-roll-back-incremental-feature-flags": _AUBSAN_TASK_FACTOR_OVERRIDES,
     "rhel8-debug-aubsan-x86": _AUBSAN_TASK_FACTOR_OVERRIDES,
     "rhel8-debug-aubsan-arm64": _AUBSAN_TASK_FACTOR_OVERRIDES,
     "linux-debug-aubsan-compile-grpc": _AUBSAN_TASK_FACTOR_OVERRIDES,
