@@ -167,11 +167,17 @@ public:
         uassertStatusOK(
             FilteringMetadataCache::get(opCtx)->onShardVersionMismatch(opCtx, nss, boost::none));
 
-        // Wait for the ShardServerCatalogCacheLoader to finish flushing the metadata to the
-        // storage. This is not required for correctness, but helps mitigate stalls on secondaries
-        // when a shard receives the first chunk for a collection with a large routing table.
-        FilteringMetadataCache::get(opCtx)->waitForCollectionFlush(opCtx, nss);
-        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+        // With authoritative shards secondaries are not refreshed via the oplog, therefore the
+        // following code is not necessary anymore.
+        // TODO (SERVER-127253): Remove this condition once v9.0 branches out.
+        if (!cloneRequest.isAuthoritative()) {
+            // Wait for the ShardServerCatalogCacheLoader to finish flushing the metadata to the
+            // storage. This is not required for correctness, but helps mitigate stalls on
+            // secondaries when a shard receives the first chunk for a collection with a large
+            // routing table.
+            FilteringMetadataCache::get(opCtx)->waitForCollectionFlush(opCtx, nss);
+            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+        }
 
         uassertStatusOK(MigrationDestinationManager::get(opCtx)->start(
             opCtx, nss, std::move(scopedReceiveChunk), cloneRequest, writeConcern));
@@ -278,7 +284,7 @@ public:
         // Whether the recipient must refresh its filtering metadata when it later releases the
         // migration critical section. Defaults to true so a donor that does not send the field
         // (legacy path) keeps the pre-existing refresh behavior.
-        // TODO (SERVER-98118) Remove this once v9.0 branches out
+        // TODO (SERVER-127253) Remove this once v9.0 branches out
         const bool clearShardCatalogCache = cmdObj.hasField("clearShardCatalogCache")
             ? cmdObj["clearShardCatalogCache"].Bool()
             : true;

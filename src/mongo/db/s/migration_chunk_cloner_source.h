@@ -227,7 +227,8 @@ public:
     Status startClone(OperationContext* opCtx,
                       const UUID& migrationId,
                       const LogicalSessionId& lsid,
-                      TxnNumber txnNumber);
+                      TxnNumber txnNumber,
+                      bool isAuthoritative);
 
     /**
      * Blocking method, which uses some custom selected logic for deciding whether it is appropriate
@@ -256,7 +257,7 @@ public:
      * 'clearShardCatalogCache' tells the recipient whether it must refresh its filtering
      * metadata when it later releases the migration critical section. The authoritative commit
      * path installs the post-migration metadata directly, so it does not need the refresh.
-     * TODO (SERVER-98118) Remove clearShardCatalogCache once v9.0 branches out.
+     * TODO (SERVER-127253) Remove clearShardCatalogCache once v9.0 branches out.
      *
      * NOTE: Must be called without any locks.
      */

@@ -74,7 +74,8 @@ TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
         BSON("Key" << -100),
         BSON("Key" << 100),
         BSON("Key" << 1),
-        MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff));
+        MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
+        true /* isAuthoritative */);
 
     BSONObj cmdObj = builder.obj();
 
@@ -99,6 +100,79 @@ TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
     ASSERT_BSONOBJ_EQ(BSON("Key" << 1), request.getShardKeyPattern());
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kOff,
               request.getSecondaryThrottle().getSecondaryThrottle());
+    ASSERT_TRUE(request.isAuthoritative());
+}
+
+TEST(StartChunkCloneRequest, IsAuthoritativeRoundTrip) {
+    auto serviceContext = ServiceContext::make();
+    auto client = serviceContext->getService()->makeClient("TestClient");
+    auto opCtx = client->makeOperationContext();
+
+    for (bool isAuthoritative : {false, true}) {
+        BSONObjBuilder builder;
+        StartChunkCloneRequest::appendAsCommand(
+            &builder,
+            NamespaceString::createNamespaceString_forTest("TestDB.TestColl"),
+            UUID::gen(),
+            makeLogicalSessionId(opCtx.get()),
+            0 /* txnNumber */,
+            MigrationSessionId::generate("shard0001", "shard0002"),
+            assertGet(ConnectionString::parse("TestDonorRS/Donor1:12345")),
+            ShardId("shard0001"),
+            ShardId("shard0002"),
+            BSON("Key" << -100),
+            BSON("Key" << 100),
+            BSON("Key" << 1),
+            MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
+            isAuthoritative);
+
+        BSONObj cmdObj = builder.obj();
+        auto request = assertGet(StartChunkCloneRequest::createFromCommand(
+            NamespaceString::createNamespaceString_forTest(cmdObj["_recvChunkStart"].String()),
+            cmdObj));
+
+        ASSERT_EQ(isAuthoritative, request.isAuthoritative());
+    }
+}
+
+// A donor that does not send the field (legacy / mixed-version path) must be treated as
+// non-authoritative so the recipient keeps the pre-existing refresh behavior.
+TEST(StartChunkCloneRequest, IsAuthoritativeDefaultsToFalseWhenAbsent) {
+    auto serviceContext = ServiceContext::make();
+    auto client = serviceContext->getService()->makeClient("TestClient");
+    auto opCtx = client->makeOperationContext();
+
+    BSONObjBuilder builder;
+    StartChunkCloneRequest::appendAsCommand(
+        &builder,
+        NamespaceString::createNamespaceString_forTest("TestDB.TestColl"),
+        UUID::gen(),
+        makeLogicalSessionId(opCtx.get()),
+        0 /* txnNumber */,
+        MigrationSessionId::generate("shard0001", "shard0002"),
+        assertGet(ConnectionString::parse("TestDonorRS/Donor1:12345")),
+        ShardId("shard0001"),
+        ShardId("shard0002"),
+        BSON("Key" << -100),
+        BSON("Key" << 100),
+        BSON("Key" << 1),
+        MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
+        true /* isAuthoritative */);
+
+    // Drop the field to simulate a donor that does not send it.
+    BSONObjBuilder strippedBuilder;
+    for (auto&& elem : builder.obj()) {
+        if (elem.fieldNameStringData() != "isAuthoritative") {
+            strippedBuilder.append(elem);
+        }
+    }
+    BSONObj cmdObj = strippedBuilder.obj();
+
+    auto request = assertGet(StartChunkCloneRequest::createFromCommand(
+        NamespaceString::createNamespaceString_forTest(cmdObj["_recvChunkStart"].String()),
+        cmdObj));
+
+    ASSERT_FALSE(request.isAuthoritative());
 }
 
 }  // namespace

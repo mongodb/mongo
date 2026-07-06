@@ -87,7 +87,8 @@ public:
                                 const BSONObj& chunkMinKey,
                                 const BSONObj& chunkMaxKey,
                                 const BSONObj& shardKeyPattern,
-                                const MigrationSecondaryThrottleOptions& secondaryThrottle);
+                                const MigrationSecondaryThrottleOptions& secondaryThrottle,
+                                bool isAuthoritative);
 
     const NamespaceString& getNss() const {
         return _nss;
@@ -142,6 +143,15 @@ public:
         return _secondaryThrottle;
     }
 
+    // Whether the migration is driven by a MoveRangeCoordinator, which commits authoritatively.
+    // On the authoritative path the recipient does not need to force a filtering-metadata refresh
+    // when it starts receiving the chunk, because the post-migration metadata is installed into the
+    // shard catalog directly. Absent on the legacy path, which defaults this to false.
+    // TODO (SERVER-127253): Remove this once v9.0 branches out.
+    bool isAuthoritative() const {
+        return _isAuthoritative;
+    }
+
 private:
     StartChunkCloneRequest(NamespaceString nss,
                            MigrationSessionId sessionId,
@@ -173,6 +183,10 @@ private:
 
     // The parsed secondary throttle options
     MigrationSecondaryThrottleOptions _secondaryThrottle;
+
+    // Whether the migration commits authoritatively (driven by a MoveRangeCoordinator).
+    // TODO (SERVER-127253): Remove this once v9.0 branches out.
+    bool _isAuthoritative{false};
 };
 
 }  // namespace mongo

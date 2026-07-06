@@ -59,6 +59,8 @@ const char kToShardId[] = "toShardName";
 const char kChunkMinKey[] = "min";
 const char kChunkMaxKey[] = "max";
 const char kShardKeyPattern[] = "shardKeyPattern";
+// TODO (SERVER-127253): Remove this once v9.0 branches out.
+const char kIsAuthoritative[] = "isAuthoritative";
 
 }  // namespace
 
@@ -161,6 +163,16 @@ StatusWith<StartChunkCloneRequest> StartChunkCloneRequest::createFromCommand(Nam
         }
     }
 
+    {
+        // Absent on the legacy path, so default to false to preserve the pre-existing refresh
+        // behavior when the donor does not send the field.
+        Status status = bsonExtractBooleanFieldWithDefault(
+            obj, kIsAuthoritative, false, &request._isAuthoritative);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
     request._migrationId = UUID::parse(obj);
     request._lsid =
         LogicalSessionId::parse(obj[kLsid].Obj(), IDLParserContext("StartChunkCloneRequest"));
@@ -182,7 +194,8 @@ void StartChunkCloneRequest::appendAsCommand(
     const BSONObj& chunkMinKey,
     const BSONObj& chunkMaxKey,
     const BSONObj& shardKeyPattern,
-    const MigrationSecondaryThrottleOptions& secondaryThrottle) {
+    const MigrationSecondaryThrottleOptions& secondaryThrottle,
+    bool isAuthoritative) {
     invariant(builder->asTempObj().isEmpty());
     invariant(nss.isValid());
     invariant(fromShardConnectionString.isValid());
@@ -201,6 +214,8 @@ void StartChunkCloneRequest::appendAsCommand(
     builder->append(kChunkMinKey, chunkMinKey);
     builder->append(kChunkMaxKey, chunkMaxKey);
     builder->append(kShardKeyPattern, shardKeyPattern);
+    // TODO (SERVER-127253): Remove this once v9.0 branches out.
+    builder->append(kIsAuthoritative, isAuthoritative);
     secondaryThrottle.append(builder);
 }
 

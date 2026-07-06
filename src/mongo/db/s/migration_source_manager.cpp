@@ -554,10 +554,16 @@ void MigrationSourceManager::startClone() {
 
     _coordinator->startMigration(_opCtx);
 
+    // The authoritative path (MoveRangeCoordinator) installs the post-migration metadata into the
+    // shard catalog directly, so the recipient does not need to force a filtering-metadata refresh
+    // when it starts receiving the chunk.
+    // TODO (SERVER-127253): Remove this once v9.0 branches out.
+    const bool isAuthoritative = _managementMode == ManagementModeEnum::kMoveRangeCoordinator;
     auto startCloneStatus = _cloneDriver->startClone(_opCtx,
                                                      _coordinator->getMigrationId(),
                                                      _coordinator->getLsid(),
-                                                     _coordinator->getTxnNumber());
+                                                     _coordinator->getTxnNumber(),
+                                                     isAuthoritative);
     withChangelogErrMsg(startCloneStatus.reason(), [&] { uassertStatusOK(startCloneStatus); });
 
     // Refresh the collection routing information after starting the clone driver to have a

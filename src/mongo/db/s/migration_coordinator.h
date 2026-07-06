@@ -122,7 +122,7 @@ public:
      * If the decision was to commit, returns a future that is set when range deletion for
      * the donated range completes.
      *
-     * TODO (SERVER-98118) Remove clearShardCatalogCache when v9.0 branches out.
+     * TODO (SERVER-127253) Remove clearShardCatalogCache when v9.0 branches out.
      */
     boost::optional<SharedSemiFuture<void>> completeMigration(OperationContext* opCtx,
                                                               bool clearShardCatalogCache);
@@ -137,7 +137,7 @@ public:
      * the _releaseRecipientCriticalSectionFuture future that will be readied once the recipient
      * critical section has been released.
      *
-     * TODO (SERVER-98118) Remove clearShardCatalogCache when v9.0 branches out.
+     * TODO (SERVER-127253) Remove clearShardCatalogCache when v9.0 branches out.
      */
     void launchReleaseRecipientCriticalSection(OperationContext* opCtx,
                                                bool clearShardCatalogCache);

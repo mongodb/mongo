@@ -336,7 +336,7 @@ private:
     // Stores a reference to the process sharding statistics object which needs to be updated
     ShardingStatistics& _stats;
 
-    // TODO (SERVER-98118): Remove this field once v9.0 branches out
+    // TODO (SERVER-127253): Remove this field once v9.0 branches out
     const ManagementModeEnum _managementMode;
 
     const UUID _migrationId;

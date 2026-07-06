@@ -189,7 +189,7 @@ public:
      * 'clearShardCatalogCache' records whether the recipient must refresh its filtering metadata
      * when it later releases the migration critical section. The authoritative path passes false
      * because the post-migration metadata is installed into the shard catalog directly.
-     * TODO (SERVER-98118): Remove clearShardCatalogCache once v9.0 branches out.
+     * TODO (SERVER-127253): Remove clearShardCatalogCache once v9.0 branches out.
      */
     Status startCommit(const MigrationSessionId& sessionId, bool clearShardCatalogCache);
 
@@ -201,7 +201,7 @@ public:
      * If clearShardCatalogCache is true, the filtering metadata is refreshed before releasing the
      * critical section. On the authoritative path it is false because the metadata has already been
      * installed into the shard catalog while the critical section was held.
-     * TODO (SERVER-98118) Remove clearShardCatalogCache when v9.0 branches out.
+     * TODO (SERVER-127253) Remove clearShardCatalogCache when v9.0 branches out.
      */
     Status exitCriticalSection(OperationContext* opCtx,
                                const MigrationSessionId& sessionId,
@@ -401,7 +401,7 @@ private:
     // critical section. Set by the donor when committing (see startCommit) and persisted in the
     // recipient recovery document so the value survives failover. Defaults to true to preserve the
     // legacy refresh behavior.
-    // TODO (SERVER-98118): Remove once v9.0 branches out
+    // TODO (SERVER-127253): Remove once v9.0 branches out
     bool _clearShardCatalogCache{true};
 
     std::unique_ptr<SessionCatalogMigrationDestination> _sessionMigration;
