@@ -39,6 +39,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
+#include "mongo/rpc/telemetry_context_section_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/serialization_context.h"
@@ -47,9 +48,9 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -183,6 +184,7 @@ struct OpMsg {
     std::vector<DocumentSequence> sequences;
 
     boost::optional<auth::ValidatedTenancyScope> validatedTenancyScope = boost::none;
+    boost::optional<TelemetryContextSection> telemetryContext;
 
     boost::optional<TenantId> getValidatedTenantId() const {
         if (!validatedTenancyScope) {
@@ -276,6 +278,8 @@ public:
     }
 
     void setSecurityToken(std::string_view token);
+
+    void setTelemetryContext(const TelemetryContextSection& telemetryContext);
 
     /**
      * Finish building and return a Message ready to give to the networking layer for transmission.

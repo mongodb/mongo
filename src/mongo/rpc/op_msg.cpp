@@ -46,6 +46,7 @@
 #include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/rpc/object_check.h"  // IWYU pragma: keep
+#include "mongo/rpc/telemetry_context_section_gen.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/duration.h"
@@ -86,7 +87,14 @@ enum class Section : uint8_t {
     kBody = 0,
     kDocSequence = 1,
     kSecurityToken = 2,
+    kTelemetry = 3,
 };
+
+// Generous upper bound for the OP_MSG telemetry section. The section only ever carries small
+// W3C trace-context propagation fields (a 55-byte traceparent and, in the future, a tracestate
+// that the W3C spec recommends vendors cap at 512 bytes). 4 KB leaves ample headroom while
+// bounding how much a malformed or malicious peer can make us materialize on the parse path.
+constexpr int kMaxTelemetrySectionSize = 4 * 1024;
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
 // All fields including size, requestId, and responseTo must already be set. The size must
@@ -235,6 +243,16 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
                 break;
             }
 
+            case Section::kTelemetry: {
+                uassert(ErrorCodes::BadValue,
+                        "Multiple telemetry context sections in message",
+                        !msg.telemetryContext);
+                auto bsonContext = sectionsBuf.read<Validated<BSONObj>>();
+                uassertStatusOK(bsonContext.val.validateBSONObjSize(kMaxTelemetrySectionSize));
+                msg.telemetryContext = TelemetryContextSection::parse(bsonContext);
+                break;
+            }
+
             default:
                 // Using uint32_t so we append as a decimal number rather than as a char.
                 uasserted(ErrorCodes::UnknownOpMsgSectionKind,
@@ -364,35 +382,35 @@ OpMsgRequest OpMsgRequestBuilder::create(
 }
 
 namespace {
-void serializeHelper(const std::vector<OpMsg::DocumentSequence>& sequences,
-                     const BSONObj& body,
-                     const boost::optional<auth::ValidatedTenancyScope>& validatedTenancyScope,
-                     OpMsgBuilder* output) {
-    if (validatedTenancyScope) {
-        auto securityToken = validatedTenancyScope->getOriginalToken();
+void serializeHelper(const OpMsg& msg, OpMsgBuilder* output) {
+    if (msg.validatedTenancyScope) {
+        auto securityToken = msg.validatedTenancyScope->getOriginalToken();
         if (!securityToken.empty()) {
             output->setSecurityToken(securityToken);
         }
     }
-    for (auto&& seq : sequences) {
+    for (auto&& seq : msg.sequences) {
         auto docSeq = output->beginDocSequence(seq.name);
         for (auto&& obj : seq.objs) {
             docSeq.append(obj);
         }
     }
-    output->beginBody().appendElements(body);
+    if (msg.telemetryContext) {
+        output->setTelemetryContext(*msg.telemetryContext);
+    }
+    output->beginBody().appendElements(msg.body);
 }
 }  // namespace
 
 Message OpMsg::serialize() const {
     OpMsgBuilder builder;
-    serializeHelper(sequences, body, validatedTenancyScope, &builder);
+    serializeHelper(*this, &builder);
     return builder.finish();
 }
 
 Message OpMsg::serializeWithoutSizeChecking() const {
     OpMsgBuilder builder;
-    serializeHelper(sequences, body, validatedTenancyScope, &builder);
+    serializeHelper(*this, &builder);
     return builder.finishWithoutSizeChecking();
 }
 
@@ -413,6 +431,19 @@ void OpMsgBuilder::setSecurityToken(std::string_view token) {
     invariant(_state == kEmpty);
     _buf.appendStruct(Section::kSecurityToken);
     _buf.appendCStr(token);
+}
+
+void OpMsgBuilder::setTelemetryContext(const TelemetryContextSection& telemetryContext) {
+    invariant((_state == kEmpty) || (_state == kDocSequence));
+    invariant(!_openBuilder);
+    const auto bson = telemetryContext.toBSON();
+    uassert(ErrorCodes::BSONObjectTooLarge,
+            fmt::format("Telemetry context section size {} exceeds maximum {}",
+                        bson.objsize(),
+                        kMaxTelemetrySectionSize),
+            bson.objsize() <= kMaxTelemetrySectionSize);
+    _buf.appendStruct(Section::kTelemetry);
+    _buf.appendBuf(bson.objdata(), bson.objsize());
 }
 
 auto OpMsgBuilder::beginDocSequence(std::string_view name) -> DocSequenceBuilder {

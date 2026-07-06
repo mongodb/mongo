@@ -16,6 +16,7 @@ mongo_cc_library(
         "op_msg.cpp",
     ],
     deps = [
+        ":telemetry_context_section",
         "//src/mongo/bson:bson_validate",
         "//src/mongo/bson/dotted_path:dotted_path_support",
         "//src/mongo/bson/util:bson_extract",
@@ -29,6 +30,38 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }),
+)
+
+idl_generator(
+    name = "telemetry_context_section_gen",
+    src = "telemetry_context_section.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "telemetry_context_section",
+    srcs = [
+        ":telemetry_context_section_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/otel/traces:traceparent",
+        "//src/mongo/otel/traces:tracing_feature_flags",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "telemetry_context_section_test",
+    srcs = [
+        "telemetry_context_section_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":telemetry_context_section",
+    ],
 )
 
 idl_generator(

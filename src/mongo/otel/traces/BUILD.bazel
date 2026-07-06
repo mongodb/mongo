@@ -14,6 +14,27 @@ GRPC_TARGET_COMPATIBLE_WITH = select({
     "//conditions:default": ["@platforms//:incompatible"],
 })
 
+mongo_cc_library(
+    name = "traceparent",
+    srcs = [
+        "traceparent.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "traceparent_test",
+    srcs = [
+        "traceparent_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":traceparent",
+    ],
+)
+
 idl_generator(
     name = "trace_settings_gen",
     src = "trace_settings.idl",

@@ -60,6 +60,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/telemetry_context_section_gen.h"
 #include "mongo/unittest/log_capture.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -729,6 +730,150 @@ TEST(OpMsgSerializer, BodyAndTwoSequences) {
                        kBodySection,
                        fromjson("{ping: 1}"),
                    });
+}
+
+namespace {
+constexpr auto kValidTraceparent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+
+BSONObj makeTelemetryBson(std::string_view traceparent) {
+    return BSON("otel" << BSON("traceparent" << traceparent));
+}
+
+BSONObj makeTelemetryBsonOfSize(std::string_view traceparent, int targetSize) {
+    auto base = BSON("otel" << BSON("traceparent" << traceparent) << "padding" << "");
+    const int padding = std::max(0, targetSize - base.objsize());
+    return BSON("otel" << BSON("traceparent" << traceparent) << "padding"
+                       << std::string(padding, 'x'));
+}
+}  // namespace
+
+TEST(OpMsgSerializer, OtelTelemetryContext) {
+    auto msg = OpMsg{};
+    msg.body = fromjson("{ping: 1}");
+    msg.telemetryContext = TelemetryContextSection::parse(makeTelemetryBson(kValidTraceparent));
+
+    testSerializer(msg.serialize(),
+                   OpMsgBytes{
+                       kNoFlags,
+                       kTelemetrySection,
+                       makeTelemetryBson(kValidTraceparent),
+                       kBodySection,
+                       fromjson("{ping: 1}"),
+                   });
+}
+
+TEST_F(OpMsgParser, SucceedsWithTelemetryContext) {
+    auto msg =
+        OpMsgBytes{
+            kNoFlags,
+            kTelemetrySection,
+            makeTelemetryBson(kValidTraceparent),
+            kBodySection,
+            fromjson("{ping: 1}"),
+        }
+            .parse();
+
+    ASSERT_BSONOBJ_EQ(msg.body, fromjson("{ping: 1}"));
+    ASSERT(msg.telemetryContext);
+    ASSERT_EQ(msg.telemetryContext->getOtel().getTraceparent(), kValidTraceparent);
+}
+
+TEST_F(OpMsgParser, SucceedsWithBodyThenTelemetryContext) {
+    auto msg =
+        OpMsgBytes{
+            kNoFlags,
+            kBodySection,
+            fromjson("{ping: 1}"),
+            kTelemetrySection,
+            makeTelemetryBson(kValidTraceparent),
+        }
+            .parse();
+
+    ASSERT_BSONOBJ_EQ(msg.body, fromjson("{ping: 1}"));
+    ASSERT(msg.telemetryContext);
+    ASSERT_EQ(msg.telemetryContext->getOtel().getTraceparent(), kValidTraceparent);
+}
+
+TEST_F(OpMsgParser, NoTelemetryContextWhenAbsent) {
+    auto msg =
+        OpMsgBytes{
+            kNoFlags,
+            kBodySection,
+            fromjson("{ping: 1}"),
+        }
+            .parse();
+
+    ASSERT_FALSE(msg.telemetryContext);
+}
+
+TEST_F(OpMsgParser, FailsWithInvalidTraceparent) {
+    auto msg = OpMsgBytes{
+        kNoFlags,
+        kTelemetrySection,
+        makeTelemetryBson("not-a-valid-traceparent"),
+        kBodySection,
+        fromjson("{ping: 1}"),
+    };
+
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::BadValue);
+}
+
+TEST_F(OpMsgParser, FailsWhenTelemetryContextExceedsMaxSize) {
+    auto msg = OpMsgBytes{
+        kNoFlags,
+        kTelemetrySection,
+        makeTelemetryBsonOfSize(kValidTraceparent, 8 * 1024),
+        kBodySection,
+        fromjson("{ping: 1}"),
+    };
+
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::BSONObjectTooLarge);
+}
+
+TEST_F(OpMsgParser, SucceedsWithTelemetryContextNearMaxSize) {
+    auto msg =
+        OpMsgBytes{
+            kNoFlags,
+            kTelemetrySection,
+            makeTelemetryBsonOfSize(kValidTraceparent, 2 * 1024),
+            kBodySection,
+            fromjson("{ping: 1}"),
+        }
+            .parse();
+
+    ASSERT_BSONOBJ_EQ(msg.body, fromjson("{ping: 1}"));
+    ASSERT(msg.telemetryContext);
+    EXPECT_EQ(msg.telemetryContext->getOtel().getTraceparent(), kValidTraceparent);
+}
+
+TEST_F(OpMsgParser, FailsWithMultipleTelemetryContexts) {
+    auto msg = OpMsgBytes{
+        kNoFlags,
+        kTelemetrySection,
+        makeTelemetryBson(kValidTraceparent),
+        kTelemetrySection,
+        makeTelemetryBson(kValidTraceparent),
+        kBodySection,
+        fromjson("{ping: 1}"),
+    };
+
+    ASSERT_THROWS_WITH_CHECK(msg.parse(), AssertionException, [](const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::BadValue);
+        ASSERT_STRING_CONTAINS(ex.reason(), "Multiple telemetry context sections in message");
+    });
+}
+
+TEST_F(OpMsgParser, FailsWithMalformedTelemetryBson) {
+    auto msg = OpMsgBytes{
+        kNoFlags,
+        kTelemetrySection,
+        int32_t{5},  // BSON object size: 4-byte length + 1-byte terminator.
+        '\x01',      // Not the required 0x00 EOO terminator, so this is not valid BSON.
+        kBodySection,
+        fromjson("{ping: 1}"),
+    };
+
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::InvalidBSON);
 }
 
 TEST(OpMsgSerializer, BodyAndSequenceInPlace) {

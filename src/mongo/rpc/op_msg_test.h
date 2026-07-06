@@ -55,6 +55,7 @@ namespace test {
 constexpr char kBodySection = 0;
 constexpr char kDocSequenceSection = 1;
 constexpr char kSecurityTokenSection = 2;
+constexpr char kTelemetrySection = 3;
 
 // Makes a SharedBuffer out of arguments passed to constructor.
 class Bytes {
