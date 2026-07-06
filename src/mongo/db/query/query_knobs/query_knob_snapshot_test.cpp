@@ -37,6 +37,7 @@
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 
 #include <chrono>
 #include <cstddef>
@@ -399,6 +400,45 @@ TEST(QueryKnobSnapshotCacheTest, SnapshotReflectsSetParameterUpdateEnum) {
     }
     auto snap = QueryKnobSnapshotCache::instance().getThreadLocalSnapshot();
     ASSERT_EQ(snap.get<TestKnobModeEnum>(test_knobs::testEnumKnob.id), TestKnobModeEnum::kAlpha);
+}
+
+// SERVER-130638: regression test for a stale thread-local cache after many knob updates.
+// '_version' used to be an AtomicWord<uint8_t>, so exactly 256 knob updates would bring it back to
+// the same value, and a thread whose cached snapshot matched the pre-wraparound value would see a
+// false cache hit in getThreadLocalSnapshot() and never refresh. This drives 256 updates (far more
+// than a uint8_t could survive) and confirms the thread-local cache still reflects the latest
+// value.
+//
+// updateKnobValue() is only reachable from production code through the registered query-knobs
+// listener, not through the public (const-only) instance() accessor, so this drives updates the
+// same way ServerParameterGuard does: through the real ServerParameter::set() path.
+TEST(QueryKnobSnapshotCacheTest, ThreadLocalCacheSurvivesManyUpdates) {
+    const auto& cache = QueryKnobSnapshotCache::instance();
+
+    const int initialValue = cache.getSnapshot().get<int>(test_knobs::testIntKnob.id);
+    auto before = cache.getThreadLocalSnapshot();
+    ASSERT_EQ(before.get<int>(test_knobs::testIntKnob.id), initialValue);
+
+    auto* serverParam = ServerParameterSet::getNodeParameterSet()->getIfExists("testIntKnob");
+    ASSERT(serverParam);
+    auto setValue = [&](int value) {
+        BSONObjBuilder b;
+        b.append("testIntKnob", value);
+        uassertStatusOK(serverParam->set(b.obj().firstElement(), boost::none));
+    };
+
+    ON_BLOCK_EXIT([&] { setValue(initialValue); });
+
+    // 256 updates would have wrapped the old uint8_t version counter back to the value 'before'
+    // observed. testIntKnob is validated to (0, 1000).
+    for (int i = 0; i < 256; i++) {
+        setValue(100 + i);
+    }
+    const int expectedCurrentValue = 100 + 255;
+    ASSERT_EQ(cache.getSnapshot().get<int>(test_knobs::testIntKnob.id), expectedCurrentValue);
+
+    auto after = cache.getThreadLocalSnapshot();
+    ASSERT_EQ(after.get<int>(test_knobs::testIntKnob.id), expectedCurrentValue);
 }
 
 }  // namespace

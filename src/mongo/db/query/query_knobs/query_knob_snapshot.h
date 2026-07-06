@@ -183,7 +183,8 @@ private:
     std::mutex _intentLock;
     QueryKnobSnapshot _defaults;  // immutable reference for kDefault vs kSetParameter detection
     QueryKnobSnapshot _snapshot;  // live snapshot used by queries
-    alignas(64) AtomicWord<uint8_t> _version{0};
+    // Must be wide enough to never wrap over a server's lifetime.
+    alignas(64) AtomicWord<uint64_t> _version{0};
 };
 
 }  // namespace mongo
