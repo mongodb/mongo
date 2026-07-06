@@ -395,7 +395,7 @@ void CommandHelpers::ensureValidCollectionName(const NamespaceString& nss) {
 NamespaceString CommandHelpers::parseNsFromCommand(const DatabaseName& dbName,
                                                    const BSONObj& cmdObj) {
     BSONElement first = cmdObj.firstElement();
-    if (first.type() != mongo::String)
+    if (first.type() != mongo::String && first.type() != mongo::Symbol)
         return NamespaceString(dbName);
     return NamespaceStringUtil::deserialize(dbName, cmdObj.firstElement().valueStringData());
 }

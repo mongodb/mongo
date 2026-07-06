@@ -172,6 +172,30 @@ DEATH_TEST(Commands, appendCommandStatusNoCodeName, "invariant") {
     CommandHelpers::appendCommandStatusNoThrow(actualResult, status);
 }
 
+TEST(ParseNamespaceFromCommand, String) {
+    ASSERT_EQ(CommandHelpers::parseNsFromCommand(DatabaseName::createDatabaseName_forTest(
+                                                     boost::none, "test"),
+                                                 BSON("command"
+                                                      << "coll")),
+              NamespaceString::createNamespaceString_forTest("test.coll"));
+}
+
+TEST(ParseNamespaceFromCommand, Symbol) {
+    BSONObjBuilder builder;
+    builder.appendSymbol("command", "coll");
+    ASSERT_EQ(CommandHelpers::parseNsFromCommand(
+                  DatabaseName::createDatabaseName_forTest(boost::none, "test"), builder.obj()),
+              NamespaceString::createNamespaceString_forTest("test.coll"));
+}
+
+TEST(ParseNamespaceFromCommand, OtherTypes) {
+    auto dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
+    ASSERT_EQ(CommandHelpers::parseNsFromCommand(dbName, BSON("command" << 1)),
+              NamespaceString{dbName});
+    ASSERT_EQ(CommandHelpers::parseNsFromCommand(dbName, BSON("command" << BSONObj())),
+              NamespaceString{dbName});
+}
+
 class ParseNsOrUUID : public ServiceContextTest {
 public:
     ParseNsOrUUID() : opCtxPtr(makeOperationContext()), opCtx(opCtxPtr.get()) {}
