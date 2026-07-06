@@ -376,10 +376,15 @@ class DataConsistencyChecker {
             if (!sourceDoc || !syncingDoc) {
                 return false;
             }
-            const hasInvalidated =
-                sourceDoc.hasOwnProperty("invalidated") && syncingDoc.hasOwnProperty("invalidated");
-            if (!hasInvalidated || sourceDoc["invalidated"] === syncingDoc["invalidated"]) {
-                // We only ever expect cases where the 'invalidated' fields are mismatched.
+            if (
+                sourceDoc["txnNumber"] === syncingDoc["txnNumber"] &&
+                sourceDoc["ts"] === syncingDoc["ts"]
+            ) {
+                // If the two entries have different `txnNumber` or `ts` values, then our
+                // retryable write logic will detect the inconsistency and handle it:
+                // https://github.com/mongodb/mongo/blob/7bc650ec9d11896a85a83b8eba66deb1f74636e7/src/mongo/db/query/write_ops/write_ops_retryability.cpp?plain=1#L237-L255
+                // If this is the case, we should return `true`. Otherwise, we should return
+                // `false`, because this data inconsistency is not one we can ignore.
                 return false;
             }
         }
