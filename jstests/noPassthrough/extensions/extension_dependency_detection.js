@@ -20,6 +20,7 @@
  * @tags: [
  *   featureFlagExtensionsAPI,
  *   featureFlagExtensionsOptimizations,
+ *   requires_fcv_90,
  * ]
  */
 import {getStageFromSplitPipeline} from "jstests/libs/query/analyze_plan.js";

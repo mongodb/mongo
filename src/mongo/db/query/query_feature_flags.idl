@@ -537,7 +537,7 @@ feature_flags:
     featureFlagExtensionsOptimizations:
         description: "Feature flag to enable new extension stage optimizations."
         cpp_varname: gFeatureFlagExtensionsOptimizations
-        default: false
+        default: true
         fcv_gated: false
 
     featureFlagPqsQueryKnobs:
