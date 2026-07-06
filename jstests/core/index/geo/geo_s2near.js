@@ -81,27 +81,36 @@ assert.commandFailedWithCode(
 );
 
 // Do some basic near searches.
-let res = t.find({"geo": {"$near": {"$geometry": origin, $maxDistance: 2000}}}).limit(10);
-resNear = t.aggregate([
-    {$geoNear: {near: [0, 0], distanceField: "dis", maxDistance: Math.PI, spherical: true}},
-    {$limit: 10},
-]);
-assert.eq(res.itcount(), resNear.itcount(), "10");
+let resCount = t
+    .find({"geo": {"$near": {"$geometry": origin, $maxDistance: 2000}}})
+    .limit(10)
+    .itcount();
+let resNearCount = t
+    .aggregate([
+        {$geoNear: {near: [0, 0], distanceField: "dis", maxDistance: Math.PI, spherical: true}},
+        {$limit: 10},
+    ])
+    .itcount();
+assert.eq(resCount, resNearCount, "10");
 
-res = t.find({"geo": {"$near": {"$geometry": origin}}}).limit(10);
-resNear = t.aggregate([
-    {$geoNear: {near: [0, 0], distanceField: "dis", spherical: true}},
-    {$limit: 10},
-]);
-assert.eq(res.itcount(), resNear.itcount(), "10");
+resCount = t
+    .find({"geo": {"$near": {"$geometry": origin}}})
+    .limit(10)
+    .itcount();
+resNearCount = t
+    .aggregate([{$geoNear: {near: [0, 0], distanceField: "dis", spherical: true}}, {$limit: 10}])
+    .itcount();
+assert.eq(resCount, resNearCount, "10");
 
 // Find all the points!
-res = t.find({"geo": {"$near": {"$geometry": origin}}}).limit(10000);
-resNear = t.aggregate([
-    {$geoNear: {near: [0, 0], distanceField: "dis", spherical: true}},
-    {$limit: 10000},
-]);
-assert.eq(res.itcount(), resNear.itcount(), (2 * points * (2 * points)).toString());
+resCount = t
+    .find({"geo": {"$near": {"$geometry": origin}}})
+    .limit(10000)
+    .itcount();
+resNearCount = t
+    .aggregate([{$geoNear: {near: [0, 0], distanceField: "dis", spherical: true}}, {$limit: 10000}])
+    .itcount();
+assert.eq(resCount, resNearCount, (2 * points * (2 * points)).toString());
 
 // longitude goes -180 to 180
 // latitude goes -90 to 90
@@ -111,20 +120,25 @@ t.insert({geo: {"type": "Point", "coordinates": [-180, -90]}});
 t.insert({geo: {"type": "Point", "coordinates": [180, -90]}});
 t.insert({geo: {"type": "Point", "coordinates": [180, 90]}});
 t.insert({geo: {"type": "Point", "coordinates": [-180, 90]}});
-res = t.find({"geo": {"$near": {"$geometry": origin}}}).limit(10000);
-resNear = t.aggregate([
-    {$geoNear: {near: [0, 0], distanceField: "dis", spherical: true}},
-    {$limit: 10000},
-]);
-assert.eq(res.itcount(), resNear.itcount(), (2 * points * (2 * points) + 4).toString());
+resCount = t
+    .find({"geo": {"$near": {"$geometry": origin}}})
+    .limit(10000)
+    .itcount();
+resNearCount = t
+    .aggregate([{$geoNear: {near: [0, 0], distanceField: "dis", spherical: true}}, {$limit: 10000}])
+    .itcount();
+assert.eq(resCount, resNearCount, (2 * points * (2 * points) + 4).toString());
 
 function testRadAndDegreesOK(distance) {
     // Distance for old style points is radians.
-    let resRadians = t.find({geo: {$nearSphere: [0, 0], $maxDistance: distance / (6378.1 * 1000)}});
+    let resRadians = t
+        .find({geo: {$nearSphere: [0, 0], $maxDistance: distance / (6378.1 * 1000)}})
+        .itcount();
     // Distance for new style points is meters.
-    let resMeters = t.find({"geo": {"$near": {"$geometry": origin, $maxDistance: distance}}});
-    // And we should get the same # of results no matter what.
-    assert.eq(resRadians.itcount(), resMeters.itcount());
+    let resMeters = t
+        .find({"geo": {"$near": {"$geometry": origin, $maxDistance: distance}}})
+        .itcount();
+    assert.eq(resRadians, resMeters);
 
     // Also, $geoNear should behave the same way.
     let resGNMeters = t
