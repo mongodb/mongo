@@ -62,13 +62,14 @@ function makeNumericKnob(knob, constraint, alpha = 2) {
         max = max - 1;
         maxInclusive = true;
     }
-    let arb = min
-        ? // Generate a pareto distribution starting from the given lower bound.
-          fc
-              .double({min: Number.EPSILON, max: 1.0, noNaN: true})
-              .map((u) => min * Math.pow(u, -1.0 / alpha))
-        : // Fallback to a normal distribution if no lower bound is provided.
-          fc.double({noNaN: true, ...constraint});
+    let arb =
+        min !== undefined
+            ? // Generate a pareto distribution shifted to start from the given lower bound.
+              fc
+                  .double({min: Number.EPSILON, max: 1.0, noNaN: true})
+                  .map((u) => min + (Math.abs(min) + 1) * (Math.pow(u, -1.0 / alpha) - 1))
+            : // Fallback to a normal distribution if no lower bound is provided.
+              fc.double({noNaN: true, ...constraint});
     // Clip to the upper bound if provided.
     if (max !== undefined) {
         arb = arb.map((u) => Math.min(u, max));
@@ -93,9 +94,10 @@ function makeNumericKnob(knob, constraint, alpha = 2) {
         arb = arb.filter((value) => value < max);
     }
 
-    // Filter out the default value.
+    // Filter out the default value. Compare numerically since long long defaults are reported as
+    // NumberLong objects, which never compare strictly equal to plain JS numbers.
     assert(knob.default !== undefined);
-    return arb.filter((value) => value !== knob.default);
+    return arb.filter((value) => value !== Number(knob.default));
 }
 
 function makeEnumKnob(knob, constraint) {

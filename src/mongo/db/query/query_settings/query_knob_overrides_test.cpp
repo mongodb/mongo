@@ -100,6 +100,46 @@ TEST(QuerySettingsKnobOverridesTest, DuplicateKnob) {
     ASSERT_BSONOBJ_EQ(overrides.toBSON(), bson);
 }
 
+// Numeric knob values must be accepted regardless of the BSON numeric type they arrive as, as
+// long as the value is exactly representable, matching setParameter's coercion semantics.
+TEST(QuerySettingsKnobOverridesTest, IntKnobAcceptsIntegralDouble) {
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 5.0));
+    ASSERT_EQ(std::get<int>(overrides.entries()[0].value), 5);
+}
+
+TEST(QuerySettingsKnobOverridesTest, IntKnobAcceptsNumberLong) {
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 5LL));
+    ASSERT_EQ(std::get<int>(overrides.entries()[0].value), 5);
+}
+
+// Non-integral doubles are truncated toward zero, matching setParameter's coercion semantics.
+TEST(QuerySettingsKnobOverridesTest, IntKnobTruncatesNonIntegralDouble) {
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 5.5));
+    ASSERT_EQ(std::get<int>(overrides.entries()[0].value), 5);
+}
+
+TEST(QuerySettingsKnobOverridesTest, DoubleKnobAcceptsInt) {
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(BSON("testDoubleKnobWire" << 5));
+    ASSERT_EQ(std::get<double>(overrides.entries()[0].value), 5.0);
+}
+
+TEST(QuerySettingsKnobOverridesTest, DoubleKnobAcceptsNumberLong) {
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(BSON("testDoubleKnobWire" << 5LL));
+    ASSERT_EQ(std::get<double>(overrides.entries()[0].value), 5.0);
+}
+
+TEST(QuerySettingsKnobOverridesTest, IntKnobRejectsInt32Overflow) {
+    ASSERT_THROWS_CODE(QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << (1LL << 40))),
+                       DBException,
+                       12194501);
+}
+
+TEST(QuerySettingsKnobOverridesTest, DoubleKnobRejectsNonNumeric) {
+    ASSERT_THROWS_CODE(QuerySettingsKnobOverrides::fromBSON(BSON("testDoubleKnobWire" << "5.0")),
+                       DBException,
+                       12194501);
+}
+
 TEST(QuerySettingsKnobOverridesTest, WrongTypeThrows) {
     ASSERT_THROWS_CODE(QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << "notAnInt")),
                        DBException,

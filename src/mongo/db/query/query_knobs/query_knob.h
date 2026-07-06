@@ -33,10 +33,10 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/util/str.h"
 
 #include <concepts>
 #include <cstdint>
-#include <limits>
 #include <string_view>
 #include <type_traits>
 #include <utility>
@@ -101,7 +101,11 @@ struct ConverterTraits<T> {
 template <>
 struct ConverterTraits<int> {
     static QueryKnobValue fromBSON(const BSONElement& elem) {
-        return elem.Int();
+        // Coerce across BSON numeric types exactly as setParameter does, including truncating
+        // doubles toward zero.
+        int out;
+        uassertStatusOK(elem.tryCoerce(&out));
+        return out;
     }
     static void toBSON(BSONObjBuilder& b, std::string_view field, const QueryKnobValue& val) {
         b.append(field, std::get<int>(val));
@@ -114,7 +118,11 @@ struct ConverterTraits<int> {
 template <>
 struct ConverterTraits<long long> {
     static QueryKnobValue fromBSON(const BSONElement& elem) {
-        return elem.Long();
+        // Coerce across BSON numeric types exactly as setParameter does, including truncating
+        // doubles toward zero.
+        long long out;
+        uassertStatusOK(elem.tryCoerce(&out));
+        return out;
     }
     static void toBSON(BSONObjBuilder& b, std::string_view field, const QueryKnobValue& val) {
         b.append(field, std::get<long long>(val));
@@ -127,7 +135,12 @@ struct ConverterTraits<long long> {
 template <>
 struct ConverterTraits<double> {
     static QueryKnobValue fromBSON(const BSONElement& elem) {
-        const double val = elem.Double();
+        // Coerce across BSON numeric types, matching setParameter semantics.
+        uassert(ErrorCodes::TypeMismatch,
+                str::stream() << "query knob double value must be numeric, got "
+                              << typeName(elem.type()),
+                elem.isNumber());
+        const double val = elem.numberDouble();
         uassert(ErrorCodes::BadValue, "query knob double value must not be NaN", !std::isnan(val));
         return val;
     }
