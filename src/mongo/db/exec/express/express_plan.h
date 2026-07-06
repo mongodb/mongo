@@ -328,7 +328,7 @@ public:
         _stats = stats;
         _stats->setStageName("EXPRESS_IXSCAN"sv);
         _stats->setIndexName(IndexConstants::kIdIndexName);
-        _stats->setIndexKeyPattern(BSON("_id" << 1));
+        _stats->setIndexKeyPattern(kIdIndexSpec);
     }
 
     template <class Continuation>
@@ -447,6 +447,8 @@ public:
     }
 
 private:
+    inline static const BSONObj kIdIndexSpec = BSON("_id" << 1);
+
     static const IndexCatalogEntry* getIndexCatalogEntryForIdIndex(OperationContext* opCtx,
                                                                    const Collection& collection) {
         const IndexCatalog* catalog = collection.getIndexCatalog();
