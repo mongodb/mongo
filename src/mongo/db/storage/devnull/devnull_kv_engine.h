@@ -280,7 +280,7 @@ public:
 
 private:
     std::shared_ptr<void> _catalogInfo;
-    int _cachePressureForTest;
+    int _cachePressureForTest = 0;
     std::deque<KVBackupBlock> _mockBackupBlocks;
     boost::filesystem::path _engineDbPath;
 };
