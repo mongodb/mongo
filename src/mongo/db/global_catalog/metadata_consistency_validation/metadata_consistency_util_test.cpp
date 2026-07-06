@@ -170,7 +170,7 @@ public:
                                                  repl::OpTime* opTime,
                                                  const OID& epoch,
                                                  const Timestamp& timestamp,
-                                                 repl::ReadConcernLevel readConcern,
+                                                 repl::ReadConcernArgs readConcern,
                                                  const boost::optional<BSONObj>& hint) override {
         if (_onGetChunksCallback) {
             _onGetChunksCallback(opCtx);

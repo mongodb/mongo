@@ -114,7 +114,7 @@ StatusWith<Shard::CommandResponse> RSLocalClient::runCommandOnce(OperationContex
 RetryStrategy::Result<Shard::QueryResponse> RSLocalClient::queryOnce(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
-    const repl::ReadConcernLevel& readConcernLevel,
+    const repl::ReadConcernArgs& readConcern,
     const NamespaceString& nss,
     const BSONObj& query,
     const BSONObj& sort,
@@ -124,8 +124,8 @@ RetryStrategy::Result<Shard::QueryResponse> RSLocalClient::queryOnce(
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     boost::optional<ScopeGuard<std::function<void()>>> readSourceGuard;
 
-    if (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern ||
-        readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern) {
+    if (readConcern.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern ||
+        readConcern.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
         invariant(!shard_role_details::getLocker(opCtx)->isLocked());
         invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
@@ -170,7 +170,7 @@ RetryStrategy::Result<Shard::QueryResponse> RSLocalClient::queryOnce(
         if (!status.isOK()) {
             return status;
         }
-        if (readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern) {
+        if (readConcern.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
             // Snapshot readConcern starts a snapshot at the majority timestamp, acquire the
             // timestamp now and overwrite the majority readConcern used above.
             auto opTime = replCoord->getCurrentCommittedSnapshotOpTime();
@@ -178,7 +178,7 @@ RetryStrategy::Result<Shard::QueryResponse> RSLocalClient::queryOnce(
                 RecoveryUnit::ReadSource::kProvided, opTime.getTimestamp());
         }
     } else {
-        invariant(readConcernLevel == repl::ReadConcernLevel::kLocalReadConcern);
+        invariant(readConcern.getLevel() == repl::ReadConcernLevel::kLocalReadConcern);
     }
 
     DBDirectClient client(opCtx);

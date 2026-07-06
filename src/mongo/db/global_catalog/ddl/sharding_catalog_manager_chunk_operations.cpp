@@ -193,7 +193,7 @@ StatusWith<ChunkType> findChunkContainingRange(OperationContext* opCtx,
     auto findResponseWith =
         configShard->exhaustiveFindOnConfig(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            repl::ReadConcernArgs::kLocal,
                                             NamespaceString::kConfigsvrChunksNamespace,
                                             chunkQuery,
                                             BSON(ChunkType::min << -1),
@@ -302,7 +302,7 @@ boost::optional<ChunkType> getControlChunkForMigrate(OperationContext* opCtx,
     auto status =
         configShard->exhaustiveFindOnConfig(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            repl::ReadConcernArgs::kLocal,
                                             NamespaceString::kConfigsvrChunksNamespace,
                                             queryBuilder.obj(),
                                             {},
@@ -346,7 +346,7 @@ StatusWith<std::pair<CollectionType, ChunkVersion>> getCollectionAndVersion(
     auto findCollResponse = configShard->exhaustiveFindOnConfig(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        repl::ReadConcernLevel::kLocalReadConcern,
+        repl::ReadConcernArgs::kLocal,
         NamespaceString::kConfigsvrCollectionsNamespace,
         BSON(CollectionType::kNssFieldName
              << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
@@ -368,7 +368,7 @@ StatusWith<std::pair<CollectionType, ChunkVersion>> getCollectionAndVersion(
         coll,
         configShard->exhaustiveFindOnConfig(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            repl::ReadConcernArgs::kLocal,
                                             NamespaceString::kConfigsvrChunksNamespace,
                                             chunksQuery,  // Query all chunks for this namespace.
                                             BSON(ChunkType::lastmod << -1),  // Sort by version.
@@ -390,7 +390,7 @@ ChunkVersion getShardPlacementVersion(OperationContext* opCtx,
         coll,
         configShard->exhaustiveFindOnConfig(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            repl::ReadConcernArgs::kLocal,
                                             NamespaceString::kConfigsvrChunksNamespace,
                                             chunksQuery,
                                             BSON(ChunkType::lastmod << -1),  // Sort by version.
@@ -417,7 +417,7 @@ void bumpCollectionMinorVersion(OperationContext* opCtx,
     const auto findCollResponse = uassertStatusOK(configShard->exhaustiveFindOnConfig(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        repl::ReadConcernLevel::kLocalReadConcern,
+        repl::ReadConcernArgs::kLocal,
         NamespaceString::kConfigsvrCollectionsNamespace,
         BSON(CollectionType::kNssFieldName
              << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
@@ -431,7 +431,7 @@ void bumpCollectionMinorVersion(OperationContext* opCtx,
     const auto findChunkResponse = uassertStatusOK(configShard->exhaustiveFindOnConfig(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        repl::ReadConcernLevel::kLocalReadConcern,
+        repl::ReadConcernArgs::kLocal,
         NamespaceString::kConfigsvrChunksNamespace,
         BSON(ChunkType::collectionUUID << coll.getUuid()) /* query */,
         BSON(ChunkType::lastmod << -1) /* sort */,
@@ -611,7 +611,7 @@ bool isPlacementChangedInParentCollection(OperationContext* opCtx,
     auto findResponse = uassertStatusOK(
         configShard->exhaustiveFindOnConfig(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            repl::ReadConcernArgs::kLocal,
                                             NamespaceString::kConfigsvrChunksNamespace,
                                             query,
                                             BSONObj(),
@@ -1257,7 +1257,7 @@ ShardingCatalogManager::_commitChunksMergeImpl(
         uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kLocalReadConcern,
+            repl::ReadConcernArgs::kLocal,
             NamespaceString::kConfigsvrChunksNamespace,
             shardChunksInRangeQuery,
             BSON(ChunkType::min << 1),
@@ -1746,7 +1746,7 @@ ShardingCatalogManager::_commitChunkMigrationImpl(
     auto shardResult = uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
         opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        repl::ReadConcernLevel::kLocalReadConcern,
+        repl::ReadConcernArgs::kLocal,
         NamespaceString::kConfigsvrShardsNamespace,
         BSON(ShardType::name(toShard.toString())),
         {},
@@ -1762,7 +1762,7 @@ ShardingCatalogManager::_commitChunkMigrationImpl(
     auto findCollResponse = uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        repl::ReadConcernLevel::kLocalReadConcern,
+        repl::ReadConcernArgs::kLocal,
         NamespaceString::kConfigsvrCollectionsNamespace,
         BSON(CollectionType::kNssFieldName
              << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
@@ -1786,7 +1786,7 @@ ShardingCatalogManager::_commitChunkMigrationImpl(
     auto findResponse = uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        repl::ReadConcernLevel::kLocalReadConcern,
+        repl::ReadConcernArgs::kLocal,
         NamespaceString::kConfigsvrChunksNamespace,
         findChunkQuery,
         BSON(ChunkType::lastmod << -1),
@@ -2111,7 +2111,7 @@ StatusWith<std::vector<ChunkType>> ShardingCatalogManager::_rebuildChangedChunks
     auto shardChunksResponse = _localConfigShard->exhaustiveFindOnConfig(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        repl::ReadConcernLevel::kLocalReadConcern,
+        repl::ReadConcernArgs::kLocal,
         NamespaceString::kConfigsvrChunksNamespace,
         shardChunksQueryBuilder.obj(),
         BSON(ChunkType::lastmod << 1),  // Sort ascending so changes apply in version order.
@@ -2159,7 +2159,7 @@ StatusWith<std::vector<ChunkType>> ShardingCatalogManager::_rebuildChangedChunks
     auto migratedChunkResponse = _localConfigShard->exhaustiveFindOnConfig(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        repl::ReadConcernLevel::kLocalReadConcern,
+        repl::ReadConcernArgs::kLocal,
         NamespaceString::kConfigsvrChunksNamespace,
         migratedChunkQueryBuilder.obj(),
         BSONObj(),
@@ -2194,7 +2194,7 @@ StatusWith<ChunkType> ShardingCatalogManager::_findChunkOnConfig(OperationContex
     auto findResponse = _localConfigShard->exhaustiveFindOnConfig(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        repl::ReadConcernLevel::kLocalReadConcern,
+        repl::ReadConcernArgs::kLocal,
         NamespaceString::kConfigsvrChunksNamespace,
         query,
         BSONObj(),
@@ -2229,7 +2229,7 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
     auto findCollResponse = uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        repl::ReadConcernLevel::kLocalReadConcern,
+        repl::ReadConcernArgs::kLocal,
         NamespaceString::kConfigsvrCollectionsNamespace,
         BSON(CollectionType::kNssFieldName
              << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
@@ -2259,7 +2259,7 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
     auto targetChunkResult = uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        repl::ReadConcernLevel::kLocalReadConcern,
+        repl::ReadConcernArgs::kLocal,
         NamespaceString::kConfigsvrChunksNamespace,
         targetChunkQuery,
         {},
@@ -2346,7 +2346,7 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
         auto findCollResponse = uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kLocalReadConcern,
+            repl::ReadConcernArgs::kLocal,
             NamespaceString::kConfigsvrCollectionsNamespace,
             BSON(CollectionType::kEpochFieldName << version.epoch()),
             {} /* sort */,
@@ -2375,7 +2375,7 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
             uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
                                 opCtx,
                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                repl::ReadConcernLevel::kLocalReadConcern,
+                                repl::ReadConcernArgs::kLocal,
                                 NamespaceString::kConfigsvrChunksNamespace,
                                 requestedChunkQuery,
                                 BSONObj() /* sort */,
@@ -2419,7 +2419,7 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
             uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
                                 opCtx,
                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                repl::ReadConcernLevel::kLocalReadConcern,
+                                repl::ReadConcernArgs::kLocal,
                                 NamespaceString::kConfigsvrChunksNamespace,
                                 query,
                                 BSON(ChunkType::lastmod << -1) /* sort */,
@@ -2544,8 +2544,8 @@ void ShardingCatalogManager::splitOrMarkJumbo(OperationContext* opCtx,
                 return *optMaxChunkSizeBytes;
             }
 
-            auto coll = _localCatalogClient->getCollection(
-                opCtx, nss, repl::ReadConcernLevel::kMajorityReadConcern);
+            auto coll =
+                _localCatalogClient->getCollection(opCtx, nss, repl::ReadConcernArgs::kMajority);
             return coll.getMaxChunkSizeBytes().value_or(
                 Grid::get(opCtx)->getBalancerConfiguration()->getMaxChunkSizeBytes());
         }();
@@ -2572,7 +2572,7 @@ void ShardingCatalogManager::splitOrMarkJumbo(OperationContext* opCtx,
             const auto findCollResponse = uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                repl::ReadConcernLevel::kLocalReadConcern,
+                repl::ReadConcernArgs::kLocal,
                 NamespaceString::kConfigsvrCollectionsNamespace,
                 BSON(CollectionType::kNssFieldName
                      << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),

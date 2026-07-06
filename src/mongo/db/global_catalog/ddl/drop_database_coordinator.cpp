@@ -131,8 +131,7 @@ void removeDatabaseMetadataFromShard(OperationContext* opCtx,
  */
 void cloneAuthoritativeDatabaseMetadata(OperationContext* opCtx, const DatabaseName& dbName) {
     auto catalogClient = Grid::get(opCtx)->catalogClient();
-    auto dbMetadata =
-        catalogClient->getDatabase(opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern);
+    auto dbMetadata = catalogClient->getDatabase(opCtx, dbName, repl::ReadConcernArgs::kMajority);
 
     const auto thisShardId = ShardingState::get(opCtx)->shardId();
 
@@ -246,8 +245,8 @@ bool isDbAlreadyDropped(OperationContext* opCtx,
     if (dbVersion) {
         try {
             auto const catalogClient = Grid::get(opCtx)->catalogClient();
-            const auto db = catalogClient->getDatabase(
-                opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern);
+            const auto db =
+                catalogClient->getDatabase(opCtx, dbName, repl::ReadConcernArgs::kMajority);
             if (dbVersion->getUuid() != db.getVersion().getUuid()) {
                 // The database was dropped and re-created with a different UUID
                 return true;
@@ -429,8 +428,8 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 }
 
                 // Drop all collections under this DB
-                const auto allTrackedCollectionsForDb = catalogClient->getCollections(
-                    opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern);
+                const auto allTrackedCollectionsForDb =
+                    catalogClient->getCollections(opCtx, _dbName, repl::ReadConcernArgs::kMajority);
 
                 // Check if the operation was previously interrupted in the middle of a sharded
                 // collection drop; if so, resume the step.

@@ -105,7 +105,7 @@ private:
 
     StatusWith<Shard::QueryResponse> _query(OperationContext* opCtx,
                                             const ReadPreferenceSetting& readPref,
-                                            const repl::ReadConcernLevel& readConcernLevel,
+                                            const repl::ReadConcernArgs& readConcern,
                                             const NamespaceString& nss,
                                             const BSONObj& query,
                                             const BSONObj& sort,

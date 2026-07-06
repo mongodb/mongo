@@ -290,7 +290,7 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveCollectionRequest) {
 
     auto catalogClient = ShardingCatalogManager::get(operationContext())->localCatalogClient();
     const auto dbEntry = catalogClient->getDatabase(
-        operationContext(), kNss.dbName(), repl::ReadConcernLevel::kMajorityReadConcern);
+        operationContext(), kNss.dbName(), repl::ReadConcernArgs::kMajority);
     auto futureResponse = _scheduler.requestMoveCollection(
         operationContext(), kNss, kShardId0, kShardId1, dbEntry.getVersion());
     ASSERT_OK(futureResponse.getNoThrow());

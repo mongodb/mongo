@@ -336,8 +336,8 @@ std::vector<DatabaseName> CommonProcessInterface::_getAllDatabasesOnAShardedClus
     OperationContext* opCtx, boost::optional<TenantId> tenantId) {
     tassert(9525808, "This method can only run on a sharded cluster", Grid::get(opCtx));
 
-    const std::vector<DatabaseType> databaseTypes = Grid::get(opCtx)->catalogClient()->getAllDBs(
-        opCtx, repl::ReadConcernLevel::kSnapshotReadConcern);
+    const std::vector<DatabaseType> databaseTypes =
+        Grid::get(opCtx)->catalogClient()->getAllDBs(opCtx, repl::ReadConcernArgs::kSnapshot);
 
     std::vector<DatabaseName> databases;
     databases.reserve(databaseTypes.size());

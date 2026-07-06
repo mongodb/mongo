@@ -179,14 +179,14 @@ StatusWith<std::vector<KeyDocumentType>> _getNewKeys(OperationContext* opCtx,
                                                      const NamespaceString& nss,
                                                      std::string_view purpose,
                                                      const LogicalTime& newerThanThis,
-                                                     repl::ReadConcernLevel readConcernLevel) {
+                                                     repl::ReadConcernArgs readConcern) {
     BSONObjBuilder queryBuilder;
     queryBuilder.append("purpose", purpose);
     queryBuilder.append("expiresAt", BSON("$gt" << newerThanThis.asTimestamp()));
 
     auto findStatus = shard->exhaustiveFindOnConfig(opCtx,
                                                     getConfigReadPreference(opCtx),
-                                                    readConcernLevel,
+                                                    readConcern,
                                                     nss,
                                                     queryBuilder.obj(),
                                                     BSON("expiresAt" << 1),
@@ -406,7 +406,7 @@ ShardingCatalogClientImpl::~ShardingCatalogClientImpl() = default;
 
 DatabaseType ShardingCatalogClientImpl::getDatabase(OperationContext* opCtx,
                                                     const DatabaseName& dbName,
-                                                    repl::ReadConcernLevel readConcernLevel) {
+                                                    repl::ReadConcernArgs readConcern) {
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << dbName.toStringForErrorMsg() << " is not a valid db name",
             DatabaseName::isValid(dbName, DatabaseName::DollarInDbNameBehavior::Allow));
@@ -433,7 +433,7 @@ DatabaseType ShardingCatalogClientImpl::getDatabase(OperationContext* opCtx,
     }
 
     auto result =
-        _fetchDatabaseMetadata(opCtx, dbName, getConfigReadPreference(opCtx), readConcernLevel);
+        _fetchDatabaseMetadata(opCtx, dbName, getConfigReadPreference(opCtx), readConcern);
     if (result == ErrorCodes::NamespaceNotFound) {
         // If we failed to find the database metadata on the 'nearest' config server, try again
         // against the primary, in case the database was recently created.
@@ -441,7 +441,7 @@ DatabaseType ShardingCatalogClientImpl::getDatabase(OperationContext* opCtx,
                    _fetchDatabaseMetadata(opCtx,
                                           dbName,
                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                          readConcernLevel))
+                                          readConcern))
             .value;
     }
 
@@ -450,7 +450,7 @@ DatabaseType ShardingCatalogClientImpl::getDatabase(OperationContext* opCtx,
 
 std::vector<DatabaseType> ShardingCatalogClientImpl::getAllDBs(
     OperationContext* opCtx,
-    repl::ReadConcernLevel readConcern,
+    repl::ReadConcernArgs readConcern,
     const boost::optional<ReadPreferenceSetting>& readPref) {
     auto dbs =
         uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
@@ -475,13 +475,13 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::_fetchData
     OperationContext* opCtx,
     const DatabaseName& dbName,
     const ReadPreferenceSetting& readPref,
-    repl::ReadConcernLevel readConcernLevel) {
+    repl::ReadConcernArgs readConcern) {
     invariant(!dbName.isAdminDB() && !dbName.isConfigDB());
 
     auto findStatus =
         _exhaustiveFindOnConfig(opCtx,
                                 readPref,
-                                readConcernLevel,
+                                readConcern,
                                 NamespaceString::kConfigDatabasesNamespace,
                                 BSON(DatabaseType::kDbNameFieldName << DatabaseNameUtil::serialize(
                                          dbName, SerializationContext::stateCommandRequest())),
@@ -546,12 +546,12 @@ std::vector<BSONObj> ShardingCatalogClientImpl::runCatalogAggregation(
 
 CollectionType ShardingCatalogClientImpl::getCollection(OperationContext* opCtx,
                                                         const NamespaceString& nss,
-                                                        repl::ReadConcernLevel readConcernLevel) {
+                                                        repl::ReadConcernArgs readConcern) {
     auto collDoc =
         uassertStatusOK(_exhaustiveFindOnConfig(
                             opCtx,
                             getConfigReadPreference(opCtx),
-                            readConcernLevel,
+                            readConcern,
                             NamespaceString::kConfigsvrCollectionsNamespace,
                             BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
                                      nss, SerializationContext::stateDefault())),
@@ -568,11 +568,11 @@ CollectionType ShardingCatalogClientImpl::getCollection(OperationContext* opCtx,
 
 CollectionType ShardingCatalogClientImpl::getCollection(OperationContext* opCtx,
                                                         const UUID& uuid,
-                                                        repl::ReadConcernLevel readConcernLevel) {
+                                                        repl::ReadConcernArgs readConcern) {
     auto collDoc =
         uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
                                                 getConfigReadPreference(opCtx),
-                                                readConcernLevel,
+                                                readConcern,
                                                 NamespaceString::kConfigsvrCollectionsNamespace,
                                                 BSON(CollectionType::kUuidFieldName << uuid),
                                                 BSONObj(),
@@ -587,7 +587,7 @@ CollectionType ShardingCatalogClientImpl::getCollection(OperationContext* opCtx,
 std::vector<CollectionType> ShardingCatalogClientImpl::getShardedCollections(
     OperationContext* opCtx,
     const DatabaseName& dbName,
-    repl::ReadConcernLevel readConcernLevel,
+    repl::ReadConcernArgs readConcern,
     const BSONObj& sort) {
     BSONObjBuilder b;
     if (!dbName.isEmpty()) {
@@ -602,7 +602,7 @@ std::vector<CollectionType> ShardingCatalogClientImpl::getShardedCollections(
     auto collDocs =
         uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
                                                 getConfigReadPreference(opCtx),
-                                                readConcernLevel,
+                                                readConcern,
                                                 NamespaceString::kConfigsvrCollectionsNamespace,
                                                 b.obj(),
                                                 sort,
@@ -619,7 +619,7 @@ std::vector<CollectionType> ShardingCatalogClientImpl::getShardedCollections(
 std::vector<CollectionType> ShardingCatalogClientImpl::getCollections(
     OperationContext* opCtx,
     const DatabaseName& dbName,
-    repl::ReadConcernLevel readConcernLevel,
+    repl::ReadConcernArgs readConcern,
     const BSONObj& sort) {
     BSONObjBuilder b;
     if (!dbName.isEmpty()) {
@@ -632,7 +632,7 @@ std::vector<CollectionType> ShardingCatalogClientImpl::getCollections(
     auto collDocs =
         uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
                                                 getConfigReadPreference(opCtx),
-                                                readConcernLevel,
+                                                readConcern,
                                                 NamespaceString::kConfigsvrCollectionsNamespace,
                                                 b.obj(),
                                                 sort,
@@ -649,7 +649,7 @@ std::vector<CollectionType> ShardingCatalogClientImpl::getCollections(
 std::vector<NamespaceString> ShardingCatalogClientImpl::getShardedCollectionNamespacesForDb(
     OperationContext* opCtx,
     const DatabaseName& dbName,
-    repl::ReadConcernLevel readConcern,
+    repl::ReadConcernArgs readConcern,
     const BSONObj& sort) {
     BSONObjBuilder b;
     const auto db =
@@ -681,7 +681,7 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getShardedCollectionName
 std::vector<NamespaceString> ShardingCatalogClientImpl::getCollectionNamespacesForDb(
     OperationContext* opCtx,
     const DatabaseName& dbName,
-    repl::ReadConcernLevel readConcern,
+    repl::ReadConcernArgs readConcern,
     const BSONObj& sort) {
     auto collectionsOnConfig = getCollections(opCtx, dbName, readConcern, sort);
 
@@ -697,7 +697,7 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getCollectionNamespacesF
 std::vector<NamespaceString> ShardingCatalogClientImpl::getUnsplittableCollectionNamespacesForDb(
     OperationContext* opCtx,
     const DatabaseName& dbName,
-    repl::ReadConcernLevel readConcern,
+    repl::ReadConcernArgs readConcern,
     const BSONObj& sort) {
     BSONObjBuilder b;
     const auto db =
@@ -730,7 +730,7 @@ StatusWith<BSONObj> ShardingCatalogClientImpl::getGlobalSettings(OperationContex
                                                                  std::string_view key) {
     auto findStatus = _exhaustiveFindOnConfig(opCtx,
                                               getConfigReadPreference(opCtx),
-                                              repl::ReadConcernLevel::kMajorityReadConcern,
+                                              repl::ReadConcernArgs::kMajority,
                                               NamespaceString::kConfigSettingsNamespace,
                                               BSON("_id" << key),
                                               BSONObj(),
@@ -750,7 +750,7 @@ StatusWith<BSONObj> ShardingCatalogClientImpl::getGlobalSettings(OperationContex
 }
 
 StatusWith<VersionType> ShardingCatalogClientImpl::getConfigVersion(
-    OperationContext* opCtx, repl::ReadConcernLevel readConcern) {
+    OperationContext* opCtx, repl::ReadConcernArgs readConcern) {
     auto findStatus =
         _getConfigShard(opCtx)->exhaustiveFindOnConfig(opCtx,
                                                        getConfigReadPreference(opCtx),
@@ -790,7 +790,7 @@ StatusWith<std::vector<DatabaseName>> ShardingCatalogClientImpl::getDatabasesFor
     auto findStatus =
         _exhaustiveFindOnConfig(opCtx,
                                 getConfigReadPreference(opCtx),
-                                repl::ReadConcernLevel::kMajorityReadConcern,
+                                repl::ReadConcernArgs::kMajority,
                                 NamespaceString::kConfigDatabasesNamespace,
                                 BSON(DatabaseType::kPrimaryFieldName << shardId.toString()),
                                 BSONObj(),
@@ -824,11 +824,11 @@ StatusWith<std::vector<ChunkType>> ShardingCatalogClientImpl::getChunks(
     repl::OpTime* opTime,
     const OID& epoch,
     const Timestamp& timestamp,
-    repl::ReadConcernLevel readConcern,
+    repl::ReadConcernArgs readConcern,
     const boost::optional<BSONObj>& hint) {
     invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
-              readConcern == repl::ReadConcernLevel::kMajorityReadConcern ||
-              readConcern == repl::ReadConcernLevel::kSnapshotReadConcern);
+              readConcern.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern ||
+              readConcern.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern);
 
     // Convert boost::optional<int> to boost::optional<long long>.
     auto longLimit = limit ? boost::optional<long long>(*limit) : boost::none;
@@ -942,7 +942,7 @@ StatusWith<std::vector<TagsType>> ShardingCatalogClientImpl::getTagsForCollectio
     OperationContext* opCtx, const NamespaceString& nss, boost::optional<long long> limit) {
     auto findStatus = _exhaustiveFindOnConfig(opCtx,
                                               getConfigReadPreference(opCtx),
-                                              repl::ReadConcernLevel::kMajorityReadConcern,
+                                              repl::ReadConcernArgs::kMajority,
                                               TagsType::ConfigNS,
                                               BSON(TagsType::ns(NamespaceStringUtil::serialize(
                                                   nss, SerializationContext::stateDefault()))),
@@ -1028,7 +1028,7 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getAllNssThatHaveZonesFo
 }
 
 repl::OpTimeWith<std::vector<ShardType>> ShardingCatalogClientImpl::getAllShards(
-    OperationContext* opCtx, repl::ReadConcernLevel readConcern, BSONObj filter) {
+    OperationContext* opCtx, repl::ReadConcernArgs readConcern, BSONObj filter) {
     if (MONGO_unlikely(serverGlobalParams.configOnly)) {
         uasserted(
             12319006,
@@ -1217,7 +1217,7 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
             auto fetchDuplicate =
                 _exhaustiveFindOnConfig(opCtx,
                                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                        repl::ReadConcernLevel::kMajorityReadConcern,
+                                        repl::ReadConcernArgs::kMajority,
                                         nss,
                                         idField.eoo() ? doc : idField.wrap(),
                                         BSONObj(),
@@ -1346,7 +1346,7 @@ Status ShardingCatalogClientImpl::removeConfigDocuments(OperationContext* opCtx,
 StatusWith<repl::OpTimeWith<std::vector<BSONObj>>>
 ShardingCatalogClientImpl::_exhaustiveFindOnConfig(OperationContext* opCtx,
                                                    const ReadPreferenceSetting& readPref,
-                                                   const repl::ReadConcernLevel& readConcern,
+                                                   const repl::ReadConcernArgs& readConcern,
                                                    const NamespaceString& nss,
                                                    const BSONObj& query,
                                                    const BSONObj& sort,
@@ -1366,26 +1366,26 @@ StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientImpl::getNe
     OperationContext* opCtx,
     std::string_view purpose,
     const LogicalTime& newerThanThis,
-    repl::ReadConcernLevel readConcernLevel) {
+    repl::ReadConcernArgs readConcern) {
     return _getNewKeys<KeysCollectionDocument>(opCtx,
                                                _getConfigShard(opCtx),
                                                NamespaceString::kKeysCollectionNamespace,
                                                purpose,
                                                newerThanThis,
-                                               readConcernLevel);
+                                               readConcern);
 }
 
 StatusWith<std::vector<ExternalKeysCollectionDocument>>
 ShardingCatalogClientImpl::getAllExternalKeys(OperationContext* opCtx,
                                               std::string_view purpose,
-                                              repl::ReadConcernLevel readConcernLevel) {
+                                              repl::ReadConcernArgs readConcern) {
     return _getNewKeys<ExternalKeysCollectionDocument>(
         opCtx,
         _getConfigShard(opCtx),
         NamespaceString::kExternalKeysCollectionNamespace,
         purpose,
         LogicalTime(),
-        readConcernLevel);
+        readConcern);
 }
 
 bool ShardingCatalogClientImpl::anyShardRemovedSince(OperationContext* opCtx,
@@ -1394,7 +1394,7 @@ bool ShardingCatalogClientImpl::anyShardRemovedSince(OperationContext* opCtx,
         uassertStatusOK(
             _exhaustiveFindOnConfig(opCtx,
                                     kConfigPrimaryPreferredReadPreference,
-                                    repl::ReadConcernLevel::kMajorityReadConcern,
+                                    repl::ReadConcernArgs::kMajority,
                                     NamespaceString::kConfigsvrShardRemovalLogNamespace,
                                     BSON("_id" << ShardingCatalogClient::kLatestShardRemovalLogId
                                                << RemoveShardEventType::kTimestampFieldName

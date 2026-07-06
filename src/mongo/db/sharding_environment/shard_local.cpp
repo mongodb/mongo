@@ -102,7 +102,7 @@ RetryStrategy::Result<Shard::QueryResponse> ShardLocal::_exhaustiveFindOnConfig(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
     const TargetingMetadata& targetingMetadata,
-    const repl::ReadConcernLevel& readConcernLevel,
+    const repl::ReadConcernArgs& readConcern,
     const NamespaceString& nss,
     const BSONObj& query,
     const BSONObj& sort,
@@ -110,7 +110,7 @@ RetryStrategy::Result<Shard::QueryResponse> ShardLocal::_exhaustiveFindOnConfig(
     const boost::optional<BSONObj>& hint,
     const boost::optional<BSONObj>& projection) {
     return _rsLocalClient.queryOnce(
-        opCtx, readPref, readConcernLevel, nss, query, sort, limit, hint, projection);
+        opCtx, readPref, readConcern, nss, query, sort, limit, hint, projection);
 }
 
 void ShardLocal::runFireAndForgetCommand(OperationContext* opCtx,

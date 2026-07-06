@@ -118,8 +118,7 @@ void triggerFireAndForgetShardRefreshes(OperationContext* opCtx,
                                         ShardingCatalogClient* catalogClient,
                                         const CollectionType& coll) {
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-    const auto allShards =
-        catalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern).value;
+    const auto allShards = catalogClient->getAllShards(opCtx, repl::ReadConcernArgs::kLocal).value;
     for (const auto& shardEntry : allShards) {
         const auto query = BSON(ChunkType::collectionUUID
                                 << coll.getUuid() << ChunkType::shard(shardEntry.getName()));
@@ -127,7 +126,7 @@ void triggerFireAndForgetShardRefreshes(OperationContext* opCtx,
         const auto chunk = uassertStatusOK(configShard->exhaustiveFindOnConfig(
                                                opCtx,
                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                               repl::ReadConcernLevel::kLocalReadConcern,
+                                               repl::ReadConcernArgs::kLocal,
                                                NamespaceString::kConfigsvrChunksNamespace,
                                                query,
                                                BSONObj(),
@@ -391,8 +390,7 @@ void ShardingCatalogManager::commitRefineCollectionShardKey(
 
     // Idempotency check: if the shard key is already the one requested, there is nothing to do
     // except waiting for majority, in case the write haven't been majority written.
-    auto collType =
-        _localCatalogClient->getCollection(opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
+    auto collType = _localCatalogClient->getCollection(opCtx, nss, repl::ReadConcernArgs::kLocal);
     if (newTimestamp == collType.getTimestamp()) {
         uassert(7648607,
                 str::stream() << "Expected refined key " << newShardKeyPattern.toBSON() << " but "

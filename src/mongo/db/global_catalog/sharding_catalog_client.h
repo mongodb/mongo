@@ -116,7 +116,7 @@ public:
      */
     virtual DatabaseType getDatabase(OperationContext* opCtx,
                                      const DatabaseName& db,
-                                     repl::ReadConcernLevel readConcernLevel) = 0;
+                                     repl::ReadConcernArgs readConcern) = 0;
 
     /**
      * Retrieves all databases in a cluster by querying the config.databases collection on the
@@ -133,7 +133,7 @@ public:
      */
     virtual std::vector<DatabaseType> getAllDBs(
         OperationContext* opCtx,
-        repl::ReadConcernLevel readConcern,
+        repl::ReadConcernArgs readConcern,
         const boost::optional<ReadPreferenceSetting>& readPref = boost::none) = 0;
 
     /**
@@ -149,12 +149,12 @@ public:
     virtual CollectionType getCollection(
         OperationContext* opCtx,
         const NamespaceString& nss,
-        repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern) = 0;
+        repl::ReadConcernArgs readConcern = repl::ReadConcernArgs::kMajority) = 0;
 
     virtual CollectionType getCollection(
         OperationContext* opCtx,
         const UUID& uuid,
-        repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern) = 0;
+        repl::ReadConcernArgs readConcern = repl::ReadConcernArgs::kMajority) = 0;
 
     /**
      * Retrieves all collections under a specified database (or in the system) which are sharded. If
@@ -165,7 +165,7 @@ public:
     virtual std::vector<CollectionType> getShardedCollections(
         OperationContext* opCtx,
         const DatabaseName& db,
-        repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern,
+        repl::ReadConcernArgs readConcern = repl::ReadConcernArgs::kMajority,
         const BSONObj& sort = BSONObj()) = 0;
 
     /**
@@ -177,7 +177,7 @@ public:
     virtual std::vector<CollectionType> getCollections(
         OperationContext* opCtx,
         const DatabaseName& db,
-        repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern,
+        repl::ReadConcernArgs readConcern = repl::ReadConcernArgs::kMajority,
         const BSONObj& sort = BSONObj()) = 0;
 
     /**
@@ -190,7 +190,7 @@ public:
     virtual std::vector<NamespaceString> getShardedCollectionNamespacesForDb(
         OperationContext* opCtx,
         const DatabaseName& dbName,
-        repl::ReadConcernLevel readConcern,
+        repl::ReadConcernArgs readConcern,
         const BSONObj& sort = BSONObj()) = 0;
 
     /**
@@ -203,7 +203,7 @@ public:
     virtual std::vector<NamespaceString> getCollectionNamespacesForDb(
         OperationContext* opCtx,
         const DatabaseName& dbName,
-        repl::ReadConcernLevel readConcern,
+        repl::ReadConcernArgs readConcern,
         const BSONObj& sort = BSONObj()) = 0;
 
     /**
@@ -216,7 +216,7 @@ public:
     virtual std::vector<NamespaceString> getUnsplittableCollectionNamespacesForDb(
         OperationContext* opCtx,
         const DatabaseName& dbName,
-        repl::ReadConcernLevel readConcern,
+        repl::ReadConcernArgs readConcern,
         const BSONObj& sort = BSONObj()) = 0;
 
     /**
@@ -251,7 +251,7 @@ public:
         repl::OpTime* opTime,
         const OID& epoch,
         const Timestamp& timestamp,
-        repl::ReadConcernLevel readConcern,
+        repl::ReadConcernArgs readConcern,
         const boost::optional<BSONObj>& hint = boost::none) = 0;
 
     /**
@@ -287,10 +287,9 @@ public:
      * (default), it retrieves all shards. Otherwise, it retrieves only shards that are not
      * draining.
      */
-    virtual repl::OpTimeWith<std::vector<ShardType>> getAllShards(
-        OperationContext* opCtx,
-        repl::ReadConcernLevel readConcern,
-        BSONObj filter = BSONObj()) = 0;
+    virtual repl::OpTimeWith<std::vector<ShardType>> getAllShards(OperationContext* opCtx,
+                                                                  repl::ReadConcernArgs readConcern,
+                                                                  BSONObj filter = BSONObj()) = 0;
 
     /**
      * Runs a user management command on the config servers. Do not use for general write command
@@ -334,7 +333,7 @@ public:
      * version as well as the clusterID.
      */
     virtual StatusWith<VersionType> getConfigVersion(OperationContext* opCtx,
-                                                     repl::ReadConcernLevel readConcern) = 0;
+                                                     repl::ReadConcernArgs readConcern) = 0;
 
     /**
      * Returns internal keys for the given purpose and have an expiresAt value greater than
@@ -344,15 +343,13 @@ public:
         OperationContext* opCtx,
         std::string_view purpose,
         const LogicalTime& newerThanThis,
-        repl::ReadConcernLevel readConcernLevel) = 0;
+        repl::ReadConcernArgs readConcern) = 0;
 
     /**
      * Returns all external (i.e. validation-only) keys for the given purpose.
      */
     virtual StatusWith<std::vector<ExternalKeysCollectionDocument>> getAllExternalKeys(
-        OperationContext* opCtx,
-        std::string_view purpose,
-        repl::ReadConcernLevel readConcernLevel) = 0;
+        OperationContext* opCtx, std::string_view purpose, repl::ReadConcernArgs readConcern) = 0;
 
     /**
      * Directly inserts a document in the specified namespace on the config server. The document
@@ -424,7 +421,7 @@ private:
     virtual StatusWith<repl::OpTimeWith<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
-        const repl::ReadConcernLevel& readConcern,
+        const repl::ReadConcernArgs& readConcern,
         const NamespaceString& nss,
         const BSONObj& query,
         const BSONObj& sort,

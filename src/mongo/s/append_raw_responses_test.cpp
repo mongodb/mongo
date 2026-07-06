@@ -195,10 +195,9 @@ protected:
             StaticCatalogClient(std::vector<ShardHandle> shards)
                 : _shardHandles(std::move(shards)) {}
 
-            repl::OpTimeWith<std::vector<ShardType>> getAllShards(
-                OperationContext* opCtx,
-                repl::ReadConcernLevel readConcern,
-                BSONObj filter) override {
+            repl::OpTimeWith<std::vector<ShardType>> getAllShards(OperationContext* opCtx,
+                                                                  repl::ReadConcernArgs readConcern,
+                                                                  BSONObj filter) override {
                 std::vector<ShardType> shardTypes;
                 for (const auto& shardHandle : _shardHandles) {
                     const ConnectionString cs = ConnectionString::forReplicaSet(

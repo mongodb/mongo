@@ -181,7 +181,7 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
     auto findResponse = uassertStatusOK(
         getConfigShard()->exhaustiveFindOnConfig(operationContext(),
                                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                 repl::ReadConcernLevel::kLocalReadConcern,
+                                                 repl::ReadConcernArgs::kLocal,
                                                  NamespaceString::kConfigsvrChunksNamespace,
                                                  query,
                                                  BSON(ChunkType::lastmod << -1),
@@ -260,7 +260,7 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
     auto findResponse = uassertStatusOK(
         getConfigShard()->exhaustiveFindOnConfig(operationContext(),
                                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                 repl::ReadConcernLevel::kLocalReadConcern,
+                                                 repl::ReadConcernArgs::kLocal,
                                                  NamespaceString::kConfigsvrChunksNamespace,
                                                  query,
                                                  BSON(ChunkType::lastmod << -1),
@@ -346,7 +346,7 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
     auto findResponse = uassertStatusOK(
         getConfigShard()->exhaustiveFindOnConfig(operationContext(),
                                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                 repl::ReadConcernLevel::kLocalReadConcern,
+                                                 repl::ReadConcernArgs::kLocal,
                                                  NamespaceString::kConfigsvrChunksNamespace,
                                                  query,
                                                  BSON(ChunkType::lastmod << -1),
@@ -430,7 +430,7 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
     auto findResponse = uassertStatusOK(
         getConfigShard()->exhaustiveFindOnConfig(operationContext(),
                                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                 repl::ReadConcernLevel::kLocalReadConcern,
+                                                 repl::ReadConcernArgs::kLocal,
                                                  NamespaceString::kConfigsvrChunksNamespace,
                                                  query,
                                                  BSON(ChunkType::lastmod << -1),
@@ -587,7 +587,7 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedSucceeds) {
     auto findResponse = uassertStatusOK(
         getConfigShard()->exhaustiveFindOnConfig(operationContext(),
                                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                 repl::ReadConcernLevel::kLocalReadConcern,
+                                                 repl::ReadConcernArgs::kLocal,
                                                  NamespaceString::kConfigsvrChunksNamespace,
                                                  query,
                                                  BSON(ChunkType::lastmod << -1),
@@ -660,7 +660,7 @@ TEST_F(MergeChunkTest, RetryCommittedMergeSucceedsDuringFCVTransition) {
     auto findResponse = uassertStatusOK(
         getConfigShard()->exhaustiveFindOnConfig(operationContext(),
                                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                 repl::ReadConcernLevel::kLocalReadConcern,
+                                                 repl::ReadConcernArgs::kLocal,
                                                  NamespaceString::kConfigsvrChunksNamespace,
                                                  query,
                                                  BSON(ChunkType::lastmod << -1),
@@ -729,7 +729,7 @@ TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceed) {
     auto findResponse = uassertStatusOK(
         getConfigShard()->exhaustiveFindOnConfig(operationContext(),
                                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                 repl::ReadConcernLevel::kLocalReadConcern,
+                                                 repl::ReadConcernArgs::kLocal,
                                                  NamespaceString::kConfigsvrChunksNamespace,
                                                  query,
                                                  BSON(ChunkType::lastmod << -1),
@@ -1046,7 +1046,7 @@ protected:
         auto findResponse = uassertStatusOK(getConfigShard()->exhaustiveFindOnConfig(
             operationContext(),
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kLocalReadConcern,
+            repl::ReadConcernArgs::kLocal,
             NamespaceString::kConfigsvrChunksNamespace,
             query,
             BSON(ChunkType::min << 1),
@@ -1280,7 +1280,7 @@ protected:
             auto response = assertGet(getConfigShard()->exhaustiveFindOnConfig(
                 operationContext(),
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                repl::ReadConcernLevel::kLocalReadConcern,
+                repl::ReadConcernArgs::kLocal,
                 ChangeLogType::ConfigNS,
                 query.obj(),
                 BSONObj(),

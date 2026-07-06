@@ -141,7 +141,7 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
                                     ->catalogClient()
                                     ->getDatabase(opCtx,
                                                   coordinatorDoc.getSourceNss().dbName(),
-                                                  repl::ReadConcernLevel::kMajorityReadConcern)
+                                                  repl::ReadConcernArgs::kMajority)
                                     .getPrimary();
 
     recipientShardIds.emplace(dbPrimaryShard);

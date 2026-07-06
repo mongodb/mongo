@@ -140,7 +140,7 @@ std::vector<std::pair<NamespaceString, ListCollectionsReplyItem>> getUntrackedCo
         const auto& localCatalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
         BSONObj noSort{};
         return localCatalogClient->getCollections(
-            opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern, noSort);
+            opCtx, dbName, repl::ReadConcernArgs::kMajority, noSort);
     }();
 
     for (const auto& trackedColl : trackedColls) {

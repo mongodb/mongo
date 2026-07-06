@@ -212,7 +212,7 @@ std::vector<ChunkType> getChunksFromGlobalCatalog(OperationContext* opCtx,
         nullptr,
         coll.getEpoch(),
         coll.getTimestamp(),
-        repl::ReadConcernLevel::kSnapshotReadConcern);
+        repl::ReadConcernArgs::kSnapshot);
 
     uassertStatusOK(chunksStatus.getStatus());
 
@@ -1642,7 +1642,7 @@ std::vector<CollectionType> getCollectionsListFromConfigServer(
             return Grid::get(opCtx)->catalogClient()->getCollections(
                 opCtx,
                 nss.dbName(),
-                repl::ReadConcernLevel::kMajorityReadConcern,
+                repl::ReadConcernArgs::kMajority,
                 BSON(CollectionType::kNssFieldName << 1) /*sort*/);
         }
         case MetadataConsistencyCommandLevelEnum::kCollectionLevel: {
@@ -2632,7 +2632,7 @@ std::vector<MetadataInconsistencyItem> runCheckMetadataConsistencyOnParticipant(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
             !nss.isConfigDB()) {
             const auto dbInGlobalCatalog = Grid::get(opCtx)->catalogClient()->getDatabase(
-                opCtx, nss.dbName(), repl::ReadConcernLevel::kMajorityReadConcern);
+                opCtx, nss.dbName(), repl::ReadConcernArgs::kMajority);
 
             auto dbMetadataInconsistencies =
                 checkDatabaseMetadataConsistency(opCtx, dbInGlobalCatalog);

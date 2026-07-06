@@ -309,11 +309,11 @@ void preCacheMongosRoutingInfo(OperationContext* opCtx) {
     auto grid = Grid::get(opCtx);
     auto catalogClient = grid->catalogClient();
     auto catalogCache = grid->catalogCache();
-    auto allDbs = catalogClient->getAllDBs(opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
+    auto allDbs = catalogClient->getAllDBs(opCtx, repl::ReadConcernArgs::kMajority);
 
     for (auto& db : allDbs) {
         for (auto& nss : catalogClient->getCollectionNamespacesForDb(
-                 opCtx, db.getDbName(), repl::ReadConcernLevel::kMajorityReadConcern)) {
+                 opCtx, db.getDbName(), repl::ReadConcernArgs::kMajority)) {
             auto resp = catalogCache->getCollectionRoutingInfo(opCtx, nss);
             if (!resp.isOK()) {
                 LOGV2_WARNING(6203600,
@@ -340,9 +340,8 @@ Status preWarmConnectionPool(OperationContext* opCtx) {
     auto const grid = Grid::get(opCtx);
     std::vector<ShardType> allShards;
     try {
-        allShards = grid->catalogClient()
-                        ->getAllShards(opCtx, repl::ReadConcernLevel::kMajorityReadConcern)
-                        .value;
+        allShards =
+            grid->catalogClient()->getAllShards(opCtx, repl::ReadConcernArgs::kMajority).value;
     } catch (const DBException& ex) {
         return ex.toStatus();
     }

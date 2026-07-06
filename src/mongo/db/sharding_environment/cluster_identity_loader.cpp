@@ -109,7 +109,8 @@ StatusWith<OID> ClusterIdentityLoader::_fetchClusterIdFromConfig(
     OperationContext* opCtx,
     ShardingCatalogClient* catalogClient,
     const repl::ReadConcernLevel& readConcernLevel) {
-    auto loadResult = catalogClient->getConfigVersion(opCtx, readConcernLevel);
+    auto loadResult =
+        catalogClient->getConfigVersion(opCtx, repl::ReadConcernArgs{readConcernLevel});
     if (!loadResult.isOK()) {
         return loadResult.getStatus().withContext("Error loading clusterID");
     }

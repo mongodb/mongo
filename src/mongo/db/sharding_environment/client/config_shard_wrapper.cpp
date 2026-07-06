@@ -123,23 +123,15 @@ RetryStrategy::Result<Shard::QueryResponse> ConfigShardWrapper::_exhaustiveFindO
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
     const TargetingMetadata& targetingMetadata,
-    const repl::ReadConcernLevel& readConcernLevel,
+    const repl::ReadConcernArgs& readConcern,
     const NamespaceString& nss,
     const BSONObj& query,
     const BSONObj& sort,
     boost::optional<long long> limit,
     const boost::optional<BSONObj>& hint,
     const boost::optional<BSONObj>& projection) {
-    return _configShard->_exhaustiveFindOnConfig(opCtx,
-                                                 readPref,
-                                                 targetingMetadata,
-                                                 readConcernLevel,
-                                                 nss,
-                                                 query,
-                                                 sort,
-                                                 limit,
-                                                 hint,
-                                                 projection);
+    return _configShard->_exhaustiveFindOnConfig(
+        opCtx, readPref, targetingMetadata, readConcern, nss, query, sort, limit, hint, projection);
 }
 
 ReadPreferenceSetting ConfigShardWrapper::_attachConfigTimeToMinClusterTime(

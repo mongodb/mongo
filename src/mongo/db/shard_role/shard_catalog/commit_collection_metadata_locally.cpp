@@ -96,7 +96,7 @@ std::vector<ChunkType> fetchOwnedChunks(OperationContext* opCtx,
         nullptr,
         coll.getEpoch(),
         coll.getTimestamp(),
-        repl::ReadConcernLevel::kSnapshotReadConcern);
+        repl::ReadConcernArgs::kSnapshot);
     uassertStatusOK(chunksStatus.getStatus());
 
     return chunksStatus.getValue();

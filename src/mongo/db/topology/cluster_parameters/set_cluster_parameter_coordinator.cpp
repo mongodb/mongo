@@ -182,7 +182,7 @@ boost::optional<BSONObj> SetClusterParameterCoordinator::_getPersistedClusterPar
     auto configsvrParameters = uassertStatusOK(configShard->exhaustiveFindOnConfig(
         opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        repl::ReadConcernLevel::kMajorityReadConcern,
+        repl::ReadConcernArgs::kMajority,
         NamespaceString::makeClusterParametersNSS(_doc.getTenantId()),
         BSON("_id" << parameterName),
         BSONObj(),

@@ -61,33 +61,33 @@ std::vector<BSONObj> ShardingCatalogClientMock::runCatalogAggregation(
 
 DatabaseType ShardingCatalogClientMock::getDatabase(OperationContext* opCtx,
                                                     const DatabaseName& db,
-                                                    repl::ReadConcernLevel readConcernLevel) {
+                                                    repl::ReadConcernArgs readConcern) {
     uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
 
 std::vector<DatabaseType> ShardingCatalogClientMock::getAllDBs(
     OperationContext* opCtx,
-    repl::ReadConcernLevel readConcern,
+    repl::ReadConcernArgs readConcern,
     const boost::optional<ReadPreferenceSetting>& readPref) {
     uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
 
 CollectionType ShardingCatalogClientMock::getCollection(OperationContext* opCtx,
                                                         const NamespaceString& nss,
-                                                        repl::ReadConcernLevel readConcernLevel) {
+                                                        repl::ReadConcernArgs readConcern) {
     uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
 
 CollectionType ShardingCatalogClientMock::getCollection(OperationContext* opCtx,
                                                         const UUID& uuid,
-                                                        repl::ReadConcernLevel readConcernLevel) {
+                                                        repl::ReadConcernArgs readConcern) {
     uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
 
 std::vector<CollectionType> ShardingCatalogClientMock::getShardedCollections(
     OperationContext* opCtx,
     const DatabaseName& dbName,
-    repl::ReadConcernLevel readConcernLevel,
+    repl::ReadConcernArgs readConcern,
     const BSONObj& sort) {
     uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
@@ -95,7 +95,7 @@ std::vector<CollectionType> ShardingCatalogClientMock::getShardedCollections(
 std::vector<CollectionType> ShardingCatalogClientMock::getCollections(
     OperationContext* opCtx,
     const DatabaseName& dbName,
-    repl::ReadConcernLevel readConcernLevel,
+    repl::ReadConcernArgs readConcern,
     const BSONObj& sort) {
     uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
@@ -103,7 +103,7 @@ std::vector<CollectionType> ShardingCatalogClientMock::getCollections(
 std::vector<NamespaceString> ShardingCatalogClientMock::getCollectionNamespacesForDb(
     OperationContext* opCtx,
     const DatabaseName& dbName,
-    repl::ReadConcernLevel readConcern,
+    repl::ReadConcernArgs readConcern,
     const BSONObj& sort) {
     return {};
 }
@@ -111,7 +111,7 @@ std::vector<NamespaceString> ShardingCatalogClientMock::getCollectionNamespacesF
 std::vector<NamespaceString> ShardingCatalogClientMock::getShardedCollectionNamespacesForDb(
     OperationContext* opCtx,
     const DatabaseName& dbName,
-    repl::ReadConcernLevel readConcern,
+    repl::ReadConcernArgs readConcern,
     const BSONObj& sort) {
     return {};
 }
@@ -119,7 +119,7 @@ std::vector<NamespaceString> ShardingCatalogClientMock::getShardedCollectionName
 std::vector<NamespaceString> ShardingCatalogClientMock::getUnsplittableCollectionNamespacesForDb(
     OperationContext* opCtx,
     const DatabaseName& dbName,
-    repl::ReadConcernLevel readConcern,
+    repl::ReadConcernArgs readConcern,
     const BSONObj& sort) {
     return {};
 }
@@ -137,7 +137,7 @@ StatusWith<std::vector<ChunkType>> ShardingCatalogClientMock::getChunks(
     repl::OpTime* opTime,
     const OID& epoch,
     const Timestamp& timestamp,
-    repl::ReadConcernLevel readConcern,
+    repl::ReadConcernArgs readConcern,
     const boost::optional<BSONObj>& hint) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
@@ -161,7 +161,7 @@ std::vector<NamespaceString> ShardingCatalogClientMock::getAllNssThatHaveZonesFo
 }
 
 repl::OpTimeWith<std::vector<ShardType>> ShardingCatalogClientMock::getAllShards(
-    OperationContext* opCtx, repl::ReadConcernLevel readConcern, BSONObj filter) {
+    OperationContext* opCtx, repl::ReadConcernArgs readConcern, BSONObj filter) {
     uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
 
@@ -178,7 +178,7 @@ StatusWith<BSONObj> ShardingCatalogClientMock::getGlobalSettings(OperationContex
 }
 
 StatusWith<VersionType> ShardingCatalogClientMock::getConfigVersion(
-    OperationContext* opCtx, repl::ReadConcernLevel readConcern) {
+    OperationContext* opCtx, repl::ReadConcernArgs readConcern) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
@@ -234,21 +234,21 @@ StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientMock::getNe
     OperationContext* opCtx,
     std::string_view purpose,
     const LogicalTime& newerThanThis,
-    repl::ReadConcernLevel readConcernLevel) {
+    repl::ReadConcernArgs readConcern) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
 StatusWith<std::vector<ExternalKeysCollectionDocument>>
 ShardingCatalogClientMock::getAllExternalKeys(OperationContext* opCtx,
                                               std::string_view purpose,
-                                              repl::ReadConcernLevel readConcernLevel) {
+                                              repl::ReadConcernArgs readConcern) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
 StatusWith<repl::OpTimeWith<std::vector<BSONObj>>>
 ShardingCatalogClientMock::_exhaustiveFindOnConfig(OperationContext* opCtx,
                                                    const ReadPreferenceSetting& readPref,
-                                                   const repl::ReadConcernLevel& readConcern,
+                                                   const repl::ReadConcernArgs& readConcern,
                                                    const NamespaceString& nss,
                                                    const BSONObj& query,
                                                    const BSONObj& sort,

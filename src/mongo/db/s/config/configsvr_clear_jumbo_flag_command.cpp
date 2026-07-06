@@ -88,8 +88,7 @@ public:
 
             CollectionType collType;
             try {
-                collType = catalogClient->getCollection(
-                    opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
+                collType = catalogClient->getCollection(opCtx, nss, repl::ReadConcernArgs::kLocal);
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 uasserted(ErrorCodes::NamespaceNotSharded,
                           str::stream() << "clearJumboFlag namespace " << nss.toStringForErrorMsg()

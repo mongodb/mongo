@@ -170,7 +170,7 @@ public:
             // This workaround avoids fetching stale information until the issue is addressed.
             std::vector<DatabaseType> databases = Grid::get(opCtx)->catalogClient()->getAllDBs(
                 opCtx,
-                repl::ReadConcernLevel::kSnapshotReadConcern,
+                repl::ReadConcernArgs::kSnapshot,
                 ReadPreferenceSetting{ReadPreference::PrimaryPreferred});
 
             std::unique_ptr<MatchExpression> filter = list_databases::getFilter(cmd, opCtx, ns());
@@ -216,7 +216,7 @@ public:
             std::vector<DatabaseType> databasesSnapshotBefore =
                 Grid::get(opCtx)->catalogClient()->getAllDBs(
                     opCtx,
-                    repl::ReadConcernLevel::kSnapshotReadConcern,
+                    repl::ReadConcernArgs::kSnapshot,
                     ReadPreferenceSetting{ReadPreference::PrimaryPreferred});
 
             int attempts = 0;
@@ -239,7 +239,7 @@ public:
                 std::vector<DatabaseType> databasesSnapshotAfter =
                     Grid::get(opCtx)->catalogClient()->getAllDBs(
                         opCtx,
-                        repl::ReadConcernLevel::kSnapshotReadConcern,
+                        repl::ReadConcernArgs::kSnapshot,
                         ReadPreferenceSetting{ReadPreference::PrimaryPreferred});
 
                 // Broadcasting a `listDatabases` command to all shards can miss a database that is

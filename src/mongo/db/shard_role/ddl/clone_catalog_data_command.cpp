@@ -76,13 +76,13 @@ void cloneDatabase(OperationContext* opCtx,
     std::vector<NamespaceString> trackedColls;
     auto const catalogClient = Grid::get(opCtx)->catalogClient();
     trackedColls = catalogClient->getShardedCollectionNamespacesForDb(
-        opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern, {});
+        opCtx, dbName, repl::ReadConcernArgs::kMajority, {});
     const auto databasePrimary =
-        catalogClient->getDatabase(opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern)
+        catalogClient->getDatabase(opCtx, dbName, repl::ReadConcernArgs::kMajority)
             .getPrimary()
             .toString();
     auto unsplittableCollections = catalogClient->getUnsplittableCollectionNamespacesForDb(
-        opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern, {});
+        opCtx, dbName, repl::ReadConcernArgs::kMajority, {});
 
     std::move(unsplittableCollections.begin(),
               unsplittableCollections.end(),

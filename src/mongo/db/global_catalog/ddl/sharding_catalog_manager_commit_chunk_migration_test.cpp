@@ -1065,7 +1065,7 @@ public:
                                        nullptr /* opTime */,
                                        _collEpoch,
                                        _collTimestamp,
-                                       repl::ReadConcernLevel::kLocalReadConcern));
+                                       repl::ReadConcernArgs::kLocal));
     }
 
     boost::optional<ChunkType> getChangedChunkByMin(const std::vector<ChunkType>& changedChunks,

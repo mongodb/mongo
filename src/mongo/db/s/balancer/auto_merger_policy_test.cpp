@@ -243,7 +243,7 @@ protected:
         auto response = unittest::assertGet(getConfigShard()->exhaustiveFindOnConfig(
             operationContext(),
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kLocalReadConcern,
+            repl::ReadConcernArgs::kLocal,
             ChangeLogType::ConfigNS,
             query.obj(),
             BSONObj(),

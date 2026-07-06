@@ -131,14 +131,13 @@ public:
     void assertOnlyZone(const NamespaceString& ns,
                         const ChunkRange& range,
                         const std::string& zoneName) {
-        auto findStatus =
-            getConfigShard()->exhaustiveFindOnConfig(operationContext(),
-                                                     kReadPref,
-                                                     repl::ReadConcernLevel::kMajorityReadConcern,
-                                                     TagsType::ConfigNS,
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     1);
+        auto findStatus = getConfigShard()->exhaustiveFindOnConfig(operationContext(),
+                                                                   kReadPref,
+                                                                   repl::ReadConcernArgs::kMajority,
+                                                                   TagsType::ConfigNS,
+                                                                   BSONObj(),
+                                                                   BSONObj(),
+                                                                   1);
         ASSERT_OK(findStatus.getStatus());
 
         auto findResult = findStatus.getValue();

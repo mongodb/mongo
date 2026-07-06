@@ -319,7 +319,7 @@ ShardId selectLeastLoadedNonDrainingShard(OperationContext* opCtx) {
         try {
             return Grid::get(opCtx)->catalogClient()->getAllShards(
                 opCtx,
-                repl::ReadConcernLevel::kSnapshotReadConcern,
+                repl::ReadConcernArgs::kSnapshot,
                 BSON(ShardType::draining.ne(true)) /* excludeDraining */);
         } catch (DBException& ex) {
             ex.addContext("Cannot retrieve updated shard list from config server");
@@ -381,7 +381,7 @@ ShardId selectLeastLoadedNonDrainingShard(OperationContext* opCtx) {
 bool isTrackedTimeseries(OperationContext* opCtx, const NamespaceString& bucketNss) {
     try {
         const auto bucketColl = Grid::get(opCtx)->catalogClient()->getCollection(
-            opCtx, bucketNss, repl::ReadConcernLevel::kMajorityReadConcern);
+            opCtx, bucketNss, repl::ReadConcernArgs::kMajority);
         return bucketColl.getTimeseriesFields().has_value();
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         // If we don't find the bucket nss it means the collection is not tracked.

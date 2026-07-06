@@ -425,7 +425,7 @@ void ShardingCatalogManager::discardCachedConfigDatabaseInitializationState() {
 
 Status ShardingCatalogManager::_initConfigVersion(OperationContext* opCtx) {
     auto versionStatus =
-        _localCatalogClient->getConfigVersion(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
+        _localCatalogClient->getConfigVersion(opCtx, repl::ReadConcernArgs::kLocal);
     if (versionStatus.isOK() || versionStatus != ErrorCodes::NoMatchingDocument) {
         return versionStatus.getStatus();
     }
@@ -559,7 +559,7 @@ Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationC
     // but don't go through the ShardRegistry to prevent it from caching data that may be rolled
     // back.
     const auto opTimeWithShards =
-        _localCatalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
+        _localCatalogClient->getAllShards(opCtx, repl::ReadConcernArgs::kLocal);
 
     for (const auto& shardType : opTimeWithShards.value) {
         const auto shardStatus =
@@ -602,7 +602,7 @@ StatusWith<bool> ShardingCatalogManager::_isShardRequiredByZoneStillInUse(
     auto findShardStatus =
         _localConfigShard->exhaustiveFindOnConfig(opCtx,
                                                   readPref,
-                                                  repl::ReadConcernLevel::kLocalReadConcern,
+                                                  repl::ReadConcernArgs::kLocal,
                                                   NamespaceString::kConfigsvrShardsNamespace,
                                                   BSON(ShardType::tags() << zoneName),
                                                   BSONObj(),
@@ -634,7 +634,7 @@ StatusWith<bool> ShardingCatalogManager::_isShardRequiredByZoneStillInUse(
         auto findChunkRangeStatus =
             _localConfigShard->exhaustiveFindOnConfig(opCtx,
                                                       readPref,
-                                                      repl::ReadConcernLevel::kLocalReadConcern,
+                                                      repl::ReadConcernArgs::kLocal,
                                                       TagsType::ConfigNS,
                                                       BSON(TagsType::tag() << zoneName),
                                                       BSONObj(),
@@ -1074,7 +1074,7 @@ void ShardingCatalogManager::convertShardRefsInNamespaceMetadata(OperationContex
         stdx::unordered_map<ShardId, ShardRef, ShardId::Hasher> shardNameToShardUuid = [&] {
             stdx::unordered_map<ShardId, ShardRef, ShardId::Hasher> map;
             const auto allShards =
-                _localCatalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
+                _localCatalogClient->getAllShards(opCtx, repl::ReadConcernArgs::kLocal);
             for (const auto& shard : allShards.value) {
                 const auto& handle = shard.getHandle();
                 tassert(12888606,

@@ -123,47 +123,47 @@ public:
 
     DatabaseType getDatabase(OperationContext* opCtx,
                              const DatabaseName& db,
-                             repl::ReadConcernLevel readConcernLevel) override;
+                             repl::ReadConcernArgs readConcern) override;
 
     std::vector<DatabaseType> getAllDBs(
         OperationContext* opCtx,
-        repl::ReadConcernLevel readConcern,
+        repl::ReadConcernArgs readConcern,
         const boost::optional<ReadPreferenceSetting>& readPref = boost::none) override;
 
     CollectionType getCollection(OperationContext* opCtx,
                                  const NamespaceString& nss,
-                                 repl::ReadConcernLevel readConcernLevel) override;
+                                 repl::ReadConcernArgs readConcern) override;
 
     CollectionType getCollection(OperationContext* opCtx,
                                  const UUID& uuid,
-                                 repl::ReadConcernLevel readConcernLevel) override;
+                                 repl::ReadConcernArgs readConcern) override;
 
     std::vector<CollectionType> getShardedCollections(OperationContext* opCtx,
                                                       const DatabaseName& db,
-                                                      repl::ReadConcernLevel readConcernLevel,
+                                                      repl::ReadConcernArgs readConcern,
                                                       const BSONObj& sort) override;
 
     std::vector<CollectionType> getCollections(OperationContext* opCtx,
                                                const DatabaseName& db,
-                                               repl::ReadConcernLevel readConcernLevel,
+                                               repl::ReadConcernArgs readConcern,
                                                const BSONObj& sort) override;
 
     std::vector<NamespaceString> getShardedCollectionNamespacesForDb(
         OperationContext* opCtx,
         const DatabaseName& dbName,
-        repl::ReadConcernLevel readConcern,
+        repl::ReadConcernArgs readConcern,
         const BSONObj& sort = BSONObj()) override;
 
     std::vector<NamespaceString> getCollectionNamespacesForDb(
         OperationContext* opCtx,
         const DatabaseName& dbName,
-        repl::ReadConcernLevel readConcern,
+        repl::ReadConcernArgs readConcern,
         const BSONObj& sort = BSONObj()) override;
 
     std::vector<NamespaceString> getUnsplittableCollectionNamespacesForDb(
         OperationContext* opCtx,
         const DatabaseName& dbName,
-        repl::ReadConcernLevel readConcern,
+        repl::ReadConcernArgs readConcern,
         const BSONObj& sort = BSONObj()) override;
 
     StatusWith<std::vector<DatabaseName>> getDatabasesForShard(OperationContext* opCtx,
@@ -177,7 +177,7 @@ public:
         repl::OpTime* opTime,
         const OID& epoch,
         const Timestamp& timestamp,
-        repl::ReadConcernLevel readConcern,
+        repl::ReadConcernArgs readConcern,
         const boost::optional<BSONObj>& hint = boost::none) override;
 
     std::pair<CollectionType, std::vector<ChunkType>> getCollectionAndChunks(
@@ -195,7 +195,7 @@ public:
         OperationContext* opCtx, const DatabaseName& dbName) override;
 
     repl::OpTimeWith<std::vector<ShardType>> getAllShards(OperationContext* opCtx,
-                                                          repl::ReadConcernLevel readConcern,
+                                                          repl::ReadConcernArgs readConcern,
                                                           BSONObj filter = BSONObj()) override;
 
     Status runUserManagementWriteCommand(OperationContext* opCtx,
@@ -212,7 +212,7 @@ public:
     StatusWith<BSONObj> getGlobalSettings(OperationContext* opCtx, std::string_view key) override;
 
     StatusWith<VersionType> getConfigVersion(OperationContext* opCtx,
-                                             repl::ReadConcernLevel readConcern) override;
+                                             repl::ReadConcernArgs readConcern) override;
 
     Status insertConfigDocument(OperationContext* opCtx,
                                 const NamespaceString& nss,
@@ -244,12 +244,12 @@ public:
         OperationContext* opCtx,
         std::string_view purpose,
         const LogicalTime& newerThanThis,
-        repl::ReadConcernLevel readConcernLevel) override;
+        repl::ReadConcernArgs readConcern) override;
 
     StatusWith<std::vector<ExternalKeysCollectionDocument>> getAllExternalKeys(
         OperationContext* opCtx,
         std::string_view purpose,
-        repl::ReadConcernLevel readConcernLevel) override;
+        repl::ReadConcernArgs readConcern) override;
 
     bool anyShardRemovedSince(OperationContext* opCtx, const Timestamp& clusterTime) override;
 
@@ -278,7 +278,7 @@ private:
     StatusWith<repl::OpTimeWith<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
-        const repl::ReadConcernLevel& readConcern,
+        const repl::ReadConcernArgs& readConcern,
         const NamespaceString& nss,
         const BSONObj& query,
         const BSONObj& sort,
@@ -293,7 +293,7 @@ private:
         OperationContext* opCtx,
         const DatabaseName& dbName,
         const ReadPreferenceSetting& readPref,
-        repl::ReadConcernLevel readConcernLevel);
+        repl::ReadConcernArgs readConcern);
 
     /**
      * Returns the Shard type that should be used to access the config server. Unless an instance

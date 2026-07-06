@@ -395,9 +395,7 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                     const auto primaryShardId =
                         Grid::get(opCtx)
                             ->catalogClient()
-                            ->getDatabase(opCtx,
-                                          fromNss.dbName(),
-                                          repl::ReadConcernLevel::kMajorityReadConcern)
+                            ->getDatabase(opCtx, fromNss.dbName(), repl::ReadConcernArgs::kMajority)
                             .getPrimary();
                     const auto thisShardId = ShardingState::get(opCtx)->shardId();
                     return thisShardId != primaryShardId;

@@ -313,7 +313,7 @@ void generateShardUUIDs(OperationContext* opCtx) {
 
     const auto opTimeWithShards =
         ShardingCatalogManager::get(opCtx)->localCatalogClient()->getAllShards(
-            opCtx, repl::ReadConcernLevel::kLocalReadConcern);
+            opCtx, repl::ReadConcernArgs::kLocal);
 
     std::vector<AsyncRequestsSender::Request> requests;
     for (const auto& shardType : opTimeWithShards.value) {
@@ -374,7 +374,7 @@ void cloneAuthoritativeDatabaseMetadataOnShards(OperationContext* opCtx) {
     // back.
     const auto opTimeWithShards =
         ShardingCatalogManager::get(opCtx)->localCatalogClient()->getAllShards(
-            opCtx, repl::ReadConcernLevel::kLocalReadConcern);
+            opCtx, repl::ReadConcernArgs::kLocal);
 
     const auto sendCloneCommandToShard = [&](const std::shared_ptr<Shard>& shard) {
         ShardsvrCloneAuthoritativeMetadata request;

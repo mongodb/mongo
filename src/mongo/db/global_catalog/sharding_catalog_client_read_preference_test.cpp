@@ -149,7 +149,7 @@ protected:
 
         auto future = launchAsync([&] {
             return catalogClient()->getAllDBs(
-                operationContext(), repl::ReadConcernLevel::kSnapshotReadConcern, readPrefOverride);
+                operationContext(), repl::ReadConcernArgs::kSnapshot, readPrefOverride);
         });
 
         onFindCommand([this, dbt, expectedReadPreference](const RemoteCommandRequest& request) {

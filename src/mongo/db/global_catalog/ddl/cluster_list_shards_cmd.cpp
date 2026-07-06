@@ -109,7 +109,7 @@ public:
             return request_filter->toBSON();
         }();
         const auto opTimeWithShards = Grid::get(opCtx)->catalogClient()->getAllShards(
-            opCtx, repl::ReadConcernLevel::kMajorityReadConcern, filter);
+            opCtx, repl::ReadConcernArgs::kMajority, filter);
 
         BSONArrayBuilder shardsArr(result.subarrayStart("shards"));
         for (const auto& shard : opTimeWithShards.value) {

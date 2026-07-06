@@ -102,7 +102,7 @@ TransactionCoordinatorTestFixture::makeShardingCatalogClient() {
         StaticCatalogClient(std::vector<ShardId> shardIds) : _shardIds(std::move(shardIds)) {}
 
         repl::OpTimeWith<std::vector<ShardType>> getAllShards(OperationContext* opCtx,
-                                                              repl::ReadConcernLevel readConcern,
+                                                              repl::ReadConcernArgs readConcern,
                                                               BSONObj filter) override {
             std::vector<ShardType> shardTypes;
             for (const auto& shardId : _shardIds) {

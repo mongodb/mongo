@@ -513,7 +513,7 @@ StatusWith<Shard::QueryResponse> Shard::runExhaustiveCursorCommand(
 StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
-    const repl::ReadConcernLevel& readConcernLevel,
+    const repl::ReadConcernArgs& readConcern,
     const NamespaceString& nss,
     const BSONObj& query,
     const BSONObj& sort,
@@ -530,7 +530,7 @@ StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
             return _exhaustiveFindOnConfig(opCtx,
                                            readPref,
                                            targetingMetadata,
-                                           readConcernLevel,
+                                           readConcern,
                                            nss,
                                            query,
                                            sort,

@@ -115,9 +115,9 @@ StatusWith<std::vector<KeyDocumentType>> KeysCollectionClientDirect::_getNewKeys
 
     // Use majority read concern if the caller wants that and the client supports it. Otherwise fall
     // back to local read concern.
-    auto readConcern = (tryUseMajority && !_mustUseLocalReads)
-        ? repl::ReadConcernLevel::kMajorityReadConcern
-        : repl::ReadConcernLevel::kLocalReadConcern;
+    const auto& readConcern = (tryUseMajority && !_mustUseLocalReads)
+        ? repl::ReadConcernArgs::kMajority
+        : repl::ReadConcernArgs::kLocal;
 
     auto findStatus = _query(opCtx,
                              ReadPreferenceSetting(ReadPreference::Nearest, TagSet{}),
@@ -149,7 +149,7 @@ StatusWith<std::vector<KeyDocumentType>> KeysCollectionClientDirect::_getNewKeys
 StatusWith<Shard::QueryResponse> KeysCollectionClientDirect::_query(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
-    const repl::ReadConcernLevel& readConcernLevel,
+    const repl::ReadConcernArgs& readConcern,
     const NamespaceString& nss,
     const BSONObj& query,
     const BSONObj& sort,
@@ -157,7 +157,7 @@ StatusWith<Shard::QueryResponse> KeysCollectionClientDirect::_query(
 
     for (int retry = 1; retry <= kOnErrorNumRetries; retry++) {
         auto result =
-            _rsLocalClient.queryOnce(opCtx, readPref, readConcernLevel, nss, query, sort, limit);
+            _rsLocalClient.queryOnce(opCtx, readPref, readConcern, nss, query, sort, limit);
 
         if (retry < kOnErrorNumRetries &&
             isRetriableError(result.getStatus().code(), Shard::RetryPolicy::kIdempotent)) {

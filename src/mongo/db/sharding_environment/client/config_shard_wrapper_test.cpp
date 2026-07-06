@@ -146,7 +146,7 @@ private:
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
         const TargetingMetadata& targetingMetadata,
-        const repl::ReadConcernLevel& readConcernLevel,
+        const repl::ReadConcernArgs& readConcern,
         const NamespaceString& nss,
         const BSONObj& query,
         const BSONObj& sort,

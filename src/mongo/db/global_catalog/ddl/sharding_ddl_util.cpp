@@ -589,7 +589,7 @@ bool checkAllowMigrationsOnConfigServer(OperationContext* opCtx, const Namespace
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
                             opCtx,
                             ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet{}),
-                            repl::ReadConcernLevel::kMajorityReadConcern,
+                            repl::ReadConcernArgs::kMajority,
                             NamespaceString::kConfigsvrCollectionsNamespace,
                             BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
                                      nss, SerializationContext::stateDefault())),
@@ -1249,7 +1249,7 @@ boost::optional<ShardId> pickShardOwningCollectionChunks(OperationContext* opCtx
         nullptr /*opTime*/,
         dummyEpoch,
         dummyTimestamp,
-        repl::ReadConcernLevelEnum::kMajorityReadConcern));
+        repl::ReadConcernArgs::kMajority));
     return chunks.empty() ? boost::none : boost::optional<ShardId>(chunks[0].getShard());
 }
 
@@ -1520,7 +1520,7 @@ ComputeAllMergeableChunksOnShardResult computeAllMergeableChunksOnShard(
     const auto zones = uassertStatusOK(configShard->exhaustiveFindOnConfig(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        repl::ReadConcernLevel::kMajorityReadConcern,
+        repl::ReadConcernArgs::kMajority,
         TagsType::ConfigNS,
         /* query */
         BSON(TagsType::ns(

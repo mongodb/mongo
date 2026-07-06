@@ -242,10 +242,9 @@ public:
         public:
             StaticCatalogClient(const std::vector<std::string>& shardIds) : _shardIds(shardIds) {}
 
-            repl::OpTimeWith<std::vector<ShardType>> getAllShards(
-                OperationContext* opCtx,
-                repl::ReadConcernLevel readConcern,
-                BSONObj filter) override {
+            repl::OpTimeWith<std::vector<ShardType>> getAllShards(OperationContext* opCtx,
+                                                                  repl::ReadConcernArgs readConcern,
+                                                                  BSONObj filter) override {
 
                 std::vector<ShardType> shards;
                 for (const auto& shardId : _shardIds) {

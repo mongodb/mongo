@@ -150,7 +150,7 @@ void checkDatabaseRestrictions(OperationContext* opCtx,
                                const NamespaceString& toNss) {
     if (!fromCollType || fromCollType->getUnsplittable().value_or(false)) {
         const auto toDB = Grid::get(opCtx)->catalogClient()->getDatabase(
-            opCtx, toNss.dbName(), repl::ReadConcernLevel::kMajorityReadConcern);
+            opCtx, toNss.dbName(), repl::ReadConcernArgs::kMajority);
 
         uassert(ErrorCodes::CommandFailed,
                 "Source and destination collections must be on same shard",

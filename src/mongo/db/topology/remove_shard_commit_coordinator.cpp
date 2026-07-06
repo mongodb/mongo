@@ -231,7 +231,7 @@ void RemoveShardCommitCoordinator::_checkShardIsEmpty(OperationContext* opCtx) {
 
 void RemoveShardCommitCoordinator::_dropLocalCollections(OperationContext* opCtx) {
     auto trackedDbs = ShardingCatalogManager::get(opCtx)->localCatalogClient()->getAllDBs(
-        opCtx, repl::ReadConcernLevel::kLocalReadConcern);
+        opCtx, repl::ReadConcernArgs::kLocal);
 
     if (auto pendingCleanupState = topology_change_helpers::dropLocalCollectionsAndDatabases(
             opCtx, trackedDbs, _doc.getShardId().toString())) {

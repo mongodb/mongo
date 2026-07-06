@@ -80,8 +80,7 @@ StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::getStats(Operati
     const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
     std::vector<ShardType> shards;
     try {
-        shards =
-            catalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kMajorityReadConcern).value;
+        shards = catalogClient->getAllShards(opCtx, repl::ReadConcernArgs::kMajority).value;
     } catch (const DBException& ex) {
         return ex.toStatus();
     }

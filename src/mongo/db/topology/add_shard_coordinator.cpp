@@ -347,7 +347,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
 
                     for (const auto& dbName : dbs) {
                         auto database = shardingCatalogManager.localCatalogClient()->getDatabase(
-                            opCtx, dbName, repl::ReadConcernLevel::kLocalReadConcern);
+                            opCtx, dbName, repl::ReadConcernArgs::kLocal);
                         const auto& session = getNewSession(opCtx);
                         sharding_ddl_util::commitCreateDatabaseMetadataToShardCatalog(
                             opCtx, database, session, executor, token);

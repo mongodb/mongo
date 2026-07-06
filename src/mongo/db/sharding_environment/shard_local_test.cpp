@@ -178,7 +178,7 @@ StatusWith<Shard::QueryResponse> ShardLocalTest::runFindQuery(NamespaceString ns
                                                               boost::optional<long long> limit) {
     return _shardLocal->exhaustiveFindOnConfig(_opCtx.get(),
                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                               repl::ReadConcernLevel::kMajorityReadConcern,
+                                               repl::ReadConcernArgs::kMajority,
                                                nss,
                                                query,
                                                sort,

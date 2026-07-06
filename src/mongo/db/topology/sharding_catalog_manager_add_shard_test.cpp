@@ -397,9 +397,8 @@ protected:
      * corresponding to 'expectedDB'.
      */
     void assertDatabaseExists(const DatabaseType& expectedDB) {
-        auto foundDB = catalogClient()->getDatabase(operationContext(),
-                                                    expectedDB.getDbName(),
-                                                    repl::ReadConcernLevel::kMajorityReadConcern);
+        auto foundDB = catalogClient()->getDatabase(
+            operationContext(), expectedDB.getDbName(), repl::ReadConcernArgs::kMajority);
         ASSERT_EQUALS(expectedDB.getDbName(), foundDB.getDbName());
         ASSERT_EQUALS(expectedDB.getPrimary(), foundDB.getPrimary());
     }
@@ -412,7 +411,7 @@ protected:
         auto response = assertGet(getConfigShard()->exhaustiveFindOnConfig(
             operationContext(),
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kLocalReadConcern,
+            repl::ReadConcernArgs::kLocal,
             NamespaceString::createNamespaceString_forTest("config.changelog"),
             BSON("what" << "addShard"
                         << "details.name" << addedShard.getName()),

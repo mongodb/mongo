@@ -62,8 +62,8 @@ ShardingReady* ShardingReady::get(OperationContext* opCtx) {
 
 void ShardingReady::scheduleTransitionToConfigShard(OperationContext* opCtx) {
     auto catalogManager = ShardingCatalogManager::get(opCtx);
-    auto shards = catalogManager->localCatalogClient()->getAllShards(
-        opCtx, repl::ReadConcernLevel::kLocalReadConcern);
+    auto shards =
+        catalogManager->localCatalogClient()->getAllShards(opCtx, repl::ReadConcernArgs::kLocal);
 
     // Only transition to config shard if we have no existing data shards. Otherwise, we could end
     // up transitioning back to config shard after the user called transition to dedicated config
@@ -138,7 +138,7 @@ void ShardingReady::setIsReadyIfShardExists(OperationContext* opCtx) {
     auto shardFindResponse = uassertStatusOK(
         configShard->exhaustiveFindOnConfig(opCtx,
                                             ReadPreferenceSetting{ReadPreference::Nearest},
-                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            repl::ReadConcernArgs::kLocal,
                                             NamespaceString::kConfigsvrShardsNamespace,
                                             BSONObj(), /* Find all shards */
                                             BSONObj() /* No sorting */,

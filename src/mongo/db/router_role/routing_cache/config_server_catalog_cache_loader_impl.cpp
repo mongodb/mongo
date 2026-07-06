@@ -140,7 +140,7 @@ SemiFuture<DatabaseType> ConfigServerCatalogCacheLoaderImpl::getDatabase(
             auto opCtx = tc->makeOperationContext();
             return Grid::get(opCtx.get())
                 ->catalogClient()
-                ->getDatabase(opCtx.get(), dbName, repl::ReadConcernLevel::kMajorityReadConcern);
+                ->getDatabase(opCtx.get(), dbName, repl::ReadConcernArgs::kMajority);
         })
         .semi();
 }

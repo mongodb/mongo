@@ -250,7 +250,7 @@ bool isCurrentShardDraining(OperationContext* opCtx) {
     const auto& shardId = ShardingState::get(opCtx)->shardId();
     const auto& allShards = Grid::get(opCtx)
                                 ->catalogClient()
-                                ->getAllShards(opCtx, repl::ReadConcernLevel::kMajorityReadConcern)
+                                ->getAllShards(opCtx, repl::ReadConcernArgs::kMajority)
                                 .value;
     for (const auto& shard : allShards) {
         if (shard.getName() == shardId) {

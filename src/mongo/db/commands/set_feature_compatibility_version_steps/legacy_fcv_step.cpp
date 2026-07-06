@@ -162,8 +162,8 @@ void handleDropPendingDBsGarbage(OperationContext* parentOpCtx) {
 
     // The list of shards is stable during the execution of this function, since it is called during
     // FCV upgrade.
-    const auto opTimeWithShards = Grid::get(opCtx)->catalogClient()->getAllShards(
-        opCtx, repl::ReadConcernLevel::kSnapshotReadConcern);
+    const auto opTimeWithShards =
+        Grid::get(opCtx)->catalogClient()->getAllShards(opCtx, repl::ReadConcernArgs::kSnapshot);
     for (const auto& shardType : opTimeWithShards.value) {
         const auto shardStatus =
             Grid::get(opCtx)->shardRegistry()->getShard(opCtx, ShardRef(shardType.getName()));
@@ -221,8 +221,8 @@ void dropAuthoritativeShardCatalogCollectionsOnShards(OperationContext* opCtx) {
                                                     "DropAuthoritativeShardCatalogMetadata",
                                                     LockMode::MODE_S);
 
-    const auto opTimeWithShards = Grid::get(opCtx)->catalogClient()->getAllShards(
-        opCtx, repl::ReadConcernLevel::kSnapshotReadConcern);
+    const auto opTimeWithShards =
+        Grid::get(opCtx)->catalogClient()->getAllShards(opCtx, repl::ReadConcernArgs::kSnapshot);
 
     const auto collNames =
         BSON_ARRAY(NamespaceString::kConfigShardCatalogDatabasesNamespace.coll()

@@ -96,7 +96,7 @@ std::vector<ShardRef> getAllNonDrainingShardRefs(OperationContext* opCtx) {
         try {
             return Grid::get(opCtx)->catalogClient()->getAllShards(
                 opCtx,
-                repl::ReadConcernLevel::kMajorityReadConcern,
+                repl::ReadConcernArgs::kMajority,
                 BSON(ShardType::draining.ne(true)) /* excludeDraining */);
         } catch (DBException& ex) {
             ex.addContext("Cannot retrieve updated shard list from config server");
@@ -216,7 +216,7 @@ StringMap<std::vector<ShardRef>> buildTagsToShardRefsMap(
     const auto shardDocs = uassertStatusOK(
         configServer->exhaustiveFindOnConfig(opCtx,
                                              ReadPreferenceSetting(ReadPreference::Nearest),
-                                             repl::ReadConcernLevel::kMajorityReadConcern,
+                                             repl::ReadConcernArgs::kMajority,
                                              NamespaceString::kConfigsvrShardsNamespace,
                                              filter,
                                              BSONObj(),
@@ -285,7 +285,7 @@ stdx::unordered_map<ShardRef, stdx::unordered_set<std::string>> buildShardRefToT
     const auto shardDocs = uassertStatusOK(
         configServer->exhaustiveFindOnConfig(opCtx,
                                              ReadPreferenceSetting(ReadPreference::Nearest),
-                                             repl::ReadConcernLevel::kMajorityReadConcern,
+                                             repl::ReadConcernArgs::kMajority,
                                              NamespaceString::kConfigsvrShardsNamespace,
                                              BSONObj(),
                                              BSONObj(),

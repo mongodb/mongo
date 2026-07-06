@@ -124,7 +124,7 @@ std::vector<DatabaseType> getDatabasesThisShardIsPrimaryFor(OperationContext* op
     auto rawDatabases{uassertStatusOK(configServer->exhaustiveFindOnConfig(
                                           opCtx,
                                           ReadPreferenceSetting{ReadPreference::Nearest},
-                                          repl::ReadConcernLevel::kMajorityReadConcern,
+                                          repl::ReadConcernArgs::kMajority,
                                           NamespaceString::kConfigDatabasesNamespace,
                                           BSON(DatabaseType::kPrimaryFieldName << thisShardId),
                                           BSONObj() /* No sorting */,

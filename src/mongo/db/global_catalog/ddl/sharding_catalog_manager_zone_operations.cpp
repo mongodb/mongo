@@ -97,7 +97,7 @@ Status checkForOverlappingZonedKeyRange(OperationContext* opCtx,
     auto tagStatus =
         configServer->exhaustiveFindOnConfig(opCtx,
                                              kConfigPrimarySelector,
-                                             repl::ReadConcernLevel::kLocalReadConcern,
+                                             repl::ReadConcernArgs::kLocal,
                                              TagsType::ConfigNS,
                                              BSON(TagsType::ns(NamespaceStringUtil::serialize(
                                                  nss, SerializationContext::stateDefault()))),
@@ -155,7 +155,7 @@ ChunkRange includeFullShardKey(OperationContext* opCtx,
             configServer->exhaustiveFindOnConfig(
                 opCtx,
                 kConfigPrimarySelector,
-                repl::ReadConcernLevel::kLocalReadConcern,
+                repl::ReadConcernArgs::kLocal,
                 NamespaceString::kConfigsvrCollectionsNamespace,
                 BSON(CollectionType::kNssFieldName
                      << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
@@ -291,7 +291,7 @@ Status ShardingCatalogManager::removeShardFromZone(OperationContext* opCtx,
     auto findShardExistsStatus =
         _localConfigShard->exhaustiveFindOnConfig(opCtx,
                                                   kConfigPrimarySelector,
-                                                  repl::ReadConcernLevel::kLocalReadConcern,
+                                                  repl::ReadConcernArgs::kLocal,
                                                   shardNS,
                                                   BSON(ShardType::name() << shardName),
                                                   BSONObj(),
@@ -384,8 +384,8 @@ void ShardingCatalogManager::assignKeyRangeToZone(OperationContext* opCtx,
     uassertStatusOK(checkForOverlappingZonedKeyRange(
         opCtx, _localConfigShard.get(), nss, actualRange, zoneName, keyPattern));
     try {
-        const auto& coll = _localCatalogClient->getCollection(
-            opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
+        const auto& coll =
+            _localCatalogClient->getCollection(opCtx, nss, repl::ReadConcernArgs::kLocal);
         const auto& isShardedTimeseries = coll.getTimeseriesFields() && !coll.getUnsplittable();
         if (isShardedTimeseries) {
             uassertStatusOK(checkForTimeseriesTimeFieldKeyRange(

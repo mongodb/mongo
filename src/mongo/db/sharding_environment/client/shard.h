@@ -484,13 +484,13 @@ public:
      * Do not use other than for very small (i.e., admin or metadata) collections.
      * Performs retries if the query fails in accordance with the kIdempotent RetryPolicy.
      *
-     * ShardRemote instances expect "readConcernLevel" to always be kMajorityReadConcern, whereas
-     * ShardLocal instances expect either kLocalReadConcern or kMajorityReadConcern.
+     * ShardRemote instances expect "readConcern" to always be kMajority, whereas ShardLocal
+     * instances expect either kLocal or kMajority.
      */
     StatusWith<QueryResponse> exhaustiveFindOnConfig(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
-        const repl::ReadConcernLevel& readConcernLevel,
+        const repl::ReadConcernArgs& readConcern,
         const NamespaceString& nss,
         const BSONObj& query,
         const BSONObj& sort,
@@ -574,7 +574,7 @@ private:
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
         const TargetingMetadata& targetingMetadata,
-        const repl::ReadConcernLevel& readConcernLevel,
+        const repl::ReadConcernArgs& readConcern,
         const NamespaceString& nss,
         const BSONObj& query,
         const BSONObj& sort,

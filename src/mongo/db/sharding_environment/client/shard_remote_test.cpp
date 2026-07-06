@@ -426,7 +426,7 @@ TEST_F(ShardRemoteTest, FindOnConfigFromShardRespectsDefaultConfigCommandTimeout
         uassertStatusOK(shard->exhaustiveFindOnConfig(
             operationContext(),
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kMajorityReadConcern,
+            repl::ReadConcernArgs::kMajority,
             NamespaceString::createNamespaceString_forTest("admin.bar"),
             {},
             {},

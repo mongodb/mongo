@@ -84,7 +84,7 @@ public:
 
     CollectionType getCollection(OperationContext* opCtx,
                                  const NamespaceString& nss,
-                                 repl::ReadConcernLevel readConcernLevel) override {
+                                 repl::ReadConcernArgs readConcern) override {
         uassert(ErrorCodes::NamespaceNotFound, "Collection not found in mock", !_notFound);
         return _coll;
     }
@@ -97,13 +97,13 @@ public:
         repl::OpTime* opTime,
         const OID& epoch,
         const Timestamp& timestamp,
-        repl::ReadConcernLevel readConcern,
+        repl::ReadConcernArgs readConcern,
         const boost::optional<BSONObj>& hint = boost::none) override {
         return _chunks;
     }
 
     repl::OpTimeWith<std::vector<ShardType>> getAllShards(OperationContext* opCtx,
-                                                          repl::ReadConcernLevel readConcern,
+                                                          repl::ReadConcernArgs readConcern,
                                                           BSONObj filter = BSONObj()) override {
         return repl::OpTimeWith<std::vector<ShardType>>(std::vector<ShardType>{});
     }

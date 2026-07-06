@@ -332,7 +332,7 @@ RetryStrategy::Result<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
     const TargetingMetadata& targetingMetadata,
-    const repl::ReadConcernLevel& readConcernLevel,
+    const repl::ReadConcernArgs& readConcern,
     const NamespaceString& nss,
     const BSONObj& query,
     const BSONObj& sort,
@@ -353,10 +353,11 @@ RetryStrategy::Result<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig
         return readPrefToReturn;
     }();
 
+    invariant(readConcern.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern ||
+              readConcern.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern);
 
-    invariant(readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern ||
-              readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern);
-    repl::ReadConcernArgs readConcern{configTime /* afterClusterTime */, readConcernLevel};
+    repl::ReadConcernArgs commandReadConcern{configTime /* afterClusterTime */,
+                                             readConcern.getLevel()};
 
     const Milliseconds maxTimeMS = getExhaustiveFindOnConfigMaxTimeMS(opCtx, nss);
 
@@ -366,7 +367,7 @@ RetryStrategy::Result<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig
         FindCommandRequest findCommand(nss);
         findCommand.setFilter(query.getOwned());
         findCommand.setSort(sort.getOwned());
-        findCommand.setReadConcern(readConcern);
+        findCommand.setReadConcern(std::move(commandReadConcern));
         findCommand.setLimit(limit ? static_cast<boost::optional<std::int64_t>>(*limit)
                                    : boost::none);
         if (hint) {

@@ -61,7 +61,7 @@ namespace {
 std::vector<NamespaceString> getTrackedNamespaces(OperationContext* opCtx,
                                                   const DatabaseName& dbName) {
     auto collections = Grid::get(opCtx)->catalogClient()->getCollections(
-        opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern);
+        opCtx, dbName, repl::ReadConcernArgs::kMajority);
     std::vector<NamespaceString> nssList;
     nssList.reserve(collections.size());
     for (const auto& coll : collections) {
@@ -197,8 +197,7 @@ void CloneAuthoritativeMetadataCoordinator::_cloneSingleDatabaseWithShardRole(
     auto catalogClient = Grid::get(opCtx)->catalogClient();
     DatabaseType dbMetadata;
     try {
-        dbMetadata =
-            catalogClient->getDatabase(opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern);
+        dbMetadata = catalogClient->getDatabase(opCtx, dbName, repl::ReadConcernArgs::kMajority);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         // If the database has been dropped, we remove it from the cloning list. If any
         // concurrent operations are attempting to recreate it, they will handle the cloning.

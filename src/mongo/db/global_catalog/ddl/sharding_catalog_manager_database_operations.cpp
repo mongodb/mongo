@@ -365,7 +365,7 @@ DatabaseType ShardingCatalogManager::commitCreateDatabase(OperationContext* opCt
         const auto shardDocs = uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kLocalReadConcern,
+            repl::ReadConcernArgs::kLocal,
             NamespaceString::kConfigsvrShardsNamespace,
             BSON(ShardType::name << primaryShard),
             {},

@@ -137,8 +137,7 @@ public:
             const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
             const auto collEntry = catalogClient->getCollection(opCtx, nss);
             const auto dbPrimary =
-                catalogClient
-                    ->getDatabase(opCtx, nss.dbName(), repl::ReadConcernLevel::kMajorityReadConcern)
+                catalogClient->getDatabase(opCtx, nss.dbName(), repl::ReadConcernArgs::kMajority)
                     .getPrimary();
 
             if (!mongo::resharding::gFeatureFlagReshardingForTimeseries.isEnabled(

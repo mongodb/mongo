@@ -97,7 +97,7 @@ std::pair<ShardRegistryData::ShardHandleToConnectionStringMap, Timestamp> fetchF
 
     const auto shardsAndOpTime = [&] {
         try {
-            return catalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kSnapshotReadConcern);
+            return catalogClient->getAllShards(opCtx, repl::ReadConcernArgs::kSnapshot);
         } catch (DBException& ex) {
             ex.addContext("could not get updated shard list from config server");
             throw;

@@ -47,13 +47,12 @@ StatusWith<std::vector<KeysCollectionDocument>> KeysCollectionClientSharded::get
     const LogicalTime& newerThanThis,
     bool tryUseMajority) {
     return _catalogClient->getNewInternalKeys(
-        opCtx, purpose, newerThanThis, repl::ReadConcernLevel::kMajorityReadConcern);
+        opCtx, purpose, newerThanThis, repl::ReadConcernArgs::kMajority);
 }
 
 StatusWith<std::vector<ExternalKeysCollectionDocument>>
 KeysCollectionClientSharded::getAllExternalKeys(OperationContext* opCtx, std::string_view purpose) {
-    return _catalogClient->getAllExternalKeys(
-        opCtx, purpose, repl::ReadConcernLevel::kMajorityReadConcern);
+    return _catalogClient->getAllExternalKeys(opCtx, purpose, repl::ReadConcernArgs::kMajority);
 }
 
 Status KeysCollectionClientSharded::insertNewKey(OperationContext* opCtx, const BSONObj& doc) {

@@ -277,7 +277,7 @@ StatusWith<BSONObj> ConfigServerTestFixture::findOneOnConfigCollection(Operation
     invariant(config);
 
     auto findStatus = config->exhaustiveFindOnConfig(
-        opCtx, kReadPref, repl::ReadConcernLevel::kMajorityReadConcern, ns, filter, sort, 1);
+        opCtx, kReadPref, repl::ReadConcernArgs::kMajority, ns, filter, sort, 1);
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
     }
@@ -446,7 +446,7 @@ std::vector<KeysCollectionDocument> ConfigServerTestFixture::getKeys(OperationCo
     auto config = getConfigShard();
     auto findStatus = config->exhaustiveFindOnConfig(opCtx,
                                                      kReadPref,
-                                                     repl::ReadConcernLevel::kMajorityReadConcern,
+                                                     repl::ReadConcernArgs::kMajority,
                                                      NamespaceString::kKeysCollectionNamespace,
                                                      BSONObj(),
                                                      BSON("expiresAt" << 1),

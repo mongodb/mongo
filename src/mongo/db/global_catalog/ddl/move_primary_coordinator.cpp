@@ -205,7 +205,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::_runImpl(
                 const auto findResponse = uassertStatusOK(config->exhaustiveFindOnConfig(
                     opCtx,
                     ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                    repl::ReadConcernLevel::kMajorityReadConcern,
+                    repl::ReadConcernArgs::kMajority,
                     NamespaceString::kConfigsvrShardsNamespace,
                     BSON(ShardType::name() << toShardId),
                     BSONObj() /* No sorting */,
@@ -486,9 +486,9 @@ std::vector<NamespaceString> MovePrimaryCoordinator::getCollectionsToClone(
     const auto collectionsToIgnore = [&] {
         auto catalogClient = Grid::get(opCtx)->catalogClient();
         auto colls = catalogClient->getShardedCollectionNamespacesForDb(
-            opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern, {});
+            opCtx, _dbName, repl::ReadConcernArgs::kMajority, {});
         auto unshardedTrackedColls = catalogClient->getUnsplittableCollectionNamespacesForDb(
-            opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern, {});
+            opCtx, _dbName, repl::ReadConcernArgs::kMajority, {});
 
         std::move(
             unshardedTrackedColls.begin(), unshardedTrackedColls.end(), std::back_inserter(colls));
@@ -684,7 +684,7 @@ DatabaseType MovePrimaryCoordinator::getPostCommitDatabaseMetadata(OperationCont
     auto findResponse = uassertStatusOK(config->exhaustiveFindOnConfig(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        repl::ReadConcernLevel::kMajorityReadConcern,
+        repl::ReadConcernArgs::kMajority,
         NamespaceString::kConfigDatabasesNamespace,
         BSON(DatabaseType::kDbNameFieldName
              << DatabaseNameUtil::serialize(_dbName, SerializationContext::stateDefault())),
@@ -718,7 +718,7 @@ void MovePrimaryCoordinator::commitCollectionsMetadataToShards(
     const CancellationToken& token) {
     auto const catalogClient = Grid::get(opCtx)->catalogClient();
     const auto trackedColls =
-        catalogClient->getCollections(opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern);
+        catalogClient->getCollections(opCtx, _dbName, repl::ReadConcernArgs::kMajority);
     // Copy by value: getNewSession() below reassigns _doc, which would leave a reference into _doc
     // dangling.
     const auto toShardId = _doc.getToShardId();
@@ -812,8 +812,7 @@ void MovePrimaryCoordinator::dropOrphanedDataOnRecipient(
 
 void MovePrimaryCoordinator::cloneAuthoritativeDatabaseMetadata(OperationContext* opCtx) const {
     auto catalogClient = Grid::get(opCtx)->catalogClient();
-    auto dbMetadata =
-        catalogClient->getDatabase(opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern);
+    auto dbMetadata = catalogClient->getDatabase(opCtx, _dbName, repl::ReadConcernArgs::kMajority);
 
     const auto thisShardId = ShardingState::get(opCtx)->shardId();
 
@@ -836,7 +835,7 @@ void MovePrimaryCoordinator::cloneAuthoritativeCollectionsMetadata(
     const CancellationToken& token) {
     const auto thisShardId = ShardingState::get(opCtx)->shardId();
     const auto trackedColls = Grid::get(opCtx)->catalogClient()->getCollections(
-        opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern);
+        opCtx, _dbName, repl::ReadConcernArgs::kMajority);
 
     // movePrimary holds the database DDL lock in MODE_X, so no collection can be dropped or
     // untracked concurrently and no per-collection DDL lock is needed. This shard is still the

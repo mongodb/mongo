@@ -302,7 +302,7 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicy::selectChunksToSplit(
     const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
 
     auto collections = catalogClient->getShardedCollections(
-        opCtx, DatabaseName::kEmpty, repl::ReadConcernLevel::kMajorityReadConcern, {});
+        opCtx, DatabaseName::kEmpty, repl::ReadConcernArgs::kMajority, {});
     if (collections.empty()) {
         return SplitInfoVector{};
     }
@@ -365,7 +365,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicy::selectChunksToMove(
     auto collections =
         catalogClient->getShardedCollections(opCtx,
                                              DatabaseName::kEmpty,
-                                             repl::ReadConcernLevel::kMajorityReadConcern,
+                                             repl::ReadConcernArgs::kMajority,
                                              BSON(CollectionType::kNssFieldName << 1));
     if (collections.empty()) {
         return MigrateInfoVector{};

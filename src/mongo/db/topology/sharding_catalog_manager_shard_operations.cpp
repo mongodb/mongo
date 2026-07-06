@@ -493,8 +493,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     for (const auto& dbName : dbNamesStatus.getValue()) {
         try {
-            auto dbt = _localCatalogClient->getDatabase(
-                opCtx, dbName, repl::ReadConcernLevel::kLocalReadConcern);
+            auto dbt =
+                _localCatalogClient->getDatabase(opCtx, dbName, repl::ReadConcernArgs::kLocal);
             return Status(ErrorCodes::OperationFailed,
                           str::stream()
                               << "can't add shard "
@@ -969,8 +969,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
         FixedFCVRegion fcvRegion(opCtx);
 
         if (shardId == ShardId::kConfigServerId) {
-            auto trackedDBs =
-                _localCatalogClient->getAllDBs(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
+            auto trackedDBs = _localCatalogClient->getAllDBs(opCtx, repl::ReadConcernArgs::kLocal);
 
             if (auto pendingCleanupState =
                     topology_change_helpers::dropLocalCollectionsAndDatabases(
@@ -1164,7 +1163,7 @@ void ShardingCatalogManager::_standardizeClusterParameters(OperationContext* opC
     auto shardsDocs = uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
         opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        repl::ReadConcernLevel::kLocalReadConcern,
+        repl::ReadConcernArgs::kLocal,
         NamespaceString::kConfigsvrShardsNamespace,
         BSONObj(),
         BSONObj(),

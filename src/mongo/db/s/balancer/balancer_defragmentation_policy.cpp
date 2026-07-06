@@ -129,7 +129,7 @@ std::vector<ChunkType> getCollectionChunks(OperationContext* opCtx, const Collec
                                  nullptr /*opTime*/,
                                  coll.getEpoch(),
                                  coll.getTimestamp(),
-                                 repl::ReadConcernLevel::kLocalReadConcern,
+                                 repl::ReadConcernArgs::kLocal,
                                  boost::none));
 }
 
@@ -1275,7 +1275,7 @@ void BalancerDefragmentationPolicy::startCollectionDefragmentations(OperationCon
     const auto& collDocs = uassertStatusOK(configShard->exhaustiveFindOnConfig(
                                                opCtx,
                                                ReadPreferenceSetting(ReadPreference::Nearest),
-                                               repl::ReadConcernLevel::kMajorityReadConcern,
+                                               repl::ReadConcernArgs::kMajority,
                                                NamespaceString::kConfigsvrCollectionsNamespace,
                                                query,
                                                BSONObj(),

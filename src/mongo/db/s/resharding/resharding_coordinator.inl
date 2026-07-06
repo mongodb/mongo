@@ -2561,7 +2561,7 @@ void ReshardingCoordinator::_updateChunkImbalanceMetrics(const NamespaceString& 
         }
 
         const auto allShardsWithOpTime =
-            catalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
+            catalogClient->getAllShards(opCtx, repl::ReadConcernArgs::kLocal);
 
         auto imbalanceCount =
             getMaxChunkImbalanceCount(routingInfo, allShardsWithOpTime.value, zoneInfo);

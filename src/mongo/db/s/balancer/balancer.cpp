@@ -376,7 +376,7 @@ std::vector<std::string> getDrainingShardNames(OperationContext* opCtx) {
         uassertStatusOK(
             configShard->exhaustiveFindOnConfig(opCtx,
                                                 ReadPreferenceSetting{ReadPreference::Nearest},
-                                                repl::ReadConcernLevel::kMajorityReadConcern,
+                                                repl::ReadConcernArgs::kMajority,
                                                 NamespaceString::kConfigsvrShardsNamespace,
                                                 BSON(ShardType::draining << true),
                                                 BSONObj() /* No sorting */,
@@ -402,7 +402,7 @@ void enqueueCollectionMigrations(OperationContext* opCtx,
     auto requestMigration = [&](const MigrateInfo& migrateInfo) -> SemiFuture<void> {
         auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
         const auto dbEntry = catalogClient->getDatabase(
-            opCtx, migrateInfo.nss.dbName(), repl::ReadConcernLevel::kMajorityReadConcern);
+            opCtx, migrateInfo.nss.dbName(), repl::ReadConcernArgs::kMajority);
 
         return scheduler.requestMoveCollection(
             opCtx, migrateInfo.nss, migrateInfo.to, dbEntry.getPrimary(), dbEntry.getVersion());
@@ -426,7 +426,7 @@ void enqueueChunkMigrations(OperationContext* opCtx,
             }
 
             auto coll = catalogClient->getCollection(
-                opCtx, migrateInfo.nss, repl::ReadConcernLevel::kMajorityReadConcern);
+                opCtx, migrateInfo.nss, repl::ReadConcernArgs::kMajority);
             return coll.getMaxChunkSizeBytes().value_or(balancerConfig->getMaxChunkSizeBytes());
         }();
 
@@ -486,8 +486,8 @@ bool processRebalanceResponse(OperationContext* opCtx,
               logAttrs(migrateInfo.nss));
 
         auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
-        const CollectionType collection = catalogClient->getCollection(
-            opCtx, migrateInfo.uuid, repl::ReadConcernLevel::kMajorityReadConcern);
+        const CollectionType collection =
+            catalogClient->getCollection(opCtx, migrateInfo.uuid, repl::ReadConcernArgs::kMajority);
 
         ShardingCatalogManager::get(opCtx)->splitOrMarkJumbo(
             opCtx, collection.getNss(), migrateInfo.minKey, migrateInfo.getMaxChunkSizeBytes());
@@ -620,7 +620,7 @@ private:
         auto collections =
             catalogClient->getShardedCollections(opCtx,
                                                  DatabaseName::kEmpty,
-                                                 repl::ReadConcernLevel::kMajorityReadConcern,
+                                                 repl::ReadConcernArgs::kMajority,
                                                  BSON(CollectionType::kNssFieldName << 1));
         if (collections.empty()) {
             return;
@@ -786,8 +786,7 @@ void Balancer::moveRange(OperationContext* opCtx,
                          const ConfigsvrMoveRange& request,
                          bool issuedByRemoteUser) {
     const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
-    auto coll =
-        catalogClient->getCollection(opCtx, nss, repl::ReadConcernLevel::kMajorityReadConcern);
+    auto coll = catalogClient->getCollection(opCtx, nss, repl::ReadConcernArgs::kMajority);
 
     uassert(ErrorCodes::NamespaceNotSharded,
             str::stream() << "Can't execute moveRange on unsharded collection "

@@ -758,8 +758,7 @@ boost::optional<ShardType> getExistingShard(
     // Check whether any host in the connection is already part of the cluster.
     const auto existingShards = [&] {
         try {
-            return localCatalogClient.getAllShards(opCtx,
-                                                   repl::ReadConcernLevel::kLocalReadConcern);
+            return localCatalogClient.getAllShards(opCtx, repl::ReadConcernArgs::kLocal);
         } catch (DBException& ex) {
             ex.addContext("Failed to load existing shards during addShard");
             throw;
@@ -1533,7 +1532,7 @@ TenantIdMap<std::vector<BSONObj>> getClusterParametersLocally(OperationContext* 
         auto findResponse = uassertStatusOK(localConfigShard->exhaustiveFindOnConfig(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kLocalReadConcern,
+            repl::ReadConcernArgs::kLocal,
             NamespaceString::makeClusterParametersNSS(tenantId),
             BSONObj(),
             BSONObj(),
@@ -1721,7 +1720,7 @@ void commitRemoveShard(const Lock::ExclusiveLock&,
     auto controlShardQueryStatus =
         localConfigShard->exhaustiveFindOnConfig(opCtx,
                                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                 repl::ReadConcernLevel::kLocalReadConcern,
+                                                 repl::ReadConcernArgs::kLocal,
                                                  NamespaceString::kConfigsvrShardsNamespace,
                                                  BSON(ShardType::name.ne(shardName)),
                                                  {},
@@ -1864,7 +1863,7 @@ boost::optional<ShardType> getShardIfExists(OperationContext* opCtx,
     auto findShardResponse = uassertStatusOK(
         localConfigShard->exhaustiveFindOnConfig(opCtx,
                                                  kConfigReadSelector,
-                                                 repl::ReadConcernLevel::kLocalReadConcern,
+                                                 repl::ReadConcernArgs::kLocal,
                                                  NamespaceString::kConfigsvrShardsNamespace,
                                                  BSON(ShardType::name() << shardId.toString()),
                                                  BSONObj(),
