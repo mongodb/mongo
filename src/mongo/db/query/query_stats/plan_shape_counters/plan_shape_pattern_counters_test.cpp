@@ -27,14 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_stats/plan_shape_counters.h"
-
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution_test_util.h"
+#include "mongo/db/query/query_stats/plan_shape_counters/plan_shape_counters.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
@@ -108,7 +107,7 @@ public:
     void assertShape(const QuerySolution& solution,
                      boost::optional<PlanShapeCounter> expected,
                      const std::string& context) {
-        const auto actual = identifyPlanShapeForCounters(solution);
+        const auto actual = analyzePlanShapeForCounters(solution).pattern;
         const auto name = [](const boost::optional<PlanShapeCounter>& shape) {
             return shape ? toStringData(*shape) : "no shape"sv;
         };

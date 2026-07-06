@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_stats/plan_shape_counters.h"
+#include "mongo/db/query/query_stats/plan_shape_counters/plan_shape_pattern_counters.h"
 
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"

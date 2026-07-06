@@ -39,7 +39,7 @@
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
-#include "mongo/db/query/query_stats/plan_shape_counters.h"
+#include "mongo/db/query/query_stats/plan_shape_counters/plan_shape_counters.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"

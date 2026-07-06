@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_stats/plan_shape_counters.h"
+#include "mongo/db/query/query_stats/plan_shape_counters/plan_shape_counters.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -42,7 +42,7 @@
 namespace mongo::plan_shape_counters {
 namespace {
 
-// 'identifyPlanShapeForCounters' is called for many query executions and is a potential hot path.
+// 'analyzePlanShapeForCounters' is called for many query executions and is a potential hot path.
 // This benchmark measures the overhead in isolation so we have an idea of the cost and can easily
 // measure improvements or regressions to it.
 
@@ -81,7 +81,7 @@ std::unique_ptr<QuerySolution> makePlan(std::unique_ptr<QuerySolutionNode> root)
 
 void runBenchmark(benchmark::State& state, std::unique_ptr<QuerySolution> solution) {
     for (auto _ : state) {
-        benchmark::DoNotOptimize(identifyPlanShapeForCounters(*solution));
+        benchmark::DoNotOptimize(analyzePlanShapeForCounters(*solution));
     }
 }
 
