@@ -65,6 +65,7 @@
 #include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/s/config/initial_split_policy.h"
@@ -304,12 +305,15 @@ void setAllowChunkOperations(OperationContext* opCtx,
     generic_argument_util::setOperationSessionInfo(shardsvrSetAllowChunkOperationsCmd,
                                                    osiGenerator());
 
-    const auto shardResponses =
-        scatterGatherUnversionedTargetAllShards(opCtx,
-                                                nss.dbName(),
-                                                shardsvrSetAllowChunkOperationsCmd.toBSON(),
-                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                Shard::RetryPolicy::kIdempotent);
+    // Use the fixed executor (NetworkInterfaceTL-Sharding-Fixed) so this critical DDL cleanup
+    // path is exempt from IRRL and cannot be rate-limited.
+    const auto shardResponses = scatterGatherUnversionedTargetAllShards(
+        opCtx,
+        nss.dbName(),
+        shardsvrSetAllowChunkOperationsCmd.toBSON(),
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        Shard::RetryPolicy::kIdempotent,
+        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
 
     for (const auto& response : shardResponses) {
         uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));

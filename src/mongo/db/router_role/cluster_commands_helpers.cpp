@@ -572,13 +572,21 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShar
     const DatabaseName& dbName,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
-    Shard::RetryPolicy retryPolicy) {
+    Shard::RetryPolicy retryPolicy,
+    std::shared_ptr<executor::TaskExecutor> executor) {
     std::vector<AsyncRequestsSender::Request> requests;
     for (auto&& shardId : Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx)) {
         requests.emplace_back(std::move(shardId), cmdObj);
     }
 
-    return gatherResponses(opCtx, dbName, NamespaceString(dbName), readPref, retryPolicy, requests);
+    return gatherResponses(opCtx,
+                           dbName,
+                           NamespaceString(dbName),
+                           readPref,
+                           retryPolicy,
+                           requests,
+                           nullptr /* routingCtx */,
+                           executor);
 }
 
 std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetConfigServerAndShards(

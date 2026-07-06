@@ -43,7 +43,7 @@ export const kRateLimiterExemptAppName = "testRateLimiter";
  * The server uses prefix (starts_with) matching, so "NetworkInterfaceTL-Repl" covers
  * ReplNetwork, ReplCoordExternNetwork, and ReplNodeDbWorkerNetwork;
  * "NetworkInterfaceTL-ReplicaSetMonitor" covers ReplicaSetMonitor-TaskExecutor;
- * "OplogFetcher" covers "OplogFetcher-{UUID}-{shard}"; and "NetworkInterfaceTL-Resharding"
+ * "OplogFetcher" covers "OplogFetcher-{UUID}-{shard}"; and "NetworkInterfaceTL-Reshard"
  * covers all resharding NetworkInterfaceTL names.
  *
  * Authoritative upstream source (production config):
@@ -153,9 +153,28 @@ export function makeKeyfileExemptConn(host) {
  * Enables a near-zero-burst IRRL on conn. Sets burst capacity to kZeroBurstCapacitySecs so the
  * token bucket starts essentially empty and every non-exempt connection is immediately rejected.
  * Uses keyfile auth via authutil.asCluster since conn is a raw (unauthenticated) node connection.
+ *
+ * Tests that configure the ingressRequestRateLimiterFractionalRateOverride failpoint at startup
+ * (via kConfigLogsAndFailPointsForRateLimiterTests) do not need to set it again. Tests that start
+ * without that failpoint (e.g. those that toggle IRRL on and off mid-run) can pass
+ * {setRefreshRateFailpoint: true} so the near-zero refresh rate is applied here, keeping the token
+ * bucket effectively empty for the whole time IRRL is enabled.
  */
-export function enableZeroBurstRateLimiter(conn, exemptions) {
+export function enableZeroBurstRateLimiter(
+    conn,
+    exemptions,
+    {setRefreshRateFailpoint = false} = {},
+) {
     authutil.asCluster(conn, kKeyFile, () => {
+        if (setRefreshRateFailpoint) {
+            assert.commandWorked(
+                conn.adminCommand({
+                    configureFailPoint: "ingressRequestRateLimiterFractionalRateOverride",
+                    mode: "alwaysOn",
+                    data: {rate: kSlowestRefreshRateSecs},
+                }),
+            );
+        }
         assert.commandWorked(
             conn.adminCommand({
                 setParameter: 1,

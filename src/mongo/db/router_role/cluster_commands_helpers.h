@@ -332,7 +332,8 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShar
     const DatabaseName& dbName,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
-    Shard::RetryPolicy retryPolicy);
+    Shard::RetryPolicy retryPolicy,
+    std::shared_ptr<executor::TaskExecutor> executor = nullptr);
 
 /**
  * Utility for dispatching unversioned commands to a dedicated config server if it exists and all
