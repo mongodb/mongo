@@ -644,5 +644,63 @@ TEST(
     ASSERT_DOCUMENT_EQ(applyTransformation(immutableEntry, collNss), expectedDoc);
 }
 
+// Applies the default transformation with a caller-provided spec, without forcing
+// 'showExpandedEvents' like the applyTransformation() helper above does.
+Document applyTransformationWithSpec(const repl::OplogEntry& oplogEntry,
+                                     DocumentSourceChangeStreamSpec spec) {
+    spec.setStartAtOperationTime(kDefaultTs);
+    ChangeStreamEventTransformer transformer(make_intrusive<ExpressionContextForTest>(nss), spec);
+    return transformer.applyTransformation(Document(oplogEntry.getEntry().toBSON()));
+}
+
+repl::OplogEntry makeUpdateOplogEntry() {
+    return makeOplogEntry(repl::OpTypeEnum::kUpdate,
+                          nss,
+                          BSON("$v" << 2 << "diff" << BSON("u" << BSON("y" << 2))),  // o
+                          testUuid(),
+                          boost::none,                  // fromMigrate
+                          BSON("x" << 1 << "y" << 1));  // o2
+}
+
+TEST(ChangeStreamEventTransformTest, MatchCollectionUUIDForUpdateLookupEmitsCollectionUUID) {
+    DocumentSourceChangeStreamSpec spec;
+    spec.setFullDocument(FullDocumentModeEnum::kUpdateLookup);
+    spec.setMatchCollectionUUIDForUpdateLookup(true);
+
+    auto event = applyTransformationWithSpec(makeUpdateOplogEntry(), spec);
+    ASSERT_VALUE_EQ(event[DocumentSourceChangeStream::kCollectionUuidField], Value(testUuid()));
+}
+
+TEST(ChangeStreamEventTransformTest, UpdateLookupWithoutMatchCollectionUUIDOmitsCollectionUUID) {
+    DocumentSourceChangeStreamSpec spec;
+    spec.setFullDocument(FullDocumentModeEnum::kUpdateLookup);
+
+    auto event = applyTransformationWithSpec(makeUpdateOplogEntry(), spec);
+    ASSERT_TRUE(event[DocumentSourceChangeStream::kCollectionUuidField].missing());
+}
+
+TEST(ChangeStreamEventTransformTest, MatchCollectionUUIDForUpdateLookupOmitsUUIDOnNonUpdateEvents) {
+    DocumentSourceChangeStreamSpec spec;
+    spec.setFullDocument(FullDocumentModeEnum::kUpdateLookup);
+    spec.setMatchCollectionUUIDForUpdateLookup(true);
+
+    auto insertEntry = makeOplogEntry(repl::OpTypeEnum::kInsert,
+                                      nss,
+                                      BSON("_id" << 1 << "x" << 2),  // o
+                                      testUuid(),
+                                      boost::none,        // fromMigrate
+                                      BSON("_id" << 1));  // o2
+    auto event = applyTransformationWithSpec(insertEntry, spec);
+    ASSERT_TRUE(event[DocumentSourceChangeStream::kCollectionUuidField].missing());
+}
+
+TEST(ChangeStreamEventTransformTest, ShowExpandedEventsEmitsCollectionUUIDWithoutMatchFlag) {
+    DocumentSourceChangeStreamSpec spec;
+    spec.setShowExpandedEvents(true);
+
+    auto event = applyTransformationWithSpec(makeUpdateOplogEntry(), spec);
+    ASSERT_VALUE_EQ(event[DocumentSourceChangeStream::kCollectionUuidField], Value(testUuid()));
+}
+
 }  // namespace
 }  // namespace mongo

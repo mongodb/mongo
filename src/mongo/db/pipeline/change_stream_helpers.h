@@ -56,6 +56,12 @@ ResumeTokenData resolveResumeTokenFromSpec(const boost::intrusive_ptr<Expression
                                            const DocumentSourceChangeStreamSpec& spec);
 
 /**
+ * Returns true if 'collectionUUID' is a user-visible field of the change events produced for the
+ * given change stream spec.
+ */
+bool shouldEmitCollectionUUIDForChangeEvent(const DocumentSourceChangeStreamSpec& spec);
+
+/**
  * Creates endOfTransaction no-op oplog entry
  */
 MONGO_MOD_NEEDS_REPLACEMENT

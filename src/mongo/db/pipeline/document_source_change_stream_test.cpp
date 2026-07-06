@@ -194,6 +194,36 @@ TEST_F(ChangeStreamStageTest, ShouldRejectUnrecognizedFullDocumentOption) {
                        ErrorCodes::BadValue);
 }
 
+TEST_F(ChangeStreamStageTest, ShouldRejectMatchCollectionUUIDForUpdateLookupWithoutUpdateLookup) {
+    auto expCtx = getExpCtx();
+
+    // Omitting 'fullDocument' defaults to 'default', not 'updateLookup'.
+    ASSERT_THROWS_CODE(
+        DSChangeStream::createFromBson(
+            BSON(DSChangeStream::kStageName << BSON("matchCollectionUUIDForUpdateLookup" << true))
+                .firstElement(),
+            expCtx),
+        AssertionException,
+        12888201);
+
+    // 'matchCollectionUUIDForUpdateLookup' is only allowed for 'updateLookup'.
+    ASSERT_DOES_NOT_THROW(
+        DSChangeStream::createFromBson(
+            BSON(DSChangeStream::kStageName << BSON("matchCollectionUUIDForUpdateLookup"
+                                                    << true << "fullDocument" << "updateLookup"))
+                .firstElement(),
+            expCtx););
+
+    ASSERT_THROWS_CODE(
+        DSChangeStream::createFromBson(
+            BSON(DSChangeStream::kStageName << BSON("matchCollectionUUIDForUpdateLookup"
+                                                    << true << "fullDocument" << "required"))
+                .firstElement(),
+            expCtx),
+        AssertionException,
+        12888201);
+}
+
 TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndResumeAfterOptions) {
     auto expCtx = getExpCtx();
 
@@ -6884,6 +6914,9 @@ TEST_F(ChangeStreamMetricsTest, BooleanOptionCountersIncrementOnTrue) {
     struct Case {
         const char* optionKey;
         const char* metricRelPath;
+        // Extra options required for the option under test to be a legal combination, e.g.
+        // 'matchCollectionUUIDForUpdateLookup' requires 'fullDocument: updateLookup'.
+        BSONObj extraOptions = BSONObj();
     };
     const Case cases[] = {
         {"showExpandedEvents", "option.showExpandedEvents"},
@@ -6891,11 +6924,13 @@ TEST_F(ChangeStreamMetricsTest, BooleanOptionCountersIncrementOnTrue) {
         {"showSystemEvents", "option.showSystemEvents"},
         {"showRawUpdateDescription", "option.showRawUpdateDescription"},
         {"ignoreRemovedShards", "option.ignoreRemovedShards"},
-        {"matchCollectionUUIDForUpdateLookup", "option.matchCollectionUUIDForUpdateLookup"},
+        {"matchCollectionUUIDForUpdateLookup",
+         "option.matchCollectionUUIDForUpdateLookup",
+         BSON("fullDocument" << "updateLookup")},
     };
     for (const auto& c : cases) {
         const long long before = readCsMetric(c.metricRelPath);
-        openOnMongod(BSON("$changeStream" << BSON(c.optionKey << true)));
+        openOnMongod(BSON("$changeStream" << BSON(c.optionKey << true).addFields(c.extraOptions)));
         ASSERT_EQ(before + 1, readCsMetric(c.metricRelPath)) << "option: " << c.optionKey;
     }
 }

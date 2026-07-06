@@ -49,8 +49,10 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/process_interface/stub_lookup_single_document_process_interface.h"
 #include "mongo/db/pipeline/resume_token.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
@@ -454,6 +456,114 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPropagatePauses) {
 
     ASSERT_TRUE(lookupChangeStage->getNext().isEOF());
     ASSERT_TRUE(lookupChangeStage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceChangeStreamAddPostImageTest,
+       MatchCollectionUUIDReadsAndStripsCollectionUUIDField) {
+    auto expCtx = getExpCtx();
+    auto spec = getSpec();
+    spec.setMatchCollectionUUIDForUpdateLookup(true);
+    expCtx->setChangeStreamSpec(spec);
+
+    auto lookupChangeDS = DocumentSourceChangeStreamAddPostImage::create(expCtx, spec);
+
+    // The event carries the collection UUID emitted by the event transform.
+    auto mockLocalStage = exec::agg::MockStage::createForTest(
+        createDocumentWithIdAndResumeToken(
+            0,
+            Document{{"documentKey", Document{{"_id", 0}}},
+                     {"operationType", "update"sv},
+                     {std::string{DocumentSourceChangeStream::kCollectionUuidField}, testUuid()},
+                     {"ns",
+                      Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                               {"coll", expCtx->getNamespaceString().coll()}}}}),
+        expCtx);
+
+    auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
+
+    std::deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}}};
+    expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>(mockForeignContents));
+
+    auto next = lookupChangeStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    auto outputDoc = next.releaseDocument();
+
+    // The lookup succeeded and the internal-only 'collectionUUID' field was removed.
+    ASSERT_VALUE_EQ(outputDoc[DocumentSourceChangeStreamAddPostImage::kFullDocumentFieldName],
+                    Value(Document{{"_id", 0}}));
+    ASSERT_TRUE(outputDoc[DocumentSourceChangeStream::kCollectionUuidField].missing());
+}
+
+TEST_F(DocumentSourceChangeStreamAddPostImageTest,
+       ShowExpandedEventsKeepsCollectionUUIDFieldOnOutput) {
+    auto expCtx = getExpCtx();
+    auto spec = getSpec();
+    spec.setMatchCollectionUUIDForUpdateLookup(true);
+    spec.setShowExpandedEvents(true);
+    expCtx->setChangeStreamSpec(spec);
+
+    auto lookupChangeDS = DocumentSourceChangeStreamAddPostImage::create(expCtx, spec);
+
+    auto mockLocalStage = exec::agg::MockStage::createForTest(
+        createDocumentWithIdAndResumeToken(
+            0,
+            Document{{"documentKey", Document{{"_id", 0}}},
+                     {"operationType", "update"sv},
+                     {std::string{DocumentSourceChangeStream::kCollectionUuidField}, testUuid()},
+                     {"ns",
+                      Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                               {"coll", expCtx->getNamespaceString().coll()}}}}),
+        expCtx);
+
+    auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
+
+    std::deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}}};
+    expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>(mockForeignContents));
+
+    auto next = lookupChangeStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    auto outputDoc = next.releaseDocument();
+
+    // With 'showExpandedEvents' the 'collectionUUID' field is user-visible and must remain.
+    ASSERT_VALUE_EQ(outputDoc[DocumentSourceChangeStream::kCollectionUuidField], Value(testUuid()));
+}
+
+using DocumentSourceChangeStreamAddPostImageDeathTest = DocumentSourceChangeStreamAddPostImageTest;
+
+DEATH_TEST_REGEX_F(DocumentSourceChangeStreamAddPostImageDeathTest,
+                   MatchCollectionUUIDWithoutCollectionUUIDFieldTasserts,
+                   "Tripwire assertion.*12888200") {
+    auto expCtx = getExpCtx();
+    auto spec = getSpec();
+    spec.setMatchCollectionUUIDForUpdateLookup(true);
+    expCtx->setChangeStreamSpec(spec);
+
+    auto lookupChangeDS = DocumentSourceChangeStreamAddPostImage::create(expCtx, spec);
+
+    // The event lacks the 'collectionUUID' field the transform must have emitted.
+    auto mockLocalStage = exec::agg::MockStage::createForTest(
+        createDocumentWithIdAndResumeToken(
+            0,
+            Document{{"documentKey", Document{{"_id", 0}}},
+                     {"operationType", "update"sv},
+                     {"ns",
+                      Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                               {"coll", expCtx->getNamespaceString().coll()}}}}),
+        expCtx);
+
+    auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
+
+    std::deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}}};
+    expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>(mockForeignContents));
+
+    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 12888200);
+}
+
+TEST_F(DocumentSourceChangeStreamAddPostImageTest, UpdateLookupDependsOnCollectionUUIDField) {
+    auto ds = DocumentSourceChangeStreamAddPostImage::create(getExpCtx(), getSpec());
+    DepsTracker deps;
+    ds->getDependencies(&deps);
+    ASSERT_EQ(deps.fields.count(std::string{DocumentSourceChangeStream::kCollectionUuidField}), 1u);
 }
 
 // Wire-up tests: assert documentSourceChangeStreamAddPostImageToStageFn builds the right

@@ -102,7 +102,7 @@ describe("metrics.changeStreams.option boolean counters", function () {
 
     it("matchCollectionUUIDForUpdateLookup increments when set to true", function () {
         const before = getCsMetrics().option.matchCollectionUUIDForUpdateLookup;
-        openAndClose({matchCollectionUUIDForUpdateLookup: true});
+        openAndClose({fullDocument: "updateLookup", matchCollectionUUIDForUpdateLookup: true});
         assert.eq(
             before + 1,
             getCsMetrics().option.matchCollectionUUIDForUpdateLookup,
@@ -143,7 +143,7 @@ describe("metrics.changeStreams.option boolean counters", function () {
             getCsMetrics().option.ignoreRemovedShards,
             "ignoreRemovedShards should not increment when explicitly false",
         );
-        openAndClose({matchCollectionUUIDForUpdateLookup: false});
+        openAndClose({fullDocument: "updateLookup", matchCollectionUUIDForUpdateLookup: false});
         assert.eq(
             before.option.matchCollectionUUIDForUpdateLookup,
             getCsMetrics().option.matchCollectionUUIDForUpdateLookup,

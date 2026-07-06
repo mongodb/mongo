@@ -33,6 +33,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/change_stream.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/resume_token.h"
@@ -117,16 +118,27 @@ Timestamp getClusterTime(const Document& updateOp) {
 
 /**
  * Returns the collection UUID to match against the lookup target, or boost::none. The UUID is only
- * required for the internal 'matchCollectionUUID' flag and is only obtainable from the resume
- * token, so we decode the token lazily -- only when the flag is set.
+ * required for the internal 'matchCollectionUUID' flag. When the flag is set, the event transform
+ * mirrors the resume token's UUID in the event's 'collectionUUID' field, so we read it directly
+ * instead of decoding the resume token keystring.
  */
 boost::optional<UUID> getCollectionUUID(const Document& updateOp, bool shouldMatchCollectionUUID) {
     if (!shouldMatchCollectionUUID) {
         return boost::none;
     }
-    return ResumeToken::parse(updateOp[DocumentSourceChangeStream::kIdField].getDocument())
-        .getData()
-        .uuid;
+    auto uuidVal = updateOp[DocumentSourceChangeStream::kCollectionUuidField];
+    tassert(12888200,
+            str::stream() << "expected the event transform to emit the '"
+                          << DocumentSourceChangeStream::kCollectionUuidField
+                          << "' field on update events when matching the collection UUID, full "
+                             "object: "
+                          << updateOp.toString(),
+            uuidVal.getType() == BSONType::binData);
+    auto uuid = uuidVal.getUuid();
+    dassert(ResumeToken::parse(updateOp[DocumentSourceChangeStream::kIdField].getDocument())
+                .getData()
+                .uuid == uuid);
+    return uuid;
 }
 }  // namespace
 
@@ -183,6 +195,10 @@ GetNextResult ChangeStreamUpdateLookupStage::doGetNext() {
     output[DocumentSourceChangeStreamAddPostImage::kFullDocumentFieldName] =
         (postImageDoc ? Value(*postImageDoc) : Value(BSONNULL));
 
+    // Remove the 'collectionUUID' field unless it is a user-visible field of this stream's events.
+    if (!change_stream::shouldEmitCollectionUUIDForChangeEvent(*pExpCtx->getChangeStreamSpec())) {
+        output.remove(DocumentSourceChangeStream::kCollectionUuidField);
+    }
     return output.freeze();
 }
 

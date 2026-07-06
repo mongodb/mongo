@@ -592,6 +592,12 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
             "Change streams from router may not show migration events",
             !(expCtx->getInRouter() && spec.getShowMigrationEvents()));
 
+    uassert(12888201,
+            "matchCollectionUUIDForUpdateLookup may only be specified when fullDocument is "
+            "'updateLookup'",
+            !spec.getMatchCollectionUUIDForUpdateLookup() ||
+                spec.getFullDocument() == FullDocumentModeEnum::kUpdateLookup);
+
     uassert(50865,
             "Do not specify both 'resumeAfter' and 'startAfter' in a $changeStream stage",
             !spec.getResumeAfter() || !spec.getStartAfter());

@@ -141,6 +141,9 @@ public:
             // updateLookup reads the event's clusterTime to ensure the document is looked up with a
             // higher cluster time via 'afterClusterTime'.
             deps->fields.insert(std::string{DocumentSourceChangeStream::kClusterTimeField});
+            // The update-lookup stage reads the event's collection UUID from this field when
+            // matching the lookup target's UUID.
+            deps->fields.insert(std::string{DocumentSourceChangeStream::kCollectionUuidField});
         }
 
         // This stage does not restrict the output fields to a finite set, and has no impact on

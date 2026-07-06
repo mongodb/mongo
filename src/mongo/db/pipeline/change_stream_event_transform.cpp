@@ -700,7 +700,11 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
         }
     }
 
-    if (_changeStreamSpec.getShowExpandedEvents() && !uuid.missing()) {
+    const bool shouldEmitCollectionUUID =
+        change_stream::shouldEmitCollectionUUIDForChangeEvent(_changeStreamSpec) ||
+        (_changeStreamSpec.getMatchCollectionUUIDForUpdateLookup() &&
+         operationType == DocumentSourceChangeStream::kUpdateOpType);
+    if (shouldEmitCollectionUUID && !uuid.missing()) {
         doc.addField(DocumentSourceChangeStream::kCollectionUuidField, uuid);
     }
 

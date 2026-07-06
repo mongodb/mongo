@@ -77,6 +77,10 @@ ResumeTokenData resolveResumeTokenFromSpec(const boost::intrusive_ptr<Expression
               "populated in $changeStream spec");
 }
 
+bool shouldEmitCollectionUUIDForChangeEvent(const DocumentSourceChangeStreamSpec& spec) {
+    return spec.getShowExpandedEvents();
+}
+
 repl::MutableOplogEntry createEndOfTransactionOplogEntry(
     const LogicalSessionId& lsid,
     const TxnNumber& txnNumber,
