@@ -494,32 +494,18 @@ configureFailCommandAllConfigNodes(st.configRS, {
     },
 });
 
-stepDownAndUp(st.configRS);
-
-// failCommand is armed on every config node, so whichever node the scan lands on bumps the counter.
-let erroredZoneStats;
-assert.soon(
-    () => {
-        erroredZoneStats = readZoneScanStats(st.configRS);
-        return erroredZoneStats.maxKeyZoneScanErrors >= 1;
-    },
-    () =>
-        `maxKeyZoneScanErrors must increment when the scan hits a non-retryable catalog read error; ` +
-        `got ${tojson(erroredZoneStats)}`,
+// Retry stepups until the doc appears.
+stepUpAndAwaitScanState(
+    st.configRS,
+    (doc) => doc.scanCompletedAt === undefined,
+    "Abandoned scan should upsert a state doc without scanCompletedAt",
 );
 
-// Corroborate independently of the new counter: an abandoned scan upserts a doc but omits
-// scanCompletedAt.
-let erroredDoc;
-assert.soon(() => {
-    erroredDoc = readScanState(st.configRS);
-    return erroredDoc !== null;
-}, "Scan should still upsert a state doc when the sweep is abandoned");
-assert.eq(
-    undefined,
-    erroredDoc.scanCompletedAt,
-    "An abandoned scan must not persist scanCompletedAt",
-    {erroredDoc},
+// failCommand is armed on every config node, so whichever node the scan lands on bumps the counter.
+assert.gte(
+    readZoneScanStats(st.configRS).maxKeyZoneScanErrors,
+    1,
+    "maxKeyZoneScanErrors must increment when the scan hits a non-retryable catalog read error",
 );
 
 configureFailCommandAllConfigNodes(st.configRS, {configureFailPoint: "failCommand", mode: "off"});

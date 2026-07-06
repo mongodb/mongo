@@ -17,7 +17,7 @@
  * @tags: [
  *   assumes_balancer_off,
  *   requires_sharding,
- *   requires_fcv_83,
+ *   requires_fcv_90,
  * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";

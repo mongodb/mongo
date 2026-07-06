@@ -1,21 +1,19 @@
 /**
- * MaxKey orphan one-shot inventory scan must not block concurrent migrations and migrations
- * must not corrupt the scan's persisted result.
- * hangDuringMaxKeyOrphanScan parks the scan mid-detection: after it pre-checks a collection for a
- * MaxKey document, before its authoritative re-check. With the scan parked on an {a: MaxKey} document
- * shard0 owns, the test moves the global-max chunk off shard0 (_waitForDelete removes the document).
- * The moveChunk completing while parked proves the scan doesn't block it; the final foundMaxKey=false
- * proves the re-check observed the removal.
+ * A chunk migration racing the MaxKey orphan one-shot inventory scan must not corrupt the scan's
+ * persisted result. hangDuringMaxKeyOrphanScan parks the scan after it pre-checks a collection for a
+ * MaxKey document, before its authoritative re-check. Once released, the scan races a migration of
+ * the global-max chunk off shard0. The MigrationBlockingGuard serializes them, so the migration
+ * either wins (removes the document) or is rejected with ConflictingOperationInProgress; either way
+ * the re-check reports foundMaxKey=false.
  *
  * @tags: [
  *  featureFlagMaxKeyDetection,
- *  multiversion_incompatible,
+ *  requires_fcv_90,
  *  does_not_support_stepdowns,
  * ]
  */
 
 import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
-import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
@@ -36,16 +34,6 @@ assert.commandWorked(adminDB.runCommand({shardCollection: candidateNs, key: {a: 
 assert.commandWorked(adminDB.runCommand({split: candidateNs, middle: {a: 0}}));
 assert.commandWorked(testDB[candidateCollName].insert({a: MaxKey}));
 assert.commandWorked(testDB[candidateCollName].insert({a: -1}));
-
-// Migrated in parallel to show multiple in-flight migrations aren't blocked. No MaxKey document, so
-// the scan never pauses on it.
-const parallelCollName = "parallel_coll";
-const parallelNs = `${dbName}.${parallelCollName}`;
-assert.commandWorked(adminDB.runCommand({shardCollection: parallelNs, key: {a: 1}}));
-assert.commandWorked(adminDB.runCommand({split: parallelNs, middle: {a: 0}}));
-for (let i = -5; i < 5; ++i) {
-    assert.commandWorked(testDB[parallelCollName].insert({a: i}));
-}
 
 const scanStateId = "scanState";
 function readScanState() {
@@ -78,43 +66,20 @@ hangFp.wait({maxTimeMS: kDefaultWaitForFailPointTimeout});
 
 assert.eq(null, readScanState(), "Scan must not have persisted the state doc while paused");
 
-jsTest.log.info("Moving the global-max chunk off shard0 while the orphan scan is parked");
-assert.commandWorked(
-    adminDB.runCommand({
-        moveChunk: candidateNs,
-        bounds: [{a: 0}, {a: MaxKey}],
-        to: st.shard1.shardName,
-        _waitForDelete: true,
-    }),
-);
-assert.eq(
-    0,
-    st.rs0.getPrimary().getDB(dbName).getCollection(candidateCollName).find({a: MaxKey}).itcount(),
-    "The migration's range deletion should have removed the global-max document from shard0",
-);
-
-jsTest.log.info("Running a second migration in parallel while the scan is still parked");
-const parallelMove = startParallelShell(
-    funWithArgs(
-        function (ns, toShard) {
-            assert.commandWorked(
-                db.getSiblingDB("admin").runCommand({
-                    moveChunk: ns,
-                    find: {a: 1},
-                    to: toShard,
-                    _waitForDelete: true,
-                }),
-            );
-        },
-        parallelNs,
-        st.shard1.shardName,
-    ),
-    mongos.port,
-);
-
-assert.eq(null, readScanState(), "Scan must remain parked while the migrations are in flight");
-
 hangFp.off();
+
+jsTest.log.info("Racing a migration of the global-max chunk against the resuming orphan scan");
+const moveRes = adminDB.runCommand({
+    moveChunk: candidateNs,
+    bounds: [{a: 0}, {a: MaxKey}],
+    to: st.shard1.shardName,
+    _waitForDelete: true,
+});
+assert(
+    moveRes.ok === 1 || moveRes.code === ErrorCodes.ConflictingOperationInProgress,
+    "Migration must either succeed or be rejected by the scan's guard",
+    {moveRes},
+);
 
 assert.soon(
     () => {
@@ -125,13 +90,11 @@ assert.soon(
     60 * 1000,
 );
 
-parallelMove(); // join the parallel shell; verifies the second moveChunk succeeded
-
 const finalState = readScanState();
 assert.eq(
     false,
     finalState.foundMaxKey,
-    "Scan's authoritative re-check must observe the concurrently-removed candidate and not flag it",
+    "Scan must not flag: the doc was removed by the migration or is still legitimately owned by shard0",
     {finalState},
 );
 

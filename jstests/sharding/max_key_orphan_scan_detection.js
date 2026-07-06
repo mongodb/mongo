@@ -24,7 +24,7 @@
  *
  * @tags: [
  *  featureFlagMaxKeyDetection,
- *  multiversion_incompatible,
+ *  requires_fcv_90,
  *  does_not_support_stepdowns,
  * ]
  */

@@ -218,7 +218,7 @@ feature_flags:
             On the config server, the Balancer scan detects zones whose upper bound matches the
             buggy trailing-MinKey fingerprint and records the result in config.maxKeyZoneScanState.
         cpp_varname: feature_flags::gMaxKeyDetection
-        default: false
+        default: true
         fcv_gated: false
     featureFlagHashedShardKeyIndexOptionalUponShardingCollection:
         description:
