@@ -77,6 +77,7 @@ TEST(CatalogContextTest, CatalogContextWithValidFields) {
     ASSERT_EQUALS(expectedUUID, statusWithUUID.getValue());
 
     ASSERT_EQUALS(extensionCatalogContext.inRouter, 1);
+    ASSERT_EQUALS(extensionCatalogContext.willBeMerged, 0);
     ASSERT_EQUALS(extensionCatalogContext.verbosity,
                   ::MongoExtensionExplainVerbosity::kExecAllPlans);
     ASSERT_EQUALS(extensionCatalogContext.shardId.len, 0);
@@ -100,8 +101,28 @@ TEST(CatalogContextTest, CatalogContextWithEmptyFields) {
     ASSERT_EQUALS(extensionNamespaceString.collectionName.len, 0);
     ASSERT_EQUALS(extensionCatalogContext.uuidString.len, 0);
     ASSERT_EQUALS(extensionCatalogContext.inRouter, 0);
+    ASSERT_EQUALS(extensionCatalogContext.willBeMerged, 0);
     ASSERT_EQUALS(extensionCatalogContext.verbosity, ::MongoExtensionExplainVerbosity::kNotExplain);
     ASSERT_EQUALS(extensionCatalogContext.shardId.len, 0);
+}
+
+TEST(CatalogContextTest, CatalogContextWithWillBeMerged) {
+    QueryTestServiceContext testCtx;
+    auto opCtx = testCtx.makeOperationContext();
+
+    auto expCtx = make_intrusive<ExpressionContextForTest>(
+        opCtx.get(),
+        NamespaceString::createNamespaceString_forTest("test"sv, "coll"sv),
+        SerializationContext());
+
+    expCtx->setInRouter(false);
+    expCtx->setNeedsMerge(true);
+
+    const auto catalogContext = mongo::extension::host::CatalogContext(*expCtx);
+    const auto& extensionCatalogContext = catalogContext.getAsBoundaryType();
+
+    ASSERT_EQUALS(extensionCatalogContext.inRouter, 0);
+    ASSERT_EQUALS(extensionCatalogContext.willBeMerged, 1);
 }
 
 TEST(CatalogContextTest, CatalogContextWithShardId) {

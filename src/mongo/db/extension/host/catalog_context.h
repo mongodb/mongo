@@ -55,6 +55,7 @@ public:
           _collName(expCtx.getNamespaceString().coll()),
           _uuid(expCtx.getUUID().has_value() ? expCtx.getUUID()->toString() : ""),
           _inRouter(expCtx.getInRouter()),
+          _willBeMerged(expCtx.getNeedsMerge() && !expCtx.getInRouter()),
           _verbosity(expCtx.getExplain()),
           _shardId([&]() -> std::string {
               auto* opCtx = expCtx.getOperationContext();
@@ -68,7 +69,8 @@ public:
                stringDataAsByteView(std::string_view(_uuid)),
                _inRouter,
                convertHostVerbosityToExtVerbosity(_verbosity),
-               stringDataAsByteView(std::string_view(_shardId))) {}
+               stringDataAsByteView(std::string_view(_shardId)),
+               _willBeMerged) {}
 
     ~CatalogContext() = default;
 
@@ -81,6 +83,7 @@ private:
     const std::string _collName;
     const std::string _uuid;
     const bool _inRouter;
+    const bool _willBeMerged;
     const boost::optional<ExplainOptions::Verbosity> _verbosity;
     const std::string _shardId;
     const ::MongoExtensionCatalogContext _api;
