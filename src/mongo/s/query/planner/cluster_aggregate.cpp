@@ -902,8 +902,6 @@ Status runAggregateImpl(OperationContext* opCtx,
                            pipelineCtx->getNamespaceString().isCollectionlessAggregateNS());
         }
 
-        // TODO SERVER-89546: Ideally extractDocsNeededBounds should be called internally within
-        // DocumentSourceSearch.
         if (search_helpers::isSearchPipeline(pipeline.get())) {
             // We won't reach this if the whole pipeline passes through with the "specific shard"
             // policy. That's okay since the shard will have access to the entire pipeline to

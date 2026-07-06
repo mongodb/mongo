@@ -758,9 +758,6 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecuto
         bool isMongotPipeline = search_helpers::isMongotPipeline(pipeline.get());
         DocsNeededBounds mongotBounds;
         if (isMongotPipeline) {
-            // TODO SERVER-89546 extractDocsNeededBounds should be called internally within
-            // DocumentSourceSearch optimization; that also means we'd be skipping that step when
-            // optimization is off.
             mongotBounds = extractDocsNeededBounds(*pipeline.get());
             search_helpers::desugarSearchPipeline(pipeline.get());
         }
