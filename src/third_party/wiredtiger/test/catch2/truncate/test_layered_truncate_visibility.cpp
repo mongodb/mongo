@@ -42,14 +42,14 @@ public:
         REQUIRE(__wt_calloc(session, 1, sizeof(WT_TXN), &session->txn) == 0);
 
         layered_table.iface.name = "layered:test_layered_truncate_visibility";
-        TAILQ_INIT(&layered_table.truncateqh);
-        REQUIRE(__wt_rwlock_init(session, &layered_table.truncate_lock) == 0);
+        TAILQ_INIT(&layered_table.truncate_list.qh);
+        REQUIRE(__wt_rwlock_init(session, &layered_table.truncate_list.lock) == 0);
     }
 
     ~layered_truncate_visibility_fixture()
     {
         __wt_layered_table_truncate_clear(session, &layered_table);
-        __wt_rwlock_destroy(session, &layered_table.truncate_lock);
+        __wt_rwlock_destroy(session, &layered_table.truncate_list.lock);
         __wt_free(session, session->txn);
         __wt_free(session, txn_shared_list);
     }
@@ -120,7 +120,7 @@ public:
         REQUIRE(__wt_buf_set(session, &entry->start_key, start, strlen(start)) == 0);
         REQUIRE(__wt_buf_set(session, &entry->stop_key, stop, strlen(stop)) == 0);
 
-        TAILQ_INSERT_TAIL(&layered_table.truncateqh, entry, q);
+        TAILQ_INSERT_TAIL(&layered_table.truncate_list.qh, entry, q);
         return entry;
     }
 
@@ -131,8 +131,8 @@ public:
         WT_ITEM item{};
         item.data = key.data();
         item.size = key.size();
-        return (__wt_truncate_delete_visible_check(
-          session, &layered_table, &item, start_keyp, stop_keyp));
+        return (__wt_truncate_delete_visible_check(session, &layered_table.truncate_list,
+          layered_table.collator, &item, start_keyp, stop_keyp));
     }
 };
 
@@ -431,7 +431,7 @@ TEST_CASE_METHOD(layered_truncate_visibility_fixture,
 
     __wti_layered_table_truncate_rollback_apply(session, &layered_table, &op);
     REQUIRE(op.u.follower_truncate.t == nullptr);
-    REQUIRE(TAILQ_FIRST(&layered_table.truncateqh) == surviving);
+    REQUIRE(TAILQ_FIRST(&layered_table.truncate_list.qh) == surviving);
     REQUIRE(TAILQ_NEXT(surviving, q) == nullptr);
 
     const char *key = "0125";

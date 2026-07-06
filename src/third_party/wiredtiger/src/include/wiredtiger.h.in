@@ -4265,6 +4265,19 @@ int wiredtiger_calc_modify(WT_SESSION *session,
 const char *wiredtiger_version(int *majorp, int *minorp, int *patchp)
     WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
+/*!
+ * repair entry point. For the config string definition, see
+ * \c conn/api_repair.c for more details. This function is not thread-safe
+ * and should not be called concurrently on the same connection.
+ *
+ * @param connection the connection on which to perform the work
+ * @param config the configuration string (must be non-NULL and non-empty)
+ * @returns a library-owned diagnostic string (never NULL; do not free); valid until the next
+ *     wiredtiger_repair call on the same connection (not thread-safe)
+ */
+const char *wiredtiger_repair(WT_CONNECTION *connection, const char *config)
+    WT_ATTRIBUTE_LIBRARY_VISIBLE;
+
 /*! @} */
 
 /*******************************************

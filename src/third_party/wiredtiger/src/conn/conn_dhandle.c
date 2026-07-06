@@ -212,8 +212,9 @@ __wt_conn_dhandle_alloc(WT_SESSION_IMPL *session, const char *uri, const char *c
     } else if (WT_PREFIX_MATCH(uri, "layered:")) {
         WT_RET(__wt_calloc_one(session, &layered));
         dhandle = (WT_DATA_HANDLE *)layered;
-        TAILQ_INIT(&layered->truncateqh);
-        WT_RET(__wt_rwlock_init(session, &layered->truncate_lock));
+        WT_TRUNCATE_LIST *truncate_list = &layered->truncate_list;
+        TAILQ_INIT(&truncate_list->qh);
+        WT_RET(__wt_rwlock_init(session, &truncate_list->lock));
         __wt_atomic_store_enum_relaxed(&dhandle->type, WT_DHANDLE_TYPE_LAYERED);
     } else if (WT_PREFIX_MATCH(uri, "table:")) {
         WT_RET(__wt_calloc_one(session, &table));
@@ -294,14 +295,17 @@ __wt_conn_dhandle_find(WT_SESSION_IMPL *session, const char *uri, const char *ch
                 continue;
             if (F_ISSET(dhandle, WT_DHANDLE_OUTDATED)) {
                 /*
-                 * For read-only stable table checkpoints, they are really outdated when they are
-                 * not in use any more. The pinned shared history store checkpoints may be still
-                 * needed by the readers while the stable table checkpoints may still be needed by
-                 * the checkpoint tracking logic.
+                 * An outdated read-only stable handle is only safe to reuse in its checkpoint-view
+                 * form (a "...wt_stable/WiredTigerCheckpoint.N" name): those checkpoint handles
+                 * span eras and sweep keeps them alive for readers and the checkpoint tracking
+                 * logic. A live stable handle must be reopened fresh instead -- draining through an
+                 * outdated one hits resident inserts or unresolved prepared updates left by the
+                 * previous leader era.
                  */
                 if (WT_DHANDLE_BTREE(dhandle) &&
                   F_ISSET((WT_BTREE *)dhandle->handle, WT_BTREE_READONLY)) {
-                    if (__wt_atomic_load_int32_acquire(&dhandle->session_inuse) == 0)
+                    if (__wt_atomic_load_int32_acquire(&dhandle->session_inuse) == 0 ||
+                      !WT_URI_IS_STABLE_CHECKPOINT(dhandle->name))
                         continue;
                 } else
                     continue;

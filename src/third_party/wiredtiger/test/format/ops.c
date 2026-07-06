@@ -1287,8 +1287,12 @@ rollback_retry:
             val_gen(table, &tinfo->data_rnd, tinfo->new_value, tinfo->keyno);
 
         /* If modify, build a modify change vector. */
-        if (op == MODIFY)
+        if (op == MODIFY) {
+            if (replay_stale_read_ts(tinfo))
+                goto rollback;
+
             modify_build(tinfo);
+        }
 
         ret = 0;
         skip1 = skip2 = NULL;

@@ -250,9 +250,6 @@ __wti_block_disagg_write(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf
     WT_RET(__wti_block_disagg_write_internal(session, block_disagg, buf, block_meta,
       page_image_size, &size, &checksum, data_checksum, checkpoint_io));
 
-    /* Update the running total of bytes. */
-    __wti_block_disagg_increase_size(block_disagg, size);
-
     __wt_page_header_byteswap(buf->mem);
 
     WT_CLEAR(cookie);
@@ -274,6 +271,14 @@ __wti_block_disagg_write(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf
     endp = addr;
     WT_RET(__wti_block_disagg_addr_pack(session, &endp, &cookie));
     *addr_sizep = WT_PTRDIFF(endp, addr);
+
+    /*
+     * The size is increased by the size of the current write. If there is a error path for this
+     * function, we should decrease the size back to the previous value, same as at the beginning of
+     * this function. This is important for the correctness of the size tracking, and to avoid
+     * potential issues with the block manager's size accounting.
+     */
+    __wti_block_disagg_increase_size(block_disagg, size);
 
     return (0);
 }

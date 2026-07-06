@@ -754,6 +754,7 @@ COMPARE_NOTFOUND_OK(__wt_cursor::_search_near)
 %exception __wt_cursor::_set_value;
 %exception __wt_cursor::_set_value_str;
 %exception wiredtiger_strerror;
+%exception wiredtiger_repair;
 %exception wiredtiger_version;
 %exception diagnostic_build;
 %exception standalone_build;

@@ -147,11 +147,16 @@ __wti_connection_destroy(WT_CONNECTION_IMPL *conn)
     /* Free allocated recovered checkpoint snapshot memory */
     __wt_free(session, conn->recovery_ckpt_snapshot);
 
+    /* Free checkpoint eviction snapshot buffer backing arrays. */
+    __wt_free(session, conn->ckpt_eviction_snap_array[0]);
+    __wt_free(session, conn->ckpt_eviction_snap_array[1]);
+
     /* Free allocated memory. */
     __wt_free(session, conn->cfg);
     __wt_free(session, conn->debug.ckpt);
     __wt_free(session, conn->error_prefix);
     __wt_free(session, conn->home);
+    __wt_buf_free(session, &conn->repair.last_report);
     __wt_free(session, WT_CONN_SESSIONS_GET(conn));
     __wt_stat_connection_discard(session, conn);
 

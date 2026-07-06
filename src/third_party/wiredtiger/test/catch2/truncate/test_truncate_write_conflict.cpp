@@ -162,7 +162,7 @@ public:
         auto key_item = make_item(key_str);
 
         return __wt_layered_table_truncate_detect_write_conflict(
-          session, layered_table(), &key_item);
+          session, &layered_table()->truncate_list, layered_table()->collator, &key_item);
     }
 
     int
@@ -173,8 +173,8 @@ public:
         auto start_item = make_item(start_str);
         auto stop_item = make_item(stop_str);
 
-        return __wt_layered_table_truncate_detect_non_ingest_write_conflict(
-          session, layered_table(), &start_item, &stop_item);
+        return __wt_layered_table_truncate_detect_non_ingest_write_conflict(session,
+          &layered_table()->truncate_list, layered_table()->collator, &start_item, &stop_item);
     }
 
 private:

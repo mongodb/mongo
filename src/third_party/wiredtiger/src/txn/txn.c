@@ -2513,6 +2513,9 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
         __wt_atomic_store_uint64_v_relaxed(&s->metadata_pinned, WT_TXN_NONE);
     }
 
+    conn->ckpt_eviction_snap[0].snap_min = WT_TXN_NONE;
+    conn->ckpt_eviction_snap[1].snap_min = WT_TXN_NONE;
+
     return (0);
 }
 

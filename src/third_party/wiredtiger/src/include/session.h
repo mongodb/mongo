@@ -393,13 +393,14 @@ struct __wt_session_impl {
     TAILQ_HEAD(__dhandles_hash, __wt_data_handle_cache) * dhhash;
 
 /* Generations manager */
-#define WT_GEN_CHECKPOINT 0   /* Checkpoint generation */
-#define WT_GEN_EVICT 1        /* Eviction generation */
-#define WT_GEN_HAS_SNAPSHOT 2 /* Snapshot generation */
-#define WT_GEN_HAZARD 3       /* Hazard pointer */
-#define WT_GEN_SPLIT 4        /* Page splits */
-#define WT_GEN_TXN_COMMIT 5   /* Commit generation */
-#define WT_GENERATIONS 6      /* Total generation manager entries */
+#define WT_GEN_CHECKPOINT 0        /* Checkpoint generation */
+#define WT_GEN_EVICT 1             /* Eviction generation */
+#define WT_GEN_HAS_SNAPSHOT 2      /* Snapshot generation */
+#define WT_GEN_HAZARD 3            /* Hazard pointer */
+#define WT_GEN_SPLIT 4             /* Page splits */
+#define WT_GEN_TXN_COMMIT 5        /* Commit generation */
+#define WT_GEN_HAS_CKPT_SNAPSHOT 6 /* Checkpoint snapshot for eviction visibility */
+#define WT_GENERATIONS 7           /* Total generation manager entries */
     wt_shared volatile uint64_t generations[WT_GENERATIONS];
 
     /*

@@ -10,6 +10,7 @@
 
 static int __evict_page_clean_update(WT_SESSION_IMPL *, WT_REF *, uint32_t);
 static int __evict_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, uint32_t);
+static bool __evict_precise_ckpt_copy_snapshot(WT_SESSION_IMPL *);
 static int __evict_reconcile(WT_SESSION_IMPL *, WT_REF *, uint32_t);
 static int __evict_review(WT_SESSION_IMPL *, WT_REF *, uint32_t, bool *);
 
@@ -715,7 +716,7 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_
             /* A disaggregated page must have a retained image to re-instantiate from. */
             WT_ASSERT(
               session, ref->page->disagg_info == NULL || mod->mod_multi[0].disk_image != NULL);
-            WT_RET(__wt_split_rewrite(session, ref, &mod->mod_multi[0], true));
+            WT_RET(__wt_split_rewrite(session, ref, &mod->mod_multi[0]));
         } else
             WT_RET(__wt_split_multi(session, ref, closing));
         break;
@@ -766,7 +767,7 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_
              */
             tmp = mod->mod_disk_image;
             mod->mod_disk_image = NULL;
-            ret = __wt_split_rewrite(session, ref, &multi, true);
+            ret = __wt_split_rewrite(session, ref, &multi);
             __wt_free(session, multi.block_meta);
             if (ret != 0) {
                 mod->mod_disk_image = tmp;
@@ -1169,6 +1170,40 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
 }
 
 /*
+ * __evict_precise_ckpt_copy_snapshot --
+ *     Copy the published checkpoint snapshot into the session's transaction snapshot so that
+ *     reconciliation can use it for precise checkpoint eviction visibility. Returns true if the
+ *     snapshot was copied, false if no snapshot has been published yet.
+ */
+static bool
+__evict_precise_ckpt_copy_snapshot(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_TXN_SNAPSHOT *snap;
+    uint32_t snap_idx;
+    bool published;
+
+    conn = S2C(session);
+
+    WT_ENTER_GENERATION(session, WT_GEN_HAS_CKPT_SNAPSHOT);
+    snap_idx = __wt_atomic_load_uint32_acquire(&conn->ckpt_eviction_snap_idx);
+    snap = &conn->ckpt_eviction_snap[snap_idx];
+    WT_ACQUIRE_READ_WITH_BARRIER(published, conn->ckpt_eviction_snap_published);
+    if (published) {
+        session->txn->snapshot_data.snap_min = snap->snap_min;
+        session->txn->snapshot_data.snap_max = snap->snap_max;
+        session->txn->snapshot_data.snapshot_count = snap->snapshot_count;
+        if (snap->snapshot_count > 0)
+            memcpy(session->txn->snapshot_data.snapshot, snap->snapshot,
+              snap->snapshot_count * sizeof(snap->snapshot[0]));
+        F_SET(session->txn, WT_TXN_HAS_SNAPSHOT);
+    }
+    WT_LEAVE_GENERATION(session, WT_GEN_HAS_CKPT_SNAPSHOT);
+
+    return (published);
+}
+
+/*
  * __evict_reconcile --
  *     Reconcile the page for eviction.
  */
@@ -1296,9 +1331,11 @@ __evict_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags)
              */
             btree_ckpt_gen = __wt_atomic_load_uint64_acquire(&btree->checkpoint_gen);
             ckpt_gen = __wt_gen(session, WT_GEN_CHECKPOINT);
-            if (btree_ckpt_gen < ckpt_gen)
-                LF_SET(WT_REC_VISIBLE_NO_SNAPSHOT);
-            else
+            if (btree_ckpt_gen < ckpt_gen) {
+                if (WT_IS_METADATA(btree->dhandle) || WT_IS_DISAGG_META(btree->dhandle) ||
+                  !__evict_precise_ckpt_copy_snapshot(session))
+                    LF_SET(WT_REC_VISIBLE_NO_SNAPSHOT);
+            } else
                 __wt_txn_bump_snapshot(session);
         } else
             __wt_txn_bump_snapshot(session);

@@ -1156,6 +1156,44 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, WT_CHECKPOINT_DB
             memcpy(dst->snapshot, src->snapshot, count * sizeof(src->snapshot[0]));
     }
 
+    /*
+     * For precise checkpoints, publish the full snapshot into the buffer so eviction can use it for
+     * accurate visibility. Write to the inactive buffer, then swap the index and drain readers of
+     * the retiring buffer once.
+     */
+    if (F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT)) {
+        WT_TXN_SNAPSHOT *src, *dst;
+        uint32_t capacity, count, cur_idx, new_idx;
+
+        src = &txn->snapshot_data;
+        count = src->snapshot_count;
+        capacity = (uint32_t)conn->session_array.size;
+
+        cur_idx = __wt_atomic_load_uint32_relaxed(&conn->ckpt_eviction_snap_idx);
+        new_idx = 1 - cur_idx;
+
+        WT_ERR(__wt_realloc_def(session, &conn->ckpt_eviction_snap_capacity[new_idx], capacity,
+          &conn->ckpt_eviction_snap_array[new_idx]));
+
+        dst = &conn->ckpt_eviction_snap[new_idx];
+        dst->snap_min = src->snap_min;
+        dst->snap_max = src->snap_max;
+        dst->snapshot_count = count;
+        dst->snapshot = conn->ckpt_eviction_snap_array[new_idx];
+        if (count > 0)
+            memcpy(dst->snapshot, src->snapshot, count * sizeof(src->snapshot[0]));
+
+        WT_RELEASE_WRITE_WITH_BARRIER(conn->ckpt_eviction_snap_published, true);
+        __wt_atomic_store_uint32_release(&conn->ckpt_eviction_snap_idx, new_idx);
+        /*
+         * Wait for eviction threads still copying from the retiring buffer before it can be reused.
+         * In practice this returns immediately: readers hold the generation only for a memcpy. This
+         * drain could be deferred to the start of the next checkpoint publish before writing the
+         * inactive buffer if that latency becomes a concern.
+         */
+        __wt_gen_next_drain(session, WT_GEN_HAS_CKPT_SNAPSHOT);
+    }
+
     if (ckpt_cfg->use_timestamp)
         __wt_verbose_info(session, WT_VERB_CHECKPOINT,
           "Checkpoint requested at stable timestamp %s",

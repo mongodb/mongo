@@ -259,5 +259,5 @@ __wt_schema_destroy_layered(WT_SESSION_IMPL *session, WT_LAYERED_TABLE *layered)
 {
     __wt_schema_close_layered(session, layered);
     __wt_layered_table_truncate_clear(session, layered);
-    __wt_rwlock_destroy(session, &layered->truncate_lock);
+    __wt_rwlock_destroy(session, &layered->truncate_list.lock);
 }

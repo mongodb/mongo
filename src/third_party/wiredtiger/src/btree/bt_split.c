@@ -2497,11 +2497,10 @@ __wt_split_reverse(WT_SESSION_IMPL *session, WT_REF *ref)
 
 /*
  * __wt_split_rewrite --
- *     Rewrite an in-memory page with a new version. If the caller changes the ref state later, it
- *     should not change ref state in this function.
+ *     Rewrite an in-memory page with a new version.
  */
 int
-__wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, WT_MULTI *multi, bool change_ref_state)
+__wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, WT_MULTI *multi)
 {
     WT_ADDR *addr;
     WT_DECL_RET;
@@ -2574,8 +2573,7 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, WT_MULTI *multi, bool 
         __wt_atomic_store_uint8_v_release(&ref->dirty_state, WT_REF_DIRTY);
     ref->page = new->page;
 
-    if (change_ref_state)
-        WT_REF_SET_STATE(ref, WT_REF_MEM);
+    WT_REF_SET_STATE(ref, WT_REF_MEM);
 
     __wt_free(session, new);
     return (0);
