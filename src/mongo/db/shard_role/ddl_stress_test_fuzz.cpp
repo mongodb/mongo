@@ -255,7 +255,54 @@ struct MovePrimaryDDL {
     }
 };
 
-using DDL = std::variant<ClearMetadataDDL, CreateDDL, DropDDL, RenameDDL, MovePrimaryDDL>;
+struct SplitChunkDDL {
+    int key;
+    NamespaceString nss;
+
+    static auto arbitrary() {
+        return StructOf<SplitChunkDDL>(Arbitrary<int>(), ArbitraryNamespace());
+    }
+};
+
+struct MergeChunkDDL {
+    int from;
+    int to;
+    NamespaceString nss;
+
+    static auto arbitrary() {
+        auto fromTo = UniqueElementsVectorOf(Arbitrary<int>()).WithSize(2);
+        return FlatMap(
+            [](const auto& fromTo) {
+                const auto from = fromTo[0];
+                const auto to = fromTo[1];
+                if (from < to) {
+                    return StructOf<MergeChunkDDL>(Just(from), Just(to), ArbitraryNamespace());
+                } else {
+                    return StructOf<MergeChunkDDL>(Just(to), Just(from), ArbitraryNamespace());
+                }
+            },
+            fromTo);
+    }
+};
+
+struct MoveChunkDDL {
+    int key;
+    ShardRef destination;
+    NamespaceString nss;
+
+    static auto arbitrary() {
+        return StructOf<MoveChunkDDL>(Arbitrary<int>(), ArbitraryShardRef(), ArbitraryNamespace());
+    }
+};
+
+using DDL = std::variant<ClearMetadataDDL,
+                         CreateDDL,
+                         DropDDL,
+                         RenameDDL,
+                         MovePrimaryDDL,
+                         SplitChunkDDL,
+                         MergeChunkDDL,
+                         MoveChunkDDL>;
 
 /**
  * A mocking client that supports transactional updates to the returned contents. This class is
@@ -419,6 +466,16 @@ public:
         _dbEntry = std::move(dbEntry);
     }
 
+    std::pair<CollectionType, std::vector<ChunkType>> getCollectionMetadata(
+        const UpdatePass&, const NamespaceString& nss) {
+        const auto it =
+            std::find_if(_collsAndChunks.begin(), _collsAndChunks.end(), [&](const auto& entry) {
+                return entry.first.getNss() == nss;
+            });
+        invariant(it != _collsAndChunks.end());
+        return *it;
+    }
+
     template <typename F>
     auto updateAtomically(F&& f) {
         std::unique_lock lk{_mutex};
@@ -459,6 +516,12 @@ private:
 
 class DDLStateMachine {
 private:
+    Timestamp nextClusterTime() {
+        auto oldValue = currentClusterTime;
+        currentClusterTime = Timestamp(oldValue.getSecs() + 1, oldValue.getInc());
+        return oldValue;
+    }
+
     void executeOperation(OperationContext* opCtx, const DDL& ddl) {
         std::visit([&](const auto& op) { return executeDDL(opCtx, op); }, ddl);
     }
@@ -484,10 +547,8 @@ private:
             return;
         }
 
-        static Timestamp nextCollTimestamp = Timestamp(1, 0);
         const auto now = Date_t::now();
-        Timestamp collTimestamp = nextCollTimestamp;
-        nextCollTimestamp = Timestamp(collTimestamp.getSecs() + 1, collTimestamp.getInc());
+        Timestamp collTimestamp = nextClusterTime();
 
         CollectionType collEntry{
             op.nss, OID::gen(), collTimestamp, now, uuid, KeyPattern{BSON("_id" << 1)}};
@@ -502,6 +563,8 @@ private:
             auto& ct = chunks.emplace_back(
                 uuid, ChunkRange{chunk.min, chunk.max}, chunkVersion, chunk.owner);
             ct.setName(OID::gen());
+            ct.setOnCurrentShardSince(collTimestamp);
+            ct.setHistory(std::vector<ChunkHistory>{ChunkHistory{collTimestamp, chunk.owner}});
             chunkVersion.incMajor();
         }
 
@@ -675,6 +738,229 @@ private:
         isCurrentPrimary = (op.to == kThisShard);
     }
 
+    void executeDDL(OperationContext* opCtx, const SplitChunkDDL& op) {
+        // If the collection isn't sharded do an early return
+        {
+            const auto it = currentCatalog.find(op.nss);
+            if (it == currentCatalog.end())
+                return;
+            if (it->second.collType != ShardingCollType::kSharded)
+                return;
+        }
+
+        static const auto csReason = BSON("reason" << "splitChunk");
+
+        {
+            auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, op.nss);
+            scopedCsr->enterCriticalSectionCatchUpPhase(opCtx, csReason);
+            scopedCsr->enterCriticalSectionCommitPhase(opCtx, csReason);
+        }
+        ON_BLOCK_EXIT([&] {
+            auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, op.nss);
+            scopedCsr->exitCriticalSection(opCtx, csReason);
+        });
+
+        const auto shardKey = BSON("_id" << op.key);
+        auto hasSplitChunk = actualFixture->mockCatalogClient()->updateAtomically([&](auto& client,
+                                                                                      auto pass) {
+            auto [collEntry, origChunks] = client.getCollectionMetadata(pass, op.nss);
+            const auto origChunkIt =
+                std::find_if(origChunks.begin(), origChunks.end(), [&](const auto& chunk) {
+                    return chunk.getRange().containsKey(shardKey);
+                });
+            auto newPlacementVersion =
+                std::max_element(origChunks.begin(),
+                                 origChunks.end(),
+                                 [](const ChunkType& left, const auto& right) {
+                                     return (left.getVersion() <=> right.getVersion()) ==
+                                         std::partial_ordering::less;
+                                 })
+                    ->getVersion();
+            auto originalRange = origChunkIt->getRange();
+
+            if (SimpleBSONObjComparator::kInstance.evaluate(shardKey == originalRange.getMin()) ||
+                SimpleBSONObjComparator::kInstance.evaluate(shardKey == originalRange.getMax())) {
+                // The split point can't be one of the edges as that would result in an empty chunk
+                // range.
+                return false;
+            }
+
+            auto newChunkLeft = *origChunkIt;
+            newChunkLeft.setRange({originalRange.getMin(), shardKey});
+            newPlacementVersion.incMinor();
+            newChunkLeft.setVersion(newPlacementVersion);
+            newChunkLeft.setEstimatedSizeBytes(boost::none);
+            newChunkLeft.setJumbo(false);
+
+            auto newChunkRight = *origChunkIt;
+            newChunkRight.setName(OID::gen());
+            newChunkRight.setRange({shardKey, originalRange.getMax()});
+            newPlacementVersion.incMinor();
+            newChunkRight.setVersion(newPlacementVersion);
+            newChunkRight.setEstimatedSizeBytes(boost::none);
+            newChunkRight.setJumbo(false);
+
+            origChunks.erase(origChunkIt);
+            origChunks.emplace_back(std::move(newChunkLeft));
+            origChunks.emplace_back(std::move(newChunkRight));
+            client.setCollectionMetadata(pass, std::move(collEntry), std::move(origChunks));
+            return true;
+        });
+
+        if (hasSplitChunk) {
+            shard_catalog_commit::commitCollectionMetadataLocally(opCtx, op.nss, isCurrentPrimary);
+        }
+    }
+
+    void executeDDL(OperationContext* opCtx, const MergeChunkDDL& op) {
+        // If the collection isn't sharded do an early return
+        {
+            const auto it = currentCatalog.find(op.nss);
+            if (it == currentCatalog.end())
+                return;
+            if (it->second.collType != ShardingCollType::kSharded)
+                return;
+        }
+
+        static const auto csReason = BSON("reason" << "mergeChunk");
+
+        {
+            auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, op.nss);
+            scopedCsr->enterCriticalSectionCatchUpPhase(opCtx, csReason);
+            scopedCsr->enterCriticalSectionCommitPhase(opCtx, csReason);
+        }
+        ON_BLOCK_EXIT([&] {
+            auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, op.nss);
+            scopedCsr->exitCriticalSection(opCtx, csReason);
+        });
+
+        const auto fromKey = BSON("_id" << op.from);
+        const auto toKey = BSON("_id" << op.to);
+        auto mergedRange = ChunkRange{fromKey, toKey};
+        auto hasMergedChunks =
+            actualFixture->mockCatalogClient()->updateAtomically([&](auto& client, auto pass) {
+                auto [collEntry, origChunks] = client.getCollectionMetadata(pass, op.nss);
+
+                auto newPlacementVersion =
+                    std::max_element(origChunks.begin(),
+                                     origChunks.end(),
+                                     [](const ChunkType& left, const auto& right) {
+                                         return (left.getVersion() <=> right.getVersion()) ==
+                                             std::partial_ordering::less;
+                                     })
+                        ->getVersion();
+                // Ensure that all the merged chunks are owned by the same shard and replace them
+                // with a single new entry.
+                auto overlappingItStart =
+                    std::remove_if(origChunks.begin(), origChunks.end(), [&](const auto& chunk) {
+                        return chunk.getRange().overlaps(mergedRange);
+                    });
+                const auto numChunksToMerge = std::distance(overlappingItStart, origChunks.end());
+                if (numChunksToMerge == 1) {
+                    // Only a single chunk would be merged, this is a no-op.
+                    return false;
+                }
+                invariant(numChunksToMerge > 0);
+                auto ownerShard = overlappingItStart->getShard();
+                auto allChunksOwnedBySameShard =
+                    std::all_of(overlappingItStart, origChunks.end(), [&](const auto& chunk) {
+                        return chunk.getShard() == ownerShard;
+                    });
+                if (!allChunksOwnedBySameShard) {
+                    return false;
+                }
+
+
+                auto mergedChunk = *overlappingItStart;
+                mergedChunk.setRange(mergedRange);
+                newPlacementVersion.incMinor();
+                mergedChunk.setVersion(newPlacementVersion);
+                mergedChunk.setEstimatedSizeBytes(boost::none);
+                auto mergeTs = nextClusterTime();
+                mergedChunk.setOnCurrentShardSince(mergeTs);
+                mergedChunk.setHistory(
+                    {ChunkHistory(*mergedChunk.getOnCurrentShardSince(), mergedChunk.getShard())});
+
+                // Replace now all the chunks to be merged with the new chunk entry.
+                origChunks.erase(overlappingItStart, origChunks.end());
+                origChunks.emplace_back(std::move(mergedChunk));
+                client.setCollectionMetadata(pass, std::move(collEntry), std::move(origChunks));
+                return true;
+            });
+
+        if (hasMergedChunks) {
+            shard_catalog_commit::commitCollectionMetadataLocally(opCtx, op.nss, isCurrentPrimary);
+        }
+    }
+
+    void executeDDL(OperationContext* opCtx, const MoveChunkDDL& op) {
+        // If the collection isn't sharded do an early return.
+        {
+            const auto it = currentCatalog.find(op.nss);
+            if (it == currentCatalog.end())
+                return;
+            if (it->second.collType != ShardingCollType::kSharded)
+                return;
+        }
+
+        static const auto csReason = BSON("reason" << "moveChunk");
+
+        {
+            auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, op.nss);
+            scopedCsr->enterCriticalSectionCatchUpPhase(opCtx, csReason);
+            scopedCsr->enterCriticalSectionCommitPhase(opCtx, csReason);
+        }
+        ON_BLOCK_EXIT([&] {
+            auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, op.nss);
+            scopedCsr->exitCriticalSection(opCtx, csReason);
+        });
+
+        const auto shardKey = BSON("_id" << op.key);
+        actualFixture->mockCatalogClient()->updateAtomically([&](auto& client, auto pass) {
+            auto [collEntry, origChunks] = client.getCollectionMetadata(pass, op.nss);
+
+            auto newPlacementVersion =
+                std::max_element(origChunks.begin(),
+                                 origChunks.end(),
+                                 [](const ChunkType& left, const auto& right) {
+                                     return (left.getVersion() <=> right.getVersion()) ==
+                                         std::partial_ordering::less;
+                                 })
+                    ->getVersion();
+            const auto origChunkIt =
+                std::find_if(origChunks.begin(), origChunks.end(), [&](const auto& chunk) {
+                    return chunk.getRange().containsKey(shardKey);
+                });
+            invariant(origChunkIt != origChunks.end());
+
+            auto movedChunk = *origChunkIt;
+            newPlacementVersion.incMajor();
+            movedChunk.setVersion(newPlacementVersion);
+            movedChunk.setEstimatedSizeBytes(boost::none);
+            movedChunk.setJumbo(false);
+            auto moveTs = nextClusterTime();
+            movedChunk.setOnCurrentShardSince(moveTs);
+            movedChunk.setShard(op.destination);
+
+            // Add new entry and remove old placement version values to simulate the snapshot window
+            // rolling off.
+            auto newHistory = movedChunk.getHistory();
+            newHistory.emplace(
+                newHistory.begin(), *movedChunk.getOnCurrentShardSince(), movedChunk.getShard());
+            const auto thresholdTs = Timestamp{
+                static_cast<unsigned int>(std::max(1, static_cast<int>(moveTs.getSecs()) - 5)), 0};
+            std::erase_if(newHistory,
+                          [&](const auto& elem) { return elem.getValidAfter() < thresholdTs; });
+            movedChunk.setHistory(std::move(newHistory));
+
+            origChunks.erase(origChunkIt);
+            origChunks.emplace_back(std::move(movedChunk));
+            client.setCollectionMetadata(pass, std::move(collEntry), std::move(origChunks));
+        });
+
+        shard_catalog_commit::commitCollectionMetadataLocally(opCtx, op.nss, isCurrentPrimary);
+    }
+
     void executeDDL(OperationContext* opCtx, const ClearMetadataDDL& clear) {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, clear.nss);
         csr->clearCollectionMetadata(opCtx);
@@ -812,6 +1098,7 @@ private:
     stdx::unordered_map<NamespaceString, CollInfo> currentCatalog;
     boost::optional<ShardServerFixture> actualFixture;
     std::vector<unittest::ServerParameterGuard> featureFlagGuards;
+    Timestamp currentClusterTime{1, 0};
 
 public:
     DDLStateMachine() {
@@ -865,7 +1152,10 @@ auto ArbitraryDDL() {
                      CreateDDL::arbitrary(),
                      DropDDL::arbitrary(),
                      RenameDDL::arbitrary(),
-                     MovePrimaryDDL::arbitrary());
+                     MovePrimaryDDL::arbitrary(),
+                     SplitChunkDDL::arbitrary(),
+                     MergeChunkDDL::arbitrary(),
+                     MoveChunkDDL::arbitrary());
 }
 
 FUZZ_TEST_F(DDLStateMachine, FuzzDDLInvariants)
