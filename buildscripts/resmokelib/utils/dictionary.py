@@ -78,6 +78,70 @@ def extend_dict_lists(
     return dict1
 
 
+def remove_from_lists(
+    dict1: MutableMapping[str, Any] | list[Any], dict2: MutableMapping[str, Any] | list[Any]
+) -> MutableMapping[str, Any] | list[Any]:
+    """Recursively removes items from lists in dict1 based on items in dict2.
+
+    All terminal elements in dict2 must be lists. For each terminal element in dict2, the matching
+    path must already exist in dict1, and the element must be a list. Each item in the dict2 list is
+    removed from the dict1 list if it matches.
+
+    Matching rules:
+    - If items are strings, they are matched by exact equality.
+    - If items are dicts, they are matched if all key-value pairs in the dict2 item are present in
+      the dict1 item (subset match). This allows removing hooks by class name only.
+
+    -- Example --
+    [dict1 contents]
+    root:
+        child:
+            some_key:
+            - class: HookA
+            - class: HookB
+
+    [dict2 contents]
+    root:
+        child:
+            some_key:
+                - class: HookA
+
+    [result]
+    root:
+        child:
+            some_key:
+            - class: HookB
+    """
+
+    def assert_valid_instance(obj: Any) -> None:
+        if not isinstance(obj, (list, MutableMapping)):
+            raise ValueError(f"the {obj} field must be a list or dict")
+
+    def matches(remove_item: Any, target_item: Any) -> bool:
+        """Check if remove_item matches target_item for removal."""
+        if isinstance(remove_item, str) and isinstance(target_item, str):
+            return remove_item == target_item
+        if isinstance(remove_item, MutableMapping) and isinstance(target_item, MutableMapping):
+            return all(k in target_item and target_item[k] == v for k, v in remove_item.items())
+        return remove_item == target_item
+
+    if not (isinstance(dict1, MutableMapping) and isinstance(dict2, MutableMapping)):
+        if not isinstance(dict1, list):
+            raise ValueError(f"{dict1} must be a list")
+        if not isinstance(dict2, list):
+            raise ValueError(f"{dict2} must be a list")
+        dict1[:] = [item for item in dict1 if not any(matches(r, item) for r in dict2)]
+        return dict1
+
+    for k in dict2.keys():
+        if k not in dict1:
+            raise ValueError(f"the {k} field must be present in both dicts")
+        assert_valid_instance(dict2[k])
+        assert_valid_instance(dict1[k])
+        dict1[k] = remove_from_lists(dict1[k], dict2[k])
+    return dict1
+
+
 def get_dict_value(dict1: MutableMapping[str, Any], path: list[str]) -> Any:
     current_object = dict1
 

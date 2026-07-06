@@ -3,3 +3,9 @@
     selector:
       roots:
         - buildscripts/tests/resmoke_validation/tests/*.py
+
+- name: test_remove_hook
+  value:
+    executor:
+      hooks:
+        - class: CheckReplDBHash

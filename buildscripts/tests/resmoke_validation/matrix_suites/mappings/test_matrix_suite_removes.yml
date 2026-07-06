@@ -1,0 +1,3 @@
+base_suite: test_suite_with_hooks
+removes:
+  - "test_overrides.test_remove_hook"

@@ -22,6 +22,7 @@ from buildscripts.resmokelib.utils.dictionary import (
     extend_dict_lists,
     get_dict_value,
     merge_dicts,
+    remove_from_lists,
     set_dict_value,
 )
 from buildscripts.resmokelib.utils.external_suite import make_external
@@ -488,6 +489,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         excludes_names = suite.get("excludes", None)
         eval_names = suite.get("eval", None)
         extends_names = suite.get("extends", None)
+        removes_names = suite.get("removes", None)
         description = suite.get("description")
 
         base_suite = ExplicitSuiteConfig.get_config_obj_no_verify(base_suite_name)
@@ -574,6 +576,10 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         if extends_names:
             for extends_name in extends_names:
                 extend_dict_lists(res, overrides[extends_name])
+
+        if removes_names:
+            for removes_name in removes_names:
+                remove_from_lists(res, overrides[removes_name])
 
         return res
 
