@@ -92,9 +92,10 @@ std::vector<BSONObj> listIndexesInLock(OperationContext* opCtx,
         collection->isTimeseriesCollection() && !isRawDataRequest;
 
     const bool expandSimpleCollation =
-        feature_flags::gFeatureFlagListIndexesAlwaysIncludesSimpleCollation.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+        feature_flags::gFeatureFlagListIndexesAlwaysIncludesSimpleCollation
+            .isEnabledUseLastLTSFCVWhenUninitialized(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
     if (collection->isClustered() && !collection->isTimeseriesCollection()) {
         BSONObj collation;
