@@ -241,6 +241,15 @@ StatusWith<QueryMetadataBitSet> validateAndGetAvailableMetadata(
         if (hasNodeInSubtree(root, MatchExpression::TEXT, MatchExpression::NOR)) {
             return Status(ErrorCodes::BadValue, "text expression not allowed in nor");
         }
+        if (hasNodeInSubtree(root, MatchExpression::TEXT, MatchExpression::INTERNAL_SCHEMA_COND)) {
+            return Status(ErrorCodes::BadValue,
+                          "text expression not allowed in $_internalSchemaCond");
+        }
+        if (hasNodeInSubtree(
+                root, MatchExpression::TEXT, MatchExpression::INTERNAL_SCHEMA_ALLOWED_PROPERTIES)) {
+            return Status(ErrorCodes::BadValue,
+                          "text expression not allowed in $_internalSchemaAllowedProperties");
+        }
         availableMetadata.set(DocumentMetadataFields::kTextScore);
         availableMetadata.set(DocumentMetadataFields::kScore);
     }
@@ -251,6 +260,17 @@ StatusWith<QueryMetadataBitSet> validateAndGetAvailableMetadata(
     if (numGeoNear > 1) {
         return Status(ErrorCodes::BadValue, "Too many geoNear expressions");
     } else if (1 == numGeoNear) {
+        if (hasNodeInSubtree(
+                root, MatchExpression::GEO_NEAR, MatchExpression::INTERNAL_SCHEMA_COND)) {
+            return Status(ErrorCodes::BadValue,
+                          "geoNear expression not allowed in $_internalSchemaCond");
+        }
+        if (hasNodeInSubtree(root,
+                             MatchExpression::GEO_NEAR,
+                             MatchExpression::INTERNAL_SCHEMA_ALLOWED_PROPERTIES)) {
+            return Status(ErrorCodes::BadValue,
+                          "geoNear expression not allowed in $_internalSchemaAllowedProperties");
+        }
         // Geo distance and geo point metadata are available.
         availableMetadata |= DepsTracker::kAllGeoNearData;
     }
