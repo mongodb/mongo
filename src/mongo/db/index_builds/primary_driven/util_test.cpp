@@ -524,6 +524,17 @@ TEST_F(UtilTest, ResumeInfoRequiresValidIdent) {
     }
 }
 
+TEST_F(UtilTest, ResumeInfoFailsOnMissingIdent) {
+    auto buildUUID = UUID::gen();
+    auto indexes = makeIndexes({"a"});
+    auto validResumableIndexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
+
+    ASSERT_THROWS_CODE(
+        resumeInfo(operationContext(), collUUID, buildUUID, indexes, validResumableIndexBuildIdent),
+        DBException,
+        ErrorCodes::FailedToParse);
+}
+
 TEST_F(UtilTest, ResumeInfoFailsOnParseError) {
     auto buildUUID = UUID::gen();
     auto indexes = makeIndexes({"a"});

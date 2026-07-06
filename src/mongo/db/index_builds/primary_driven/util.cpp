@@ -340,9 +340,9 @@ ResumeIndexInfo resumeInfo(OperationContext* opCtx,
         auto& engine = *opCtx->getServiceContext()->getStorageEngine()->getEngine();
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
 
-        if (!engine.hasIdent(ru, ident)) {
-            return false;
-        }
+        uassert(ErrorCodes::FailedToParse,
+                "Index build ident for resume not present",
+                engine.hasIdent(ru, ident));
 
         return engine
             .getRecordStore(
