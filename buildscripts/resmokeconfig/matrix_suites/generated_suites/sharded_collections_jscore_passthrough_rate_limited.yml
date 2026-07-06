@@ -165,6 +165,7 @@ selector:
     - jstests/core/timeseries/query/timeseries_raw_data_queries.js
     - jstests/core/timeseries/write/timeseries_raw_data_writes.js
     - jstests/core/timeseries/query/timeseries_out_non_sharded.js
+    - jstests/core/administrative/current_op/currentop_find.js
     - jstests/core_sharding/analyze_shard_key/configure_query_analyzer_cmd_validation.js
     - jstests/core_sharding/resharding/*.js
   exclude_with_any_tags:
@@ -182,7 +183,6 @@ selector:
     - creates_and_authenticates_user
     - uses_map_reduce_internal_merge_pipeline
     - uses_parallel_shell
-    - requires_getmore
     - requires_auth
   roots:
     - jstests/core/**/*.js

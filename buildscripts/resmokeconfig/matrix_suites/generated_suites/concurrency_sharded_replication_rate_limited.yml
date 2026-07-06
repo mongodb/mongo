@@ -134,7 +134,6 @@ selector:
     - creates_and_authenticates_user
     - uses_map_reduce_internal_merge_pipeline
     - uses_parallel_shell
-    - requires_getmore
     - requires_auth
   roots:
     - jstests/concurrency/fsm_workloads/**/*.js

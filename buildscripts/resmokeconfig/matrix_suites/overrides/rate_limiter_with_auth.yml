@@ -291,6 +291,8 @@
       - jstests/core/timeseries/query/timeseries_raw_data_queries.js
       - jstests/core/timeseries/write/timeseries_raw_data_writes.js
       - jstests/core/timeseries/query/timeseries_out_non_sharded.js
+      # TODO SERVER-130473: Enable this test.
+      - jstests/core/administrative/current_op/currentop_find.js
 
 - name: auth_exclude_files_core_sharding
   value:
@@ -353,8 +355,6 @@
       - uses_map_reduce_internal_merge_pipeline
       # Parallel shell spawns unauthenticated connections.
       - uses_parallel_shell
-      # TODO SERVER-129844: Crash when getMore retry runs after original opCtx is destroyed.
-      - requires_getmore
       # These suites already authenticate as a user, so they can't run tests that expect to be able
       # to log in as a different user.
       - requires_auth
