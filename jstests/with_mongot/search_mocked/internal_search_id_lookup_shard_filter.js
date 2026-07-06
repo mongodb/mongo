@@ -3,7 +3,17 @@
  * orphaned documents are not returned.
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
+import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+
+// `$_internalSearchIdLookup` resolves _id values on each shard through either the Express fast path
+// (flag on) or the classic local-read path (flag off); both must drop orphans via the shard filter.
+// The flag is a runtime-toggleable IFR flag, so we run each idLookup assertion under both states to
+// cover both executors on the waterfall. runWithParamsAllNonConfigNodes scopes the flag change to
+// the callback and restores the prior value afterwards, so state does not leak across the shared
+// cluster's tests.
+// TODO SERVER-130493 Remove kOptimizedIdLookupStates when no-ff search variant exists.
+const kOptimizedIdLookupStates = [false, true];
 
 /**
  * Verifies that orphaned documents exist on their respective shards when queried directly,
@@ -186,12 +196,21 @@ describe("$_internalSearchIdLookup shard filtering", function () {
             {_id: 17.5, shardKey: 100},
         ];
 
-        const result = this.testColl.aggregate(pipeline).toArray();
-        assert.eq(
-            result,
-            expectedDocs,
-            "Orphan documents should be filtered out by $_internalSearchIdLookup",
-        );
+        for (const optimizedIdLookup of kOptimizedIdLookupStates) {
+            runWithParamsAllNonConfigNodes(
+                this.testDB,
+                {featureFlagSearchOptimizedIdLookup: optimizedIdLookup},
+                () => {
+                    const result = this.testColl.aggregate(pipeline).toArray();
+                    assert.eq(
+                        result,
+                        expectedDocs,
+                        "Orphan documents should be filtered out by $_internalSearchIdLookup " +
+                            `(featureFlagSearchOptimizedIdLookup=${optimizedIdLookup})`,
+                    );
+                },
+            );
+        }
     });
 
     it("filters orphans across getMore batches", function () {
@@ -257,14 +276,23 @@ describe("$_internalSearchIdLookup shard filtering", function () {
             {_id: 17.5, shardKey: 100},
         ];
 
-        const resultWithSmallBatch = this.testColl
-            .aggregate(pipeline, {cursor: {batchSize: 1}})
-            .toArray();
-        assert.eq(
-            resultWithSmallBatch,
-            expectedDocs,
-            "Orphan filtering should work across getMore batches",
-        );
+        for (const optimizedIdLookup of kOptimizedIdLookupStates) {
+            runWithParamsAllNonConfigNodes(
+                this.testDB,
+                {featureFlagSearchOptimizedIdLookup: optimizedIdLookup},
+                () => {
+                    const resultWithSmallBatch = this.testColl
+                        .aggregate(pipeline, {cursor: {batchSize: 1}})
+                        .toArray();
+                    assert.eq(
+                        resultWithSmallBatch,
+                        expectedDocs,
+                        "Orphan filtering should work across getMore batches " +
+                            `(featureFlagSearchOptimizedIdLookup=${optimizedIdLookup})`,
+                    );
+                },
+            );
+        }
     });
 
     it("filters orphans in $lookup subpipeline", function () {
@@ -321,8 +349,20 @@ describe("$_internalSearchIdLookup shard filtering", function () {
             },
         ];
 
-        const lookupResult = baseColl.aggregate(lookupPipeline).toArray();
-        assert.eq(lookupResult, expectedLookupResults, "$lookup should filter orphans");
+        for (const optimizedIdLookup of kOptimizedIdLookupStates) {
+            runWithParamsAllNonConfigNodes(
+                this.testDB,
+                {featureFlagSearchOptimizedIdLookup: optimizedIdLookup},
+                () => {
+                    const lookupResult = baseColl.aggregate(lookupPipeline).toArray();
+                    assert.eq(
+                        lookupResult,
+                        expectedLookupResults,
+                        `$lookup should filter orphans (featureFlagSearchOptimizedIdLookup=${optimizedIdLookup})`,
+                    );
+                },
+            );
+        }
     });
 
     it("filters orphans in $unionWith subpipeline", function () {
@@ -367,8 +407,20 @@ describe("$_internalSearchIdLookup shard filtering", function () {
             {_id: 200},
         ];
 
-        const unionResult = baseColl.aggregate(unionPipeline).toArray();
-        assert.eq(unionResult, expectedUnionDocs, "$unionWith should filter orphans");
+        for (const optimizedIdLookup of kOptimizedIdLookupStates) {
+            runWithParamsAllNonConfigNodes(
+                this.testDB,
+                {featureFlagSearchOptimizedIdLookup: optimizedIdLookup},
+                () => {
+                    const unionResult = baseColl.aggregate(unionPipeline).toArray();
+                    assert.eq(
+                        unionResult,
+                        expectedUnionDocs,
+                        `$unionWith should filter orphans (featureFlagSearchOptimizedIdLookup=${optimizedIdLookup})`,
+                    );
+                },
+            );
+        }
     });
 
     it("orphans still exist on shards but are filtered via mongos", function () {
