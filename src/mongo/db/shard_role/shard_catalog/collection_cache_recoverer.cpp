@@ -251,7 +251,7 @@ void CollectionCacheRecoverer::onOplogEntry(Timestamp entryTs,
 }
 
 void CollectionCacheRecoverer::onOplogEntry(Timestamp entryTs,
-                                            const CollectionShardingStateDeltaOplogEntry& entry) {
+                                            const UpdateCollectionMetadataOplogEntry& entry) {
     LOGV2_INFO(12195300,
                "Received oplog entry for delta application",
                "nss"_attr = _nss,
@@ -264,10 +264,9 @@ void CollectionCacheRecoverer::onOplogEntry(Timestamp entryTs,
 }
 
 namespace {
-boost::optional<CollectionMetadata> applyOplogEntry(
-    OperationContext* opCtx,
-    const CollectionShardingStateDeltaOplogEntry& entry,
-    CollectionMetadata collMetadata) {
+boost::optional<CollectionMetadata> applyOplogEntry(OperationContext* opCtx,
+                                                    const UpdateCollectionMetadataOplogEntry& entry,
+                                                    CollectionMetadata collMetadata) {
     tassert(12698703,
             "Expected recovered metadata to have a routing table when applying changed chunks",
             collMetadata.hasRoutingTable());

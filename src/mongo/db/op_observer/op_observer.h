@@ -773,8 +773,8 @@ public:
      * Called when new chunks need to be updated/inserted to the sharding collection metadata of a
      * collection.
      */
-    virtual void onApplyCollectionShardingStateDelta(OperationContext* opCtx,
-                                                     const repl::OplogEntry& op) = 0;
+    virtual void onUpdateCollectionMetadata(OperationContext* opCtx,
+                                            const repl::OplogEntry& op) = 0;
 
     /**
      * Called when 'truncateRange' is called on a collection.

@@ -1318,11 +1318,10 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
          opCtx->getServiceContext()->getOpObserver()->onSetAllowChunkOperations(opCtx, *op);
          return Status::OK();
      }}},
-    {"applyCollectionShardingStateDelta",
+    {"updateCollectionMetadata",
      {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
           -> Status {
-         opCtx->getServiceContext()->getOpObserver()->onApplyCollectionShardingStateDelta(opCtx,
-                                                                                          *op);
+         opCtx->getServiceContext()->getOpObserver()->onUpdateCollectionMetadata(opCtx, *op);
          return Status::OK();
      }}},
     {"truncateRange",

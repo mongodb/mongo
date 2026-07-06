@@ -458,7 +458,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsWritesDeltaOplogEntry
 
     auto oplogEntry = findLastOplogEntry();
     auto object = oplogEntry.getObjectField("o");
-    ASSERT_EQ(object.firstElementFieldNameStringData(), "applyCollectionShardingStateDelta");
+    ASSERT_EQ(object.firstElementFieldNameStringData(), "updateCollectionMetadata");
     ASSERT_EQ(object.firstElement().valueStringData(), kTestNss.coll());
     ASSERT_EQ(object.getField("changedChunks").Obj().nFields(), 2);
 }
@@ -478,7 +478,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsWritesDeltaOplogEntry
 
     auto oplogEntry = findLastOplogEntry();
     auto object = oplogEntry.getObjectField("o");
-    ASSERT_EQ(object.firstElementFieldNameStringData(), "applyCollectionShardingStateDelta");
+    ASSERT_EQ(object.firstElementFieldNameStringData(), "updateCollectionMetadata");
     ASSERT_EQ(object.getField("changedChunks").Obj().nFields(), kNumChangedChunks);
 }
 
@@ -816,8 +816,8 @@ TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsDeltaOplogEntryIsIdem
         ->setCollectionMetadata(operationContext(), std::move(*originalMetadata));
 
     ShardServerOpObserver observer;
-    observer.onApplyCollectionShardingStateDelta(operationContext(), oplogEntry);
-    observer.onApplyCollectionShardingStateDelta(operationContext(), oplogEntry);
+    observer.onUpdateCollectionMetadata(operationContext(), oplogEntry);
+    observer.onUpdateCollectionMetadata(operationContext(), oplogEntry);
 
     auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
     auto metadata = scopedCsr->getCurrentMetadataIfKnown();

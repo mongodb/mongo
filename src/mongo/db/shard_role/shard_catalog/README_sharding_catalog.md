@@ -217,7 +217,7 @@ defined in [`type_oplog_catalog_metadata.idl`](type_oplog_catalog_metadata.idl) 
 | `CreateDatabaseMetadataOplogEntry`       | Populates the DSS for a database (also used by the authoritative clone).      |
 | `DropDatabaseMetadataOplogEntry`         | Clears the DSS for a database.                                                |
 | `InvalidateCollectionMetadataOplogEntry` | Triggers a CSS recovery from the durable shard catalog (optionally pre-drop). |
-| `CollectionShardingStateDeltaOplogEntry` | Applies inserted/updated chunk deltas to the CSS.                             |
+| `UpdateCollectionMetadataOplogEntry`     | Applies inserted/updated chunks to the CSS.                                   |
 | `SetAllowChunkOperationsOplogEntry`      | Updates the `allowChunkOperations` flag of a collection.                      |
 
 ## Service commands

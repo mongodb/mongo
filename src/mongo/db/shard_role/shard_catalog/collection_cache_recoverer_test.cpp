@@ -77,16 +77,16 @@ std::pair<CollectionType, std::vector<ChunkType>> makeShardedMetadataForDisk(
     return {std::move(collType), std::move(chunks)};
 }
 
-// Packs the changed chunks into a single delta oplog entry. Used to feed changed chunks to the
-// recoverer so they get merged onto the recovered routing table.
-CollectionShardingStateDeltaOplogEntry makeDeltaEntry(const std::vector<ChunkType>& chunks) {
+// Packs the changed chunks into a single UpdateCollectionMetadata oplog entry. Used to feed changed
+// chunks to the recoverer so they get merged onto the recovered routing table.
+UpdateCollectionMetadataOplogEntry makeDeltaEntry(const std::vector<ChunkType>& chunks) {
     std::vector<BSONObj> changedChunks;
     changedChunks.reserve(chunks.size());
     for (const auto& chunk : chunks) {
         changedChunks.push_back(chunk.toConfigBSON());
     }
-    return CollectionShardingStateDeltaOplogEntry{std::string(kTestNss.coll()),
-                                                  std::move(changedChunks)};
+    return UpdateCollectionMetadataOplogEntry{std::string(kTestNss.coll()),
+                                              std::move(changedChunks)};
 }
 
 // Builds a named chunk covering [min, max) owned by 'shard' at the given version.

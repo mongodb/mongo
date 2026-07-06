@@ -60,8 +60,8 @@ public:
                        _countInvalidateCollectionMetadataOplogEntriesApplied.get());
         builder.append("countInvalidateCollectionMetadataOplogEntriesForDroppedCollections",
                        _countInvalidateCollectionMetadataOplogEntriesForDroppedCollections.get());
-        builder.append("countApplyCollectionShardingStateDeltaOplogEntriesApplied",
-                       _countApplyCollectionShardingStateDeltaOplogEntriesApplied.get());
+        builder.append("countUpdateCollectionMetadataOplogEntriesApplied",
+                       _countUpdateCollectionMetadataOplogEntriesApplied.get());
         builder.append("countSetAllowChunkOperationsOplogEntriesApplied",
                        _countSetAllowChunkOperationsOplogEntriesApplied.get());
         builder.append("countLocalCollectionMetadataCommits",
@@ -121,8 +121,8 @@ public:
         }
     }
 
-    void registerApplyCollectionShardingStateDeltaOplogEntryApplied() {
-        _countApplyCollectionShardingStateDeltaOplogEntriesApplied.incrementRelaxed();
+    void registerUpdateCollectionMetadataOplogEntryApplied() {
+        _countUpdateCollectionMetadataOplogEntriesApplied.incrementRelaxed();
     }
 
     void registerSetAllowChunkOperationsOplogEntryApplied() {
@@ -170,8 +170,8 @@ private:
     Counter64 _countInvalidateCollectionMetadataOplogEntriesApplied;
     // Subset of the above for dropped/untracked collection clears.
     Counter64 _countInvalidateCollectionMetadataOplogEntriesForDroppedCollections;
-    // applyCollectionShardingStateDelta ('c') oplog entries applied on replication secondaries.
-    Counter64 _countApplyCollectionShardingStateDeltaOplogEntriesApplied;
+    // updateCollectionMetadata ('c') oplog entries applied on replication secondaries.
+    Counter64 _countUpdateCollectionMetadataOplogEntriesApplied;
     // setAllowChunkOperations ('c') oplog entries applied on replication secondaries.
     Counter64 _countSetAllowChunkOperationsOplogEntriesApplied;
     // Local shard-catalog collection commits (shardCollection / reshard / refresh).

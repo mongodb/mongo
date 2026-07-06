@@ -254,7 +254,7 @@ public:
                                            uuid);
     }
 
-    static repl::OplogEntry makeCollectionShardingStateDeltaOplogEntry(
+    static repl::OplogEntry makeUpdateCollectionMetadataOplogEntry(
         const NamespaceString& nss, const UUID& uuid, const std::vector<ChunkType>& changedChunks) {
         BSONArrayBuilder changedChunksBuilder;
         for (const auto& chunk : changedChunks) {
@@ -265,7 +265,7 @@ public:
         // CollectionCacheRecoverer is not installed, so reusing the same value everywhere is fine.
         return repl::makeCommandOplogEntry(repl::OpTime(Timestamp(1, 1), 1),
                                            nss,
-                                           BSON("applyCollectionShardingStateDelta"
+                                           BSON("updateCollectionMetadata"
                                                 << nss.coll() << "changedChunks"
                                                 << changedChunksBuilder.arr()),
                                            boost::none,
@@ -1734,7 +1734,7 @@ TEST_F(CollectionShardingRuntimeTest,
         stats.getIntField("countInvalidateCollectionMetadataOplogEntriesForDroppedCollections"), 1);
 }
 
-TEST_F(CollectionShardingRuntimeTest, OnApplyCollectionShardingStateDeltaCSRWithMatchingUUID) {
+TEST_F(CollectionShardingRuntimeTest, OnUpdateCollectionMetadataCSRWithMatchingUUID) {
     auto opCtx = operationContext();
     createTestCollection(opCtx, kTestNss);
     auto collUuid = UUID::gen();
@@ -1751,12 +1751,11 @@ TEST_F(CollectionShardingRuntimeTest, OnApplyCollectionShardingStateDeltaCSRWith
                            ShardId("other"));
     changedChunk.setName(OID::gen());
 
-    auto oplogEntry =
-        makeCollectionShardingStateDeltaOplogEntry(kTestNss, collUuid, {changedChunk});
+    auto oplogEntry = makeUpdateCollectionMetadataOplogEntry(kTestNss, collUuid, {changedChunk});
     ShardServerOpObserver observer;
-    observer.onApplyCollectionShardingStateDelta(opCtx, oplogEntry);
+    observer.onUpdateCollectionMetadata(opCtx, oplogEntry);
     ASSERT_EQ(getCollectionRecoveryStatistics().getIntField(
-                  "countApplyCollectionShardingStateDeltaOplogEntriesApplied"),
+                  "countUpdateCollectionMetadataOplogEntriesApplied"),
               1);
 
     {
@@ -1785,7 +1784,7 @@ TEST_F(CollectionShardingRuntimeTest, OnSetAllowChunkOperationsTracksOplogEntryA
     ASSERT_FALSE(csr->allowChunkOperations());
 }
 
-TEST_F(CollectionShardingRuntimeTest, OnApplyCollectionShardingStateDeltaWithoutKnownMetadata) {
+TEST_F(CollectionShardingRuntimeTest, OnUpdateCollectionMetadataWithoutKnownMetadata) {
     auto opCtx = operationContext();
     createTestCollection(opCtx, kTestNss);
     auto collUuid = UUID::gen();
@@ -1804,10 +1803,9 @@ TEST_F(CollectionShardingRuntimeTest, OnApplyCollectionShardingStateDeltaWithout
                            ShardId("other"));
     changedChunk.setName(OID::gen());
 
-    auto oplogEntry =
-        makeCollectionShardingStateDeltaOplogEntry(kTestNss, collUuid, {changedChunk});
+    auto oplogEntry = makeUpdateCollectionMetadataOplogEntry(kTestNss, collUuid, {changedChunk});
     ShardServerOpObserver observer;
-    observer.onApplyCollectionShardingStateDelta(opCtx, oplogEntry);
+    observer.onUpdateCollectionMetadata(opCtx, oplogEntry);
 
     // The delta is dropped and the collection stays unknown, forcing the next user to perform a
     // full recovery from disk.
@@ -1818,7 +1816,7 @@ TEST_F(CollectionShardingRuntimeTest, OnApplyCollectionShardingStateDeltaWithout
 }
 
 DEATH_TEST_REGEX_F(CollectionShardingRuntimeTestDeathTest,
-                   OnApplyCollectionShardingStateDeltaWithMismatchedUUID,
+                   OnUpdateCollectionMetadataWithMismatchedUUID,
                    "Tripwire assertion.*12698707") {
     auto opCtx = operationContext();
     createTestCollection(opCtx, kTestNss);
@@ -1838,10 +1836,9 @@ DEATH_TEST_REGEX_F(CollectionShardingRuntimeTestDeathTest,
                            ShardId("other"));
     changedChunk.setName(OID::gen());
 
-    auto oplogEntry =
-        makeCollectionShardingStateDeltaOplogEntry(kTestNss, otherUuid, {changedChunk});
+    auto oplogEntry = makeUpdateCollectionMetadataOplogEntry(kTestNss, otherUuid, {changedChunk});
     ShardServerOpObserver observer;
-    observer.onApplyCollectionShardingStateDelta(opCtx, oplogEntry);
+    observer.onUpdateCollectionMetadata(opCtx, oplogEntry);
 }
 
 }  // namespace mongo

@@ -802,29 +802,28 @@ void ShardServerOpObserver::onInvalidateCollectionMetadata(OperationContext* opC
     }
 }
 
-void ShardServerOpObserver::onApplyCollectionShardingStateDelta(OperationContext* opCtx,
-                                                                const repl::OplogEntry& op) {
+void ShardServerOpObserver::onUpdateCollectionMetadata(OperationContext* opCtx,
+                                                       const repl::OplogEntry& op) {
     // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
     if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return;
     }
 
     tassert(12698705,
-            "CollectionShardingStateDelta oplog entry is missing the collection UUID",
+            "UpdateCollectionMetadata oplog entry is missing the collection UUID",
             op.getUuid());
 
     const auto nss =
         CommandHelpers::parseNsCollectionRequired(op.getNss().dbName(), op.getObject());
 
-    const auto entry = CollectionShardingStateDeltaOplogEntry::parse(
-        op.getObject(), IDLParserContext("CollectionShardingStateDeltaOplogEntryContext"));
+    const auto entry = UpdateCollectionMetadataOplogEntry::parse(
+        op.getObject(), IDLParserContext("UpdateCollectionMetadataOplogEntryContext"));
     ShardingStatistics::get(opCtx)
-        .collectionShardingMetadataStatistics
-        .registerApplyCollectionShardingStateDeltaOplogEntryApplied();
+        .collectionShardingMetadataStatistics.registerUpdateCollectionMetadataOplogEntryApplied();
 
     LOGV2_DEBUG(12920503,
                 2,
-                "Applying collectionShardingStateDelta oplog entry",
+                "Applying UpdateCollectionMetadata oplog entry",
                 logAttrs(nss),
                 "uuid"_attr = op.getUuid(),
                 "numChangedChunks"_attr = entry.getChangedChunks().size());
@@ -854,11 +853,10 @@ void ShardServerOpObserver::onApplyCollectionShardingStateDelta(OperationContext
             currentMetadata->hasRoutingTable());
 
     tassert(12698707,
-            str::stream()
-                << "Known metadata for " << nss.toStringForErrorMsg() << " has collection UUID "
-                << currentMetadata->getUUID()
-                << ", but applyCollectionShardingStateDelta oplog entry is for collection UUID "
-                << collectionUuid,
+            str::stream() << "Known metadata for " << nss.toStringForErrorMsg()
+                          << " has collection UUID " << currentMetadata->getUUID()
+                          << ", but UpdateCollectionMetadata oplog entry is for collection UUID "
+                          << collectionUuid,
             currentMetadata->uuidMatches(collectionUuid));
 
     const auto collPlacementVersion = currentMetadata->getCollPlacementVersion();

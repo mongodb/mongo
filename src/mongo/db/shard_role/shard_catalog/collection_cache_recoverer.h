@@ -120,7 +120,7 @@ public:
      * CacheSynchronizer::drain is called.
      */
     void onOplogEntry(Timestamp entryTs, const InvalidateCollectionMetadataOplogEntry& entry);
-    void onOplogEntry(Timestamp entryTs, const CollectionShardingStateDeltaOplogEntry& entry);
+    void onOplogEntry(Timestamp entryTs, const UpdateCollectionMetadataOplogEntry& entry);
 
 private:
     // The following convention is used to denote what protects what:
@@ -129,8 +129,8 @@ private:
     CancellationSource _cancellationSource;
     SharedSemiFuture<CollectionMetadata> _collMetadata;
 
-    using QueuedItem = std::variant<InvalidateCollectionMetadataOplogEntry,
-                                    CollectionShardingStateDeltaOplogEntry>;
+    using QueuedItem =
+        std::variant<InvalidateCollectionMetadataOplogEntry, UpdateCollectionMetadataOplogEntry>;
     std::queue<std::pair<Timestamp, QueuedItem>> _entriesToApply;  // (M)
 
     const NamespaceString _nss;

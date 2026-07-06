@@ -72,16 +72,16 @@ structs:
                 description: "If true, indicates the invalidation precedes a collection drop"
                 default: false
 
-    CollectionShardingStateDeltaOplogEntry:
+    UpdateCollectionMetadataOplogEntry:
         description: "Oplog entry format for delta changes to apply to the overall CSS"
         strict: false
         fields:
-            applyCollectionShardingStateDelta:
+            updateCollectionMetadata:
                 type: string
-                description: "Collection name for which we are applying the metadata delta"
+                description: "Collection name for which we are applying the metadata update"
             changedChunks:
                 type: array<object_owned>
-                description: "Chunk documents inserted or updated by the metadata operation"
+                description: "Chunk documents inserted or updated"
 
     SetAllowChunkOperationsOplogEntry:
         description: "Oplog entry format to signal the change of allowChunkOperations"

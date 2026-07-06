@@ -705,10 +705,9 @@ public:
             o->onSetAllowChunkOperations(opCtx, op);
     }
 
-    void onApplyCollectionShardingStateDelta(OperationContext* opCtx,
-                                             const repl::OplogEntry& op) override {
+    void onUpdateCollectionMetadata(OperationContext* opCtx, const repl::OplogEntry& op) override {
         for (auto& o : _observers)
-            o->onApplyCollectionShardingStateDelta(opCtx, op);
+            o->onUpdateCollectionMetadata(opCtx, op);
     }
 
     void onTruncateRange(OperationContext* opCtx,

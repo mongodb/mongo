@@ -548,7 +548,7 @@ RollbackImpl::_namespacesAndUUIDsForOp(const OplogEntry& oplogEntry) {
             case OplogEntry::CommandType::kTruncateRange:
             case OplogEntry::CommandType::kInvalidateCollectionMetadata:
             case OplogEntry::CommandType::kSetAllowChunkOperations:
-            case OplogEntry::CommandType::kApplyCollectionShardingStateDelta:
+            case OplogEntry::CommandType::kUpdateCollectionMetadata:
             case OplogEntry::CommandType::kSetMultikeyMetadata: {
                 // For all other command types, we should be able to parse the collection name from
                 // the first command argument.

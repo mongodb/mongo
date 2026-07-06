@@ -64,10 +64,10 @@ namespace mongo {
 namespace shard_catalog_commit {
 namespace {
 
-// Max chunks sent to secondaries in one delta oplog entry. Bigger changes invalidate all metadata
-// instead.
+// Max chunks sent to secondaries in one UpdateCollectionMetadata oplog entry. Bigger changes
+// invalidate all metadata instead.
 constexpr size_t kMaxChangedChunksInDeltaOplogEntry = 100;
-constexpr int kMaxCollectionShardingStateDeltaOplogEntryObjectSizeBytes = BSONObjMaxUserSize;
+constexpr int kMaxUpdateCollectionMetadataOplogEntryObjectSizeBytes = BSONObjMaxUserSize;
 
 std::string serializeNss(const NamespaceString& nss) {
     return NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
@@ -352,11 +352,11 @@ void updateCollectionMetadata(OperationContext* opCtx,
         changedChunkDocs.push_back(chunk.toConfigBSON());
     }
 
-    auto entry = CollectionShardingStateDeltaOplogEntry{std::string(nss.coll()),
-                                                        std::move(changedChunkDocs)};
+    auto entry =
+        UpdateCollectionMetadataOplogEntry{std::string(nss.coll()), std::move(changedChunkDocs)};
 
     auto oplogEntry = makeShardCatalogCommandOplogEntry(opCtx, nss, uuid, entry.toBSON());
-    if (oplogEntry.toBSON().objsize() > kMaxCollectionShardingStateDeltaOplogEntryObjectSizeBytes) {
+    if (oplogEntry.toBSON().objsize() > kMaxUpdateCollectionMetadataOplogEntryObjectSizeBytes) {
         invalidateCollectionMetadata(opCtx, nss, uuid, false /* forDroppedCollection */);
         return;
     }
@@ -364,7 +364,7 @@ void updateCollectionMetadata(OperationContext* opCtx,
     logShardCatalogCommandOplogEntry(opCtx, oplogEntry, "updateCollectionMetadata");
 
     // Apply the update on the current (primary) node after the timestamp has been assigned.
-    opCtx->getServiceContext()->getOpObserver()->onApplyCollectionShardingStateDelta(
+    opCtx->getServiceContext()->getOpObserver()->onUpdateCollectionMetadata(
         opCtx, repl::OplogEntry(oplogEntry.toBSON()));
 }
 
