@@ -2193,6 +2193,32 @@ TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_AllMatch) {
     ASSERT_EQ(0, countInconsistenciesWithReasonField(inconsistencies));
 }
 
+TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_TransientInterruptionIsRethrown) {
+    const auto localUuid = setUpLocalCollection();
+    auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
+    auto chunk = generateChunk(
+        localUuid, _shardId, _keyPattern.globalMin(), _keyPattern.globalMax(), kShard0History);
+
+    setShardCatalogMetadata(localUuid, _keyPattern, {chunk});
+    setCSRAuthoritative();
+
+    insertDurableShardCatalogCollection(globalCatalogColl);
+    insertDurableShardCatalogChunks({chunk});
+    _catalogClient->setChunksToReturn({chunk});
+
+    // Simulate a stepdown happening while the metadata consistency check reads the durable shard
+    // catalog. The read against config.shard.catalog.* is the first interruptible operation on this
+    // path, so it fails with InterruptedDueToReplStateChange. Such transient interruptions are not
+    // genuine metadata inconsistencies: they must be rethrown so the command fails with a retriable
+    // error (and callers retry) rather than being reported as a spurious
+    // InconsistentShardCatalogCollectionMetadata inconsistency.
+    operationContext()->markKilled(ErrorCodes::InterruptedDueToReplStateChange);
+
+    ASSERT_THROWS_CODE(checkConsistency(globalCatalogColl),
+                       DBException,
+                       ErrorCodes::InterruptedDueToReplStateChange);
+}
+
 TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_UuidMismatch) {
     const auto localUuid = setUpLocalCollection();
     auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
