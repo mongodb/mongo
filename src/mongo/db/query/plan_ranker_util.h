@@ -304,7 +304,7 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
                      });
 
     // Apply tie-breaking heuristics.
-    if (internalQueryPlanTieBreakingWithIndexHeuristics.load()) {
+    if (cq.getExpCtx()->getQueryKnobConfiguration().getPlanTieBreakingWithIndexHeuristics()) {
         addTieBreakingHeuristicsBonuses(scoresAndCandidateIndices, candidates, documentsExamined);
 
         // Re-sort the candidates.

@@ -36,6 +36,7 @@
 #include "mongo/db/query/plan_ranking/cbr_plan_ranking.h"
 #include "mongo/db/query/plan_ranking/plan_ranker_method.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 
@@ -102,7 +103,10 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
     // across all plans does not exceed internalQueryPlanEvaluationWorks.
     auto trialsConfig = _multiPlanner->getTrialPhaseConfig();
     auto cappedTrialsConfig = trial_period::TrialPhaseConfig{
-        .maxNumWorksPerPlan = internalQueryPlanEvaluationWorks.load() / solutionsSize,
+        .maxNumWorksPerPlan =
+            static_cast<size_t>(
+                query.getExpCtx()->getQueryKnobConfiguration().getPlanEvaluationWorks()) /
+            solutionsSize,
         .targetNumResults = trialsConfig.targetNumResults,
         .isCappedTrialPhase = true};
     auto mpTrialsStatus = _multiPlanner->runTrials(cappedTrialsConfig);

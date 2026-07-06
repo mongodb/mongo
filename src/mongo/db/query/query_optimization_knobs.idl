@@ -153,6 +153,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: planEvaluationWorks
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryPlanEvaluationCollFraction:
         description: >-
@@ -172,6 +175,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: planEvaluationCollFraction
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryPlanTotalEvaluationCollFraction:
         description: >-
@@ -190,6 +196,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: planTotalEvaluationCollFraction
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryPlanEvaluationMaxResults:
         description: "Stop working plans once a plan returns this many results."
@@ -203,6 +212,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: planEvaluationMaxResults
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQuerySBEPlanEvaluationMaxMemoryBytes:
         description: >-
@@ -219,6 +231,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: sbePlanEvaluationMaxMemoryBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryPlanTieBreakingWithIndexHeuristics:
         description: >-
@@ -233,6 +248,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: planTieBreakingWithIndexHeuristics
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryForceIntersectionPlans:
         description: >-
@@ -1126,6 +1144,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: numWorksPerPlanForMPEstimation
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryMinRequiredImprovementRatioForCostBasedRankerChoice:
         description: >-
@@ -1142,6 +1163,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: minRequiredImprovementRatioForCostBasedRankerChoice
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryExtraPredicateForReversedIn:
         description: >-

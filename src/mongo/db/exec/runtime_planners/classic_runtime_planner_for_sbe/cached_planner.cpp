@@ -35,6 +35,7 @@
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/planner_analysis.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/replanning_required_info.h"
 #include "mongo/db/query/sbe_trial_runtime_executor.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
@@ -165,13 +166,14 @@ sbe::plan_ranker::CandidatePlan collectExecutionStatsForCachedPlan(
         candidate.data.tracker.get(),
         candidate.data.stageData.staticData->runtimePlanningRootNodeId);
 
-    sbe::TrialRuntimeExecutor{
-        plannerData.opCtx,
-        plannerData.collections,
-        *plannerData.cq,
-        plannerData.sbeYieldPolicy.get(),
-        indexExistenceChecker,
-        static_cast<size_t>(internalQuerySBEPlanEvaluationMaxMemoryBytes.load())}
+    sbe::TrialRuntimeExecutor{plannerData.opCtx,
+                              plannerData.collections,
+                              *plannerData.cq,
+                              plannerData.sbeYieldPolicy.get(),
+                              indexExistenceChecker,
+                              static_cast<size_t>(plannerData.cq->getExpCtx()
+                                                      ->getQueryKnobConfiguration()
+                                                      .getSbePlanEvaluationMaxMemoryBytes())}
         .executeCachedCandidateTrial(&candidate, maxTrialResults);
 
     return candidate;

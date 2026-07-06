@@ -46,6 +46,7 @@
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/plan_ranker_util.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/restore_context.h"
 #include "mongo/db/service_context.h"
@@ -427,7 +428,10 @@ trial_period::TrialPhaseConfig MultiPlanStage::getTrialPhaseConfig() const {
         trial_period::getCollFractionPerCandidatePlan(*_query, _candidates.size());
 
     const size_t numWorks = trial_period::getTrialPeriodMaxWorks(
-        opCtx(), collectionPtr(), internalQueryPlanEvaluationWorks.load(), collFraction);
+        opCtx(),
+        collectionPtr(),
+        _query->getExpCtx()->getQueryKnobConfiguration().getPlanEvaluationWorks(),
+        collFraction);
 
     size_t numResults = trial_period::getTrialPeriodNumToReturn(*_query);
     return {numWorks, numResults};

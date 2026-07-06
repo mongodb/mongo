@@ -38,6 +38,7 @@
 #include "mongo/db/query/plan_ranking/cbr_plan_ranking.h"
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
 #include "mongo/db/query/plan_ranking/plan_ranker_method.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/logv2/log.h"
 
@@ -186,7 +187,8 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
     const auto numResultsMP = trialConfig.targetNumResults;
 
     // Number of works that each plan should do in order to collect enough execution stats.
-    size_t numWorksPerPlanEst = internalQueryNumWorksPerPlanForMPEstimation.load();
+    size_t numWorksPerPlanEst = static_cast<size_t>(
+        query.getExpCtx()->getQueryKnobConfiguration().getNumWorksPerPlanForMPEstimation());
     // TODO SERVER-115645 use the child of LIMIT/SORT nodes to estimate plan productivity
     // see comment in MultiPlanStage::estimateAllPlans
     if (skipCount > 0) {
@@ -283,7 +285,9 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
     auto remMPCost = remNumWorks * totalCostPerEstWork;
 
     double minRequiredImprovementRatio =
-        internalQueryMinRequiredImprovementRatioForCostBasedRankerChoice.load();
+        query.getExpCtx()
+            ->getQueryKnobConfiguration()
+            .getMinRequiredImprovementRatioForCostBasedRankerChoice();
     double maxAchievableImprovementRatio = ratio(remMPCost, cbrCost);
     LOGV2_INFO(11306803,
                "Comparing MP with CBR:",
