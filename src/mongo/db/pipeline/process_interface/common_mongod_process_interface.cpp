@@ -908,16 +908,16 @@ std::unique_ptr<Pipeline> CommonMongodProcessInterface::attachCursorSourceToPipe
 }
 
 std::string CommonMongodProcessInterface::getShardName(OperationContext* opCtx) const {
-    if (ShardingState::get(opCtx)->enabled()) {
-        return ShardingState::get(opCtx)->shardHandle().name().toString();
+    if (auto shardId = getShardId(opCtx)) {
+        return shardId->toString();
     }
 
     return std::string();
 }
 
-boost::optional<ShardRef> CommonMongodProcessInterface::getShardRef(OperationContext* opCtx) const {
+boost::optional<ShardId> CommonMongodProcessInterface::getShardId(OperationContext* opCtx) const {
     if (ShardingState::get(opCtx)->enabled()) {
-        return ShardingState::get(opCtx)->asShardRef(opCtx);
+        return ShardingState::get(opCtx)->shardId();
     }
 
     return {};

@@ -164,9 +164,6 @@ public:
      *
      * Note that the first overload creates an instance of RoutingContext, while the second takes
      * it as a parameter.
-     *
-     * TODO (SERVER-128349): Update this function to return a ShardRef instead of a ShardId once
-     * the chunk manager's APIs use ShardRef.
      */
     static boost::optional<ShardId> findOwningShard(OperationContext* opCtx,
                                                     const NamespaceString& nss);

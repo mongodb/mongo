@@ -154,7 +154,7 @@ public:
 
     std::string getShardName(OperationContext* opCtx) const final;
 
-    boost::optional<ShardRef> getShardRef(OperationContext* opCtx) const final;
+    boost::optional<ShardId> getShardId(OperationContext* opCtx) const final;
 
     bool inShardedEnvironment(OperationContext* opCtx) const final;
 

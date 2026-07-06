@@ -308,7 +308,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    boost::optional<ShardRef> getShardRef(OperationContext*) const final {
+    boost::optional<ShardId> getShardId(OperationContext*) const final {
         return {};
     }
 
