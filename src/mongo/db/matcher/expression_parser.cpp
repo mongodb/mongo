@@ -1541,8 +1541,15 @@ StatusWithMatchExpression parseInternalSchemaFixedArityArgument(
                                   << obj.type()};
         }
 
-        auto subexpr =
-            parse(obj.embeddedObject(), expCtx, extensionsCallback, allowedFeatures, currentLevel);
+        // Children of fixed-arity schema operators (e.g. $_internalSchemaCond) are predicate
+        // expressions, not top-level query operators.  Treat them as sub-document predicates so
+        // that operators restricted to the top level (e.g. $text, $where) are rejected here
+        // rather than silently producing an untagged node that crashes the query planner.
+        auto subexpr = parse(obj.embeddedObject(),
+                             expCtx,
+                             extensionsCallback,
+                             allowedFeatures,
+                             DocumentParseLevel::kUserSubDocument);
         if (!subexpr.isOK()) {
             return subexpr.getStatus();
         }

@@ -226,6 +226,15 @@ StatusWith<QueryMetadataBitSet> isValid(const MatchExpression* root,
         if (hasNodeInSubtree(root, MatchExpression::TEXT, MatchExpression::NOR)) {
             return Status(ErrorCodes::BadValue, "text expression not allowed in nor");
         }
+        if (hasNodeInSubtree(root, MatchExpression::TEXT, MatchExpression::INTERNAL_SCHEMA_COND)) {
+            return Status(ErrorCodes::BadValue,
+                          "text expression not allowed in $_internalSchemaCond");
+        }
+        if (hasNodeInSubtree(
+                root, MatchExpression::TEXT, MatchExpression::INTERNAL_SCHEMA_ALLOWED_PROPERTIES)) {
+            return Status(ErrorCodes::BadValue,
+                          "text expression not allowed in $_internalSchemaAllowedProperties");
+        }
     } else {
         // Text metadata is not available.
         unavailableMetadata.set(DocumentMetadataFields::kTextScore);
@@ -237,6 +246,17 @@ StatusWith<QueryMetadataBitSet> isValid(const MatchExpression* root,
     if (numGeoNear > 1) {
         return Status(ErrorCodes::BadValue, "Too many geoNear expressions");
     } else if (1 == numGeoNear) {
+        if (hasNodeInSubtree(
+                root, MatchExpression::GEO_NEAR, MatchExpression::INTERNAL_SCHEMA_COND)) {
+            return Status(ErrorCodes::BadValue,
+                          "geoNear expression not allowed in $_internalSchemaCond");
+        }
+        if (hasNodeInSubtree(root,
+                             MatchExpression::GEO_NEAR,
+                             MatchExpression::INTERNAL_SCHEMA_ALLOWED_PROPERTIES)) {
+            return Status(ErrorCodes::BadValue,
+                          "geoNear expression not allowed in $_internalSchemaAllowedProperties");
+        }
         // Do nothing, we will perform extra checks in CanonicalQuery::isValidNormalized.
     } else {
         // Geo distance and geo point metadata are unavailable.

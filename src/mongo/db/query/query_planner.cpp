@@ -1354,8 +1354,9 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                           "need exactly one text index for $text query");
         }
 
-        // Error if the text node is tagged with zero indices.
-        if (0 == tag->first.size() && 0 == tag->notFirst.size()) {
+        // Error if the text node is untagged (e.g. nested inside a kOther operator such as
+        // $_internalSchemaCond that rateIndices does not recurse into) or tagged with zero indices.
+        if (!tag || (0 == tag->first.size() && 0 == tag->notFirst.size())) {
             // Don't leave tags on query tree.
             query.root()->resetTag();
             return Status(ErrorCodes::NoQueryExecutionPlans,
