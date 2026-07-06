@@ -41,6 +41,8 @@ class ValidateGeneratedSuites(unittest.TestCase):
             gen_dir = os.path.join(suites_dir, "generated_suites")
             generated_files = os.listdir(gen_dir)
             for filename in generated_files:
+                if filename == "OWNERS.yml":
+                    continue
                 (suite_name, ext) = os.path.splitext(filename)
                 self.assertEqual(
                     ext, ".yml", msg=f"{filename} has the wrong file extension, expected `.yml`"

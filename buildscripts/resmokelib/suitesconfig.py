@@ -16,6 +16,7 @@ import buildscripts.resmokelib.utils.filesystem as fs
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import errors, suite_hierarchy, utils
 from buildscripts.resmokelib.logging import loggers
+from buildscripts.resmokelib.owners_generation import SuiteOwnersGenerator
 from buildscripts.resmokelib.testing import suite as _suite
 from buildscripts.resmokelib.utils import load_yaml_file
 from buildscripts.resmokelib.utils.dictionary import (
@@ -344,6 +345,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
     _all_mappings = {}
     _all_overrides = {}
     _suite_roots = {}  # Maps suite name → root directory path
+    _owners_generators: dict[str, SuiteOwnersGenerator] = {}  # keyed by realpath(suite_dir)
 
     @classmethod
     def get_suite_files(cls) -> dict[str, str]:
@@ -806,12 +808,33 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         return "\n".join(comments) + "\n" + yml
 
     @classmethod
+    def _get_owners_generator(cls, suite_dir: str) -> SuiteOwnersGenerator:
+        """Return the SuiteOwnersGenerator for suite_dir, creating it on first access.
+
+        The key is always os.path.realpath(suite_dir) so relative paths and
+        symlinks can't produce duplicate entries or shadow each other.
+        """
+        key = os.path.realpath(suite_dir)
+        if key not in cls._owners_generators:
+            cls._owners_generators[key] = SuiteOwnersGenerator(suite_dir)
+        return cls._owners_generators[key]
+
+    @classmethod
     def generate_matrix_suite_file(cls, suite_name):
+        """Write the generated suite file and return its resolved code owners.
+
+        Returns the approver list for this suite, which generate_all_matrix_suite_files
+        collects to write generated_suites/OWNERS.yml. Returns [] for suites left on
+        the default owner.
+        """
         text = cls.generate_matrix_suite_text(suite_name)
         path = cls.get_generated_suite_path(suite_name)
         with open(path, "w+") as file:
             file.write(text)
         print(f"Generated matrix suite file {path}")
+        _, suite_dir = cls.get_mappings_path(suite_name)
+        mapping = cls.parse_mappings_file(cls.get_suites_dirs(), suite_name)
+        return cls._get_owners_generator(suite_dir).resolve_suite_owners(suite_name, mapping)
 
     @classmethod
     def generate_all_matrix_suite_files(cls):
@@ -823,9 +846,25 @@ class MatrixSuiteConfig(SuiteConfigInterface):
             if os.path.isdir(generated_suites):
                 shutil.rmtree(generated_suites)
 
-        suite_names = cls.get_named_suites()
-        for suite_name in suite_names:
-            cls.generate_matrix_suite_file(suite_name)
+        # Generate each suite file and collect its owners, grouped by matrix dir,
+        # so we can write one generated_suites/OWNERS.yml per dir afterwards.
+        owners_by_dir = collections.defaultdict(list)
+        for suite_name in cls.get_named_suites():
+            owners = cls.generate_matrix_suite_file(suite_name)
+            if owners:
+                _, suite_dir = cls.get_mappings_path(suite_name)
+                owners_by_dir[suite_dir].append((suite_name, owners))
+
+        # TODO(DEVPROD-35070): Add a test asserting the committed
+        #   generated_suites/OWNERS.yml matches what this generates (i.e. that it
+        #   isn't stale), analogous to ValidateGeneratedSuites.test_generated_suites
+        #   which asserts the committed generated suite files are up to date.
+        for suite_dir in suite_dirs:
+            generated_suites = os.path.join(suite_dir, "generated_suites")
+            if os.path.isdir(generated_suites):
+                cls._get_owners_generator(suite_dir).write_generated_owners_yml(
+                    owners_by_dir.get(suite_dir, [])
+                )
 
 
 class SuiteFinder(object):

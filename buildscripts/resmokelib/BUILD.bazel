@@ -12,6 +12,7 @@ py_library(
         "flags.py",
         "multiversionconstants.py",
         "multiversionsetupconstants.py",
+        "owners_generation.py",
         "parser.py",
         "plugin.py",
         "reportfile.py",

@@ -6,6 +6,18 @@ filters:
   - "README.md":
     approvers:
       - 10gen/devprod-test-infrastructure
+  - "generated_suites/OWNERS.yml":
+    approvers:
+      - 10gen/devprod-test-infrastructure
+  # The generated_suites/ entries below are hand-maintained ownership for specific
+  # generated matrix suites. Everything not matched here is auto-derived into
+  # generated_suites/OWNERS.yml by 'buildscripts/resmoke.py generate-matrix-suites'
+  # (from mappings/OWNERS.yml and the base suite in suites/OWNERS.yml). The generator
+  # skips any suite matched here, so these entries take precedence over the auto file.
+  #
+  # TODO(DEVPROD-35071): Hoist these into the source OWNERS.yml files (mappings/ and
+  # suites/) so ownership is fully derivable, then remove this block and the
+  # override-skip logic in suitesconfig.py.
   - "/generated_suites/*legacy_timeseries_no_rawdata.yml":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
