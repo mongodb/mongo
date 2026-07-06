@@ -31,13 +31,92 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/shared_buffer_fragment.h"
 
 
 namespace mongo::ce {
+
+// Returns the count of unique compound index keys across 'docs', computed by running the
+// real BtreeKeyGenerator and unioning the per-document key sets. This is used to verify that
+// the CE module NDV estimation agrees with the engine's actual key generation.
+// If 'bounds' is non-empty, only keys whose fields all fall within the corresponding
+// per-field intervals are counted.
+static size_t countUniqueKeysBtree(
+    const std::vector<FieldPathAndEqSemantics>& fields,
+    const std::vector<BSONObj>& docs,
+    boost::optional<std::span<const OrderedIntervalList>> bounds = boost::none) {
+    // FieldPath::fullPath() returns a const std::string& into internal storage that lives as
+    // long as 'fields', so the const char* pointers are valid for the lifetime of keyGen below.
+    std::vector<const char*> fieldNames;
+    std::vector<BSONElement> fixed;
+    for (const auto& f : fields) {
+        fieldNames.push_back(f.path.fullPath().c_str());
+        fixed.emplace_back();  // EOO placeholder; BtreeKeyGenerator requires parallel vectors
+    }
+
+    BtreeKeyGenerator keyGen(fieldNames,
+                             fixed,
+                             false /* isSparse */,
+                             key_string::Version::kLatestVersion,
+                             Ordering::make(BSONObj()));
+
+    KeyStringSet allKeys;
+    for (const auto& doc : docs) {
+        SharedBufferFragmentBuilder allocator(BufBuilder::kDefaultInitSizeBytes);
+        KeyStringSet docKeys;
+        keyGen.getKeys(allocator, doc, false /* skipMultikey */, &docKeys, nullptr);
+        allKeys.insert(docKeys.begin(), docKeys.end());
+    }
+
+    if (!bounds)
+        return allKeys.size();
+
+    tassert(10061116,
+            "Should have the same number of bounds as fields",
+            fields.size() == bounds->size());
+
+    Ordering ord = Ordering::make(BSONObj());
+    size_t count = 0;
+    for (const auto& ks : allKeys) {
+        BSONObj keyBson = key_string::toBson(ks, ord);
+
+        tassert(10061117,
+                "BtreeKeyGenerator produced unexpected key arity",
+                static_cast<size_t>(keyBson.nFields()) == bounds->size());
+
+        bool matches = true;
+        size_t i = 0;
+        for (auto it = keyBson.begin(); it != keyBson.end(); ++it, ++i) {
+            if (!matchesInterval((*bounds)[i], *it)) {
+                matches = false;
+                break;
+            }
+        }
+        if (matches)
+            ++count;
+    }
+    return count;
+}
+
+static void assertNDV(size_t expected,
+                      const std::vector<FieldPathAndEqSemantics>& fields,
+                      const std::vector<BSONObj>& docs,
+                      boost::optional<std::span<const OrderedIntervalList>> bounds = boost::none) {
+    for (const auto& f : fields) {
+        ASSERT_FALSE(f.isExprEq) << "assertNDV() uses BtreeKeyGenerator semantics (null == "
+                                    "missing); use countNDV() directly for isExprEq=true";
+    }
+    ASSERT_EQ(expected, countNDV(fields, docs, bounds));
+    ASSERT_EQ(expected, countUniqueKeysBtree(fields, docs, bounds));
+}
 
 TEST(CountNDV, VariousUniqueValues) {
     // "a" has all unique values, "b" has some unique values, "c" has a single unique value, "d" is
@@ -46,29 +125,27 @@ TEST(CountNDV, VariousUniqueValues) {
                                        fromjson("{a:2, b:2, c:1}"),
                                        fromjson("{a:3, b:3, c:1}"),
                                        fromjson("{a:4, b:1, c:1}")};
-    ASSERT_EQ(4, countNDV({{.path = "a"}}, docs));
-    ASSERT_EQ(3, countNDV({{.path = "b"}}, docs));
-    ASSERT_EQ(1, countNDV({{.path = "c"}}, docs));
-    ASSERT_EQ(2, countNDV({{.path = "d"}}, docs));
-    ASSERT_EQ(1, countNDV({{.path = "e"}}, docs));
+    assertNDV(4, {{.path = "a"}}, docs);
+    assertNDV(3, {{.path = "b"}}, docs);
+    assertNDV(1, {{.path = "c"}}, docs);
+    assertNDV(2, {{.path = "d"}}, docs);
+    assertNDV(1, {{.path = "e"}}, docs);
 }
 
 TEST(CountNDV, NullAndMissingAreDistinguishedOnlyForExpr) {
-    ASSERT_EQ(1, countNDV({{.path = "a"}}, {fromjson("{a:null}"), fromjson("{}")}));
+    assertNDV(1, {{.path = "a"}}, {fromjson("{a:null}"), fromjson("{}")});
     ASSERT_EQ(2,
               countNDV({{.path = "a", .isExprEq = true}}, {fromjson("{a:null}"), fromjson("{}")}));
 }
 
 TEST(CountNDV, DifferentObjectFieldOrdersAreDistinct) {
-    ASSERT_EQ(
-        2,
-        countNDV({{.path = "a"}}, {fromjson("{a: {b: 1, c: 1}}"), fromjson("{a: {c: 1, b: 1}}")}));
+    assertNDV(2, {{.path = "a"}}, {fromjson("{a: {b: 1, c: 1}}"), fromjson("{a: {c: 1, b: 1}}")});
 }
 
 TEST(CountNDV, DifferentArrayOrdersUnderObjectAreDistinct) {
-    ASSERT_EQ(2,
-              countNDV({{.path = "a"}},
-                       {fromjson("{a: {b: 1, c: [1, 2]}}"), fromjson("{a: {b: 1, c: [2, 1]}}")}));
+    assertNDV(2,
+              {{.path = "a"}},
+              {fromjson("{a: {b: 1, c: [1, 2]}}"), fromjson("{a: {b: 1, c: [2, 1]}}")});
 }
 
 TEST(CountNDV, VariousBSONTypes) {
@@ -132,7 +209,7 @@ TEST(CountNDV, VariousBSONTypes) {
     doubleDocs.insert(doubleDocs.end(), docs.begin(), docs.end());
 
     // For regular $eq, we treat null & missing the same.
-    ASSERT_EQ(docs.size() - 1, countNDV({{.path = "a"}}, docs));
+    assertNDV(docs.size() - 1, {{.path = "a"}}, docs);
     ASSERT_EQ(docs.size() - 1, countNDV({{.path = "a"}}, doubleDocs));
 
     // For $expr eq, null & missing are treated as being distinct.
@@ -146,9 +223,9 @@ TEST(CountNDV, NestedField) {
                                        fromjson("{a: {b: {c: 1}, c: 3}}"),
                                        fromjson("{a: {b: {c: 2}}}"),
                                        fromjson("{a: {c: [1,2,3]}}")};
-    ASSERT_EQ(5, countNDV({{.path = "a"}}, docs));
-    ASSERT_EQ(3, countNDV({{.path = "a.b"}}, docs));
-    ASSERT_EQ(3, countNDV({{.path = "a.b.c"}}, docs));
+    assertNDV(5, {{.path = "a"}}, docs);
+    assertNDV(3, {{.path = "a.b"}}, docs);
+    assertNDV(3, {{.path = "a.b.c"}}, docs);
 }
 
 TEST(CountNDV, NestedFieldNull) {
@@ -159,9 +236,9 @@ TEST(CountNDV, NestedFieldNull) {
                                        fromjson("{a: {b: {}}}"),
                                        fromjson("{a: {b: {c: null}}}")};
     // Regular eq semantics.
-    ASSERT_EQ(5, countNDV({{.path = "a"}}, docs));
-    ASSERT_EQ(3, countNDV({{.path = "a.b"}}, docs));
-    ASSERT_EQ(1, countNDV({{.path = "a.b.c"}}, docs));
+    assertNDV(5, {{.path = "a"}}, docs);
+    assertNDV(3, {{.path = "a.b"}}, docs);
+    assertNDV(1, {{.path = "a.b.c"}}, docs);
 
     // Regular $expr eq semantics.
     ASSERT_EQ(6, countNDV({{.path = "a", .isExprEq = true}}, docs));
@@ -170,12 +247,12 @@ TEST(CountNDV, NestedFieldNull) {
 }
 
 TEST(CountNDV, DifferentNumericTypesAreNotDistinguished) {
-    ASSERT_EQ(1,
-              countNDV({{.path = "a"}},
-                       {fromjson("{a: 1}"),
-                        fromjson("{a: NumberLong(1)}"),
-                        fromjson("{a: NumberInt(1)}"),
-                        fromjson("{a: NumberDecimal('1.00000')}")}));
+    assertNDV(1,
+              {{.path = "a"}},
+              {fromjson("{a: 1}"),
+               fromjson("{a: NumberLong(1)}"),
+               fromjson("{a: NumberInt(1)}"),
+               fromjson("{a: NumberDecimal('1.00000')}")});
 }
 
 DEATH_TEST(CountNDVDeathTest, ThrowsOnEmptyArray, "unexpected array in NDV computation") {
@@ -212,9 +289,9 @@ TEST(CountNDV, BasicMultiField) {
                                        fromjson("{a: 3}"),
                                        fromjson("{c: 3}"),
                                        fromjson("{}")};
-    ASSERT_EQ(4, countNDV({{.path = "a"}}, docs));
-    ASSERT_EQ(3, countNDV({{.path = "b"}}, docs));
-    ASSERT_EQ(5, countNDV({{.path = "a"}, {.path = "b"}}, docs));
+    assertNDV(4, {{.path = "a"}}, docs);
+    assertNDV(3, {{.path = "b"}}, docs);
+    assertNDV(5, {{.path = "a"}, {.path = "b"}}, docs);
 }
 
 TEST(CountNDV, MultiFieldManyFields) {
@@ -229,16 +306,14 @@ TEST(CountNDV, MultiFieldManyFields) {
         fromjson("{a: 1, b: 2, c: 2, d: 2, e: 2}"),
         fromjson("{e: 2, c: 2, b: 2, d: 2, a: 1}"),
     };
-    ASSERT_EQ(1, countNDV({{.path = "a"}}, docs));
-    ASSERT_EQ(2, countNDV({{.path = "b"}}, docs));
-    ASSERT_EQ(2, countNDV({{.path = "c"}}, docs));
-    ASSERT_EQ(2, countNDV({{.path = "d"}}, docs));
-    ASSERT_EQ(2, countNDV({{.path = "e"}}, docs));
-    ASSERT_EQ(2, countNDV({{.path = "a"}, {.path = "b"}}, docs));
-    ASSERT_EQ(2, countNDV({{.path = "b"}, {.path = "c"}}, docs));
-    ASSERT_EQ(3,
-              countNDV({{.path = "a"}, {.path = "b"}, {.path = "c"}, {.path = "d"}, {.path = "e"}},
-                       docs));
+    assertNDV(1, {{.path = "a"}}, docs);
+    assertNDV(2, {{.path = "b"}}, docs);
+    assertNDV(2, {{.path = "c"}}, docs);
+    assertNDV(2, {{.path = "d"}}, docs);
+    assertNDV(2, {{.path = "e"}}, docs);
+    assertNDV(2, {{.path = "a"}, {.path = "b"}}, docs);
+    assertNDV(2, {{.path = "b"}, {.path = "c"}}, docs);
+    assertNDV(3, {{.path = "a"}, {.path = "b"}, {.path = "c"}, {.path = "d"}, {.path = "e"}}, docs);
 }
 
 TEST(CountNDV, MultiFieldOrderInsensitive) {
@@ -248,10 +323,10 @@ TEST(CountNDV, MultiFieldOrderInsensitive) {
                                        fromjson("{b: 2, a: 1}"),
                                        fromjson("{a: 2, b: 2}"),
                                        fromjson("{b: 2, a: 2}")};
-    ASSERT_EQ(2, countNDV({{.path = "a"}}, docs));
-    ASSERT_EQ(2, countNDV({{.path = "b"}}, docs));
-    ASSERT_EQ(3, countNDV({{.path = "a"}, {.path = "b"}}, docs));
-    ASSERT_EQ(3, countNDV({{.path = "b"}, {.path = "a"}}, docs));
+    assertNDV(2, {{.path = "a"}}, docs);
+    assertNDV(2, {{.path = "b"}}, docs);
+    assertNDV(3, {{.path = "a"}, {.path = "b"}}, docs);
+    assertNDV(3, {{.path = "b"}, {.path = "a"}}, docs);
 }
 
 TEST(CountNDV, MultiFieldNullMissing) {
@@ -264,10 +339,10 @@ TEST(CountNDV, MultiFieldNullMissing) {
                                        fromjson("{a: null, b: null}"),
                                        fromjson("{}")};
     // No $expr: count null/missing as the same.
-    ASSERT_EQ(2, countNDV({{.path = "a"}}, docs));
-    ASSERT_EQ(2, countNDV({{.path = "b"}}, docs));
-    ASSERT_EQ(3, countNDV({{.path = "a"}, {.path = "b"}}, docs));
-    ASSERT_EQ(3, countNDV({{.path = "b"}, {.path = "a"}}, docs));
+    assertNDV(2, {{.path = "a"}}, docs);
+    assertNDV(2, {{.path = "b"}}, docs);
+    assertNDV(3, {{.path = "a"}, {.path = "b"}}, docs);
+    assertNDV(3, {{.path = "b"}, {.path = "a"}}, docs);
 
     // Only "a" in $expr; treat null/missing as different for "a".
     ASSERT_EQ(3, countNDV({{.path = "a", .isExprEq = true}}, docs));
@@ -294,14 +369,14 @@ TEST(CountNDV, MultiFieldDuplicateAndNestedFields) {
         fromjson("{a: {b: 20}}"),
         fromjson("{b: {b: 10}}"),
     };
-    ASSERT_EQ(5, countNDV({{.path = "a"}}, docs));
-    ASSERT_EQ(4, countNDV({{.path = "b"}}, docs));
+    assertNDV(5, {{.path = "a"}}, docs);
+    assertNDV(4, {{.path = "b"}}, docs);
 
     // Arguably these queries don't make the most sense, but we handle them correctly.
     ASSERT_EQ(5, countNDV({{.path = "a"}, {.path = "a"}}, docs));
-    ASSERT_EQ(5, countNDV({{.path = "a"}, {.path = "a.b"}}, docs));
+    assertNDV(5, {{.path = "a"}, {.path = "a.b"}}, docs);
     ASSERT_EQ(5, countNDV({{.path = "a.b"}, {.path = "a"}}, docs));
-    ASSERT_EQ(5, countNDV({{.path = "a.b"}, {.path = "b"}}, docs));
+    assertNDV(5, {{.path = "a.b"}, {.path = "b"}}, docs);
 }
 
 // Build a single closed-interval OIL [lo, hi].
@@ -329,7 +404,7 @@ TEST(CountNDV, BoundsPointFilter) {
         fromjson("{a: 1}"), fromjson("{a: 2}"), fromjson("{a: 3}"), fromjson("{a: 2}")};
     // Only value 2 is a matching key.
     const std::vector<OrderedIntervalList> bounds = {makePointOIL(2)};
-    ASSERT_EQ(1, countNDV({{.path = "a"}}, docs, std::span{bounds}));
+    assertNDV(1, {{.path = "a"}}, docs, std::span{bounds});
 }
 
 TEST(CountNDV, BoundsRangeFilter) {
@@ -337,14 +412,14 @@ TEST(CountNDV, BoundsRangeFilter) {
         fromjson("{a: 1}"), fromjson("{a: 2}"), fromjson("{a: 3}"), fromjson("{a: 4}")};
     // Values 2 and 3 are in [2, 3].
     const std::vector<OrderedIntervalList> bounds = {makeOIL(2, 3)};
-    ASSERT_EQ(2, countNDV({{.path = "a"}}, docs, std::span{bounds}));
+    assertNDV(2, {{.path = "a"}}, docs, std::span{bounds});
 }
 
 TEST(CountNDV, BoundsFilterAllOut) {
     const std::vector<BSONObj> docs = {fromjson("{a: 1}"), fromjson("{a: 2}")};
     // No document matches [10, 20].
     const std::vector<OrderedIntervalList> bounds = {makeOIL(10, 20)};
-    ASSERT_EQ(0, countNDV({{.path = "a"}}, docs, std::span{bounds}));
+    assertNDV(0, {{.path = "a"}}, docs, std::span{bounds});
 }
 
 TEST(CountNDV, BoundsMultiField) {
@@ -355,7 +430,7 @@ TEST(CountNDV, BoundsMultiField) {
     // Restrict a to [1,1] and b to [1,2] -- all four docs match, but a=1 is fixed so NDV of
     // compound key is: (1,1) and (1,2) = 2.
     const std::vector<OrderedIntervalList> bounds = {makePointOIL(1), makeOIL(1, 2)};
-    ASSERT_EQ(2, countNDV({{.path = "a"}, {.path = "b"}}, docs, std::span{bounds}));
+    assertNDV(2, {{.path = "a"}, {.path = "b"}}, docs, std::span{bounds});
 }
 
 TEST(CountNDV, BoundsNullMatchesMissingField) {
@@ -368,7 +443,7 @@ TEST(CountNDV, BoundsNullMatchesMissingField) {
     };
     // Bound on b = [null, null]: the three docs with null/missing b all collapse to one NDV.
     const std::vector<OrderedIntervalList> bounds = {makeNullOIL()};
-    ASSERT_EQ(1, countNDV({{.path = "b"}}, docs, std::span{bounds}));
+    assertNDV(1, {{.path = "b"}}, docs, std::span{bounds});
 }
 
 TEST(CountNDVMultiKey, SingleArrayField) {
@@ -377,12 +452,16 @@ TEST(CountNDVMultiKey, SingleArrayField) {
         auto r = countNDVMultiKey({{.path = "a"}}, {fromjson("{a: [1, 2, 3]}")});
         ASSERT_EQ(3, r.totalSampleKeys);
         ASSERT_EQ(3, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys,
+                  countUniqueKeysBtree({{.path = "a"}}, {fromjson("{a: [1, 2, 3]}")}));
     }
     // Duplicates within the array.
     {
         auto r = countNDVMultiKey({{.path = "a"}}, {fromjson("{a: [1, 1, 2]}")});
         ASSERT_EQ(3, r.totalSampleKeys);
         ASSERT_EQ(2, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys,
+                  countUniqueKeysBtree({{.path = "a"}}, {fromjson("{a: [1, 1, 2]}")}));
     }
     // Multiple documents, overlapping values.
     {
@@ -390,6 +469,17 @@ TEST(CountNDVMultiKey, SingleArrayField) {
             countNDVMultiKey({{.path = "a"}}, {fromjson("{a: [1, 2]}"), fromjson("{a: [2, 3]}")});
         ASSERT_EQ(4, r.totalSampleKeys);
         ASSERT_EQ(3, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys,
+                  countUniqueKeysBtree({{.path = "a"}},
+                                       {fromjson("{a: [1, 2]}"), fromjson("{a: [2, 3]}")}));
+    }
+    // Single-element array.
+    {
+        auto r = countNDVMultiKey({{.path = "a"}}, {fromjson("{a: [42]}")});
+        ASSERT_EQ(1, r.totalSampleKeys);
+        ASSERT_EQ(1, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys,
+                  countUniqueKeysBtree({{.path = "a"}}, {fromjson("{a: [42]}")}));
     }
 }
 
@@ -398,12 +488,17 @@ TEST(CountNDVMultiKey, NonArrayFieldBehavesLikeCountNDV) {
                               {fromjson("{a: 1}"), fromjson("{a: 2}"), fromjson("{a: 1}")});
     ASSERT_EQ(3, r.totalSampleKeys);
     ASSERT_EQ(2, r.sampleUniqueKeys);
+    ASSERT_EQ(r.sampleUniqueKeys,
+              countUniqueKeysBtree({{.path = "a"}},
+                                   {fromjson("{a: 1}"), fromjson("{a: 2}"), fromjson("{a: 1}")}));
 }
 
 TEST(CountNDVMultiKey, MixedArrayAndScalarDocs) {
     auto r = countNDVMultiKey({{.path = "a"}}, {fromjson("{a: 1}"), fromjson("{a: [2, 3]}")});
     ASSERT_EQ(3, r.totalSampleKeys);
     ASSERT_EQ(3, r.sampleUniqueKeys);
+    ASSERT_EQ(r.sampleUniqueKeys,
+              countUniqueKeysBtree({{.path = "a"}}, {fromjson("{a: 1}"), fromjson("{a: [2, 3]}")}));
 }
 
 TEST(CountNDVMultiKey, CompoundKeyOneArrayField) {
@@ -414,6 +509,9 @@ TEST(CountNDVMultiKey, CompoundKeyOneArrayField) {
         // Produces (1,1), (1,2), (1,3).
         ASSERT_EQ(3, r.totalSampleKeys);
         ASSERT_EQ(3, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys,
+                  countUniqueKeysBtree({{.path = "a"}, {.path = "b"}},
+                                       {fromjson("{a: 1, b: [1, 2, 3]}")}));
     }
     // Multiple docs, no shared compound values.
     {
@@ -422,6 +520,10 @@ TEST(CountNDVMultiKey, CompoundKeyOneArrayField) {
         // (1,1),(1,2),(2,1),(2,3) -- all distinct.
         ASSERT_EQ(4, r.totalSampleKeys);
         ASSERT_EQ(4, r.sampleUniqueKeys);
+        ASSERT_EQ(
+            r.sampleUniqueKeys,
+            countUniqueKeysBtree({{.path = "a"}, {.path = "b"}},
+                                 {fromjson("{a: 1, b: [1, 2]}"), fromjson("{a: 2, b: [1, 3]}")}));
     }
     // Multiple docs sharing a compound key value.
     {
@@ -430,6 +532,20 @@ TEST(CountNDVMultiKey, CompoundKeyOneArrayField) {
         // (1,1),(1,2),(1,2),(1,3) -- (1,2) is duplicated.
         ASSERT_EQ(4, r.totalSampleKeys);
         ASSERT_EQ(3, r.sampleUniqueKeys);
+        ASSERT_EQ(
+            r.sampleUniqueKeys,
+            countUniqueKeysBtree({{.path = "a"}, {.path = "b"}},
+                                 {fromjson("{a: 1, b: [1, 2]}"), fromjson("{a: 1, b: [2, 3]}")}));
+    }
+    // Array in the first field of a compound key.
+    {
+        auto r = countNDVMultiKey({{.path = "a"}, {.path = "b"}}, {fromjson("{a: [1, 2], b: 10}")});
+        // Produces (1,10), (2,10).
+        ASSERT_EQ(2, r.totalSampleKeys);
+        ASSERT_EQ(2, r.sampleUniqueKeys);
+        ASSERT_EQ(
+            r.sampleUniqueKeys,
+            countUniqueKeysBtree({{.path = "a"}, {.path = "b"}}, {fromjson("{a: [1, 2], b: 10}")}));
     }
 }
 
@@ -438,12 +554,23 @@ TEST(CountNDVMultiKey, EmptyArrayProducesUndefinedKey) {
     auto r = countNDVMultiKey({{.path = "a"}}, {fromjson("{a: []}")});
     ASSERT_EQ(1, r.totalSampleKeys);
     ASSERT_EQ(1, r.sampleUniqueKeys);
+    ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree({{.path = "a"}}, {fromjson("{a: []}")}));
 
     // {a: []} maps to undefined; {a: null} and {} map to null -- two distinct keys.
     auto r2 = countNDVMultiKey({{.path = "a"}},
                                {fromjson("{a: []}"), fromjson("{a: null}"), fromjson("{}")});
     ASSERT_EQ(3, r2.totalSampleKeys);
     ASSERT_EQ(2, r2.sampleUniqueKeys);
+    ASSERT_EQ(r2.sampleUniqueKeys,
+              countUniqueKeysBtree({{.path = "a"}},
+                                   {fromjson("{a: []}"), fromjson("{a: null}"), fromjson("{}")}));
+
+    // {a: null} and {} both map to null — one distinct key.
+    auto r3 = countNDVMultiKey({{.path = "a"}}, {fromjson("{a: null}"), fromjson("{}")});
+    ASSERT_EQ(2, r3.totalSampleKeys);
+    ASSERT_EQ(1, r3.sampleUniqueKeys);
+    ASSERT_EQ(r3.sampleUniqueKeys,
+              countUniqueKeysBtree({{.path = "a"}}, {fromjson("{a: null}"), fromjson("{}")}));
 }
 
 TEST(CountNDVMultiKey, MissingFieldTreatedAsNull) {
@@ -451,6 +578,9 @@ TEST(CountNDVMultiKey, MissingFieldTreatedAsNull) {
                               {fromjson("{}"), fromjson("{a: null}"), fromjson("{a: 1}")});
     ASSERT_EQ(3, r.totalSampleKeys);
     ASSERT_EQ(2, r.sampleUniqueKeys);  // null/missing count as one, plus 1
+    ASSERT_EQ(r.sampleUniqueKeys,
+              countUniqueKeysBtree({{.path = "a"}},
+                                   {fromjson("{}"), fromjson("{a: null}"), fromjson("{a: 1}")}));
 }
 
 // ---------------------------------------------------------------------------
@@ -465,6 +595,7 @@ TEST(CountNDVMultiKey, BoundsPointFilter) {
     ASSERT_EQ(5, r.totalSampleKeys);
     ASSERT_EQ(2, r.uniqueMatchingKeys);  // one 2 from each doc
     ASSERT_EQ(1, r.sampleUniqueKeys);
+    ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree({{.path = "a"}}, docs, std::span{bounds}));
 }
 
 TEST(CountNDVMultiKey, BoundsRangeFilter) {
@@ -475,6 +606,7 @@ TEST(CountNDVMultiKey, BoundsRangeFilter) {
     ASSERT_EQ(7, r.totalSampleKeys);
     ASSERT_EQ(4, r.uniqueMatchingKeys);  // 2,3 from first doc, 2,3 from second
     ASSERT_EQ(2, r.sampleUniqueKeys);
+    ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree({{.path = "a"}}, docs, std::span{bounds}));
 }
 
 TEST(CountNDVMultiKey, BoundsFilterAllOut) {
@@ -484,6 +616,7 @@ TEST(CountNDVMultiKey, BoundsFilterAllOut) {
     ASSERT_EQ(2, r.totalSampleKeys);
     ASSERT_EQ(0, r.uniqueMatchingKeys);
     ASSERT_EQ(0, r.sampleUniqueKeys);
+    ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree({{.path = "a"}}, docs, std::span{bounds}));
 }
 
 TEST(CountNDVMultiKey, BoundsNullMatchesMissingAndNull) {
@@ -499,6 +632,216 @@ TEST(CountNDVMultiKey, BoundsNullMatchesMissingAndNull) {
     ASSERT_EQ(5, r.totalSampleKeys);
     ASSERT_EQ(2, r.uniqueMatchingKeys);
     ASSERT_EQ(1, r.sampleUniqueKeys);
+    ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree({{.path = "a"}}, docs, std::span{bounds}));
+}
+
+TEST(CountNDVMultiKey, SingleElementArrayMatchesScalar) {
+    // {a: [v]} must produce the same unique-key count as {a: v}.
+    const std::vector<FieldPathAndEqSemantics> fields = {{.path = "a"}};
+
+    for (int n : {1, 5, 10}) {
+        std::vector<BSONObj> scalarDocs, singleElemDocs;
+        for (int i = 0; i < n; ++i) {
+            scalarDocs.push_back(BSON("a" << i));
+            singleElemDocs.push_back(BSON("a" << BSON_ARRAY(i)));
+        }
+        ASSERT_EQ(countUniqueKeysBtree(fields, scalarDocs),
+                  countUniqueKeysBtree(fields, singleElemDocs));
+        auto r = countNDVMultiKey(fields, singleElemDocs);
+        ASSERT_EQ(static_cast<size_t>(n), r.totalSampleKeys);
+        ASSERT_EQ(static_cast<size_t>(n), r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, singleElemDocs));
+    }
+}
+
+TEST(CountNDVMultiKey, NestedArrayInsideArraySubobject) {
+    // Both 'a' and 'a[i].b' are arrays — multikey at two levels of the path.
+    const std::vector<FieldPathAndEqSemantics> fields = {{.path = "a.b"}};
+
+    // Single subdoc with single-element 'b' array.
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a:[{b:[2]}]}")};
+        auto r = countNDVMultiKey(fields, docs);
+        ASSERT_EQ(1, r.totalSampleKeys);
+        ASSERT_EQ(1, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
+    // Single subdoc with multi-element 'b' array.
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a:[{b:[1, 2, 3]}]}")};
+        auto r = countNDVMultiKey(fields, docs);
+        ASSERT_EQ(3, r.totalSampleKeys);
+        ASSERT_EQ(3, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
+    // Two subdocs with overlapping 'b' arrays.
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a: [{b: [1, 2]}, {b: [2, 3]}]}")};
+        auto r = countNDVMultiKey(fields, docs);
+        ASSERT_EQ(4, r.totalSampleKeys);
+        ASSERT_EQ(3, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
+    // Two subdocs with non-overlapping 'b' arrays.
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a: [{b: [1, 2]}, {b: [3, 4]}]}")};
+        auto r = countNDVMultiKey(fields, docs);
+        ASSERT_EQ(4, r.totalSampleKeys);
+        ASSERT_EQ(4, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
+    // Multiple subdocs with non-distinct values across elements.
+    {
+        const std::vector<BSONObj> docs = {
+            fromjson("{a: [{b: [1, 2, 3]}, {b: [2]}, {b: [3, 1]}]}")};
+        auto r = countNDVMultiKey(fields, docs);
+        ASSERT_EQ(6, r.totalSampleKeys);
+        ASSERT_EQ(3, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
+    // Multiple docs.
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a:[{b:[1, 2]}]}"),
+                                           fromjson("{a:[{b:[2, 3]}]}")};
+        auto r = countNDVMultiKey(fields, docs);
+        ASSERT_EQ(4, r.totalSampleKeys);
+        ASSERT_EQ(3, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
+}
+
+TEST(CountNDVMultiKey, HeterogeneousArraySubobjectValues) {
+    // Heterogeneous array: one element has scalar 'b', another has array 'b'.
+    const std::vector<FieldPathAndEqSemantics> fields = {{.path = "a.b"}};
+
+    // Scalar 'b' value overlaps with array 'b' values.
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a:[{b:1},{b:[1,2,3]}]}")};
+        auto r = countNDVMultiKey(fields, docs);
+        ASSERT_EQ(4, r.totalSampleKeys);
+        ASSERT_EQ(3, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
+    // Scalar 'b' does not overlap with array 'b' values.
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a:[{b:5},{b:[1,2,3]}]}")};
+        auto r = countNDVMultiKey(fields, docs);
+        ASSERT_EQ(4, r.totalSampleKeys);
+        ASSERT_EQ(4, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
+}
+
+TEST(CountNDVMultiKey, CompoundWithEmptyArrayField) {
+    // Compound key {a:1, b:1} where 'b' is an array field, including the empty-array case
+    // which produces an 'undefined' key for 'b'.
+    const std::vector<FieldPathAndEqSemantics> fields = {{.path = "a"}, {.path = "b"}};
+
+    // 'b' is a two-element array: (1,1) and (1,2).
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a: 1, b: [1, 2]}")};
+        auto r = countNDVMultiKey(fields, docs);
+        ASSERT_EQ(2, r.totalSampleKeys);
+        ASSERT_EQ(2, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
+    // 'b' is a single-element array: (1,1).
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a: 1, b: [1]}")};
+        auto r = countNDVMultiKey(fields, docs);
+        ASSERT_EQ(1, r.totalSampleKeys);
+        ASSERT_EQ(1, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
+    // 'b' is an empty array → compound key (1, undefined).
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a: 1, b: []}")};
+        auto r = countNDVMultiKey(fields, docs);
+        ASSERT_EQ(1, r.totalSampleKeys);
+        ASSERT_EQ(1, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
+}
+
+TEST(CountNDVMultiKey, NestedEmptyArrayWithDottedPath) {
+    // Empty parent array with dotted-path access yields null (not undefined) keys.
+
+    // Single dotted field: {a.b:1} with {a:[]} → one null key.
+    {
+        const std::vector<FieldPathAndEqSemantics> fields = {{.path = "a.b"}};
+        const std::vector<BSONObj> docs = {fromjson("{a:[]}")};
+        auto r = countNDVMultiKey(fields, docs);
+        ASSERT_EQ(1, r.totalSampleKeys);
+        ASSERT_EQ(1, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
+    // Compound dotted fields sharing the empty parent: {a.b:1, a.c:1} with {a:[]} → (null,null).
+    {
+        const std::vector<FieldPathAndEqSemantics> fields = {{.path = "a.b"}, {.path = "a.c"}};
+        const std::vector<BSONObj> docs = {fromjson("{a:[]}")};
+        auto r = countNDVMultiKey(fields, docs);
+        ASSERT_EQ(1, r.totalSampleKeys);
+        ASSERT_EQ(1, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
+}
+
+TEST(CountNDVMultiKey, UnevenNestedEmptyArray) {
+    // Compound index where one path is a prefix of the other ('a' and 'a.b').
+
+    // Forward order: {a:1, a.b:1}.
+    const std::vector<FieldPathAndEqSemantics> fwd = {{.path = "a"}, {.path = "a.b"}};
+    // {a:[]} → (undefined, null).
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a:[]}")};
+        auto r = countNDVMultiKey(fwd, docs);
+        ASSERT_EQ(1, r.totalSampleKeys);
+        ASSERT_EQ(1, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fwd, docs));
+    }
+    // {a:[{b:1}]} → ({b:1}, 1).
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a:[{b: 1}]}")};
+        auto r = countNDVMultiKey(fwd, docs);
+        ASSERT_EQ(1, r.totalSampleKeys);
+        ASSERT_EQ(1, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fwd, docs));
+    }
+    // {a:[{b:[]}]} → ({b:[]}, undefined).
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a:[{b: []}]}")};
+        auto r = countNDVMultiKey(fwd, docs);
+        ASSERT_EQ(1, r.totalSampleKeys);
+        ASSERT_EQ(1, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fwd, docs));
+    }
+
+    // Reverse order: {a.b:1, a:1}.
+    const std::vector<FieldPathAndEqSemantics> rev = {{.path = "a.b"}, {.path = "a"}};
+    // {a:[]} → (null, undefined).
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a:[]}")};
+        auto r = countNDVMultiKey(rev, docs);
+        ASSERT_EQ(1, r.totalSampleKeys);
+        ASSERT_EQ(1, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(rev, docs));
+    }
+    // {a:[{b:1}]} → (1, {b:1}).
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a:[{b: 1}]}")};
+        auto r = countNDVMultiKey(rev, docs);
+        ASSERT_EQ(1, r.totalSampleKeys);
+        ASSERT_EQ(1, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(rev, docs));
+    }
+    // {a:[{b:[]}]} → (undefined, {b:[]}).
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a:[{b: []}]}")};
+        auto r = countNDVMultiKey(rev, docs);
+        ASSERT_EQ(1, r.totalSampleKeys);
+        ASSERT_EQ(1, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(rev, docs));
+    }
 }
 
 // For a collection of documents {a: i % n}, countNDVMultiKey must agree with countNDV:
@@ -554,6 +897,22 @@ INSTANTIATE_TEST_SUITE_P(
 DEATH_TEST(CountNDVMultiKeyDeathTest, ThrowsOnParallelArrays, "Parallel arrays are not supported") {
     countNDVMultiKey({{.path = "a"}, {.path = "b"}}, {fromjson("{a: [1, 2], b: [3, 4]}")});
 }
+
+// TODO SERVER-129532: Move to a passing non-death test.
+DEATH_TEST(CountNDVDeathTest,
+           DottedPathSharingPrefixWithArrayField,
+           "Parallel arrays are not supported") {
+    // Regression for SERVER-129532: index {a:1, "a.b":-1} with document
+    // {a:[{b:0},{b:0},1]}. Today this is (incorrectly) treated as a parallel-array case and
+    // triggers "Parallel arrays are not supported"; once SERVER-129532 is fixed this should become
+    // a regular (non-death) test that validates the produced key counts.
+    auto r =
+        countNDVMultiKey({{.path = "a"}, {.path = "a.b"}}, {fromjson("{a: [{b: 0}, {b: 0}, 1]}")});
+    // The compound key produces ({b:0},0), ({b:0},0), ({b:0},null) -- three keys, two unique.
+    ASSERT_EQ(3, r.totalSampleKeys);
+    ASSERT_EQ(2, r.sampleUniqueKeys);
+}
+
 TEST(CountUniqueDocuments, AllUnique) {
     const std::vector<BSONObj> docs = {
         fromjson("{_id: 1, a: 10}"),
@@ -723,4 +1082,61 @@ TEST(MatchesIntervalOIL, PointIntervalExclusive) {
     ASSERT_FALSE(matchesInterval(oil, intElt(5, s)));
     ASSERT_FALSE(matchesInterval(oil, intElt(6, s)));
 }
+
+// TODO SERVER-129532: Re-enable this test.
+DEATH_TEST(CountNDVDeathTest, DottedPathSharingArrayPrefix, "Parallel arrays are not supported") {
+    // Regression for SERVER-129532: index {a:1, "a.b":-1} with documents where
+    // "a.b" shares the array-valued prefix "a". Both countNDVMultiKey and BtreeKeyGenerator
+    // must produce the same count of unique compound keys.
+    const std::vector<FieldPathAndEqSemantics> fields = {{.path = "a"}, {.path = "a.b"}};
+
+    // a is an array of subdocs lacking a subfield "b"; original bug trigger.
+    countNDVMultiKey(fields, {fromjson("{a: [{x: 0}, {y: 0}, 1]}")});
+
+    // Additional cases to add once SERVER-129532 is fixed:
+    // a is an array of subdocs with distinct "b" subfields.
+    // countNDVMultiKey(fields, {fromjson("{a: [{b: 1}, {b: 2}]}")});
+    // a is an array of subdocs with duplicate "b" subfields.
+    // countNDVMultiKey(fields, {fromjson("{a: [{b: 1}, {b: 1}]}")});
+    // Multiple documents.
+    // countNDVMultiKey(fields, {fromjson("{a: [{b: 1}]}") , fromjson("{a: [{b: 2}]}")});
+}
+
+// TODO SERVER-129532: Move to a passing non-death test.
+DEATH_TEST(CountNDVDeathTest, UnevenNestedArrays, "Parallel arrays are not supported") {
+    // Mirrors BtreeKeyGeneratorTest::GetKeysUnevenNestedArrays:
+    // index {a:1, "a.b":1} with document {a:[1, {b:[2,3,4]}]}.
+    // BtreeKeyGenerator produces (1,null), ({b:[2,3,4]},2), ({b:[2,3,4]},3), ({b:[2,3,4]},4).
+    const std::vector<FieldPathAndEqSemantics> fields = {{.path = "a"}, {.path = "a.b"}};
+
+    countNDVMultiKey(fields, {fromjson("{a: [1, {b: [2, 3, 4]}]}")});
+
+    // countNDVMultiKey(fields, {fromjson("{a: [1, {b: [2, 3, 4]}]}")});
+    // // Single subdoc with array subfield.
+    // countNDVMultiKey(fields, {fromjson("{a: [{b: [10, 20]}]}")});
+    // // Multiple docs.
+    // countNDVMultiKey(fields,
+    //                     {fromjson("{a: [1, {b: [2, 3]}]}"), fromjson("{a: [{b: [3, 4]}]}")});
+}
+
+// TODO SERVER-129532: Move to a passing non-death test.
+DEATH_TEST(CountNDVDeathTest,
+           AlternateMissingCompoundDottedPath,
+           "Parallel arrays are not supported") {
+    // Mirrors BtreeKeyGeneratorTest::GetKeysAlternateMissing:
+    // Compound nested-field index where different array elements have different subfields
+    // present, producing alternating null keys across the two indexed fields.
+    // Both fields share the 'a' prefix array so this is not a parallel-array case.
+    const std::vector<FieldPathAndEqSemantics> fields = {{.path = "a.b"}, {.path = "a.c"}};
+
+    countNDVMultiKey(fields, {fromjson("{a:[{b:1},{c:2}]}")});
+
+    // Keys: (1, null) and (null, 2).
+    // countNDVMultiKey(fields, {fromjson("{a:[{b:1},{c:2}]}")});
+    // Multiple docs.
+    // countNDVMultiKey(fields, {fromjson("{a:[{b:1},{c:2}]}"), fromjson("{a:[{b:3},{c:4}]}")});
+    // Some elements have both fields.
+    // countNDVMultiKey(fields, {fromjson("{a:[{b:1,c:2},{c:3}]}")});
+}
+
 }  // namespace mongo::ce
