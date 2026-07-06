@@ -237,7 +237,7 @@ constexpr auto kNumDurableCatalogScansDueToMissingMapping = "numScansDueToMissin
 class LatestCollectionCatalog {
 public:
     LatestCollectionCatalog() {
-        ObservableMutexRegistry::get().add("Shard Local Catalog Mutexes", _writeMutex);
+        ObservableMutexRegistry::get().add("shardLocalCatalogMutexes", _writeMutex);
     }
 
     std::shared_ptr<CollectionCatalog> load() const {

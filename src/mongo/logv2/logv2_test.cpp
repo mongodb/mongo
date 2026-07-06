@@ -2204,7 +2204,7 @@ TEST_F(LogV2Test, Threads) {
 }
 
 TEST_F(LogV2Test, Ramlog) {
-    RamLog* ramlog = RamLog::get("test_ramlog");
+    RamLog* ramlog = RamLog::get("TestRamlog");
     auto sink = wrapInUnlockedSink(boost::make_shared<RamLogSink>(ramlog));
     applyDefaultFilterToSink(sink);
     sink->set_formatter(PlainFormatter());
@@ -2234,7 +2234,7 @@ TEST_F(LogV2Test, Ramlog) {
 TEST_F(LogV2Test, Ramlog_AltMaxLinesMaxSize) {
     constexpr size_t alternativeMaxLines = 2048;
     constexpr size_t alternativeMaxSizeBytes = 2 * 1024 * 1024;
-    RamLog* ramlog = RamLog::get("test_ramlog_alt2", alternativeMaxLines, alternativeMaxSizeBytes);
+    RamLog* ramlog = RamLog::get("TestRamlogAlt2", alternativeMaxLines, alternativeMaxSizeBytes);
     auto sink = wrapInUnlockedSink(boost::make_shared<RamLogSink>(ramlog));
     applyDefaultFilterToSink(sink);
     sink->set_formatter(PlainFormatter());
@@ -2263,7 +2263,7 @@ TEST_F(LogV2Test, Ramlog_AltMaxLinesMaxSize) {
 
 // Positive: Test that the ram log is properly circular
 TEST_F(LogV2Test, Ramlog_CircularBuffer) {
-    RamLog* ramlog = RamLog::get("test_ramlog2");
+    RamLog* ramlog = RamLog::get("TestRamlog2");
 
     std::vector<std::string> lines;
 
@@ -2295,7 +2295,7 @@ TEST_F(LogV2Test, Ramlog_CircularBuffer) {
 TEST_F(LogV2Test, Ramlog_CircularBuffer_AltMaxLinesMaxSize) {
     constexpr size_t alternativeMaxLines = 10;
     constexpr size_t alternativeMaxSizeBytes = 2 * 1024 * 1024;
-    RamLog* ramlog = RamLog::get("test_ramlog2_alt2", alternativeMaxLines, alternativeMaxSizeBytes);
+    RamLog* ramlog = RamLog::get("TestRamlog2Alt2", alternativeMaxLines, alternativeMaxSizeBytes);
     ASSERT_EQ(alternativeMaxLines, ramlog->getMaxLines());
     ASSERT_EQ(alternativeMaxSizeBytes, ramlog->getMaxSizeBytes());
 
@@ -2329,7 +2329,7 @@ TEST_F(LogV2Test, Ramlog_CircularBuffer_AltMaxLinesMaxSize) {
 
 // Positive: Test that the ram log has a max size cap
 TEST_F(LogV2Test, Ramlog_MaxSize) {
-    RamLog* ramlog = RamLog::get("test_ramlog3");
+    RamLog* ramlog = RamLog::get("TestRamlog3");
 
     std::vector<std::string> lines;
 
@@ -2369,7 +2369,7 @@ TEST_F(LogV2Test, Ramlog_MaxSize_AltMaxLinesMaxSize) {
 
     constexpr size_t alternativeMaxLines = 2048;
     constexpr size_t alternativeMaxSizeBytes = 1024 * 1024 + fullStringLength;
-    RamLog* ramlog = RamLog::get("test_ramlog3_alt", alternativeMaxLines, alternativeMaxSizeBytes);
+    RamLog* ramlog = RamLog::get("TestRamlog3Alt", alternativeMaxLines, alternativeMaxSizeBytes);
 
     std::vector<std::string> lines;
 
@@ -2400,7 +2400,7 @@ TEST_F(LogV2Test, Ramlog_MaxSize_AltMaxLinesMaxSize) {
 
 // Positive: Test that the ram log handles really large lines
 TEST_F(LogV2Test, Ramlog_GiantLine) {
-    RamLog* ramlog = RamLog::get("test_ramlog4");
+    RamLog* ramlog = RamLog::get("TestRamlog4");
 
     std::vector<std::string> lines;
 
@@ -2435,7 +2435,7 @@ TEST_F(LogV2Test, Ramlog_GiantLine) {
 TEST_F(LogV2Test, Ramlog_GiantLine_AltMaxLinesMaxSize) {
     constexpr size_t alternativeMaxLines = 1024;
     constexpr size_t alternativeMaxSizeBytes = 2 * 1024 * 1024;
-    RamLog* ramlog = RamLog::get("test_ramlog4_alt", alternativeMaxLines, alternativeMaxSizeBytes);
+    RamLog* ramlog = RamLog::get("TestRamlog4Alt", alternativeMaxLines, alternativeMaxSizeBytes);
 
     std::vector<std::string> lines;
 

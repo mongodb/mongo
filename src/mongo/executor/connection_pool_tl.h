@@ -81,7 +81,7 @@ public:
           _transientSSLContext(transientSSLContext),
           _instanceName(instanceName) {
         ObservableMutexRegistry::get().add(
-            "TLTypeFactory::_mutex", _mutex, std::string_view(_instanceName));
+            "tlTypeFactoryMutex", _mutex, std::string_view(_instanceName));
     }
 
     std::shared_ptr<ConnectionPool::ConnectionInterface> makeConnection(

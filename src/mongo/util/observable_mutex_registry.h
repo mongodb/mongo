@@ -57,8 +57,8 @@ public:
     static constexpr auto kRegisteredFieldName = "registered"sv;
     static constexpr auto kInstanceLabelFieldName = "instanceLabel"sv;
 
-    static constexpr auto kRegistrationMutexTag = "ObservableMutexRegistry::_registrationMutex"sv;
-    static constexpr auto kCollectionMutexTag = "ObservableMutexRegistry::_collectionMutex"sv;
+    static constexpr auto kRegistrationMutexTag = "observableMutexRegistryRegistrationMutex"sv;
+    static constexpr auto kCollectionMutexTag = "observableMutexRegistryCollectionMutex"sv;
 
     struct StatsRecord {
         MutexStats data;

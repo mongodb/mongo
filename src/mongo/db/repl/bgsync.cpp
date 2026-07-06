@@ -196,7 +196,7 @@ BackgroundSync::BackgroundSync(
       _replCoord(replicationCoordinator),
       _replicationCoordinatorExternalState(replicationCoordinatorExternalState),
       _replicationProcess(replicationProcess) {
-    ObservableMutexRegistry::get().add("BackgroundSync::_mutex", _mutex);
+    ObservableMutexRegistry::get().add("backgroundSyncMutex", _mutex);
 }
 
 void BackgroundSync::startup(OperationContext* opCtx) {

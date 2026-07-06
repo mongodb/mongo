@@ -179,8 +179,8 @@ ShardRegistry::ShardRegistry(ServiceContext* service,
 
     _threadPool.startup();
 
-    ObservableMutexRegistry::get().add("Router Cache Mutexes", _cacheMutex);
-    ObservableMutexRegistry::get().add("Router Cache Mutexes", _mutex);
+    ObservableMutexRegistry::get().add("routerCacheMutexes", _cacheMutex);
+    ObservableMutexRegistry::get().add("routerCacheMutexes", _mutex);
 }
 
 ShardRegistry::~ShardRegistry() {

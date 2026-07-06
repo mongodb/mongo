@@ -64,7 +64,7 @@ OplogApplier::OplogApplier(executor::TaskExecutor* executor,
                            Observer* observer,
                            const Options& options)
     : _executor(executor), _oplogBuffer(oplogBuffer), _observer(observer), _options(options) {
-    ObservableMutexRegistry::get().add("OplogApplier::_mutex", _mutex);
+    ObservableMutexRegistry::get().add("oplogApplierMutex", _mutex);
     _oplogBatcher = std::make_unique<OplogApplierBatcher>(this, oplogBuffer);
 }
 

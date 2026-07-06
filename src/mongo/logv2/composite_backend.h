@@ -63,7 +63,7 @@ private:
 
         BackendTraits(boost::shared_ptr<backend_t> backend) : _backend(std::move(backend)) {
             if constexpr (std::is_same_v<decltype(_mutex), ObservableMutex<std::mutex>>) {
-                ObservableMutexRegistry::get().add("logv2::CompositeBackend::BackendTraits::_mutex",
+                ObservableMutexRegistry::get().add("logv2CompositeBackendBackendTraitsMutex",
                                                    _mutex);
             }
         }

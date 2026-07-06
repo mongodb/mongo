@@ -48,7 +48,7 @@ namespace mongo {
 namespace executor {
 
 NetworkInterfaceThreadPool::NetworkInterfaceThreadPool(NetworkInterface* net) : _net(net) {
-    ObservableMutexRegistry::get().add("NetworkInterfaceThreadPool::_mutex", _mutex);
+    ObservableMutexRegistry::get().add("networkInterfaceThreadPoolMutex", _mutex);
 }
 
 NetworkInterfaceThreadPool::~NetworkInterfaceThreadPool() {

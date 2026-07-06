@@ -75,7 +75,7 @@ OplogApplierBatcher::OplogApplierBatcher(OplogApplier* oplogApplier, OplogBuffer
     : _oplogApplier(oplogApplier), _oplogBuffer(oplogBuffer), _ops() {}
 OplogApplierBatcher::~OplogApplierBatcher() {
     invariant(!_thread);
-    ObservableMutexRegistry::get().add("OplogApplierBatcher::_mutex", _mutex);
+    ObservableMutexRegistry::get().add("oplogApplierBatcherMutex", _mutex);
 }
 
 OplogApplierBatch OplogApplierBatcher::getNextBatch(Seconds maxWaitTime) {

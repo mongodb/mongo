@@ -251,7 +251,7 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* executor,
     invariant(!_lastFetched.isNull());
     invariant(onShutdownCallbackFn);
     invariant(enqueueDocumentsFn);
-    ObservableMutexRegistry::get().add("OplogFetcher::_mutex", _mutex);
+    ObservableMutexRegistry::get().add("oplogFetcherMutex", _mutex);
 }
 
 OplogFetcher::~OplogFetcher() {

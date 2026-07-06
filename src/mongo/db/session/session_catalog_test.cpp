@@ -1808,7 +1808,7 @@ TEST_F(SessionCatalogTest, MutexRegisteredWithObservableMutexRegistry) {
     catalog()->size();
 
     const BSONObj report = ObservableMutexRegistry::get().report(false);
-    const std::string_view name = "SessionCatalog::_mutex";
+    const std::string_view name = "sessionCatalogMutex";
     ASSERT_TRUE(report.hasField(name)) << "Missing " << name << " in " << report;
     const BSONObj exclusive =
         report.getObjectField(name).getObjectField(ObservableMutexRegistry::kExclusiveFieldName);

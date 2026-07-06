@@ -74,7 +74,7 @@ const auto transactionCoordinatorServiceDecoration =
 }  // namespace
 
 TransactionCoordinatorService::TransactionCoordinatorService() {
-    ObservableMutexRegistry::get().add("TransactionCoordinatorService::_mutex", _mutex);
+    ObservableMutexRegistry::get().add("transactionCoordinatorServiceMutex", _mutex);
 }
 
 TransactionCoordinatorService::~TransactionCoordinatorService() {

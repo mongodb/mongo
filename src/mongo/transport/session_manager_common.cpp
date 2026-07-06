@@ -182,7 +182,7 @@ std::size_t getSupportedMax() {
 class SessionManagerCommon::Sessions {
 public:
     Sessions() {
-        ObservableMutexRegistry::get().add("SessionManagerCommon::Sessions::_mutex", _mutex);
+        ObservableMutexRegistry::get().add("sessionManagerCommonSessionsMutex", _mutex);
     }
     struct Entry {
         explicit Entry(std::shared_ptr<SessionWorkflow> workflow) : workflow{std::move(workflow)} {}

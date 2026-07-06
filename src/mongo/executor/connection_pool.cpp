@@ -201,7 +201,7 @@ std::string ConnectionPool::PoolMetrics::toString() const {
 class ConnectionPool::LimitController final : public ConnectionPool::ControllerInterface {
 public:
     LimitController() {
-        ObservableMutexRegistry::get().add("LimitController::_mutex", _mutex);
+        ObservableMutexRegistry::get().add("limitControllerMutex", _mutex);
     }
 
     void addHost(PoolId id, const HostAndPort& host) override {
@@ -703,7 +703,7 @@ ConnectionPool::ConnectionPool(std::shared_ptr<DependentTypeFactoryInterface> im
       _options(std::move(options)),
       _controller(_options.controllerFactory()),
       _manager(_options.egressConnectionCloserManager) {
-    ObservableMutexRegistry::get().add("ConnectionPool::_mutex", _mutex, std::string_view(_name));
+    ObservableMutexRegistry::get().add("connectionPoolMutex", _mutex, std::string_view(_name));
 
     if (_manager) {
         _manager->add(this);

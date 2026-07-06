@@ -42,7 +42,7 @@ static constexpr char kHelloPrefix[] = "hello";
 
 ReplicaSetMonitorManagerStats::ReplicaSetMonitorManagerStats(Microseconds resetTimeout)
     : _resetTimeout(resetTimeout) {
-    ObservableMutexRegistry::get().add("ReplicaSetMonitorManagerStats::_mutex", _mutex);
+    ObservableMutexRegistry::get().add("replicaSetMonitorManagerStatsMutex", _mutex);
 }
 
 void ReplicaSetMonitorManagerStats::report(BSONObjBuilder* builder, bool forFTDC) {

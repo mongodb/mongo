@@ -70,6 +70,10 @@ public:
     /**
      * Returns a pointer to the ramlog named "name", creating one if it did not already exist.
      *
+     * "name" is the ramlog's public identity (e.g., "global" is looked up by the getLog command),
+     * For its ObservableMutex tag we derive a valid camelCase metric name segment from it by
+     * capitalizing its first letter. "name" should otherwise be camelCase.
+     *
      * Synchronizes on the RamLog catalog lock, _namedLock.
      */
     static RamLog* get(const std::string& name);

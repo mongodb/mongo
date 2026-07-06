@@ -216,7 +216,7 @@ StreamableReplicaSetMonitor::StreamableReplicaSetMonitor(
         SdamConfiguration(seedsNoDups, TopologyType::kReplicaSetNoPrimary, _uri.getSetName());
     _serverSelector = std::make_unique<ServerSelector>(_sdamConfig);
 
-    ObservableMutexRegistry::get().add("StreamableReplicaSetMonitor::_mutex", _mutex);
+    ObservableMutexRegistry::get().add("streamableReplicaSetMonitorMutex", _mutex);
 }
 
 StreamableReplicaSetMonitor::~StreamableReplicaSetMonitor() {

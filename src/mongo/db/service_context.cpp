@@ -150,7 +150,7 @@ ServiceContext::ServiceContext(std::unique_ptr<ClockSource> fastClockSource,
       _fastClockSource(std::move(fastClockSource)),
       _preciseClockSource(std::move(preciseClockSource)),
       _serviceSet(std::make_unique<ServiceSet>(this)) {
-    ObservableMutexRegistry::get().add("ServiceContext::_mutex", _mutex);
+    ObservableMutexRegistry::get().add("serviceContextMutex", _mutex);
 }
 
 

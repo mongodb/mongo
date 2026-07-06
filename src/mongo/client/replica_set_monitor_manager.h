@@ -119,7 +119,7 @@ class ReplicaSetMonitorManager {
 
 public:
     ReplicaSetMonitorManager() {
-        ObservableMutexRegistry::get().add("ReplicaSetMonitorManager::_mutex", _mutex);
+        ObservableMutexRegistry::get().add("replicaSetMonitorManagerMutex", _mutex);
     }
     ~ReplicaSetMonitorManager();
 

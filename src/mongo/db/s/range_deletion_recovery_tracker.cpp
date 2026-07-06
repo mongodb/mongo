@@ -54,7 +54,7 @@ std::unique_ptr<ActiveTerm> RangeDeletionRecoveryTracker::notifyStartOfTerm(Term
 }
 
 RangeDeletionRecoveryTracker::RangeDeletionRecoveryTracker() {
-    ObservableMutexRegistry::get().add("RangeDeletionRecoveryTracker::_mutex", _mutex);
+    ObservableMutexRegistry::get().add("rangeDeletionRecoveryTrackerMutex", _mutex);
 }
 
 void RangeDeletionRecoveryTracker::registerRecoveryJob(Term term) {

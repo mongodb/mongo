@@ -484,7 +484,7 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
       _splitSessionManager(InternalSessionPool::get(service)),
       _intentRegistry(rss::consensus::IntentRegistry::get(service)),
       _primaryMajorityReadsAvailability(PrimaryMajorityReadsAvailability()) {
-    ObservableMutexRegistry::get().add("ReplicationCoordinatorImpl::_mutex", _mutex);
+    ObservableMutexRegistry::get().add("replicationCoordinatorImplMutex", _mutex);
 
     _termShadow.store(OpTime::kUninitializedTerm);
     _electionIdTermShadow.store(_topCoord->getElectionIdTerm());

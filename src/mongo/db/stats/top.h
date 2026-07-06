@@ -147,7 +147,7 @@ public:
     typedef StringMap<std::unique_ptr<CollectionData>> UsageMap;
 
     Top() {
-        ObservableMutexRegistry::get().add("Top::_lockUsage", _lockUsage);
+        ObservableMutexRegistry::get().add("topLockUsage", _lockUsage);
     }
 
     static Top& getDecoration(OperationContext* opCtx);

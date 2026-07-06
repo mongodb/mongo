@@ -40,7 +40,7 @@ OplogWriter::OplogWriter(executor::TaskExecutor* executor,
                          OplogBuffer* writeBuffer,
                          const Options& options)
     : _batcher(writeBuffer), _executor(executor), _writeBuffer(writeBuffer), _options(options) {
-    ObservableMutexRegistry::get().add("OplogWriter::_mutex", _mutex);
+    ObservableMutexRegistry::get().add("oplogWriterMutex", _mutex);
 }
 
 OplogBuffer* OplogWriter::getBuffer() const {

@@ -81,7 +81,7 @@ std::string provenanceToString(SessionCatalog::Provenance provenance) {
 }  // namespace
 
 SessionCatalog::SessionCatalog() {
-    ObservableMutexRegistry::get().add("SessionCatalog::_mutex", _mutex);
+    ObservableMutexRegistry::get().add("sessionCatalogMutex", _mutex);
 }
 
 SessionCatalog::~SessionCatalog() {

@@ -152,7 +152,7 @@ public:
 
     explicit ShardingTaskExecutorPoolController(std::weak_ptr<ShardRegistry> shardRegistry)
         : _shardRegistry(std::move(shardRegistry)) {
-        ObservableMutexRegistry::get().add("ShardingTaskExecutorPoolController::_mutex", _mutex);
+        ObservableMutexRegistry::get().add("shardingTaskExecutorPoolControllerMutex", _mutex);
     }
 
     ShardingTaskExecutorPoolController& operator=(ShardingTaskExecutorPoolController&&) = delete;

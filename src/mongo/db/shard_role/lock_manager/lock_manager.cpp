@@ -770,7 +770,7 @@ LockHead* LockManager::LockBucket::findOrInsert(ResourceId resId) {
 }
 
 LockManager::LockBucket::LockBucket() {
-    ObservableMutexRegistry::get().add("Lock Manager Mutexes", mutex);
+    ObservableMutexRegistry::get().add("lockManagerMutexes", mutex);
 }
 
 //
@@ -797,7 +797,7 @@ PartitionedLockHead* LockManager::Partition::findOrInsert(ResourceId resId) {
 }
 
 LockManager::Partition::Partition() {
-    ObservableMutexRegistry::get().add("Lock Manager Mutexes", mutex);
+    ObservableMutexRegistry::get().add("lockManagerMutexes", mutex);
 }
 
 //

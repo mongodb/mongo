@@ -82,7 +82,7 @@ TopologyManagerImpl::TopologyManagerImpl(SdamConfiguration config,
       _topologyDescription(TopologyDescription::create(_config)),
       _topologyStateMachine(std::make_unique<TopologyStateMachine>(_config)),
       _topologyEventsPublisher(eventsPublisher) {
-    ObservableMutexRegistry::get().add("TopologyManagerImpl::_mutex", _mutex);
+    ObservableMutexRegistry::get().add("topologyManagerImplMutex", _mutex);
 }
 
 bool TopologyManagerImpl::onServerDescription(const HelloOutcome& helloOutcome) {

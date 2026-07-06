@@ -33,6 +33,7 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/observable_mutex_registry.h"
 
 #include <map>
@@ -57,7 +58,11 @@ Atomic<size_t> _globalMaxSizeBytes = 1024 * 1024;
 
 RamLog::RamLog(std::string_view name, size_t maxLines, size_t maxSizeBytes)
     : _maxLines(maxLines), _maxSizeBytes(maxSizeBytes), _name(name) {
-    ObservableMutexRegistry::get().add(fmt::format("logv2::RamLog({})::_mutex", name), _mutex);
+    std::string tagName{name};
+    if (!tagName.empty()) {
+        tagName.front() = ctype::toUpper(tagName.front());
+    }
+    ObservableMutexRegistry::get().add(fmt::format("logv2RamLog{}Mutex", tagName), _mutex);
     _lines.resize(_maxLines);
     clear();
 }

@@ -65,8 +65,8 @@ class RateLimiter {
         WindowBasedPolicy& operator=(WindowBasedPolicy&&) = delete;
         ~WindowBasedPolicy() = default;
         WindowBasedPolicy() {
-            ObservableMutexRegistry::get().add(
-                "QueryStats::RateLimiter::WindowBasedPolicy::_windowMutex", _windowMutex);
+            ObservableMutexRegistry::get().add("queryStatsRateLimiterWindowBasedPolicyWindowMutex",
+                                               _windowMutex);
         };
         /*
          * Getter for the sampling rate.

@@ -51,7 +51,7 @@ const auto grid = ServiceContext::declareDecoration<Grid>();
 }  // namespace
 
 Grid::Grid() {
-    ObservableMutexRegistry::get().add("Grid::_mutex", _mutex);
+    ObservableMutexRegistry::get().add("gridMutex", _mutex);
 }
 
 Grid::~Grid() = default;

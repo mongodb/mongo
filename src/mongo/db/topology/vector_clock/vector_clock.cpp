@@ -101,7 +101,7 @@ void VectorClock::registerVectorClockOnServiceContext(ServiceContext* service,
 }
 
 VectorClock::VectorClock() {
-    ObservableMutexRegistry::get().add("VectorClock::_mutex", _mutex);
+    ObservableMutexRegistry::get().add("vectorClockMutex", _mutex);
     const auto initialRaw = kInitialComponentTime.asTimestamp().asULL();
     for (auto& slot : _vectorTimeShadow) {
         slot.storeRelaxed(initialRaw);

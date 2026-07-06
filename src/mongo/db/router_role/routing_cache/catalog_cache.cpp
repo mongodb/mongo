@@ -725,7 +725,7 @@ CatalogCache::DatabaseCache::DatabaseCache(ServiceContext* service,
           },
           gCatalogCacheDatabaseMaxEntries),
       _catalogCacheLoader(catalogCacheLoader) {
-    ObservableMutexRegistry::get().add("Router Cache Mutexes", _mutex);
+    ObservableMutexRegistry::get().add("routerCacheMutexes", _mutex);
 }
 
 CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDatabase(
@@ -815,7 +815,7 @@ CatalogCache::CollectionCache::CollectionCache(
           },
           gCatalogCacheCollectionMaxEntries),
       _catalogCacheLoader(catalogCacheLoader) {
-    ObservableMutexRegistry::get().add("Router Cache Mutexes", _mutex);
+    ObservableMutexRegistry::get().add("routerCacheMutexes", _mutex);
 }
 
 void CatalogCache::CollectionCache::reportStats(BSONObjBuilder* builder) const {
