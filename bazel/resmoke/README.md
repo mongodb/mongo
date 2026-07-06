@@ -180,3 +180,70 @@ bazel-testlogs/.../test.outputs/multiversion-downloads-last-continuous.json
 
 Use the ID from that file with `--//bazel/resmoke/multiversion:last-continuous-pin` to reproduce the
 failure with identical binaries.
+
+## jstestfuzz_generate
+
+Generates a directory of randomized `.js` test files by invoking the
+[10gen/jstestfuzz](https://github.com/10gen/jstestfuzz) generator, and feeds them into a
+`resmoke_suite_test` via `srcs`.
+
+**EXAMPLE**
+
+```bzl
+load("//bazel/resmoke:jstestfuzz.bzl", "jstestfuzz_generate")
+load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
+
+jstestfuzz_generate(
+    name = "jstestfuzz_generated",
+    npm_command = "jstestfuzz",
+    num_generated_files = 10,
+)
+
+resmoke_suite_test(
+    name = "jstestfuzz",
+    srcs = [":jstestfuzz_generated"],
+    config = ":suites/jstestfuzz.yml",
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+```
+
+**ATTRIBUTES**
+
+| Name                | Description                                                                                                                                         | Type            | Mandatory | Default        |
+| :------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------- | :-------- | :------------- |
+| name                | A unique name for this target.                                                                                                                      | Name            | required  |                |
+| num_generated_files | How many `.js` test files to emit. Forwarded to jstestfuzz as `--numGeneratedFiles`.                                                                | Integer         | required  |                |
+| seed                | Fixed seed for this target. Overrides `--//bazel/resmoke:jstestfuzz_seed` when set. Leave empty to use the flag (random per build by default).      | String          | optional  | `""`           |
+| npm_command         | The npm script in jstestfuzz's `package.json` to run (e.g. `jstestfuzz`, `agg-fuzzer`, `query-fuzzer`, `update-fuzzer`, `rollback-fuzzer`).         | String          | optional  | `"jstestfuzz"` |
+| use_es_modules      | Pass `--useEsModules` to jstestfuzz. Required for npm commands other than the default `jstestfuzz`.                                                 | Boolean         | optional  | `False`        |
+| extra_args          | Additional CLI flags forwarded verbatim to jstestfuzz (e.g. `["--opType", "moveCollection"]`). `--jsTestsDir` defaults to the workspace `jstests/`. | List of strings | optional  | `[]`           |
+
+### Reproducing a failure
+
+Two flags must match for byte-identical reproduction: the seed used by jstestfuzz and the upstream
+commit it was generated from.
+
+| Flag                                    | What it pins                                                         |
+| :-------------------------------------- | :------------------------------------------------------------------- |
+| `--//bazel/resmoke:jstestfuzz_seed=<n>` | The seed passed to jstestfuzz (default: random per build).           |
+| `--repo_env=JSTESTFUZZ_COMMIT=<sha>`    | The upstream jstestfuzz commit to clone (default: head of `master`). |
+
+Example:
+
+```
+bazel test //buildscripts/resmokeconfig:jstestfuzz \
+    --//bazel/resmoke:jstestfuzz_seed=42 \
+    --repo_env=JSTESTFUZZ_COMMIT=f21b49c53824f677af60f766eda029366e82513e
+```
+
+**Finding the seed and commit from a previous run**
+
+Each test run records both values into `test.outputs/`:
+
+```
+bazel-testlogs/.../test.outputs/jstestfuzz_seed.txt
+bazel-testlogs/.../test.outputs/jstestfuzz_commit_sha.txt
+```

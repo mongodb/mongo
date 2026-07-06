@@ -135,6 +135,26 @@ int_flag(
     visibility = ["//visibility:public"],
 )
 
+# Seed for jstestfuzz_generate. Empty (default) makes generation depend on the
+# build's volatile-status, so each run produces a fresh random test set.
+# Set to a numeric value to pin the seed.
+string_flag(
+    name = "jstestfuzz_seed",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
+# MongoDB target version forwarded to jstestfuzz as --branch. Selects which
+# server features the generated tests may use (see jstestfuzz's
+# generate_version_info.ts). Defaults to "master"; release branches and
+# Evergreen tasks should pass the project's branch_name, e.g.
+# --//bazel/resmoke:jstestfuzz_branch=v8.0.
+string_flag(
+    name = "jstestfuzz_branch",
+    build_setting_default = "master",
+    visibility = ["//visibility:public"],
+)
+
 # Seed for config fuzzer suites. Empty (default) derives the seed from
 # volatile-status at build time so each run gets a fresh configuration.
 # Set to a numeric value to pin the seed for reproduction.
@@ -211,3 +231,9 @@ py_binary(
 exports_files([
     "resmoke_shim.py",
 ])
+
+sh_binary(
+    name = "jstestfuzz_run",
+    srcs = ["jstestfuzz_run.sh"],
+    visibility = ["//visibility:public"],
+)

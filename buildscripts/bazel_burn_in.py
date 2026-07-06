@@ -348,7 +348,7 @@ def make_task(targets_to_run, variant_name):
             FunctionCall("set up venv"),
             FunctionCall("configure evergreen api credentials"),
             FunctionCall("set up credentials"),
-            FunctionCall("get engflow creds"),
+            FunctionCall("setup bazel (credentials, bazelrc)"),
         ],
         teardown_task=[
             FunctionCall("s3.put bazel build events"),

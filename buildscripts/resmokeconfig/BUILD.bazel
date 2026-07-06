@@ -64,26 +64,3 @@ mongo_js_library(
         "//src/mongo/db/modules/enterprise/jstests/libs:all_subpackage_javascript_files",
     ],
 )
-
-# This is an experimental test target for running the jstestfuzz
-# suite as a bazel test. It runs in an experimental Evergreen task on an
-# infrequent build variant. Cleanup with SERVER-103537.
-resmoke_suite_test(
-    name = "jstestfuzz",
-    srcs = [
-        "//:jstestfuzz_generated_tests",
-    ],
-    config = ":suites/jstestfuzz.yml",
-    tags = [
-        "common",
-        "jstestfuzz",
-        "manual",  # exclude from expansion of target pattern wildcards (..., :*, :all, etc.)
-        "non_deterministic",
-        "random_name",
-        "require_npm",
-    ],
-    deps = [
-        "//src/mongo/db:mongod",
-        "//src/mongo/shell:mongo",
-    ],
-)

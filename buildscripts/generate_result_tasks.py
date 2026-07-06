@@ -86,7 +86,7 @@ def _make_setup_group(resmoke_task: str, resmoke_disable_rbe: bool) -> list:
         FunctionCall("set up venv"),
         FunctionCall("configure evergreen api credentials"),
         FunctionCall("set up credentials"),
-        FunctionCall("get engflow creds"),
+        FunctionCall("setup bazel (credentials, bazelrc)"),
     ]
     if resmoke_disable_rbe:
         # Download and extract the pre-built dist-test binaries into src/ so that

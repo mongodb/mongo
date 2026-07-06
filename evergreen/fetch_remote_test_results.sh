@@ -100,18 +100,43 @@ function unzip_outputs() {
 }
 
 # Writes a user-friendly bazel invocation for re-running this test target.
+# If the test was a jstestfuzz suite, pin the seed, the upstream jstestfuzz
+# commit, and (on release branches) the MongoDB target version so the run
+# reproduces:
+#   --//bazel/resmoke:jstestfuzz_seed=<seed>
+#   --repo_env=JSTESTFUZZ_COMMIT=<sha>
+#   --//bazel/resmoke:jstestfuzz_branch=<branch>     # only when not master
 # If the test was a config fuzzer suite, pins the seed so the run reproduces:
 #   --//bazel/resmoke:config_fuzz_seed=<seed>
 function write_bazel_invocation() {
     local extra_flags=""
-
-    local seed_file
-    seed_file=$(find "${workdir}/results" -name config_fuzz_seed.txt -type f 2>/dev/null | head -n 1)
+    local seed_file commit_file config_fuzz_seed_file
+    seed_file=$(find "${workdir}/results" -name jstestfuzz_seed.txt -type f 2>/dev/null | head -n 1)
     if [[ -n "$seed_file" ]]; then
         local seed
         seed=$(tr -d '[:space:]' <"$seed_file")
         if [[ -n "$seed" ]]; then
-            extra_flags+="--//bazel/resmoke:config_fuzz_seed=${seed} "
+            extra_flags+="--//bazel/resmoke:jstestfuzz_seed=${seed} "
+        fi
+    fi
+    commit_file=$(find "${workdir}/results" -name jstestfuzz_commit_sha.txt -type f 2>/dev/null | head -n 1)
+    if [[ -n "$commit_file" ]]; then
+        local commit
+        commit=$(tr -d '[:space:]' <"$commit_file")
+        if [[ -n "$commit" ]]; then
+            extra_flags+="--repo_env=JSTESTFUZZ_COMMIT=${commit} "
+        fi
+    fi
+    # Only emit --jstestfuzz_branch on release branches; master is the rule's default.
+    if [[ -n "${branch_name:-}" && "${branch_name}" != "master" ]]; then
+        extra_flags+="--//bazel/resmoke:jstestfuzz_branch=${branch_name} "
+    fi
+    config_fuzz_seed_file=$(find "${workdir}/results" -name config_fuzz_seed.txt -type f 2>/dev/null | head -n 1)
+    if [[ -n "$config_fuzz_seed_file" ]]; then
+        local config_fuzz_seed
+        config_fuzz_seed=$(tr -d '[:space:]' <"$config_fuzz_seed_file")
+        if [[ -n "$config_fuzz_seed" ]]; then
+            extra_flags+="--//bazel/resmoke:config_fuzz_seed=${config_fuzz_seed} "
         fi
     fi
 

@@ -105,7 +105,12 @@ def _resmoke_config_impl(ctx):
                 python_path.append(ctx.expand_make_variables("python_library_imports", "$(BINDIR)/external/" + path, ctx.var))
         generator_deps = [ctx.attr.generator[PyInfo].transitive_sources]
 
-        test_list = [test.short_path for test in ctx.files.srcs]
+        # Directory artifacts (e.g. from jstestfuzz_generate) can't be enumerated
+        # so record them as a glob.
+        test_list = [
+            (test.short_path + "/*.js") if test.is_directory else test.short_path
+            for test in ctx.files.srcs
+        ]
         ctx.actions.write(test_list_file, "\n".join(test_list))
 
         deps = depset([test_list_file, base_config_file] + ctx.files.srcs, transitive = [python.files] + generator_deps)

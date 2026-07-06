@@ -473,6 +473,39 @@
         ]
       }
     },
+    "//bazel/repository_rules:jstestfuzz_repository.bzl%jstestfuzz_repository": {
+      "general": {
+        "bzlTransitiveDigest": "xxuA12RU5C2X5DLMRWlYmgSK1WCcShYhrrTrT4VjPLE=",
+        "usagesDigest": "hfv5GZCbjEm9mqVjqsLkZAo40qQLmsIZVIL6T+or5E4=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {
+          "JSTESTFUZZ_COMMIT": null
+        },
+        "generatedRepoSpecs": {
+          "jstestfuzz": {
+            "bzlFile": "@@bazel_tools//tools/build_defs/repo:git.bzl",
+            "ruleClassName": "git_repository",
+            "attributes": {
+              "remote": "https://github.com/10gen/jstestfuzz.git",
+              "branch": "master",
+              "commit": "",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nfilegroup(\n    name = \"sources\",\n    srcs = glob(\n        include = [\"**/*\"],\n        exclude = [\n            \"node_modules/**\",\n            \"out/**\",\n        ],\n        allow_empty = True,\n    ),\n)\n",
+              "patch_cmds": [
+                "git rev-parse HEAD > .jstestfuzz_commit_sha"
+              ]
+            }
+          }
+        },
+        "recordedRepoMappingEntries": [
+          [
+            "",
+            "bazel_tools",
+            "bazel_tools"
+          ]
+        ]
+      }
+    },
     "//bazel/resmoke/multiversion:version_compat.bzl%multiversion_compat": {
       "general": {
         "bzlTransitiveDigest": "ht8HY1acr6ZvwIAjHvG+wAELB172czx5SAXMCxtJwHI=",

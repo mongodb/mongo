@@ -317,6 +317,12 @@ mothra_repository = use_repo_rule("//bazel/repository_rules:mothra.bzl", "mothra
 # If the directory doesn't exist, a stub with empty teams will be created.
 mothra_repository(name = "mothra")
 
+jstestfuzz_repository = use_extension(
+    "//bazel/repository_rules:jstestfuzz_repository.bzl",
+    "jstestfuzz_repository",
+)
+use_repo(jstestfuzz_repository, "jstestfuzz")
+
 setup_mongo_windows_toolchains_extension = use_extension("//bazel/toolchains/cc/mongo_windows:mongo_toolchain.bzl", "setup_mongo_windows_toolchain_extension")
 use_repo(setup_mongo_windows_toolchains_extension, "mongo_windows_toolchain")
 

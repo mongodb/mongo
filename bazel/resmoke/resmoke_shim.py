@@ -86,6 +86,31 @@ def add_evergreen_build_info(args):
     add_volatile_arg(args, "--versionId=", "version_id")
 
 
+def copy_jstestfuzz_metadata_to_undeclared_outputs():
+    """Copy jstestfuzz_generate metadata files from runfiles into the test outputs."""
+    test_srcdir = os.environ.get("TEST_SRCDIR")
+    out_dir = os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR")
+    if not test_srcdir or not out_dir:
+        return
+    base = os.path.join(test_srcdir, "_main")
+    if not os.path.isdir(base):
+        return
+    metadata = {
+        ".jstestfuzz_seed": "jstestfuzz_seed.txt",
+        ".jstestfuzz_commit_sha": "jstestfuzz_commit_sha.txt",
+    }
+    for root, dirs, _ in os.walk(base, followlinks=False):
+        for d in dirs:
+            candidate = os.path.join(root, d)
+            if not os.path.isfile(os.path.join(candidate, ".jstestfuzz_seed")):
+                continue
+            for src_name, dst_name in metadata.items():
+                src = os.path.join(candidate, src_name)
+                if os.path.exists(src):
+                    shutil.copyfile(src, os.path.join(out_dir, dst_name))
+            return
+
+
 def inject_config_fuzz_seed(resmoke_args):
     """Read the pre-generated config fuzz seed file and inject --configFuzzSeed into resmoke args.
 
@@ -236,6 +261,7 @@ class ResmokeShimContext:
 
 
 if __name__ == "__main__":
+    copy_jstestfuzz_metadata_to_undeclared_outputs()
     setup_pythonpath()
 
     sys.argv[0] = os.path.join(
