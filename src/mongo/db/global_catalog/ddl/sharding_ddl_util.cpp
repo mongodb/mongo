@@ -1161,19 +1161,13 @@ void commitCreateCollectionChunklessMetadataToShardCatalog(
 void commitChunkOperationsMetadataToShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const std::vector<ChunkType>& newChunks,
+    std::vector<BSONObj> newChunkDocs,
     const std::vector<ShardRef>& shardRefs,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
     ShardsvrCommitChunkOperationsMetadata request(nss);
     request.setDbName(DatabaseName::kAdmin);
-
-    std::vector<BSONObj> newChunkDocs;
-    newChunkDocs.reserve(newChunks.size());
-    for (const auto& chunk : newChunks) {
-        newChunkDocs.push_back(chunk.toConfigBSON());
-    }
     request.setNewChunks(std::move(newChunkDocs));
 
     generic_argument_util::setMajorityWriteConcern(request);

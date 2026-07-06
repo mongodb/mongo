@@ -30,21 +30,23 @@
 #include "mongo/db/global_catalog/ddl/split_chunk_coordinator.h"
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/generic_argument_util.h"
+#include "mongo/db/global_catalog/ddl/commit_split_chunk_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
 #include "mongo/db/global_catalog/ddl/split_chunk.h"
-#include "mongo/db/global_catalog/ddl/split_chunk_request_type.h"
+#include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/chunk_operation_precondition_checks.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
-#include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/str.h"
@@ -83,6 +85,26 @@ bool checkPreconditions(OperationContext* opCtx,
         ErrorCodes::InvalidOptions, "No split points provided", !request.getSplitKeys().empty());
     const std::vector<BSONObj> splitKeys(request.getSplitKeys().begin(),
                                          request.getSplitKeys().end());
+
+    // Anticipate any BSONTooLarge error that might occur after committing on the config server.
+    // Once the config server commit succeeds, the operation cannot be rolled back, so we must
+    // avoid failing with a non-retryable error.
+    //
+    // Assume the worst case: each split point is stored three times in the coordinator document:
+    // once in the list of split points, and once each as the min and max bounds of the updated
+    // chunks.
+    long long estimatedMetadataSize = chunkRange.getMin().objsize() + chunkRange.getMax().objsize();
+    for (const auto& splitKey : splitKeys) {
+        estimatedMetadataSize += 3 * splitKey.objsize();
+    }
+    estimatedMetadataSize = 2 * estimatedMetadataSize;
+
+    uassert(ErrorCodes::BSONObjectTooLarge,
+            str::stream() << "Refusing to split chunk " << chunkRange.toString()
+                          << ": estimated resulting chunk metadata (~" << estimatedMetadataSize
+                          << " bytes) would exceed the maximum BSON object size ("
+                          << BSONObjMaxUserSize << " bytes)",
+            estimatedMetadataSize < BSONObjMaxUserSize);
 
     // Read the CSR's allowChunkOperations flag up front.
     // We snapshot the CSR before fetching CollectionMetadata so the metadata checks run against
@@ -166,32 +188,47 @@ void releaseCriticalSection(OperationContext* opCtx,
         ShardingRecoveryService::NoCustomAction());
 }
 
-void commitToGlobalCatalog(OperationContext* opCtx,
-                           const NamespaceString& nss,
-                           std::string_view shardName,
-                           const OID& epoch,
-                           const boost::optional<Timestamp>& timestamp,
-                           const ChunkRange& chunkRange,
-                           const std::vector<BSONObj>& splitKeys,
-                           OperationSessionInfo session) {
-    SplitChunkRequest request(nss, std::string{shardName}, epoch, timestamp, chunkRange, splitKeys);
-
-    BSONObjBuilder cmdBuilder;
-    request.appendAsConfigCommand(&cmdBuilder);
-    cmdBuilder.append(WriteConcernOptions::kWriteConcernField,
-                      defaultMajorityWriteConcernDoNotUse().toBSON());
-    session.serialize(&cmdBuilder);
+// Commits the split to the global catalog by issuing the idempotent '_configsvrCommitSplitChunk'
+// command and returns the resulting sub-chunks that the shard catalog must install.
+// 'shardVersionPreSplit' is the shard's placement version captured before the split; the config
+// server uses it to validate the request and to rebuild the same set of changed chunks on an
+// idempotent retry.
+std::vector<BSONObj> commitToGlobalCatalog(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           const ShardId& shardId,
+                                           const ChunkRange& chunkRange,
+                                           const std::vector<BSONObj>& splitKeys,
+                                           const ChunkVersion& shardVersionPreSplit,
+                                           OperationSessionInfo session) {
+    ConfigSvrCommitSplitChunkRequest request(nss);
+    request.setDbName(DatabaseName::kAdmin);
+    request.setShard(ShardRef(shardId));
+    request.setRange(chunkRange);
+    request.setSplitPoints(splitKeys);
+    request.setShardVersionPreSplit(shardVersionPreSplit);
+    generic_argument_util::setMajorityWriteConcern(request);
+    generic_argument_util::setOperationSessionInfo(request, session);
 
     auto cmdResponse = uassertStatusOK(
         Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithIndefiniteRetries(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             DatabaseName::kAdmin,
-            cmdBuilder.obj(),
+            request.toBSON(),
             Shard::RetryPolicy::kIdempotent));
 
     uassertStatusOKWithContext(cmdResponse.commandStatus, "Failed to commit chunk split");
     uassertStatusOKWithContext(cmdResponse.writeConcernStatus, "Failed to commit chunk split");
+
+    auto response = ConfigSvrCommitSplitChunkResponse::parse(
+        cmdResponse.response, IDLParserContext("ConfigSvrCommitSplitChunkResponse"));
+
+    std::vector<BSONObj> changedChunks;
+    changedChunks.reserve(response.getChangedChunks().size());
+    for (const auto& chunk : response.getChangedChunks()) {
+        changedChunks.push_back(chunk.getOwned());
+    }
+    return changedChunks;
 }
 
 // Errors that ShardingCatalogManager::commitChunkSplit raises strictly before it modifies the
@@ -310,6 +347,22 @@ ExecutorFuture<void> SplitChunkCoordinator::_runImpl(
                       "range"_attr = ChunkRange(_request.getMin(), _request.getMax()).toString());
 
                 _alreadyCommitted = checkPreconditions(opCtx, nss(), _request);
+
+                // Capture and persist the shard's placement version before the first commit
+                // attempt. The configsvr commit is idempotent on this version, so it must remain
+                // stable across retries and failovers; otherwise a retry that ran after the commit
+                // already applied would observe the post-split version and rebuild no chunks.
+                if (!_alreadyCommitted && !_doc.getShardVersionPreSplit()) {
+                    auto cm = uassertStatusOK(
+                        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(
+                            opCtx, nss()));
+                    const CollectionMetadata metadata(std::move(cm),
+                                                      ShardingState::get(opCtx)->shardHandle());
+
+                    auto newDoc = _doc;
+                    newDoc.setShardVersionPreSplit(metadata.getShardPlacementVersion());
+                    _updateStateDocument(opCtx, std::move(newDoc));
+                }
             }))
         .then(_buildPhaseHandler(Phase::kAcquireCriticalSection,
                                  shouldExecuteIfNotCommitted,
@@ -331,23 +384,33 @@ ExecutorFuture<void> SplitChunkCoordinator::_runImpl(
                 auto chunkRange = ChunkRange(_request.getMin(), _request.getMax());
                 std::vector<BSONObj> splitKeys(_request.getSplitKeys().begin(),
                                                _request.getSplitKeys().end());
-                const std::string shardName{_request.getFrom()};
-                const auto& expectedEpoch = _request.getEpoch();
-                const auto& expectedTimestamp = _request.getTimestamp();
 
                 LOGV2(12117800,
                       "Committing split chunk operation to the global catalog",
                       logAttrs(nss()),
                       "range"_attr = chunkRange.toString());
 
-                commitToGlobalCatalog(opCtx,
-                                      nss(),
-                                      shardName,
-                                      expectedEpoch,
-                                      expectedTimestamp,
-                                      chunkRange,
-                                      splitKeys,
-                                      getNewSession(opCtx));
+
+                // Set during kCheckPreconditions, before this phase can run. Assert explicitly
+                // instead of dereferencing an empty optional if that ever changes.
+                tassert(12933302,
+                        "Expected persisted pre-split shard version before committing split to the "
+                        "global catalog",
+                        _doc.getShardVersionPreSplit());
+
+                auto changedChunks = commitToGlobalCatalog(opCtx,
+                                                           nss(),
+                                                           ShardingState::get(opCtx)->shardId(),
+                                                           chunkRange,
+                                                           splitKeys,
+                                                           *_doc.getShardVersionPreSplit(),
+                                                           getNewSession(opCtx));
+
+                // Persist the changed chunks so the shard catalog commit phase can install them
+                // even after a failover, without contacting the config server again.
+                auto newDoc = _doc;
+                newDoc.setChangedChunks(std::move(changedChunks));
+                _updateStateDocument(opCtx, std::move(newDoc));
 
                 // Checkpoint the configTime to ensure that, in the case of a stepdown, the new
                 // primary will start-up from a configTime that is inclusive of the metadata update
@@ -363,10 +426,21 @@ ExecutorFuture<void> SplitChunkCoordinator::_runImpl(
                       logAttrs(nss()),
                       "range"_attr = ChunkRange(_request.getMin(), _request.getMax()).toString());
 
-                // Install the new chunk layout into the local shard catalog.
-                sharding_ddl_util::commitCreateCollectionMetadataToShardCatalog(
+                // A committed split always produces at least one changed chunk. Reaching this
+                // phase without any means the global catalog commit result was not persisted,
+                // which would silently install nothing into the shard catalog.
+                tassert(12933301,
+                        "Expected persisted changed chunks after committing split to the global "
+                        "catalog",
+                        _doc.getChangedChunks() && !_doc.getChangedChunks()->empty());
+
+                // Forward the committed chunks to the shard catalog.
+                // Note that all the updated chunks are relevant for both shards donor and recipient
+                // to persist the PIT read history.
+                sharding_ddl_util::commitChunkOperationsMetadataToShardCatalog(
                     opCtx,
                     nss(),
+                    *_doc.getChangedChunks(),
                     {ShardingState::get(opCtx)->shardId()},
                     getNewSession(opCtx),
                     executor,

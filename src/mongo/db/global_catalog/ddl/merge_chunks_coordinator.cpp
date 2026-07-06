@@ -36,9 +36,11 @@
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
+#include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/chunk_operation_precondition_checks.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
@@ -148,30 +150,45 @@ void releaseCriticalSection(OperationContext* opCtx,
         ShardingRecoveryService::NoCustomAction());
 }
 
-void commitToGlobalCatalog(OperationContext* opCtx,
-                           const NamespaceString& nss,
-                           const ShardId& shardId,
-                           const UUID& uuid,
-                           const ChunkRange& chunkRange,
-                           const OID& epoch,
-                           const boost::optional<Timestamp>& timestamp,
-                           OperationSessionInfo session) {
-    ConfigSvrMergeChunks configRequest{nss, shardId, uuid, chunkRange};
-    configRequest.setEpoch(epoch);
-    configRequest.setTimestamp(timestamp);
-    generic_argument_util::setMajorityWriteConcern(configRequest);
-    generic_argument_util::setOperationSessionInfo(configRequest, session);
+// Commits the merge to the global catalog by issuing the idempotent '_configsvrCommitMergeChunks'
+// command and returns the resulting merged chunk that the shard catalog must install.
+// 'shardVersionPreMerge' is the shard's placement version captured before the merge; the config
+// server uses it to validate the request and to rebuild the same set of changed chunks on an
+// idempotent retry.
+std::vector<BSONObj> commitToGlobalCatalog(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           const ShardId& shardId,
+                                           const ChunkRange& chunkRange,
+                                           const ChunkVersion& shardVersionPreMerge,
+                                           OperationSessionInfo session) {
+    ConfigSvrCommitMergeChunksRequest request(nss);
+    request.setDbName(DatabaseName::kAdmin);
+    request.setShard(ShardRef(shardId));
+    request.setChunkRange(chunkRange);
+    request.setShardVersionPreMerge(shardVersionPreMerge);
+    generic_argument_util::setMajorityWriteConcern(request);
+    generic_argument_util::setOperationSessionInfo(request, session);
 
     auto cmdResponse = uassertStatusOK(
         Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithIndefiniteRetries(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             DatabaseName::kAdmin,
-            configRequest.toBSON(),
+            request.toBSON(),
             Shard::RetryPolicy::kIdempotent));
 
     uassertStatusOKWithContext(cmdResponse.commandStatus, "Failed to commit chunk merge");
     uassertStatusOKWithContext(cmdResponse.writeConcernStatus, "Failed to commit chunk merge");
+
+    auto response = ConfigSvrCommitMergeChunksResponse::parse(
+        cmdResponse.response, IDLParserContext("ConfigSvrCommitMergeChunksResponse"));
+
+    std::vector<BSONObj> changedChunks;
+    changedChunks.reserve(response.getChangedChunks().size());
+    for (const auto& chunk : response.getChangedChunks()) {
+        changedChunks.push_back(chunk.getOwned());
+    }
+    return changedChunks;
 }
 
 // Errors that ShardingCatalogManager::commitChunksMerge raises strictly before it modifies the
@@ -276,23 +293,39 @@ ExecutorFuture<void> MergeChunksCoordinator::_runImpl(
     };
 
     return ExecutorFuture<void>(**executor)
-        .then(_buildPhaseHandler(Phase::kCheckPreconditions,
-                                 [this, anchor = shared_from_this()](auto* opCtx) {
-                                     tassert(12578402,
-                                             "Chunk operation coordinator must not run without "
-                                             "authoritative metadata access",
-                                             _doc.getAuthoritativeMetadataAccessLevel() !=
-                                                 AuthoritativeMetadataAccessLevelEnum::kNone);
+        .then(_buildPhaseHandler(
+            Phase::kCheckPreconditions,
+            [this, anchor = shared_from_this()](auto* opCtx) {
+                tassert(12578402,
+                        "Chunk operation coordinator must not run without "
+                        "authoritative metadata access",
+                        _doc.getAuthoritativeMetadataAccessLevel() !=
+                            AuthoritativeMetadataAccessLevelEnum::kNone);
 
-                                     auto bounds = _request.getBounds();
-                                     LOGV2(12578403,
-                                           "Checking preconditions for merge chunks operation",
-                                           logAttrs(nss()),
-                                           "range"_attr =
-                                               ChunkRange(bounds[0], bounds[1]).toString());
+                auto bounds = _request.getBounds();
+                LOGV2(12578403,
+                      "Checking preconditions for merge chunks operation",
+                      logAttrs(nss()),
+                      "range"_attr = ChunkRange(bounds[0], bounds[1]).toString());
 
-                                     _alreadyCommitted = checkPreconditions(opCtx, nss(), _request);
-                                 }))
+                _alreadyCommitted = checkPreconditions(opCtx, nss(), _request);
+
+                // Capture and persist the shard's placement version before the first commit
+                // attempt. The configsvr commit is idempotent on this version, so it must remain
+                // stable across retries and failovers; otherwise a retry that ran after the commit
+                // already applied would observe the post-merge version and rebuild no chunks.
+                if (!_alreadyCommitted && !_doc.getShardVersionPreMerge()) {
+                    auto cm = uassertStatusOK(
+                        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(
+                            opCtx, nss()));
+                    const CollectionMetadata metadata(std::move(cm),
+                                                      ShardingState::get(opCtx)->shardHandle());
+
+                    auto newDoc = _doc;
+                    newDoc.setShardVersionPreMerge(metadata.getShardPlacementVersion());
+                    _updateStateDocument(opCtx, std::move(newDoc));
+                }
+            }))
         .then(_buildPhaseHandler(Phase::kAcquireCriticalSection,
                                  shouldExecuteIfNotCommitted,
                                  [this, anchor = shared_from_this()](auto* opCtx) {
@@ -318,22 +351,26 @@ ExecutorFuture<void> MergeChunksCoordinator::_runImpl(
                       logAttrs(nss()),
                       "range"_attr = chunkRange.toString());
 
-                auto const shardingState = ShardingState::get(opCtx);
 
-                const auto collectionUuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
-                uassert(12578406,
-                        str::stream() << "Collection " << nss().toStringForErrorMsg()
-                                      << " not found locally during merge chunks commit",
-                        collectionUuid.has_value());
+                // Set during kCheckPreconditions, before this phase can run. Assert explicitly
+                // instead of dereferencing an empty optional if that ever changes.
+                tassert(12933303,
+                        "Expected persisted pre-merge shard version before committing merge to the "
+                        "global catalog",
+                        _doc.getShardVersionPreMerge());
 
-                commitToGlobalCatalog(opCtx,
-                                      nss(),
-                                      shardingState->shardId(),
-                                      *collectionUuid,
-                                      chunkRange,
-                                      _request.getEpoch(),
-                                      _request.getTimestamp(),
-                                      getNewSession(opCtx));
+                auto changedChunks = commitToGlobalCatalog(opCtx,
+                                                           nss(),
+                                                           ShardingState::get(opCtx)->shardId(),
+                                                           chunkRange,
+                                                           *_doc.getShardVersionPreMerge(),
+                                                           getNewSession(opCtx));
+
+                // Persist the changed chunks so the shard catalog commit phase can install them
+                // even after a failover, without contacting the config server again.
+                auto newDoc = _doc;
+                newDoc.setChangedChunks(std::move(changedChunks));
+                _updateStateDocument(opCtx, std::move(newDoc));
 
                 // Checkpoint the configTime to ensure that, in the case of a stepdown, the new
                 // primary will start-up from a configTime that is inclusive of the metadata update
@@ -350,10 +387,21 @@ ExecutorFuture<void> MergeChunksCoordinator::_runImpl(
                       logAttrs(nss()),
                       "range"_attr = ChunkRange(bounds[0], bounds[1]).toString());
 
-                // Install the new chunk layout into the local shard catalog.
-                sharding_ddl_util::commitCreateCollectionMetadataToShardCatalog(
+                // A committed merge always produces at least one changed chunk. Reaching this
+                // phase without any means the global catalog commit result was not persisted,
+                // which would silently install nothing into the shard catalog.
+                tassert(12578412,
+                        "Expected persisted changed chunks after committing merge to the global "
+                        "catalog",
+                        _doc.getChangedChunks() && !_doc.getChangedChunks()->empty());
+
+                // Forward the committed chunks to the shard catalog.
+                // Note that all the updated chunks are relevant for both shards donor and recipient
+                // to persist the PIT read history.
+                sharding_ddl_util::commitChunkOperationsMetadataToShardCatalog(
                     opCtx,
                     nss(),
+                    *_doc.getChangedChunks(),
                     {ShardingState::get(opCtx)->shardId()},
                     getNewSession(opCtx),
                     executor,

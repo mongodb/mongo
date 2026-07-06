@@ -62,3 +62,14 @@ structs:
             phase:
                 type: SplitChunkCoordinatorPhase
                 default: kUnset
+            shardVersionPreSplit:
+                description: >-
+                    Shard placement version captured before the split is committed to the global
+                    catalog.
+                type: ChunkVersion
+                optional: true
+            changedChunks:
+                description: >-
+                    Chunks produced by the split commit, in config BSON format.
+                type: array<object_owned>
+                optional: true

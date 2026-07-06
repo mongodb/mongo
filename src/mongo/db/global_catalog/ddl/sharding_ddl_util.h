@@ -522,18 +522,19 @@ MONGO_MOD_PRIVATE void commitRenameCollectionMetadataToShardCatalog(
  * Commits chunk operation metadata to the shard catalog by sending
  * `_shardsvrCommitChunkOperationsMetadata` to each given shard.
  *
- * Each shard receives the new chunks and reconciles any overlaps with its existing durable chunks
- * locally.
+ * `newChunkDocs` are the changed chunks in config BSON format, as produced by the global catalog
+ * commit. Each shard re-parses and validates them against its authoritative collection entry and
+ * reconciles any overlaps with its existing durable chunks locally.
  *
- * The caller is responsible for ensuring that `newChunks` contains the relevant chunks that must be
- * sent to the specified shards. This method does not assert that every chunk in `newChunks` is
- * currently owned by a target shard, because unowned chunks may still need to be sent to preserve
- * history for point-in-time reads.
+ * The caller is responsible for ensuring that `newChunkDocs` contains the relevant chunks that must
+ * be sent to the specified shards. This method does not assert that every chunk is currently owned
+ * by a target shard, because unowned chunks may still need to be sent to preserve history for
+ * point-in-time reads.
  */
 MONGO_MOD_PRIVATE void commitChunkOperationsMetadataToShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const std::vector<ChunkType>& newChunks,
+    std::vector<BSONObj> newChunkDocs,
     const std::vector<ShardRef>& shardRefs,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,

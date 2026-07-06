@@ -62,3 +62,14 @@ structs:
             phase:
                 type: MergeChunksCoordinatorPhase
                 default: kUnset
+            shardVersionPreMerge:
+                description: >-
+                    Shard placement version captured before the merge is committed to the global
+                    catalog.
+                type: ChunkVersion
+                optional: true
+            changedChunks:
+                description: >-
+                    Chunk produced by the merge commit, in config BSON format.
+                type: array<object_owned>
+                optional: true
