@@ -3,11 +3,6 @@
 
 set -eu
 
-if [ ! -f "src/cedar_report.json" ]; then
-    echo "src/cedar_report.json not found, skipping perf data submission."
-    exit 0
-fi
-
 if [ "${requester}" == "commit" ]; then
     is_mainline=true
 else

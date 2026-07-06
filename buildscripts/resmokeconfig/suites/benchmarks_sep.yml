@@ -6,7 +6,6 @@ selector:
 
 executor:
   config: {}
-  # TODO SERVER-122547 Re-enable GenerateAndCheckPerfResults on benchmarks_sep on release branches
-  # hooks:
-  #   - class: GenerateAndCheckPerfResults
-  #     check_result: True
+  hooks:
+    - class: GenerateAndCheckPerfResults
+      check_result: True
