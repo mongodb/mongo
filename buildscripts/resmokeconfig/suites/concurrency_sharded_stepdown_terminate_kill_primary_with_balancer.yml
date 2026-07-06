@@ -66,7 +66,6 @@ selector:
     - requires_standalone
     - assumes_balancer_off
     - assumes_against_mongod_not_mongos
-    - requires_replication
     - requires_non_retryable_writes
     # mongos has no system.profile collection.
     - requires_profiling

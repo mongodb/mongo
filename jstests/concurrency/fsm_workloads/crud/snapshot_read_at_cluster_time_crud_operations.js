@@ -8,7 +8,12 @@
  * is between 0-99, and the value of x is always 1.
  *
  * @tags: [
+ *   # Relies on a snapshot find that spans a getMore.
+ *   assumes_no_implicit_cursor_exhaustion,
  *   does_not_support_causal_consistency,
+ *   # Stepdown suites force defaultReadConcernLevel=majority for network-error retryability, which
+ *   # conflicts with this test's explicit snapshot readConcern.
+ *   does_not_support_stepdowns,
  *   requires_majority_read_concern,
  *   requires_replication,
  *   does_not_support_transactions,

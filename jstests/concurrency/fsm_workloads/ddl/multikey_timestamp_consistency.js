@@ -59,6 +59,7 @@
  * and the preceding timestamp.
  *
  * @tags: [
+ *   assumes_against_mongod_not_mongos,
  *   uses_transactions,
  *   featureFlagReplicateMultikeynessInTransactions,
  *   requires_replication,

@@ -59,7 +59,6 @@ selector:
   exclude_with_any_tags:
     - requires_standalone
     - assumes_against_mongod_not_mongos
-    - requires_replication
     - requires_non_retryable_writes
     - assumes_balancer_on
     # Curop requires readConcern local.

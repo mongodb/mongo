@@ -89,8 +89,6 @@ selector:
     - assumes_unsharded_collection
     - assumes_standalone_mongod
     - assumes_read_preference_unchanged
-    # The tests start their own ReplSetTest
-    - requires_replication
     - does_not_support_causal_consistency
     # Because this suite kills / restarts the initial syncing node, if a kill occurs between a read and
     # subsequent getMore on the initial syncing node tests can fail.

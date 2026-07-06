@@ -56,7 +56,6 @@ selector:
   exclude_with_any_tags:
     - requires_standalone
     - assumes_against_mongod_not_mongos
-    - requires_replication
     - assumes_balancer_on
     # Sharing cursors between state functions will fail in this suite because it will attempt to use
     # the same cursor in multiple transactions.

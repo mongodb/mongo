@@ -9,6 +9,7 @@
  * node crash, interfering with other tests.
  *
  * @tags: [
+ *     assumes_against_mongod_not_mongos,
  *     creates_background_indexes,
  *     # The test uses $currentOp, which is not supported in transactions.
  *     does_not_support_transactions,

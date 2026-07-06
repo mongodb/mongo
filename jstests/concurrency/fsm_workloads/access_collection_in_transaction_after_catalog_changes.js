@@ -9,7 +9,7 @@
  *
  * Do not run in sharding suites because the first transaction statement is expect to succeed
  * unconditionally, which need not be true in a sharded cluster.
- * @tags: [uses_transactions, requires_replication]
+ * @tags: [assumes_against_mongod_not_mongos, uses_transactions, requires_replication]
  */
 
 import {withTxnAndAutoRetry} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";

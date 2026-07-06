@@ -56,7 +56,6 @@ selector:
     - requires_standalone
     - assumes_balancer_off
     - assumes_against_mongod_not_mongos
-    - requires_replication
     # Snapshot reads in transactions are banned on capped collections.
     - requires_capped
     # Sharing cursors between state functions will fail in this suite because it will attempt to use
