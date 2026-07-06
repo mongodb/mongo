@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/overloaded_visitor.h"
+#include "mongo/util/shared_buffer.h"
 
 #include <fstream>
 #include <string>
@@ -86,6 +87,23 @@ wc::List makeListU8(std::string_view s);
 wc::Val makeString(std::string_view s);
 
 std::vector<uint8_t> extractListU8(const wc::Val& v);
+
+// Copies `size` bytes of guest-produced data into an owned BSONObj, fully validating that the
+// bytes form a structurally sound BSON document contained within `size`.
+//
+// The WASM guest (a SpiderMonkey sandbox running arbitrary attacker-supplied JS) is untrusted:
+// a compromised guest can forge the BSON length header so it points past the allocation, which
+// would otherwise cause downstream BSON readers to over-read adjacent mongod heap into query
+// results. `validateBSON` is called with the actual buffer size as maxLength so any embedded
+// length that would read past the allocation is rejected. Malformed input throws a uassert
+// (never a fatal invariant) so a compromised sandbox can only fail its own request rather than
+// leak heap or abort the process. Buffers outside [kMinBSONLength, BufferMaxSize] are rejected
+// before allocation.
+BSONObj validatedBsonFromGuestBytes(const uint8_t* data, size_t size);
+
+// As validatedBsonFromGuestBytes, but adopts an already-filled `size`-byte SharedBuffer instead of
+// copying, avoiding a second allocation on the per-element slow path.
+BSONObj validatedBsonFromGuestBuffer(SharedBuffer buf, size_t size);
 
 bool isResultOk(const wc::Val& result);
 

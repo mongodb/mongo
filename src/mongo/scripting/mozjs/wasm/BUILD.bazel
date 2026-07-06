@@ -181,6 +181,7 @@ mongo_cc_library(
     }),
     deps = [
         "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
         "//src/mongo/db:server_parameter",
         "//src/mongo/scripting:scripting_common",
         "@crates//:wasmtime_c",

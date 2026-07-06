@@ -657,26 +657,24 @@ BSONObj MozJSWasmBridge::_extractBSON(const wc::Val& result) {
     const auto* rawPayload = wc::Val::to_capi(payload);
     if (rawPayload->kind == WASMTIME_COMPONENT_RAW_U8_LIST) {
         const auto& bv = rawPayload->of.raw_u8_list;
-        invariant(bv.size >= static_cast<size_t>(BSONObj::kMinBSONLength));
-        auto buf = SharedBuffer::allocate(bv.size);
-        std::memcpy(buf.get(), bv.data, bv.size);
-        auto returnVal = BSONObj(std::move(buf));
-        invariant(returnVal.isValid());
-        return returnVal;
+        // The guest is untrusted: fully validate the bytes against the actual buffer size before
+        // any downstream reader walks the document.
+        return wasm_helpers::validatedBsonFromGuestBytes(reinterpret_cast<const uint8_t*>(bv.data),
+                                                         bv.size);
     }
 
     const wc::List& list = payload->get_list();
     size_t n = list.size();
-    invariant(n >= static_cast<size_t>(BSONObj::kMinBSONLength));
-    // Write directly into the SharedBuffer — no intermediate std::vector allocation.
+    // Write directly into the SharedBuffer — no intermediate std::vector allocation — then hand it
+    // off for validation + ownership. The guest is untrusted, so validatedBsonFromGuestBuffer
+    // checks the embedded lengths against the actual buffer size rather than trusting the forgeable
+    // BSON header.
     auto buf = SharedBuffer::allocate(n);
     auto* dst = reinterpret_cast<uint8_t*>(buf.get());
     for (const wc::Val& elem : list) {
         *dst++ = elem.get_u8();
     }
-    auto returnVal = BSONObj(std::move(buf));
-    invariant(returnVal.isValid());
-    return returnVal;
+    return wasm_helpers::validatedBsonFromGuestBuffer(std::move(buf), n);
 }
 
 BSONObj MozJSWasmBridge::_getReturnValueBson() {

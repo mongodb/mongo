@@ -53,6 +53,7 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/config_engine_gen.h"
 #include "mongo/scripting/config_engine_wasm_gen.h"
+#include "mongo/scripting/mozjs/wasm/bridge/wasm_helpers.h"
 #include "mongo/scripting/mozjs/wasm/embedded_wasm_resource.h"
 #include "mongo/unittest/unittest.h"
 
@@ -3301,6 +3302,62 @@ TEST(WasmBridgeStatsTest, ToBSONContainsAllCounters) {
     ASSERT_EQ(bson["maxSingleCallBytesOut"].Long(), 60);
     ASSERT_EQ(bson["maxEmitByteLimit"].Long(), 1000);
     ASSERT_EQ(bson["killCount"].Long(), 11);
+}
+
+// The WASM guest is untrusted. validatedBsonFromGuestBytes must fully validate the
+// guest-produced bytes against the actual buffer size so a compromised sandbox cannot forge a BSON
+// length header that walks downstream readers past the allocation (heap over-read) or aborts the
+// process. All rejections must throw (uassert), never fire a fatal invariant.
+
+TEST(WasmValidatedBsonFromGuestBytes, RoundTripsValidBson) {
+    BSONObj obj = BSON("__returnValue" << "hello" << "n" << 42);
+    auto out = wasm_helpers::validatedBsonFromGuestBytes(
+        reinterpret_cast<const uint8_t*>(obj.objdata()), static_cast<size_t>(obj.objsize()));
+    ASSERT_BSONOBJ_EQ(out, obj);
+    // The returned object owns its own copy of the bytes.
+    ASSERT_NE(out.objdata(), obj.objdata());
+}
+
+TEST(WasmValidatedBsonFromGuestBytes, RejectsForgedOversizedHeader) {
+    // Exploit shape from the ticket: a tiny buffer whose embedded objsize header claims a huge
+    // document (here 4 MiB). isValid() alone would accept this because 4 MiB <= 125 MiB; only
+    // comparing against the actual buffer size catches it.
+    std::vector<uint8_t> bytes = {
+        0x00,
+        0x00,
+        0x40,
+        0x00,  // objsize = 4 MiB (far larger than the 5-byte buffer)
+        0x00   // EOO
+    };
+    ASSERT_THROWS_CODE(wasm_helpers::validatedBsonFromGuestBytes(bytes.data(), bytes.size()),
+                       DBException,
+                       ErrorCodes::InvalidBSON);
+}
+
+TEST(WasmValidatedBsonFromGuestBytes, RejectsForgedInnerStringLength) {
+    // A structurally plausible top-level header, but an inner string whose length runs past the
+    // end of the buffer. Downstream readers would over-read; validateBSON must reject it.
+    std::vector<uint8_t> bytes = {
+        0x1a, 0x00, 0x00, 0x00,  // objsize = 26 (matches)
+        0x02,                    // type: string
+        0x5f, 0x5f, 0x72, 0x65, 0x74, 0x75, 0x72,
+        0x6e, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x00,  // "__returnValue\0"
+        0x00, 0x00, 0x20, 0x00,                    // strlen = 2 MiB (forged)
+        0x41, 0x00, 0x00                           // "A" + trailing
+    };
+    ASSERT_EQ(bytes.size(), 26u);
+    ASSERT_THROWS_CODE(wasm_helpers::validatedBsonFromGuestBytes(bytes.data(), bytes.size()),
+                       DBException,
+                       ErrorCodes::InvalidBSON);
+}
+
+TEST(WasmValidatedBsonFromGuestBytes, RejectsTruncatedBufferWithoutAborting) {
+    // Fewer than kMinBSONLength bytes: previously a fatal invariant (guest-triggerable DoS); must
+    // now throw with the dedicated undersized-buffer code instead of aborting.
+    std::vector<uint8_t> bytes = {0x00, 0x00};
+    ASSERT_THROWS_CODE(wasm_helpers::validatedBsonFromGuestBytes(bytes.data(), bytes.size()),
+                       DBException,
+                       11543000);
 }
 
 }  // namespace mongo::mozjs::wasm

@@ -29,6 +29,10 @@
 
 #include "mongo/scripting/mozjs/wasm/bridge/wasm_helpers.h"
 
+#include "mongo/bson/bson_validate.h"
+#include "mongo/util/shared_buffer.h"
+
+#include <cstring>
 #include <string_view>
 
 namespace mongo::mozjs::wasm::wasm_helpers {
@@ -198,6 +202,41 @@ std::vector<uint8_t> extractListU8(const wc::Val& v) {
         }
     }
     return out;
+}
+
+namespace {
+// Bounds guest-produced BSON to the same range BSONObj::isValid() historically enforced: at least
+// the minimum length, and no larger than the 125 MiB buffer cap, so a compromised guest cannot
+// force an oversized allocation/copy. Checked before allocating on the copy path.
+void checkGuestBsonSize(size_t size) {
+    uassert(11543000,
+            "WASM guest returned a BSON buffer shorter than the minimum BSON length",
+            size >= static_cast<size_t>(BSONObj::kMinBSONLength));
+    uassert(11543002,
+            "WASM guest returned a BSON buffer larger than the maximum BSON size",
+            size <= static_cast<size_t>(BufferMaxSize));
+}
+
+// Validates the (owned) buffer against its actual size and, on success, adopts it into a BSONObj.
+// maxLength is the actual buffer size (NOT the embedded BSON size header), so any forged top-level
+// or nested length that would read past the allocation is rejected here rather than trusted by
+// downstream BSON readers.
+BSONObj validateAndAdopt(SharedBuffer buf, size_t size) {
+    uassertStatusOK(validateBSON(buf.get(), size));
+    return BSONObj(std::move(buf));
+}
+}  // namespace
+
+BSONObj validatedBsonFromGuestBytes(const uint8_t* data, size_t size) {
+    checkGuestBsonSize(size);
+    auto buf = SharedBuffer::allocate(size);
+    std::memcpy(buf.get(), data, size);
+    return validateAndAdopt(std::move(buf), size);
+}
+
+BSONObj validatedBsonFromGuestBuffer(SharedBuffer buf, size_t size) {
+    checkGuestBsonSize(size);
+    return validateAndAdopt(std::move(buf), size);
 }
 
 bool isResultOk(const wc::Val& result) {
