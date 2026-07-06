@@ -122,8 +122,29 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
         // Compute expected min/max from iterator elements.
         auto expected = bsoncolumn::expectedMinMax(iteratorElems);
 
-        auto minResult =
-            bsoncolumn::min<bsoncolumn::BSONElementMaterializer>(Data, Size, allocator);
+        // min/max/minmax use a stricter decode path (decompressAllLiteral) that may throw on
+        // inputs the iterator and block-based APIs accept. Catch here so the fuzzer doesn't
+        // terminate via an unhandled exception; then assert all APIs agree.
+        decltype(bsoncolumn::min<bsoncolumn::BSONElementMaterializer>(
+            Data, Size, allocator)) minResult,
+            maxResult;
+        decltype(bsoncolumn::minmax<bsoncolumn::BSONElementMaterializer>(
+            Data, Size, allocator)) minmaxResult;
+        try {
+            minResult = bsoncolumn::min<bsoncolumn::BSONElementMaterializer>(Data, Size, allocator);
+            maxResult = bsoncolumn::max<bsoncolumn::BSONElementMaterializer>(Data, Size, allocator);
+            minmaxResult =
+                bsoncolumn::minmax<bsoncolumn::BSONElementMaterializer>(Data, Size, allocator);
+        } catch (...) {
+            // If min/max/minmax threw, the other decode APIs must also have succeeded; if they
+            // didn't, this reveals an inconsistency between decode paths.
+            invariant(false,
+                      str::stream()
+                          << "For the input: " << base64::encode(std::string_view(Data, Size))
+                          << ". min/max/minmax threw: " << exceptionToStatus().toString()
+                          << " but iterator and block-based APIs succeeded");
+        }
+
         invariant(minResult.first.binaryEqualValues(expected.min.first),
                   str::stream() << "For the input: " << base64::encode(std::string_view(Data, Size))
                                 << ". min() returned: " << minResult.first.toString()
@@ -136,8 +157,6 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
                           << expected.min.second);
         }
 
-        auto maxResult =
-            bsoncolumn::max<bsoncolumn::BSONElementMaterializer>(Data, Size, allocator);
         invariant(maxResult.first.binaryEqualValues(expected.max.first),
                   str::stream() << "For the input: " << base64::encode(std::string_view(Data, Size))
                                 << ". max() returned: " << maxResult.first.toString()
@@ -150,8 +169,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
                           << expected.max.second);
         }
 
-        auto [minmaxMin, minmaxMax] =
-            bsoncolumn::minmax<bsoncolumn::BSONElementMaterializer>(Data, Size, allocator);
+        auto [minmaxMin, minmaxMax] = minmaxResult;
         invariant(minmaxMin.binaryEqualValues(expected.min.first),
                   str::stream() << "For the input: " << base64::encode(std::string_view(Data, Size))
                                 << ". minmax().first returned: " << minmaxMin.toString()
