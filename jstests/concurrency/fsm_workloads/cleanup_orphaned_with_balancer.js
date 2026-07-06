@@ -9,7 +9,7 @@
  */
 
 import {BalancerHelper} from "jstests/concurrency/fsm_workload_helpers/balancer.js";
-import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
+import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/chunks.js";
 import {ShardingTopologyHelpers} from "jstests/concurrency/fsm_workload_helpers/catalog_and_routing/sharding_topology_helpers.js";
 
 export const $config = (function () {

@@ -1,12 +1,4 @@
-export const ConcurrentOperation = {
-    MoveChunk: "moveChunk",
-    RemoveShard: "removeShard",
-    BroadcastWrite: "broadcastWrite",
-    ShardKeyUpdate: "shardKeyUpdate",
-    RefineShardKey: "refineShardKey",
-    CoordinatedMultiWrite: "coordinatedMultiWrite",
-    ValidationLevelChange: "validationLevelChange",
-};
+import {ConcurrentOperation} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/chunk_operation_errors.js";
 
 const acceptabilityHandlers = new Map([
     [ConcurrentOperation.MoveChunk, isErrorAcceptableWithMoveChunk],

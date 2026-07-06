@@ -21,7 +21,7 @@
  *  assumes_balancer_off,
  * ]
  */
-import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
+import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/chunks.js";
 import {isMongodConfigsvr} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
