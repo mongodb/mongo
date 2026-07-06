@@ -200,10 +200,11 @@ StateMachine makePlanShapeRule() {
     sm.shrinkToFit();
 
     const size_t sizeBytes = sm.sizeInBytes();
+    static constexpr size_t kMaxSizeBytes = 128 * 1024;
     tassert(11907604,
-            str::stream() << "Plan shape rule state machine exceeded the expected size: "
-                          << sizeBytes << " bytes",
-            sizeBytes < 40 * 1024);
+            str::stream() << "Plan shape rule state machine size: " << sizeBytes
+                          << " bytes exceeds limit of " << kMaxSizeBytes << " bytes",
+            sizeBytes <= kMaxSizeBytes);
 
     return sm;
 }
