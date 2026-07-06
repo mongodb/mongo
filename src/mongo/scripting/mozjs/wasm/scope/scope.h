@@ -34,12 +34,14 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/wasm/bridge/bridge.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/scopeguard.h"
 
 #include <atomic>
 #include <string_view>
 #include <unordered_set>
 
 #include <boost/optional.hpp>
+
 namespace mongo::mozjs {
 
 class WasmtimeImplScope : public Scope {
@@ -99,6 +101,14 @@ public:
     void kill() override;
     bool isKillPending() const override;
 
+    // Used by WasmtimeScriptEngine::interrupt()/interruptAll(), which have direct, synchronous
+    // access to the opCtx's own kill code at the exact moment it was set (see
+    // ServiceContext::killOperation(): markKilled() and kill-op-listener notification happen in
+    // the same call, on the same thread -- no race). Recording that reason here, at the source,
+    // is what lets _invokeWithDeadlineMonitoring below translate Interrupted traps without
+    // reconstructing the reason later from possibly-stale opCtx state.
+    void killWithReason(ErrorCodes::Error reason);
+
     // Single-call predicate path: skips the 2 extra WASM crossings for setObject/setBoolean
     // and the per-invocation deadline monitor, since epoch interruption already covers us.
     bool execPredicate(ScriptingFunction func, const BSONObj& doc, int timeoutMs) override;
@@ -150,6 +160,28 @@ private:
     // across the pool handoff. Owned solely by this scope.
     std::shared_ptr<wasm::WasmEngineContext> _wasmEngineCtx;
     const boost::optional<int> _jsHeapLimitMB;
+
+    // Starts the deadline monitor, calls f(), and stops it (even on exception).
+    //
+    // No exception translation happens here anymore: the bridge itself throws the correct,
+    // final mongo error directly from _throwAfterTrap(), using the reason recorded at the exact
+    // moment kill() was called (see bridge.h's kill() doc comment and scope.cpp's
+    // kill()/killWithReason()). The two callers of kill() cover every case at the source, with
+    // no reconstruction needed later:
+    //   - WasmtimeScriptEngine::interrupt()/interruptAll() call killWithReason() with the opCtx's
+    //     own kill code, read synchronously in the same call that set it (killOp/killSessions,
+    //     an explicit cursor/operation kill, client disconnect, shutdown/stepdown, or a genuinely
+    //     expired maxTimeMS -- see ServiceContext::killOperation()).
+    //   - This scope's own JS-fn DeadlineMonitor calls the plain kill() (defaulting to
+    //     Interrupted) when internalQueryJavaScriptFnTimeoutMillis fires. That's never a
+    //     client-facing maxTimeMS, so Interrupted is the correct, honest reason regardless of how
+    //     much of the opCtx's own maxTimeMS remains.
+    template <typename F>
+    auto _invokeWithDeadlineMonitoring(int timeoutMs, F&& f) -> decltype(f()) {
+        _deadlineMonitor.startDeadline(this, timeoutMs);
+        ScopeGuard guard([&] { _deadlineMonitor.stopDeadline(this); });
+        return f();
+    }
 
     std::unique_ptr<wasm::MozJSWasmBridge> _bridge;
     int64_t _storeLinearMemBytes = 0;

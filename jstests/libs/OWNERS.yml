@@ -114,3 +114,6 @@ filters:
   - "os_helpers.js":
     approvers:
       - 10gen/server-security
+  - "js_engine_util.js":
+    approvers:
+      - 10gen/query-integration-features

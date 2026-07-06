@@ -29,11 +29,18 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/scripting/mozjs/wasm/scope/scope.h"
 #include "mongo/scripting/mozjs/wasm/wasmtime_engine.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/duration.h"
 
 #include <atomic>
+#include <condition_variable>
+#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -174,4 +181,256 @@ TEST(WasmtimeScopeConcurrency, ConcurrentFunctionInvoke) {
         t.join();
 
     ASSERT_EQ(successCount.load(), kThreads);
+}
+
+// ---------------------------------------------------------------------------
+// Interrupt translation tests: scope-level opCtx error code propagation
+// ---------------------------------------------------------------------------
+//
+// These tests confirm the end-to-end behaviour: when the opCtx is killed
+// with MaxTimeMSExpired before (or during) a JS invocation, the scope must
+// throw MaxTimeMSExpired, not Interrupted.
+// ---------------------------------------------------------------------------
+
+// Fixture that provides a full ServiceContext so we can create OperationContexts.
+class WasmtimeScopeInterruptTranslationTest : public unittest::Test,
+                                              public ScopedGlobalServiceContextForTest {
+protected:
+    void setUp() override {
+        // Register the WASM engine as the global script engine, which is required by
+        // registerOperation().
+        setGlobalScriptEngine(new WasmtimeScriptEngine());
+    }
+
+    void tearDown() override {
+        setGlobalScriptEngine(nullptr);
+    }
+};
+
+// Runs invokerBody in a background thread with a pre-killed OperationContext (marked with
+// 'killCode', e.g. MaxTimeMSExpired or CursorKilled) and registerOperation() already called,
+// then fires kill() from the calling thread so _opCtx is set when the scope translates
+// Interrupted → the real code via _invokeWithDeadlineMonitoring.
+//
+// The caller is responsible for creating the scope and compiling any function handles
+// before calling this helper (see KillFromAnotherThread for the same cross-thread
+// scope-usage pattern). _killPending is sticky, so kill() fired a few instructions
+// before WASM execution begins still causes the bridge to trap on the first epoch check.
+//
+// Returns the exception thrown by invokerBody, or nullptr if it returned normally.
+template <typename InvokerBody>
+static std::exception_ptr runWithKillAndMarkedOpCtx(WasmtimeScopeInterruptTranslationTest& fixture,
+                                                    Scope& scope,
+                                                    ErrorCodes::Error killCode,
+                                                    InvokerBody&& invokerBody) {
+    std::mutex killReadyMutex;
+    std::condition_variable killReadyCv;
+    bool killReady = false;
+    std::exception_ptr result;
+
+    std::thread invoker([&] {
+        auto client = fixture.getService()->makeClient("interrupt-translation-test");
+        AlternativeClientRegion acr(client);
+        auto opCtx = cc().makeOperationContext();
+        opCtx->markKilled(killCode);
+        scope.registerOperation(opCtx.get());
+        {
+            std::lock_guard<std::mutex> lk(killReadyMutex);
+            killReady = true;
+        }
+        killReadyCv.notify_one();
+        try {
+            invokerBody(scope);
+        } catch (...) {
+            result = std::current_exception();
+        }
+        scope.unregisterOperation();
+    });
+
+    {
+        std::unique_lock<std::mutex> lk(killReadyMutex);
+        killReadyCv.wait(lk, [&] { return killReady; });
+    }
+    // Mirrors WasmtimeScriptEngine::interrupt(): the caller already knows opCtx's kill code
+    // (it's what we just marked it with above), so pass it straight through via
+    // killWithReason() rather than the reason-less kill() -- exactly as production does.
+    static_cast<WasmtimeImplScope&>(scope).killWithReason(killCode);
+    invoker.join();
+    return result;
+}
+
+// Asserts that 'ex' is a DBException with the given code, failing with 'opName' in the message
+// otherwise.
+static void assertTranslatedCode(std::exception_ptr ex,
+                                 ErrorCodes::Error expectedCode,
+                                 std::string_view opName) {
+    ASSERT(ex) << opName << " should have thrown";
+    try {
+        std::rethrow_exception(ex);
+    } catch (const DBException& e) {
+        ASSERT_EQ(e.code(), expectedCode)
+            << "Expected " << ErrorCodes::errorString(expectedCode) << ", got: " << e.toString();
+    } catch (...) {
+        FAIL(std::string(opName) + " threw an unexpected exception type");
+    }
+}
+
+// invoke() with a looping predicate (recv != nullptr) translates Interrupted → the real code,
+// for both of the codes the bridge/scope contract calls out as needing translation:
+// MaxTimeMSExpired (query timeout) and CursorKilled (an explicit killCursors on the operation).
+TEST_F(WasmtimeScopeInterruptTranslationTest, Invoke_PredicateTranslatesInterruptedToRealCode) {
+    for (auto killCode : {ErrorCodes::MaxTimeMSExpired, ErrorCodes::CursorKilled}) {
+        BSONObj doc = BSON("x" << 1);
+        WasmtimeScriptEngine engine;
+        std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+        ScriptingFunction fn =
+            scope->createFunction("function() { while (true) {}; return true; }");
+        auto ex = runWithKillAndMarkedOpCtx(*this, *scope, killCode, [&](Scope& s) {
+            s.invoke(fn, nullptr, &doc, /*timeoutMs=*/60000);
+        });
+        assertTranslatedCode(ex, killCode, "invoke() predicate path");
+    }
+}
+
+// execPredicate() translates Interrupted → the real code.
+TEST_F(WasmtimeScopeInterruptTranslationTest, ExecPredicateTranslatesInterruptedToRealCode) {
+    for (auto killCode : {ErrorCodes::MaxTimeMSExpired, ErrorCodes::CursorKilled}) {
+        BSONObj doc = BSON("x" << 1);
+        WasmtimeScriptEngine engine;
+        std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+        ScriptingFunction fn =
+            scope->createFunction("function() { while (true) {}; return true; }");
+        auto ex = runWithKillAndMarkedOpCtx(*this, *scope, killCode, [&](Scope& s) {
+            static_cast<WasmtimeImplScope*>(&s)->execPredicate(fn, doc, /*timeoutMs=*/60000);
+        });
+        assertTranslatedCode(ex, killCode, "execPredicate()");
+    }
+}
+
+// invoke() with a regular function (no recv) translates Interrupted → the real code.
+TEST_F(WasmtimeScopeInterruptTranslationTest, Invoke_FunctionTranslatesInterruptedToRealCode) {
+    for (auto killCode : {ErrorCodes::MaxTimeMSExpired, ErrorCodes::CursorKilled}) {
+        WasmtimeScriptEngine engine;
+        std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+        ScriptingFunction fn = scope->createFunction("while (true) {}");
+        auto ex = runWithKillAndMarkedOpCtx(*this, *scope, killCode, [&](Scope& s) {
+            s.invoke(fn, nullptr, nullptr, /*timeoutMs=*/60000);
+        });
+        assertTranslatedCode(ex, killCode, "invoke() function path");
+    }
+}
+
+// Covers the scope's own JS-fn-only timeout path: when WasmtimeImplScope's internal
+// DeadlineMonitor is what triggers kill() -- not the opCtx being externally marked -- the plain,
+// reason-less kill() call defaults the bridge's recorded kill reason to Interrupted, and the
+// bridge throws exactly that from _throwAfterTrap(). This must hold regardless of how much of the
+// opCtx's own maxTimeMS remains: this scope's JS-fn timeout is never a client-facing maxTimeMS.
+// Unlike runWithKillAndMarkedOpCtx, this never calls scope.kill()/killWithReason() or
+// opCtx->markKilled() itself: the short 'timeoutMs' passed to invoke() lets the DeadlineMonitor
+// fire the kill on its own, exactly as it would for a real $where/$function that runs past
+// internalQueryJavaScriptFnTimeoutMillis while comfortably inside a much longer maxTimeMS.
+TEST_F(WasmtimeScopeInterruptTranslationTest,
+       JsFnTimeoutWithUnexpiredOpCtxDeadlineStaysInterrupted) {
+    auto client = getService()->makeClient("interrupt-translation-fallback-test");
+    AlternativeClientRegion acr(client);
+    auto opCtx = cc().makeOperationContext();
+    // A real, far-future maxTimeMS, to make explicit that it plays no role in this scenario.
+    opCtx->setDeadlineAfterNowBy(Hours(1), ErrorCodes::MaxTimeMSExpired);
+
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    scope->registerOperation(opCtx.get());
+    ScriptingFunction fn = scope->createFunction("function() { while (true) {}; return true; }");
+
+    std::exception_ptr result;
+    try {
+        // Short JS-fn timeout so the scope's own DeadlineMonitor -- not the opCtx -- is what
+        // calls kill() here.
+        scope->invoke(fn, nullptr, nullptr, /*timeoutMs=*/200);
+    } catch (...) {
+        result = std::current_exception();
+    }
+    scope->unregisterOperation();
+
+    assertTranslatedCode(result, ErrorCodes::Interrupted, "invoke() under a JS-fn-only timeout");
+}
+
+TEST_F(WasmtimeScopeInterruptTranslationTest, RegisterOperationForwardsRealCodeWhenAlreadyKilled) {
+    for (auto killCode : {ErrorCodes::MaxTimeMSExpired, ErrorCodes::CursorKilled}) {
+        auto client = getService()->makeClient("register-operation-already-killed-test");
+        AlternativeClientRegion acr(client);
+        auto opCtx = cc().makeOperationContext();
+
+        WasmtimeScriptEngine engine;
+        std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+        ScriptingFunction fn = scope->createFunction("return true;");
+
+        // Mark the opCtx killed *before* registering, simulating the deadline having expired in
+        // between two consecutive per-document predicate calls.
+        opCtx->markKilled(killCode);
+        scope->registerOperation(opCtx.get());
+
+        std::exception_ptr result;
+        try {
+            scope->invoke(fn, nullptr, nullptr, /*timeoutMs=*/60000);
+        } catch (...) {
+            result = std::current_exception();
+        }
+        scope->unregisterOperation();
+
+        assertTranslatedCode(
+            result, killCode, "invoke() after registerOperation() found opCtx already killed");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Epoch bleed test
+// ---------------------------------------------------------------------------
+//
+// Without the per-bridge epoch_deadline_callback, killing one scope calls
+// increment_epoch() on the shared engine and interrupts every other
+// concurrently-running scope.  The callback re-arms non-killed bridges so
+// they continue executing.  This test verifies that property at the scope
+// layer (the bridge-level equivalent is EpochIsolation_BridgeBCompletesWhile
+// BridgeAIsKilled in bridge_test.cpp, which is disabled under TSan due to an
+// unrelated wasmtime signal-handler issue; this test does not exercise the
+// store limiter so it is TSan-safe).
+// ---------------------------------------------------------------------------
+
+// Killing scope A must not prevent scope B from executing on the calling thread.
+TEST(WasmtimeScopeConcurrency, EpochBleed_KillingOneScopeDoesNotInterruptAnother) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scopeA(engine.createScopeForCurrentThread(boost::none));
+    std::unique_ptr<Scope> scopeB(engine.createScopeForCurrentThread(boost::none));
+
+    ScriptingFunction fnA = scopeA->createFunction("while (true) {}");
+    ScriptingFunction fnB = scopeB->createFunction("return 42;");
+
+    std::mutex readyMutex;
+    std::condition_variable readyCv;
+    bool invokeReady = false;
+
+    std::thread threadA([&] {
+        {
+            std::lock_guard<std::mutex> lk(readyMutex);
+            invokeReady = true;
+        }
+        readyCv.notify_one();
+        try {
+            scopeA->invoke(fnA, nullptr, nullptr, /*timeoutMs=*/30000);
+        } catch (...) {
+        }
+    });
+
+    {
+        std::unique_lock<std::mutex> lk(readyMutex);
+        readyCv.wait(lk, [&] { return invokeReady; });
+    }
+    scopeA->kill();
+    threadA.join();
+
+    // Without the per-bridge epoch callback, increment_epoch() would have advanced the global
+    // epoch to B's deadline, causing B to trap on its first epoch check (epoch >= deadline).
+    bool scopeBSucceeded = (scopeB->invoke(fnB, nullptr, nullptr, /*timeoutMs=*/30000) == 0);
+    ASSERT_TRUE(scopeBSucceeded) << "Killing scope A must not interrupt scope B (epoch bleed)";
 }

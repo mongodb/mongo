@@ -224,3 +224,4 @@ TEST(WasmtimeScope, ScopeIsolation_IndependentGlobals) {
     ASSERT_EQ(1.0, scope1->getNumber("x"));
     ASSERT_EQ(2.0, scope2->getNumber("x"));
 }
+

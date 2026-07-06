@@ -219,5 +219,6 @@ mongo_cc_unit_test(
     deps = [
         ":bson_template_evaluator",
         ":scripting_server",
+        "//src/mongo/db:service_context_test_fixture",
     ],
 )

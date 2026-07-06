@@ -274,7 +274,11 @@ bool WasmtimeScriptEngine::hasIdleBridgeForTest() {
 
 void WasmtimeScriptEngine::interrupt(ClientLock&, OperationContext* opCtx) {
     if (opCtx && (*opCtx)[operationWasmtimeScopeDecoration].scope) {
-        (*opCtx)[operationWasmtimeScopeDecoration].scope->kill();
+        // ServiceContext::killOperation() has already called opCtx->markKilled(killCode) by the
+        // time it notifies us -- on this same thread, in the same call -- so the real reason is
+        // known with certainty right here. Pass it straight through instead of losing it behind
+        // a reason-less kill() and reconstructing it later from (possibly stale) opCtx state.
+        (*opCtx)[operationWasmtimeScopeDecoration].scope->killWithReason(opCtx->getKillStatus());
         LOGV2_DEBUG(11542360, 2, "Interrupting Wasmtime op", "opId"_attr = opCtx->getOpID());
     }
 }
@@ -284,7 +288,14 @@ void WasmtimeScriptEngine::interruptAll(ServiceContextLock& svcCtxLock) {
         std::lock_guard lk(*client);
         if (auto opCtx = client->getOperationContext();
             opCtx && (*opCtx)[operationWasmtimeScopeDecoration].scope) {
-            (*opCtx)[operationWasmtimeScopeDecoration].scope->kill();
+            // By the time ServiceContext broadcasts interruptAll() to listeners, every opCtx has
+            // already been through killOperation(InterruptedAtShutdown) in
+            // interruptOperations(), except clients excluded from that per-op loop
+            // (shouldExcludeFromInterruptAtShutdown()). Fall back to InterruptedAtShutdown for
+            // those rather than propagating a stale OK as the kill reason.
+            auto reason = opCtx->getKillStatus();
+            (*opCtx)[operationWasmtimeScopeDecoration].scope->killWithReason(
+                reason != ErrorCodes::OK ? reason : ErrorCodes::InterruptedAtShutdown);
         }
     }
 }
@@ -297,8 +308,14 @@ void WasmtimeScriptEngine::registerOperation(OperationContext* opCtx,
     ref.client = opCtx->getClient();
     ref.onTeardown = std::move(onTeardown);
 
+    // If the opCtx is already interrupted (e.g. maxTimeMS expired between the previous
+    // predicate call and this one -- see JsFunction::runAsPredicate(), which re-registers on
+    // every document), kill the scope now so the next invoke() traps immediately. Forward the
+    // real reason: this runs synchronously on the operation's own thread, so status.code() is
+    // exactly as authoritative as opCtx's kill code in WasmtimeScriptEngine::interrupt() above --
+    // there is nothing to reconstruct later if we don't discard it here.
     if (auto status = opCtx->checkForInterruptNoAssert(); !status.isOK()) {
-        scope->kill();
+        scope->killWithReason(status.code());
     }
 }
 void WasmtimeScriptEngine::unregisterOperation(OperationContext* opCtx) {

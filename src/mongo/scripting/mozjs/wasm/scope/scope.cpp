@@ -41,7 +41,6 @@
 #include "mongo/scripting/config_engine_wasm_gen.h"
 #include "mongo/scripting/deadline_monitor.h"
 #include "mongo/scripting/mozjs/wasm/wasmtime_engine.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
 #include <string_view>
@@ -231,9 +230,8 @@ bool WasmtimeImplScope::execPredicate(ScriptingFunction func, const BSONObj& doc
     // Single WASM crossing instead of 3 (setObject + setBoolean + invoke).
     // obj/fullObject are set on the WASM side inside invokePredicate() — no extra host calls.
     auto bsonVal = wasm::wasm_helpers::convertBsonToWcVal(doc);
-    _deadlineMonitor.startDeadline(this, timeoutMs);
-    ScopeGuard guard([&] { _deadlineMonitor.stopDeadline(this); });
-    return _bridge->invokePredicate(func, std::move(bsonVal));
+    return _invokeWithDeadlineMonitoring(
+        timeoutMs, [&] { return _bridge->invokePredicate(func, std::move(bsonVal)); });
 }
 
 ScriptingFunction WasmtimeImplScope::_createFunction(const char* raw) {
@@ -283,11 +281,8 @@ int WasmtimeImplScope::invoke(ScriptingFunction func,
                         "func"_attr = static_cast<uint64_t>(func),
                         "emitSetupBytes"_attr = _emitSetupBytes,
                         "argSize"_attr = bsonArg.objsize());
-            _deadlineMonitor.startDeadline(this, timeoutMs);
-            {
-                ScopeGuard mapGuard([&] { _deadlineMonitor.stopDeadline(this); });
-                _bridge->invokeMap(func, std::move(bsonVal));
-            }
+            _invokeWithDeadlineMonitoring(timeoutMs,
+                                          [&] { _bridge->invokeMap(func, std::move(bsonVal)); });
             _drainEmitToCallback();
             return 0;
         }
@@ -300,11 +295,8 @@ int WasmtimeImplScope::invoke(ScriptingFunction func,
                     "func"_attr = static_cast<uint64_t>(func),
                     "argSize"_attr = bsonArg.objsize());
         bool predicateResult;
-        _deadlineMonitor.startDeadline(this, timeoutMs);
-        {
-            ScopeGuard predGuard([&] { _deadlineMonitor.stopDeadline(this); });
-            predicateResult = _bridge->invokePredicate(func, std::move(bsonVal));
-        }
+        predicateResult = _invokeWithDeadlineMonitoring(
+            timeoutMs, [&] { return _bridge->invokePredicate(func, std::move(bsonVal)); });
         if (!ignoreReturn) {
             _lastReturnValue = BSON(kReturnValueField << predicateResult);
         }
@@ -319,11 +311,8 @@ int WasmtimeImplScope::invoke(ScriptingFunction func,
                 "argSize"_attr = bsonArg.objsize(),
                 "ignoreReturn"_attr = ignoreReturn);
     StatusWith<BSONObj> result{BSONObj{}};
-    _deadlineMonitor.startDeadline(this, timeoutMs);
-    {
-        ScopeGuard funcGuard([&] { _deadlineMonitor.stopDeadline(this); });
-        result = _bridge->invokeFunction(func, std::move(bsonVal), ignoreReturn);
-    }
+    result = _invokeWithDeadlineMonitoring(
+        timeoutMs, [&] { return _bridge->invokeFunction(func, std::move(bsonVal), ignoreReturn); });
     uassertStatusOK(result.getStatus());
     // Detect any stale emit() calls made during this invocation. In the invokeMap path,
     // _drainEmitToCallback() is called explicitly. For regular invocations the buffer
@@ -537,12 +526,11 @@ bool WasmtimeImplScope::exec(std::string_view code,
                              bool assertOnError,
                              int timeoutMs) {
     std::string wrapped = "function() { " + std::string(code) + " }";
-    ScriptingFunction func = _bridge->createFunction(wrapped);
     auto bsonVal = wasm::wasm_helpers::convertBsonToWcVal(BSONObj());
-    _deadlineMonitor.startDeadline(this, timeoutMs);
-    StatusWith<BSONObj> result =
-        _bridge->invokeFunction(func, std::move(bsonVal), /*ignoreReturn=*/true);
-    _deadlineMonitor.stopDeadline(this);
+    ScriptingFunction func = _bridge->createFunction(wrapped);
+    StatusWith<BSONObj> result = _invokeWithDeadlineMonitoring(timeoutMs, [&] {
+        return _bridge->invokeFunction(func, std::move(bsonVal), /*ignoreReturn=*/true);
+    });
     if (!result.isOK()) {
         if (reportError) {
             LOGV2_ERROR(11605401,
@@ -583,7 +571,11 @@ void WasmtimeImplScope::unregisterOperation() {
 }
 void WasmtimeImplScope::kill() {
     if (_bridge)
-        _bridge->kill();
+        _bridge->kill(ErrorCodes::Interrupted);
+}
+void WasmtimeImplScope::killWithReason(ErrorCodes::Error reason) {
+    if (_bridge)
+        _bridge->kill(reason);
 }
 bool WasmtimeImplScope::isKillPending() const {
     return _bridge && _bridge->isKillPending();

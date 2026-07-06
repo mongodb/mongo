@@ -12,12 +12,16 @@
  *   requires_getmore,
  *   requires_fcv_62,
  *   requires_scripting,
- *   # TODO SERVER-128345: Reenable this test which is timing out on macos.
- *   mozjs_wasm_unsupported,
+ *   # TODO SERVER-128404: Wasmtime's sigaction-based SIGSEGV trap detection conflicts with TSAN's
+ *   # pthread_kill interceptor (CHECK thr->slot!=0 in tsan_interceptors_posix.cpp). Fix is
+ *   # Config::signals_based_traps(false) in TSAN builds (bridge.cpp), deferred to a separate
+ *   # branch. See also: expression_function.js, return_bson_scalar_from_js_function.js.
+ *   tsan_incompatible,
  *  ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {isMozjsWasm} from "jstests/libs/js_engine_util.js";
 
 Random.setRandomSeed();
 
@@ -120,10 +124,14 @@ const neverTimeout = new MultiController([
     new NeverTimeoutController(st.s),
 ]);
 
-// Set ampleTimeMS to at least 2000ms, plus ten times the basic query runtime.
-// This timeout must provide ample time for our queries to run to completion, even on passthrough
-// suites with resource contention.
-const ampleTimeMS = 2000 + 10 * runtimeMillis(() => runQueryWithTimeout(true, 999999999));
+// Set ampleTimeMS to at least 2000ms, plus a multiple of the basic query runtime.
+// On WASM the $where eval has higher variance (JIT compilation per scope on debug builds),
+// so use a larger multiplier to stay clear of the timeout boundary.
+// Pass the mongos admin DB explicitly: the global `db` variable is not set in sharding tests.
+const adminDb = st.s0.getDB("admin");
+const ampleTimeMSBase = runtimeMillis(() => runQueryWithTimeout(true, 999999999));
+const ampleTimeMSMultiplier = isMozjsWasm(adminDb) ? 20 : 10;
+const ampleTimeMS = 2000 + ampleTimeMSMultiplier * ampleTimeMSBase;
 print("ampleTimeMS: " + ampleTimeMS);
 
 // Try to fetch all the data in one batch, with ample time allowed.
@@ -244,9 +252,11 @@ class NetworkFailureController {
     constructor(shard) {
         this.shard = shard;
         this.delayTime = Math.round(1.1 * ampleTimeMS);
+        this._enabledAt = 0;
     }
 
     enable() {
+        this._enabledAt = Date.now();
         // Delay messages from mongos to shard so that mongos will see it as having exceeded
         // MaxTimeMS. The shard process is active and receives the request, but the response is
         // lost. We delay instead of dropping messages because this lets the shard request proceed
@@ -257,8 +267,15 @@ class NetworkFailureController {
 
     disable() {
         this.shard.getPrimary().delayMessagesFrom(st.s, 0);
-        // Allow time for delayed messages to be flushed so that the next request is not delayed.
-        sleep(this.delayTime);
+        // Delayed messages were queued shortly after enable() and are held for delayTime ms
+        // from that point, so they arrive at the shard at approximately _enabledAt + delayTime.
+        // By the time disable() is called, most of that time has already elapsed (the getMore
+        // ran until MaxTimeMS expired). Only sleep for what remains, plus a small safety margin,
+        // rather than the full delayTime — this keeps test duration viable on slow builds
+        // (e.g. WASM on TSAN) where ampleTimeMS and therefore delayTime can be very large.
+        const elapsed = Date.now() - this._enabledAt;
+        const remainingSleep = Math.max(0, this.delayTime - elapsed + 2000);
+        sleep(remainingSleep);
     }
 }
 
@@ -308,7 +325,7 @@ function withEachSingleShardFailure(callback) {
     shard0SleepFailure.disable();
     shard1SleepFailure.enable();
     callback(shard1SleepFailure);
-    shard1NetworkFailure.disable();
+    shard1SleepFailure.disable();
 }
 
 function withEachAllShardFailure(callback) {

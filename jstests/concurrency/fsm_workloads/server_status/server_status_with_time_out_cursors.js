@@ -11,9 +11,6 @@
  *     requires_getmore,
  *     # TODO: SERVER-119660 Ensure server_status_with_time_out_cursors.js does not leak cursors.
  *     can_leak_idle_cursors,
- *     # TODO SERVER-127318 re-enable on WASM once per-request JS context cost is
- *     # eliminated.
- *     mozjs_wasm_unsupported,
  * ]
  */
 export const $config = (function () {
