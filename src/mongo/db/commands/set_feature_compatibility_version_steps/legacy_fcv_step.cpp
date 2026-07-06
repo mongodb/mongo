@@ -290,6 +290,22 @@ void dropAuthoritativeShardCatalogCollectionsOnShards(OperationContext* opCtx) {
             uassertStatusOK(status);
         }
     }
+
+    // The config server is also the primary shard for the config database, and thus maintains its
+    // own local shard catalog collections for it, even when it is not itself registered as a shard
+    // in config.shards. Drop them locally, since the loop above only reaches registered shards.
+    DBDirectClient client(opCtx);
+    for (const auto& nss : {NamespaceString::kConfigShardCatalogDatabasesNamespace,
+                            NamespaceString::kConfigShardCatalogCollectionsNamespace,
+                            NamespaceString::kConfigShardCatalogChunksNamespace}) {
+        BSONObj result;
+        if (!client.dropCollection(nss, defaultMajorityWriteConcern(), &result)) {
+            const auto status = getStatusFromCommandResult(result);
+            if (status != ErrorCodes::NamespaceNotFound) {
+                uassertStatusOK(status);
+            }
+        }
+    }
 }
 
 // TODO (SERVER-98118): remove once 9.0 becomes last LTS.

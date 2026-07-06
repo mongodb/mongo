@@ -64,7 +64,7 @@ function assertAuthoritativeShardCatalog(shard, {authoritativeCollections, haveD
 describeOrSkip("FCV lifecycle for authoritative metadata", function () {
     const kDbName = "testDb";
 
-    let st, mongos, shard0, shard1;
+    let st, mongos, shard0, shard1, configPrimary;
 
     function assertFeatureFlags({enabled}) {
         const db = mongos.getDB(kDbName);
@@ -98,6 +98,7 @@ describeOrSkip("FCV lifecycle for authoritative metadata", function () {
         mongos = st.s;
         shard0 = st.shard0;
         shard1 = st.shard1;
+        configPrimary = st.configRS.getPrimary();
 
         assert.commandWorked(
             mongos.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
@@ -116,14 +117,12 @@ describeOrSkip("FCV lifecycle for authoritative metadata", function () {
 
     it("should correctly create and remove metadata on FCV upgrade and downgrade", function () {
         assertFeatureFlags({enabled: false});
-        assertAuthoritativeShardCatalog(shard0, {
-            authoritativeCollections: false,
-            haveDatabases: false,
-        });
-        assertAuthoritativeShardCatalog(shard1, {
-            authoritativeCollections: false,
-            haveDatabases: false,
-        });
+        for (const node of [shard0, shard1, configPrimary]) {
+            assertAuthoritativeShardCatalog(node, {
+                authoritativeCollections: false,
+                haveDatabases: false,
+            });
+        }
 
         // The upgrade creates the databases metadata on the primary shard, and the catalog on every shard.
         assert.commandWorked(
@@ -135,24 +134,24 @@ describeOrSkip("FCV lifecycle for authoritative metadata", function () {
             authoritativeCollections: true,
             haveDatabases: true,
         });
-        assertAuthoritativeShardCatalog(shard1, {
-            authoritativeCollections: true,
-            haveDatabases: false,
-        });
+        for (const node of [shard1, configPrimary]) {
+            assertAuthoritativeShardCatalog(node, {
+                authoritativeCollections: true,
+                haveDatabases: false,
+            });
+        }
 
         // The downgrade drops everything from every shard.
         assert.commandWorked(
             mongos.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
         );
 
-        assertAuthoritativeShardCatalog(shard0, {
-            authoritativeCollections: false,
-            haveDatabases: false,
-        });
-        assertAuthoritativeShardCatalog(shard1, {
-            authoritativeCollections: false,
-            haveDatabases: false,
-        });
+        for (const node of [shard0, shard1, configPrimary]) {
+            assertAuthoritativeShardCatalog(node, {
+                authoritativeCollections: false,
+                haveDatabases: false,
+            });
+        }
     });
 
     it("should drop pre-existing metadata collection on FCV upgrade", function () {
@@ -232,37 +231,41 @@ describeOrSkip("FCV lifecycle for authoritative metadata", function () {
             authoritativeCollections: true,
             haveDatabases: true,
         });
-        assertAuthoritativeShardCatalog(shard1, {
-            authoritativeCollections: true,
-            haveDatabases: false,
-        });
+        for (const node of [shard1, configPrimary]) {
+            assertAuthoritativeShardCatalog(node, {
+                authoritativeCollections: true,
+                haveDatabases: false,
+            });
+        }
 
-        // Manually create the databases collection on shard1 to simulate a dirty state.
-        assert.commandWorked(
-            shard1.getDB(kAuthoritativeDb).getCollection(kAuthoritativeDbsColl).insertOne({
-                _id: kDbName,
-            }),
-        );
-        st.rs1.awaitLastOpCommitted();
-        assertAuthoritativeShardCatalog(shard1, {
-            authoritativeCollections: true,
-            haveDatabases: true,
-        });
+        // Manually create the databases collection on shard1 and the config server to simulate a
+        // dirty state.
+        for (const rs of [st.rs1, st.configRS]) {
+            const node = rs.getPrimary();
+            assert.commandWorked(
+                node.getDB(kAuthoritativeDb).getCollection(kAuthoritativeDbsColl).insertOne({
+                    _id: kDbName,
+                }),
+            );
+            rs.awaitLastOpCommitted();
+            assertAuthoritativeShardCatalog(node, {
+                authoritativeCollections: true,
+                haveDatabases: true,
+            });
+        }
 
         assert.commandWorked(
             mongos.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
         );
 
-        // Assert everything is gone from both shards.
+        // Assert everything is gone from all shards.
         assertFeatureFlags({enabled: false});
-        assertAuthoritativeShardCatalog(shard0, {
-            authoritativeCollections: false,
-            haveDatabases: false,
-        });
-        assertAuthoritativeShardCatalog(shard1, {
-            authoritativeCollections: false,
-            haveDatabases: false,
-        });
+        for (const node of [shard0, shard1, configPrimary]) {
+            assertAuthoritativeShardCatalog(node, {
+                authoritativeCollections: false,
+                haveDatabases: false,
+            });
+        }
     });
 
     function getGlobalCollectionMetadata(ns) {
