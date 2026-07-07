@@ -100,10 +100,7 @@ describe("scatter-gather queries with ingress rate limiter", function () {
                 assertShardingStatisticsDiffEq(diff, {
                     numOverloadErrorsReceived: 1,
                     numRetriesDueToOverloadAttempted: 0,
-                    // Incremented on the first overload error even when no retry is performed.
-                    // TODO SERVER-129657 Investigate numOperationsRetriedAtLeastOnceDueToOverload
-                    // logic
-                    numOperationsRetriedAtLeastOnceDueToOverload: 1,
+                    numOperationsRetriedAtLeastOnceDueToOverload: 0,
                     numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded: 0,
                 });
             } finally {
