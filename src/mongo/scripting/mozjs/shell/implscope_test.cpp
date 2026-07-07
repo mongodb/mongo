@@ -151,6 +151,38 @@ TEST_F(MozJSImplScopeTest, DBPointerPropertiesAreReadOnly) {
     setGlobalScriptEngine(nullptr);
 }
 
+TEST_F(MozJSImplScopeTest, DeleteGlobal_RemovesInstalledGlobal) {
+    mongo::ScriptEngine::setup(ExecutionEnvironment::TestRunner);
+    {
+        std::unique_ptr<mongo::Scope> scope(
+            mongo::getGlobalScriptEngine()->newScopeForCurrentThread());
+
+        BSONObj doc = BSON("myFunc" << BSONCode("function() { return 1; }"));
+        scope->setElement("myFunc", doc["myFunc"], doc);
+
+        ScriptingFunction callFn = scope->createFunction("return myFunc();");
+        ASSERT_EQ(0, scope->invoke(callFn, nullptr, nullptr, 0));
+        ASSERT_EQ(1.0, scope->getNumber("__returnValue"));
+
+        scope->deleteGlobal("myFunc");
+
+        ScriptingFunction checkFn = scope->createFunction("return typeof myFunc === 'undefined';");
+        ASSERT_EQ(0, scope->invoke(checkFn, nullptr, nullptr, 0));
+        ASSERT_TRUE(scope->getBoolean("__returnValue"));
+    }
+    setGlobalScriptEngine(nullptr);
+}
+
+TEST_F(MozJSImplScopeTest, DeleteGlobal_NonExistentIsNoOp) {
+    mongo::ScriptEngine::setup(ExecutionEnvironment::TestRunner);
+    {
+        std::unique_ptr<mongo::Scope> scope(
+            mongo::getGlobalScriptEngine()->newScopeForCurrentThread());
+        ASSERT_NO_THROW(scope->deleteGlobal("doesNotExist"));
+    }
+    setGlobalScriptEngine(nullptr);
+}
+
 }  // namespace
 
 }  // namespace mozjs

@@ -173,6 +173,8 @@ public:
     void setObject(const char* field, const BSONObj& obj, bool readOnly) override;
     void setFunction(const char* field, const char* code) override;
 
+    void deleteGlobal(std::string_view name) override;
+
     int type(const char* field) override;
 
     void rename(const char* from, const char* to) override;
