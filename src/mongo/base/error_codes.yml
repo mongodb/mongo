@@ -1302,6 +1302,7 @@ error_codes:
       name: StreamProcessorAtlasRetryableUserError,
       categories: [StreamProcessorUserError, StreamProcessorRetryableError],
     }
+  - {code: 514, name: LightweightStepdownConflict}
 
   # ^^^^
   # Add new codes, sequentially numbered, above.

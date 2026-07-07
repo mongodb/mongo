@@ -400,22 +400,45 @@ void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
     _doStepUp(newTerm, stepUpOpTime);
 }
 
+void PrimaryOnlyService::onStepDown_forTest() {
+    tassert(12755410,
+            "onStepDown_forTest can only be used in tests",
+            TestingProctor::instance().isEnabled());
+    {
+        std::lock_guard lk(_mutex);
+        // If this is already set, a previous lightweight stepdown/stepup cycle for this service
+        // is still in progress. We reject it to minimize scenarios where the service is in
+        // constant stepdown/stepup cycles and never gets a chance to do work.
+        uassert(ErrorCodes::LightweightStepdownConflict,
+                str::stream() << getServiceName()
+                              << " is already in a lightweight stepdown/stepup test cycle",
+                !_isOnStepUpStepDownTestMode);
+        _isOnStepUpStepDownTestMode = true;
+    }
+    onStepDown();
+}
+
 void PrimaryOnlyService::onStepUp_forTest() {
     tassert(12755400,
-            "stepDown_forTest can only be used in tests",
+            "stepUp_forTest can only be used in tests",
             TestingProctor::instance().isEnabled());
 
-    auto opTime = repl::ReplicationCoordinator::get(_serviceContext)->getMyLastAppliedOpTime();
+    // Use the last committed op time to prevent a scenario the majority wait for the optime takes
+    // longer than the stepdown interval, leading into a perpetual stepdown/stepup cycle without
+    // a chance for the service to do any work. This is alright because we didn't perform a real
+    // stepdown, so this is still the same primary.
+    auto opTime = repl::ReplicationCoordinator::get(_serviceContext)->getLastCommittedOpTime();
     long long currentTerm = ([&] {
         std::lock_guard lk(_mutex);
         return _term;
     })();
 
-    // Just pass the current term to avoid clashing with the real step up.
-    _doStepUp(currentTerm, opTime);
+    _doStepUp(currentTerm, opTime, true /* clearTestModeOnCompletion */);
 }
 
-void PrimaryOnlyService::_doStepUp(long long newTerm, const OpTime& majorityWaitOpTime) {
+void PrimaryOnlyService::_doStepUp(long long newTerm,
+                                   const OpTime& majorityWaitOpTime,
+                                   bool clearTestModeOnCompletion) {
     SimpleBSONObjUnorderedMap<ActiveInstance> savedInstances;
     invariant(_getHasExecutor());
     auto newThenOldScopedExecutor =
@@ -528,7 +551,12 @@ void PrimaryOnlyService::_doStepUp(long long newTerm, const OpTime& majorityWait
             _rebuildStatus = s;
             _setState(State::kRebuildFailed, lk);
         })
-        .getAsync([](auto&&) {});  // Ignore the result Future
+        .getAsync([this, clearTestModeOnCompletion](auto&&) {
+            if (clearTestModeOnCompletion) {
+                std::lock_guard lk(_mutex);
+                _isOnStepUpStepDownTestMode = false;
+            }
+        });  // Ignore the result Future
     lk.unlock();
 }
 
@@ -925,6 +953,19 @@ void PrimaryOnlyService::waitForStateNotRebuilding_forTest(OperationContext* opC
 
 void PrimaryOnlyService::_waitForStateNotRebuilding(OperationContext* opCtx,
                                                     BasicLockableAdapter m) {
+    // During a real stepdown, an opCtx that is not tied to this service's cancellation source
+    // gets interrupted via ReplicationCoordinator's killAllOperations path. When using
+    // onStepUp_forTest() and onStepDown_forTest(), the onStepUp handler can get into a cyclic
+    // dependency deadlock (so we make it fail early instead):
+    // 1. onStepUp_forTest() waits for previous instance to cleanup itself and finish.
+    // 2. The previous instance is waiting for a different thread.
+    // 3. That different thread is using an opCtx not tied to this service's cancellation source
+    //    and is calling _waitForStateNotRebuilding, waiting for the rebuilding state to be over.
+    if (_isOnStepUpStepDownTestMode && _state == State::kRebuilding &&
+        _opCtxs.find(opCtx) == _opCtxs.end()) {
+        uasserted(ErrorCodes::NotWritablePrimary,
+                  str::stream() << getServiceName() << " is rebuilding instances");
+    }
 
     opCtx->waitForConditionOrInterrupt(
         _stateChangeCV, m, [this]() { return _state != State::kRebuilding; });

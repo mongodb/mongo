@@ -165,7 +165,7 @@ void ReshardingCoordinatorService::abortAllReshardCollection(
 
 void ReshardingCoordinatorService::stepDown_forTest() {
     LOGV2(12755408, "Performing resharding coordinator service stepdown for test");
-    onStepDown();
+    onStepDown_forTest();
 }
 
 void ReshardingCoordinatorService::stepUp_forTest() {

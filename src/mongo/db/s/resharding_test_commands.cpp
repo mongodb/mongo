@@ -55,6 +55,7 @@
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/rpc/op_msg.h"
@@ -124,20 +125,36 @@ public:
                     12755403, "resharding coordinator service does not exist", coordinatorService);
             }
 
+            // Each service's stepdown/stepup pair is independent of the others. If a given
+            // service's previous lightweight cycle hasn't finished rebuilding yet,
+            // stepDown_forTest() throws LightweightStepdownConflict; skip only that service this
+            // round instead of letting the exception abort the whole command. Aborting here would
+            // leave any service processed earlier in this call permanently stuck: it already
+            // called stepDown_forTest() successfully (moving it to kPaused and setting its
+            // test-mode flag), but would never reach the matching stepUp_forTest() call below to
+            // step it back up and clear that flag, so every subsequent invocation would
+            // immediately hit the same conflict for that service.
+            auto stepDownThenUpForTest = [&](auto* service) {
+                try {
+                    service->stepDown_forTest();
+                } catch (const ExceptionFor<ErrorCodes::LightweightStepdownConflict>& ex) {
+                    LOGV2(12755411,
+                          "Skipping lightweight stepdown/stepup this round; a previous "
+                          "lightweight cycle for this service is still rebuilding",
+                          "service"_attr = service->getServiceName(),
+                          "error"_attr = ex.toStatus());
+                    return;
+                }
+                service->stepUp_forTest();
+            };
+
             // Try to mimic order in registerPrimaryOnlyServices in mongod_main.cpp.
             if (coordinatorService) {
-                coordinatorService->stepDown_forTest();
+                stepDownThenUpForTest(coordinatorService);
             }
 
-            donorService->stepDown_forTest();
-            recipientService->stepDown_forTest();
-
-            if (coordinatorService) {
-                coordinatorService->stepUp_forTest();
-            }
-
-            donorService->stepUp_forTest();
-            recipientService->stepUp_forTest();
+            stepDownThenUpForTest(donorService);
+            stepDownThenUpForTest(recipientService);
         }
 
     private:

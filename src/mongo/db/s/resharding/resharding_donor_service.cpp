@@ -283,7 +283,7 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingDonorService::cons
 
 void ReshardingDonorService::stepDown_forTest() {
     LOGV2(12755406, "Performing resharding donor service stepdown for test");
-    onStepDown();
+    onStepDown_forTest();
 }
 
 void ReshardingDonorService::stepUp_forTest() {

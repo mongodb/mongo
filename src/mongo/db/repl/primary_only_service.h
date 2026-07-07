@@ -328,6 +328,14 @@ public:
     void waitForStateNotRebuilding_forTest(OperationContext* opCtx);
 
     /**
+     * Test-only step-down that marks this service as being in a lightweight stepdown/stepup test
+     * cycle (see _isOnStepUpStepDownTestMode below), then steps down normally. Must be paired
+     * with a subsequent onStepUp_forTest() call, which clears the flag once the rebuild triggered
+     * by that stepup completes.
+     */
+    MONGO_MOD_PUBLIC void onStepDown_forTest();
+
+    /**
      * Test-only step-up that bypasses the term-monotonicity invariant. Use when simulating a
      * step-down/step-up cycle without a real replica-set election (so the term doesn't advance).
      */
@@ -546,8 +554,13 @@ private:
      *
      * The majorityWaitOpTime is the time to wait for before proceeding to read the backing state
      * documents and rebuild the instances.
+     *
+     * If clearTestModeOnCompletion is true, _isOnStepUpStepDownTestMode is cleared once the
+     * rebuild this call triggers leaves State::kRebuilding (whether it succeeds or fails).
      */
-    void _doStepUp(long long newTerm, const OpTime& majorityWaitOpTime);
+    void _doStepUp(long long newTerm,
+                   const OpTime& majorityWaitOpTime,
+                   bool clearTestModeOnCompletion = false);
 
     ServiceContext* const _serviceContext;
 
@@ -584,6 +597,11 @@ private:
     std::shared_ptr<executor::TaskExecutor> _executor;  // (W)
 
     State _state = State::kPaused;  // (M)
+
+    // Set for the duration of a test-only lightweight stepdown/stepup cycle: from
+    // onStepDown_forTest() until the rebuild triggered by the paired onStepUp_forTest() call
+    // completes.
+    bool _isOnStepUpStepDownTestMode = false;  // (M)
 
     // If rebuilding the instances fails, for example due to a failure reloading the state documents
     // from disk, this Status gets set to a non-ok value and calls to lookup() or getOrCreate() will

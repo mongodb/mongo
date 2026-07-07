@@ -298,7 +298,7 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingRecipientService::
 
 void ReshardingRecipientService::stepDown_forTest() {
     LOGV2(12755404, "Performing resharding recipient service stepdown for test");
-    onStepDown();
+    onStepDown_forTest();
 }
 
 void ReshardingRecipientService::stepUp_forTest() {
