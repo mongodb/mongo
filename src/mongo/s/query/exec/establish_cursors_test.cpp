@@ -42,6 +42,7 @@
 #include "mongo/db/shard_role/resource_yielders.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
@@ -53,8 +54,10 @@
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
+#include <condition_variable>
 #include <cstddef>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -565,6 +568,82 @@ TEST_F(EstablishCursorsTest, SingleRemoteMaxesOutRetriableErrors) {
     expectKillOperations(1);
 
     future.default_timed_get();
+}
+
+// Verify that the CleanupPool decoration on ServiceContext handles sequential cleanup requests
+// correctly: the first call lazily starts the thread pool, and the second call reuses it without
+// attempting a second startup.
+TEST_F(EstablishCursorsTest, CleanupPoolHandlesSequentialRequests) {
+    BSONObj cmdObj = fromjson("{find: 'testcoll'}");
+    std::vector<AsyncRequestsSender::Request> remotes{{kTestShardIds[0], cmdObj}};
+
+    for (int iteration = 0; iteration < 2; ++iteration) {
+        auto future = launchAsync([&] {
+            ASSERT_THROWS(establishCursors(operationContext(),
+                                           executor(),
+                                           _nss,
+                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                           remotes,
+                                           false),  // allowPartialResults
+                          ExceptionFor<ErrorCodes::HostUnreachable>);
+        });
+
+        for (int i = 0; i < kMaxRetries + 1; ++i) {
+            onCommand([this](const RemoteCommandRequest& request) {
+                ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
+                return Status(ErrorCodes::HostUnreachable, "host unreachable");
+            });
+        }
+
+        expectKillOperations(1);
+        future.default_timed_get();
+    }
+}
+
+// Verify that concurrent callers racing to lazily start the CleanupPool decoration only start the
+// underlying thread pool once, and that every scheduled task still runs to completion.
+TEST_F(EstablishCursorsTest, CleanupPoolHandlesConcurrentStartupRace) {
+    constexpr int kNumThreads = 8;
+
+    auto fp = globalFailPointRegistry().find("hangBeforeCleanupPoolStartup");
+    invariant(fp);
+    auto timesEntered = fp->setMode(FailPoint::alwaysOn);
+
+    // Tasks count themselves in on completion. A blocking primitive (e.g. a Barrier) cannot be used
+    // here because the CleanupPool has a single worker thread: a task that blocked waiting for its
+    // peers would stall the only thread, and the remaining tasks would never run.
+    std::mutex mutex;
+    std::condition_variable cv;
+    int completed = 0;
+
+    std::vector<stdx::thread> threads;
+    for (int i = 0; i < kNumThreads; ++i) {
+        threads.emplace_back([&] {
+            scheduleOnCursorCleanupPool_forTest(getServiceContext(), [&](Status) {
+                std::lock_guard lk(mutex);
+                if (++completed == kNumThreads) {
+                    cv.notify_one();
+                }
+            });
+        });
+    }
+
+    // The failpoint hangs each thread after the lock-free running check but before the startup
+    // lock, so waiting for all threads to enter it guarantees they genuinely race on the
+    // check-and-startup logic (rather than running serially) once the failpoint is cleared.
+    fp->waitForTimesEntered(timesEntered + kNumThreads);
+    fp->setMode(FailPoint::off);
+
+    // Wait for every scheduled task to actually run, proving the pool started successfully exactly
+    // once despite the concurrent callers.
+    {
+        std::unique_lock lk(mutex);
+        cv.wait(lk, [&] { return completed == kNumThreads; });
+    }
+
+    for (auto& thread : threads) {
+        thread.join();
+    }
 }
 
 TEST_F(EstablishCursorsTest, SingleRemoteMaxesOutRetriableErrorsAllowPartialResults) {

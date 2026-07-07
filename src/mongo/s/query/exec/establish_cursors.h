@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/namespace_string.h"
@@ -41,6 +42,7 @@
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -136,5 +138,14 @@ MONGO_MOD_NEEDS_REPLACEMENT void appendOpKey(const OperationKey& opKey, BSONObjB
  * real sleeps. Not thread-safe, so use only during controlled testing.
  */
 void setCursorEstablisherSuppressorClockSource_forTest(ClockSource* cs);
+
+/**
+ * Schedules 'task' directly on the ServiceContext-decorated cursor cleanup thread pool that
+ * backs scheduleCursorCleanup(). Exposed only so tests can exercise the pool's lazy-startup logic
+ * (including under concurrent access) without needing to drive a full cursor-establishment
+ * failure through the network layer.
+ */
+void scheduleOnCursorCleanupPool_forTest(ServiceContext* svcCtx,
+                                         unique_function<void(Status)> task);
 
 }  // namespace mongo
