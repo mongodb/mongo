@@ -35,15 +35,12 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/client.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection_common_types_gen.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
@@ -77,23 +74,6 @@ namespace {
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test", "foo");
 
-struct BenchmarkOperationContext {
-    BenchmarkOperationContext() {
-        _serviceContext = ServiceContext::make();
-        _client = _serviceContext->getService()->makeClient("chunk_manager_refresh_bm");
-        _opCtx = _client->makeOperationContext();
-    }
-
-    OperationContext* get() const {
-        return _opCtx.get();
-    }
-
-private:
-    ServiceContext::UniqueServiceContext _serviceContext;
-    ServiceContext::UniqueClient _client;
-    ServiceContext::UniqueOperationContext _opCtx;
-};
-
 RoutingTableHistoryValueHandle makeStandaloneRoutingTableHistory(RoutingTableHistory rt) {
     const auto version = rt.getVersion();
     return RoutingTableHistoryValueHandle(
@@ -101,24 +81,8 @@ RoutingTableHistoryValueHandle makeStandaloneRoutingTableHistory(RoutingTableHis
         ComparableChunkVersion::makeComparableChunkVersion(version));
 }
 
-UUID getShardUuid(int i) {
-    std::array<unsigned char, UUID::kNumBytes> bytes{};
-    bytes[0] = 0x00;
-    bytes[1] = 0x01;
-    int64_t idx = i;
-    for (int i = 0; i < 8; ++i) {
-        bytes[15 - i] = static_cast<unsigned char>(idx & 0xFF);
-        idx >>= 8;
-    }
-    return UUID::fromCDR(bytes);
-}
-
 ShardId getShardId(int i) {
     return {std::string(str::stream() << "shard_" << i)};
-}
-
-ShardHandle getShardHandle(int i) {
-    return ShardHandle(getShardId(i), getShardUuid(i));
 }
 
 ChunkRange getRangeForChunk(int i, int nChunks) {
@@ -131,8 +95,7 @@ ChunkRange getRangeForChunk(int i, int nChunks) {
 }
 
 template <typename ShardSelectorFn>
-CollectionMetadata makeChunkManagerWithShardSelector(OperationContext* opCtx,
-                                                     int nShards,
+CollectionMetadata makeChunkManagerWithShardSelector(int nShards,
                                                      uint32_t nChunks,
                                                      ShardSelectorFn selectShard) {
     const auto collUuid = UUID::gen();
@@ -146,7 +109,7 @@ CollectionMetadata makeChunkManagerWithShardSelector(OperationContext* opCtx,
         chunks.emplace_back(collUuid,
                             getRangeForChunk(i, nChunks),
                             ChunkVersion({collEpoch, Timestamp(1, 0)}, {i + 1, 0}),
-                            selectShard(opCtx, i, nShards, nChunks));
+                            selectShard(i, nShards, nChunks));
     }
 
     auto rt = RoutingTableHistory::makeNew(kNss,
@@ -162,31 +125,27 @@ CollectionMetadata makeChunkManagerWithShardSelector(OperationContext* opCtx,
                                            true,
                                            chunks);
     return CollectionMetadata(CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))),
-                              getShardHandle(0));
+                              getShardId(0));
 }
 
-ShardRef pessimalShardSelector(OperationContext* opCtx, int i, int nShards, int nChunks) {
-    return getShardHandle(i % nShards).toShardRef(opCtx);
+ShardId pessimalShardSelector(int i, int nShards, int nChunks) {
+    return getShardId(i % nShards);
 }
 
-ShardRef optimalShardSelector(OperationContext* opCtx, int i, int nShards, int nChunks) {
+ShardId optimalShardSelector(int i, int nShards, int nChunks) {
     invariant(nShards <= nChunks);
     const auto shardNum = (int64_t(i) * nShards / nChunks) % nShards;
-    return getShardHandle(shardNum).toShardRef(opCtx);
+    return getShardId(shardNum);
 }
 
 MONGO_COMPILER_NOINLINE auto makeChunkManagerWithPessimalBalancedDistribution(int nShards,
                                                                               uint32_t nChunks) {
-    BenchmarkOperationContext benchmarkOpCtx;
-    return makeChunkManagerWithShardSelector(
-        benchmarkOpCtx.get(), nShards, nChunks, pessimalShardSelector);
+    return makeChunkManagerWithShardSelector(nShards, nChunks, pessimalShardSelector);
 }
 
 MONGO_COMPILER_NOINLINE auto makeChunkManagerWithOptimalBalancedDistribution(int nShards,
                                                                              uint32_t nChunks) {
-    BenchmarkOperationContext benchmarkOpCtx;
-    return makeChunkManagerWithShardSelector(
-        benchmarkOpCtx.get(), nShards, nChunks, optimalShardSelector);
+    return makeChunkManagerWithShardSelector(nShards, nChunks, optimalShardSelector);
 }
 
 MONGO_COMPILER_NOINLINE auto runIncrementalUpdate(const CollectionMetadata& cm,
@@ -198,7 +157,7 @@ MONGO_COMPILER_NOINLINE auto runIncrementalUpdate(const CollectionMetadata& cm,
         false /* unsplittable */,
         newChunks);
     return CollectionMetadata(CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))),
-                              getShardHandle(0));
+                              getShardId(0));
 }
 
 /*
@@ -208,7 +167,6 @@ MONGO_COMPILER_NOINLINE auto runIncrementalUpdate(const CollectionMetadata& cm,
  * The chunks modified in the routing table are equally spaced.
  */
 void BM_IncrementalSpacedRefreshMoveChunks(benchmark::State& state) {
-    BenchmarkOperationContext benchmarkOpCtx;
     const int nShards = state.range(0);
     const int nChunks = state.range(1);
     const int nUpdates = state.range(2);
@@ -225,7 +183,7 @@ void BM_IncrementalSpacedRefreshMoveChunks(benchmark::State& state) {
         newChunks.emplace_back(metadata.getUUID(),
                                getRangeForChunk(idx, nChunks),
                                lastVersion,
-                               pessimalShardSelector(benchmarkOpCtx.get(), idx, nShards, nChunks));
+                               pessimalShardSelector(idx, nShards, nChunks));
     }
 
     std::mt19937 g;
@@ -253,7 +211,6 @@ BENCHMARK(BM_IncrementalSpacedRefreshMoveChunks)
  * Simulate a refresh of the ChunkManager where a number of chunks is merged together.
  */
 void BM_IncrementalSpacedRefreshMergeChunks(benchmark::State& state) {
-    BenchmarkOperationContext benchmarkOpCtx;
     const int nShards = state.range(0);
     const int nChunks = state.range(1);
     const int nUpdates = state.range(2);
@@ -265,13 +222,13 @@ void BM_IncrementalSpacedRefreshMergeChunks(benchmark::State& state) {
     newChunks.reserve(nUpdates);
     invariant(nUpdates <= nShards);
     const auto shardSpacing = nShards / (nUpdates + 1);
-    std::set<ShardRef> shardsToMerge;
+    std::set<ShardId> shardsToMerge;
     for (int i = 0; i < nUpdates; i++) {
         invariant(i * shardSpacing <= nShards);
-        shardsToMerge.emplace(getShardHandle(i * shardSpacing).toShardRef(benchmarkOpCtx.get()));
+        shardsToMerge.emplace(getShardId(i * shardSpacing));
     }
 
-    ShardRef shardRef;
+    ShardId shardId;
     std::vector<ChunkRange> rangesToMerge;
 
     const auto flushRanges = [&] {
@@ -284,17 +241,17 @@ void BM_IncrementalSpacedRefreshMergeChunks(benchmark::State& state) {
             metadata.getUUID(),
             ChunkRange(rangesToMerge.front().getMin(), rangesToMerge.back().getMax()),
             lastVersion,
-            shardRef);
+            shardId);
         rangesToMerge.clear();
     };
 
     for (int i = 0; i < nChunks; i++) {
-        auto nextShardRef = pessimalShardSelector(benchmarkOpCtx.get(), i, nShards, nChunks);
-        if (nextShardRef != shardRef) {
+        auto nextShardId = pessimalShardSelector(i, nShards, nChunks);
+        if (nextShardId != shardId) {
             flushRanges();
-            shardRef = nextShardRef;
+            shardId = nextShardId;
         }
-        if (shardsToMerge.count(shardRef) == 1) {
+        if (shardsToMerge.count(shardId) == 1) {
             rangesToMerge.emplace_back(getRangeForChunk(i, nChunks));
         }
     }
@@ -326,7 +283,6 @@ BENCHMARK(BM_IncrementalSpacedRefreshMergeChunks)
 
 template <typename ShardSelectorFn>
 auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectShard) {
-    BenchmarkOperationContext benchmarkOpCtx;
     const int nShards = state.range(0);
     const uint32_t nChunks = state.range(1);
 
@@ -341,7 +297,7 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
         chunks.emplace_back(collUuid,
                             getRangeForChunk(i, nChunks),
                             ChunkVersion({collEpoch, Timestamp(1, 0)}, {i + 1, 0}),
-                            selectShard(benchmarkOpCtx.get(), i, nShards, nChunks));
+                            selectShard(i, nShards, nChunks));
     }
 
     for (auto keepRunning : state) {
@@ -358,8 +314,7 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
                                                true,
                                                chunks);
         benchmark::DoNotOptimize(CollectionMetadata(
-            CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))),
-            getShardHandle(0)));
+            CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))), getShardId(0)));
     }
 }
 

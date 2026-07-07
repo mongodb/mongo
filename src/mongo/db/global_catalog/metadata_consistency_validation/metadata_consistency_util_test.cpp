@@ -913,8 +913,7 @@ TEST_F(MetadataConsistencyTest, ShardTrackedCollectionInconsistencyTest) {
             std::make_shared<RoutingTableHistory>(std::move(rt)),
             ComparableChunkVersion::makeComparableChunkVersion(version));
 
-        const auto collectionMetadata =
-            CollectionMetadata(CurrentChunkManager(rtHandle), ShardHandle(_shardId, boost::none));
+        const auto collectionMetadata = CollectionMetadata(CurrentChunkManager(rtHandle), _shardId);
 
         auto scopedCSR = CollectionShardingRuntime::acquireExclusive(opCtx, _nss);
         scopedCSR->setCollectionMetadata(opCtx, collectionMetadata);
@@ -1319,8 +1318,7 @@ protected:
         const auto rtHandle = RoutingTableHistoryValueHandle(
             std::make_shared<RoutingTableHistory>(std::move(rt)),
             ComparableChunkVersion::makeComparableChunkVersion(version));
-        const auto collectionMetadata =
-            CollectionMetadata(CurrentChunkManager(rtHandle), ShardHandle(_shardId, boost::none));
+        const auto collectionMetadata = CollectionMetadata(CurrentChunkManager(rtHandle), _shardId);
         auto scopedCSR = CollectionShardingRuntime::acquireExclusive(operationContext(), nss);
         scopedCSR->setCollectionMetadata(operationContext(),
                                          collectionMetadata,
@@ -1353,8 +1351,7 @@ protected:
         const auto rtHandle = RoutingTableHistoryValueHandle(
             std::make_shared<RoutingTableHistory>(std::move(rt)),
             ComparableChunkVersion::makeComparableChunkVersion(version));
-        const auto collectionMetadata =
-            CollectionMetadata(CurrentChunkManager(rtHandle), ShardHandle(_shardId, boost::none));
+        const auto collectionMetadata = CollectionMetadata(CurrentChunkManager(rtHandle), _shardId);
         auto scopedCSR = CollectionShardingRuntime::acquireExclusive(opCtx, _nss);
         scopedCSR->setCollectionMetadata(opCtx, collectionMetadata);
     }

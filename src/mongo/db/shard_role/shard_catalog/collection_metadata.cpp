@@ -55,15 +55,14 @@
 
 namespace mongo {
 
-CollectionMetadata::CollectionMetadata(CurrentChunkManager cm, const ShardHandle& thisShardHandle)
-    : _cm(std::move(cm)), _thisShardHandle(thisShardHandle) {}
+CollectionMetadata::CollectionMetadata(CurrentChunkManager cm, const ShardId& thisShardId)
+    : _cm(std::move(cm)), _thisShardId(thisShardId) {}
 
-CollectionMetadata::CollectionMetadata(PointInTimeChunkManager cm,
-                                       const ShardHandle& thisShardHandle)
-    : _cm(std::move(cm)), _thisShardHandle(thisShardHandle) {}
+CollectionMetadata::CollectionMetadata(PointInTimeChunkManager cm, const ShardId& thisShardId)
+    : _cm(std::move(cm)), _thisShardId(thisShardId) {}
 
-CollectionMetadata CollectionMetadata::makeUpdated(const std::vector<ChunkType>& changedChunks,
-                                                   const ShardHandle& thisShardHandle) const {
+CollectionMetadata CollectionMetadata::makeUpdated(
+    const std::vector<ChunkType>& changedChunks) const {
     tassert(12775502, "Expected metadata to have a routing table", hasRoutingTable());
 
     const auto currentChunkManager = getCurrentChunkManager();
@@ -85,11 +84,11 @@ CollectionMetadata CollectionMetadata::makeUpdated(const std::vector<ChunkType>&
             compareResult == std::partial_ordering::equivalent) {
             // Skip applying `changedChunks` if the current `ChunkManager` already has a
             // version >= the highest version in `changedChunks`.
-            return CollectionMetadata(CurrentChunkManager(*currentChunkManager), thisShardHandle);
+            return CollectionMetadata(CurrentChunkManager(*currentChunkManager), _thisShardId);
         }
     }
 
-    return CollectionMetadata(currentChunkManager->makeUpdated(changedChunks), thisShardHandle);
+    return CollectionMetadata(currentChunkManager->makeUpdated(changedChunks), _thisShardId);
 }
 
 bool CollectionMetadata::allowMigrations() const {
@@ -194,7 +193,7 @@ RangeMap CollectionMetadata::getChunks() const {
     RangeMap chunksMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>());
 
     getChunkManagerBase().forEachChunk([this, &chunksMap](const auto& chunk) {
-        if (chunk.getShardId() == _thisShardHandle.name())
+        if (chunk.getShardId() == _thisShardId)
             chunksMap.emplace_hint(chunksMap.end(), chunk.getMin(), chunk.getMax());
 
         return true;
@@ -208,8 +207,8 @@ RangeMap CollectionMetadata::getChunks() const {
 bool CollectionMetadata::getNextChunk(const BSONObj& lookupKey, ChunkType* chunk) const {
     tassert(10016203, "Expected a routing table to be initialized", hasRoutingTable());
 
-    auto nextChunk = getCurrentChunkManager()->getNextChunkOnShard(
-        nullptr /* opCtx */, lookupKey, _thisShardHandle.name());
+    auto nextChunk =
+        getCurrentChunkManager()->getNextChunkOnShard(nullptr /* opCtx */, lookupKey, _thisShardId);
     if (!nextChunk)
         return false;
 
@@ -222,7 +221,7 @@ bool CollectionMetadata::currentShardHasAnyChunks() const {
     tassert(10016204, "Expected a routing table to be initialized", hasRoutingTable());
     std::set<ShardId> shards;
     getCurrentChunkManager()->getAllShardIds(&shards);
-    return shards.find(_thisShardHandle.name()) != shards.end();
+    return shards.find(_thisShardId) != shards.end();
 }
 
 boost::optional<ChunkRange> CollectionMetadata::getNextOrphanRange(
@@ -299,7 +298,7 @@ void CollectionMetadata::toBSONChunks(BSONArrayBuilder* builder) const {
         return;
 
     getChunkManagerBase().forEachChunk([this, &builder](const auto& chunk) {
-        if (chunk.getShardId() == _thisShardHandle.name()) {
+        if (chunk.getShardId() == _thisShardId) {
             BSONArrayBuilder chunkBB(builder->subarrayStart());
             chunkBB.append(chunk.getMin());
             chunkBB.append(chunk.getMax());

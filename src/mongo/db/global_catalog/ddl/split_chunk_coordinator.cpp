@@ -118,7 +118,7 @@ bool checkPreconditions(OperationContext* opCtx,
     // catalog.
     auto cm = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
-    const CollectionMetadata metadata(std::move(cm), ShardingState::get(opCtx)->shardHandle());
+    const CollectionMetadata metadata(std::move(cm), ShardingState::get(opCtx)->shardId());
 
     // Validate that the collection is sharded and that its identity (epoch / timestamp) still
     // matches the request.
@@ -357,7 +357,7 @@ ExecutorFuture<void> SplitChunkCoordinator::_runImpl(
                         Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(
                             opCtx, nss()));
                     const CollectionMetadata metadata(std::move(cm),
-                                                      ShardingState::get(opCtx)->shardHandle());
+                                                      ShardingState::get(opCtx)->shardId());
 
                     auto newDoc = _doc;
                     newDoc.setShardVersionPreSplit(metadata.getShardPlacementVersion());

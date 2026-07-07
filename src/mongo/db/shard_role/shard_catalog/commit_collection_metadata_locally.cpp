@@ -381,7 +381,7 @@ void updateShardCatalogCache(OperationContext* opCtx,
                              const NamespaceString& nss,
                              const CollectionType& coll,
                              const std::vector<ChunkType>& chunks) {
-    auto thisShardHandle = ShardingState::get(opCtx)->shardHandle();
+    auto thisShardId = ShardingState::get(opCtx)->shardId();
     auto rt = [&] {
         auto defaultCollator = [&]() -> std::unique_ptr<CollatorInterface> {
             if (!coll.getDefaultCollation().isEmpty()) {
@@ -410,7 +410,7 @@ void updateShardCatalogCache(OperationContext* opCtx,
         RoutingTableHistoryValueHandle(std::make_shared<RoutingTableHistory>(std::move(rt)),
                                        ComparableChunkVersion::makeComparableChunkVersion(version));
 
-    CollectionMetadata ownedMetadata(CurrentChunkManager(std::move(rtHandle)), thisShardHandle);
+    CollectionMetadata ownedMetadata(CurrentChunkManager(std::move(rtHandle)), thisShardId);
 
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
     scopedCsr->setCollectionMetadata(opCtx, std::move(ownedMetadata));

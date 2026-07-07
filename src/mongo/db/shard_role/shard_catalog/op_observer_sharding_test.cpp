@@ -115,15 +115,14 @@ protected:
      * salient detail is the argument `keyPattern` which, defining the shard key, selects the fields
      * that will be extracted from the document to the document key.
      */
-    static CollectionMetadata makeAMetadata(OperationContext* opCtx, BSONObj const& keyPattern) {
+    static CollectionMetadata makeAMetadata(BSONObj const& keyPattern) {
         const UUID uuid = UUID::gen();
         const OID epoch = OID::gen();
         auto range = ChunkRange(BSON("key" << MINKEY), BSON("key" << MAXKEY));
-        const ShardHandle shardHandle(ShardId("other"), UUID::gen());
         auto chunk = ChunkType(uuid,
                                std::move(range),
                                ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}),
-                               shardHandle.toShardRef(opCtx));
+                               ShardId("other"));
         auto rt = RoutingTableHistory::makeNew(kTestNss,
                                                uuid,
                                                KeyPattern(keyPattern),
@@ -141,7 +140,7 @@ protected:
         return CollectionMetadata(
             PointInTimeChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)),
                                     Timestamp(100, 0)),
-            shardHandle);
+            ShardId("this"));
     }
 };
 
@@ -170,7 +169,7 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateUnsharded) {
 
 TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithoutIdInShardKey) {
     // Push a CollectionMetadata with a shard key not including "_id"...
-    const auto metadata{makeAMetadata(operationContext(), BSON("key" << 1 << "key3" << 1))};
+    const auto metadata{makeAMetadata(BSON("key" << 1 << "key3" << 1))};
     setCollectionFilteringMetadata(operationContext(), metadata);
 
     ScopedSetShardRole scopedSetShardRole{operationContext(),
@@ -198,8 +197,7 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithoutIdInShardKey) {
 
 TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdInShardKey) {
     // Push a CollectionMetadata with a shard key that does have "_id" in the middle...
-    const auto metadata{
-        makeAMetadata(operationContext(), BSON("key" << 1 << "_id" << 1 << "key2" << 1))};
+    const auto metadata{makeAMetadata(BSON("key" << 1 << "_id" << 1 << "key2" << 1))};
     setCollectionFilteringMetadata(operationContext(), metadata);
 
     ScopedSetShardRole scopedSetShardRole{operationContext(),
@@ -227,7 +225,7 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdInShardKey) {
 
 TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdHashInShardKey) {
     // Push a CollectionMetadata with a shard key "_id", hashed.
-    const auto metadata{makeAMetadata(operationContext(), BSON("_id" << "hashed"))};
+    const auto metadata{makeAMetadata(BSON("_id" << "hashed"))};
     setCollectionFilteringMetadata(operationContext(), metadata);
 
     ScopedSetShardRole scopedSetShardRole{operationContext(),

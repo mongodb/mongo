@@ -867,8 +867,7 @@ void ShardServerOpObserver::onUpdateCollectionMetadata(OperationContext* opCtx,
             ChunkType::parseConfigBSONDocuments(entry.getChangedChunks(),
                                                 currentMetadata->getUUID(),
                                                 collPlacementVersion.epoch(),
-                                                collPlacementVersion.getTimestamp()),
-            ShardingState::get(opCtx)->shardHandle()),
+                                                collPlacementVersion.getTimestamp())),
         CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 }
 

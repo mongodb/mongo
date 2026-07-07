@@ -172,9 +172,9 @@ public:
             }
 
             CollectionShardingRuntime::acquireExclusive(opCtx.get(), _outputNss)
-                ->setCollectionMetadata(
-                    opCtx.get(),
-                    CollectionMetadata(makeChunkManagerForOutputCollection(), _myDonorHandle));
+                ->setCollectionMetadata(opCtx.get(),
+                                        CollectionMetadata(makeChunkManagerForOutputCollection(),
+                                                           _myDonorHandle.name()));
 
             _metrics =
                 ReshardingMetrics::makeInstance_forTest(_sourceUUID,

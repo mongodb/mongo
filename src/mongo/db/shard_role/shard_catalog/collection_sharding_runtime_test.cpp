@@ -97,16 +97,13 @@ const NamespaceString kTestNss =
     NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 const std::string kShardKey = "_id";
 const BSONObj kShardKeyPattern = BSON(kShardKey << 1);
-const ShardHandle kThisShardHandle = ShardHandle(ShardId("thisShard"), UUID::gen());
-const ShardHandle kOtherShardHandle = ShardHandle(ShardId("otherShard"), UUID::gen());
 
 class CollectionShardingRuntimeTest : public ShardServerTestFixture {
 public:
-    static CollectionMetadata makeShardedMetadata(
-        OperationContext* opCtx,
-        UUID uuid = UUID::gen(),
-        ShardHandle chunkShardHandle = kOtherShardHandle,
-        ShardHandle collectionShardHandle = kThisShardHandle) {
+    static CollectionMetadata makeShardedMetadata(OperationContext* opCtx,
+                                                  UUID uuid = UUID::gen(),
+                                                  ShardId chunkShardId = ShardId("other"),
+                                                  ShardId collectionShardId = ShardId("0")) {
         const OID epoch = OID::gen();
         const Timestamp timestamp(Date_t::now());
 
@@ -115,10 +112,8 @@ public:
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
         auto range = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY));
-        auto chunk = ChunkType(uuid,
-                               std::move(range),
-                               ChunkVersion({epoch, timestamp}, {1, 0}),
-                               chunkShardHandle.toShardRef(opCtx));
+        auto chunk = ChunkType(
+            uuid, std::move(range), ChunkVersion({epoch, timestamp}, {1, 0}), chunkShardId);
         CurrentChunkManager cm(makeStandaloneRoutingTableHistory(
             RoutingTableHistory::makeNew(kTestNss,
                                          uuid,
@@ -134,17 +129,14 @@ public:
                                          true,
                                          {std::move(chunk)})));
 
-        return CollectionMetadata(std::move(cm), collectionShardHandle);
+        return CollectionMetadata(std::move(cm), collectionShardId);
     }
 
-    static CollectionMetadata changeShardVersion(OperationContext* opCtx,
-                                                 const CollectionMetadata& metadata,
+    static CollectionMetadata changeShardVersion(const CollectionMetadata& metadata,
                                                  const ChunkVersion& newVersion) {
         auto range = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY));
-        auto chunk = ChunkType(metadata.getUUID(),
-                               std::move(range),
-                               newVersion,
-                               metadata.shardHandle().toShardRef(opCtx));
+        auto chunk =
+            ChunkType(metadata.getUUID(), std::move(range), newVersion, metadata.shardId());
         CurrentChunkManager cm(makeStandaloneRoutingTableHistory(
             RoutingTableHistory::makeNew(metadata.getChunkManager()->getNss(),
                                          metadata.getUUID(),
@@ -158,7 +150,7 @@ public:
                                          boost::none /* reshardingFields */,
                                          true,
                                          {std::move(chunk)})));
-        return CollectionMetadata{cm, metadata.shardHandle()};
+        return CollectionMetadata{cm, metadata.shardId()};
     }
 
     // Builds sharded metadata over a gap-allowing routing table containing only the given owned
@@ -166,10 +158,9 @@ public:
     // actually owns. Each entry is {min, max, owningShard}; unowned ranges are left as real gaps.
     // `collectionShardId` is the shard whose perspective `keyBelongsToMe` answers from.
     static CollectionMetadata makeGappedShardedMetadata(
-        OperationContext* opCtx,
         const UUID& uuid,
-        const std::vector<std::tuple<int, int, ShardHandle>>& ownedChunks,
-        ShardHandle collectionShardHandle = kThisShardHandle) {
+        const std::vector<std::tuple<int, int, ShardId>>& ownedChunks,
+        ShardId collectionShardId = ShardId("0")) {
         const OID epoch = OID::gen();
         const Timestamp timestamp(Date_t::now());
 
@@ -182,7 +173,7 @@ public:
             ChunkType chunk(uuid,
                             ChunkRange(BSON(kShardKey << minVal), BSON(kShardKey << maxVal)),
                             version,
-                            owner.toShardRef(opCtx));
+                            owner);
             chunk.setOnCurrentShardSince(Timestamp(100, 0));
             chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), chunk.getShard())});
             chunks.push_back(std::move(chunk));
@@ -202,15 +193,14 @@ public:
                                                      boost::none /* reshardingFields */,
                                                      true,
                                                      chunks)));
-        return CollectionMetadata(std::move(cm), std::move(collectionShardHandle));
+        return CollectionMetadata(std::move(cm), std::move(collectionShardId));
     }
 
     // Builds a delta of changed chunks to feed CollectionMetadata::makeUpdated, bumping the
     // collection placement version once per chunk so each carries a strictly newer version.
     static std::vector<ChunkType> makeChangedChunks(
-        OperationContext* opCtx,
         const CollectionMetadata& metadata,
-        const std::vector<std::tuple<int, int, ShardHandle>>& changedChunks) {
+        const std::vector<std::tuple<int, int, ShardId>>& changedChunks) {
         auto version = metadata.getCollPlacementVersion();
         std::vector<ChunkType> result;
         for (const auto& [minVal, maxVal, owner] : changedChunks) {
@@ -218,7 +208,7 @@ public:
             ChunkType chunk(metadata.getUUID(),
                             ChunkRange(BSON(kShardKey << minVal), BSON(kShardKey << maxVal)),
                             version,
-                            owner.toShardRef(opCtx));
+                            owner);
             chunk.setOnCurrentShardSince(Timestamp(200, 0));
             chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), chunk.getShard())});
             result.push_back(std::move(chunk));
@@ -360,7 +350,7 @@ TEST_F(CollectionShardingRuntimeTest, CheckShardVersionThrowsStaleConfigAfterDon
     OperationContext* opCtx = operationContext();
 
     // This shard ("0") owns the collection's only chunk.
-    auto metadata = makeShardedMetadata(opCtx, UUID::gen(), kThisShardHandle, kThisShardHandle);
+    auto metadata = makeShardedMetadata(opCtx, UUID::gen(), ShardId("0"), ShardId("0"));
 
     // The version a stale router would still send after the chunk has moved away.
     const auto staleShardVersion = ShardVersionFactory::make(metadata);
@@ -372,11 +362,11 @@ TEST_F(CollectionShardingRuntimeTest, CheckShardVersionThrowsStaleConfigAfterDon
     ChunkType changedChunk(metadata.getUUID(),
                            ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
                            newVersion,
-                           kOtherShardHandle.toShardRef(opCtx));
+                           ShardId("other"));
     changedChunk.setOnCurrentShardSince(Timestamp(200, 0));
     changedChunk.setHistory(
         {ChunkHistory(*changedChunk.getOnCurrentShardSince(), changedChunk.getShard())});
-    auto updatedMetadata = metadata.makeUpdated({changedChunk}, kThisShardHandle);
+    auto updatedMetadata = metadata.makeUpdated({changedChunk});
 
     csr.setCollectionMetadata(
         opCtx, updatedMetadata, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
@@ -790,16 +780,16 @@ DEATH_TEST_REGEX_F(CollectionShardingRuntimeTestDeathTest,
 TEST_F(CollectionShardingRuntimeTest, InvalidateRangePreserversOlderThanShardVersion) {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss);
     OperationContext* opCtx = operationContext();
-    // By default, makeShardedMetadata assigns different shard IDs to the chunk ("otherShard") and
-    // the collection ("thisShard"), resulting in a placement version of {0,0}. For this test, we
-    // want to ensure the chunk and collection share the same shard ID ("thisShard") to generate
-    // comparable chunk versions. This setup is required to correctly test
-    // invalidateRangePreserversOlderThanShardVersion, which compares shard placement versions for
-    // invalidation.
+    // By default, makeShardedMetadata assigns different shard IDs to the chunk ("other") and the
+    // collection ("0"), resulting in a placement version of {0,0}. For this test, we want to ensure
+    // the chunk and collection share the same shard ID ("0") to generate comparable chunk versions.
+    // This setup is required to correctly test invalidateRangePreserversOlderThanShardVersion,
+    // which compares shard placement versions for invalidation.
     auto collectionUUID = UUID::gen();
+    ShardId metadataShardId("0");
     auto metadataInThePast =
-        makeShardedMetadata(opCtx, collectionUUID, kThisShardHandle, kThisShardHandle);
-    auto metadata = makeShardedMetadata(opCtx, collectionUUID, kThisShardHandle, kThisShardHandle);
+        makeShardedMetadata(opCtx, collectionUUID, metadataShardId, metadataShardId);
+    auto metadata = makeShardedMetadata(opCtx, collectionUUID, metadataShardId, metadataShardId);
     csr.setCollectionMetadata(opCtx, metadata);
     const auto optCurrMetadata = csr.getCurrentMetadataIfKnown();
     ASSERT_TRUE(optCurrMetadata);
@@ -960,7 +950,7 @@ TEST_F(CollectionShardingRuntimeTest, WaiterFunctionalityWakesEarlierVersions) {
     newVersion.incMajor();
     ASSERT_EQ(targetVersion <=> newVersion, std::partial_ordering::less);
 
-    auto newMetadata = changeShardVersion(opCtx, collMetadata, newVersion);
+    auto newMetadata = changeShardVersion(collMetadata, newVersion);
     csr.setCollectionMetadata(opCtx, std::move(newMetadata));
 
     // Waiter should now be woken as it waited on a previous version.
@@ -1015,10 +1005,11 @@ TEST_F(CollectionShardingRuntimeTest, WaiterIsWokenForMatchingTrackedZeroChunksA
 TEST_F(CollectionShardingRuntimeTest, AuthoritativeEmptyCsrReceivesFirstChunks) {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss);
     OperationContext* opCtx = operationContext();
+    const ShardId thisShard("0");
     const auto uuid = UUID::gen();
 
     // Start authoritative with zero owned chunks: every key is a gap.
-    auto metadata = makeGappedShardedMetadata(opCtx, uuid, {}, kThisShardHandle);
+    auto metadata = makeGappedShardedMetadata(uuid, {}, thisShard);
     csr.setCollectionMetadata(
         opCtx, metadata, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
@@ -1030,8 +1021,7 @@ TEST_F(CollectionShardingRuntimeTest, AuthoritativeEmptyCsrReceivesFirstChunks) 
 
     // Receive the first chunks, both assigned to this shard.
     auto updated = metadata.makeUpdated(
-        makeChangedChunks(opCtx, metadata, {{0, 10, kThisShardHandle}, {20, 30, kThisShardHandle}}),
-        kThisShardHandle);
+        makeChangedChunks(metadata, {{0, 10, thisShard}, {20, 30, thisShard}}));
     csr.setCollectionMetadata(
         opCtx, updated, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
@@ -1049,15 +1039,15 @@ TEST_F(CollectionShardingRuntimeTest, AuthoritativeEmptyCsrReceivesFirstChunks) 
 TEST_F(CollectionShardingRuntimeTest, AuthoritativeCsrReceivesChunksForAnotherShard) {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss);
     OperationContext* opCtx = operationContext();
+    const ShardId thisShard("0");
+    const ShardId otherShard("other");
     const auto uuid = UUID::gen();
 
-    auto metadata =
-        makeGappedShardedMetadata(opCtx, uuid, {{0, 10, kThisShardHandle}}, kThisShardHandle);
+    auto metadata = makeGappedShardedMetadata(uuid, {{0, 10, thisShard}}, thisShard);
     csr.setCollectionMetadata(
         opCtx, metadata, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
-    auto updated = metadata.makeUpdated(
-        makeChangedChunks(opCtx, metadata, {{20, 30, kOtherShardHandle}}), kThisShardHandle);
+    auto updated = metadata.makeUpdated(makeChangedChunks(metadata, {{20, 30, otherShard}}));
     csr.setCollectionMetadata(
         opCtx, updated, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
@@ -1074,15 +1064,14 @@ TEST_F(CollectionShardingRuntimeTest, AuthoritativeCsrReceivesChunksForAnotherSh
 TEST_F(CollectionShardingRuntimeTest, AuthoritativeCsrReceivesChunksForCurrentShard) {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss);
     OperationContext* opCtx = operationContext();
+    const ShardId thisShard("0");
     const auto uuid = UUID::gen();
 
-    auto metadata =
-        makeGappedShardedMetadata(opCtx, uuid, {{0, 10, kThisShardHandle}}, kThisShardHandle);
+    auto metadata = makeGappedShardedMetadata(uuid, {{0, 10, thisShard}}, thisShard);
     csr.setCollectionMetadata(
         opCtx, metadata, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
-    auto updated = metadata.makeUpdated(
-        makeChangedChunks(opCtx, metadata, {{20, 30, kThisShardHandle}}), kThisShardHandle);
+    auto updated = metadata.makeUpdated(makeChangedChunks(metadata, {{20, 30, thisShard}}));
     csr.setCollectionMetadata(
         opCtx, updated, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
@@ -1099,10 +1088,11 @@ TEST_F(CollectionShardingRuntimeTest, AuthoritativeCsrReceivesChunksForCurrentSh
 TEST_F(CollectionShardingRuntimeTest, AuthoritativeSingleChunkCsrDonatesItsOnlyChunk) {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss);
     OperationContext* opCtx = operationContext();
+    const ShardId thisShard("0");
+    const ShardId otherShard("other");
     const auto uuid = UUID::gen();
 
-    auto metadata =
-        makeGappedShardedMetadata(opCtx, uuid, {{0, 10, kThisShardHandle}}, kThisShardHandle);
+    auto metadata = makeGappedShardedMetadata(uuid, {{0, 10, thisShard}}, thisShard);
     csr.setCollectionMetadata(
         opCtx, metadata, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
@@ -1113,8 +1103,7 @@ TEST_F(CollectionShardingRuntimeTest, AuthoritativeSingleChunkCsrDonatesItsOnlyC
     }
 
     // The same range is re-tagged to another shard, so this shard owns nothing afterwards.
-    auto updated = metadata.makeUpdated(
-        makeChangedChunks(opCtx, metadata, {{0, 10, kOtherShardHandle}}), kThisShardHandle);
+    auto updated = metadata.makeUpdated(makeChangedChunks(metadata, {{0, 10, otherShard}}));
     csr.setCollectionMetadata(
         opCtx, updated, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
@@ -1130,16 +1119,16 @@ TEST_F(CollectionShardingRuntimeTest, AuthoritativeSingleChunkCsrDonatesItsOnlyC
 TEST_F(CollectionShardingRuntimeTest, AuthoritativeCsrReceivesMixedChunkDelta) {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss);
     OperationContext* opCtx = operationContext();
+    const ShardId thisShard("0");
+    const ShardId otherShard("other");
     const auto uuid = UUID::gen();
 
-    auto metadata = makeGappedShardedMetadata(opCtx, uuid, {}, kThisShardHandle);
+    auto metadata = makeGappedShardedMetadata(uuid, {}, thisShard);
     csr.setCollectionMetadata(
         opCtx, metadata, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
     auto updated = metadata.makeUpdated(
-        makeChangedChunks(
-            opCtx, metadata, {{0, 10, kThisShardHandle}, {20, 30, kOtherShardHandle}}),
-        kThisShardHandle);
+        makeChangedChunks(metadata, {{0, 10, thisShard}, {20, 30, otherShard}}));
     csr.setCollectionMetadata(
         opCtx, updated, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
@@ -1156,8 +1145,7 @@ public:
     const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.foo");
     const UUID kCollUUID = UUID::gen();
     const std::string kShardKey = "x";
-    const std::vector<ShardType> kShardList = {
-        ShardType(kThisShardHandle.name().toString(), kThisShardHandle.uuid(), "Host0:12345")};
+    const std::vector<ShardType> kShardList = {ShardType(kMyShardName.toString(), "Host0:12345")};
 
     void setUp() override {
         ShardServerTestFixtureWithCatalogCacheLoaderMock::setUp();
@@ -1223,21 +1211,20 @@ public:
         return res;
     }
 
-    std::vector<ChunkType> createChunks(OperationContext* opCtx,
-                                        const OID& epoch,
+    std::vector<ChunkType> createChunks(const OID& epoch,
                                         const UUID& uuid,
                                         const Timestamp& timestamp) {
         auto range1 = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << 5));
         ChunkType chunk1(uuid,
                          range1,
                          ChunkVersion({epoch, timestamp}, {1, 0}),
-                         kShardList[0].getHandle().toShardRef(opCtx));
+                         ShardRef{kShardList[0].getName()});
 
         auto range2 = ChunkRange(BSON(kShardKey << 5), BSON(kShardKey << MAXKEY));
         ChunkType chunk2(uuid,
                          range2,
                          ChunkVersion({epoch, timestamp}, {1, 1}),
-                         kShardList[0].getHandle().toShardRef(opCtx));
+                         ShardRef{kShardList[0].getName()});
 
         return {chunk1, chunk2};
     }

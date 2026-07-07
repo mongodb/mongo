@@ -128,7 +128,7 @@ CollectionMetadata recoverCollectionFromDisk(OperationContext* opCtx,
                                                  coll->getAllowMigrations(),
                                                  chunks))};
     auto cm = CurrentChunkManager{std::move(rt)};
-    return CollectionMetadata{std::move(cm), ShardingState::get(opCtx)->shardHandle()};
+    return CollectionMetadata{std::move(cm), ShardingState::get(opCtx)->shardId()};
 }
 }  // namespace
 
@@ -276,8 +276,7 @@ boost::optional<CollectionMetadata> applyOplogEntry(OperationContext* opCtx,
         ChunkType::parseConfigBSONDocuments(entry.getChangedChunks(),
                                             collMetadata.getUUID(),
                                             collPlacementVersion.epoch(),
-                                            collPlacementVersion.getTimestamp()),
-        ShardingState::get(opCtx)->shardHandle());
+                                            collPlacementVersion.getTimestamp()));
 }
 
 boost::optional<CollectionMetadata> applyOplogEntry(

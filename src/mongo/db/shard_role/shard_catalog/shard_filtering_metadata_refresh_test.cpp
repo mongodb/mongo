@@ -64,11 +64,9 @@ const NamespaceString kTestNss =
     NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 const std::string kShardKey = "_id";
 const BSONObj kShardKeyPattern = BSON(kShardKey << 1);
-const ShardHandle kThisShardHandle(ShardId("thisShard"), UUID::gen());
-const ShardHandle kOtherShardHandle(ShardId("otherShard"), UUID::gen());
 
 std::pair<CollectionType, std::vector<ChunkType>> makeShardedMetadataForDisk(
-    OperationContext* opCtx, int nChunks, ShardHandle shardHandle) {
+    OperationContext* opCtx, int nChunks, ShardId shardId) {
     const UUID uuid = UUID::gen();
     const OID epoch = OID::gen();
     const Timestamp timestamp(Date_t::now());
@@ -82,8 +80,7 @@ std::pair<CollectionType, std::vector<ChunkType>> makeShardedMetadataForDisk(
         auto max =
             i == (nChunks - 1) ? BSON(kShardKey << MAXKEY) : BSON(kShardKey << ((i + 1) * 100));
         auto range = ChunkRange(min, max);
-        auto& chunkInserted = chunks.emplace_back(
-            uuid, std::move(range), chunkVersion, shardHandle.toShardRef(opCtx));
+        auto& chunkInserted = chunks.emplace_back(uuid, std::move(range), chunkVersion, shardId);
         chunkInserted.setName(OID::gen());
         chunkVersion.incMajor();
     }
@@ -91,19 +88,16 @@ std::pair<CollectionType, std::vector<ChunkType>> makeShardedMetadataForDisk(
     return {std::move(collType), std::move(chunks)};
 }
 
-CollectionMetadata makeShardedMetadataInMemory(
-    OperationContext* opCtx,
-    UUID uuid = UUID::gen(),
-    ShardHandle chunkShardHandle = kOtherShardHandle,
-    ShardHandle collectionShardHandle = kThisShardHandle) {
+CollectionMetadata makeShardedMetadataInMemory(OperationContext* opCtx,
+                                               UUID uuid = UUID::gen(),
+                                               ShardId chunkShardId = ShardId("other"),
+                                               ShardId collectionShardId = ShardId("0")) {
     const OID epoch = OID::gen();
     const Timestamp timestamp(Date_t::now());
 
     auto range = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY));
-    auto chunk = ChunkType(uuid,
-                           std::move(range),
-                           ChunkVersion({epoch, timestamp}, {1, 0}),
-                           chunkShardHandle.toShardRef(opCtx));
+    auto chunk =
+        ChunkType(uuid, std::move(range), ChunkVersion({epoch, timestamp}, {1, 0}), chunkShardId);
     CurrentChunkManager cm(ShardServerTestFixture::makeStandaloneRoutingTableHistory(
         RoutingTableHistory::makeNew(kTestNss,
                                      uuid,
@@ -118,7 +112,7 @@ CollectionMetadata makeShardedMetadataInMemory(
                                      true,
                                      {std::move(chunk)})));
 
-    return CollectionMetadata(std::move(cm), collectionShardHandle);
+    return CollectionMetadata(std::move(cm), collectionShardId);
 }
 
 class AuthoritativeRefreshFixture : public ShardServerTestFixture {
@@ -225,7 +219,7 @@ TEST_F(AuthoritativeRefreshFixture, UntrackedIsCorrectlyRecoveredFromDisk) {
 TEST_F(AuthoritativeRefreshFixture, NoChunkVersionTriggersRecoveryFromDisk) {
     auto* opCtx = operationContext();
 
-    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardHandle);
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
     populateDiskCatalog(opCtx, collType, chunks);
 
     {
@@ -245,7 +239,7 @@ TEST_F(AuthoritativeRefreshFixture, NoChunkVersionTriggersRecoveryFromDisk) {
 TEST_F(AuthoritativeRefreshFixture, ChunkVersionMatchReturnsEarly) {
     auto* opCtx = operationContext();
 
-    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardHandle);
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
     populateDiskCatalog(opCtx, collType, chunks);
 
     auto matchingVersion = chunks.back().getVersion();
@@ -271,7 +265,7 @@ TEST_F(AuthoritativeRefreshFixture, ChunkVersionMatchReturnsEarly) {
 TEST_F(AuthoritativeRefreshFixture, RefreshUsesGlobalFCVRatherThanOperationFCV) {
     auto* opCtx = operationContext();
 
-    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardHandle);
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
     populateDiskCatalog(opCtx, collType, chunks);
 
     {
@@ -297,7 +291,7 @@ TEST_F(AuthoritativeRefreshFixture,
        UntrackedRouterVersionWithKnownTrackedMetadataSkipsSecondDiskRecovery) {
     auto* opCtx = operationContext();
 
-    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardHandle);
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
     populateDiskCatalog(opCtx, collType, chunks);
 
     {
@@ -324,7 +318,7 @@ TEST_F(AuthoritativeRefreshFixture,
        IgnoredReceivedVersionResolvesAfterRecoveryWithoutPostRecoveryWait) {
     auto* opCtx = operationContext();
 
-    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardHandle);
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
     populateDiskCatalog(opCtx, collType, chunks);
 
     {
@@ -350,7 +344,7 @@ TEST_F(AuthoritativeRefreshFixture,
 TEST_F(AuthoritativeRefreshFixture, HigherRouterVersionTriggersRecoveryThenConfigTimeWait) {
     auto* opCtx = operationContext();
 
-    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardHandle);
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
     populateDiskCatalog(opCtx, collType, chunks);
 
     auto currentVersion = chunks.back().getVersion();
@@ -379,7 +373,7 @@ TEST_F(AuthoritativeRefreshFixture, HigherRouterVersionTriggersRecoveryThenConfi
 TEST_F(AuthoritativeRefreshFixture, ConfigTimeReachedWithEmptyCSRTriggersFullRecovery) {
     auto* opCtx = operationContext();
 
-    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardHandle);
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
     populateDiskCatalog(opCtx, collType, chunks);
 
     auto dummyVersion = ChunkVersion({OID::gen(), Timestamp(50, 1)}, {1, 0});
@@ -404,7 +398,7 @@ TEST_F(AuthoritativeRefreshFixture, ConfigTimeReachedWithEmptyCSRTriggersFullRec
 TEST_F(AuthoritativeRefreshFixture, CriticalSectionBlocksRecoveryThenProceeds) {
     auto* opCtx = operationContext();
 
-    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardHandle);
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
     populateDiskCatalog(opCtx, collType, chunks);
 
     auto dummyVersion = ChunkVersion({OID::gen(), Timestamp(50, 1)}, {1, 0});
@@ -447,7 +441,7 @@ TEST_F(AuthoritativeRefreshFixture, CollectionCriticalSectionWaitDoesNotCountAsN
     unittest::ServerParameterGuard maxAttempts("maxShardMetadataDiskRecoveryAttempts", 1);
     auto* opCtx = operationContext();
 
-    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardHandle);
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
     populateDiskCatalog(opCtx, collType, chunks);
 
     auto dummyVersion = ChunkVersion({OID::gen(), Timestamp(50, 1)}, {1, 0});
@@ -505,7 +499,7 @@ DEATH_TEST_REGEX_F(AuthoritativeRefreshFixtureDeathTest,
 TEST_F(AuthoritativeRefreshFixture, ClearFilteringMetadataDuringPostRecoveryWaitTriggersRetry) {
     auto* opCtx = operationContext();
 
-    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardHandle);
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
     populateDiskCatalog(opCtx, collType, chunks);
 
     {
@@ -555,7 +549,7 @@ TEST_F(AuthoritativeRefreshFixture, ClearFilteringMetadataDuringPostRecoveryWait
 TEST_F(AuthoritativeRefreshFixture, RecoveryCreatesExactlyOneRecoverer) {
     auto* opCtx = operationContext();
 
-    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardHandle);
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
     populateDiskCatalog(opCtx, collType, chunks);
 
     auto dummyVersion = ChunkVersion({OID::gen(), Timestamp(50, 1)}, {1, 0});
@@ -584,7 +578,7 @@ TEST_F(AuthoritativeRefreshFixture, RecoveryCreatesExactlyOneRecoverer) {
 TEST_F(AuthoritativeRefreshFixture, RecovererCleanedUpAfterRecovery) {
     auto* opCtx = operationContext();
 
-    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 3, kMyShardHandle);
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 3, kMyShardName);
     populateDiskCatalog(opCtx, collType, chunks);
 
     {
@@ -603,7 +597,7 @@ TEST_F(AuthoritativeRefreshFixture, RecovererCleanedUpAfterRecovery) {
 TEST_F(AuthoritativeRefreshFixture, ThreeConcurrentCallersAllSucceed) {
     auto* opCtx = operationContext();
 
-    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 10, kMyShardHandle);
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 10, kMyShardName);
     populateDiskCatalog(opCtx, collType, chunks);
 
     auto dummyVersion = ChunkVersion({OID::gen(), Timestamp(50, 1)}, {1, 0});
@@ -646,7 +640,7 @@ TEST_F(AuthoritativeRefreshFixture, ThreeConcurrentCallersAllSucceed) {
 TEST_F(AuthoritativeRefreshFixture, RecoveryWithSingleChunkVerifiesExactMetadata) {
     auto* opCtx = operationContext();
 
-    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 1, kMyShardHandle);
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 1, kMyShardName);
     populateDiskCatalog(opCtx, collType, chunks);
 
     {
@@ -668,7 +662,7 @@ TEST_F(AuthoritativeRefreshFixture, RecoveryWithSingleChunkVerifiesExactMetadata
 TEST_F(AuthoritativeRefreshFixture, RecoveryWithManyChunksVerifiesVersionSorting) {
     auto* opCtx = operationContext();
 
-    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 100, kMyShardHandle);
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 100, kMyShardName);
     populateDiskCatalog(opCtx, collType, chunks);
 
     {
@@ -690,9 +684,9 @@ TEST_F(AuthoritativeRefreshFixture,
        RecoveryWithChunksOnDifferentShardReportsUntrackedForThisShard) {
     auto* opCtx = operationContext();
 
-    // All chunks belong to "otherShard", not kMyShardHandle.
-    const ShardHandle otherShardHandle(ShardId("otherShard"), UUID::gen());
-    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 3, otherShardHandle);
+    // All chunks belong to "otherShard", not kMyShardName.
+    const ShardId otherShard("otherShard");
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 3, otherShard);
     populateDiskCatalog(opCtx, collType, chunks);
 
     {
@@ -725,8 +719,7 @@ TEST_F(AuthoritativeRefreshFixture, PartialRangeDiskCatalogRecoversWithoutChunkM
     // "otherShard" but are not persisted on this node, exactly as `fetchOwnedChunks` would
     // produce at runtime.
     auto makeChunk = [&](BSONObj min, BSONObj max, ChunkVersion v) {
-        ChunkType c{
-            uuid, ChunkRange(std::move(min), std::move(max)), v, kMyShardHandle.toShardRef(opCtx)};
+        ChunkType c{uuid, ChunkRange(std::move(min), std::move(max)), v, kMyShardName};
         c.setName(OID::gen());
         return c;
     };
@@ -761,7 +754,7 @@ TEST_F(AuthoritativeRefreshFixture, PartialRangeDiskCatalogRecoversWithoutChunkM
 TEST_F(AuthoritativeRefreshFixture, SequentialCallsAreIdempotent) {
     auto* opCtx = operationContext();
 
-    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardHandle);
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
     populateDiskCatalog(opCtx, collType, chunks);
 
     auto dummyVersion = ChunkVersion({OID::gen(), Timestamp(50, 1)}, {1, 0});
@@ -798,7 +791,7 @@ TEST_F(AuthoritativeRefreshFixture, SequentialCallsAreIdempotent) {
 TEST_F(AuthoritativeRefreshFixture, RecoveredVersionMatchSkipsRecoveryLoopOnNextCall) {
     auto* opCtx = operationContext();
 
-    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardHandle);
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
     populateDiskCatalog(opCtx, collType, chunks);
 
     {
@@ -832,7 +825,7 @@ TEST_F(AuthoritativeRefreshFixture, RecoveredVersionMatchSkipsRecoveryLoopOnNext
 TEST_F(AuthoritativeRefreshFixture, OngoingRecoverySatisfiesVersionSkipsDiskRecovery) {
     auto* opCtx = operationContext();
 
-    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardHandle);
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
     populateDiskCatalog(opCtx, collType, chunks);
 
     auto matchingVersion = chunks.back().getVersion();
@@ -891,7 +884,7 @@ TEST_F(AuthoritativeRefreshFixture, OngoingRecoverySatisfiesVersionSkipsDiskReco
 TEST_F(AuthoritativeRefreshFixture, ReRecoveryAfterMetadataCleared) {
     auto* opCtx = operationContext();
 
-    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardHandle);
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
     populateDiskCatalog(opCtx, collType, chunks);
 
     {
@@ -920,7 +913,7 @@ TEST_F(AuthoritativeRefreshFixture, ReRecoveryAfterMetadataCleared) {
         client.remove(NamespaceString::kConfigShardCatalogCollectionsNamespace, BSONObj{});
         client.remove(NamespaceString::kConfigShardCatalogChunksNamespace, BSONObj{});
     }
-    const auto [collType2, chunks2] = makeShardedMetadataForDisk(opCtx, 2, kMyShardHandle);
+    const auto [collType2, chunks2] = makeShardedMetadataForDisk(opCtx, 2, kMyShardName);
     populateDiskCatalogIfNeeded(opCtx, collType2, chunks2);
 
     // Second recovery should pick up the new disk state.
@@ -940,7 +933,7 @@ TEST_F(AuthoritativeRefreshFixture, ReRecoveryAfterMetadataCleared) {
 TEST_F(AuthoritativeRefreshFixture, CriticalSectionExitedWithExternalMetadataSkipsDiskRecovery) {
     auto* opCtx = operationContext();
 
-    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardHandle);
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
     populateDiskCatalog(opCtx, collType, chunks);
 
     auto dummyVersion = ChunkVersion({OID::gen(), Timestamp(50, 1)}, {1, 0});
@@ -1173,13 +1166,12 @@ void runRecoveryAndInjectInModeB(OperationContext* opCtx,
 
 void setDbPrimaryShardForTest(OperationContext* opCtx,
                               const NamespaceString& nss,
-                              const ShardHandle& shardHandle,
+                              const ShardId& shardId,
                               const Timestamp& timestamp) {
     BypassDatabaseMetadataAccess bypass(opCtx,
                                         BypassDatabaseMetadataAccess::Type::kWriteOnly);  // NOLINT
     auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, nss.dbName());
-    scopedDsr->setDbMetadata(
-        opCtx, DatabaseType{nss.dbName(), shardHandle.toShardRef(opCtx), {UUID::gen(), timestamp}});
+    scopedDsr->setDbMetadata(opCtx, DatabaseType{nss.dbName(), shardId, {UUID::gen(), timestamp}});
 }
 
 // Non-primary shard, transient primary window (set+clear) keeps the primary at `boost::none` but
@@ -1199,10 +1191,8 @@ TEST_F(AuthoritativeRefreshFixture, TransientPrimaryAbaForcesModeBRetry) {
         BypassDatabaseMetadataAccess bypass(
             opCtx, BypassDatabaseMetadataAccess::Type::kWriteOnly);  // NOLINT
         auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, kTestNss.dbName());
-        scopedDsr->setDbMetadata(opCtx,
-                                 DatabaseType{kTestNss.dbName(),
-                                              kMyShardHandle.toShardRef(opCtx),
-                                              {UUID::gen(), Timestamp(10, 1)}});
+        scopedDsr->setDbMetadata(
+            opCtx, DatabaseType{kTestNss.dbName(), kMyShardName, {UUID::gen(), Timestamp(10, 1)}});
         scopedDsr->clearDbMetadata(opCtx);
     });
 
@@ -1228,7 +1218,7 @@ TEST_F(AuthoritativeRefreshFixture, DbPrimaryShardInstallsUntrackedOnEmptyDisk) 
     createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
     createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
 
-    setDbPrimaryShardForTest(opCtx, kTestNss, kMyShardHandle, Timestamp(1, 1));
+    setDbPrimaryShardForTest(opCtx, kTestNss, kMyShardName, Timestamp(1, 1));
 
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
@@ -1317,10 +1307,8 @@ TEST_F(AuthoritativeRefreshFixture, PrimaryChangeDuringRecoveryForcesModeBRetry)
         BypassDatabaseMetadataAccess bypass(
             opCtx, BypassDatabaseMetadataAccess::Type::kWriteOnly);  // NOLINT
         auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, kTestNss.dbName());
-        scopedDsr->setDbMetadata(opCtx,
-                                 DatabaseType{kTestNss.dbName(),
-                                              kMyShardHandle.toShardRef(opCtx),
-                                              {UUID::gen(), Timestamp(40, 1)}});
+        scopedDsr->setDbMetadata(
+            opCtx, DatabaseType{kTestNss.dbName(), kMyShardName, {UUID::gen(), Timestamp(40, 1)}});
     });
 
     auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
@@ -1368,7 +1356,7 @@ TEST_F(RefreshCancellationFixture, CancelAuthRefreshRetriesAsNonAuthoritative) {
 
     // Cached version matches received, so both the initial auth path (before we cancel it) and the
     // non-auth retry can complete from the local cache.
-    setDbPrimaryShardForTest(opCtx, kTestNss, kMyShardHandle, Timestamp(1, 0));
+    setDbPrimaryShardForTest(opCtx, kTestNss, kMyShardName, Timestamp(1, 0));
     const auto receivedDbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 0));
 
     unittest::LogCaptureGuard logs;
@@ -1406,7 +1394,7 @@ TEST_F(RefreshCancellationFixture, CancelNonAuthRefreshRetriesAsAuthoritative) {
                                                          false);
 
     // Set a dbVersion lower than receivedDbVersion, to actually run the non-authoritative refresh.
-    setDbPrimaryShardForTest(opCtx, kTestNss, kMyShardHandle, Timestamp(1, 0));
+    setDbPrimaryShardForTest(opCtx, kTestNss, kMyShardName, Timestamp(1, 0));
     const auto receivedDbVersion = DatabaseVersion(UUID::gen(), Timestamp(2, 0));
 
     unittest::LogCaptureGuard logs;
@@ -1424,7 +1412,7 @@ TEST_F(RefreshCancellationFixture, CancelNonAuthRefreshRetriesAsAuthoritative) {
     fp->waitForTimesEntered(initialTimesEntered + 1);
 
     // Bump the cached version so the auth retry's inner loop sees a matching version.
-    setDbPrimaryShardForTest(opCtx, kTestNss, kMyShardHandle, Timestamp(2, 0));
+    setDbPrimaryShardForTest(opCtx, kTestNss, kMyShardName, Timestamp(2, 0));
 
     // Flip the flag before cancelling so the outer retry dispatches to the auth path.
     unittest::ServerParameterGuard authoritativeScope("featureFlagAuthoritativeShardsCRUD", true);
@@ -1451,7 +1439,7 @@ TEST_F(RefreshCancellationFixture, CancelAuthCollectionRefreshRetriesAsNonAuthor
     }
 
     auto sharedMetadata =
-        makeShardedMetadataInMemory(opCtx, UUID::gen(), kMyShardHandle, kMyShardHandle);
+        makeShardedMetadataInMemory(opCtx, UUID::gen(), kMyShardName, kMyShardName);
     const auto receivedShardVersion = sharedMetadata.getShardPlacementVersion();
 
     unittest::LogCaptureGuard logs;
@@ -1496,7 +1484,7 @@ TEST_F(RefreshCancellationFixture, CancelNonAuthCollectionRefreshRetriesAsAuthor
                                                          false);
 
     auto sharedMetadata =
-        makeShardedMetadataInMemory(opCtx, UUID::gen(), kMyShardHandle, kMyShardHandle);
+        makeShardedMetadataInMemory(opCtx, UUID::gen(), kMyShardName, kMyShardName);
     const auto receivedShardVersion = sharedMetadata.getShardPlacementVersion();
 
     unittest::LogCaptureGuard logs;
@@ -1546,7 +1534,7 @@ TEST_F(RefreshCancellationFixture, MaxTimeMsOnOperationContextInterruptsRefresh)
     }
 
     auto sharedMetadata =
-        makeShardedMetadataInMemory(opCtx, UUID::gen(), kMyShardHandle, kMyShardHandle);
+        makeShardedMetadataInMemory(opCtx, UUID::gen(), kMyShardName, kMyShardName);
     const auto receivedShardVersion = sharedMetadata.getShardPlacementVersion();
 
     auto* fp = globalFailPointRegistry().find("hangInRecoverRefreshThread");
@@ -1571,7 +1559,7 @@ TEST_F(RefreshCancellationFixture, InterruptIncompatibleRefreshesWaitsForDrain) 
     auto* opCtx = operationContext();
     unittest::ServerParameterGuard nonAuthoritativeScope("featureFlagAuthoritativeShardsCRUD",
                                                          false);
-    setDbPrimaryShardForTest(opCtx, kTestNss, kMyShardHandle, Timestamp(1, 0));
+    setDbPrimaryShardForTest(opCtx, kTestNss, kMyShardName, Timestamp(1, 0));
     const auto receivedDbVersion = DatabaseVersion(UUID::gen(), Timestamp(2, 0));
 
     // Hang a non-authoritative refresh then interrupt it.
@@ -1585,7 +1573,7 @@ TEST_F(RefreshCancellationFixture, InterruptIncompatibleRefreshesWaitsForDrain) 
     });
     fp->waitForTimesEntered(initialTimesEntered + 1);
 
-    setDbPrimaryShardForTest(opCtx, kTestNss, kMyShardHandle, Timestamp(2, 0));
+    setDbPrimaryShardForTest(opCtx, kTestNss, kMyShardName, Timestamp(2, 0));
     unittest::ServerParameterGuard authoritativeScope("featureFlagAuthoritativeShardsCRUD", true);
 
     AtomicWord<bool> interruptFinished{false};

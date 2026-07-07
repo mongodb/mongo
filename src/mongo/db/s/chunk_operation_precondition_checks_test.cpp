@@ -67,8 +67,8 @@ const KeyPattern kShardKeyPattern(BSON(kPattern << 1));
 // same value used as _thisShardId when constructing CollectionMetadata. Otherwise
 // getNextChunk would filter against a different shardId than the StaleConfigInfo emitted by the
 // helpers.
-const ShardHandle kThisShardHandle(ShardId("myShardName"), UUID::gen());
-const ShardHandle kOtherShardHandle(ShardId("otherShard"), UUID::gen());
+const ShardId kThisShard{"myShardName"};
+const ShardId kOtherShard{"otherShard"};
 
 class ChunkOperationPreconditionChecksTest : public ShardServerTestFixture {
 protected:
@@ -107,21 +107,35 @@ protected:
                                                std::move(chunkTypes));
 
         return CollectionMetadata(
-            CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))),
-            kThisShardHandle);
+            CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))), kThisShard);
     }
 
     /**
      * Builds a single-chunk CollectionMetadata spanning the full shard key space and owned by the
      * given shard.
      */
-    static CollectionMetadata makeSingleChunkMetadata(const ShardRef& owner) {
+    static CollectionMetadata makeSingleChunkMetadata(const ShardId& owner) {
         return makeMetadataWithChunks(
             {{ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << MAXKEY)), owner}});
     }
 
     static ChunkRange range(int min, int max) {
         return ChunkRange(BSON(kPattern << min), BSON(kPattern << max));
+    }
+};
+
+class ChunkOperationPreconditionChecksUniqueShardIdentifiersTest
+    : public ChunkOperationPreconditionChecksTest,
+      public testing::WithParamInterface<bool> {
+protected:
+    void setUp() override {
+        _featureFlagScope.emplace("featureFlagUniqueShardIdentifiers", GetParam());
+        ChunkOperationPreconditionChecksTest::setUp();
+    }
+
+    void tearDown() override {
+        ChunkOperationPreconditionChecksTest::tearDown();
+        _featureFlagScope.reset();
     }
 
     /**
@@ -130,9 +144,7 @@ protected:
      * IGNORED placeholder, wantedVersion is the placement version derived from the metadata,
      * shardRef identifies the local shard (by name or UUID depending on feature flag state).
      */
-    void assertStaleConfigPayload(const DBException& ex,
-                                  const CollectionMetadata& metadata,
-                                  bool useUuid) {
+    void assertStaleConfigPayload(const DBException& ex, const CollectionMetadata& metadata) {
         const auto exInfo = ex.extraInfo<StaleConfigInfo>();
         ASSERT(exInfo);
         ASSERT_EQ(kNss, exInfo->getNss());
@@ -140,7 +152,7 @@ protected:
         ASSERT(exInfo->getVersionWanted().has_value());
         ASSERT_EQ(ShardVersionFactory::make(metadata), *exInfo->getVersionWanted());
         const auto& shardRef = ex.extraInfo<StaleConfigInfo>()->getShardRef();
-        if (useUuid) {
+        if (GetParam()) {
             ASSERT_TRUE(shardRef.isUUID());
             ASSERT_EQ(*kMyShardHandle.uuid(), shardRef.getUUID());
         } else {
@@ -148,7 +160,18 @@ protected:
             ASSERT_EQ(kMyShardHandle.name(), shardRef.getShardId());
         }
     }
+
+private:
+    boost::optional<unittest::ServerParameterGuard> _featureFlagScope;
 };
+
+INSTANTIATE_TEST_SUITE_P(UniqueShardIdentifiers,
+                         ChunkOperationPreconditionChecksUniqueShardIdentifiersTest,
+                         testing::Bool(),
+                         [](const testing::TestParamInfo<bool>& info) {
+                             return info.param ? "WithUniqueShardIdentifiers"
+                                               : "WithoutUniqueShardIdentifiers";
+                         });
 
 //
 // checkChunkMatchesRange (split coordinator)
@@ -156,116 +179,103 @@ protected:
 
 TEST_F(ChunkOperationPreconditionChecksTest, MatchesExactChunkOwnedByThisShard_Succeeds) {
     const auto metadata = makeMetadataWithChunks({
-        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)),
-         kOtherShardHandle.toShardRef(operationContext())},
-        {range(10, 20), kThisShardHandle.toShardRef(operationContext())},
-        {ChunkRange(BSON(kPattern << 20), BSON(kPattern << MAXKEY)),
-         kOtherShardHandle.toShardRef(operationContext())},
+        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)), kOtherShard},
+        {range(10, 20), kThisShard},
+        {ChunkRange(BSON(kPattern << 20), BSON(kPattern << MAXKEY)), kOtherShard},
     });
 
     checkChunkMatchesRange(operationContext(), kNss, metadata, range(10, 20));
 }
 
-TEST_F(ChunkOperationPreconditionChecksTest, RangeOwnedByOtherShard_ThrowsStaleConfigNotOwned) {
+TEST_P(ChunkOperationPreconditionChecksUniqueShardIdentifiersTest,
+       RangeOwnedByOtherShard_ThrowsStaleConfigNotOwned) {
     const auto metadata = makeMetadataWithChunks({
-        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)),
-         kThisShardHandle.toShardRef(operationContext())},
-        {range(10, 20), kOtherShardHandle.toShardRef(operationContext())},
-        {ChunkRange(BSON(kPattern << 20), BSON(kPattern << MAXKEY)),
-         kThisShardHandle.toShardRef(operationContext())},
+        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)), kThisShard},
+        {range(10, 20), kOtherShard},
+        {ChunkRange(BSON(kPattern << 20), BSON(kPattern << MAXKEY)), kThisShard},
     });
 
-    auto useUuid = feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabledAndIgnoreFCVUnsafe();
     ASSERT_THROWS_WITH_CHECK(
         checkChunkMatchesRange(operationContext(), kNss, metadata, range(10, 20)),
         ExceptionFor<ErrorCodes::StaleConfig>,
         [&](const DBException& ex) {
             ASSERT_STRING_CONTAINS(ex.reason(), "is not owned by this shard");
-            assertStaleConfigPayload(ex, metadata, useUuid);
+            assertStaleConfigPayload(ex, metadata);
         });
 }
 
-TEST_F(ChunkOperationPreconditionChecksTest,
+TEST_P(ChunkOperationPreconditionChecksUniqueShardIdentifiersTest,
        RangeIsSubsetOfChunk_ThrowsStaleConfigBoundsDontExist) {
     // [10, 30) is owned by this shard. Querying [15, 25) finds the chunk starting at 10, so the
     // "is not owned" assertion passes; the subsequent "bounds match" assertion fails because the
     // chunk's bounds are [10, 30), not [15, 25).
     const auto metadata = makeMetadataWithChunks({
-        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)),
-         kOtherShardHandle.toShardRef(operationContext())},
-        {range(10, 30), kThisShardHandle.toShardRef(operationContext())},
-        {ChunkRange(BSON(kPattern << 30), BSON(kPattern << MAXKEY)),
-         kOtherShardHandle.toShardRef(operationContext())},
+        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)), kOtherShard},
+        {range(10, 30), kThisShard},
+        {ChunkRange(BSON(kPattern << 30), BSON(kPattern << MAXKEY)), kOtherShard},
     });
 
-    auto useUuid = feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabledAndIgnoreFCVUnsafe();
     ASSERT_THROWS_WITH_CHECK(
         checkChunkMatchesRange(operationContext(), kNss, metadata, range(15, 25)),
         ExceptionFor<ErrorCodes::StaleConfig>,
         [&](const DBException& ex) {
             ASSERT_STRING_CONTAINS(ex.reason(), "is not owned by this shard");
-            assertStaleConfigPayload(ex, metadata, useUuid);
+            assertStaleConfigPayload(ex, metadata);
         });
 }
 
-TEST_F(ChunkOperationPreconditionChecksTest,
+TEST_P(ChunkOperationPreconditionChecksUniqueShardIdentifiersTest,
        RangeIsSupersetOfChunk_ThrowsStaleConfigBoundsDontExist) {
     // Two contiguous chunks [10, 20) and [20, 30) both owned by this shard. Querying [10, 30)
     // finds the chunk starting at 10 (so the ownership step passes) but its bounds are [10, 20),
     // not [10, 30); the second assertion fires with "do not exist".
     const auto metadata = makeMetadataWithChunks({
-        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)),
-         kOtherShardHandle.toShardRef(operationContext())},
-        {range(10, 20), kThisShardHandle.toShardRef(operationContext())},
-        {range(20, 30), kThisShardHandle.toShardRef(operationContext())},
-        {ChunkRange(BSON(kPattern << 30), BSON(kPattern << MAXKEY)),
-         kOtherShardHandle.toShardRef(operationContext())},
+        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)), kOtherShard},
+        {range(10, 20), kThisShard},
+        {range(20, 30), kThisShard},
+        {ChunkRange(BSON(kPattern << 30), BSON(kPattern << MAXKEY)), kOtherShard},
     });
 
-    auto useUuid = feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabledAndIgnoreFCVUnsafe();
     ASSERT_THROWS_WITH_CHECK(
         checkChunkMatchesRange(operationContext(), kNss, metadata, range(10, 30)),
         ExceptionFor<ErrorCodes::StaleConfig>,
         [&](const DBException& ex) {
             ASSERT_STRING_CONTAINS(ex.reason(), "do not exist");
-            assertStaleConfigPayload(ex, metadata, useUuid);
+            assertStaleConfigPayload(ex, metadata);
         });
 }
 
-TEST_F(ChunkOperationPreconditionChecksTest, ChunkMatches_RangeMinNotAtBoundary_ThrowsStaleConfig) {
+TEST_P(ChunkOperationPreconditionChecksUniqueShardIdentifiersTest,
+       ChunkMatches_RangeMinNotAtBoundary_ThrowsStaleConfig) {
     // Querying [12, 20) where this shard owns [10, 20): getNextChunk(12) returns the
     // chunk starting at 10, whose min does not equal 12, so the "is not owned" assertion fires.
     const auto metadata = makeMetadataWithChunks({
-        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)),
-         kOtherShardHandle.toShardRef(operationContext())},
-        {range(10, 20), kThisShardHandle.toShardRef(operationContext())},
-        {ChunkRange(BSON(kPattern << 20), BSON(kPattern << MAXKEY)),
-         kOtherShardHandle.toShardRef(operationContext())},
+        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)), kOtherShard},
+        {range(10, 20), kThisShard},
+        {ChunkRange(BSON(kPattern << 20), BSON(kPattern << MAXKEY)), kOtherShard},
     });
 
-    auto useUuid = feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabledAndIgnoreFCVUnsafe();
     ASSERT_THROWS_WITH_CHECK(
         checkChunkMatchesRange(operationContext(), kNss, metadata, range(12, 20)),
         ExceptionFor<ErrorCodes::StaleConfig>,
         [&](const DBException& ex) {
             ASSERT_STRING_CONTAINS(ex.reason(), "is not owned by this shard");
-            assertStaleConfigPayload(ex, metadata, useUuid);
+            assertStaleConfigPayload(ex, metadata);
         });
 }
 
-TEST_F(ChunkOperationPreconditionChecksTest,
+TEST_P(ChunkOperationPreconditionChecksUniqueShardIdentifiersTest,
        ChunkMatches_RangeBeyondMetadata_ThrowsStaleConfigNotOwned) {
     // All chunks owned by this shard lie below 100. Querying [100, 200) gets no result from
     // getNextChunk, so the first assertion ("is not owned") fires immediately.
-    const auto metadata = makeSingleChunkMetadata(kOtherShardHandle.toShardRef(operationContext()));
+    const auto metadata = makeSingleChunkMetadata(kOtherShard);
 
-    auto useUuid = feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabledAndIgnoreFCVUnsafe();
     ASSERT_THROWS_WITH_CHECK(
         checkChunkMatchesRange(operationContext(), kNss, metadata, range(100, 200)),
         ExceptionFor<ErrorCodes::StaleConfig>,
         [&](const DBException& ex) {
             ASSERT_STRING_CONTAINS(ex.reason(), "is not owned by this shard");
-            assertStaleConfigPayload(ex, metadata, useUuid);
+            assertStaleConfigPayload(ex, metadata);
         });
 }
 
@@ -275,11 +285,9 @@ TEST_F(ChunkOperationPreconditionChecksTest,
 
 TEST_F(ChunkOperationPreconditionChecksTest, SingleChunkExactlyFillsRange_Succeeds) {
     const auto metadata = makeMetadataWithChunks({
-        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)),
-         kOtherShardHandle.toShardRef(operationContext())},
-        {range(10, 20), kThisShardHandle.toShardRef(operationContext())},
-        {ChunkRange(BSON(kPattern << 20), BSON(kPattern << MAXKEY)),
-         kOtherShardHandle.toShardRef(operationContext())},
+        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)), kOtherShard},
+        {range(10, 20), kThisShard},
+        {ChunkRange(BSON(kPattern << 20), BSON(kPattern << MAXKEY)), kOtherShard},
     });
 
     checkRangeOwnership(operationContext(), kNss, metadata, range(10, 20));
@@ -287,12 +295,10 @@ TEST_F(ChunkOperationPreconditionChecksTest, SingleChunkExactlyFillsRange_Succee
 
 TEST_F(ChunkOperationPreconditionChecksTest, TwoContiguousChunksFillRange_Succeeds) {
     const auto metadata = makeMetadataWithChunks({
-        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)),
-         kOtherShardHandle.toShardRef(operationContext())},
-        {range(10, 20), kThisShardHandle.toShardRef(operationContext())},
-        {range(20, 30), kThisShardHandle.toShardRef(operationContext())},
-        {ChunkRange(BSON(kPattern << 30), BSON(kPattern << MAXKEY)),
-         kOtherShardHandle.toShardRef(operationContext())},
+        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)), kOtherShard},
+        {range(10, 20), kThisShard},
+        {range(20, 30), kThisShard},
+        {ChunkRange(BSON(kPattern << 30), BSON(kPattern << MAXKEY)), kOtherShard},
     });
 
     checkRangeOwnership(operationContext(), kNss, metadata, range(10, 30));
@@ -300,81 +306,72 @@ TEST_F(ChunkOperationPreconditionChecksTest, TwoContiguousChunksFillRange_Succee
 
 TEST_F(ChunkOperationPreconditionChecksTest, ThreeContiguousChunksFillRange_Succeeds) {
     const auto metadata = makeMetadataWithChunks({
-        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)),
-         kOtherShardHandle.toShardRef(operationContext())},
-        {range(10, 20), kThisShardHandle.toShardRef(operationContext())},
-        {range(20, 30), kThisShardHandle.toShardRef(operationContext())},
-        {range(30, 40), kThisShardHandle.toShardRef(operationContext())},
-        {ChunkRange(BSON(kPattern << 40), BSON(kPattern << MAXKEY)),
-         kOtherShardHandle.toShardRef(operationContext())},
+        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)), kOtherShard},
+        {range(10, 20), kThisShard},
+        {range(20, 30), kThisShard},
+        {range(30, 40), kThisShard},
+        {ChunkRange(BSON(kPattern << 40), BSON(kPattern << MAXKEY)), kOtherShard},
     });
 
     checkRangeOwnership(operationContext(), kNss, metadata, range(10, 40));
 }
 
-TEST_F(ChunkOperationPreconditionChecksTest, GapToOtherShardInMiddle_ThrowsStaleConfigNotOwned) {
+TEST_P(ChunkOperationPreconditionChecksUniqueShardIdentifiersTest,
+       GapToOtherShardInMiddle_ThrowsStaleConfigNotOwned) {
     // Querying [10, 40) where this shard owns [10, 20) and [30, 40) but not [20, 30):
     // after [10, 20) is consumed, getNextChunk(20) skips the [20, 30) chunk owned by
     // the other shard and returns [30, 40), whose min (30) does not equal the expected boundary
     // (20). The helper throws "is not owned by this shard".
     const auto metadata = makeMetadataWithChunks({
-        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)),
-         kOtherShardHandle.toShardRef(operationContext())},
-        {range(10, 20), kThisShardHandle.toShardRef(operationContext())},
-        {range(20, 30), kOtherShardHandle.toShardRef(operationContext())},
-        {range(30, 40), kThisShardHandle.toShardRef(operationContext())},
-        {ChunkRange(BSON(kPattern << 40), BSON(kPattern << MAXKEY)),
-         kOtherShardHandle.toShardRef(operationContext())},
+        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)), kOtherShard},
+        {range(10, 20), kThisShard},
+        {range(20, 30), kOtherShard},
+        {range(30, 40), kThisShard},
+        {ChunkRange(BSON(kPattern << 40), BSON(kPattern << MAXKEY)), kOtherShard},
     });
 
-    auto useUuid = feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabledAndIgnoreFCVUnsafe();
     ASSERT_THROWS_WITH_CHECK(checkRangeOwnership(operationContext(), kNss, metadata, range(10, 40)),
                              ExceptionFor<ErrorCodes::StaleConfig>,
                              [&](const DBException& ex) {
                                  ASSERT_STRING_CONTAINS(ex.reason(), "is not owned by this shard");
-                                 assertStaleConfigPayload(ex, metadata, useUuid);
+                                 assertStaleConfigPayload(ex, metadata);
                              });
 }
 
-TEST_F(ChunkOperationPreconditionChecksTest, RangeStartsAtNonOwnedChunk_ThrowsStaleConfigNotOwned) {
+TEST_P(ChunkOperationPreconditionChecksUniqueShardIdentifiersTest,
+       RangeStartsAtNonOwnedChunk_ThrowsStaleConfigNotOwned) {
     const auto metadata = makeMetadataWithChunks({
-        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)),
-         kOtherShardHandle.toShardRef(operationContext())},
-        {range(10, 20), kOtherShardHandle.toShardRef(operationContext())},
-        {range(20, 30), kThisShardHandle.toShardRef(operationContext())},
-        {ChunkRange(BSON(kPattern << 30), BSON(kPattern << MAXKEY)),
-         kOtherShardHandle.toShardRef(operationContext())},
+        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)), kOtherShard},
+        {range(10, 20), kOtherShard},
+        {range(20, 30), kThisShard},
+        {ChunkRange(BSON(kPattern << 30), BSON(kPattern << MAXKEY)), kOtherShard},
     });
 
-    auto useUuid = feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabledAndIgnoreFCVUnsafe();
     ASSERT_THROWS_WITH_CHECK(checkRangeOwnership(operationContext(), kNss, metadata, range(10, 30)),
                              ExceptionFor<ErrorCodes::StaleConfig>,
                              [&](const DBException& ex) {
                                  ASSERT_STRING_CONTAINS(ex.reason(), "is not owned by this shard");
-                                 assertStaleConfigPayload(ex, metadata, useUuid);
+                                 assertStaleConfigPayload(ex, metadata);
                              });
 }
 
-TEST_F(ChunkOperationPreconditionChecksTest,
+TEST_P(ChunkOperationPreconditionChecksUniqueShardIdentifiersTest,
        RangeOwnership_RangeMinNotAtBoundary_ThrowsStaleConfig) {
     const auto metadata = makeMetadataWithChunks({
-        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)),
-         kOtherShardHandle.toShardRef(operationContext())},
-        {range(10, 20), kThisShardHandle.toShardRef(operationContext())},
-        {ChunkRange(BSON(kPattern << 20), BSON(kPattern << MAXKEY)),
-         kOtherShardHandle.toShardRef(operationContext())},
+        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)), kOtherShard},
+        {range(10, 20), kThisShard},
+        {ChunkRange(BSON(kPattern << 20), BSON(kPattern << MAXKEY)), kOtherShard},
     });
 
-    auto useUuid = feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabledAndIgnoreFCVUnsafe();
     ASSERT_THROWS_WITH_CHECK(checkRangeOwnership(operationContext(), kNss, metadata, range(12, 20)),
                              ExceptionFor<ErrorCodes::StaleConfig>,
                              [&](const DBException& ex) {
                                  ASSERT_STRING_CONTAINS(ex.reason(), "is not owned by this shard");
-                                 assertStaleConfigPayload(ex, metadata, useUuid);
+                                 assertStaleConfigPayload(ex, metadata);
                              });
 }
 
-TEST_F(ChunkOperationPreconditionChecksTest,
+TEST_P(ChunkOperationPreconditionChecksUniqueShardIdentifiersTest,
        RangeExtendsBeyondOwnedChunks_ThrowsStaleConfigPartialFill) {
     // Range [10, 30) extends past the single owned chunk [10, 20). The loop walks [10, 20), then
     // looks for the next chunk after 20. The only owned chunk has already been consumed, so
@@ -387,22 +384,19 @@ TEST_F(ChunkOperationPreconditionChecksTest,
     // this shard but past the query range max — so the inner loop exits cleanly but the final
     // boundary check rejects the partial fill.
     const auto metadata = makeMetadataWithChunks({
-        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)),
-         kOtherShardHandle.toShardRef(operationContext())},
-        {range(10, 20), kThisShardHandle.toShardRef(operationContext())},
-        {range(20, 25), kThisShardHandle.toShardRef(operationContext())},
-        {ChunkRange(BSON(kPattern << 25), BSON(kPattern << MAXKEY)),
-         kThisShardHandle.toShardRef(operationContext())},
+        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)), kOtherShard},
+        {range(10, 20), kThisShard},
+        {range(20, 25), kThisShard},
+        {ChunkRange(BSON(kPattern << 25), BSON(kPattern << MAXKEY)), kThisShard},
     });
 
-    auto useUuid = feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabledAndIgnoreFCVUnsafe();
     ASSERT_THROWS_WITH_CHECK(
         checkRangeOwnership(operationContext(), kNss, metadata, range(10, 30)),
         ExceptionFor<ErrorCodes::StaleConfig>,
         [&](const DBException& ex) {
             ASSERT_STRING_CONTAINS(
                 ex.reason(), "does not contain a sequence of chunks that exactly fills the range");
-            assertStaleConfigPayload(ex, metadata, useUuid);
+            assertStaleConfigPayload(ex, metadata);
         });
 }
 
@@ -411,38 +405,36 @@ TEST_F(ChunkOperationPreconditionChecksTest,
 //
 
 TEST_F(ChunkOperationPreconditionChecksTest, ShardKeyPattern_ValidBounds_Succeeds) {
-    const auto metadata = makeSingleChunkMetadata(kThisShardHandle.toShardRef(operationContext()));
+    const auto metadata = makeSingleChunkMetadata(kThisShard);
     checkShardKeyPattern(operationContext(), kNss, metadata, range(10, 20));
 }
 
-TEST_F(ChunkOperationPreconditionChecksTest,
+TEST_P(ChunkOperationPreconditionChecksUniqueShardIdentifiersTest,
        ShardKeyPattern_MinDoesNotMatchPattern_ThrowsStaleConfig) {
-    const auto metadata = makeSingleChunkMetadata(kThisShardHandle.toShardRef(operationContext()));
+    const auto metadata = makeSingleChunkMetadata(kThisShard);
     // Key pattern is {key: 1}; a min using a field name that sorts before "key" preserves
     // the ChunkRange::min < max invariant while still failing isValidKey.
     const ChunkRange invalidRange(BSON("aaa" << 5), BSON(kPattern << 20));
 
-    auto useUuid = feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabledAndIgnoreFCVUnsafe();
     ASSERT_THROWS_WITH_CHECK(checkShardKeyPattern(operationContext(), kNss, metadata, invalidRange),
                              ExceptionFor<ErrorCodes::StaleConfig>,
                              [&](const DBException& ex) {
                                  ASSERT_STRING_CONTAINS(ex.reason(), "is not valid for collection");
-                                 assertStaleConfigPayload(ex, metadata, useUuid);
+                                 assertStaleConfigPayload(ex, metadata);
                              });
 }
 
-TEST_F(ChunkOperationPreconditionChecksTest,
+TEST_P(ChunkOperationPreconditionChecksUniqueShardIdentifiersTest,
        ShardKeyPattern_MaxDoesNotMatchPattern_ThrowsStaleConfig) {
-    const auto metadata = makeSingleChunkMetadata(kThisShardHandle.toShardRef(operationContext()));
+    const auto metadata = makeSingleChunkMetadata(kThisShard);
     // Max uses a field name that sorts after "key" so min < max still holds.
     const ChunkRange invalidRange(BSON(kPattern << 10), BSON("zzz" << 20));
 
-    auto useUuid = feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabledAndIgnoreFCVUnsafe();
     ASSERT_THROWS_WITH_CHECK(checkShardKeyPattern(operationContext(), kNss, metadata, invalidRange),
                              ExceptionFor<ErrorCodes::StaleConfig>,
                              [&](const DBException& ex) {
                                  ASSERT_STRING_CONTAINS(ex.reason(), "is not valid for collection");
-                                 assertStaleConfigPayload(ex, metadata, useUuid);
+                                 assertStaleConfigPayload(ex, metadata);
                              });
 }
 
@@ -452,11 +444,9 @@ TEST_F(ChunkOperationPreconditionChecksTest,
 
 TEST_F(ChunkOperationPreconditionChecksTest, RangeWithinChunk_RangeEqualsOwnedChunk_Succeeds) {
     const auto metadata = makeMetadataWithChunks({
-        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)),
-         kOtherShardHandle.toShardRef(operationContext())},
-        {range(10, 20), kThisShardHandle.toShardRef(operationContext())},
-        {ChunkRange(BSON(kPattern << 20), BSON(kPattern << MAXKEY)),
-         kOtherShardHandle.toShardRef(operationContext())},
+        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)), kOtherShard},
+        {range(10, 20), kThisShard},
+        {ChunkRange(BSON(kPattern << 20), BSON(kPattern << MAXKEY)), kOtherShard},
     });
 
     checkRangeWithinChunk(operationContext(), kNss, metadata, range(10, 20));
@@ -465,78 +455,69 @@ TEST_F(ChunkOperationPreconditionChecksTest, RangeWithinChunk_RangeEqualsOwnedCh
 TEST_F(ChunkOperationPreconditionChecksTest, RangeWithinChunk_StrictSubsetOfOwnedChunk_Succeeds) {
     // Owned chunk [10, 30) covers strict subset [15, 25).
     const auto metadata = makeMetadataWithChunks({
-        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)),
-         kOtherShardHandle.toShardRef(operationContext())},
-        {range(10, 30), kThisShardHandle.toShardRef(operationContext())},
-        {ChunkRange(BSON(kPattern << 30), BSON(kPattern << MAXKEY)),
-         kOtherShardHandle.toShardRef(operationContext())},
+        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)), kOtherShard},
+        {range(10, 30), kThisShard},
+        {ChunkRange(BSON(kPattern << 30), BSON(kPattern << MAXKEY)), kOtherShard},
     });
 
     checkRangeWithinChunk(operationContext(), kNss, metadata, range(15, 25));
 }
 
-TEST_F(ChunkOperationPreconditionChecksTest,
+TEST_P(ChunkOperationPreconditionChecksUniqueShardIdentifiersTest,
        RangeWithinChunk_RangeExtendsBeyondOwnedChunk_ThrowsStaleConfig) {
     // Owned chunk [10, 20); the next owned chunk is [10, 20) itself. covers([10, 25)) is false
     // because max 20 < 25.
     const auto metadata = makeMetadataWithChunks({
-        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)),
-         kOtherShardHandle.toShardRef(operationContext())},
-        {range(10, 20), kThisShardHandle.toShardRef(operationContext())},
-        {range(20, 30), kOtherShardHandle.toShardRef(operationContext())},
-        {ChunkRange(BSON(kPattern << 30), BSON(kPattern << MAXKEY)),
-         kOtherShardHandle.toShardRef(operationContext())},
+        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)), kOtherShard},
+        {range(10, 20), kThisShard},
+        {range(20, 30), kOtherShard},
+        {ChunkRange(BSON(kPattern << 30), BSON(kPattern << MAXKEY)), kOtherShard},
     });
 
-    auto useUuid = feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabledAndIgnoreFCVUnsafe();
     ASSERT_THROWS_WITH_CHECK(
         checkRangeWithinChunk(operationContext(), kNss, metadata, range(10, 25)),
         ExceptionFor<ErrorCodes::StaleConfig>,
         [&](const DBException& ex) {
             ASSERT_STRING_CONTAINS(ex.reason(),
                                    "is not contained within a chunk owned by this shard");
-            assertStaleConfigPayload(ex, metadata, useUuid);
+            assertStaleConfigPayload(ex, metadata);
         });
 }
 
-TEST_F(ChunkOperationPreconditionChecksTest,
+TEST_P(ChunkOperationPreconditionChecksUniqueShardIdentifiersTest,
        RangeWithinChunk_RangeStartsBeforeOwnedChunk_ThrowsStaleConfig) {
     // getNextChunk(15) skips other-shard chunks and returns the owned [20, 30), whose
     // min (20) does not cover the query range [15, 25).
     const auto metadata = makeMetadataWithChunks({
-        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)),
-         kOtherShardHandle.toShardRef(operationContext())},
-        {range(10, 20), kOtherShardHandle.toShardRef(operationContext())},
-        {range(20, 30), kThisShardHandle.toShardRef(operationContext())},
-        {ChunkRange(BSON(kPattern << 30), BSON(kPattern << MAXKEY)),
-         kOtherShardHandle.toShardRef(operationContext())},
+        {ChunkRange(BSON(kPattern << MINKEY), BSON(kPattern << 10)), kOtherShard},
+        {range(10, 20), kOtherShard},
+        {range(20, 30), kThisShard},
+        {ChunkRange(BSON(kPattern << 30), BSON(kPattern << MAXKEY)), kOtherShard},
     });
 
-    auto useUuid = feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabledAndIgnoreFCVUnsafe();
     ASSERT_THROWS_WITH_CHECK(
         checkRangeWithinChunk(operationContext(), kNss, metadata, range(15, 25)),
         ExceptionFor<ErrorCodes::StaleConfig>,
         [&](const DBException& ex) {
             ASSERT_STRING_CONTAINS(ex.reason(),
                                    "is not contained within a chunk owned by this shard");
-            assertStaleConfigPayload(ex, metadata, useUuid);
+            assertStaleConfigPayload(ex, metadata);
         });
 }
 
-TEST_F(ChunkOperationPreconditionChecksTest,
+TEST_P(ChunkOperationPreconditionChecksUniqueShardIdentifiersTest,
        RangeWithinChunk_NoOwnedChunksAfterRangeMin_ThrowsStaleConfig) {
     // No owned chunk at or after key 100; getNextChunk returns false, first assertion
     // fires.
-    const auto metadata = makeSingleChunkMetadata(kOtherShardHandle.toShardRef(operationContext()));
+    const auto metadata = makeSingleChunkMetadata(kOtherShard);
 
-    auto useUuid = feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabledAndIgnoreFCVUnsafe();
     ASSERT_THROWS_WITH_CHECK(
         checkRangeWithinChunk(operationContext(), kNss, metadata, range(100, 200)),
         ExceptionFor<ErrorCodes::StaleConfig>,
         [&](const DBException& ex) {
             ASSERT_STRING_CONTAINS(ex.reason(),
                                    "is not contained within a chunk owned by this shard");
-            assertStaleConfigPayload(ex, metadata, useUuid);
+            assertStaleConfigPayload(ex, metadata);
         });
 }
 
@@ -545,12 +526,12 @@ TEST_F(ChunkOperationPreconditionChecksTest,
 //
 
 TEST_F(ChunkOperationPreconditionChecksTest, SplitPoints_SingleKeyInsideChunk_Succeeds) {
-    const auto metadata = makeSingleChunkMetadata(kThisShardHandle.toShardRef(operationContext()));
+    const auto metadata = makeSingleChunkMetadata(kThisShard);
     validateSplitPoints(operationContext(), kNss, metadata, range(10, 20), {BSON(kPattern << 15)});
 }
 
 TEST_F(ChunkOperationPreconditionChecksTest, SplitPoints_MultipleStrictlyIncreasing_Succeeds) {
-    const auto metadata = makeSingleChunkMetadata(kThisShardHandle.toShardRef(operationContext()));
+    const auto metadata = makeSingleChunkMetadata(kThisShard);
     validateSplitPoints(operationContext(),
                         kNss,
                         metadata,
@@ -561,12 +542,12 @@ TEST_F(ChunkOperationPreconditionChecksTest, SplitPoints_MultipleStrictlyIncreas
 TEST_F(ChunkOperationPreconditionChecksTest, SplitPoints_KeyEqualToChunkMax_Succeeds) {
     // The helper explicitly allows endKey == chunkRange.getMax() ("not contained" is only
     // asserted when the key is also not equal to the upper bound).
-    const auto metadata = makeSingleChunkMetadata(kThisShardHandle.toShardRef(operationContext()));
+    const auto metadata = makeSingleChunkMetadata(kThisShard);
     validateSplitPoints(operationContext(), kNss, metadata, range(10, 20), {BSON(kPattern << 20)});
 }
 
 TEST_F(ChunkOperationPreconditionChecksTest, SplitPoints_KeyEqualToChunkMin_ThrowsLowerBound) {
-    const auto metadata = makeSingleChunkMetadata(kThisShardHandle.toShardRef(operationContext()));
+    const auto metadata = makeSingleChunkMetadata(kThisShard);
     ASSERT_THROWS_WITH_CHECK(
         validateSplitPoints(
             operationContext(), kNss, metadata, range(10, 20), {BSON(kPattern << 10)}),
@@ -578,7 +559,7 @@ TEST_F(ChunkOperationPreconditionChecksTest, SplitPoints_KeyEqualToChunkMin_Thro
 
 TEST_F(ChunkOperationPreconditionChecksTest,
        SplitPoints_DecreasingSequence_ThrowsStrictlyIncreasing) {
-    const auto metadata = makeSingleChunkMetadata(kThisShardHandle.toShardRef(operationContext()));
+    const auto metadata = makeSingleChunkMetadata(kThisShard);
     ASSERT_THROWS_WITH_CHECK(validateSplitPoints(operationContext(),
                                                  kNss,
                                                  metadata,
@@ -594,7 +575,7 @@ TEST_F(ChunkOperationPreconditionChecksTest, SplitPoints_DuplicatedKeys_ThrowsLo
     // After the first iteration, startKey is set to 15. The second key 15 satisfies the "strictly
     // increasing" assertion (>= startKey) but fails the "different from startKey" one, which is
     // emitted as the "Split on lower bound" error.
-    const auto metadata = makeSingleChunkMetadata(kThisShardHandle.toShardRef(operationContext()));
+    const auto metadata = makeSingleChunkMetadata(kThisShard);
     ASSERT_THROWS_WITH_CHECK(validateSplitPoints(operationContext(),
                                                  kNss,
                                                  metadata,
@@ -607,7 +588,7 @@ TEST_F(ChunkOperationPreconditionChecksTest, SplitPoints_DuplicatedKeys_ThrowsLo
 }
 
 TEST_F(ChunkOperationPreconditionChecksTest, SplitPoints_KeyOutsideChunk_ThrowsNotContained) {
-    const auto metadata = makeSingleChunkMetadata(kThisShardHandle.toShardRef(operationContext()));
+    const auto metadata = makeSingleChunkMetadata(kThisShard);
     ASSERT_THROWS_WITH_CHECK(
         validateSplitPoints(
             operationContext(), kNss, metadata, range(10, 20), {BSON(kPattern << 25)}),
@@ -617,18 +598,17 @@ TEST_F(ChunkOperationPreconditionChecksTest, SplitPoints_KeyOutsideChunk_ThrowsN
         });
 }
 
-TEST_F(ChunkOperationPreconditionChecksTest,
+TEST_P(ChunkOperationPreconditionChecksUniqueShardIdentifiersTest,
        SplitPoints_SplitKeyDoesNotMatchShardKeyPattern_ThrowsStaleConfig) {
-    const auto metadata = makeSingleChunkMetadata(kThisShardHandle.toShardRef(operationContext()));
+    const auto metadata = makeSingleChunkMetadata(kThisShard);
     const BSONObj invalidSplitKey = BSON(kPattern << 15 << "b" << 1);
 
-    auto useUuid = feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabledAndIgnoreFCVUnsafe();
     ASSERT_THROWS_WITH_CHECK(
         validateSplitPoints(operationContext(), kNss, metadata, range(10, 20), {invalidSplitKey}),
         ExceptionFor<ErrorCodes::StaleConfig>,
         [&](const DBException& ex) {
             ASSERT_STRING_CONTAINS(ex.reason(), "is not valid for collection");
-            assertStaleConfigPayload(ex, metadata, useUuid);
+            assertStaleConfigPayload(ex, metadata);
         });
 }
 
@@ -637,7 +617,7 @@ TEST_F(ChunkOperationPreconditionChecksTest,
 //
 
 TEST_F(ChunkOperationPreconditionChecksTest, MetadataIdentity_MatchingEpochAndTimestamp_Succeeds) {
-    const auto metadata = makeSingleChunkMetadata(kThisShardHandle.toShardRef(operationContext()));
+    const auto metadata = makeSingleChunkMetadata(kThisShard);
     const auto placementVersion = metadata.getShardPlacementVersion();
 
     checkCollectionIdentity(operationContext(),
@@ -648,67 +628,66 @@ TEST_F(ChunkOperationPreconditionChecksTest, MetadataIdentity_MatchingEpochAndTi
 }
 
 TEST_F(ChunkOperationPreconditionChecksTest, MetadataIdentity_NoExpectedEpochOrTimestamp_Succeeds) {
-    const auto metadata = makeSingleChunkMetadata(kThisShardHandle.toShardRef(operationContext()));
+    const auto metadata = makeSingleChunkMetadata(kThisShard);
 
     checkCollectionIdentity(operationContext(), kNss, boost::none, boost::none, metadata);
 }
 
-TEST_F(ChunkOperationPreconditionChecksTest, MetadataIdentity_EpochMismatch_ThrowsStaleConfig) {
-    const auto metadata = makeSingleChunkMetadata(kThisShardHandle.toShardRef(operationContext()));
+TEST_P(ChunkOperationPreconditionChecksUniqueShardIdentifiersTest,
+       MetadataIdentity_EpochMismatch_ThrowsStaleConfig) {
+    const auto metadata = makeSingleChunkMetadata(kThisShard);
     const auto placementVersion = metadata.getShardPlacementVersion();
 
-    auto useUuid = feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabledAndIgnoreFCVUnsafe();
     ASSERT_THROWS_WITH_CHECK(
         checkCollectionIdentity(
             operationContext(), kNss, OID::gen(), placementVersion.getTimestamp(), metadata),
         ExceptionFor<ErrorCodes::StaleConfig>,
         [&](const DBException& ex) {
             ASSERT_STRING_CONTAINS(ex.reason(), "has changed since operation was sent");
-            assertStaleConfigPayload(ex, metadata, useUuid);
+            assertStaleConfigPayload(ex, metadata);
         });
 }
 
-TEST_F(ChunkOperationPreconditionChecksTest, MetadataIdentity_TimestampMismatch_ThrowsStaleConfig) {
-    const auto metadata = makeSingleChunkMetadata(kThisShardHandle.toShardRef(operationContext()));
+TEST_P(ChunkOperationPreconditionChecksUniqueShardIdentifiersTest,
+       MetadataIdentity_TimestampMismatch_ThrowsStaleConfig) {
+    const auto metadata = makeSingleChunkMetadata(kThisShard);
     const auto placementVersion = metadata.getShardPlacementVersion();
 
-    auto useUuid = feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabledAndIgnoreFCVUnsafe();
     ASSERT_THROWS_WITH_CHECK(
         checkCollectionIdentity(
             operationContext(), kNss, placementVersion.epoch(), Timestamp(99, 99), metadata),
         ExceptionFor<ErrorCodes::StaleConfig>,
         [&](const DBException& ex) {
             ASSERT_STRING_CONTAINS(ex.reason(), "has changed since operation was sent");
-            assertStaleConfigPayload(ex, metadata, useUuid);
+            assertStaleConfigPayload(ex, metadata);
         });
 }
 
-TEST_F(ChunkOperationPreconditionChecksTest, MetadataIdentity_NotSharded_ThrowsStaleConfig) {
+TEST_P(ChunkOperationPreconditionChecksUniqueShardIdentifiersTest,
+       MetadataIdentity_NotSharded_ThrowsStaleConfig) {
     const auto metadata = CollectionMetadata::UNTRACKED();
 
-    auto useUuid = feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabledAndIgnoreFCVUnsafe();
     ASSERT_THROWS_WITH_CHECK(
         checkCollectionIdentity(operationContext(), kNss, boost::none, boost::none, metadata),
         ExceptionFor<ErrorCodes::StaleConfig>,
         [&](const DBException& ex) {
             ASSERT_STRING_CONTAINS(ex.reason(), "is not sharded");
-            assertStaleConfigPayload(ex, metadata, useUuid);
+            assertStaleConfigPayload(ex, metadata);
         });
 }
 
-TEST_F(ChunkOperationPreconditionChecksTest,
+TEST_P(ChunkOperationPreconditionChecksUniqueShardIdentifiersTest,
        MetadataIdentity_ThisShardOwnsNoChunks_ThrowsStaleConfig) {
     // The collection is sharded but every chunk belongs to another shard, so this shard's placement
     // major version is 0.
-    const auto metadata = makeSingleChunkMetadata(kOtherShardHandle.toShardRef(operationContext()));
+    const auto metadata = makeSingleChunkMetadata(kOtherShard);
 
-    auto useUuid = feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabledAndIgnoreFCVUnsafe();
     ASSERT_THROWS_WITH_CHECK(
         checkCollectionIdentity(operationContext(), kNss, boost::none, boost::none, metadata),
         ExceptionFor<ErrorCodes::StaleConfig>,
         [&](const DBException& ex) {
             ASSERT_STRING_CONTAINS(ex.reason(), "does not contain any chunks");
-            assertStaleConfigPayload(ex, metadata, useUuid);
+            assertStaleConfigPayload(ex, metadata);
         });
 }
 

@@ -100,8 +100,7 @@ public:
     /**
      * Sets up the collection metadata according to the provided map of chunks.
      */
-    CollectionMetadata prepareTestData(OperationContext* opCtx,
-                                       const KeyPattern& shardKeyPattern,
+    CollectionMetadata prepareTestData(const KeyPattern& shardKeyPattern,
                                        const std::vector<ChunkDesc>& chunkDescs);
 
     ~QueryShardServerTestFixture() override = default;

@@ -104,6 +104,7 @@ public:
 
         // (Generic FCV reference): Test latest FCV behavior.
         serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
+
         setupCatalogCacheMock(serviceContext, _withShardedCollection);
     }
 
@@ -144,7 +145,9 @@ protected:
             const size_t nShards = 1;
             const uint32_t nChunks = 60;
             const auto clusterId = OID::gen();
-            const auto shards = std::vector<ShardRef>{_originatorShardHandle.toShardRef(opCtx)};
+            const auto shards = std::vector<ShardId>{ShardId("shard0")};
+            const auto originatorShardId = shards[0];
+            const auto originatorShardHandle = ShardHandle(originatorShardId, UUID::gen());
 
             auto [chunks, chunkManager] = createChunks(nShards, nChunks, shards);
 
@@ -160,11 +163,11 @@ protected:
                 ->setRecoveryCompleted({clusterId,
                                         ClusterRole::ShardServer,
                                         ConnectionString(kConfigHostAndPort),
-                                        _originatorShardHandle.name()},
-                                       _originatorShardHandle.uuid().value());
+                                        originatorShardId},
+                                       originatorShardHandle.uuid().value());
 
             _shardVersion.emplace(
-                ShardVersionFactory::make(opCtx, chunkManager, _originatorShardHandle.name()));
+                ShardVersionFactory::make(opCtx, chunkManager, originatorShardId));
 
             OperationShardingState::setShardRole(
                 opCtx, kNss, _shardVersion, boost::none /* databaseVersion */);
@@ -173,8 +176,7 @@ protected:
             // collection with a routing table. The resharding key and temp namespace are
             // advertised separately through the LocalReshardingOperationsRegistry.
             CollectionShardingRuntime::acquireExclusive(opCtx, kNss)
-                ->setCollectionMetadata(opCtx,
-                                        CollectionMetadata(chunkManager, _originatorShardHandle));
+                ->setCollectionMetadata(opCtx, CollectionMetadata(chunkManager, originatorShardId));
 
             const auto reshardingTempNs =
                 resharding::constructTemporaryReshardingNss(kNss, chunkManager.getUUID());
@@ -241,7 +243,7 @@ protected:
     }
 
     std::pair<std::vector<mongo::ChunkType>, mongo::CurrentChunkManager> createChunks(
-        size_t nShards, uint32_t nChunks, std::vector<ShardRef> shards) {
+        size_t nShards, uint32_t nChunks, std::vector<ShardId> shards) {
         invariant(shards.size() == nShards);
 
         const auto collIdentifier = UUID::gen();
@@ -280,7 +282,6 @@ protected:
     bool _withShardedCollection{false};
     boost::optional<ShardVersion> _shardVersion;
     boost::optional<CommonReshardingMetadata> _registeredDonorMetadata;
-    const ShardHandle _originatorShardHandle{ShardId("shard0"), UUID::gen()};
 };
 
 class ShardingWriteRouterTestFixture : public WriteRouterTestFixture {

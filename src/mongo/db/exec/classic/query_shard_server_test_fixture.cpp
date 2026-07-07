@@ -121,24 +121,18 @@ const IndexCatalogEntry& QueryShardServerTestFixture::getIndexEntry(const Collec
 }
 
 CollectionMetadata QueryShardServerTestFixture::prepareTestData(
-    OperationContext* opCtx,
-    const KeyPattern& shardKeyPattern,
-    const std::vector<ChunkDesc>& chunkDescs) {
+    const KeyPattern& shardKeyPattern, const std::vector<ChunkDesc>& chunkDescs) {
     const UUID uuid = UUID::gen();
     const OID epoch = OID::gen();
 
-    ShardHandle curShard(ShardId("0"), UUID::gen());
-    ShardHandle otherShard(ShardId("1"), UUID::gen());
+    ShardId curShard("0");
+    ShardId otherShard("1");
     ChunkVersion version({epoch, Timestamp(1, 1)}, {1, 0});
 
     _chunks.clear();
     _chunks.reserve(chunkDescs.size());
     for (auto&& chunkDesc : chunkDescs) {
-        ChunkType c{uuid,
-                    chunkDesc.range,
-                    version,
-                    chunkDesc.isOnCurShard ? curShard.toShardRef(opCtx)
-                                           : otherShard.toShardRef(opCtx)};
+        ChunkType c{uuid, chunkDesc.range, version, chunkDesc.isOnCurShard ? curShard : otherShard};
         _chunks.push_back(c);
     };
 

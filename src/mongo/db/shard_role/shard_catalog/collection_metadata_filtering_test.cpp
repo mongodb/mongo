@@ -93,13 +93,10 @@ protected:
      *  time (25,0) - no history
      */
     CollectionMetadata prepareTestData(
-        OperationContext* opCtx,
         boost::optional<TypeCollectionTimeseriesFields> timeseriesFields = boost::none) {
         const UUID uuid = UUID::gen();
         const OID epoch = OID::gen();
         const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
-        const ShardHandle shard0(ShardId("0"), UUID::gen());
-        const ShardHandle shard1(ShardId("1"), UUID::gen());
 
         auto rt = RoutingTableHistory::makeNew(
             kNss,
@@ -119,41 +116,33 @@ protected:
                 ChunkType chunk1(uuid,
                                  {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << -100)},
                                  version,
-                                 shard0.toShardRef(opCtx));
+                                 ShardRef{"0"});
                 chunk1.setOnCurrentShardSince(Timestamp(75, 0));
-                chunk1.setHistory(
-                    {ChunkHistory(*chunk1.getOnCurrentShardSince(), shard0.toShardRef(opCtx)),
-                     ChunkHistory(Timestamp(25, 0), shard1.toShardRef(opCtx))});
+                chunk1.setHistory({ChunkHistory(*chunk1.getOnCurrentShardSince(), ShardRef("0")),
+                                   ChunkHistory(Timestamp(25, 0), ShardRef("1"))});
                 version.incMinor();
 
-                ChunkType chunk2(uuid,
-                                 {BSON("_id" << -100), BSON("_id" << 0)},
-                                 version,
-                                 shard1.toShardRef(opCtx));
+                ChunkType chunk2(
+                    uuid, {BSON("_id" << -100), BSON("_id" << 0)}, version, ShardRef{"1"});
                 chunk2.setOnCurrentShardSince(Timestamp(75, 0));
-                chunk2.setHistory(
-                    {ChunkHistory(*chunk2.getOnCurrentShardSince(), shard1.toShardRef(opCtx)),
-                     ChunkHistory(Timestamp(25, 0), shard0.toShardRef(opCtx))});
+                chunk2.setHistory({ChunkHistory(*chunk2.getOnCurrentShardSince(), ShardRef("1")),
+                                   ChunkHistory(Timestamp(25, 0), ShardRef("0"))});
                 version.incMinor();
 
-                ChunkType chunk3(uuid,
-                                 {BSON("_id" << 0), BSON("_id" << 100)},
-                                 version,
-                                 shard0.toShardRef(opCtx));
+                ChunkType chunk3(
+                    uuid, {BSON("_id" << 0), BSON("_id" << 100)}, version, ShardRef{"0"});
                 chunk3.setOnCurrentShardSince(Timestamp(75, 0));
-                chunk3.setHistory(
-                    {ChunkHistory(*chunk3.getOnCurrentShardSince(), shard0.toShardRef(opCtx)),
-                     ChunkHistory(Timestamp(25, 0), shard1.toShardRef(opCtx))});
+                chunk3.setHistory({ChunkHistory(*chunk3.getOnCurrentShardSince(), ShardRef("0")),
+                                   ChunkHistory(Timestamp(25, 0), ShardRef("1"))});
                 version.incMinor();
 
                 ChunkType chunk4(uuid,
                                  {BSON("_id" << 100), shardKeyPattern.getKeyPattern().globalMax()},
                                  version,
-                                 shard1.toShardRef(opCtx));
+                                 ShardRef{"1"});
                 chunk4.setOnCurrentShardSince(Timestamp(75, 0));
-                chunk4.setHistory(
-                    {ChunkHistory(*chunk4.getOnCurrentShardSince(), shard1.toShardRef(opCtx)),
-                     ChunkHistory(Timestamp(25, 0), shard0.toShardRef(opCtx))});
+                chunk4.setHistory({ChunkHistory(*chunk4.getOnCurrentShardSince(), ShardRef("1")),
+                                   ChunkHistory(Timestamp(25, 0), ShardRef("0"))});
                 version.incMinor();
 
                 return std::vector<ChunkType>{chunk1, chunk2, chunk3, chunk4};
@@ -164,13 +153,14 @@ protected:
 
         {
             auto scopedCsr = CollectionShardingRuntime::acquireExclusive(operationContext(), kNss);
-            scopedCsr->setCollectionMetadata(operationContext(), CollectionMetadata(cm, shard0));
+            scopedCsr->setCollectionMetadata(operationContext(),
+                                             CollectionMetadata(cm, ShardId("0")));
         }
 
         _manager = std::make_shared<MetadataManager>(
-            getServiceContext(), kNss, CollectionMetadata(cm, shard0));
+            getServiceContext(), kNss, CollectionMetadata(cm, ShardId("0")));
 
-        return CollectionMetadata(std::move(cm), shard0);
+        return CollectionMetadata(std::move(cm), ShardId("0"));
     }
 
     std::shared_ptr<MetadataManager> _manager;
@@ -178,7 +168,7 @@ protected:
 
 // Verifies that right set of documents is visible
 TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInTheFuture) {
-    const auto metadata{prepareTestData(operationContext())};
+    const auto metadata{prepareTestData()};
 
     const auto testFilterFn = [](const ScopedCollectionFilter& collectionFilter) {
         ASSERT_TRUE(collectionFilter.keyBelongsToMe(BSON("_id" << -500)));
@@ -210,7 +200,7 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInTheFuture) {
 
 // Verifies that a different set of documents is visible for a timestamp in the past
 TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInThePast) {
-    const auto metadata{prepareTestData(operationContext())};
+    const auto metadata{prepareTestData()};
 
     const auto testFilterFn = [](const ScopedCollectionFilter& collectionFilter) {
         ASSERT_FALSE(collectionFilter.keyBelongsToMe(BSON("_id" << -500)));
@@ -242,7 +232,7 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInThePast) {
 
 // Verifies that when accessing too far into the past we get the stale error
 TEST_F(CollectionMetadataFilteringTest, FilterDocumentsTooFarInThePastThrowsStaleChunkHistory) {
-    const auto metadata{prepareTestData(operationContext())};
+    const auto metadata{prepareTestData()};
 
     const auto testFilterFn = [](const ScopedCollectionFilter& collectionFilter) {
         ASSERT_THROWS_CODE(collectionFilter.keyBelongsToMe(BSON("_id" << -500)),

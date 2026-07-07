@@ -139,7 +139,7 @@ public:
 
             CollectionShardingRuntime::acquireExclusive(opCtx.get(), kNss)
                 ->setCollectionMetadata(opCtx.get(),
-                                        CollectionMetadata(chunkManager, kDonorShardHandle));
+                                        CollectionMetadata(chunkManager, kDonorShardHandle.name()));
         }
 
         {

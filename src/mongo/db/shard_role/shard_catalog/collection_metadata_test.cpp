@@ -56,11 +56,10 @@ namespace {
 
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.foo");
-const ShardHandle kThisShardHandle(ShardId("thisShard"), UUID::gen());
-const ShardHandle kOtherShardHandle(ShardId("otherShard"), UUID::gen());
+const ShardId kThisShard("thisShard");
+const ShardId kOtherShard("otherShard");
 
 CollectionMetadata makeTrackedCollectionMetadataImpl(
-    OperationContext* opCtx,
     const KeyPattern& shardKeyPattern,
     const std::vector<std::pair<BSONObj, BSONObj>>& thisShardsChunks,
     bool staleChunkManager,
@@ -79,20 +78,16 @@ CollectionMetadata makeTrackedCollectionMetadataImpl(
     for (const auto& myNextChunk : thisShardsChunks) {
         if (SimpleBSONObjComparator::kInstance.evaluate(nextMinKey < myNextChunk.first)) {
             // Need to add a chunk to the other shard from nextMinKey to myNextChunk.first.
-            allChunks.emplace_back(uuid,
-                                   ChunkRange{nextMinKey, myNextChunk.first},
-                                   version,
-                                   kOtherShardHandle.toShardRef(opCtx));
+            allChunks.emplace_back(
+                uuid, ChunkRange{nextMinKey, myNextChunk.first}, version, kOtherShard);
             auto& chunk = allChunks.back();
             chunk.setOnCurrentShardSince(kOnCurrentShardSince);
             chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), chunk.getShard())});
 
             version.incMajor();
         }
-        allChunks.emplace_back(uuid,
-                               ChunkRange{myNextChunk.first, myNextChunk.second},
-                               version,
-                               kThisShardHandle.toShardRef(opCtx));
+        allChunks.emplace_back(
+            uuid, ChunkRange{myNextChunk.first, myNextChunk.second}, version, kThisShard);
         auto& chunk = allChunks.back();
         chunk.setOnCurrentShardSince(kOnCurrentShardSince);
         chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), chunk.getShard())});
@@ -102,10 +97,8 @@ CollectionMetadata makeTrackedCollectionMetadataImpl(
     }
 
     if (SimpleBSONObjComparator::kInstance.evaluate(nextMinKey < shardKeyPattern.globalMax())) {
-        allChunks.emplace_back(uuid,
-                               ChunkRange{nextMinKey, shardKeyPattern.globalMax()},
-                               version,
-                               kOtherShardHandle.toShardRef(opCtx));
+        allChunks.emplace_back(
+            uuid, ChunkRange{nextMinKey, shardKeyPattern.globalMax()}, version, kOtherShard);
         auto& chunk = allChunks.back();
         chunk.setOnCurrentShardSince(kOnCurrentShardSince);
         chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), chunk.getShard())});
@@ -128,10 +121,9 @@ CollectionMetadata makeTrackedCollectionMetadataImpl(
     if (kChunkManager) {
         return CollectionMetadata(
             PointInTimeChunkManager(std::move(routingTableHistory), kChunkManager.get()),
-            kThisShardHandle);
+            kThisShard);
     } else {
-        return CollectionMetadata(CurrentChunkManager(std::move(routingTableHistory)),
-                                  kThisShardHandle);
+        return CollectionMetadata(CurrentChunkManager(std::move(routingTableHistory)), kThisShard);
     }
 }
 
@@ -160,7 +152,6 @@ ChunkType makeChangedChunk(const CollectionMetadata& metadata,
 // makeTrackedCollectionMetadataImpl, the unowned ranges are left as real gaps rather than
 // back-filled with kOtherShard chunks.
 CollectionMetadata makeGappedCollectionMetadata(
-    OperationContext* opCtx,
     const KeyPattern& shardKeyPattern,
     const std::vector<std::pair<BSONObj, BSONObj>>& ownedChunks) {
     const OID epoch = OID::gen();
@@ -171,10 +162,7 @@ CollectionMetadata makeGappedCollectionMetadata(
     std::vector<ChunkType> chunks;
     ChunkVersion version({epoch, timestamp}, {1, 0});
     for (const auto& range : ownedChunks) {
-        chunks.emplace_back(uuid,
-                            ChunkRange{range.first, range.second},
-                            version,
-                            kThisShardHandle.toShardRef(opCtx));
+        chunks.emplace_back(uuid, ChunkRange{range.first, range.second}, version, kThisShard);
         auto& chunk = chunks.back();
         chunk.setOnCurrentShardSince(kOnCurrentShardSince);
         chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), chunk.getShard())});
@@ -194,8 +182,7 @@ CollectionMetadata makeGappedCollectionMetadata(
                                                  boost::none /* reshardingFields */,
                                                  true,
                                                  chunks));
-    return CollectionMetadata(CurrentChunkManager(std::move(routingTableHistory)),
-                              kThisShardHandle);
+    return CollectionMetadata(CurrentChunkManager(std::move(routingTableHistory)), kThisShard);
 }
 
 struct ConstructedRangeMap : public RangeMap {
@@ -230,26 +217,21 @@ protected:
 
         if (state == CoordinatorStateEnum::kCommitting) {
             TypeCollectionRecipientFields recipientFields{
-                {kThisShardHandle.name(), kOtherShardHandle.name()}, existingUuid, kNss, 5000};
+                {kThisShard, kOtherShard}, existingUuid, kNss, 5000};
             reshardingFields.setRecipientFields(std::move(recipientFields));
         } else if (state == CoordinatorStateEnum::kBlockingWrites) {
             TypeCollectionDonorFields donorFields{
                 resharding::constructTemporaryReshardingNss(kNss, existingUuid),
                 KeyPattern{BSON("newKey" << 1)},
-                {kThisShardHandle.name(), kOtherShardHandle.name()}};
+                {kThisShard, kOtherShard}};
             reshardingFields.setDonorFields(std::move(donorFields));
         }
 
         auto metadataUuid =
             (state >= CoordinatorStateEnum::kCommitting) ? reshardingUuid : existingUuid;
 
-        return makeTrackedCollectionMetadataImpl(opCtx(),
-                                                 KeyPattern(BSON("a" << 1)),
-                                                 {},
-                                                 false,
-                                                 metadataUuid,
-                                                 Timestamp(1, 1),
-                                                 reshardingFields);
+        return makeTrackedCollectionMetadataImpl(
+            KeyPattern(BSON("a" << 1)), {}, false, metadataUuid, Timestamp(1, 1), reshardingFields);
     }
 };
 
@@ -324,10 +306,8 @@ TEST_F(NoChunkFixture, OrphanedDataRangeEnd) {
 class SingleChunkFixture : public CollectionMetadataTestFixture {
 protected:
     CollectionMetadata makeTrackedCollectionMetadata() const {
-        return makeTrackedCollectionMetadataImpl(opCtx(),
-                                                 KeyPattern(BSON("a" << 1)),
-                                                 {std::make_pair(BSON("a" << 10), BSON("a" << 20))},
-                                                 false);
+        return makeTrackedCollectionMetadataImpl(
+            KeyPattern(BSON("a" << 1)), {std::make_pair(BSON("a" << 10), BSON("a" << 20))}, false);
     }
 };
 
@@ -392,26 +372,22 @@ TEST_F(SingleChunkFixture, ChunkOrphanedDataRanges) {
 
 TEST_F(SingleChunkFixture, CurrentChunkManagerMakeUpdatedAppliesChangedChunks) {
     auto metadata = makeTrackedCollectionMetadata();
-    auto changedChunk = makeChangedChunk(metadata,
-                                         ChunkRange{BSON("a" << 10), BSON("a" << 20)},
-                                         kOtherShardHandle.toShardRef(opCtx()));
+    auto changedChunk =
+        makeChangedChunk(metadata, ChunkRange{BSON("a" << 10), BSON("a" << 20)}, kOtherShard);
 
     auto updatedChunkManager = metadata.getCurrentChunkManager()->makeUpdated({changedChunk});
 
     ASSERT_EQ(changedChunk.getVersion(), updatedChunkManager.getVersion());
-    ASSERT(
-        !updatedChunkManager.keyBelongsToShard(opCtx(), BSON("a" << 15), kThisShardHandle.name()));
-    ASSERT(
-        updatedChunkManager.keyBelongsToShard(opCtx(), BSON("a" << 15), kOtherShardHandle.name()));
+    ASSERT(!updatedChunkManager.keyBelongsToShard(opCtx(), BSON("a" << 15), kThisShard));
+    ASSERT(updatedChunkManager.keyBelongsToShard(opCtx(), BSON("a" << 15), kOtherShard));
 }
 
 TEST_F(SingleChunkFixture, CollectionMetadataMakeUpdatedAppliesChangedChunks) {
     auto metadata = makeTrackedCollectionMetadata();
-    auto changedChunk = makeChangedChunk(metadata,
-                                         ChunkRange{BSON("a" << 10), BSON("a" << 20)},
-                                         kOtherShardHandle.toShardRef(opCtx()));
+    auto changedChunk =
+        makeChangedChunk(metadata, ChunkRange{BSON("a" << 10), BSON("a" << 20)}, kOtherShard);
 
-    auto updatedMetadata = metadata.makeUpdated({changedChunk}, kThisShardHandle);
+    auto updatedMetadata = metadata.makeUpdated({changedChunk});
 
     ASSERT(metadata.keyBelongsToMe(BSON("a" << 15)));
     ASSERT(!updatedMetadata.keyBelongsToMe(BSON("a" << 15)));
@@ -425,10 +401,9 @@ TEST_F(SingleChunkFixture, CollectionMetadataMakeUpdatedDonorOfLastChunkReportsZ
     auto metadata = makeTrackedCollectionMetadata();
     ASSERT(metadata.keyBelongsToMe(BSON("a" << 15)));
 
-    auto changedChunk = makeChangedChunk(metadata,
-                                         ChunkRange{BSON("a" << 10), BSON("a" << 20)},
-                                         kOtherShardHandle.toShardRef(opCtx()));
-    auto updatedMetadata = metadata.makeUpdated({changedChunk}, kThisShardHandle);
+    auto changedChunk =
+        makeChangedChunk(metadata, ChunkRange{BSON("a" << 10), BSON("a" << 20)}, kOtherShard);
+    auto updatedMetadata = metadata.makeUpdated({changedChunk});
 
     // The donor no longer owns the migrated key.
     ASSERT(!updatedMetadata.keyBelongsToMe(BSON("a" << 15)));
@@ -447,19 +422,14 @@ TEST_F(SingleChunkFixture, CollectionMetadataMakeUpdatedIsIdempotentForSplitDelt
 
     auto version = metadata.getCollPlacementVersion();
     version.incMajor();
-    auto splitFirst = makeChangedChunkWithVersion(metadata,
-                                                  ChunkRange{BSON("a" << 10), BSON("a" << 15)},
-                                                  kOtherShardHandle.toShardRef(opCtx()),
-                                                  version);
+    auto splitFirst = makeChangedChunkWithVersion(
+        metadata, ChunkRange{BSON("a" << 10), BSON("a" << 15)}, kOtherShard, version);
     version.incMinor();
-    auto splitSecond = makeChangedChunkWithVersion(metadata,
-                                                   ChunkRange{BSON("a" << 15), BSON("a" << 20)},
-                                                   kOtherShardHandle.toShardRef(opCtx()),
-                                                   version);
+    auto splitSecond = makeChangedChunkWithVersion(
+        metadata, ChunkRange{BSON("a" << 15), BSON("a" << 20)}, kOtherShard, version);
 
-    auto updatedMetadata = metadata.makeUpdated({splitFirst, splitSecond}, kThisShardHandle);
-    auto reappliedMetadata =
-        updatedMetadata.makeUpdated({splitFirst, splitSecond}, kThisShardHandle);
+    auto updatedMetadata = metadata.makeUpdated({splitFirst, splitSecond});
+    auto reappliedMetadata = updatedMetadata.makeUpdated({splitFirst, splitSecond});
 
     ASSERT_EQ(splitSecond.getVersion(), reappliedMetadata.getCollPlacementVersion());
     ASSERT_EQ(updatedMetadata.getChunkManager()->numChunks(),
@@ -470,16 +440,14 @@ TEST_F(SingleChunkFixture, CollectionMetadataMakeUpdatedIsIdempotentForSplitDelt
 
 TEST_F(SingleChunkFixture, CollectionMetadataMakeUpdatedIgnoresOlderDelta) {
     auto metadata = makeTrackedCollectionMetadata();
-    auto firstChangedChunk = makeChangedChunk(metadata,
-                                              ChunkRange{BSON("a" << 10), BSON("a" << 20)},
-                                              kOtherShardHandle.toShardRef(opCtx()));
-    auto updatedMetadata = metadata.makeUpdated({firstChangedChunk}, kThisShardHandle);
+    auto firstChangedChunk =
+        makeChangedChunk(metadata, ChunkRange{BSON("a" << 10), BSON("a" << 20)}, kOtherShard);
+    auto updatedMetadata = metadata.makeUpdated({firstChangedChunk});
 
-    auto newerChangedChunk = makeChangedChunk(updatedMetadata,
-                                              ChunkRange{BSON("a" << 10), BSON("a" << 20)},
-                                              kThisShardHandle.toShardRef(opCtx()));
-    auto newerMetadata = updatedMetadata.makeUpdated({newerChangedChunk}, kThisShardHandle);
-    auto reappliedOlderMetadata = newerMetadata.makeUpdated({firstChangedChunk}, kThisShardHandle);
+    auto newerChangedChunk =
+        makeChangedChunk(updatedMetadata, ChunkRange{BSON("a" << 10), BSON("a" << 20)}, kThisShard);
+    auto newerMetadata = updatedMetadata.makeUpdated({newerChangedChunk});
+    auto reappliedOlderMetadata = newerMetadata.makeUpdated({firstChangedChunk});
 
     ASSERT_EQ(newerChangedChunk.getVersion(), reappliedOlderMetadata.getCollPlacementVersion());
     ASSERT(reappliedOlderMetadata.keyBelongsToMe(BSON("a" << 15)));
@@ -488,7 +456,7 @@ TEST_F(SingleChunkFixture, CollectionMetadataMakeUpdatedIgnoresOlderDelta) {
 TEST_F(SingleChunkFixture, CollectionMetadataMakeUpdatedWithEmptyDeltaIsNoOp) {
     auto metadata = makeTrackedCollectionMetadata();
 
-    auto updatedMetadata = metadata.makeUpdated({}, kThisShardHandle);
+    auto updatedMetadata = metadata.makeUpdated({});
 
     // An empty delta carries no version, so the metadata is left untouched.
     ASSERT_EQ(metadata.getCollPlacementVersion(), updatedMetadata.getCollPlacementVersion());
@@ -505,21 +473,14 @@ TEST_F(SingleChunkFixture, CollectionMetadataMakeUpdatedSelectsMaxVersionRegardl
     // still recognized as newer and applied.
     auto version = metadata.getCollPlacementVersion();
     version.incMajor();
-    auto lowerVersionChunk =
-        makeChangedChunkWithVersion(metadata,
-                                    ChunkRange{BSON("a" << 10), BSON("a" << 15)},
-                                    kOtherShardHandle.toShardRef(opCtx()),
-                                    version);
+    auto lowerVersionChunk = makeChangedChunkWithVersion(
+        metadata, ChunkRange{BSON("a" << 10), BSON("a" << 15)}, kOtherShard, version);
     version.incMinor();
-    auto higherVersionChunk =
-        makeChangedChunkWithVersion(metadata,
-                                    ChunkRange{BSON("a" << 15), BSON("a" << 20)},
-                                    kOtherShardHandle.toShardRef(opCtx()),
-                                    version);
+    auto higherVersionChunk = makeChangedChunkWithVersion(
+        metadata, ChunkRange{BSON("a" << 15), BSON("a" << 20)}, kOtherShard, version);
 
     // Highest-version chunk first, lowest last.
-    auto updatedMetadata =
-        metadata.makeUpdated({higherVersionChunk, lowerVersionChunk}, kThisShardHandle);
+    auto updatedMetadata = metadata.makeUpdated({higherVersionChunk, lowerVersionChunk});
 
     ASSERT_EQ(higherVersionChunk.getVersion(), updatedMetadata.getCollPlacementVersion());
     ASSERT(!updatedMetadata.keyBelongsToMe(BSON("a" << 12)));
@@ -527,8 +488,7 @@ TEST_F(SingleChunkFixture, CollectionMetadataMakeUpdatedSelectsMaxVersionRegardl
 
     // Re-applying the same delta (again with the max version first) is recognized as already
     // applied and changes nothing.
-    auto reappliedMetadata =
-        updatedMetadata.makeUpdated({higherVersionChunk, lowerVersionChunk}, kThisShardHandle);
+    auto reappliedMetadata = updatedMetadata.makeUpdated({higherVersionChunk, lowerVersionChunk});
     ASSERT_EQ(higherVersionChunk.getVersion(), reappliedMetadata.getCollPlacementVersion());
     ASSERT_EQ(updatedMetadata.getChunkManager()->numChunks(),
               reappliedMetadata.getChunkManager()->numChunks());
@@ -538,7 +498,7 @@ class GappedChunksFixture : public CollectionMetadataTestFixture {
 protected:
     CollectionMetadata makeGappedMetadata(
         const std::vector<std::pair<BSONObj, BSONObj>>& ownedChunks) const {
-        return makeGappedCollectionMetadata(opCtx(), KeyPattern(BSON("a" << 1)), ownedChunks);
+        return makeGappedCollectionMetadata(KeyPattern(BSON("a" << 1)), ownedChunks);
     }
 };
 
@@ -554,10 +514,9 @@ TEST_F(GappedChunksFixture, MakeUpdatedPreservesGapsWithNonAdjacentChunk) {
 
     // Receiving a new chunk [50, 60) that is not adjacent to any owned chunk must not be rejected
     // as a gap: makeUpdated tolerates gaps because the routing table was built allowing them.
-    auto changedChunk = makeChangedChunk(metadata,
-                                         ChunkRange{BSON("a" << 50), BSON("a" << 60)},
-                                         kThisShardHandle.toShardRef(opCtx()));
-    auto updatedMetadata = metadata.makeUpdated({changedChunk}, kThisShardHandle);
+    auto changedChunk =
+        makeChangedChunk(metadata, ChunkRange{BSON("a" << 50), BSON("a" << 60)}, kThisShard);
+    auto updatedMetadata = metadata.makeUpdated({changedChunk});
 
     // The new chunk is applied and the pre-existing gaps are preserved (not back-filled with
     // placeholder chunks).
@@ -577,7 +536,6 @@ protected:
     CollectionMetadata makeTrackedCollectionMetadata() const {
         const KeyPattern shardKeyPattern(BSON("a" << 1 << "b" << 1));
         return makeTrackedCollectionMetadataImpl(
-            opCtx(),
             shardKeyPattern,
             {std::make_pair(shardKeyPattern.globalMin(), shardKeyPattern.globalMax())},
             false);
@@ -602,7 +560,6 @@ class TwoChunksWithGapCompoundKeyFixture : public CollectionMetadataTestFixture 
 protected:
     CollectionMetadata makeTrackedCollectionMetadata() const {
         return makeTrackedCollectionMetadataImpl(
-            opCtx(),
             KeyPattern(BSON("a" << 1 << "b" << 1)),
             {std::make_pair(BSON("a" << 10 << "b" << 0), BSON("a" << 20 << "b" << 0)),
              std::make_pair(BSON("a" << 30 << "b" << 0), BSON("a" << 40 << "b" << 0))},
@@ -640,7 +597,6 @@ class ThreeChunkWithRangeGapFixture : public CollectionMetadataTestFixture {
 protected:
     CollectionMetadata makeTrackedCollectionMetadata() const {
         return makeTrackedCollectionMetadataImpl(
-            opCtx(),
             KeyPattern(BSON("a" << 1)),
             {std::make_pair(BSON("a" << MINKEY), BSON("a" << 10)),
              std::make_pair(BSON("a" << 10), BSON("a" << 20)),
@@ -711,10 +667,8 @@ TEST_F(ThreeChunkWithRangeGapFixture, GetNextChunkFromLast) {
 class StaleChunkFixture : public CollectionMetadataTestFixture {
 protected:
     CollectionMetadata makeTrackedCollectionMetadata() const {
-        return makeTrackedCollectionMetadataImpl(opCtx(),
-                                                 KeyPattern(BSON("a" << 1)),
-                                                 {std::make_pair(BSON("a" << 10), BSON("a" << 20))},
-                                                 true);
+        return makeTrackedCollectionMetadataImpl(
+            KeyPattern(BSON("a" << 1)), {std::make_pair(BSON("a" << 10), BSON("a" << 20))}, true);
     }
 };
 

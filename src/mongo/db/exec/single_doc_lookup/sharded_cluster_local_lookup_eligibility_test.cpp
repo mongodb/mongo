@@ -35,7 +35,6 @@
 #include "mongo/db/router_role/routing_cache/catalog_cache_mock.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
-#include "mongo/db/sharding_environment/shard_handle.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
@@ -96,9 +95,8 @@ protected:
     // Drives the held-sharded arm through the public run(): the filter stands in for the one
     // production takes from the held acquisition, not from the routing CRI.
     Decision decideFromHeldFilter(const CollectionRoutingInfo& cri, const Document& documentKey) {
-        auto filter = ScopedCollectionFilter(
-            std::make_shared<TestScopedCollectionFilterImpl>(CollectionMetadata(
-                cri.getCurrentChunkManager(), ShardHandle(kThisShard, boost::none))));
+        auto filter = ScopedCollectionFilter(std::make_shared<TestScopedCollectionFilterImpl>(
+            CollectionMetadata(cri.getCurrentChunkManager(), kThisShard)));
         return runDecision(LocalLookupEligibility::HeldShardedCollection{std::cref(filter)},
                            documentKey);
     }

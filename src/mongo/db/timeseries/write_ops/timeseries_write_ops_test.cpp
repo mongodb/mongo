@@ -222,9 +222,9 @@ public:
         });
 
         const ChunkRange cr{BSON("skey" << MINKEY), BSON("skey" << MAXKEY)};
-        const ShardHandle shardHandle{ShardId("myShardName"), UUID::gen()};
+        const ShardId shardName{"myShardName"};
         const std::vector<ChunkType> chunks{
-            ChunkType(_uuid, cr, _shardVersion.placementVersion(), shardHandle.toShardRef(_opCtx))};
+            ChunkType(_uuid, cr, _shardVersion.placementVersion(), shardName)};
 
         constexpr std::string_view shardKey("skey");
         const ShardKeyPattern shardKeyPattern{BSON(shardKey << 1)};
@@ -251,7 +251,7 @@ public:
             ComparableChunkVersion::makeComparableChunkVersion(version));
 
         const auto collectionMetadata =
-            CollectionMetadata(CurrentChunkManager(rtHandle), shardHandle);
+            CollectionMetadata(CurrentChunkManager(rtHandle), shardName);
 
         CollectionShardingRuntime::acquireExclusive(_opCtx, _nss)
             ->setCollectionMetadata(_opCtx, collectionMetadata);
