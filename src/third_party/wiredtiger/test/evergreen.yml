@@ -10,6 +10,7 @@
 stepback: true
 pre:
   - func: "cleanup"
+  - func: "pin mongo toolchain"
 post:
   - func: "dump stacktraces"
   - func: "upload stacktraces"
@@ -29,6 +30,38 @@ exec_timeout_secs: 21600 # 6 hrs
 #######################################
 
 functions:
+
+  "pin mongo toolchain":
+    - command: shell.exec
+      type: setup
+      params:
+        shell: bash
+        script: |
+          set -o errexit
+
+          if [ "${REQUIRE_MDB_TOOLCHAIN|}" != "1" ]; then
+              exit 0
+          fi
+
+          MDB_TOOLCHAIN_REV="93d85cc1a00ca1d53fcc7d4ca790f19a4e5dd542"
+          if readlink /opt/mongodbtoolchain/v5/bin/clang 2>/dev/null | grep -q "$MDB_TOOLCHAIN_REV"; then
+              echo "mongodbtoolchain $MDB_TOOLCHAIN_REV already installed, skipping download."
+              exit 0
+          fi
+
+          echo "mongodbtoolchain $MDB_TOOLCHAIN_REV not installed, downloading..."
+
+          # Work around installer.sh detecting the wrong platform on non-x86 architectures.
+          ARCH=$(uname -m)
+          EXTRA_ARGS=""
+          if [[ "$ARCH" == "ppc64le" ]]; then
+              EXTRA_ARGS="--os-id rhel81"
+          elif [[ "$ARCH" == "s390x" ]]; then
+              EXTRA_ARGS="--download-url https://mongodbtoolchain.build.10gen.cc/toolchain/rhel80-zseries/x86_64/mongodbtoolchain-${MDB_TOOLCHAIN_REV}.tar.gz"
+          fi
+
+          curl -fsSL https://s3.amazonaws.com/mongodbtoolchain.build.10gen.cc/installer.sh \
+              | bash -s -- --revision-id "$MDB_TOOLCHAIN_REV" $EXTRA_ARGS
 
   "get project" :
     command: git.get_project
@@ -5239,6 +5272,7 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
+    REQUIRE_MDB_TOOLCHAIN: "1"
     configure_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
     compile_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
     test_env_vars:
@@ -5304,6 +5338,7 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
+    REQUIRE_MDB_TOOLCHAIN: "1"
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=ASan
     CMAKE_PREFIX_PATH: -DCMAKE_PREFIX_PATH="$(pwd)/TCMALLOC_LIB"
@@ -5333,6 +5368,7 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
+    REQUIRE_MDB_TOOLCHAIN: "1"
     configure_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
     compile_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
     test_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
@@ -5352,6 +5388,7 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
+    REQUIRE_MDB_TOOLCHAIN: "1"
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=MSan
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
@@ -5383,6 +5420,7 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
+    REQUIRE_MDB_TOOLCHAIN: "1"
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=UBSan
     CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O1
@@ -5436,6 +5474,7 @@ buildvariants:
   run_on:
   - ubuntu2004-small
   expansions:
+    REQUIRE_MDB_TOOLCHAIN: "1"
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: ninja
     configure_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
@@ -5476,6 +5515,7 @@ buildvariants:
   run_on:
   - ubuntu2004-arm64-large
   expansions:
+    REQUIRE_MDB_TOOLCHAIN: "1"
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: ninja
     configure_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
@@ -5554,6 +5594,8 @@ buildvariants:
   batchtime: 1440 # 1 day
   run_on:
   - ubuntu2004-test
+  expansions:
+    REQUIRE_MDB_TOOLCHAIN: "1"
   tasks:
     - name: package
 
@@ -5586,6 +5628,7 @@ buildvariants:
   run_on:
   - rhel80-test
   expansions:
+    REQUIRE_MDB_TOOLCHAIN: "1"
     configure_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
     compile_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
     test_env_vars:
@@ -5685,6 +5728,7 @@ buildvariants:
   - ubuntu1804-large
   batchtime: 4320 # 3 days
   expansions:
+    REQUIRE_MDB_TOOLCHAIN: "1"
     python_binary: '/opt/mongodbtoolchain/v4/bin/python3'
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     configure_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
@@ -5710,6 +5754,7 @@ buildvariants:
   - rhel8-zseries-small
   batchtime: 4320 # 3 days
   expansions:
+    REQUIRE_MDB_TOOLCHAIN: "1"
     python_binary: '/opt/mongodbtoolchain/v4/bin/python3'
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     configure_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
@@ -5734,6 +5779,7 @@ buildvariants:
   - rhel81-power8-small
   batchtime: 120 # 2 hours
   expansions:
+    REQUIRE_MDB_TOOLCHAIN: "1"
     format_test_setting: ulimit -c unlimited
     configure_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
     compile_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
@@ -5764,6 +5810,7 @@ buildvariants:
   - rhel8-zseries-small
   batchtime: 120 # 2 hours
   expansions:
+    REQUIRE_MDB_TOOLCHAIN: "1"
     configure_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
     compile_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
     test_env_vars:
@@ -5789,6 +5836,7 @@ buildvariants:
   - ubuntu2004-arm64-small
   batchtime: 1440 # 24 hours
   expansions:
+    REQUIRE_MDB_TOOLCHAIN: "1"
     configure_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
     compile_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
     test_env_vars:
@@ -5875,6 +5923,8 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
+    REQUIRE_MDB_TOOLCHAIN: "1"
+    ENABLE_TCMALLOC: 0
     posix_configure_flags: -DENABLE_ANTITHESIS=1 -DENABLE_STRICT=0
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
     make_command: ninja
