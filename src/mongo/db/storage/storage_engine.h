@@ -1044,6 +1044,17 @@ public:
      * Returns whether the storage engine is currently trying to live-restore its database.
      */
     virtual bool hasOngoingLiveRestore() = 0;
+
+    /**
+     * Returns the total logical size in bytes of the given index tables as recorded in the most
+     * recent checkpoint. 'indexIdents' are storage idents identifying the index tables to sum.
+     * Indexes that have not yet been checkpointed contribute zero. Returns 0 for storage engines
+     * that do not support this operation.
+     */
+    virtual StatusWith<int64_t> getIndexStorageSize(
+        OperationContext* opCtx, const std::vector<std::string>& indexIdents) const {
+        return 0;
+    }
 };
 
 }  // namespace mongo

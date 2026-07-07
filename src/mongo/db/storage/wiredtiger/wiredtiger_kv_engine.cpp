@@ -75,6 +75,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -3364,6 +3365,36 @@ bool WiredTigerKVEngine::hasOngoingLiveRestore() {
     auto result = WiredTigerUtil::getStatisticsValue(
         *session, "statistics:", "statistics=(fast)", WT_STAT_CONN_LIVE_RESTORE_STATE);
     return uassertStatusOK(result) == WT_LIVE_RESTORE_IN_PROGRESS;
+}
+
+StatusWith<int64_t> WiredTigerKVEngineBase::getIndexStorageSize(
+    OperationContext*, const std::vector<std::string>& indexIdents) const {
+    auto session = getConnection().getUninterruptibleSession();
+    int64_t total = 0;
+    for (const auto& ident : indexIdents) {
+        const std::string fileUri = str::stream()
+            << WiredTigerUtil::kFileUriPrefix << ident << WiredTigerUtil::kStableFileSuffix;
+        // Read the on-disk block size statistic for the stable index file.
+        auto swSize = WiredTigerUtil::getStatisticsValue(
+            *session, "statistics:" + fileUri, "statistics=(size)", WT_STAT_DSRC_BLOCK_SIZE);
+        if (!swSize.isOK()) {
+            // A missing stable file surfaces as an open_cursor failure, which getStatisticsValue
+            // maps to CursorNotFound. Only that case is ambiguous, so confirm the file is genuinely
+            // absent from the metadata table before treating it as zero. Any other error (or a
+            // CursorNotFound whose file still exists) is real and must be surfaced.
+            if (swSize.getStatus() == ErrorCodes::CursorNotFound &&
+                WiredTigerUtil::getMetadata(*session, fileUri).getStatus() ==
+                    ErrorCodes::NoSuchKey) {
+                continue;
+            }
+            return swSize.getStatus();
+        }
+        if (overflow::add(total, swSize.getValue(), &total)) {
+            return Status(ErrorCodes::Overflow,
+                          "Logical index size total overflows int64; corrupted metadata");
+        }
+    }
+    return total;
 }
 
 Status WiredTigerKVEngine::_drop(WiredTigerSession& session, const char* uri, const char* config) {

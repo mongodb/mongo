@@ -274,6 +274,9 @@ public:
         return _wtConfig.cacheSizeMB;
     }
 
+    StatusWith<int64_t> getIndexStorageSize(
+        OperationContext* opCtx, const std::vector<std::string>& indexIdents) const override;
+
     void setRecordStoreExtraOptions(const std::string& options);
 
     bool isEphemeral() const override {

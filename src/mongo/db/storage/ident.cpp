@@ -317,6 +317,11 @@ bool isCollectionIdent(std::string_view ident) {
     return parsed && parsed->identType == IdentType::collection;
 }
 
+bool isIndexIdent(std::string_view ident) {
+    auto parsed = parseIdent(ident);
+    return parsed && parsed->identType == IdentType::index;
+}
+
 bool validateTag(std::string_view uniqueTag) {
     return !uniqueTag.empty() && uniqueTag.find_first_of("./\\:") == uniqueTag.npos;
 }

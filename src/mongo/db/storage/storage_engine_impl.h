@@ -327,6 +327,9 @@ public:
 
     bool hasOngoingLiveRestore() override;
 
+    StatusWith<int64_t> getIndexStorageSize(
+        OperationContext* opCtx, const std::vector<std::string>& indexIdents) const override;
+
 private:
     using CollIter = std::list<std::string>::iterator;
 

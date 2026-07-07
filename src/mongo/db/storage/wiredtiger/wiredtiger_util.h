@@ -102,6 +102,9 @@ private:
 public:
     static constexpr std::string_view kConfigStringField = "configString"sv;
     static constexpr std::string_view kTableUriPrefix = "table:"sv;
+    static constexpr std::string_view kFileUriPrefix = "file:"sv;
+    // Suffix of the file backing the stable (checkpointed) table of a disaggregated ident.
+    static constexpr std::string_view kStableFileSuffix = ".wt_stable"sv;
     static constexpr double memoryThresholdPercentage = 0.8;
 
     static std::string buildTableUri(std::string_view ident);

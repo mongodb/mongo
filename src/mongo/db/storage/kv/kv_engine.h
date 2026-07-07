@@ -714,6 +714,14 @@ public:
     }
 
     /**
+     * See StorageEngine::getIndexStorageSize for details.
+     */
+    virtual StatusWith<int64_t> getIndexStorageSize(
+        OperationContext*, const std::vector<std::string>& indexIdents) const {
+        return 0;
+    }
+
+    /**
      * The destructor will never be called from mongod, but may be called from tests.
      * Engines may assume that this will only be called in the case of clean shutdown, even if
      * cleanShutdown() hasn't been called.

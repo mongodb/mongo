@@ -157,6 +157,8 @@ bool isReplicatedFastCountIdent(std::string_view ident);
 
 bool isCollectionIdent(std::string_view ident);
 
+bool isIndexIdent(std::string_view ident);
+
 /**
  * Validates that the tag does not contain any characters which would be special when interpreted as
  * a path.
