@@ -37,6 +37,10 @@
 
 #include <asio.hpp>
 
+#ifdef MONGO_CONFIG_SSL
+#include "mongo/util/net/ssl.hpp"
+#endif
+
 namespace mongo::transport {
 namespace {
 using namespace std::literals::string_view_literals;
@@ -180,6 +184,30 @@ TEST(ASIOUtils, PeekPastAvailableBytesTCPNonBlocking) {
     TCPSocketPair sockets;
     sockets.clientSocket().non_blocking(true);
     peekPastBuffer(sockets.serverSocket(), sockets.clientSocket(), "example"sv);
+}
+// A graceful peer close maps to ErrorCodes::ConnectionClosedByPeer on all platforms: a non-TLS FIN
+// (eof) and a TLS close without close_notify (stream_truncated). The reason carries ec.message(),
+// so the transport modes stay distinguishable in diagnostics under the single code. On Windows, a
+// purposeful termination can also surface as an abortive close (connection_reset /
+// connection_aborted), which is normalized to the same code; on other platforms a reset keeps its
+// historical HostUnreachable classification.
+TEST(ASIOUtils, PeerClosedMapsToConnectionClosedByPeer) {
+    ASSERT_EQ(errorCodeToStatus(asio::error::eof).code(), ErrorCodes::ConnectionClosedByPeer);
+#ifdef _WIN32
+    ASSERT_EQ(errorCodeToStatus(asio::error::connection_reset).code(),
+              ErrorCodes::ConnectionClosedByPeer);
+    ASSERT_EQ(errorCodeToStatus(asio::error::connection_aborted).code(),
+              ErrorCodes::ConnectionClosedByPeer);
+#else
+    ASSERT_EQ(errorCodeToStatus(asio::error::connection_reset).code(), ErrorCodes::HostUnreachable);
+#endif
+#ifdef MONGO_CONFIG_SSL
+    ASSERT_EQ(errorCodeToStatus(asio::ssl::error::stream_truncated).code(),
+              ErrorCodes::ConnectionClosedByPeer);
+    // Same code, distinct reasons: ec.message() differs between eof and stream_truncated.
+    ASSERT_NE(errorCodeToStatus(asio::error::eof).reason(),
+              errorCodeToStatus(asio::ssl::error::stream_truncated).reason());
+#endif
 }
 }  // namespace
 }  // namespace mongo::transport

@@ -393,6 +393,15 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string ins
     std::move(pf.future).thenRunOn(_reactor).getAsync(
         [this, cb = std::move(cb), anchor](Status status) { cb(this, std::move(status)); });
 
+    // Flipped to true once the initial hello (initWireVersion) completes -- i.e. once we leave the
+    // connection-establishment + hello phase and enter authentication. The setup timer reads this
+    // to classify a timeout per the SDAM spec: a timeout during connection establishment or the
+    // hello must not change the server's description (-> ConnectionEstablishmentTimeout, which
+    // SpecificPool::finishRefresh single-drops), whereas a timeout during the authentication step
+    // must (-> HostUnreachable, which flushes the pool). Both the timer callback and the
+    // continuation that sets it run on _reactor, so the store happens-before any timer read.
+    auto helloDone = std::make_shared<AtomicWord<bool>>(false);
+
     if (MONGO_unlikely(triggerConnectionSetupHandshakeTimeout.shouldFail())) {
         triggerConnectionSetupHandshakeTimeout.executeIf(
             [&](const BSONObj& data) { timeout = Milliseconds(0); },
@@ -402,13 +411,28 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string ins
             });
     }
 
-    setTimeout(timeout, [this, handler, timeout] {
+    setTimeout(timeout, [this, handler, timeout, helloDone] {
         if (handler->done.swap(true)) {
             return;
         }
-        std::string reason = str::stream()
-            << "Timed out connecting to " << _peer << " after " << timeout;
-        handler->promise.setError(Status(ErrorCodes::HostUnreachable, std::move(reason)));
+        // Classify the setup timeout per the SDAM spec (see helloDone above). A timeout during
+        // connection establishment or the initial hello is reported as
+        // ConnectionEstablishmentTimeout so SpecificPool::finishRefresh single-drops the failing
+        // attempt instead of flushing the pool -- a peer that merely throttles *new* establishments
+        // (e.g. a connection establishment rate limiter) accepts the TCP/TLS connection and then
+        // withholds the hello response, so its timeout surfaces here and must not tear down
+        // healthy, already-established connections. A timeout during the later authentication step
+        // is reported as HostUnreachable, which flushes the pool.
+        if (!helloDone->load()) {
+            std::string reason = str::stream()
+                << "Timed out establishing connection to " << _peer << " after " << timeout;
+            handler->promise.setError(
+                Status(ErrorCodes::ConnectionEstablishmentTimeout, std::move(reason)));
+        } else {
+            std::string reason = str::stream()
+                << "Timed out authenticating to " << _peer << " after " << timeout;
+            handler->promise.setError(Status(ErrorCodes::HostUnreachable, std::move(reason)));
+        }
 
         cancel();
     });
@@ -435,14 +459,20 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string ins
                            connMetricsAnchor,
                            _transientSSLContext)
         .thenRunOn(_reactor)
-        .onError([](StatusWith<std::shared_ptr<AsyncDBClient>> swc)
-                     -> StatusWith<std::shared_ptr<AsyncDBClient>> {
-            if (const Status& status = swc.getStatus();
-                status.code() == ErrorCodes::ConnectionError) {
+        .onError([](Status status) -> StatusWith<std::shared_ptr<AsyncDBClient>> {
+            // Preserve the codes finishRefresh classifies. This lambda only sees connect-phase
+            // failures, so a NetworkTimeout here is the transport-layer connect timeout
+            // ("Connecting timed out") racing our own timer — normalize it to
+            // ConnectionEstablishmentTimeout so the connect-phase result is classified the same way
+            // regardless of which timer wins. Everything else is normalized to HostUnreachable for
+            // SDAM-spec consistency.
+            if (status.code() == ErrorCodes::ConnectionError ||
+                status.code() == ErrorCodes::ConnectionClosedByPeer ||
+                status.code() == ErrorCodes::ConnectionEstablishmentTimeout)
                 return status;
-            } else {
-                return Status(ErrorCodes::HostUnreachable, status.reason());
-            }
+            if (status.code() == ErrorCodes::NetworkTimeout)
+                return Status(ErrorCodes::ConnectionEstablishmentTimeout, status.reason());
+            return Status(ErrorCodes::HostUnreachable, status.reason());
         })
         .then([this, helloHook, instanceName = std::move(instanceName)](
                   std::shared_ptr<AsyncDBClient> client) {
@@ -452,7 +482,11 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string ins
             }
             return _client->initWireVersion(instanceName, helloHook.get());
         })
-        .then([this, helloHook]() -> Future<bool> {
+        .then([this, helloHook, helloDone]() -> Future<bool> {
+            // The initial hello has completed; any subsequent setup timeout is in the
+            // authentication step, which per the SDAM spec must mark the server Unknown (->
+            // HostUnreachable).
+            helloDone->store(true);
             if (_skipAuth) {
                 return false;
             }
