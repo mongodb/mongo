@@ -1264,11 +1264,8 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
                 foundValueObj = BSONObj(reinterpret_cast<const char*>(foundValue.data));
             }
 
-            return Status{DuplicateKeyErrorInfo{BSONObj(),
-                                                BSONObj(),
-                                                BSONObj(),
-                                                std::move(foundValueObj),
-                                                std::move(record.id)},
+            return Status{DuplicateKeyErrorInfo{
+                              BSONObj(), BSONObj(), BSONObj(), std::move(foundValueObj), record.id},
                           "Duplicate cluster key found"};
         }
 
