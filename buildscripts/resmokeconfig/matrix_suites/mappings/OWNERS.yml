@@ -136,3 +136,6 @@ filters:
   - "sharded_collections_jscore_passthrough_with_balancer_drop_config_cache_collections.yml":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "with_mongot_extension*":
+    approvers:
+      - 10gen/query-integration-extensions-api

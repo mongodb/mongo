@@ -82,3 +82,6 @@ filters:
   - "encryption.yml":
     approvers:
       - 10gen/server-security
+  - "with_mongot_extension*":
+    approvers:
+      - 10gen/query-integration-extensions-api

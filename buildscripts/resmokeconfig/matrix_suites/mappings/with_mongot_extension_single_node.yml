@@ -1,0 +1,8 @@
+base_suite: mongot_e2e_single_node
+description: >-
+  Runs the with_mongot e2e suite against a single node replica set to test the real
+  mongot-extension.
+excludes:
+  - "with_mongot_extension.exclude_incompatible_tests"
+overrides:
+  - "with_mongot_extension.load_extension"

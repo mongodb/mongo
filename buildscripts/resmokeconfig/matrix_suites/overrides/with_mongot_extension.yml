@@ -1,0 +1,21 @@
+# Overrides for the with_mongot_extension_* suites, which run the with_mongot e2e corpus against
+# the real (externally-published) mongot-extension.
+#
+# TODO SERVER-130648: load the mongot-extension and enable the extension feature flags. Until then,
+# these suites are exact clones of their base suites and run the server's built-in search
+# implementations (the task definitions force-disable the extension feature flags).
+
+# Tests the mongot-extension cannot run, appended to each base suite's own exclusions via the
+# mappings' `excludes` tag.
+- name: exclude_incompatible_tests
+  value:
+    exclude_files: []
+
+# The extensions these suites load. Note that this list REPLACES the base suite's list rather than
+# extending it.
+- name: load_extension
+  value:
+    executor:
+      fixture:
+        load_extensions:
+          - "add_fields_match"

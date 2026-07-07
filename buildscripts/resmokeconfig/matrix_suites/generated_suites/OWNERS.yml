@@ -187,3 +187,15 @@ filters:
   - "/update_fuzzer_replication_last_lts.yml":
     approvers:
       - 10gen/query-execution-write-exec
+  - "/with_mongot_extension_sharded_cluster.yml":
+    approvers:
+      - 10gen/query-integration-extensions-api
+  - "/with_mongot_extension_sharded_collections.yml":
+    approvers:
+      - 10gen/query-integration-extensions-api
+  - "/with_mongot_extension_single_node.yml":
+    approvers:
+      - 10gen/query-integration-extensions-api
+  - "/with_mongot_extension_single_shard.yml":
+    approvers:
+      - 10gen/query-integration-extensions-api
