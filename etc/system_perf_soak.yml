@@ -1,0 +1,35 @@
+# Config file for the sys-perf-soak Evergreen project.
+#
+# Unlike etc/system_perf.yml, this file deliberately does NOT include the
+# regular build-variant fragments (variants.yml, master_variants.yml), so that
+# sys-perf-soak exposes only the long-running soak build variants and users are
+# not made to browse the ~180 unrelated sys-perf variants. It also excludes
+# compiles_pgo.yml, whose PGO/BOLT variants depend on training variants defined
+# in variants.yml. It includes only:
+#   - base.yml / compiles.yml / shared_tasks.yml  (functions, the shared compile
+#     variants, and task definitions needed to build and run)
+#   - evergreen/system_perf/master/soak_variants.yml  (the soak build variants)
+modules:
+  - name: dsi
+    owner: 10gen
+    repo: dsi
+    prefix: ${workdir}/src
+    branch: master
+
+include:
+  ### lint_yaml trim start ###
+  #
+  # Trim markers mirror etc/system_perf.yml's convention for tools that strip
+  # DSI-module includes before `evergreen evaluate` (yamllinters.sh currently
+  # evaluates only system_perf.yml; trimming this file would leave nothing to
+  # evaluate since all of its includes come from the dsi module).
+  #
+  - filename: evergreen/system_perf/master/base.yml
+    module: dsi
+  - filename: evergreen/system_perf/master/compiles.yml
+    module: dsi
+  - filename: evergreen/system_perf/master/soak_variants.yml
+    module: dsi
+  - filename: evergreen/system_perf/shared_tasks.yml
+    module: dsi
+  ### lint_yaml trim end ###
