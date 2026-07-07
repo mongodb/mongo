@@ -1,6 +1,6 @@
 /**
- * Tests that the change_streams.cursor.lifespan OTel histogram metric is correctly exported to the
- * OTel JSONL file when change stream cursors are closed.
+ * Tests that the serverStatus.metrics.changeStreams.cursor.lifespan OTel histogram metric is
+ * correctly exported to the OTel JSONL file when change stream cursors are closed.
  *
  * Unlike serverStatus (which only exposes {average, count}), the file exporter provides the full
  * histogram structure including per-bucket counts, allowing verification that cursors with
@@ -26,13 +26,14 @@ import {
     getLatestMetrics,
 } from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
 
-const kMetricName = "change_streams.cursor.lifespan";
+const kMetricName = "serverStatus.metrics.changeStreams.cursor.lifespan";
 // Number of buckets = number of boundaries + 1 (for the implicit +inf bucket).
 const kNumBuckets = 8;
 
 /**
- * Reads the change_streams.cursor.lifespan histogram from the latest exported metrics file.
- * Returns the raw OTel data point object, or null if the metric has not been exported yet.
+ * Reads the serverStatus.metrics.changeStreams.cursor.lifespan histogram from the latest exported
+ * metrics file. Returns the raw OTel data point object, or null if the metric has not been
+ * exported yet.
  */
 function readCSLifespanHistogram(metricsDir) {
     return getLatestMetrics(metricsDir)?.[kMetricName] ?? null;
@@ -77,7 +78,7 @@ function awaitCSLifespanHistogram(metricsDir, afterDate, expectedTotalCount) {
     return hist;
 }
 
-describe("OTel change_streams.cursor.lifespan histogram file export", function () {
+describe("OTel serverStatus.metrics.changeStreams.cursor.lifespan histogram file export", function () {
     before(function () {
         this.metricsDir = createMetricsDirectory(jsTestName());
 

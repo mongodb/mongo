@@ -61,14 +61,14 @@ namespace change_stream_metrics {
 
 
 // The total number of change stream cursors opened since the start of the mongoS process. This
-// counter corresponds to the OTEL metric "change_streams.cursor.total_opened".
+// counter corresponds to the OTEL metric "serverStatus.metrics.changeStreams.cursor.totalOpened".
 auto& gCursorsTotalOpened = change_stream::createCurorsTotalOpened();
 
-// The OTEL metric "change_streams.cursor.lifespan" in the mongoS process.
+// The OTEL metric "serverStatus.metrics.changeStreams.cursor.lifespan" in the mongoS process.
 auto& gLifespan = change_stream::createCursorsLifespan();
 
-// The OTEL metric "change_streams.cursor.open.total" for the currently open cursors in the mongoS
-// process.
+// The OTEL metric "serverStatus.metrics.changeStreams.cursor.open.total" for the currently open
+// cursors in the mongoS process.
 auto& gCursorsOpenTotal = change_stream::createCursorsOpenTotal();
 
 }  // namespace change_stream_metrics

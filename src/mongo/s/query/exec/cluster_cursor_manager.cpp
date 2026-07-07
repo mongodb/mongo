@@ -67,8 +67,8 @@ namespace mongo {
 namespace {
 
 namespace change_stream_metrics {
-// The OTEL metric "change_streams.cursor.open.pinned" for the currently active cursors in the
-// mongoS process.
+// The OTEL metric "serverStatus.metrics.changeStreams.cursor.open.pinned" for the currently active
+// cursors in the mongoS process.
 auto& gCursorsOpenPinned = change_stream::createCursorsOpenPinned();
 }  // namespace change_stream_metrics
 

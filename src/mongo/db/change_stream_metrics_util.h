@@ -52,7 +52,8 @@ inline const otel::metrics::CounterOptions kCursorsTotalOpenedOpts = [] {
     return opts;
 }();
 
-// Constructs the counter for the OTEL metric "change_streams.cursor.total_opened".
+// Constructs the counter for the OTEL metric
+// "serverStatus.metrics.changeStreams.cursor.totalOpened".
 inline otel::metrics::Counter<int64_t>& createCurorsTotalOpened() {
     return otel::metrics::MetricsService::instance().createInt64Counter(
         otel::metrics::MetricNames::kChangeStreamCursorsTotalOpened,
@@ -61,10 +62,10 @@ inline otel::metrics::Counter<int64_t>& createCurorsTotalOpened() {
         kCursorsTotalOpenedOpts);
 }
 
-// Constructs the histogram for the OTEL metric "change_streams.cursor.lifespan". The change stream
-// lifespan histogram is updated after a change stream cursor is closed. A histogram provides
-// accurate and thread-safe average for every bucket. This is achieved by locks, so there might be
-// some overhead.
+// Constructs the histogram for the OTEL metric
+// "serverStatus.metrics.changeStreams.cursor.lifespan". The change stream lifespan histogram is
+// updated after a change stream cursor is closed. A histogram provides accurate and thread-safe
+// average for every bucket. This is achieved by locks, so there might be some overhead.
 inline const otel::metrics::HistogramOptions kLifespanOpts = [] {
     otel::metrics::HistogramOptions opts{};
     opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
@@ -126,7 +127,7 @@ inline const otel::metrics::UpDownCounterOptions kCursorsOpenPinnedOpts = [] {
 }();
 
 // Constructs the counter for the number of currently pinned (active) change stream cursors. This
-// counter corresponds to the OTEL metric "change_streams.cursor.open.pinned".
+// counter corresponds to the OTEL metric "serverStatus.metrics.changeStreams.cursor.open.pinned".
 inline otel::metrics::UpDownCounter<int64_t>& createCursorsOpenPinned() {
     return otel::metrics::MetricsService::instance().createInt64UpDownCounter(
         otel::metrics::MetricNames::kChangeStreamCursorsOpenPinned,
