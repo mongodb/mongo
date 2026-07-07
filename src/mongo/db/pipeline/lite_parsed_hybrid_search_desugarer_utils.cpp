@@ -231,7 +231,7 @@ void mutateRightmostSortToOutputSortKey(const NamespaceString& nss, StageSpecs& 
     for (auto it = stages.rbegin(); it != stages.rend(); ++it) {
         if ((*it)->getParseTimeName() == "$sort") {
             BSONElement origSpec = (*it)->getOriginalBson();
-            tassert(12559415,
+            uassert(12559415,
                     "Expected $sort spec value to be an object",
                     origSpec.type() == BSONType::object);
 

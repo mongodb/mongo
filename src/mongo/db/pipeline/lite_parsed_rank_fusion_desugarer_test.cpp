@@ -1738,6 +1738,19 @@ TEST_F(LiteParsedRankFusionDesugarerTest, RejectsMoreWeightsThanPipelines) {
     ASSERT_THROWS_CODE(desugar(spec), AssertionException, 12559403);
 }
 
+TEST_F(LiteParsedRankFusionDesugarerTest, RejectsNonObjectSortSpecInInputPipeline) {
+    BSONObj spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    name1: [{ $sort: 5 }]
+                }
+            }
+        }
+    })");
+    ASSERT_THROWS_CODE(desugar(spec), AssertionException, 12559415);
+}
+
 TEST_F(LiteParsedRankFusionDesugarerTest, DesugarContainsInternalHybridSearchLast) {
     BSONObj spec = fromjson(R"({
         $rankFusion: {
