@@ -45,6 +45,8 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache_mock.h"
+#include "mongo/db/s/resharding/local_resharding_operations_registry.h"
+#include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
@@ -68,7 +70,6 @@
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/resharding/common_types_gen.h"
-#include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/processinfo.h"
@@ -107,6 +108,11 @@ public:
     }
 
     void lastTearDown() {
+        if (_registeredDonorMetadata) {
+            LocalReshardingOperationsRegistry::get().unregisterOperation(
+                LocalReshardingOperationsRegistry::Role::kDonor, *_registeredDonorMetadata);
+            _registeredDonorMetadata.reset();
+        }
         setGlobalServiceContext({});
     }
 
@@ -163,23 +169,35 @@ protected:
             OperationShardingState::setShardRole(
                 opCtx, kNss, _shardVersion, boost::none /* databaseVersion */);
 
-            // Configuring the filtering metadata such that calls to getCollectionDescription
-            // what we want. Specifically the reshardingFields are what we use. Its specified by
-            // the chunkManager.
+            // Install filtering metadata so that getCollectionDescription reports a sharded
+            // collection with a routing table. The resharding key and temp namespace are
+            // advertised separately through the LocalReshardingOperationsRegistry.
             CollectionShardingRuntime::acquireExclusive(opCtx, kNss)
                 ->setCollectionMetadata(opCtx,
                                         CollectionMetadata(chunkManager, _originatorShardHandle));
 
-            // Setup the CatalogCacheMock for the temp resharding ns.
             const auto reshardingTempNs =
-                chunkManager.getReshardingFields()->getDonorFields()->getTempReshardingNss();
+                resharding::constructTemporaryReshardingNss(kNss, chunkManager.getUUID());
+            const auto reshardKey = BSON("y" << 1);
+
+            // ShardingWriteRouter discovers the donor operation via the
+            // LocalReshardingOperationsRegistry, so register a matching donor operation.
+            CommonReshardingMetadata reshardingMetadata(UUID::gen() /* reshardingUUID */,
+                                                        kNss,
+                                                        chunkManager.getUUID() /* sourceUUID */,
+                                                        reshardingTempNs,
+                                                        reshardKey);
+            LocalReshardingOperationsRegistry::get().registerOperation(
+                LocalReshardingOperationsRegistry::Role::kDonor, reshardingMetadata);
+            _registeredDonorMetadata = reshardingMetadata;
+
             catalogCache->setCollectionReturnValue(
                 reshardingTempNs,
                 CatalogCacheMock::makeCollectionRoutingInfoSharded(
                     reshardingTempNs,
                     shards[0],
                     DatabaseVersion(),
-                    BSON("y" << 1),
+                    reshardKey,
                     {{ChunkRange(BSON("y" << MINKEY), BSON("y" << MAXKEY)), shards[0]}}));
         }
 
@@ -228,14 +246,8 @@ protected:
 
         const auto collIdentifier = UUID::gen();
         const auto shardKeyPattern = KeyPattern(BSON("_id" << 1));
-        const auto reshardKeyPattern = KeyPattern(BSON("y" << 1));
         const auto collEpoch = OID::gen();
         const auto collTimestamp = Timestamp(100, 5);
-        const auto tempNss = NamespaceString::createNamespaceString_forTest(
-            kNss.db_forSharding(),
-            fmt::format("{}{}",
-                        NamespaceString::kTemporaryReshardingCollectionPrefix,
-                        collIdentifier.toString()));
 
         std::vector<ChunkType> chunks;
         chunks.reserve(nChunks);
@@ -247,14 +259,6 @@ protected:
                                 pessimalShardSelector(i, nShards, nChunks));
         }
 
-        TypeCollectionReshardingFields reshardingFields{UUID::gen()};
-        reshardingFields.setState(CoordinatorStateEnum::kPreparingToDonate);
-        // TODO (SERVER-128553): remove conversion to shardId once resharding fields take shard ref
-        std::vector<ShardId> shardIds(shards.begin(), shards.end());
-        // ShardingWriteRouter is only meant to be used by the donor.
-        reshardingFields.setDonorFields(
-            TypeCollectionDonorFields{tempNss, reshardKeyPattern, shardIds});
-
         CurrentChunkManager cm(makeStandaloneRoutingTableHistory(
             RoutingTableHistory::makeNew(kNss,
                                          collIdentifier,
@@ -265,7 +269,7 @@ protected:
                                          collEpoch,
                                          collTimestamp,
                                          boost::none /* timeseriesFields */,
-                                         reshardingFields, /* reshardingFields */
+                                         boost::none /* reshardingFields */,
                                          true,
                                          chunks)));
 
@@ -275,6 +279,7 @@ protected:
 protected:
     bool _withShardedCollection{false};
     boost::optional<ShardVersion> _shardVersion;
+    boost::optional<CommonReshardingMetadata> _registeredDonorMetadata;
     const ShardHandle _originatorShardHandle{ShardId("shard0"), UUID::gen()};
 };
 
