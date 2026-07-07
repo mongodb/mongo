@@ -109,6 +109,50 @@ TEST(WiredTigerRecordStoreTest, GenerateCreateStringValidConfigStringOption) {
               std::string("prefix_compression=true,"));
 }
 
+TEST(WiredTigerRecordStoreTest, GenerateCreateStringOverridesValueFormat) {
+    const auto harnessHelper(newRecordStoreHarnessHelper());
+
+    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig;
+    wtTableConfig.extraCreateOptions = "value_format=Q";
+
+    std::string createString = WiredTigerRecordStore::generateCreateString("collection-test",
+                                                                           wtTableConfig,
+                                                                           /*isOplog=*/false);
+
+    ASSERT_STRING_CONTAINS(createString, "value_format=Q");
+    ASSERT_STRING_CONTAINS(createString, "value_format=u");
+    ASSERT_GT(createString.rfind("value_format=u"), createString.rfind("value_format=Q"));
+}
+
+TEST(WiredTigerRecordStoreTest, ConfigStringValueFormatOverridesUserSuppliedFormat) {
+    const auto harnessHelper(newRecordStoreHarnessHelper());
+
+    // User-supplied 'value_format' must be silently overridden to 'u' by generateCreateString -
+    // it must not affect the on-disk format.
+    RecordStore::Options options;
+    options.storageEngineCollectionOptions =
+        BSON(std::string{kWiredTigerEngineName} << BSON("configString" << "value_format=Q"));
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore("a.b", options));
+
+    ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+
+    BSONObj doc = BSON("x" << "hello");
+    RecordId id;
+    {
+        StorageWriteTransaction txn(ru);
+        StatusWith<RecordId> res =
+            rs->insertRecord(opCtx.get(), ru, doc.objdata(), doc.objsize(), Timestamp());
+        ASSERT_OK(res.getStatus());
+        id = res.getValue();
+        txn.commit();
+    }
+
+    BSONObj readBack;
+    ASSERT_DOES_NOT_THROW(readBack = rs->dataFor(opCtx.get(), ru, id).toBson());
+    ASSERT_BSONOBJ_EQ(doc, readBack);
+}
+
 TEST(WiredTigerRecordStoreTest, Isolation1) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());

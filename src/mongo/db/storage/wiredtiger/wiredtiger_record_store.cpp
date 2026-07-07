@@ -257,6 +257,8 @@ std::string WiredTigerRecordStore::generateCreateString(
         ss << "key_format=q";
     }
 
+    ss << ",value_format=u";
+
     // Record store metadata
     ss << ",app_metadata=(formatVersion=" << kCurrentRecordStoreVersion;
     if (isOplog) {
