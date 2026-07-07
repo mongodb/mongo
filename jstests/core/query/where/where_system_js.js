@@ -6,6 +6,7 @@
 //   requires_multi_updates,
 //   requires_non_retryable_writes,
 //   requires_scripting,
+//   backport_required_multiversion,
 // ]
 (function() {
 "use strict";
@@ -50,4 +51,34 @@ assert.commandWorked(
 assert.commandFailedWithCode(
     testDB.runCommand({find: testColl.getName(), filter: {$where: "code_with_scope(this.x)"}}),
     4546000);
+// Clean up for the next test.
+assert.commandWorked(systemJsColl.deleteOne({_id: "code_with_scope"}));
+
+// Test that a system.js _id cannot inject JS code during scope cleanup.
+{
+    const numFunctionsBefore = systemJsColl.find({}).itcount();
+    // TODO SERVER-130236 improve validation for _id fields to reject this input.
+    const craftedId = "x; throw new Error('INJECTED_CODE_EXECUTION') //";
+    assert.commandWorked(systemJsColl.insertOne({_id: craftedId, value: 1}));
+
+    // First query loads the 'craftedId' into memory on the pooled scope.
+    assert.commandWorked(
+        testDB.runCommand({find: testColl.getName(), filter: {$where: "this.x == 1"}}));
+
+    // Deleting the entry forces the next $where to check if all entries in 'system.js' are still in
+    // memory and delete the ones that have been removed.
+    assert.commandWorked(systemJsColl.deleteOne({_id: craftedId}));
+
+    // Second query should succeed and we should've removed the deleted entry from scope.
+    const res = assert.commandWorked(
+        testDB.runCommand({find: testColl.getName(), filter: {$where: "this.x == 1"}}));
+    assert.eq(1, res.cursor.firstBatch.length, "expected one document after cleanup", {res});
+
+    // Confirm the stale entry has been deleted from scope.
+    const numFunctions = systemJsColl.find({}).toArray();
+    assert.eq(
+        numFunctionsBefore, numFunctions.length, "expected no new entries in system.js namespace", {
+            numFunctions,
+        });
+}
 }());

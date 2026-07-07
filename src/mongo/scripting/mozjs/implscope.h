@@ -32,6 +32,7 @@
 #include <jsapi.h>
 #include <jsfriendapi.h>
 #include <mongo/scripting/mozjs/freeOpToJSContext.h>
+#include <string_view>
 #include <vm/PosixNSPR.h>
 
 #include "mongo/client/dbclient_cursor.h"
@@ -141,6 +142,7 @@ public:
     void setElement(const char* field, const BSONElement& e, const BSONObj& parent) override;
     void setObject(const char* field, const BSONObj& obj, bool readOnly) override;
     void setFunction(const char* field, const char* code) override;
+    void deleteGlobal(std::string_view name) override;
 
     int type(const char* field) override;
 

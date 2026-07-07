@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <string_view>
+
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/service_context.h"
@@ -99,6 +101,9 @@ public:
     virtual void setObject(const char* field, const BSONObj& obj, bool readOnly = true) = 0;
     virtual void setBoolean(const char* field, bool val) = 0;
     virtual void setFunction(const char* field, const char* code) = 0;
+
+    // Deletes a property from the scope's JS global object (used for system.js scope cleanup).
+    virtual void deleteGlobal(std::string_view name) = 0;
 
     virtual int type(const char* field) = 0;
 
