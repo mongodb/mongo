@@ -1331,18 +1331,19 @@ TEST_F(RateLimitRejectionResponseTest, DefaultRateLimitRejectionResponse) {
                                    {ErrorLabel::kSystemOverloadedError,
                                     ErrorLabel::kRetryableError,
                                     ErrorLabel::kNoWritesPerformed}));
-        // With the default (disabled) overloadRetryAfterMS, neither path emits retryAfterMS.
-        ASSERT_FALSE(body.hasField(kRetryAfterMSFieldName));
+        // With the default (disabled) externalClientBaseBackoffMS, neither path emits
+        // baseBackoffMS.
+        ASSERT_FALSE(body.hasField(kBaseBackoffMSFieldName));
     });
 }
 
 /**
- * When the overloadRetryAfterMS server parameter is positive, the fast path must stamp the live
- * value into the cached `retryAfterMS` slot and stay byte-equivalent to the slow path.
+ * When the externalClientBaseBackoffMS server parameter is positive, the fast path must stamp the
+ * live value into the cached `baseBackoffMS` slot and stay byte-equivalent to the slow path.
  */
-TEST_F(RateLimitRejectionResponseTest, RetryAfterMsStampedIntoFastPathWhenEnabled) {
-    constexpr long long kRetryAfterMs = 1500;
-    unittest::ServerParameterGuard retryGuard{"overloadRetryAfterMS", kRetryAfterMs};
+TEST_F(RateLimitRejectionResponseTest, BaseBackoffMsStampedIntoFastPathWhenEnabled) {
+    constexpr long long kBaseBackoffMS = 1500;
+    unittest::ServerParameterGuard retryGuard{"externalClientBaseBackoffMS", kBaseBackoffMS};
 
     runTest([&](auto body) {
         ASSERT_EQ(getStatusFromCommandResult(body).code(),
@@ -1351,23 +1352,23 @@ TEST_F(RateLimitRejectionResponseTest, RetryAfterMsStampedIntoFastPathWhenEnable
                                    {ErrorLabel::kSystemOverloadedError,
                                     ErrorLabel::kRetryableError,
                                     ErrorLabel::kNoWritesPerformed}));
-        ASSERT_TRUE(body.hasField(kRetryAfterMSFieldName));
-        ASSERT_EQ(body[kRetryAfterMSFieldName].Long(), kRetryAfterMs);
+        ASSERT_TRUE(body.hasField(kBaseBackoffMSFieldName));
+        ASSERT_EQ(body[kBaseBackoffMSFieldName].Long(), kBaseBackoffMS);
     });
 }
 
 /**
- * Two rejections at different live retryAfterMS values must each reflect the value in effect at
+ * Two rejections at different live baseBackoffMS values must each reflect the value in effect at
  * the time of the call. The cached template only reserves space, it does not freeze the value.
  */
-TEST_F(RateLimitRejectionResponseTest, RetryAfterMsReflectsLiveParameterValue) {
+TEST_F(RateLimitRejectionResponseTest, BaseBackoffMsReflectsLiveParameterValue) {
     {
-        unittest::ServerParameterGuard guard{"overloadRetryAfterMS", 100};
-        runTest([&](auto body) { ASSERT_EQ(body[kRetryAfterMSFieldName].Long(), 100); });
+        unittest::ServerParameterGuard guard{"externalClientBaseBackoffMS", 100};
+        runTest([&](auto body) { ASSERT_EQ(body[kBaseBackoffMSFieldName].Long(), 100); });
     }
     {
-        unittest::ServerParameterGuard guard{"overloadRetryAfterMS", 9999};
-        runTest([&](auto body) { ASSERT_EQ(body[kRetryAfterMSFieldName].Long(), 9999); });
+        unittest::ServerParameterGuard guard{"externalClientBaseBackoffMS", 9999};
+        runTest([&](auto body) { ASSERT_EQ(body[kBaseBackoffMSFieldName].Long(), 9999); });
     }
 }
 
@@ -1377,7 +1378,7 @@ TEST_F(RateLimitRejectionResponseTest, AllowRetriesFalseOmitsRetryableErrorLabel
         runTest([&](auto body) {
             ASSERT_TRUE(hasErrorLabels(
                 body, {ErrorLabel::kSystemOverloadedError, ErrorLabel::kNoWritesPerformed}));
-            ASSERT_FALSE(body.hasField(kRetryAfterMSFieldName));
+            ASSERT_FALSE(body.hasField(kBaseBackoffMSFieldName));
         });
     }
 
@@ -1387,20 +1388,20 @@ TEST_F(RateLimitRejectionResponseTest, AllowRetriesFalseOmitsRetryableErrorLabel
                                    {ErrorLabel::kSystemOverloadedError,
                                     ErrorLabel::kRetryableError,
                                     ErrorLabel::kNoWritesPerformed}));
-        ASSERT_FALSE(body.hasField(kRetryAfterMSFieldName));
+        ASSERT_FALSE(body.hasField(kBaseBackoffMSFieldName));
     });
 }
 
-TEST_F(RateLimitRejectionResponseTest, AllowRetriesFalseOmitsRetryAfterMS) {
+TEST_F(RateLimitRejectionResponseTest, AllowRetriesFalseBaseBackoffMs) {
     unittest::ServerParameterGuard retryGuard{"ingressRequestRateLimiterAllowRetries", false};
-    unittest::ServerParameterGuard retryMsGuard{"overloadRetryAfterMS", 1234};
+    unittest::ServerParameterGuard retryMsGuard{"externalClientBaseBackoffMS", 1234};
 
     runTest([&](auto body) {
         ASSERT_EQ(getStatusFromCommandResult(body).code(),
                   ErrorCodes::IngressRequestRateLimitExceeded);
         ASSERT_TRUE(hasErrorLabels(
             body, {ErrorLabel::kSystemOverloadedError, ErrorLabel::kNoWritesPerformed}));
-        ASSERT_FALSE(body.hasField(kRetryAfterMSFieldName));
+        ASSERT_FALSE(body.hasField(kBaseBackoffMSFieldName));
     });
 }
 

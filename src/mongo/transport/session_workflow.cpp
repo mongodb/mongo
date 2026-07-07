@@ -773,7 +773,7 @@ namespace {
 
 Message makeRateLimitRejectionMessage(rpc::Protocol protocol,
                                       bool allowRetries,
-                                      long long retryAfterMs) {
+                                      long long baseBackoffMS) {
     const auto replyBuilder = rpc::makeReplyBuilder(protocol);
     replyBuilder->setCommandReply(admission::IngressRequestRateLimiter::rejectionStatus(), {});
 
@@ -793,8 +793,8 @@ Message makeRateLimitRejectionMessage(rpc::Protocol protocol,
             arrayBuilder.append(ErrorLabel::kNoWritesPerformed);
         }
 
-        if (allowRetries && retryAfterMs > 0) {
-            commandBodyBob.append(kRetryAfterMSFieldName, retryAfterMs);
+        if (allowRetries && baseBackoffMS > 0) {
+            commandBodyBob.append(kBaseBackoffMSFieldName, baseBackoffMS);
         }
     }
 
@@ -803,53 +803,53 @@ Message makeRateLimitRejectionMessage(rpc::Protocol protocol,
 
 // A process-wide, immutable, pre-built OP_MSG rejection response for
 // IngressRequestRateLimitExceeded errors. The body is identical across all such rejections except
-// for two per-rejection fields: the wire-header responseTo, and (when present) the retryAfterMS
+// for two per-rejection fields: the wire-header responseTo, and (when present) the baseBackoffMS
 // value. Callers obtain an owned copy via the static makeResponse() entry point, which
 // selects the appropriate cached variant and stamps the per-rejection fields.
 class RejectionResponseTemplate {
 public:
-    static Message makeResponse(bool allowRetries, long long retryAfterMs) {
-        return templateFor(allowRetries, retryAfterMs > 0).stamp(retryAfterMs);
+    static Message makeResponse(bool allowRetries, long long baseBackoffMS) {
+        return templateFor(allowRetries, baseBackoffMS > 0).stamp(baseBackoffMS);
     }
 
 private:
-    explicit RejectionResponseTemplate(bool allowRetries, bool withRetryAfter) {
+    explicit RejectionResponseTemplate(bool allowRetries, bool withBaseBackoff) {
         // The rejection fast path only ever serves OP_MSG requests, so assume kOpMsg.
         Message responseMsg = makeRateLimitRejectionMessage(
-            rpc::Protocol::kOpMsg, allowRetries, withRetryAfter ? 1 : 0);
+            rpc::Protocol::kOpMsg, allowRetries, withBaseBackoff ? 1 : 0);
 
         // Zero out responseTo; it is stamped per-rejection at send time.
         responseMsg.header().setResponseToMsgId(0);
 
-        if (allowRetries && withRetryAfter) {
-            // retryAfterMS is the last field appended to the body (see
+        if (allowRetries && withBaseBackoff) {
+            // baseBackoffMS is the last field appended to the body (see
             // makeRateLimitRejectionMessage) and the template has no trailing bytes after the BSON
             // document, so its 8-byte value occupies the bytes immediately before the document
             // terminator.
-            _retryAfterValueOffset = static_cast<int>(responseMsg.size() - sizeof(long long) - 1);
+            _baseBackoffValueOffset = static_cast<int>(responseMsg.size() - sizeof(long long) - 1);
         }
 
         _template = std::move(responseMsg);
     }
 
     // Returns the cached variant, built once on first use.
-    static const RejectionResponseTemplate& templateFor(bool retryable, bool withRetryAfter) {
+    static const RejectionResponseTemplate& templateFor(bool retryable, bool withBaseBackoff) {
         static const RejectionResponseTemplate kNoRetry{/*allowRetries=*/false,
-                                                        /*withRetryAfter=*/false};
-        static const RejectionResponseTemplate kRetryableNoRetryAfter{/*allowRetries=*/true,
-                                                                      /*withRetryAfter=*/false};
-        static const RejectionResponseTemplate kRetryableWithRetryAfter{/*allowRetries=*/true,
-                                                                        /*withRetryAfter=*/true};
+                                                        /*withBaseBackoff=*/false};
+        static const RejectionResponseTemplate kRetryableNoBaseBackoff{/*allowRetries=*/true,
+                                                                       /*withBaseBackoff=*/false};
+        static const RejectionResponseTemplate kRetryableWithBaseBackoff{/*allowRetries=*/true,
+                                                                         /*withBaseBackoff=*/true};
 
         if (!retryable) {
             return kNoRetry;
         } else {
-            return withRetryAfter ? kRetryableWithRetryAfter : kRetryableNoRetryAfter;
+            return withBaseBackoff ? kRetryableWithBaseBackoff : kRetryableNoBaseBackoff;
         }
     }
 
     // Copies the template into a fresh owned buffer and stamps the per-rejection fields.
-    Message stamp(long long retryAfterMs) const {
+    Message stamp(long long baseBackoffMS) const {
         // Pre-reserve the checksum's worth of slack so appendChecksum's realloc check finds enough
         // room downstream and doesn't have to grow the buffer at all.
         const size_t templateSize = _template.size();
@@ -857,18 +857,18 @@ private:
         memcpy(buf.get(), _template.buf(), templateSize);
 
         Message msg(std::move(buf));
-        if (_retryAfterValueOffset >= 0) {
-            DataView(msg.buf()).write<LittleEndian<long long>>(retryAfterMs,
-                                                               _retryAfterValueOffset);
+        if (_baseBackoffValueOffset >= 0) {
+            DataView(msg.buf()).write<LittleEndian<long long>>(baseBackoffMS,
+                                                               _baseBackoffValueOffset);
         }
         return msg;
     }
 
     // The pre-built OP_MSG rejection response, used as an immutable template
     Message _template;
-    // Byte offset within the template of the 8-byte little-endian retryAfterMS value, or -1 if this
-    // template has no retryAfterMS field.
-    int _retryAfterValueOffset = -1;
+    // Byte offset within the template of the 8-byte little-endian baseBackoffMS value, or -1 if
+    // this template has no baseBackoffMS field.
+    int _baseBackoffValueOffset = -1;
 };
 
 }  // namespace
@@ -883,17 +883,17 @@ DbResponse makeDbResponseErrorForRateLimiting(const Message& message) {
     }
 
     auto allowRetries = admission::gIngressRequestRateLimiterAllowRetries.loadRelaxed();
-    const long long retryAfterMs = getOverloadRetryAfterMS();
+    const long long baseBackoffMS = getExternalClientBaseBackoffMS();
 
     // Fast path for OP_MSG rejections, which are the overwhelmingly common case when the ingress
     // rate limiter is enabled.
     if (MONGO_likely(rpc::protocolForMessage(message) == rpc::Protocol::kOpMsg)) {
         return DbResponse{.response =
-                              RejectionResponseTemplate::makeResponse(allowRetries, retryAfterMs)};
+                              RejectionResponseTemplate::makeResponse(allowRetries, baseBackoffMS)};
     }
 
     return DbResponse{.response = makeRateLimitRejectionMessage(
-                          rpc::protocolForMessage(message), allowRetries, retryAfterMs)};
+                          rpc::protocolForMessage(message), allowRetries, baseBackoffMS)};
 }
 
 Future<DbResponse> SessionWorkflow::Impl::_dispatchWork() {

@@ -32,14 +32,14 @@ imports:
     - "mongo/db/basic_types.idl"
 
 server_parameters:
-    overloadRetryAfterMS:
+    externalClientBaseBackoffMS:
         description: >-
             When set to a positive value, error responses carrying both the SystemOverloadedError
-            and RetryableError error labels will include a retryAfterMS field with this value,
-            indicating to clients how long (in milliseconds) to wait before retrying. A value
-            of 0 (default) disables this behavior.
+            and RetryableError error labels will include a baseBackoffMS field with this value,
+            indicating to clients how long (in milliseconds) to use for the base of their exponential
+            backoff calculations. A value of 0 (default) disables this behavior.
         set_at: [startup, runtime]
-        cpp_varname: gOverloadRetryAfterMS
+        cpp_varname: gExternalClientBaseBackoffMS
         cpp_vartype: Atomic<long long>
         default: 0
         validator:

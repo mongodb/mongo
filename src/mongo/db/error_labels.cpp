@@ -308,16 +308,16 @@ BSONObj getErrorLabels(OperationContext* opCtx,
 
     // TODO: SERVER-108898 Add a test for this behavior once this branch becomes possible.
     if (labelBuilder.isSystemOverloadedError() && labelBuilder.isOperationIdempotent()) {
-        if (auto retry = getOverloadRetryAfterMS(); retry > 0) {
-            responseBuilder.append(kRetryAfterMSFieldName, retry);
+        if (auto retry = getExternalClientBaseBackoffMS(); retry > 0) {
+            responseBuilder.append(kBaseBackoffMSFieldName, retry);
         }
     }
 
     return responseBuilder.obj();
 }
 
-long long getOverloadRetryAfterMS() {
-    return gOverloadRetryAfterMS.loadRelaxed();
+long long getExternalClientBaseBackoffMS() {
+    return gExternalClientBaseBackoffMS.loadRelaxed();
 }
 
 bool isTransientTransactionError(ErrorCodes::Error code,

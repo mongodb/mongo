@@ -47,7 +47,7 @@ MONGO_MOD_PUBLIC;
 namespace mongo {
 using namespace std::literals::string_view_literals;
 static constexpr std::string_view kErrorLabelsFieldName = "errorLabels"sv;
-static constexpr std::string_view kRetryAfterMSFieldName = "retryAfterMS"sv;
+static constexpr std::string_view kBaseBackoffMSFieldName = "baseBackoffMS"sv;
 namespace ErrorLabel {
 // PLEASE CONSULT DRIVERS BEFORE ADDING NEW ERROR LABELS.
 constexpr inline auto kTransientTransaction = "TransientTransactionError"sv;
@@ -154,9 +154,9 @@ bool isStreamProcessorUserError(ErrorCodes::Error code);
 bool isSystemOverloadedError(ErrorCodes::Error code);
 
 /**
- * Returns the configured `overloadRetryAfterMS` server parameter value in milliseconds, or 0 when
- * disabled.
+ * Returns the configured `externalClientBaseBackoffMS` server parameter value in milliseconds, or 0
+ * when disabled.
  */
-long long getOverloadRetryAfterMS();
+long long getExternalClientBaseBackoffMS();
 
 }  // namespace mongo
