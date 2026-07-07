@@ -522,6 +522,19 @@ class PackageTestProvenanceTest(unittest.TestCase):
         ):
             self.assertTrue(under_test.should_create_release_binary_provenance())
 
+    def test_package_task_can_create_provenance_in_versioned_server_release_project(self):
+        with mock.patch.dict(
+            "os.environ",
+            {
+                "is_patch": "false",
+                "is_release": "false",
+                "project": "mongo-release-v8.0",
+                "task_name": "package",
+            },
+            clear=False,
+        ):
+            self.assertTrue(under_test.should_create_release_binary_provenance())
+
 
 if __name__ == "__main__":
     unittest.main()

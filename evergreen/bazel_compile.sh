@@ -134,14 +134,10 @@ if [[ "${is_patch:-}" != "true" || "${is_release:-false}" != "false" ]]; then
     SHOULD_ENFORCE_RELEASE_LOCAL_BUILD=true
 fi
 echo "Release-local build enforcement: ${SHOULD_ENFORCE_RELEASE_LOCAL_BUILD} (is_patch=${is_patch:-}, is_release=${is_release:-false})"
-SERVER_RELEASE_PROJECTS=("mongo-release")
 IS_SERVER_RELEASE_PROJECT=false
-for SERVER_RELEASE_PROJECT in "${SERVER_RELEASE_PROJECTS[@]}"; do
-    if [[ "${project:-}" == "${SERVER_RELEASE_PROJECT}" ]]; then
-        IS_SERVER_RELEASE_PROJECT=true
-        break
-    fi
-done
+if [[ "${project:-}" == mongo-release* ]]; then
+    IS_SERVER_RELEASE_PROJECT=true
+fi
 
 if [[ "${SHOULD_ENFORCE_RELEASE_LOCAL_BUILD}" == "true" ]]; then
     if [[ " ${BASE_FLAGS} " == *" --config=public-release "* ||

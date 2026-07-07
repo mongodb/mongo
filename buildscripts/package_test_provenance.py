@@ -24,12 +24,18 @@ RELEASE_EXECUTION_LOG_ARTIFACT_NAME = "Release Execution Log"
 RELEASE_BINARY_NAMES = ("mongod", "mongos")
 CRYPT_RELEASE_BINARY_NAMES = ("mongo_crypt_v1.so",)
 DISALLOWED_EXECUTION_LOG_RUNNERS = {"remote", "remote cache hit"}
-SERVER_RELEASE_PROJECTS = {"mongo-release"}
+SERVER_RELEASE_PROJECT_PREFIX = "mongo-release"
 
 RELEASE_LOCAL_SAFETY_FLAGS = (
     "--remote_executor= --noremote_accept_cached "
     "--remote_upload_local_results=false --modify_execution_info=.*=+no-cache"
 )
+
+
+def is_server_release_project(evg_project: str | None) -> bool:
+    """Return whether this Evergreen project is a server release project."""
+
+    return bool(evg_project) and evg_project.startswith(SERVER_RELEASE_PROJECT_PREFIX)
 
 
 def find_build_task(tasks: list[Any], task_display_name: str) -> Any:
@@ -271,9 +277,8 @@ def should_create_release_binary_provenance() -> bool:
 def release_binary_provenance_skip_reason() -> str | None:
     """Return the reason to skip release binary provenance, if any."""
 
-    if (
-        os.environ.get("task_name") == "package"
-        and os.environ.get("project") not in SERVER_RELEASE_PROJECTS
+    if os.environ.get("task_name") == "package" and not is_server_release_project(
+        os.environ.get("project")
     ):
         return (
             "package task in non-server-release project "

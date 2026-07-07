@@ -35,6 +35,7 @@ from buildscripts.package_test_provenance import (
     find_build_task,
     find_task_artifact_url,
     hash_release_binaries_in_archive,
+    is_server_release_project,
     release_binary_name_from_path,
     validate_compact_execution_log_file,
     validate_release_binary_provenance_against_archive,
@@ -51,16 +52,9 @@ formatter = logging.Formatter("[%(asctime)s]%(levelname)s:%(message)s")
 handler.setFormatter(formatter)
 root.addHandler(handler)
 
-SERVER_RELEASE_PROJECTS = {"mongo-release"}
 ARCHIVE_DIST_TEST_BUILD_COMMAND_PATH = ".bazel_build_invocation"
 ARCHIVE_DIST_TEST_EXECUTION_LOG_PATH = ".bazel_release_execution_log.binpb.zst"
 DEFAULT_RELEASE_BINARY_ARCHIVE_PATH = Path("mongo-binaries.tgz")
-
-
-def is_server_release_project(evg_project: str) -> bool:
-    """Return whether this Evergreen project is the server release project."""
-
-    return evg_project in SERVER_RELEASE_PROJECTS
 
 
 def download_packages_from_build(
