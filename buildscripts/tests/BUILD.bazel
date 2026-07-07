@@ -156,6 +156,24 @@ py_test(
 )
 
 py_test(
+    name = "test_generate_version_expansions",
+    srcs = ["test_generate_version_expansions.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:generate_version_expansions",
+    ],
+)
+
+py_test(
+    name = "test_gather_failed_tests",
+    srcs = ["test_gather_failed_tests.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:gather_failed_tests",
+    ],
+)
+
+py_test(
     name = "test_evergreen_resmoke_job_count",
     srcs = ["test_evergreen_resmoke_job_count.py"],
     visibility = ["//visibility:public"],
@@ -271,6 +289,17 @@ py_test(
     visibility = ["//visibility:public"],
     deps = [
         "//buildscripts:mongosymb",
+    ],
+)
+
+py_test(
+    name = "test_package_test_provenance",
+    srcs = ["test_package_test_provenance.py"],
+    data = ["//:.bazelversion"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:generate_bazel_spawn_pb2",
+        "//buildscripts:package_test_provenance",
     ],
 )
 

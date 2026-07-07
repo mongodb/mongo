@@ -100,6 +100,14 @@ def main(build_events: str = "build_events.json"):
 
     os.chdir(os.environ.get("BUILD_WORKSPACE_DIRECTORY", "."))
 
+    build_events_path = Path(build_events)
+    if not build_events_path.is_file():
+        print(
+            f"Build events file {build_events_path} was not found; skipping failed test "
+            "binary gathering. This can happen when Bazel fails before the test phase emits BEP."
+        )
+        return
+
     upload_bin_dir = Path("dist-tests/bin")
     upload_lib_dir = Path("dist-tests/lib")
     upload_bin_dir.mkdir(parents=True, exist_ok=True)

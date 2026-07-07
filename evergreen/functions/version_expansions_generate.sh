@@ -46,4 +46,4 @@ fi
 echo "MONGO_VERSION = ${MONGO_VERSION}"
 
 activate_venv
-MONGO_VERSION=${MONGO_VERSION} IS_PATCH=${is_patch} IS_COMMIT_QUEUE=${is_commit_queue} $python buildscripts/generate_version_expansions.py --out version_expansions.yml
+MONGO_VERSION=${MONGO_VERSION} IS_PATCH=${is_patch} IS_RELEASE=${is_release:-} IS_COMMIT_QUEUE=${is_commit_queue} $python buildscripts/generate_version_expansions.py --out version_expansions.yml

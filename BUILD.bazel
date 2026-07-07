@@ -18,6 +18,7 @@ package(
 )
 
 exports_files([
+    ".bazelversion",
     ".bazelrc.target_mongo_version",
     ".prettierrc",
     "pyproject.toml",

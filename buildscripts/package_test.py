@@ -26,6 +26,20 @@ from docker.models.images import Image
 from retry.api import retry_call
 from simple_report import Report, Result
 
+from buildscripts.package_test_provenance import (
+    RELEASE_BINARY_NAMES,
+    combine_execution_log_validation_summaries,
+    fetch_release_binary_provenance_from_tasks,
+    fetch_release_execution_log_from_tasks,
+    fetch_task_artifact_to_file,
+    find_build_task,
+    find_task_artifact_url,
+    hash_release_binaries_in_archive,
+    release_binary_name_from_path,
+    validate_compact_execution_log_file,
+    validate_release_binary_provenance_against_archive,
+    validate_release_build_command,
+)
 from buildscripts.resmokelib.utils import evergreen_conn
 
 root = logging.getLogger()
@@ -37,41 +51,16 @@ formatter = logging.Formatter("[%(asctime)s]%(levelname)s:%(message)s")
 handler.setFormatter(formatter)
 root.addHandler(handler)
 
-
-def find_build_task(tasks: list[Any], task_display_name: str) -> Any:
-    """Find a unique Evergreen task by display name."""
-
-    matching_tasks = [task for task in tasks if task.display_name == task_display_name]
-
-    if not matching_tasks:
-        raise RuntimeError(f"Could not find task '{task_display_name}' in build task list")
-
-    if len(matching_tasks) > 1:
-        matching_task_ids = ", ".join(task.task_id for task in matching_tasks)
-        raise RuntimeError(
-            f"Found multiple tasks named '{task_display_name}' in build task list: {matching_task_ids}"
-        )
-
-    return matching_tasks[0]
+SERVER_RELEASE_PROJECTS = {"mongo-release"}
+ARCHIVE_DIST_TEST_BUILD_COMMAND_PATH = ".bazel_build_invocation"
+ARCHIVE_DIST_TEST_EXECUTION_LOG_PATH = ".bazel_release_execution_log.binpb.zst"
+DEFAULT_RELEASE_BINARY_ARCHIVE_PATH = Path("mongo-binaries.tgz")
 
 
-def find_task_artifact_url(task: Any, artifact_name: str) -> str:
-    """Find a unique artifact URL on a task."""
+def is_server_release_project(evg_project: str) -> bool:
+    """Return whether this Evergreen project is the server release project."""
 
-    matching_artifacts = [artifact for artifact in task.artifacts if artifact.name == artifact_name]
-
-    if not matching_artifacts:
-        raise RuntimeError(
-            f"Could not find '{artifact_name}' artifact for task {task.task_id} ({task.display_name})"
-        )
-
-    if len(matching_artifacts) > 1:
-        matching_urls = ", ".join(artifact.url for artifact in matching_artifacts)
-        raise RuntimeError(
-            f"Found multiple '{artifact_name}' artifacts for task {task.task_id}: {matching_urls}"
-        )
-
-    return matching_artifacts[0].url
+    return evg_project in SERVER_RELEASE_PROJECTS
 
 
 def download_packages_from_build(
@@ -121,6 +110,237 @@ def download_packages_from_build(
 
     logging.info("Downloaded packages successfully: %s", local_path)
     return local_path
+
+
+def get_release_binary_provenance_for_validation(
+    binary_provenance_file: Optional[str],
+    evg_build_id: Optional[str],
+    binary_provenance_task_name: str,
+    download_dir: Path,
+) -> str:
+    """Get release binary provenance to validate package provenance."""
+
+    if binary_provenance_file:
+        binary_provenance_path = Path(binary_provenance_file)
+        logging.info("Reading release binary provenance from: %s", binary_provenance_path)
+        return binary_provenance_path.read_text()
+
+    if not evg_build_id:
+        raise RuntimeError(
+            "Release package build provenance validation requires either "
+            "--binary-provenance-file or --evg-build-id."
+        )
+
+    evg_project = os.environ.get("project")
+    if not evg_project:
+        raise RuntimeError(
+            "Release package build provenance validation requires the Evergreen project "
+            "expansion in the 'project' environment variable."
+        )
+
+    evg_api = evergreen_conn.get_evergreen_api()
+    tasks = evg_api.tasks_by_build(evg_build_id)
+
+    if is_server_release_project(evg_project) or binary_provenance_task_name != "package":
+        logging.info(
+            "Fetching release binary provenance from Evergreen task: %s",
+            binary_provenance_task_name,
+        )
+        return fetch_release_binary_provenance_from_tasks(tasks, binary_provenance_task_name)
+
+    logging.info(
+        "Creating release binary provenance from archive_dist_test artifacts for Evergreen "
+        "project: %s",
+        evg_project,
+    )
+    return create_release_binary_provenance_from_archive_dist_test(
+        tasks, evg_build_id, download_dir
+    )
+
+
+def create_release_binary_provenance_from_archive_dist_test(
+    tasks: list[Any], evg_build_id: str, download_dir: Path
+) -> str:
+    """Create release binary provenance from archive_dist_test's existing artifacts."""
+
+    task_name = "archive_dist_test"
+    archive_task = find_build_task(tasks, task_name)
+    artifacts_path = fetch_task_artifact_to_file(
+        archive_task, "Artifacts", download_dir / "archive_dist_test_artifacts.tgz"
+    )
+    build_command_path = extract_file_from_tar_by_basename(
+        artifacts_path, ARCHIVE_DIST_TEST_BUILD_COMMAND_PATH, download_dir
+    )
+    binary_archive_path = fetch_task_artifact_to_file(
+        archive_task, "Binaries", download_dir / "archive_dist_test_binaries"
+    )
+
+    build_command = build_command_path.read_text()
+    validate_release_build_command(build_command)
+    return json.dumps(
+        {
+            "build_id": evg_build_id,
+            "task_name": task_name,
+            "build_command": build_command,
+            "binaries": hash_release_binaries_in_archive(binary_archive_path),
+        }
+    )
+
+
+def get_release_execution_logs_for_validation(
+    execution_log_files: Optional[list[str]],
+    evg_build_id: Optional[str],
+    execution_log_task_name: Optional[str],
+    download_dir: Path,
+) -> list[tuple[str, Path]]:
+    """Get release execution logs to validate package provenance."""
+
+    if execution_log_files:
+        return [(f"local:{path}", Path(path)) for path in execution_log_files]
+
+    if not evg_build_id:
+        raise RuntimeError(
+            "Release package build provenance validation requires either "
+            "--execution-log-file or --evg-build-id."
+        )
+
+    evg_project = os.environ.get("project")
+    if not evg_project:
+        raise RuntimeError(
+            "Release package build provenance validation requires the Evergreen project "
+            "expansion in the 'project' environment variable."
+        )
+
+    evg_api = evergreen_conn.get_evergreen_api()
+    tasks = evg_api.tasks_by_build(evg_build_id)
+
+    if is_server_release_project(evg_project) or (
+        execution_log_task_name and execution_log_task_name != "package"
+    ):
+        task_name = execution_log_task_name or "package"
+        logging.info("Fetching release execution log from Evergreen task: %s", task_name)
+        return [
+            (
+                task_name,
+                fetch_release_execution_log_from_tasks(
+                    tasks, task_name, download_dir / "release_execution_log.binpb.zst"
+                ),
+            )
+        ]
+
+    task_name = "archive_dist_test"
+    logging.info(
+        "Fetching release execution log from archive_dist_test Artifacts for Evergreen project: %s",
+        evg_project,
+    )
+    return [
+        (
+            task_name,
+            fetch_release_execution_log_from_archive_artifacts(
+                tasks, task_name, download_dir / "archive_dist_test_artifacts.tgz", download_dir
+            ),
+        )
+    ]
+
+
+def get_release_binary_archive_for_validation(
+    binary_archive_file: Optional[str],
+    evg_build_id: Optional[str],
+    binary_archive_task_name: str,
+    binary_archive_artifact_name: Optional[str],
+    download_dir: Path,
+) -> Path:
+    """Get the release binary archive whose binaries should match provenance."""
+
+    if binary_archive_file:
+        archive_path = Path(binary_archive_file)
+        logging.info("Reading release binary archive from: %s", archive_path)
+        return archive_path
+
+    if binary_archive_artifact_name:
+        if not evg_build_id:
+            raise RuntimeError(
+                "Release package build provenance validation requires --evg-build-id when "
+                "--evg-binary-provenance-archive-artifact-name is provided."
+            )
+
+        evg_api = evergreen_conn.get_evergreen_api()
+        tasks = evg_api.tasks_by_build(evg_build_id)
+        logging.info(
+            "Fetching release binary archive artifact '%s' from Evergreen task: %s",
+            binary_archive_artifact_name,
+            binary_archive_task_name,
+        )
+        build_task = find_build_task(tasks, binary_archive_task_name)
+        return fetch_task_artifact_to_file(
+            build_task, binary_archive_artifact_name, download_dir / "release_binary_archive"
+        )
+
+    if DEFAULT_RELEASE_BINARY_ARCHIVE_PATH.is_file():
+        logging.info("Reading release binary archive from: %s", DEFAULT_RELEASE_BINARY_ARCHIVE_PATH)
+        return DEFAULT_RELEASE_BINARY_ARCHIVE_PATH
+
+    raise RuntimeError(
+        "Release package build provenance validation requires a release binary archive. "
+        "Provide --binary-provenance-archive-file, provide "
+        "--evg-binary-provenance-archive-artifact-name with --evg-build-id, or run from an "
+        f"Evergreen package-test task with {DEFAULT_RELEASE_BINARY_ARCHIVE_PATH} present."
+    )
+
+
+def fetch_release_execution_log_from_archive_artifacts(
+    tasks: list[Any], task_display_name: str, artifacts_path: Path, output_dir: Path
+) -> Path:
+    """Fetch the archive_dist_test execution log from the existing Artifacts tarball."""
+
+    archive_task = find_build_task(tasks, task_display_name)
+    fetch_task_artifact_to_file(archive_task, "Artifacts", artifacts_path)
+    return extract_file_from_tar_by_basename(
+        artifacts_path, ARCHIVE_DIST_TEST_EXECUTION_LOG_PATH, output_dir
+    )
+
+
+def extract_file_from_tar_by_basename(
+    artifacts_path: Path, artifact_basename: str, output_dir: Path
+) -> Path:
+    """Extract a file from a tar archive by basename."""
+
+    output_path = output_dir / artifact_basename
+    with tarfile.open(artifacts_path, "r:*") as artifacts:
+        for member in artifacts.getmembers():
+            if not member.isfile():
+                continue
+            if Path(member.name).name != artifact_basename:
+                continue
+
+            extracted = artifacts.extractfile(member)
+            if extracted is None:
+                continue
+
+            try:
+                with output_path.open("wb") as output:
+                    while chunk := extracted.read(1024 * 1024):
+                        output.write(chunk)
+            finally:
+                extracted.close()
+            return output_path
+
+    raise RuntimeError(f"Could not find {artifact_basename} in {artifacts_path}")
+
+
+def should_validate_package_build_provenance() -> bool:
+    """Return whether this package test invocation should validate build provenance."""
+
+    is_patch = os.environ.get("is_patch")
+    is_release = os.environ.get("is_release", "false")
+    should_validate = is_patch != "true" or is_release != "false"
+    logging.info(
+        "Release package provenance validation: %s (is_patch=%s, is_release=%s)",
+        should_validate,
+        is_patch,
+        is_release,
+    )
+    return should_validate
 
 
 PACKAGE_MANAGER_COMMANDS = {
@@ -701,46 +921,6 @@ def validate_atlas(sources_text, edition, binfile):
             raise Exception(f"Failed to find atlas code in {edition} binary {binfile}.")
 
 
-def validate_no_remote_cache_or_execution(bep_json_path: str) -> None:
-    """Validate that the build did not use remote cache or remote execution.
-
-    Parses a Bazel Build Event Protocol (BEP) JSON file and checks that
-    --remote_executor was empty/unset and --modify_execution_info=.*=+no-cache
-    was set. The remote cache endpoint may still be configured (needed by the
-    remote downloader for artifact caching) as long as action caching is disabled.
-    """
-    logging.info("Validating no remote cache or execution in BEP file: %s", bep_json_path)
-    with open(bep_json_path, "r") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            event = json.loads(line)
-            if "optionsParsed" not in event.get("id", {}):
-                continue
-            cmd_line = event.get("optionsParsed", {}).get("cmdLine", [])
-            remote_executor = ""
-            has_no_cache = False
-            for opt in cmd_line:
-                if opt.startswith("--remote_executor="):
-                    remote_executor = opt[len("--remote_executor=") :]
-                elif opt.startswith("--modify_execution_info=") and "no-cache" in opt:
-                    has_no_cache = True
-            if remote_executor:
-                raise Exception(
-                    f"Build used remote execution: --remote_executor={remote_executor}. "
-                    "Release builds must not use remote execution."
-                )
-            if not has_no_cache:
-                raise Exception(
-                    "Build did not disable action caching. "
-                    "Release builds must set --modify_execution_info=.*=+no-cache."
-                )
-            logging.info("Validated: no remote cache or remote execution detected in BEP")
-            return
-    raise Exception(f"No optionsParsed event found in BEP file: {bep_json_path}")
-
-
 def validate_no_libdwarf(sources_text, edition, binfile):
     if "third_party/libdwarf" in sources_text:
         raise Exception(f"Found LGPL code from libdwarf in {edition} binary {binfile}.")
@@ -771,6 +951,12 @@ parser.add_argument(
     "--skip-enterprise-check",
     action="store_true",
     help="Skip checking archives debug symbols to make sure enterprise code was correctly used.",
+    default=False,
+)
+parser.add_argument(
+    "--skip-release-binary-provenance-check",
+    action="store_true",
+    help="Skip release binary provenance validation.",
     default=False,
 )
 parser.add_argument(
@@ -836,11 +1022,60 @@ branch_test_parser.add_argument(
     default="package",
 )
 branch_test_parser.add_argument(
-    "--bep-json-file",
+    "--binary-provenance-file",
     type=str,
-    help="Path to a Bazel Build Event Protocol JSON file. "
-    "Validates that no remote cache or remote execution was used to build the binaries.",
-    required=True,
+    help="Path to a release binary provenance JSON file. Validates that release binaries "
+    "match binaries produced by a release-safe Bazel build command.",
+    default=None,
+)
+branch_test_parser.add_argument(
+    "--binary-provenance-archive-file",
+    type=str,
+    help="Path to the release binary archive whose binaries should match provenance.",
+    default=None,
+)
+branch_test_parser.add_argument(
+    "--evg-binary-provenance-task-name",
+    type=str,
+    help=(
+        "Evergreen task display name that owns the Release Binary Provenance artifact when using "
+        "--evg-build-id."
+    ),
+    default="package",
+)
+branch_test_parser.add_argument(
+    "--evg-binary-provenance-archive-artifact-name",
+    type=str,
+    help=(
+        "Evergreen artifact display name for the release binary archive whose binaries should "
+        "match provenance. The artifact is fetched from --evg-binary-provenance-task-name."
+    ),
+    default=None,
+)
+branch_test_parser.add_argument(
+    "--release-binary-name",
+    type=str,
+    help="Release binary basename to validate in provenance. May be specified more than once.",
+    action="append",
+    default=None,
+)
+branch_test_parser.add_argument(
+    "--execution-log-file",
+    type=str,
+    help="Path to a Bazel compact execution log file. Validates that the release build did not "
+    "use remote execution or remote cache hits.",
+    action="append",
+    default=None,
+)
+branch_test_parser.add_argument(
+    "--evg-execution-log-task-name",
+    type=str,
+    help=(
+        "Evergreen task display name that owns the Release Execution Log artifact when using "
+        "--evg-build-id. Non-server projects use archive_dist_test unless this is set to a "
+        "non-default task."
+    ),
+    default=None,
 )
 args = parser.parse_args()
 
@@ -868,12 +1103,63 @@ urls: list[str] = []
 if args.command == "branch":
     # If evg-build-id is provided, download the packages locally using the Evergreen API
     # This is required for private artifacts which need authenticated access
+    download_dir = Path(__file__).parent / "downloaded_packages"
     local_packages_path: Optional[Path] = None
+    release_binary_provenance: Optional[str] = None
+    release_execution_logs: list[tuple[str, Path]] = []
+    should_validate_provenance = (
+        should_validate_package_build_provenance() and not args.skip_release_binary_provenance_check
+    )
+    release_binary_names = args.release_binary_name or list(RELEASE_BINARY_NAMES)
     if args.evg_build_id:
-        download_dir = Path(__file__).parent / "downloaded_packages"
         local_packages_path = download_packages_from_build(
             args.evg_build_id, download_dir, args.evg_package_task_name
         )
+    if should_validate_provenance:
+        release_binary_provenance = get_release_binary_provenance_for_validation(
+            args.binary_provenance_file,
+            args.evg_build_id,
+            args.evg_binary_provenance_task_name,
+            download_dir,
+        )
+        release_binary_archive = get_release_binary_archive_for_validation(
+            args.binary_provenance_archive_file,
+            args.evg_build_id,
+            args.evg_binary_provenance_task_name,
+            args.evg_binary_provenance_archive_artifact_name,
+            download_dir,
+        )
+        validate_release_binary_provenance_against_archive(
+            release_binary_provenance,
+            release_binary_archive,
+            args.evg_build_id,
+            release_binary_names,
+        )
+        logging.info(
+            "Validated release binary provenance from %s hash(es) in %s",
+            ", ".join(release_binary_names),
+            release_binary_archive,
+        )
+        release_execution_logs = get_release_execution_logs_for_validation(
+            args.execution_log_file,
+            args.evg_build_id,
+            args.evg_execution_log_task_name,
+            download_dir,
+        )
+        execution_log_summaries = []
+        for execution_log_source, execution_log_path in release_execution_logs:
+            summary = validate_compact_execution_log_file(execution_log_path, allow_empty=True)
+            execution_log_summaries.append(summary)
+            logging.info(
+                "Validated release execution log candidate from %s: checked %s Bazel spawn "
+                "action(s), cache hits=%s, runners=%s",
+                execution_log_source,
+                summary.spawn_count,
+                summary.cache_hit_count,
+                summary.runner_counts,
+            )
+
+        combine_execution_log_validation_summaries(execution_log_summaries)
 
     for test_pair in args.test:
         test_os = test_pair[0]
@@ -942,20 +1228,28 @@ if args.command == "branch":
                 tar.extract(member_info, path="dist-test")
             tar.close()
 
-            bins_to_check = ["mongod", "mongos"]
+            binary_names_to_check = ["mongod", "mongos"]
+            bin_files_to_check = {}
             bin_dir = None
-            for dirpath, dirnames, filenames in os.walk("dist-test"):
+            for dirpath, _dirnames, filenames in os.walk("dist-test"):
+                local_bin_files = {}
                 for filename in filenames:
-                    if filename in bins_to_check:
-                        bin_dir = dirpath
-                        break
-                if bin_dir:
+                    binary_name = release_binary_name_from_path(filename)
+                    if binary_name in binary_names_to_check:
+                        local_bin_files[binary_name] = filename
+                if set(binary_names_to_check).issubset(local_bin_files):
+                    bin_files_to_check = local_bin_files
+                    bin_dir = dirpath
                     break
+
+            if bin_dir is None:
+                raise Exception("Could not find mongod and mongos in extracted binary archive")
 
             with open("gdb_commands.txt", "w") as f:
                 f.write("info sources")
 
-            for binfile in bins_to_check:
+            for binary_name in binary_names_to_check:
+                binfile = bin_files_to_check[binary_name]
                 p = subprocess.run(
                     [
                         "/opt/mongodbtoolchain/v5/bin/gdb",
@@ -976,9 +1270,6 @@ if args.command == "branch":
 
                 if p.returncode != 0:
                     raise Exception("GDB process exited non-zero!")
-
-    if os.environ.get("is_patch") != "true" or os.environ.get("is_release", "false") != "false":
-        validate_no_remote_cache_or_execution(args.bep_json_file)
 
 # If os is None we only want to do the tests specified in the arguments
 if args.command == "release":

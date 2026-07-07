@@ -125,24 +125,61 @@ fi
 # Build flags line
 BEP_FULL="build_events_full.json"
 BEP_OUT="build_events.json"
-ALL_FLAGS="--verbose_failures ${LOCAL_ARG} ${MONGO_VERSION_ARG} ${bazel_args:-} ${bazel_compile_flags:-} ${task_compile_flags:-} ${patch_compile_flags:-} --build_event_json_file=${BEP_FULL}"
+BASE_FLAGS="--verbose_failures ${LOCAL_ARG} ${MONGO_VERSION_ARG} ${bazel_args:-}"
+BASE_FLAGS+=" ${bazel_compile_flags:-} ${task_compile_flags:-} ${patch_compile_flags:-}"
+RELEASE_EXECUTION_LOG_FLAGS=""
+RELEASE_LOCAL_SAFETY_FLAGS=""
+SHOULD_ENFORCE_RELEASE_LOCAL_BUILD=false
+if [[ "${is_patch:-}" != "true" || "${is_release:-false}" != "false" ]]; then
+    SHOULD_ENFORCE_RELEASE_LOCAL_BUILD=true
+fi
+echo "Release-local build enforcement: ${SHOULD_ENFORCE_RELEASE_LOCAL_BUILD} (is_patch=${is_patch:-}, is_release=${is_release:-false})"
+SERVER_RELEASE_PROJECTS=("mongo-release")
+IS_SERVER_RELEASE_PROJECT=false
+for SERVER_RELEASE_PROJECT in "${SERVER_RELEASE_PROJECTS[@]}"; do
+    if [[ "${project:-}" == "${SERVER_RELEASE_PROJECT}" ]]; then
+        IS_SERVER_RELEASE_PROJECT=true
+        break
+    fi
+done
+
+if [[ "${SHOULD_ENFORCE_RELEASE_LOCAL_BUILD}" == "true" ]]; then
+    if [[ " ${BASE_FLAGS} " == *" --config=public-release "* ||
+        " ${BASE_FLAGS} " == *" --config public-release "* ||
+        " ${BASE_FLAGS} " == *" --config=public-release-local "* ||
+        " ${BASE_FLAGS} " == *" --config public-release-local "* ]]; then
+        if [[ "${IS_SERVER_RELEASE_PROJECT}" == "true" && "${task_name:-}" == "package" ]]; then
+            RELEASE_EXECUTION_LOG_FLAGS="--execution_log_compact_file=release_execution_log.binpb.zst"
+        elif [[ "${task_name:-}" == "crypt_create_lib" ]]; then
+            RELEASE_EXECUTION_LOG_FLAGS="--execution_log_compact_file=release_execution_log.binpb.zst"
+        elif [[ "${IS_SERVER_RELEASE_PROJECT}" == "false" && "${task_name:-}" == "archive_dist_test" ]]; then
+            RELEASE_EXECUTION_LOG_FLAGS="--execution_log_compact_file=.bazel_release_execution_log.binpb.zst"
+        fi
+        RELEASE_LOCAL_SAFETY_FLAGS="--remote_executor= --noremote_accept_cached"
+        RELEASE_LOCAL_SAFETY_FLAGS+=" --remote_upload_local_results=false"
+        RELEASE_LOCAL_SAFETY_FLAGS+=" --modify_execution_info=.*=+no-cache"
+    fi
+fi
+
+ALL_FLAGS="${BASE_FLAGS}"
+ALL_FLAGS+=" --build_event_json_file=${BEP_FULL}"
+ALL_FLAGS+=" ${RELEASE_EXECUTION_LOG_FLAGS}"
 echo "${ALL_FLAGS}" >.bazel_build_flags
 
 # Save the entire bazel build invocation to attach to the task for re-running locally
-echo "bazel build ${ALL_FLAGS} ${targets}" >.bazel_build_invocation
+echo "bazel build ${ALL_FLAGS} ${targets} ${RELEASE_LOCAL_SAFETY_FLAGS}" >.bazel_build_invocation
 
 set +o errexit
 
 export RETRY_ON_FAIL=1
 bazel_evergreen_shutils::retry_bazel_cmd 3 "$BAZEL_BINARY" \
-    build ${ALL_FLAGS} ${targets}
+    build ${ALL_FLAGS} ${targets} ${RELEASE_LOCAL_SAFETY_FLAGS}
 RET=$?
 
 bazel_evergreen_shutils::write_last_engflow_link
 
 # Extract just the optionsParsed event from the full BEP JSON.
-# This single line (~few KB) is all package_test.py needs to verify
-# that remote cache and remote execution were not used.
+# This keeps the uploaded compile BEP artifact small while preserving existing BEP consumers.
 if [[ -f "${BEP_FULL}" ]]; then
     grep '"optionsParsed"' "${BEP_FULL}" >"${BEP_OUT}" || true
     rm -f "${BEP_FULL}"

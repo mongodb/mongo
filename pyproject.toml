@@ -195,6 +195,7 @@ pexpect = "^4.9.0"
 oauthlib = "^3.1.1"
 requests-oauthlib = "^2.0.0"
 packaging = "^25.0"
+protobuf = "5.29.3"
 docker = "^7.1.0"
 mongomock = "^4.1.2"
 pyjwt = "^2.12.0"
@@ -234,6 +235,7 @@ resmoke = "buildscripts.resmoke:entrypoint"
 [tool.ruff]
 force-exclude = true
 extend-exclude = [
+    "buildscripts/bazel_spawn_pb2.py",
     "src/third_party",
 ]
 
@@ -272,6 +274,7 @@ include = [
     "src"
 ]
 exclude = [
+    "buildscripts/bazel_spawn_pb2.py",
     "**/third_party/**",
     "**/external/**"
 ]
