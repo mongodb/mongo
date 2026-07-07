@@ -52,3 +52,20 @@ commands:
             cursor:
                 type: SimpleCursorOptions
                 optional: true
+
+server_parameters:
+    probabilityTriggerShardFilteringRecoveryDuringCheckMetadataConsistency:
+        description: >
+            A test-only parameter that enables random filtering metadata recovery during the execution of
+            checkMetadataConsistency
+        set_at:
+            - startup
+            - runtime
+        cpp_vartype: AtomicWord<double>
+        cpp_varname: gProbabilityOfFilteringMetadataRecovery
+        default: 0.5
+        validator:
+            gte: 0.0
+            lte: 1.0
+        redact: false
+        test_only: true

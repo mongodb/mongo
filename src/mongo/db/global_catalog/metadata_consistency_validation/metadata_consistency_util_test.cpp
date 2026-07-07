@@ -207,6 +207,8 @@ protected:
     const KeyPattern _keyPattern{BSON("x" << 1)};
     const CollectionType _coll{
         _nss, OID::gen(), Timestamp(1), Date_t::now(), _collUuid, _keyPattern};
+    const unittest::ServerParameterGuard disableRandomRecovery{
+        "probabilityTriggerShardFilteringRecoveryDuringCheckMetadataConsistency", 0.0};
 
     CollectionType generateCollectionType(const NamespaceString& nss,
                                           const UUID& uuid,
@@ -1504,6 +1506,11 @@ protected:
                                          CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
     }
 
+    void clearCSR(bool collIsDropped) {
+        auto scopedCSR = CollectionShardingRuntime::acquireExclusive(operationContext(), _nss);
+        scopedCSR->clearCollectionMetadata(operationContext(), collIsDropped);
+    }
+
     void insertDurableShardCatalogCollection(const CollectionType& coll) {
         DBDirectClient client(operationContext());
         auto res = client.insert(write_ops::InsertCommandRequest{
@@ -2702,6 +2709,41 @@ TEST_F(MetadataConsistencyShardCatalogTest,
     // from check metadata inconsistency.
     const auto inconsistencies = checkConsistency(globalCatalogColl);
     ASSERT_EQ(0, inconsistencies.size());
+}
+
+TEST_F(MetadataConsistencyShardCatalogTest,
+       InconsistencyIsReportedEvenIfUnknownDueToRandomRecovery) {
+    const auto localUuid = setUpLocalCollection();
+    auto shardCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
+    auto shardCatalogChunk = generateChunk(
+        localUuid, _shardId, _keyPattern.globalMin(), _keyPattern.globalMax(), kShard0History);
+    const KeyPattern globalCatalogKeyPattern{BSON("y" << 1)};
+    auto globalCatalogColl = generateCollectionType(_nss, localUuid, globalCatalogKeyPattern);
+    auto globalCatalogChunk = generateChunk(localUuid,
+                                            _shardId,
+                                            globalCatalogKeyPattern.globalMin(),
+                                            globalCatalogKeyPattern.globalMax(),
+                                            kShard0History);
+
+    insertDurableShardCatalogCollection(shardCatalogColl);
+    insertDurableShardCatalogChunks({shardCatalogChunk});
+    _catalogClient->setChunksToReturn({globalCatalogChunk});
+
+    clearCSR(true);
+
+    // At this point the check should do an early return since no sharding metadata is in memory.
+    // This means no inconsistencies are reported even if the entire durable state is wrong.
+    {
+        const auto inconsistencies = checkConsistency(globalCatalogColl, kShard1);
+        ASSERT_TRUE(inconsistencies.empty());
+    }
+
+    // Trigger a random recovery, this should populate the in-memory state in order to detect
+    // inconsistencies.
+    const unittest::ServerParameterGuard enableRandomRecovery{
+        "probabilityTriggerShardFilteringRecoveryDuringCheckMetadataConsistency", 1.0};
+    const auto inconsistencies = checkConsistency(globalCatalogColl, kShard1);
+    ASSERT_FALSE(inconsistencies.empty());
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest,
