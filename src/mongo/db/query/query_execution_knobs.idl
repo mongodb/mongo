@@ -215,6 +215,16 @@ server_parameters:
         default: false
         redact: false
 
+    internalQueryReuseCursorForExpressPathUpdates:
+        description: >-
+            Enables express updates to reuse the cursor from the find portion of the query for
+            the update portion.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryReuseCursorForExpressPathUpdates"
+        cpp_vartype: AtomicWord<bool>
+        default: false
+        redact: false
+
     internalQueryMaxJsEmitBytes:
         description: >-
             Limits the vector of values emitted from a single document's call to JsEmit to the

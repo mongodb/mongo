@@ -65,5 +65,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/compiler/logical_model/projection:projection_ast",
         "//src/mongo/db/shard_role",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/unittest:server_parameter_guard",
     ],
 )

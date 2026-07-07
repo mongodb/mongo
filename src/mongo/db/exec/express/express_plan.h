@@ -44,6 +44,7 @@
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/plan_explainer_express.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
@@ -380,7 +381,8 @@ public:
         }
 
         auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
-        const bool reuseCursor = provider.supportsCursorReuseForExpressPathQueries();
+        const bool reuseCursor = internalQueryReuseCursorForExpressPathUpdates.load() &&
+            provider.supportsCursorReuseForExpressPathQueries();
 
         // When the cursor will be reused (typical WiredTiger path), the cursor — held as a
         // member — outlives this call, so the non-owning BSONObj view remains valid. Skip the

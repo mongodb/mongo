@@ -53,6 +53,7 @@
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -195,6 +196,9 @@ TEST_F(ExpressPlanTest,
     auto& provider =
         rss::ReplicatedStorageService::get(operationContext()).getPersistenceProvider();
     ASSERT(provider.supportsCursorReuseForExpressPathQueries());
+
+    unittest::ServerParameterGuard reuseGuard("internalQueryReuseCursorForExpressPathUpdates",
+                                              true);
 
     auto collection =
         createAndPopulateTestCollection("{_id: 0, a: 2}"sv, "{_id: 1, a: 3}"sv, "{_id: 2, a: 5}"sv);
