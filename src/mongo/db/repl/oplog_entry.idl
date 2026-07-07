@@ -257,7 +257,7 @@ structs:
                     which ensures that feature flag checks are stable through its execution."
             h:
                 cpp_name: docHash
-                type: safeInt
+                type: safeInt64
                 optional: true
                 description:
                     "Hash of the document affected by this operation. For inserts and updates,

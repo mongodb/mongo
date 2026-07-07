@@ -401,7 +401,7 @@ public:
         getDurableReplOperation().setSizeMetadata(std::move(value));
     }
 
-    void setDocHash(boost::optional<int32_t> value) & {
+    void setDocHash(boost::optional<std::int64_t> value) & {
         getDurableReplOperation().setDocHash(std::move(value));
     }
 
@@ -914,7 +914,7 @@ public:
     const mongo::BSONObj& getObject() const;
     const boost::optional<mongo::BSONObj>& getObject2() const;
     boost::optional<bool> getIsTimeseries() const;
-    boost::optional<std::int32_t> getDocHash() const;
+    boost::optional<std::int64_t> getDocHash() const;
     const boost::optional<mongo::repl::OplogEntrySizeMetadata>& getSizeMetadata() const;
     boost::optional<bool> getUpsert() const;
     const boost::optional<mongo::repl::OpTime>& getPreImageOpTime() const;

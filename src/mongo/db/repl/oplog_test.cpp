@@ -150,7 +150,7 @@ TEST_F(OplogTest, HashSingleOpRoundTrip) {
     auto opCtx = cc().makeOperationContext();
 
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
-    const int32_t hash = 0x5EAF9B27;
+    const std::int64_t hash = 8622950721748590592LL;
 
     MutableOplogEntry op;
     op.setOpType(repl::OpTypeEnum::kInsert);
@@ -170,8 +170,8 @@ TEST_F(OplogTest, HashSingleOpRoundTrip) {
         wunit.commit();
     }
 
-    const auto entry = _getSingleOplogEntry(opCtx.get());
-    const auto parsedDocHash = entry.getDocHash();
+    const OplogEntry entry = _getSingleOplogEntry(opCtx.get());
+    const boost::optional<std::int64_t> parsedDocHash = entry.getDocHash();
     ASSERT_TRUE(parsedDocHash.has_value());
     EXPECT_EQ(hash, *parsedDocHash);
 }
