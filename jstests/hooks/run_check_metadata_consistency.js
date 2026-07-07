@@ -29,9 +29,11 @@ const assertNonShardedCluster = (conn) => {
 };
 
 try {
-    MetadataConsistencyChecker.run(conn);
+    MetadataConsistencyChecker.run(conn, true /* ignoreInconsistenciesTempWorkaround */);
 } catch (e) {
     if (e.code === ErrorCodes.CommandNotFound) {
         assertNonShardedCluster(conn);
+    } else {
+        throw e;
     }
 }

@@ -1,5 +1,5 @@
 export var MetadataConsistencyChecker = (function () {
-    const run = (mongos) => {
+    const run = (mongos, ignoreInconsistenciesTempWorkaround = false) => {
         const adminDB = mongos.getDB("admin");
 
         // The isTransientError() function is responsible for setting an error as transient and
@@ -84,6 +84,23 @@ export var MetadataConsistencyChecker = (function () {
                         inconsistencies.splice(i, 1); // Remove inconsistency
                     }
                 }
+            }
+
+            // Temporary workaround: tolerate these inconsistencies until linked tickets are fixed.
+            const knownInconsistencyTempWorkaround = [
+                // TODO(SERVER-130694): Fix false positives and remove inconsistency type
+                "MalformedTimeseriesBucketsCollection",
+                // TODO(SERVER-130695): Fix underlying issues and remove inconsistency type
+                "InconsistentShardCatalogCollectionMetadata",
+            ];
+            if (ignoreInconsistenciesTempWorkaround) {
+                inconsistencies = inconsistencies.filter((inconsistency) => {
+                    if (!knownInconsistencyTempWorkaround.includes(inconsistency.type)) {
+                        return true;
+                    }
+                    jsTest.log.info("Ignored metadata inconsistency (workaround)", {inconsistency});
+                    return false;
+                });
             }
 
             assert.eq(
