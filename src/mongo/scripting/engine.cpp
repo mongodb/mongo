@@ -333,9 +333,9 @@ void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
     // remove things from scope that were removed from the system.js collection
     for (set<string>::iterator i = _storedNames.begin(); i != _storedNames.end();) {
         if (thisTime.count(*i) == 0) {
-            string toDelete = str::stream() << "delete " << *i;
+            string name = *i;
             _storedNames.erase(i++);
-            execSetup(toDelete, "clean up scope");
+            deleteGlobal(name);
         } else {
             ++i;
         }
@@ -599,6 +599,9 @@ public:
     }
     void setFunction(const char* field, const char* code) override {
         _real->setFunction(field, code);
+    }
+    void deleteGlobal(std::string_view name) override {
+        _real->deleteGlobal(name);
     }
     ScriptingFunction createFunction(const char* code) override {
         return _real->createFunction(code);

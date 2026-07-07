@@ -891,6 +891,10 @@ void MozJSImplScope::setFunction(const char* field, const char* code) {
     });
 }
 
+void MozJSImplScope::deleteGlobal(std::string_view name) {
+    _runSafely([&] { ObjectWrapper(_context, _global).deleteProperty(std::string(name).c_str()); });
+}
+
 void MozJSImplScope::rename(const char* from, const char* to) {
     _runSafely([&] { ObjectWrapper(_context, _global).rename(from, to); });
 }

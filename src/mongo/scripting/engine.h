@@ -119,6 +119,9 @@ public:
     virtual void setBoolean(const char* field, bool val) = 0;
     virtual void setFunction(const char* field, const char* code) = 0;
 
+    // Deletes a property from the scope's JS global object (used for system.js scope cleanup).
+    virtual void deleteGlobal(std::string_view name) = 0;
+
     virtual int type(const char* field) = 0;
 
     virtual void append(BSONObjBuilder& builder, const char* fieldName, const char* scopeName);

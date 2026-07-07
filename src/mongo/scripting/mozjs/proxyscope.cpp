@@ -209,6 +209,10 @@ void MozJSProxyScope::setFunction(const char* field, const char* code) {
     run([&] { _implScope->setFunction(field, code); });
 }
 
+void MozJSProxyScope::deleteGlobal(std::string_view name) {
+    run([&] { _implScope->deleteGlobal(name); });
+}
+
 int MozJSProxyScope::type(const char* field) {
     int out;
     run([&] { out = _implScope->type(field); });
