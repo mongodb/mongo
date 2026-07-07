@@ -30,6 +30,7 @@
 
 #include "mongo/db/auth/sasl_x509_server_conversation.h"
 
+#include "mongo/client/authenticate.h"
 #include "mongo/db/auth/auth_options_gen.h"
 #include "mongo/db/auth/authentication_session.h"
 #include "mongo/db/auth/authorization_manager_global_parameters_gen.h"
@@ -44,6 +45,8 @@
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_peer_info.h"
 #include "mongo/util/net/ssl_types.h"
+
+#include <algorithm>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
@@ -204,6 +207,10 @@ StatusWith<std::tuple<bool, std::string>> SaslX509ServerMechanism::stepImpl(
             ServerMechanismBase::getAuthenticationDatabase() == "$external");
 
     if (!isClusterMember(opCtx->getClient())) {
+        const auto& mechs = saslGlobalParams.authenticationMechanisms;
+        uassert(ErrorCodes::BadValue,
+                str::stream() << auth::kMechanismMongoX509 << " authentication is disabled",
+                std::find(mechs.begin(), mechs.end(), auth::kMechanismMongoX509) != mechs.end());
         return std::make_tuple(true, std::string());
     }
 
