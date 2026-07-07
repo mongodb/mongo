@@ -941,7 +941,7 @@ __recovery_file_scan(WT_RECOVERY *r)
       "scanning metadata to remove all incomplete tables");
 
     /* Scan through all table entries in the metadata and clean up incomplete tables. */
-    __recovery_metadata_scan_prefix(r, "table:", NULL, __metadata_clean_incomplete_table);
+    WT_RET(__recovery_metadata_scan_prefix(r, "table:", NULL, __metadata_clean_incomplete_table));
 
     __wt_verbose_level_multi(r->session, WT_VERB_RECOVERY_ALL, WT_VERBOSE_INFO, "%s",
       "scanning metadata to find the largest file ID");
