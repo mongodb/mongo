@@ -201,5 +201,5 @@
 - name: kill_stepdown_terminate_jscore_passthrough_extra_files
   value:
     exclude_files:
-      # TODO (SERVER-122384) Re-enable the following tests
+      # TODO SERVER-130517: enable the tests
       - jstests/core/ddl/create_collection.js
