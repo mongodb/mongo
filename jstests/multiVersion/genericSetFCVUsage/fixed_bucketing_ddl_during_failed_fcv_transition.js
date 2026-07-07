@@ -15,7 +15,7 @@
  * NOTE: The `failDowngrading` / `failUpgrading` failpoints fire in the FCV transition's prepare
  * phase, before any viewless<->viewful collection conversion.
  *
- * TODO(SERVER-128739): Remove after 9.0 becomes last LTS.
+ * TODO(SERVER-128768): Remove after 9.0 becomes last LTS.
  *
  * @tags: [
  *   requires_timeseries,
