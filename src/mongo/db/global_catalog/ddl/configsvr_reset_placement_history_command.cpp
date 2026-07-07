@@ -88,31 +88,32 @@ public:
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
 
-            FixedFCVRegion fcvRegion(opCtx);
+            auto initializePlacementHistoryCoordinator = [&] {
+                FixedFCVRegion fcvRegion(opCtx);
 
-            // The Operation FCV is currently propagated only for DDL operations,
-            // which cannot be nested. Therefore, the VersionContext shouldn't have an OFCV yet.
-            // TODO Revisit this invariant once this workflow gets integrated into addShard.
-            invariant(!VersionContext::getDecoration(opCtx).hasOperationFCV());
+                // The Operation FCV is currently propagated only for DDL operations,
+                // which cannot be nested. Therefore, the VersionContext shouldn't have an OFCV yet.
+                // TODO Revisit this invariant once this workflow gets integrated into addShard.
+                invariant(!VersionContext::getDecoration(opCtx).hasOperationFCV());
 
-            if (const auto fcvSnapshot = fcvRegion->acquireFCVSnapshot();
-                !feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabled(
-                    VersionContext::getDecoration(opCtx), fcvSnapshot)) {
-                uasserted(ErrorCodes::CommandNotSupported,
-                          "Unable to initialize config.placementHistory under the currently active "
-                          "FCV version");
-            }
+                if (const auto fcvSnapshot = fcvRegion->acquireFCVSnapshot();
+                    !feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabled(
+                        VersionContext::getDecoration(opCtx), fcvSnapshot)) {
+                    uasserted(
+                        ErrorCodes::CommandNotSupported,
+                        "Unable to initialize config.placementHistory under the currently active "
+                        "FCV version");
+                }
 
-            InitializePlacementHistoryCoordinatorDocument coordinatorDoc;
-            coordinatorDoc.setShardingCoordinatorMetadata(
-                {{NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                  CoordinatorTypeEnum::kInitializePlacementHistory}});
+                InitializePlacementHistoryCoordinatorDocument coordinatorDoc;
+                coordinatorDoc.setShardingCoordinatorMetadata(
+                    {{NamespaceString::kConfigsvrPlacementHistoryNamespace,
+                      CoordinatorTypeEnum::kInitializePlacementHistory}});
 
-            auto service = ShardingCoordinatorService::getService(opCtx);
-            auto initializePlacementHistoryCoordinator =
-                checked_pointer_cast<InitializePlacementHistoryCoordinator>(
-                    service->getOrCreateInstance(
-                        opCtx, coordinatorDoc.toBSON(), std::move(fcvRegion)));
+                auto service = ShardingCoordinatorService::getService(opCtx);
+                return checked_pointer_cast<InitializePlacementHistoryCoordinator>(
+                    service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON(), fcvRegion));
+            }();
 
             initializePlacementHistoryCoordinator->getCompletionFuture().get(opCtx);
         }
