@@ -42,6 +42,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/timer.h"
 
 #include <boost/optional/optional.hpp>
 
@@ -145,9 +146,14 @@ SingleDocumentLookupExecutor::LookupResult ExpressSingleDocumentLookupExecutor::
     boost::optional<Timestamp> afterClusterTime) {
     OperationContext* opCtx = expCtx->getOperationContext();
 
+    // Timed around the whole eligibility run (not just the terminal attempt) so the recorded
+    // latency reflects what the caller actually waited, including any StaleConfig-triggered
+    // routing refresh + retry.
+    Timer timer;
+
     // Express executor does not cache the acquisition and eligibility check is done before
     // acquiring the collection and therefore we always pass NoHeldAcquisition.
-    return _localEligibility->run(
+    LookupResult result = _localEligibility->run(
         expCtx,
         nss,
         documentKey,
@@ -205,6 +211,21 @@ SingleDocumentLookupExecutor::LookupResult ExpressSingleDocumentLookupExecutor::
                 return {LookupResult::HandledStatus::kDocumentNotFound, boost::none};
             }
         });
+
+    if (_recorder) {
+        switch (result.status) {
+            case LookupResult::HandledStatus::kDocumentFound:
+                _recorder->recordFound(timer.elapsed());
+                break;
+            case LookupResult::HandledStatus::kDocumentNotFound:
+                _recorder->recordNotFound(timer.elapsed());
+                break;
+            case LookupResult::HandledStatus::kNotHandled:
+                _recorder->recordNotHandled();
+                break;
+        }
+    }
+    return result;
 }
 
 }  // namespace mongo::exec::agg

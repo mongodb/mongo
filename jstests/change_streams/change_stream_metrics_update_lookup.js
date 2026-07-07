@@ -4,6 +4,9 @@
  * 'changeStreams.updateLookup.<engine>'.
  *
  * @tags: [
+ *   # Can not run in balancer suites as it expects no data migrations across shards for correct
+ *   # metric capture (test expects shard local lookup).
+ *   assumes_balancer_off,
  *   requires_fcv_90,
  *   assumes_no_implicit_cursor_exhaustion,
  *   # The 'gone' document's post-image lookup relies on observing the delete that immediately
@@ -27,13 +30,13 @@ import {
 } from "jstests/change_streams/change_stream_metrics_util.js";
 
 // The engine expected to handle an updateLookup given the optimized-updateLookup flag state. When
-// the flag is off, the Aggregation executor is the entire lookup path regardless of topology.
-// SERVER-129514 / SERVER-129515 add the Express / SBE branches.
+// the flag is off, the Aggregation executor is the entire lookup path regardless of topology; when
+// it's on, Express handles every topology today.
 function expectedEngine(isRunningOptimizedUpdateLookup) {
     if (!isRunningOptimizedUpdateLookup) {
         return UpdateLookupExecutor.kAggregation;
     }
-    return null;
+    return UpdateLookupExecutor.kExpress;
 }
 
 describe("change stream updateLookup single-document-lookup metrics", function () {
@@ -62,17 +65,8 @@ describe("change stream updateLookup single-document-lookup metrics", function (
         assert.commandWorked(testColl.deleteMany({}));
     });
 
-    it("records found / notFound into the aggregation cell on the flag-off path", function () {
-        if (isRunningOptimizedUpdateLookup) {
-            jsTest.log.info("optimized updateLookup flag is on; the aggregation branch is skipped");
-            return;
-        }
-
-        // With the flag off the engine is always aggregation, in every passthrough topology.
-        assert.eq(
-            expectedEngine(isRunningOptimizedUpdateLookup),
-            UpdateLookupExecutor.kAggregation,
-        );
+    it("records found / notFound into the engine's single-document-lookup cell", function () {
+        const engine = expectedEngine(isRunningOptimizedUpdateLookup);
 
         const delta = ServerStatusMetrics.withServerStatusMetricsAcrossCluster(testDB, () => {
             withChangeStreamTest(testDB, (cst) => {
@@ -95,11 +89,11 @@ describe("change stream updateLookup single-document-lookup metrics", function (
             });
         });
 
-        const lookup = delta.changeStreams.updateLookup[UpdateLookupExecutor.kAggregation];
+        const lookup = delta.changeStreams.updateLookup[engine];
         assert.eq(lookup.found, 1, {lookup});
         assert.eq(lookup.notFound, 1, {lookup});
 
-        // The aggregation executor is the universal fallback, it never declines.
+        // Since there are no migration, the primary executor should always succeed.
         assert.eq(lookup.notHandled, 0, {lookup});
 
         // Two update events → exactly 2 post-image lookups total.

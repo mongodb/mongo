@@ -35,6 +35,7 @@
 #include "mongo/util/assert_util.h"
 
 #include <cstdint>
+#include <utility>
 
 namespace mongo::exec {
 
@@ -49,49 +50,44 @@ struct CellSnapshot {
     int64_t latencySum = 0;
 };
 
-// Returns the current counters and latency totals for the given cell. If the cell has not been
-// registered yet (lazy init hasn't fired) or the histogram has no data yet (OTEL only exports
-// histograms after at least one record() call), returns an all-zero snapshot so before/after delta
-// assertions work correctly regardless of test order.
-inline CellSnapshot snapshotExpressCell(otel::metrics::OtelMetricsCapturer& c) {
-    using otel::metrics::MetricNames;
+// Reads the given histogram's count/sum, defaulting to zero if it has no data yet.
+inline std::pair<uint64_t, int64_t> readHistogramOrZero(otel::metrics::OtelMetricsCapturer& c,
+                                                        otel::metrics::MetricName name) {
     try {
-        auto lat = c.readInt64Histogram(MetricNames::kChangeStreamUpdateLookupExpressLatency);
-        return {
-            .found = c.readInt64Counter(MetricNames::kChangeStreamUpdateLookupExpressFound),
-            .notFound = c.readInt64Counter(MetricNames::kChangeStreamUpdateLookupExpressNotFound),
-            .notHandled =
-                c.readInt64Counter(MetricNames::kChangeStreamUpdateLookupExpressNotHandled),
-            .latencyCount = lat.count,
-            .latencySum = lat.sum,
-        };
+        auto lat = c.readInt64Histogram(name);
+        return {lat.count, lat.sum};
     } catch (const DBException& ex) {
         if (ex.code() == ErrorCodes::KeyNotFound) {
-            return {};
+            return {0, 0};
         }
         throw;
     }
 }
 
+// Returns the current counters and latency totals for the given cell. If the cell has not been
+// registered yet (lazy init hasn't fired), returns an all-zero snapshot so before/after delta
+// assertions work correctly regardless of test order.
+inline CellSnapshot snapshotExpressCell(otel::metrics::OtelMetricsCapturer& c) {
+    using otel::metrics::MetricNames;
+    CellSnapshot snap;
+    snap.found = c.readInt64Counter(MetricNames::kChangeStreamUpdateLookupExpressFound);
+    snap.notFound = c.readInt64Counter(MetricNames::kChangeStreamUpdateLookupExpressNotFound);
+    snap.notHandled = c.readInt64Counter(MetricNames::kChangeStreamUpdateLookupExpressNotHandled);
+    std::tie(snap.latencyCount, snap.latencySum) =
+        readHistogramOrZero(c, MetricNames::kChangeStreamUpdateLookupExpressLatency);
+    return snap;
+}
+
 inline CellSnapshot snapshotAggregationCell(otel::metrics::OtelMetricsCapturer& c) {
     using otel::metrics::MetricNames;
-    try {
-        auto lat = c.readInt64Histogram(MetricNames::kChangeStreamUpdateLookupAggregationLatency);
-        return {
-            .found = c.readInt64Counter(MetricNames::kChangeStreamUpdateLookupAggregationFound),
-            .notFound =
-                c.readInt64Counter(MetricNames::kChangeStreamUpdateLookupAggregationNotFound),
-            .notHandled =
-                c.readInt64Counter(MetricNames::kChangeStreamUpdateLookupAggregationNotHandled),
-            .latencyCount = lat.count,
-            .latencySum = lat.sum,
-        };
-    } catch (const DBException& ex) {
-        if (ex.code() == ErrorCodes::KeyNotFound) {
-            return {};
-        }
-        throw;
-    }
+    CellSnapshot snap;
+    snap.found = c.readInt64Counter(MetricNames::kChangeStreamUpdateLookupAggregationFound);
+    snap.notFound = c.readInt64Counter(MetricNames::kChangeStreamUpdateLookupAggregationNotFound);
+    snap.notHandled =
+        c.readInt64Counter(MetricNames::kChangeStreamUpdateLookupAggregationNotHandled);
+    std::tie(snap.latencyCount, snap.latencySum) =
+        readHistogramOrZero(c, MetricNames::kChangeStreamUpdateLookupAggregationLatency);
+    return snap;
 }
 
 }  // namespace mongo::exec

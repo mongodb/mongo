@@ -32,6 +32,8 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/single_doc_lookup/collection_acquirer.h"
 #include "mongo/db/exec/single_doc_lookup/mock_local_lookup_eligibility.h"
+#include "mongo/db/exec/single_doc_lookup/single_document_lookup_stats.h"
+#include "mongo/db/exec/single_doc_lookup/single_document_lookup_stats_test_util.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/router_role/routing_cache/shard_cannot_refresh_due_to_locks_held_exception.h"
@@ -41,6 +43,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -54,6 +57,7 @@ namespace {
 using namespace std::literals::string_view_literals;
 
 using LookupResult = SingleDocumentLookupExecutor::LookupResult;
+using otel::metrics::OtelMetricsCapturer;
 
 const NamespaceString kTestNss =
     NamespaceString::createNamespaceString_forTest("test", "express_lookup");
@@ -107,6 +111,17 @@ protected:
         std::unique_ptr<LocalLookupEligibility> eligibility) {
         return ExpressSingleDocumentLookupExecutor(std::make_unique<OnDemandCollectionAcquirer>(),
                                                    std::move(eligibility));
+    }
+
+    // Same as makeExecutor(), but wired to the real process-global express cell so metrics tests
+    // can observe recording. Other tests use makeExecutor()'s boost::none default so they don't
+    // have an incidental side effect on the process-global counters.
+    ExpressSingleDocumentLookupExecutor makeExecutorWithRealRecorder(
+        std::unique_ptr<LocalLookupEligibility> eligibility) {
+        return ExpressSingleDocumentLookupExecutor(
+            std::make_unique<OnDemandCollectionAcquirer>(),
+            std::move(eligibility),
+            exec::SingleDocumentLookupStatsRecorder::makeUpdateLookupExpressRecorder());
     }
 
     LookupResult lookup(ExpressSingleDocumentLookupExecutor& exec, const Document& documentKey) {
@@ -294,6 +309,69 @@ TEST_F(ExpressLookupTest, IdLookupUsesCollectionDefaultCollation) {
                            boost::none);
     ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_BSONOBJ_EQ(result.document->toBson(), BSON("_id" << "abc"));
+}
+
+// --- Metrics recording ------------------------------------------------------------------------
+
+TEST_F(ExpressLookupTest, FoundDocumentRecordsFoundAndLatency) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    insert(BSON("_id" << 1 << "value" << "hello"));
+    auto exec = makeExecutorWithRealRecorder(MockLocalLookupEligibility::makeAlwaysLocal());
+
+    const auto before = snapshotExpressCell(capturer);
+    auto result = lookup(exec, Document{{"_id", 1}});
+    const auto after = snapshotExpressCell(capturer);
+
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
+    ASSERT_EQ(after.found, before.found + 1);
+    ASSERT_EQ(after.notFound, before.notFound);
+    ASSERT_EQ(after.notHandled, before.notHandled);
+    ASSERT_EQ(after.latencyCount, before.latencyCount + 1);
+}
+
+TEST_F(ExpressLookupTest, AbsentDocumentRecordsNotFound) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    insert(BSON("_id" << 1));
+    auto exec = makeExecutorWithRealRecorder(MockLocalLookupEligibility::makeAlwaysLocal());
+
+    const auto before = snapshotExpressCell(capturer);
+    auto result = lookup(exec, Document{{"_id", 404}});
+    const auto after = snapshotExpressCell(capturer);
+
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentNotFound);
+    ASSERT_EQ(after.found, before.found);
+    ASSERT_EQ(after.notFound, before.notFound + 1);
+    ASSERT_EQ(after.notHandled, before.notHandled);
+    ASSERT_EQ(after.latencyCount, before.latencyCount + 1);
+}
+
+TEST_F(ExpressLookupTest, UnknownDecisionRecordsNotHandledWithNoLatency) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    insert(BSON("_id" << 1));
+    auto exec = makeExecutorWithRealRecorder(MockLocalLookupEligibility::makeAlwaysUnknown());
+
+    const auto before = snapshotExpressCell(capturer);
+    auto result = lookup(exec, Document{{"_id", 1}});
+    const auto after = snapshotExpressCell(capturer);
+
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kNotHandled);
+    ASSERT_EQ(after.found, before.found);
+    ASSERT_EQ(after.notFound, before.notFound);
+    ASSERT_EQ(after.notHandled, before.notHandled + 1);
+    // A declined lookup carries no meaningful latency.
+    ASSERT_EQ(after.latencyCount, before.latencyCount);
 }
 
 }  // namespace

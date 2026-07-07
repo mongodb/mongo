@@ -32,6 +32,7 @@
 #include "mongo/db/exec/single_doc_lookup/collection_acquirer.h"
 #include "mongo/db/exec/single_doc_lookup/local_lookup_eligibility.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
+#include "mongo/db/exec/single_doc_lookup/single_document_lookup_stats.h"
 #include "mongo/db/query/plan_summary_stats.h"
 
 #include <memory>
@@ -47,10 +48,13 @@ namespace mongo::exec::agg {
  */
 class ExpressSingleDocumentLookupExecutor : public SingleDocumentLookupExecutor {
 public:
-    ExpressSingleDocumentLookupExecutor(std::unique_ptr<CollectionAcquirer> collectionAcquirer,
-                                        std::unique_ptr<LocalLookupEligibility> localEligibility)
+    ExpressSingleDocumentLookupExecutor(
+        std::unique_ptr<CollectionAcquirer> collectionAcquirer,
+        std::unique_ptr<LocalLookupEligibility> localEligibility,
+        boost::optional<SingleDocumentLookupStatsRecorder> recorder = boost::none)
         : _collectionAcquirer(std::move(collectionAcquirer)),
-          _localEligibility(std::move(localEligibility)) {
+          _localEligibility(std::move(localEligibility)),
+          _recorder(std::move(recorder)) {
         tassert(12841300,
                 "ExpressSingleDocumentLookupExecutor requires a non-null collection acquirer",
                 _collectionAcquirer);
@@ -86,6 +90,7 @@ public:
 private:
     std::unique_ptr<CollectionAcquirer> _collectionAcquirer;
     std::unique_ptr<LocalLookupEligibility> _localEligibility;
+    boost::optional<SingleDocumentLookupStatsRecorder> _recorder;
 
     // Non-owning; owned by the caller. Stats are accumulated here when set.
     PlanSummaryStats* _planSummaryStatsSink = nullptr;

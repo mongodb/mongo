@@ -183,6 +183,7 @@ mongo_cc_library(
         ":collection_acquirer",
         ":local_lookup_eligibility",
         ":single_document_lookup_executor",
+        ":single_document_lookup_stats",
         "//src/mongo/db/exec/express:express_executor",
         # CollectionIndexUsageTrackerDecoration::recordCollectionIndexUsage for $indexStats.
         "//src/mongo/db/query:collection_query_info",
@@ -199,9 +200,11 @@ mongo_cc_unit_test(
     deps = [
         ":express_single_document_lookup_executor",
         ":local_lookup_eligibility_test_util",
+        ":single_document_lookup_stats_test_util",
         "//src/mongo/db:dbhelpers",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/otel/metrics:metrics_test_util",
     ],
 )
 

@@ -71,7 +71,8 @@ std::unique_ptr<exec::agg::SingleDocumentLookupExecutor> buildUpdateLookupExecut
     LocalLookupEligibilityFactoryImpl eligibilityFactory;
     auto expressExecutor = std::make_unique<ExpressSingleDocumentLookupExecutor>(
         std::make_unique<OnDemandCollectionAcquirer>(),
-        eligibilityFactory.makeLocalLookupEligibility(opCtx));
+        eligibilityFactory.makeLocalLookupEligibility(opCtx),
+        exec::SingleDocumentLookupStatsRecorder::makeUpdateLookupExpressRecorder());
     return std::make_unique<PrimaryWithFallbackSingleDocumentLookupExecutor>(
         std::move(expressExecutor), std::move(aggExecutor));
 }
