@@ -52,4 +52,3 @@ executor:
         featureFlagEgressGrpcForSearch: true
         useGrpcForSearch: 1
         skipAuthenticationToMongot: true
-        featureFlagExtensionsAPI: true

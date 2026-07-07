@@ -44,11 +44,9 @@ executor:
       keyFile: jstests/with_mongot/keyfile_for_testing
       set_parameters:
         enableTestCommands: 1
-        featureFlagExtensionsAPI: true
     mongos_options:
       keyFile: jstests/with_mongot/keyfile_for_testing
-      set_parameters:
-        featureFlagExtensionsAPI: true
+      set_parameters: {}
     num_mongos: 3
     num_shards: 2
 matrix_suite: true

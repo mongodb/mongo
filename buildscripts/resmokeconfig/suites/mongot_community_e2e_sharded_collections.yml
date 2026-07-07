@@ -58,7 +58,6 @@ executor:
         featureFlagEgressGrpcForSearch: true
         useGrpcForSearch: 1
         skipAuthenticationToMongot: true
-        featureFlagExtensionsAPI: true
     mongos_options:
       keyFile: *keyFile
       set_parameters:
@@ -66,4 +65,3 @@ executor:
         featureFlagEgressGrpcForSearch: true
         useGrpcForSearch: 1
         skipAuthenticationToMongot: true
-        featureFlagExtensionsAPI: true

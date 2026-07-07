@@ -288,7 +288,7 @@ feature_flags:
     featureFlagExtensionsAPI:
         description: "Feature flag to enable loading extensions via the Extensions API."
         cpp_varname: gFeatureFlagExtensionsAPI
-        default: false
+        default: true
         fcv_gated: false
 
     featureFlagExtensionsApiSignatureValidation:

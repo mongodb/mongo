@@ -42,7 +42,6 @@ executor:
       keyFile: jstests/with_mongot/keyfile_for_testing
       set_parameters:
         enableTestCommands: 1
-        featureFlagExtensionsAPI: true
     num_nodes: 1
 matrix_suite: true
 selector:

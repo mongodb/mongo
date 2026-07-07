@@ -51,8 +51,6 @@ executor:
       keyFile: *keyFile
       set_parameters:
         enableTestCommands: 1
-        featureFlagExtensionsAPI: true
     mongos_options:
       keyFile: *keyFile
-      set_parameters:
-        featureFlagExtensionsAPI: true
+      set_parameters: {}
