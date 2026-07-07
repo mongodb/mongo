@@ -109,7 +109,6 @@ let testCases = {
     _configsvrCommitShardRemoval: {skip: "internal command"},
     _configsvrCommitSplitChunk: {skip: "internal command"},
     _configsvrConfigureCollectionBalancing: {skip: "internal command"},
-    _configsvrConvertShardRefsInNamespaceMetadata: {skip: "internal command"},
     _configsvrCreateDatabase: {skip: "internal command"},
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: "internal command"},
     _configsvrGetHistoricalPlacement: {skip: "internal command"},

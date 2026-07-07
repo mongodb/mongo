@@ -286,14 +286,13 @@ Status ShardingCatalogManager::createIndexForConfigShards(OperationContext* opCt
             return true;
         }
 
-        // Note that we can check the feature flag here without a fixed FCV region because the
-        // caller is either setFCV itself, or onStepUpComplete in which the primary is not yet
-        // writable, thus there's no 'concurrent setFCV' race.
-        const bool useUUID = feature_flags::gFeatureFlagUniqueShardIdentifiersDDL.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-
-        if (!useUUID) {
+        // TODO SERVER-128162 use the proper feature flag to perform the check.
+        const auto featureFlagEnabled =
+            feature_flags::gFeatureFlagUniqueShardIdentifiers
+                .isEnabledUseLatestFCVWhenUninitialized(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+        if (!featureFlagEnabled) {
             return false;
         }
 
@@ -327,8 +326,7 @@ Status ShardingCatalogManager::createIndexForConfigShards(OperationContext* opCt
 void ShardingCatalogManager::installConfigShardIdentityDocument(OperationContext* opCtx,
                                                                 bool deferShardingInitialization) {
     // Note that we can check the feature flag here without a fixed FCV region because the caller
-    // is part of onStepUpComplete in which the primary is not yet writable, thus there's no
-    // 'concurrent setFCV' race.
+    // is part of onStepUpComplete in which the primary is not yet writable, thus setFCV cannot run.
     // TODO (SERVER-126212): Always generate a UUID for the config server.
     const bool uniqueShardIdsEnabled = feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabled(
         VersionContext::getDecoration(opCtx),

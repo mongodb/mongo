@@ -553,15 +553,6 @@ public:
                            const ShardId& toShardId,
                            const SerializationContext& serializationContext);
 
-    /**
-     * Updates any persisted metadata for 'nss' in the global catalog so that existing ShardId
-     * references are converted into their corresponding shard references. This method assumes
-     * that any precondition to ensure the stability of the namespace metadata throughout its
-     * execution are guaranteed by the caller.
-     * TODO SERVER-126212 remove this method.
-     */
-    void convertShardRefsInNamespaceMetadata(OperationContext* opCtx, const NamespaceString& nss);
-
     //
     // Collection Operations
     //

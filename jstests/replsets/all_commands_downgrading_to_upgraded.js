@@ -79,7 +79,6 @@ const allCommands = {
     _configsvrCommitShardRemoval: {skip: isAnInternalCommand},
     _configsvrCommitSplitChunk: {skip: isAnInternalCommand},
     _configsvrConfigureCollectionBalancing: {skip: isAnInternalCommand},
-    _configsvrConvertShardRefsInNamespaceMetadata: {skip: isAnInternalCommand},
     _configsvrCreateDatabase: {skip: isAnInternalCommand},
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: isAnInternalCommand},
     _configsvrGetHistoricalPlacement: {skip: isAnInternalCommand},

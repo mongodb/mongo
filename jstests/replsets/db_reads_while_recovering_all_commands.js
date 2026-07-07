@@ -50,7 +50,6 @@ const allCommands = {
     _configsvrCommitShardRemoval: {skip: isPrimaryOnly},
     _configsvrCommitSplitChunk: {skip: isPrimaryOnly},
     _configsvrConfigureCollectionBalancing: {skip: isPrimaryOnly},
-    _configsvrConvertShardRefsInNamespaceMetadata: {skip: isPrimaryOnly},
     _configsvrCreateDatabase: {skip: isPrimaryOnly},
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: isPrimaryOnly},
     _configsvrGetHistoricalPlacement: {skip: isAnInternalCommand},

@@ -279,15 +279,6 @@ idl_generator(
 )
 
 idl_generator(
-    name = "convert_shard_refs_in_namespace_metadata_gen",
-    src = "convert_shard_refs_in_namespace_metadata.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-    ],
-)
-
-idl_generator(
     name = "drop_collection_if_uuid_not_matching_gen",
     src = "drop_collection_if_uuid_not_matching.idl",
     deps = [

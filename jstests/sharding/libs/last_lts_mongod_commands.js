@@ -99,6 +99,5 @@ export const commandsAddedToMongodSinceLastLTS = [
     "_configsvrCommitMergeChunks",
     "_configsvrCommitMoveRange",
     "_configsvrCommitSplitChunk",
-    "_configsvrConvertShardRefsInNamespaceMetadata",
     "_shardsvrCheckMetadataConsistencySecondaryParticipant",
 ];

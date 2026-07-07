@@ -1,5 +1,5 @@
 /**
- * Tests that when featureFlagUniqueShardIdentifiers* is enabled, the addShard and
+ * Tests that when featureFlagUniqueShardIdentifiers is enabled, the addShard and
  * transitionFromDedicatedConfigServer operations persist a unique uuid in config.shards and
  * propagate it into the shard's identity document on the newly added shard. Also verifies that the
  * shardingState command reports the same shard UUID.
@@ -7,7 +7,6 @@
  * @tags: [
  *   requires_fcv_90,
  *   featureFlagUniqueShardIdentifiers,
- *   featureFlagUniqueShardIdentifiersDDL,
  *   config_shard_incompatible,
  *   # This test calls addShard manually and checks sharding metadata.
  *   assumes_stable_shard_list,

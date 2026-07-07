@@ -541,22 +541,13 @@ MONGO_MOD_PRIVATE void commitChunkOperationsMetadataToShardCatalog(
     const CancellationToken& token);
 
 /**
- * Based on the FCV, get whether the DDL needs to act according to the database
+ * Based on the FCV, get the where the DDL needs to act accordingly to the database
  * or collection metadata authoritativeness.
  */
 MONGO_MOD_NEEDS_REPLACEMENT AuthoritativeMetadataAccessLevelEnum
 getGrantedAuthoritativeMetadataAccessLevel(const VersionContext& vCtx,
                                            const ServerGlobalParams::FCVSnapshot& snapshot);
 
-
-/**
- * Based on the FCV, get whether the DDL needs to operate with shards referred to by:
- * - Pre-upgrade: their ShardId exclusively (pre-upgrade);
- * - setFCV in progress: their UUID (preferably) or ShardId (fallback);
- * - Post-upgrade: their UUID.
- */
-MONGO_MOD_NEEDS_REPLACEMENT ShardIdentificationTypeEnum getGrantedShardIdentificationType(
-    const VersionContext& vCtx, const ServerGlobalParams::FCVSnapshot& snapshot);
 /*
  * Provided a collection UUID, returns the ID of one of the shards that are currently owning its
  * chunks (or boost:node when the collection is untracked or non-existing).
