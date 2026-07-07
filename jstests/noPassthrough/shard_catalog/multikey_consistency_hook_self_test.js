@@ -134,6 +134,38 @@ describe("multikey consistency hook self-test", () => {
         }
     });
 
+    it("handles collections with numeric names", () => {
+        // Collection names that look like integers (e.g. "123") must be preserved as strings
+        // when the hook enumerates and accesses them. Bracket notation db["123"] causes
+        // SpiderMonkey to convert the key to an integer, which then reaches the server as
+        // a BSON numeric type in the listIndexes command, producing
+        // "Collection name has invalid type double".
+        const rst = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: kFeatureFlagParameter}});
+        rst.startSet();
+        rst.initiate();
+
+        try {
+            const primary = rst.getPrimary();
+            const testDB = primary.getDB(`${jsTestName()}_numeric`);
+            assert.commandWorked(testDB.dropDatabase());
+
+            // Create collections with purely numeric names.
+            for (const numCollName of ["0", "123", "0.3"]) {
+                const coll = testDB.getCollection(numCollName);
+                assert.commandWorked(
+                    coll.insert({_id: 0, a: [1, 2]}, {writeConcern: kWriteConcern}),
+                );
+                assert.commandWorked(coll.createIndex({a: 1}, {name: "a_1"}));
+            }
+            rst.awaitReplication();
+
+            // The hook must not throw "Collection name has invalid type double".
+            runMultikeyConsistencyHook(primary, "replica set with numeric-named collections");
+        } finally {
+            rst.stopSet();
+        }
+    });
+
     it("passes against a healthy sharded cluster through the Thread-worker path", () => {
         const st = new ShardingTest({
             mongos: 1,
