@@ -158,6 +158,14 @@ public:
         }
     }
 
+    /**
+     * Returns the side writes interceptor for this index build, or null if one has not been
+     * installed (e.g. for foreground builds).
+     */
+    const IndexBuildInterceptor* getIndexBuildInterceptor() const {
+        return _indexBuildInterceptor.get();
+    }
+
 private:
     void _completeInit(OperationContext* opCtx, Collection* collection);
 

@@ -164,7 +164,8 @@ boost::optional<std::string> findPersistedResumeState(
     OperationContext* opCtx,
     const UUID& buildUUID,
     boost::optional<IndexBuildPhaseEnum> phase = boost::none,
-    boost::optional<UUID> collectionUUID = boost::none) {
+    boost::optional<UUID> collectionUUID = boost::none,
+    ResumeIndexInfo* resumeInfoOut = nullptr) {
     boost::optional<std::string> foundResumeIdent;
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     const auto idents =
@@ -209,6 +210,9 @@ boost::optional<std::string> findPersistedResumeState(
         EXPECT_FALSE(cursor->next());
 
         foundResumeIdent = *it;
+        if (resumeInfoOut) {
+            *resumeInfoOut = std::move(resumeInfo);
+        }
     }
 
     return foundResumeIdent;
@@ -450,6 +454,70 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateOnAbortWithoutCleanup) {
     auto indexBuildIdent = findPersistedResumeState(
         operationContext(), buildUUID, IndexBuildPhaseEnum::kInitialized, coll->uuid());
     ASSERT_TRUE(indexBuildIdent);
+
+    validateTempTableIdentsOnTeardown({*indexBuildInfo1.sideWritesIdent, *indexBuildIdent});
+}
+
+// A multikey write that happens while an index build is in progress is recorded only by the side
+// writes interceptor, and the side writes table stores bare index keys. The multikey information
+// cannot be reconstructed by re-draining the table after a restart, so it must be included in the
+// persisted resume state.
+TEST_F(MultiIndexBlockTest, ResumeStateIncludesMultikeyFromSideWrites) {
+    auto indexer = getIndexer();
+    const auto buildUUID = UUID::gen();
+    indexer->setBuildUUID(buildUUID);
+
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
+
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo1 =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       *storageEngine);
+
+    auto specs = unittest::assertGet(indexer->init(operationContext(),
+                                                   coll,
+                                                   {indexBuildInfo1},
+                                                   MultiIndexBlock::kNoopOnInitFn,
+                                                   MultiIndexBlock::InitMode::SteadyState,
+                                                   boost::none));
+    EXPECT_EQ(1U, specs.size());
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(Helpers::insert(operationContext(),
+                                  acq.getCollectionPtr(),
+                                  BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2))));
+        wuow.commit();
+    }
+
+    indexer->setIsResumable(true);
+    indexer->abortWithoutCleanup(operationContext(), coll.get());
+
+    ResumeIndexInfo resumeInfo;
+    auto indexBuildIdent = findPersistedResumeState(operationContext(),
+                                                    buildUUID,
+                                                    IndexBuildPhaseEnum::kInitialized,
+                                                    coll->uuid(),
+                                                    &resumeInfo);
+    ASSERT_TRUE(indexBuildIdent);
+
+    const auto& indexes = resumeInfo.getIndexes();
+    ASSERT_EQ(1U, indexes.size());
+    ASSERT_TRUE(indexes[0].getIsMultikey());
+
+    const auto& multikeyPaths = indexes[0].getMultikeyPaths();
+    ASSERT_EQ(1U, multikeyPaths.size());
+    const auto& multikeyComponents = multikeyPaths[0].getMultikeyComponents();
+    ASSERT_EQ(1U, multikeyComponents.size());
+    ASSERT_EQ(0, multikeyComponents[0]);
 
     validateTempTableIdentsOnTeardown({*indexBuildInfo1.sideWritesIdent, *indexBuildIdent});
 }
