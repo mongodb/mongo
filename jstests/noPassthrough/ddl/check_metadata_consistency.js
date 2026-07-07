@@ -578,7 +578,8 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 
     // Insert a RoutingTableRangeOverlap inconsistency
     const collUuid = configDB.collections.findOne({_id: ns}).uuid;
-    assert.commandWorked(configDB.chunks.updateOne({uuid: collUuid}, {$set: {max: {skey: 10}}}));
+    const chunk = configDB.chunks.findOne({uuid: collUuid});
+    assert.commandWorked(configDB.chunks.updateOne({_id: chunk._id}, {$set: {max: {skey: 10}}}));
 
     // Insert a ZonesRangeOverlap inconsistency
     let entry = {
@@ -618,6 +619,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     );
 
     // Clean up the database to pass the hooks that detect inconsistencies
+    assert.commandWorked(configDB.chunks.updateOne({_id: chunk._id}, {$set: {max: chunk.max}}));
     db.dropDatabase();
     inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
     assert.eq(0, inconsistencies.length, tojson(inconsistencies));
@@ -639,6 +641,8 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 
     // Insert a MissingRoutingTable inconsistency
     const collUuid = configDB.collections.findOne({_id: ns}).uuid;
+    const chunks = configDB.chunks.find({uuid: collUuid}).toArray();
+    assert.gt(chunks.length, 0, chunks);
     assert.commandWorked(configDB.chunks.deleteMany({uuid: collUuid}));
 
     // Restart nodes to clear filtering metadata to trigger a refresh with following operations.
@@ -661,6 +665,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     );
 
     // Clean up the database to pass the hooks that detect inconsistencies
+    assert.commandWorked(configDB.chunks.insertMany(chunks));
     db.dropDatabase();
     inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
     assert.eq(0, inconsistencies.length, tojson(inconsistencies));

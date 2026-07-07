@@ -209,8 +209,11 @@ checkIfCollectionAlreadyTrackedWithOptions(OperationContext* opCtx,
 
 /**
  * Stops ongoing migrations and prevents future ones to start for the given nss.
- * If expectedCollectionUUID is set and doesn't match that of that collection, then this is a no-op.
+ * If the collection is not currently tracked by the global catalog, this is a no-op.
  * If expectedCollectionUUID is not set, no UUID check will be performed before stopping migrations.
+ *
+ * The caller is responsible for guaranteeing that the identity of the collection (its existence
+ * and, if expectedCollectionUUID is set, its UUID) cannot change for the duration of this call.
  */
 MONGO_MOD_NEEDS_REPLACEMENT void stopMigrations(
     OperationContext* opCtx,
@@ -221,8 +224,11 @@ MONGO_MOD_NEEDS_REPLACEMENT void stopMigrations(
 
 /**
  * Resume migrations and balancing rounds for the given nss.
- * If expectedCollectionUUID is set and doesn't match that of the collection, then this is a no-op.
+ * If the collection is not currently tracked by the global catalog, this is a no-op.
  * If expectedCollectionUUID is not set, no UUID check will be performed before resuming migrations.
+ *
+ * The caller is responsible for guaranteeing that the identity of the collection (its existence
+ * and, if expectedCollectionUUID is set, its UUID) cannot change for the duration of this call.
  */
 MONGO_MOD_NEEDS_REPLACEMENT void resumeMigrations(
     OperationContext* opCtx,

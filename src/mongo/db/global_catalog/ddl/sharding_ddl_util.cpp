@@ -247,11 +247,7 @@ void setAllowMigrationsOnConfigServer(OperationContext* opCtx,
             str::stream() << "Error setting allowMigrations to " << allowMigrations
                           << " for collection " << nss.toStringForErrorMsg());
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotSharded>&) {
-        // Collection no longer exists
-    } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>&) {
-        // Collection metadata was concurrently dropped
-    } catch (const ExceptionFor<ErrorCodes::ChunkMetadataInconsistency>&) {
-        // Collection metadata has inconsistencies
+        // The collection is not sharded, so there are no migrations to block or resume.
     }
 }
 
@@ -277,7 +273,6 @@ void setAllowChunkOperations(OperationContext* opCtx,
                 configsvrSetAllowChunkOperationsCmd.toBSON(),
                 Shard::RetryPolicy::kIdempotent);
 
-        // TODO (SERVER-127531) Review these catch clauses.
         try {
             uassertStatusOKWithContext(
                 Shard::CommandResponse::getEffectiveStatus(swSetAllowChunkOperationsResult),
@@ -285,13 +280,7 @@ void setAllowChunkOperations(OperationContext* opCtx,
                               << " in the config server for collection "
                               << nss.toStringForErrorMsg());
         } catch (const ExceptionFor<ErrorCodes::NamespaceNotSharded>&) {
-            // Collection no longer exists
-            return;
-        } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>&) {
-            // Collection metadata was concurrently dropped
-            return;
-        } catch (const ExceptionFor<ErrorCodes::ChunkMetadataInconsistency>&) {
-            // Collection metadata has inconsistencies
+            // The collection is not sharded, so there are no migrations to block or resume.
             return;
         }
     }
