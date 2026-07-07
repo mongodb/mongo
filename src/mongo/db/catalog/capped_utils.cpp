@@ -165,6 +165,10 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
                           << " is currently in a drop-pending state.",
             !fromNss.isDropPendingNamespace());
 
+    uassert(ErrorCodes::IllegalOperation,
+            "Cannot convert a timeseries collection to a capped collection",
+            !fromCollection->getTimeseriesOptions());
+
     uassert(ErrorCodes::NamespaceExists,
             str::stream() << "cloneCollectionAsCapped failed - destination collection "
                           << toNss.toStringForErrorMsg() << " already exists. source collection: "
