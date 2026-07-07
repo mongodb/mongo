@@ -1,0 +1,82 @@
+{
+    "graph": {
+        "nodes": [
+            {
+                "collectionName": "test.pipeline_test",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": ""
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {},
+                    "projection": {
+                        "_id": false,
+                        "c": false
+                    }
+                },
+                "embedPath": "x"
+            }
+        ],
+        "edges": [
+            {
+                "predicates": [
+                    {
+                        "op": "exprEq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"1"}
+                    }
+                ],
+                "left": {"$numberInt":"0"},
+                "right": {"$numberInt":"1"}
+            }
+        ]
+    },
+    "resolvedPaths": [
+        {
+            "nodeId": {"$numberInt":"0"},
+            "fieldName": "a"
+        },
+        {
+            "nodeId": {"$numberInt":"1"},
+            "fieldName": "b"
+        }
+    ],
+    "prefix": [
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "x",
+                "let": {
+                    "aa": "$a"
+                },
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$expr": {
+                                "$eq": [
+                                    "$$aa",
+                                    "$b"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "$project": {
+                            "_id": false,
+                            "c": false
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$x"
+            }
+        }
+    ],
+    "suffix": []
+}

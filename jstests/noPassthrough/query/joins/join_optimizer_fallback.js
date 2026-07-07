@@ -591,7 +591,7 @@ runTestCaseIneligibleSuffix({
     expectedNumJoinNodes: 2,
 });
 
-// Repeat, but with $expr.
+// We don't support computed join predicates.
 runTestCaseIneligiblePipeline({
     pipeline: [
         {
@@ -599,15 +599,17 @@ runTestCaseIneligiblePipeline({
                 from: coll12.getName(),
                 as: "x",
                 let: {aa: "$a"},
-                pipeline: [{$project: {a: 100}}, {$match: {$expr: {$eq: ["$a", "$$aa"]}}}],
+                pipeline: [
+                    {$project: {a: "xyz-computed"}},
+                    {$match: {$expr: {$eq: ["$a", "$$aa"]}}},
+                ],
             },
         },
         {$unwind: "$x"},
     ],
-    expectedCount: 1,
+    expectedCount: 0,
 });
 
-// We don't support computed join predicates.
 runTestCaseIneligiblePipeline({
     pipeline: [
         {$project: {a: "some-computed-field"}},

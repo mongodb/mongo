@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model_fixture.h"
 #include "mongo/db/query/compiler/parsers/matcher/parsed_match_expression_for_test.h"
 #include "mongo/unittest/golden_test.h"
@@ -1646,13 +1645,7 @@ TEST_F(PipelineAnalyzerTest, GroupOnMainCollection) {
 
     auto pipeline = makePipeline(query, {"A", "B"});
     markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}, {"B", {"b"sv}}});
-
-    // We don't detect ineligibility here.
-    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-
-    // But we fail to construct a model here, because $group isn't pushed into SBE.
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
-    ASSERT_EQ(swJoinModel.getStatus(), ErrorCodes::QueryFeatureNotAllowed);
+    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 }
 
 TEST_F(PipelineAnalyzerTest, ConflictingLocalFields) {
@@ -1787,66 +1780,8 @@ TEST_F(PipelineAnalyzerTest, GroupInSubPipeline) {
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}, {"B", {"b"sv}}});
-
-    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
-    ASSERT_NOT_OK(swJoinModel);
-
-    // Ensure we haven't modified our pipeline.
-    auto serializedPipeline = pipeline->serializeToBson();
-    BSONObjBuilder bob;
-    {
-        BSONArrayBuilder bar(bob.subarrayStart("pipeline"));
-        for (auto&& stage : serializedPipeline) {
-            bar.append(stage);
-        }
-    }
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT,
-        R"({
-            "pipeline": [
-                {
-                    "$lookup": {
-                        "from": "A",
-                        "as": "fromA",
-                        "localField": "a",
-                        "foreignField": "b",
-                        "let": {},
-                        "pipeline": [
-                            {
-                                "$group": {
-                                    "_id": "$key",
-                                    "a": {
-                                        "$avg": "$c"
-                                    },
-                                    "$willBeMerged": false
-                                }
-                            }
-                        ]
-                    }
-                },
-                {
-                    "$unwind": {
-                        "path": "$fromA"
-                    }
-                },
-                {
-                    "$lookup": {
-                        "from": "B",
-                        "as": "fromB",
-                        "localField": "a",
-                        "foreignField": "b"
-                    }
-                },
-                {
-                    "$unwind": {
-                        "path": "$fromB"
-                    }
-                }
-            ]
-        })",
-        bob.obj());
+    markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}, {"B", {"b"}}});
+    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 }
 
 TEST_F(PipelineAnalyzerTest, IneligibleSubPipelineStage) {
@@ -1863,63 +1798,7 @@ TEST_F(PipelineAnalyzerTest, IneligibleSubPipelineStage) {
     auto pipeline = makePipeline(query, {"A", "B"});
     markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}, {"B", {"b"sv}}});
 
-    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
-    ASSERT_NOT_OK(swJoinModel);
-
-    // Ensure we haven't modified our pipeline.
-    auto serializedPipeline = pipeline->serializeToBson();
-    BSONObjBuilder bob;
-    {
-        BSONArrayBuilder bar(bob.subarrayStart("pipeline"));
-        for (auto&& stage : serializedPipeline) {
-            bar.append(stage);
-        }
-    }
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT,
-        R"({
-            "pipeline": [
-                {
-                    "$lookup": {
-                        "from": "A",
-                        "as": "fromA",
-                        "localField": "a",
-                        "foreignField": "b",
-                        "let": {},
-                        "pipeline": [
-                            {
-                                "$lookup": {
-                                    "from": "B",
-                                    "as": "innerB",
-                                    "localField": "b",
-                                    "foreignField": "b"
-                                }
-                            }
-                        ]
-                    }
-                },
-                {
-                    "$unwind": {
-                        "path": "$fromA"
-                    }
-                },
-                {
-                    "$lookup": {
-                        "from": "B",
-                        "as": "fromB",
-                        "localField": "a",
-                        "foreignField": "b"
-                    }
-                },
-                {
-                    "$unwind": {
-                        "path": "$fromB"
-                    }
-                }
-            ]
-        })",
-        bob.obj());
+    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 }
 
 TEST_F(PipelineAnalyzerTest, LongPrefix) {
@@ -1956,26 +1835,7 @@ TEST_F(PipelineAnalyzerTest, PipelineInEligibleForSortStage) {
         ])";
 
     auto pipeline = makePipeline(sortPrefixQuery, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}, {"B", {"b"sv}}});
-    // This is not where we examine the pipeline for a $sort stage.
-    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-    auto status = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams).getStatus();
-    ASSERT_NOT_OK(status);
-    ASSERT_EQ(status.code(), ErrorCodes::BadValue);
-    ASSERT_STRING_CONTAINS(status.reason(), "Sort stage found in pipeline");
-
-    const auto sortSubPipelineQuery = R"([
-        {$lookup: {
-            from: "A",
-            localField: "a",
-            foreignField: "b",
-            as: "fromA",
-            pipeline: [{$sort: {b: -1}}]
-        }},
-        {$unwind: "$fromA"}
-    ])";
-    pipeline = makePipeline(sortSubPipelineQuery, {"A", "B"});
-    // We check $lookup subpipeline here, so this method will flag the $sort in the subpipeline.
+    markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}, {"B", {"b"}}});
     ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 }
 
@@ -1997,6 +1857,305 @@ TEST_F(PipelineAnalyzerTest, LocalFieldOverride) {
     ASSERT_OK(swJoinModel);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+}
+
+TEST_F(PipelineAnalyzerTest, PipelineWithProjectsJoinPredicatesUnmodifiedOk) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    const auto query = R"([
+            {$project: {_id: 0}},
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "x", pipeline: [
+                {$project: {_id: 0}}
+            ]}},
+            {$unwind: "$x"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a", "b"}, {{"A", {"b"}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+    auto& joinModel = swJoinModel.getValue();
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+}
+
+TEST_F(PipelineAnalyzerTest, PipelineWithRenamedBaseCollectionJoinPredFieldBails) {
+    const auto query = R"([
+            {$project: {a: "$foo"}},
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "x"}},
+            {$unwind: "$x"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a", "foo"}, {{"A", {"b"}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    // We bail because we detect that field "a" was last modified by a non-$lookup stage.
+    // TODO SERVER-128365: Support renames within CQ.
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_NOT_OK(swJoinModel);
+}
+
+TEST_F(PipelineAnalyzerTest, PipelineWithRenamedBaseCollectionExprJoinPredFieldBails) {
+    const auto query = R"([
+            {$project: {a: "$foo"}},
+            {$lookup: {from: "A", as: "x", let: {aa: "$a"}, pipeline: [
+                {$match: {$expr: {$eq: ["$$aa", "$b"]}}}
+            ]}},
+            {$unwind: "$x"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a", "foo"}, {{"A", {"b"}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    // We bail because we detect that field "a" was last modified by a non-$lookup stage.
+    // TODO SERVER-128365: Support renames within CQ.
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_NOT_OK(swJoinModel);
+}
+
+TEST_F(PipelineAnalyzerTest, PipelineWithRenamedBaseCollectionTrailingExprJoinPredFieldBails) {
+    const auto query = R"([
+            {$project: {a: "$foo"}},
+            {$lookup: {from: "A", as: "x", pipeline: []}},
+            {$unwind: "$x"},
+            {$match: {$expr: {$eq: ["$a", "$x.b"]}}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a", "foo"}, {{"A", {"b"}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    // We bail because we detect that field "a" was last modified by a non-$lookup stage.
+    // TODO SERVER-128365: Support renames within CQ.
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_NOT_OK(swJoinModel);
+}
+
+TEST_F(PipelineAnalyzerTest, PipelineWithProjectsJoinPredicateModifiedForJoinBails) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "x", pipeline: [
+                {$project: {b: "$c.d.e.f"}}
+            ]}},
+            {$unwind: "$x"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a", "b"}, {{"A", {"b"}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    // TODO SERVER-128365: Support renames within CQ.
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_NOT_OK(swJoinModel);
+}
+
+TEST_F(PipelineAnalyzerTest, PipelineWithProjectsExprJoinPredicateModifiedForJoinBails) {
+    const auto query = R"([
+            {$lookup: {from: "A", as: "a", let: {aa: "$a"}, pipeline: [
+                {$match: {$expr: {$eq: ["$$aa", "$b"]}}},
+                {$project: {b: "$c.d.e.f"}}
+            ]}},
+            {$unwind: "$a"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a", "b"}, {{"A", {"b"}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    // TODO SERVER-128365: Support renames within CQ.
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_NOT_OK(swJoinModel);
+}
+
+TEST_F(PipelineAnalyzerTest, PrefixTooComplexForCQPushdownBails) {
+    const auto query = R"([
+            {$project: {_id: 0}},
+            {$addFields: {bar: "$a"}},
+            {$match: {bar: {$gt: 0}}},
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "a"}},
+            {$unwind: "$a"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a", "b"}, {{"A", {"b"}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_NOT_OK(swJoinModel);
+}
+
+TEST_F(PipelineAnalyzerTest, InferredPredicateDoesntDiscardProjections) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    const auto query = R"([
+            {$project: {_id: 0}},
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "x", pipeline: [
+                {$match: {b: {$eq: 3}}},
+                {$project: {_id: 0}}
+            ]}},
+            {$unwind: "$x"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a", "b"}, {{"A", {"b"}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+    auto& joinModel = swJoinModel.getValue();
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+}
+
+TEST_F(PipelineAnalyzerTest, SubPipelineTooComplexForCQPushdownBails) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "a", pipeline: [
+                {$project: {_id: 0}},
+                {$addFields: {bar: "$a"}},
+                {$match: {bar: {$gt: 0}}}
+            ]}},
+            {$unwind: "$a"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a", "b"}, {{"A", {"b"}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_NOT_OK(swJoinModel);
+}
+
+// Tests that a $project stage as the only stage in a subpipeline (no $match) that excludes
+// non-join-predicate fields is correctly handled: the model is built successfully and the
+// projection is preserved in the foreign node's access path.
+TEST_F(PipelineAnalyzerTest, SubpipelineProjectOnlyExcludesNonJoinFieldOk) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    const auto query = R"([
+        {$lookup: {from: "A", localField: "a", foreignField: "b", as: "x", pipeline: [
+            {$project: {_id: 0, c: 0}}
+        ]}},
+        {$unwind: "$x"}
+    ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a", "b"}, {{"A", {"b", "c"}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+    auto& joinModel = swJoinModel.getValue();
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+}
+
+// Tests that a $project stage in a subpipeline for an $expr-join that does not modify or
+// rename the join predicate field succeeds. The projection on non-join fields must be
+// preserved in the foreign node's access path.
+TEST_F(PipelineAnalyzerTest, SubpipelineExprJoinProjectNotModifyingJoinFieldOk) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    const auto query = R"([
+        {$lookup: {from: "A", as: "x", let: {aa: "$a"}, pipeline: [
+            {$match: {$expr: {$eq: ["$$aa", "$b"]}}},
+            {$project: {_id: 0, c: 0}}
+        ]}},
+        {$unwind: "$x"}
+    ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a", "b"}, {{"A", {"b", "c"}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+    auto& joinModel = swJoinModel.getValue();
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+}
+
+// Tests that an inclusion $project in the pipeline prefix that excludes the join predicate
+// field (localField) causes model construction to bail.
+TEST_F(PipelineAnalyzerTest, PrefixProjectInclusionExcludesJoinFieldBails) {
+    const auto query = R"([
+        {$project: {_id: 0, c: 1}},
+        {$lookup: {from: "A", localField: "a", foreignField: "b", as: "x"}},
+        {$unwind: "$x"}
+    ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a", "b", "c"}, {{"A", {"b"}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    // We bail because the inclusion $project drops field "a" (the localField).
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_NOT_OK(swJoinModel);
+}
+
+// Tests that two joins each having a $project in their subpipeline are correctly handled.
+// The first join has a $match + $project, and the second has a $project-only subpipeline.
+// Both projections must be preserved in their respective nodes' access paths.
+TEST_F(PipelineAnalyzerTest, TwoJoinsEachWithSubpipelineProjectOk) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    const auto query = R"([
+        {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA", pipeline: [
+            {$match: {c: {$gt: 0}}},
+            {$project: {_id: 0}}
+        ]}},
+        {$unwind: "$fromA"},
+        {$lookup: {from: "B", localField: "a", foreignField: "b", as: "fromB", pipeline: [
+            {$project: {_id: 0, d: 0}}
+        ]}},
+        {$unwind: "$fromB"}
+    ])";
+
+    auto pipeline = makePipeline(query, {"A", "B"});
+    markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}, {"B", {"b"}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+    auto& joinModel = swJoinModel.getValue();
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+}
+
+TEST_F(PipelineAnalyzerTest, InvalidPipelinePrefixDetected) {
+    const auto query = R"([
+        {$match: {a: {$gt: 0}}},
+        {$sort: {b: 1}},
+        {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
+        {$unwind: "$fromA"},
+        {$lookup: {from: "B", localField: "a", foreignField: "b", as: "fromB"}},
+        {$unwind: "$fromB"}
+    ])";
+
+    auto pipeline = makePipeline(query, {"A", "B"});
+    markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}, {"B", {"b"}}});
+    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+}
+
+TEST_F(PipelineAnalyzerTest, InvalidSubPipelineDetected) {
+    const auto query = R"([
+        {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA", pipeline: [
+            {$match: {a: {$gt: 0}}},
+            {$sort: {b: 1}}
+        ]}},
+        {$unwind: "$fromA"},
+        {$lookup: {from: "B", localField: "a", foreignField: "b", as: "fromB"}},
+        {$unwind: "$fromB"}
+    ])";
+
+    auto pipeline = makePipeline(query, {"A", "B"});
+    markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}, {"B", {"b"}}});
+    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 }
 
 TEST_F(PipelineAnalyzerTest, tooManyNodes) {

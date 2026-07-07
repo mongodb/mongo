@@ -34,13 +34,14 @@
 #include "mongo/db/exec/classic/subplanning_utils.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_internal_join_hint.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/pipeline/document_source_project.h"
+#include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline_d.h"
@@ -50,10 +51,8 @@
 #include "mongo/db/query/compiler/optimizer/join/predicate_extractor.h"
 #include "mongo/db/query/compiler/optimizer/join/predicate_inferer.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
-#include "mongo/db/query/util/disjoint_set.h"
 #include "mongo/util/assert_util.h"
 
-#include <ios>
 #include <memory>
 #include <string_view>
 #include <utility>
@@ -72,17 +71,30 @@ std::unique_ptr<Pipeline> createEmptyPipeline(
     return pipeline_factory::makePipeline(emptyPipeline, expCtx, opts);
 }
 
-std::unique_ptr<CanonicalQuery> makeFullScanCQ(boost::intrusive_ptr<ExpressionContext> expCtx) {
-    auto fcr = std::make_unique<FindCommandRequest>(expCtx->getNamespaceString());
-    return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = expCtx, .parsedFind = ParsedFindCommandParams{.findCommand = std::move(fcr)}});
-}
-
 DocumentSource* getFirstSubpipelineStage(const DocumentSourceLookUp& lookup) {
     if (!lookup.getResolvedIntrospectionPipeline().empty()) {
         return lookup.getResolvedIntrospectionPipeline().peekFront();
     }
     return nullptr;
+}
+
+StatusWith<std::unique_ptr<CanonicalQuery>> createCQForJoinPipeline(
+    boost::intrusive_ptr<ExpressionContext> expCtx, Pipeline& pipeline) {
+    ExpressionContext::PlanCacheOptions oldPlanCache = expCtx->getPlanCache();
+    expCtx->setPlanCache(ExpressionContext::PlanCacheOptions::kDisablePlanCache);
+    auto swCQ = createCanonicalQuery(expCtx, expCtx->getNamespaceString(), pipeline);
+    expCtx->setPlanCache(oldPlanCache);
+
+    if (!swCQ.isOK()) {
+        return swCQ;
+    }
+
+    if (SubPlanningUtils::canUseSubplanning(*swCQ.getValue())) {
+        return Status(ErrorCodes::QueryFeatureNotAllowed,
+                      "Encountered rooted $or, can't use subplanning together with join opt");
+    }
+
+    return swCQ;
 }
 
 struct Predicates {
@@ -132,8 +144,6 @@ boost::optional<JoinPredicate> resolve(const ExtractedJoinPredicate& predicate,
 StatusWith<Predicates> extractPredicatesFromLookup(const DocumentSourceLookUp& lookup,
                                                    PathResolver& pathResolver,
                                                    NodeId foreignNodeId) {
-    auto expCtx = lookup.getSubpipelineExpCtx();
-
     std::vector<JoinPredicate> joinPredicates;
     std::unique_ptr<MatchExpression> singleTablePredicates;
 
@@ -149,9 +159,10 @@ StatusWith<Predicates> extractPredicatesFromLookup(const DocumentSourceLookUp& l
         joinPredicates.push_back(*resolved);
     }
 
-    if (auto firstStage = getFirstSubpipelineStage(lookup); firstStage) {
-        auto match = dynamic_cast<DocumentSourceMatch*>(firstStage);
-        tassert(11317205, "expected $match stage as leading stage in subpipeline", match);
+    // Note: we may have other stages here. If we do, that just means we can't extract join
+    // predicates from the subpipeline (this is fine).
+    auto start = lookup.getSubPipeline()->begin();
+    if (auto match = dynamic_cast<DocumentSourceMatch*>(getFirstSubpipelineStage(lookup)); match) {
         // Attempt to split.
         auto splitRes = splitJoinAndSingleCollectionPredicates(match, lookup.getLetVariables());
         if (!splitRes.has_value()) {
@@ -171,6 +182,7 @@ StatusWith<Predicates> extractPredicatesFromLookup(const DocumentSourceLookUp& l
         }
 
         singleTablePredicates = std::move(splitRes->singleTablePredicates);
+        start++;  // Ignore starting $match now that we've extracted it.
     }
 
     // Absorbed filter, reachable via getAbsorbedFilter() for both pipeline-form and non-pipeline
@@ -197,24 +209,34 @@ StatusWith<Predicates> extractPredicatesFromLookup(const DocumentSourceLookUp& l
         }
     }
 
-    // If neither branch is hit, then this a non-pipeline or empty subpipeline (pipeline: []) lookup
-    // with no absorbed filters. In this case, 'joinPredicates' and 'singleTablePredicates' stay
-    // empty and the foreign CQ is the full scan.
+    // Recreate the pipeline with just our STPs & any CBR + SBE eligible subpipeline.
+    auto cqExpCtx = lookup.getSubpipelineExpCtx();
 
-    std::unique_ptr<CanonicalQuery> cq;
+    // Propagate query settings onto the sub-pipeline ExpressionContext before we build a
+    // CanonicalQuery from it. Constructing the CQ (and the sampling/cost estimation that follows)
+    // reads the query knob configuration off 'cqExpCtx', which initializes it. Since query settings
+    // must be assigned before the knobs are initialized, we mirror what LookUpStage does at runtime
+    // (see LookUpStage::prepareStateToBuildPipeline) and set them here first. Otherwise, executing
+    // the resulting plan would trip the tassert in setQuerySettingsIfNotPresent().
+    cqExpCtx->setQuerySettingsIfNotPresent(lookup.getExpCtx()->getQuerySettings());
+    auto pipelineForCQ =
+        Pipeline::create(DocumentSourceContainer(start, lookup.getSubPipeline()->end()), cqExpCtx);
     if (singleTablePredicates) {
-        auto swCq = createCanonicalQueryFromSingleMatchExpression(
-            expCtx, lookup.getFromNs(), std::move(singleTablePredicates));
-        if (!swCq.isOK()) {
-            return swCq.getStatus();
-        }
-        cq = std::move(swCq.getValue());
-    } else {
-        cq = makeFullScanCQ(expCtx);
+        pipelineForCQ->addInitialSource(
+            make_intrusive<DocumentSourceMatch>(std::move(singleTablePredicates), cqExpCtx));
+    }
+    auto swCq = createCQForJoinPipeline(cqExpCtx, *pipelineForCQ);
+    if (!swCq.isOK()) {
+        return swCq.getStatus();
+    }
+
+    if (!pipelineForCQ->empty()) {
+        // We bail out if the entire sub-pipeline can't be pushed into a CQ.
+        return Status(ErrorCodes::QueryFeatureNotAllowed, "Encountered complex sub-pipeline");
     }
 
     return {{
-        .canonicalQuery = std::move(cq),
+        .canonicalQuery = std::move(swCq.getValue()),
         .joinPredicates = std::move(joinPredicates),
     }};
 }
@@ -237,9 +259,18 @@ bool isUnwindEligible(const DocumentSourceUnwind& unwind) {
     return !unwind.preserveNullAndEmptyArrays() && !unwind.indexPath();
 }
 
+bool isSubPipelineOrPrefixEligible(auto start, auto end) {
+    return std::all_of(start, end, [](const auto& docSrc) {
+        return dynamic_cast<DocumentSourceMatch*>(docSrc.get()) ||
+            dynamic_cast<DocumentSourceProject*>(docSrc.get()) ||
+            dynamic_cast<DocumentSourceSingleDocumentTransformation*>(docSrc.get()) ||
+            dynamic_cast<DocumentSourceAddFields*>(docSrc.get());
+    });
+}
+
 bool isLookupEligible(const DocumentSourceLookUp& lookup) {
     if (lookup.getExpCtx()->getSubPipelineDepth() != 0) {
-        // We've descended into a subpipelined, fallback.
+        // We've descended into a subpipeline, fallback.
         return false;
     }
 
@@ -262,8 +293,9 @@ bool isLookupEligible(const DocumentSourceLookUp& lookup) {
 
     // Otherwise the sub-pipeline must contain a single $match stage. The absorbed filter (if any)
     // is combined with that $match in extractPredicatesFromLookup().
-    return lookup.getResolvedIntrospectionPipeline().size() == 1 &&
-        dynamic_cast<DocumentSourceMatch*>(lookup.getResolvedIntrospectionPipeline().peekFront());
+    return isSubPipelineOrPrefixEligible(
+        lookup.getResolvedIntrospectionPipeline().getSources().begin(),
+        lookup.getResolvedIntrospectionPipeline().getSources().end());
 }
 
 bool addJoinPredicates(const std::vector<JoinPredicate>& joinPreds,
@@ -290,20 +322,28 @@ bool AggJoinModel::pipelineEligibleForJoinReordering(const Pipeline& pipeline) {
         return false;
     }
 
-    // Pipelines starting with $geoNear are not eligible.
-    if (!pipeline.getSources().empty() &&
-        dynamic_cast<DocumentSourceGeoNear*>(pipeline.peekFront())) {
+    if (pipeline.getSources().empty()) {
         return false;
     }
 
-    // Since we can reorder base collections, any pipeline with even just one eligible $lookup +
-    // $unwind pair could be eligible.
-    return std::any_of(pipeline.getSources().begin(), pipeline.getSources().end(), [](auto ds) {
-        if (auto* lookup = dynamic_cast<DocumentSourceLookUp*>(ds.get()); lookup) {
-            return isLookupEligible(*lookup);
+    auto startIt = pipeline.getSources().begin();
+
+    // Permit a leading join hint- we'll check it later.
+    if (dynamic_cast<DocumentSourceInternalJoinHint*>(startIt->get())) {
+        startIt++;
+    }
+
+    auto it = startIt;
+    while (it != pipeline.getSources().end()) {
+        if (auto* lookup = dynamic_cast<DocumentSourceLookUp*>(it->get()); lookup) {
+            // Found first $lookup- if prefix not valid, or if $lookup itself is not eligible,
+            // bail!
+            return isLookupEligible(*lookup) && isSubPipelineOrPrefixEligible(startIt, it);
         }
-        return false;
-    });
+        it++;
+    }
+
+    return false;
 }
 
 StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeline,
@@ -335,26 +375,13 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
     pipeline::dependency_graph::DependencyGraph mainCollDeps(suffix->getSources(),
                                                              canMainCollPathBeArray);
 
-    ExpressionContext::PlanCacheOptions oldPlanCache = expCtx->getPlanCache();
-    expCtx->setPlanCache(ExpressionContext::PlanCacheOptions::kDisablePlanCache);
-    auto swCQ = createCanonicalQuery(expCtx, nss, *suffix);
-
-    expCtx->setPlanCache(oldPlanCache);
-
+    auto swCQ = createCQForJoinPipeline(expCtx, *suffix);
     if (!swCQ.isOK()) {
         // Bail out & return the failure status- we failed to generate a CanonicalQuery from a
         // pipeline prefix.
         return swCQ.getStatus();
     }
 
-    if (SubPlanningUtils::canUseSubplanning(*swCQ.getValue())) {
-        return Status(ErrorCodes::QueryFeatureNotAllowed,
-                      "Encountered rooted $or, can't use subplanning together with join opt");
-    }
-
-    if (swCQ.getValue()->getSortPattern()) {
-        return Status(ErrorCodes::BadValue, "Sort stage found in pipeline");
-    }
     // Initialize the JoinGraph & base NodeId.
     MutableJoinGraph graph{buildParams.joinGraphBuildParams};
     auto baseNodeId = graph.addNode(nss, std::move(swCQ.getValue()), boost::none);

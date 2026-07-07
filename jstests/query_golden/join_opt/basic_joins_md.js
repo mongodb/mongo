@@ -495,4 +495,109 @@ joinTestWrapper(db, () => {
         {$unwind: "$x"},
         {$match: {"x.c": {$eq: "blah"}}},
     ]);
+
+    section("Basic example with a $project including fields from the base collection");
+    runBasicJoinTest([
+        {$project: {a: 1, b: 1, notUsed: 1}},
+        {$lookup: {from: foreignColl1.getName(), as: "x", localField: "a", foreignField: "a"}},
+        {$unwind: "$x"},
+        {$lookup: {from: foreignColl2.getName(), as: "y", localField: "b", foreignField: "b"}},
+        {$unwind: "$y"},
+    ]);
+
+    section(
+        "Basic example with a $project including join-predicate fields from foreign collections",
+    );
+    runBasicJoinTest([
+        {
+            $lookup: {
+                from: foreignColl1.getName(),
+                as: "x",
+                localField: "a",
+                foreignField: "a",
+                pipeline: [{$project: {a: 1}}],
+            },
+        },
+        {$unwind: "$x"},
+        {
+            $lookup: {
+                from: foreignColl2.getName(),
+                as: "y",
+                localField: "b",
+                foreignField: "b",
+                pipeline: [{$project: {b: 1, c: 1}}],
+            },
+        },
+        {$unwind: "$y"},
+    ]);
+
+    section(
+        "$project as only stage in subpipeline (no $match), excluding non-join-predicate fields",
+    );
+    runBasicJoinTest([
+        {
+            $lookup: {
+                from: foreignColl1.getName(),
+                as: "x",
+                localField: "a",
+                foreignField: "a",
+                pipeline: [{$project: {_id: 0, c: 0}}],
+            },
+        },
+        {$unwind: "$x"},
+    ]);
+
+    section("$project in prefix excluding a non-join-predicate field with single join");
+    runBasicJoinTest([
+        {$project: {_id: 0, b: 0}},
+        {
+            $lookup: {
+                from: foreignColl1.getName(),
+                as: "x",
+                localField: "a",
+                foreignField: "a",
+            },
+        },
+        {$unwind: "$x"},
+    ]);
+
+    section("Subpipeline with $match followed by multi-field $project excluding non-join fields");
+    runBasicJoinTest([
+        {
+            $lookup: {
+                from: foreignColl1.getName(),
+                as: "x",
+                localField: "a",
+                foreignField: "a",
+                pipeline: [{$match: {d: {$lt: 3}}}, {$project: {_id: 0, c: 0}}],
+            },
+        },
+        {$unwind: "$x"},
+    ]);
+
+    section(
+        "Two joins: first with $match and $project subpipeline, second with $project-only subpipeline",
+    );
+    runBasicJoinTest([
+        {
+            $lookup: {
+                from: foreignColl1.getName(),
+                as: "x",
+                localField: "a",
+                foreignField: "a",
+                pipeline: [{$match: {d: {$lt: 3}}}, {$project: {_id: 0}}],
+            },
+        },
+        {$unwind: "$x"},
+        {
+            $lookup: {
+                from: foreignColl2.getName(),
+                as: "y",
+                localField: "b",
+                foreignField: "b",
+                pipeline: [{$project: {_id: 0, d: 0}}],
+            },
+        },
+        {$unwind: "$y"},
+    ]);
 }); // joinTestWrapper();

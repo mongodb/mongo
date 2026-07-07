@@ -319,16 +319,19 @@ StatusWith<std::unique_ptr<MatchExpression>> finalizeSTPForTargetNode(
     return matchExpr;
 }
 
-StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQueryFromSingleMatchExpression(
+StatusWith<std::unique_ptr<CanonicalQuery>> cloneCQWithUpdatedFilter(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     NamespaceString nss,
-    std::unique_ptr<MatchExpression> expr) {
+    std::unique_ptr<MatchExpression> expr,
+    const CanonicalQuery& cqOld) {
     ExpressionContext::PlanCacheOptions oldPlanCache = expCtx->getPlanCache();
     expCtx->setPlanCache(ExpressionContext::PlanCacheOptions::kDisablePlanCache);
+    auto fcr = std::make_unique<FindCommandRequest>(nss);
+    fcr->setProjection(cqOld.getFindCommandRequest().getProjection());
     auto pfc = ParsedFindCommand::withExistingFilter(expCtx,
                                                      nullptr,
                                                      std::move(expr),
-                                                     std::make_unique<FindCommandRequest>(nss),
+                                                     std::move(fcr),
                                                      ProjectionPolicies::findProjectionPolicies());
     CanonicalQueryParams params{.expCtx = expCtx, .parsedFind = std::move(pfc.getValue())};
     auto cq = CanonicalQuery::make(std::move(params));
@@ -388,7 +391,7 @@ Status propagateSingleTablePredicate(absl::InlinedVector<PathId, 8> equivalenceC
         // This will normalize and optimize the Match Expression (eg flattening an unnecessary AND
         // wrapper) before creating the new CQ.
         auto swCq =
-            createCanonicalQueryFromSingleMatchExpression(expCtx, nss, std::move(newFilter));
+            cloneCQWithUpdatedFilter(expCtx, nss, std::move(newFilter), *targetNode.accessPath);
         if (!swCq.isOK()) {
             uassertStatusOK(swCq.getStatus());
         }

@@ -138,13 +138,17 @@ boost::optional<PathId> PathResolver::resolve(const FieldPath& fieldPath,
     }
     tassert(12835902, "Expected to find a dependency graph", graph);
 
+    // Make sure this path is actually valid before proceeding. We validate the path where it is
+    // referenced for arrayness.
+    if (!isPathValid(*graph, at, fieldPath)) {
+        return boost::none;
+    }
+
+    boost::optional<ResolvedPath> resolved;
     auto src = graph->getPrevModifyingStage(at, fieldPath.fullPath());
     if (src == nullptr) {
         // Path originates at base of pipeline for this graph.
-        if (!isPathValid(*graph, at, fieldPath)) {
-            return boost::none;
-        }
-        return addPathOrGetExisting({nodeId.get_value_or(_baseNodeId), fieldPath});
+        resolved = ResolvedPath{nodeId.get_value_or(_baseNodeId), fieldPath};
 
     } else if (auto lookup = dynamic_cast<const DocumentSourceLookUp*>(src.get()); lookup) {
         // Path comes from a $lookup!
@@ -179,11 +183,31 @@ boost::optional<PathId> PathResolver::resolve(const FieldPath& fieldPath,
             return boost::none;
         }
 
-        return addPathOrGetExisting({_lookupNodes[lookup], strippedPath});
+        resolved = ResolvedPath{_lookupNodes[lookup], strippedPath};
     }
 
     // This comes from a rename/ field computation! Bail- we don't support this.
-    return boost::none;
+    if (!resolved) {
+        return boost::none;
+    }
+
+    // One last check! If this is not originating from the base node, ensure that it is not in
+    // fact modified in any way by the sub-pipeline of the node that produced it. This is
+    // because we rely on the CQ we generate for this node not modifying this field. We don't do
+    // this for the base node, because we allow a trailing suffix after our join-opt-eligible prefix
+    // to modify any path.
+    // TODO SERVER-128365: Support renames.
+    if (resolved->nodeId != _baseNodeId) {
+        graph = _graph.getSubpipelineGraph(_nodeLookups[resolved->nodeId].sourceLookup);
+        tassert(12836400, "Expected to find a dependency graph for lookup", graph);
+
+        if (graph->getPrevModifyingStage(nullptr, resolved->fieldName.fullPath())) {
+            // This path was modified at some point by our sub-pipeline! Bail.
+            return boost::none;
+        }
+    }
+
+    return addPathOrGetExisting(*resolved);
 }
 
 std::vector<ResolvedPath> PathResolver::releaseResolvedPaths(size_t maxNodeIdExclusive) {

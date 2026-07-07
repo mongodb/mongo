@@ -1,0 +1,88 @@
+{
+    "graph": {
+        "nodes": [
+            {
+                "collectionName": "test.pipeline_test",
+                "accessPath": {
+                    "filter": {
+                        "a": {
+                            "$eq": {"$numberInt":"3"}
+                        }
+                    },
+                    "projection": {
+                        "_id": false
+                    }
+                },
+                "embedPath": ""
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {
+                        "b": {
+                            "$eq": {"$numberInt":"3"}
+                        }
+                    },
+                    "projection": {
+                        "_id": false
+                    }
+                },
+                "embedPath": "x"
+            }
+        ],
+        "edges": [
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"1"}
+                    }
+                ],
+                "left": {"$numberInt":"0"},
+                "right": {"$numberInt":"1"}
+            }
+        ]
+    },
+    "resolvedPaths": [
+        {
+            "nodeId": {"$numberInt":"0"},
+            "fieldName": "a"
+        },
+        {
+            "nodeId": {"$numberInt":"1"},
+            "fieldName": "b"
+        }
+    ],
+    "prefix": [
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "x",
+                "localField": "a",
+                "foreignField": "b",
+                "let": {},
+                "pipeline": [
+                    {
+                        "$match": {
+                            "b": {
+                                "$eq": {"$numberInt":"3"}
+                            }
+                        }
+                    },
+                    {
+                        "$project": {
+                            "_id": false
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$x"
+            }
+        }
+    ],
+    "suffix": []
+}

@@ -39,12 +39,6 @@
 #include "mongo/db/query/compiler/optimizer/join/path_resolver.h"
 
 namespace mongo::join_ordering {
-
-StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQueryFromSingleMatchExpression(
-    boost::intrusive_ptr<ExpressionContext> expCtx,
-    NamespaceString nss,
-    std::unique_ptr<MatchExpression> expr);
-
 /**
  * Find and add implicit (transitive) edges within the graph.
  * `maxNodes` is the maximum number of nodes allowed in a connected component to be used for
