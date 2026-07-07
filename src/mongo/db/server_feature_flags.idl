@@ -364,6 +364,11 @@ feature_flags:
         cpp_varname: gFeatureFlagContinuousInternodeValidationPerDocument
         default: false
         fcv_gated: true
+    featureFlagContinuousInternodeValidationPerDocumentDurability:
+        description: "Enable 64-bit hash size for continuous internode validation per document on Atlas Infinite nodes."
+        cpp_varname: gFeatureFlagContinuousInternodeValidationPerDocumentDurability
+        default: false
+        fcv_gated: true
     featureFlagQESubstringSearch:
         description: "Queryable Encryption encrypted substring search support"
         cpp_varname: gFeatureFlagQESubstringSearch
