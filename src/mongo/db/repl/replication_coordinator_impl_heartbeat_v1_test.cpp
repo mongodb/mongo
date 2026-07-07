@@ -876,6 +876,7 @@ TEST_F(ReplCoordHBV1ReconfigTest, ScheduleImmediateHeartbeatToSpeedUpConfigCommi
             makeRSConfigWithVersionAndTerm(initConfigVersion + 1, initConfigTerm + 1).getMutable();
         ReplSetConfigSettings settings;
         settings.setHeartbeatIntervalMillis(10000);
+        settings.setElectionTimeoutMillis(20000);
         mutableConfig.setSettings(settings);
         return ReplSetConfig(std::move(mutableConfig));
     }();
@@ -936,6 +937,7 @@ TEST_F(ReplCoordHBV1ReconfigTest, FindOwnHostForHeartbeatReconfigQuick) {
             makeRSConfigWithVersionAndTerm(initConfigVersion + 1, initConfigTerm + 1).getMutable();
         ReplSetConfigSettings settings;
         settings.setHeartbeatIntervalMillis(10000);
+        settings.setElectionTimeoutMillis(20000);
         mutableConfig.setSettings(settings);
         return ReplSetConfig(std::move(mutableConfig));
     }();

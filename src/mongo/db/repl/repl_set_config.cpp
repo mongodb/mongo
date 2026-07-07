@@ -411,6 +411,16 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
                                     << kMaxVotingMembers);
     }
 
+    if (getSettings()->getElectionTimeoutMillis() <= getSettings()->getHeartbeatIntervalMillis()) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream()
+                          << "electionTimeoutMillis (" << getSettings()->getElectionTimeoutMillis()
+                          << ") must be greater than heartbeatIntervalMillis ("
+                          << getSettings()->getHeartbeatIntervalMillis()
+                          << ") to allow at least one heartbeat before the election "
+                             "timeout expires");
+    }
+
     if (electableCount == 0) {
         return Status(ErrorCodes::BadValue,
                       "Replica set configuration must contain at least "

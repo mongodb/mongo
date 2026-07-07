@@ -152,7 +152,7 @@ TEST(ReplSetConfig, ParseLargeConfigAndCheckAccessors) {
                    << BSON("getLastErrorModes"
                            << BSON("eastCoast" << BSON("NYC" << 1)) << "chainingAllowed" << false
                            << "heartbeatIntervalMillis" << 5000 << "heartbeatTimeoutSecs" << 120
-                           << "electionTimeoutMillis" << 10))));
+                           << "electionTimeoutMillis" << 10000))));
     ASSERT_OK(config.validate());
     ASSERT_EQUALS("rs0", config.getReplSetName());
     ASSERT_EQUALS(1234, config.getConfigVersion());
@@ -164,7 +164,7 @@ TEST(ReplSetConfig, ParseLargeConfigAndCheckAccessors) {
     ASSERT_FALSE(config.getConfigServer_deprecated());
     ASSERT_EQUALS(Seconds(5), config.getHeartbeatInterval());
     ASSERT_EQUALS(Seconds(120), config.getHeartbeatTimeoutPeriod());
-    ASSERT_EQUALS(Milliseconds(10), config.getElectionTimeoutPeriod());
+    ASSERT_EQUALS(Seconds(10), config.getElectionTimeoutPeriod());
     ASSERT_EQUALS(1, config.getProtocolVersion());
     ASSERT_EQUALS(
         ConnectionString::forReplicaSet("rs0", {HostAndPort{"localhost:12345"}}).toString(),
@@ -1234,16 +1234,16 @@ TEST(ReplSetConfig, ElectionTimeoutField) {
                                         << "version" << 1 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "localhost:12345"))
-                                        << "settings" << BSON("electionTimeoutMillis" << 20))));
+                                        << "settings" << BSON("electionTimeoutMillis" << 5000))));
     ASSERT_OK(config.validate());
-    ASSERT_EQUALS(Milliseconds(20), config.getElectionTimeoutPeriod());
+    ASSERT_EQUALS(Milliseconds(5000), config.getElectionTimeoutPeriod());
 
     ASSERT_THROWS(
         ReplSetConfig::parse(BSON("_id" << "rs0"
                                         << "version" << 1 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "localhost:12345"))
-                                        << "settings" << BSON("electionTimeoutMillis" << -20))),
+                                        << "settings" << BSON("electionTimeoutMillis" << -5000))),
         DBException);
 }
 
@@ -1532,25 +1532,26 @@ TEST(ReplSetConfig, CheckConfigServerMustHaveTrueForWriteConcernMajorityJournalD
 
 TEST(ReplSetConfig, GetPriorityTakeoverDelay) {
     ReplSetConfig configA;
-    configA =
-        ReplSetConfig::parse(BSON("_id" << "rs0"
-                                        << "version" << 1 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                 << "localhost:12345"
-                                                                 << "priority" << 1)
-                                                      << BSON("_id" << 1 << "host"
-                                                                    << "localhost:54321"
-                                                                    << "priority" << 2)
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "localhost:5321"
-                                                                    << "priority" << 3)
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "localhost:5421"
-                                                                    << "priority" << 4)
-                                                      << BSON("_id" << 4 << "host"
-                                                                    << "localhost:5431"
-                                                                    << "priority" << 5))
-                                        << "settings" << BSON("electionTimeoutMillis" << 1000)));
+    configA = ReplSetConfig::parse(
+        BSON("_id" << "rs0"
+                   << "version" << 1 << "protocolVersion" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "localhost:12345"
+                                            << "priority" << 1)
+                                 << BSON("_id" << 1 << "host"
+                                               << "localhost:54321"
+                                               << "priority" << 2)
+                                 << BSON("_id" << 2 << "host"
+                                               << "localhost:5321"
+                                               << "priority" << 3)
+                                 << BSON("_id" << 3 << "host"
+                                               << "localhost:5421"
+                                               << "priority" << 4)
+                                 << BSON("_id" << 4 << "host"
+                                               << "localhost:5431"
+                                               << "priority" << 5))
+                   << "settings"
+                   << BSON("electionTimeoutMillis" << 1000 << "heartbeatIntervalMillis" << 500)));
     ASSERT_OK(configA.validate());
     ASSERT_EQUALS(Milliseconds(5000), configA.getPriorityTakeoverDelay(0));
     ASSERT_EQUALS(Milliseconds(4000), configA.getPriorityTakeoverDelay(1));
@@ -1559,25 +1560,26 @@ TEST(ReplSetConfig, GetPriorityTakeoverDelay) {
     ASSERT_EQUALS(Milliseconds(1000), configA.getPriorityTakeoverDelay(4));
 
     ReplSetConfig configB;
-    configB =
-        ReplSetConfig::parse(BSON("_id" << "rs0"
-                                        << "version" << 1 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                 << "localhost:12345"
-                                                                 << "priority" << 1)
-                                                      << BSON("_id" << 1 << "host"
-                                                                    << "localhost:54321"
-                                                                    << "priority" << 2)
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "localhost:5321"
-                                                                    << "priority" << 2)
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "localhost:5421"
-                                                                    << "priority" << 3)
-                                                      << BSON("_id" << 4 << "host"
-                                                                    << "localhost:5431"
-                                                                    << "priority" << 3))
-                                        << "settings" << BSON("electionTimeoutMillis" << 1000)));
+    configB = ReplSetConfig::parse(
+        BSON("_id" << "rs0"
+                   << "version" << 1 << "protocolVersion" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "localhost:12345"
+                                            << "priority" << 1)
+                                 << BSON("_id" << 1 << "host"
+                                               << "localhost:54321"
+                                               << "priority" << 2)
+                                 << BSON("_id" << 2 << "host"
+                                               << "localhost:5321"
+                                               << "priority" << 2)
+                                 << BSON("_id" << 3 << "host"
+                                               << "localhost:5421"
+                                               << "priority" << 3)
+                                 << BSON("_id" << 4 << "host"
+                                               << "localhost:5431"
+                                               << "priority" << 3))
+                   << "settings"
+                   << BSON("electionTimeoutMillis" << 1000 << "heartbeatIntervalMillis" << 500)));
     ASSERT_OK(configB.validate());
     ASSERT_EQUALS(Milliseconds(5000), configB.getPriorityTakeoverDelay(0));
     ASSERT_EQUALS(Milliseconds(3000), configB.getPriorityTakeoverDelay(1));
@@ -2089,6 +2091,36 @@ TEST(ReplSetConfig, DifferentWriteConcernModesSameNameDifferentDefinition) {
 
     ASSERT_FALSE(config.areWriteConcernModesTheSame(&otherConfig));
     ASSERT_FALSE(otherConfig.areWriteConcernModesTheSame(&config));
+}
+
+TEST(ReplSetConfig, ValidElectionTimeoutAndHeartbeatIntervalAccepted) {
+    ReplSetConfig config(ReplSetConfig::parse(
+        BSON("_id" << "rs0"
+                   << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "localhost:12345"))
+                   << "settings"
+                   << BSON("heartbeatIntervalMillis" << 500 << "electionTimeoutMillis" << 2000))));
+    ASSERT_OK(config.validate());
+}
+
+
+TEST(ReplSetConfig, ElectionTimeoutLessThanHeartbeatIntervalRejected) {
+    ReplSetConfig config(ReplSetConfig::parse(
+        BSON("_id" << "rs0" << "version" << 1 << "term" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host" << "localhost:12345")) << "settings"
+                   << BSON("heartbeatIntervalMillis" << 5000 << "electionTimeoutMillis" << 10))));
+
+    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+}
+
+TEST(ReplSetConfig, ElectionTimeoutEqualHeartbeatIntervalRejected) {
+    ReplSetConfig config(ReplSetConfig::parse(
+        BSON("_id" << "rs0" << "version" << 1 << "term" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host" << "localhost:12345")) << "settings"
+                   << BSON("heartbeatIntervalMillis" << 500 << "electionTimeoutMillis" << 500))));
+
+    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
 }
 
 }  // namespace

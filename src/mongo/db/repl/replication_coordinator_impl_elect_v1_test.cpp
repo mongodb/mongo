@@ -192,7 +192,8 @@ TEST_F(ReplCoordTest, RandomizedElectionOffsetWithinProperBounds) {
 }
 
 TEST_F(ReplCoordTest, RandomizedElectionOffsetAvoidsDivideByZero) {
-    auto configObj = generateConfigObj(3, 1, BSON("electionTimeoutMillis" << 1));
+    auto configObj = generateConfigObj(
+        3, 1, BSON("electionTimeoutMillis" << 2 << "heartbeatIntervalMillis" << 1));
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
 
     // Make sure that an election timeout of 1ms doesn't make the random number

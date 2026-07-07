@@ -2409,13 +2409,14 @@ TEST_F(
 TEST_F(ReplCoordTest, SingleNodeReplSetStepDownTimeoutAndElectionTimeoutExpiresAtTheSameTime) {
     init();
 
-    assertStartSuccess(BSON("_id" << "mySet"
-                                  << "version" << 1 << "members"
-                                  << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                           << "test1:1234"))
-                                  << "protocolVersion" << 1 << "settings"
-                                  << BSON("electionTimeoutMillis" << 1000)),
-                       HostAndPort("test1", 1234));
+    assertStartSuccess(
+        BSON("_id" << "mySet"
+                   << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "test1:1234"))
+                   << "protocolVersion" << 1 << "settings"
+                   << BSON("electionTimeoutMillis" << 1000 << "heartbeatIntervalMillis" << 500)),
+        HostAndPort("test1", 1234));
     auto opCtx = makeOperationContext();
     getExternalState()->setElectionTimeoutOffsetLimitFraction(0);
     runSingleNodeElection(opCtx.get());
@@ -2443,15 +2444,16 @@ TEST_F(ReplCoordTest, SingleNodeReplSetStepDownTimeoutAndElectionTimeoutExpiresA
 TEST_F(ReplCoordTest, CancelElectionTimeoutIfSyncSourceKnowsThePrimary) {
     init();
 
-    assertStartSuccess(BSON("_id" << "mySet"
-                                  << "version" << 1 << "members"
-                                  << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                           << "test1:1234")
-                                                << BSON("_id" << 1 << "host"
-                                                              << "test2:1234"))
-                                  << "protocolVersion" << 1 << "settings"
-                                  << BSON("electionTimeoutMillis" << 1000)),
-                       HostAndPort("test1", 1234));
+    assertStartSuccess(
+        BSON("_id" << "mySet"
+                   << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "test1:1234")
+                                 << BSON("_id" << 1 << "host"
+                                               << "test2:1234"))
+                   << "protocolVersion" << 1 << "settings"
+                   << BSON("electionTimeoutMillis" << 1000 << "heartbeatIntervalMillis" << 500)),
+        HostAndPort("test1", 1234));
     auto opCtx = makeOperationContext();
     getExternalState()->setElectionTimeoutOffsetLimitFraction(0);
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
@@ -7567,7 +7569,7 @@ TEST_F(ReplCoordTest, OnlyForwardSyncProgressForOtherNodesWhenTheNodesAreBelieve
                                  << BSON("_id" << 2 << "host"
                                                << "test3:1234"))
                    << "protocolVersion" << 1 << "settings"
-                   << BSON("electionTimeoutMillis" << 2000 << "heartbeatIntervalMillis" << 40000)),
+                   << BSON("electionTimeoutMillis" << 2000 << "heartbeatIntervalMillis" << 1000)),
         HostAndPort("test1", 1234));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
@@ -7600,6 +7602,7 @@ TEST_F(ReplCoordTest, OnlyForwardSyncProgressForOtherNodesWhenTheNodesAreBelieve
     getNet()->enterNetwork();
     while (getNet()->now() < endDate) {
         getNet()->runUntil(endDate);
+        // Discard any heartbeats or other network requests that might have arrived in the middle.
         if (getNet()->now() < endDate) {
             getNet()->blackHole(getNet()->getNextReadyRequest());
         }
@@ -7638,7 +7641,7 @@ TEST_F(ReplCoordTest, UpdatePositionCmdHasMetadata) {
                                  << BSON("_id" << 2 << "host"
                                                << "test3:1234"))
                    << "protocolVersion" << 1 << "settings"
-                   << BSON("electionTimeoutMillis" << 2000 << "heartbeatIntervalMillis" << 40000
+                   << BSON("electionTimeoutMillis" << 2000 << "heartbeatIntervalMillis" << 1000
                                                    << "replicaSetId" << replicaSetId)),
         HostAndPort("test1", 1234));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
@@ -7686,7 +7689,7 @@ TEST_F(ReplCoordTest, StepDownWhenHandleLivenessTimeoutMarksAMajorityOfVotingNod
                                  << BSON("host" << "node5:12345"
                                                 << "_id" << 4))
                    << "protocolVersion" << 1 << "settings"
-                   << BSON("electionTimeoutMillis" << 2000 << "heartbeatIntervalMillis" << 40000)),
+                   << BSON("electionTimeoutMillis" << 2000 << "heartbeatIntervalMillis" << 1000)),
         HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     OpTime startingOpTime = OpTime(Timestamp(100, 1), 0);
@@ -7776,13 +7779,33 @@ TEST_F(ReplCoordTest, StepDownWhenHandleLivenessTimeoutMarksAMajorityOfVotingNod
                        << UpdatePositionArgs::kDurableWallTimeFieldName
                        << Date_t() + Seconds(startingOpTime.getSecs()))))));
     const Date_t startDate = getNet()->now();
+    const Date_t endDate = startDate + Milliseconds(100);
     getNet()->enterNetwork();
-    getNet()->runUntil(startDate + Milliseconds(100));
+
+    // Drop any heartbeats that occur in the next 100 ms.
+    while (getNet()->now() < endDate) {
+        getNet()->runUntil(endDate);
+        if (getNet()->now() < endDate) {
+            getNet()->blackHole(getNet()->getNextReadyRequest());
+        }
+    }
+    getNet()->exitNetwork();
+
     ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args1));
 
     // Confirm that the node remains PRIMARY after the other two nodes are marked DOWN.
-    getNet()->runUntil(startDate + Milliseconds(2080));
+    const Date_t endDate1 = startDate + Milliseconds(2080);
+    getNet()->enterNetwork();
+
+    // Drop any heartbeats that occur in the next 2080 ms.
+    while (getNet()->now() < endDate1) {
+        getNet()->runUntil(endDate1);
+        if (getNet()->now() < endDate1) {
+            getNet()->blackHole(getNet()->getNextReadyRequest());
+        }
+    }
     getNet()->exitNetwork();
+
     ASSERT_EQUALS(MemberState::RS_PRIMARY, getReplCoord()->getMemberState().s);
 
     // Keep the same two nodes alive via v1 heartbeat.
@@ -7800,10 +7823,10 @@ TEST_F(ReplCoordTest, StepDownWhenHandleLivenessTimeoutMarksAMajorityOfVotingNod
 
     // Confirm that the node remains PRIMARY after the timeout from the UpdatePosition expires.
     getNet()->enterNetwork();
-    const Date_t endDate = startDate + Milliseconds(2200);
-    while (getNet()->now() < endDate) {
-        getNet()->runUntil(endDate);
-        if (getNet()->now() < endDate) {
+    const Date_t endDate2 = startDate + Milliseconds(2200);
+    while (getNet()->now() < endDate2) {
+        getNet()->runUntil(endDate2);
+        if (getNet()->now() < endDate2) {
             getNet()->blackHole(getNet()->getNextReadyRequest());
         }
     }
@@ -7836,12 +7859,12 @@ TEST_F(ReplCoordTest, StepDownWhenHandleLivenessTimeoutMarksAMajorityOfVotingNod
     ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
 
     // Confirm that the node relinquishes PRIMARY after only one node is left UP.
-    const Date_t startDate1 = getNet()->now();
-    const Date_t endDate1 = startDate1 + Milliseconds(1980);
+    const Date_t startDateNew = getNet()->now();
+    const Date_t endDate3 = startDateNew + Milliseconds(1980);
     getNet()->enterNetwork();
-    while (getNet()->now() < endDate1) {
-        getNet()->runUntil(endDate1);
-        if (getNet()->now() < endDate1) {
+    while (getNet()->now() < endDate3) {
+        getNet()->runUntil(endDate3);
+        if (getNet()->now() < endDate3) {
             getNet()->blackHole(getNet()->getNextReadyRequest());
         }
     }
