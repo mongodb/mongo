@@ -58,9 +58,9 @@ def generate_extension_configs(
 
     extension_names = []
 
-    # Create a clean output directory.
+    # Create the output directory with restricted permissions so it is not world-writable.
     conf_out_dir = get_conf_out_dir()
-    os.makedirs(conf_out_dir, exist_ok=True)
+    os.makedirs(conf_out_dir, mode=0o700, exist_ok=True)
 
     for so_file in so_files:
         # path/to/libfoo_mongo_extension.so -> libfoo_mongo_extension
@@ -88,11 +88,15 @@ def generate_extension_configs(
                 elif ext_config := extensions.get(extension_name):
                     yaml.dump(ext_config, conf_file)
 
-                logger.info(
-                    "Created .conf file for extension %s at %s",
-                    extension_name,
-                    conf_file_path,
-                )
+            # Restrict permissions explicitly rather than relying on umask, since the server
+            # rejects extension config files that are group- or other-writable.
+            os.chmod(conf_file_path, 0o600)
+
+            logger.info(
+                "Created .conf file for extension %s at %s",
+                extension_name,
+                conf_file_path,
+            )
         except (IOError, OSError) as e:
             # Clean up created directories on failure.
             shutil.rmtree(conf_out_dir)

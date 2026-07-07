@@ -42,6 +42,8 @@
 #include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/shared_library.h"
+#include "mongo/util/errno_util.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
 
@@ -52,6 +54,16 @@
 #include <string>
 #include <vector>
 
+#include <fcntl.h>
+#ifdef __linux__
+#include <unistd.h>
+#endif
+
+#include <fmt/format.h>
+#ifdef __linux__
+#include <sys/stat.h>
+#endif
+
 #ifdef MONGO_HOST_EXTENSIONS_COMPATIBLE
 #include "mongo/db/extension/host/signature_validator.h"
 #endif
@@ -61,6 +73,37 @@
 namespace mongo::extension::host {
 namespace {
 
+void verifyConfigPathPermissions(const std::string& extensionName, const std::string& path) {
+#ifdef __linux__
+    const int fd = ::open(path.c_str(), O_RDONLY | O_CLOEXEC);
+    uassert(13011803,
+            fmt::format("Loading extension '{}' failed: could not open config path '{}': {}",
+                        extensionName,
+                        path,
+                        errorMessage(lastSystemError())),
+            fd >= 0);
+    ScopeGuard closeFd = [&] {
+        ::close(fd);
+    };
+
+    struct stat fileStat;
+    uassert(13011800,
+            fmt::format("Failed to verify extension config path '{}': fstat failed: {}",
+                        path,
+                        errorMessage(lastSystemError())),
+            ::fstat(fd, &fileStat) == 0);
+    uassert(13011801,
+            fmt::format("Failed to verify extension config path '{}': must be owned by root or "
+                        "the server's user",
+                        path),
+            fileStat.st_uid == 0 || fileStat.st_uid == ::geteuid());
+    uassert(13011802,
+            fmt::format("Failed to verify extension config path '{}': must not be writable by "
+                        "group or other users",
+                        path),
+            (fileStat.st_mode & (S_IWGRP | S_IWOTH)) == 0);
+#endif
+}
 
 host_connector::ExtensionHandle getMongoExtension(SharedLibrary& extensionLib,
                                                   const std::string& extensionPath) {
@@ -215,13 +258,17 @@ ExtensionConfig ExtensionLoader::loadExtensionConfig(const std::string& extensio
             !extensionName.empty() && extensionName.find('/') == std::string::npos &&
                 extensionName.find('\\') == std::string::npos);
 
-    const auto confPath = getExtensionConfDir() / std::string(extensionName + ".conf");
+    const auto& confDir = getExtensionConfDir();
+    const auto confPath = confDir / std::string(extensionName + ".conf");
 
     uassert(11042900,
             str::stream() << "Loading extension '" << extensionName
                           << "' failed: Expected configuration file not found at '"
                           << confPath.string() << "'",
             std::filesystem::exists(confPath));
+
+    verifyConfigPathPermissions(extensionName, confDir.string());
+    verifyConfigPathPermissions(extensionName, confPath.string());
 
     const auto root = [&] {
         try {
