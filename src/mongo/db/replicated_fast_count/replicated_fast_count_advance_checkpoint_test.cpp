@@ -30,6 +30,7 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_advance_checkpoint.h"
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/replicated_fast_count/size_count_store.h"
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
@@ -45,21 +46,6 @@
 namespace mongo::replicated_fast_count {
 namespace {
 using namespace std::literals::string_view_literals;
-void createReplicatedFastCountCollection(repl::StorageInterface* storageInterface,
-                                         OperationContext* opCtx) {
-    ASSERT_OK(storageInterface->createCollection(
-        opCtx,
-        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore),
-        CollectionOptions{.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex()}));
-}
-
-void createTimestampCollection(repl::StorageInterface* storageInterface, OperationContext* opCtx) {
-    ASSERT_OK(storageInterface->createCollection(
-        opCtx,
-        NamespaceString::makeGlobalConfigCollection(
-            NamespaceString::kReplicatedFastCountStoreTimestamps),
-        CollectionOptions{.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex()}));
-}
 
 UUID getOplogUuid(OperationContext* opCtx) {
     const auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
@@ -81,8 +67,8 @@ protected:
     void setUp() override {
         CatalogTestFixture::setUp();
         opCtx = operationContext();
-        createTimestampCollection(storageInterface(), opCtx);
-        createReplicatedFastCountCollection(storageInterface(), opCtx);
+        ASSERT_OK(createReplicatedFastCountTimestampCollection(storageInterface(), opCtx));
+        ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), opCtx));
     }
 
     boost::optional<SizeCountStore::Entry> readSizeCount(UUID uuid) {
