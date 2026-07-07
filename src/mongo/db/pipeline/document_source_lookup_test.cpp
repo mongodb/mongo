@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
@@ -53,6 +54,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
@@ -1051,6 +1053,31 @@ TEST_F(DocumentSourceLookUpTest, ExplainSerializesSubpipelineIncludingViewStages
     ASSERT_EQ(serializedStage["pipeline"].getArrayLength(), 2UL);
     ASSERT_FALSE(serializedStage["pipeline"][0].getDocument().getField("$match").missing());
     ASSERT_FALSE(serializedStage["pipeline"][1].getDocument().getField("$addFields").missing());
+}
+
+TEST_F(DocumentSourceLookUpTest, RejectsUserSuppliedIsHybridSearchWhenExtensionsFlagOn) {
+    // When featureFlagExtensionsInsideHybridSearch is on, the stage-params dispatch path is taken
+    // instead of createFromBson, and must equally reject a user-supplied $_internalIsHybridSearch.
+    auto ifrCtx = std::make_shared<IncrementalFeatureRolloutContext>(std::vector<BSONObj>{
+        BSON("name" << "featureFlagExtensionsInsideHybridSearch" << "value" << true)});
+
+    // A client with a transport session and no internal tag is an external (user) client.
+    auto client = getServiceContext()->getService()->makeClient(
+        "external", transport::MockSession::create(/*transportLayer=*/nullptr));
+    auto opCtx = client->makeOperationContext();
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx.get())
+                      .ns(getExpCtx()->getNamespaceString())
+                      .ifrContext(ifrCtx)
+                      .build();
+
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$lookup" << BSON("from" << "coll" << "pipeline" << BSONArray() << "as" << "out"
+                                      << "$_internalIsHybridSearch" << true))};
+    LiteParsedPipeline liteParsedPipeline(
+        expCtx->getNamespaceString(), rawPipeline, false, LiteParserOptions{.ifrContext = ifrCtx});
+    ASSERT_THROWS_CODE(
+        Pipeline::parseFromLiteParsed(liteParsedPipeline, expCtx), AssertionException, 5491300);
 }
 
 TEST_F(DocumentSourceLookUpTest,

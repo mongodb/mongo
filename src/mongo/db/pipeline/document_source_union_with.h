@@ -289,6 +289,10 @@ private:
     // TODO SERVER-121094: Remove when featureFlagExtensionsInsideHybridSearch is removed.
     Value legacyUnionWithSerialize(const query_shape::SerializationOptions& opts) const;
 
+    // Appends the internal-only isHybridSearch flag to a serialized spec when appropriate.
+    void appendIsHybridSearchFlag(MutableDocument& spec,
+                                  const query_shape::SerializationOptions& opts) const;
+
     std::shared_ptr<UnionWithSharedState> _sharedState;
 
     // The original, unresolved namespace to union.

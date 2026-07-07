@@ -122,6 +122,12 @@ DocumentSourceContainer unionWithStageParamsToDocumentSourceFn(
         return {DocumentSourceUnionWith::createFromBson(typedParams->getOriginalBson(), expCtx)};
     }
 
+    // Reject a user-supplied isHybridSearch flag before building from stage params.
+    if (auto originalSpec = typedParams->getOriginalBson();
+        originalSpec.type() == BSONType::object) {
+        hybrid_scoring_util::validateIsHybridSearchNotSetByUser(expCtx,
+                                                                originalSpec.embeddedObject());
+    }
     return DocumentSourceUnionWith::createFromStageParams(*typedParams, expCtx);
 }
 
@@ -385,8 +391,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
         unionNss = NamespaceStringUtil::deserialize(expCtx->getNamespaceString().dbName(),
                                                     elem.valueStringData());
     } else {
-        // TODO SERVER-108117 Validate that the isHybridSearch flag is only set internally. See
-        // helper hybrid_scoring_util::validateIsHybridSearchNotSetByUser to handle this.
+        // The isHybridSearch flag is internal-only: it is set when a desugared hybrid-search
+        // sub-pipeline is serialized across the wire, and re-parsed by internal clients. Reject it
+        // when a user supplies it directly.
+        hybrid_scoring_util::validateIsHybridSearchNotSetByUser(expCtx, elem.embeddedObject());
         auto unionWithSpec =
             UnionWithSpec::parse(elem.embeddedObject(), IDLParserContext(kStageName));
         if (unionWithSpec.getColl()) {
@@ -450,6 +458,17 @@ Value DocumentSourceUnionWith::buildUnionWithResult(Value pipelineValue, Value c
     return Value(DOC(getSourceName() << spec.freezeToValue()));
 }
 
+void DocumentSourceUnionWith::appendIsHybridSearchFlag(
+    MutableDocument& spec, const query_shape::SerializationOptions& opts) const {
+    // The isHybridSearch flag is only carried on the shard-dispatch path, never in the explain
+    // serialization: an explain-of-a-view spec can be re-parsed on the (non-internal) router,
+    // where the flag would fail validateIsHybridSearchNotSetByUser (error 5491300). Mirrors the
+    // guard on $lookup's serialization.
+    if (_userPipelineIsHybridSearch && !opts.isSerializingForExplain()) {
+        spec[hybrid_scoring_util::kIsHybridSearchFlagFieldName] = Value(true);
+    }
+}
+
 // TODO SERVER-121094: Remove when featureFlagExtensionsInsideHybridSearch is removed.
 Value DocumentSourceUnionWith::legacyUnionWithSerialize(
     const query_shape::SerializationOptions& opts) const {
@@ -481,10 +500,7 @@ Value DocumentSourceUnionWith::legacyUnionWithSerialize(
         } else {
             spec["pipeline"] = Value(_sharedState->_pipeline->serializeToBson(opts));
         }
-        bool isHybridSearch = _userPipelineIsHybridSearch;
-        if (isHybridSearch) {
-            spec[hybrid_scoring_util::kIsHybridSearchFlagFieldName] = Value(isHybridSearch);
-        }
+        appendIsHybridSearchFlag(spec, opts);
         return Value(DOC(getSourceName() << spec.freezeToValue()));
     }
 }
@@ -654,10 +670,7 @@ Value DocumentSourceUnionWith::serialize(const query_shape::SerializationOptions
         } else {
             spec["pipeline"] = Value(_sharedState->_pipeline->serializeToBson(opts));
         }
-        bool isHybridSearch = _userPipelineIsHybridSearch;
-        if (isHybridSearch) {
-            spec[hybrid_scoring_util::kIsHybridSearchFlagFieldName] = Value(isHybridSearch);
-        }
+        appendIsHybridSearchFlag(spec, opts);
         return Value(DOC(getSourceName() << spec.freezeToValue()));
     }
 }

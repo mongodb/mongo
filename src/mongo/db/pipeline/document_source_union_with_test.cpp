@@ -38,6 +38,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_comparator.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_facet.h"
@@ -57,6 +58,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
@@ -329,6 +331,31 @@ TEST_F(DocumentSourceUnionWithTest, ParseErrors) {
                            getExpCtx()),
                        AssertionException,
                        ErrorCodes::TypeMismatch);
+}
+
+TEST_F(DocumentSourceUnionWithTest, RejectsUserSuppliedIsHybridSearchWhenExtensionsFlagOn) {
+    // When featureFlagExtensionsInsideHybridSearch is on, the stage-params dispatch path is taken
+    // instead of createFromBson, and must equally reject a user-supplied $_internalIsHybridSearch.
+    auto ifrCtx = std::make_shared<IncrementalFeatureRolloutContext>(std::vector<BSONObj>{
+        BSON("name" << "featureFlagExtensionsInsideHybridSearch" << "value" << true)});
+
+    // A client with a transport session and no internal tag is an external (user) client.
+    auto client = getServiceContext()->getService()->makeClient(
+        "external", transport::MockSession::create(/*transportLayer=*/nullptr));
+    auto opCtx = client->makeOperationContext();
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx.get())
+                      .ns(getExpCtx()->getNamespaceString())
+                      .ifrContext(ifrCtx)
+                      .build();
+
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$unionWith" << BSON("coll" << "coll" << "pipeline" << BSONArray()
+                                         << "$_internalIsHybridSearch" << true))};
+    LiteParsedPipeline liteParsedPipeline(
+        expCtx->getNamespaceString(), rawPipeline, false, LiteParserOptions{.ifrContext = ifrCtx});
+    ASSERT_THROWS_CODE(
+        Pipeline::parseFromLiteParsed(liteParsedPipeline, expCtx), AssertionException, 5491300);
 }
 
 TEST_F(DocumentSourceUnionWithTest, PropagatePauses) {

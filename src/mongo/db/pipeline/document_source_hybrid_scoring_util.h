@@ -130,14 +130,13 @@ bool isHybridSearchPipeline(const std::vector<BSONObj>& bsonPipeline);
 
 /**
  * Validates that the provided spec does not have the internal-use-only $_internalIsHybridSearch
- * flag set.
+ * flag set. Asserts with error 5491300 if a non-internal client supplied it.
  *
- * TODO SERVER-108117 This is currently not called because the validation is broken when running an
- * explain on a view in a sharded collection. In that scenario, the router desugars the subpipeline,
- * adds $_internalIsHybridSearch to the serialized BSON, and sends it to the shards. The shards
- * respond with an error that the view must be executed on the router, and then the router tries
- * executing the fully-desugared pipeline. However, on this retry, the internal client flag is not
- * set, and the router fails the explain due to this assertion.
+ * Note the explain-on-a-view interaction: the router desugars the subpipeline and, when dispatching
+ * to shards, serializes $_internalIsHybridSearch into the BSON. For a view the shards respond that
+ * the view must be executed on the router, and the router retries with the fully-desugared pipeline
+ * -- where the client is not internal. To keep this retry from tripping the assertion, $lookup and
+ * $unionWith omit $_internalIsHybridSearch from their explain serialization.
  */
 void validateIsHybridSearchNotSetByUser(boost::intrusive_ptr<ExpressionContext> expCtx,
                                         const BSONObj& spec);

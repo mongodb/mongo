@@ -614,6 +614,12 @@ DocumentSourceContainer lookupStageParamsToDocumentSourceFn(
         return {DocumentSourceLookUp::createFromBson(typedParams->getOriginalBson(), expCtx)};
     }
 
+    // Reject a user-supplied isHybridSearch flag before building from stage params.
+    if (auto originalSpec = typedParams->getOriginalBson();
+        originalSpec.type() == BSONType::object) {
+        hybrid_scoring_util::validateIsHybridSearchNotSetByUser(expCtx,
+                                                                originalSpec.embeddedObject());
+    }
     return DocumentSourceLookUp::createFromStageParams(*typedParams, expCtx);
 }
 
@@ -1358,8 +1364,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
     bool hasPipeline = false;
     bool hasLet = false;
 
-    // TODO SERVER-108117 Validate that the isHybridSearch flag is only set internally. See helper
-    // hybrid_scoring_util::validateIsHybridSearchNotSetByUser to handle this.
+    // The isHybridSearch flag is internal-only: it is set when a desugared hybrid-search
+    // sub-pipeline is serialized across the wire, and re-parsed by internal clients. Reject it when
+    // a user supplies it directly.
+    hybrid_scoring_util::validateIsHybridSearchNotSetByUser(pExpCtx, elem.Obj());
 
     auto lookupSpec = DocumentSourceLookupSpec::parse(elem.Obj(), IDLParserContext(kStageName));
 
