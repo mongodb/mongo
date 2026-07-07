@@ -32,15 +32,14 @@
 #include <memory>
 #include <vector>
 
+#include <absl/container/btree_set.h>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -104,11 +103,47 @@ private:
         }
     }
 
+    struct BSONElementAndIndex {
+        BSONElement element;
+        size_t index;
+    };
+
+    class BSONElementAndIndexComparator {
+    public:
+        using is_transparent = void;
+
+        explicit BSONElementAndIndexComparator(const CollatorInterface* collator = nullptr)
+            : _collator(collator) {}
+
+        bool operator()(const BSONElementAndIndex& l, const BSONElementAndIndex& r) const {
+            return l.element.woCompare(r.element, false, _collator) < 0;
+        }
+
+        bool operator()(const BSONElementAndIndex& l, const mutablebson::Element& r) const {
+            return r.compareWithBSONElement(l.element, _collator, false) > 0;
+        }
+
+        bool operator()(const mutablebson::Element& l, const BSONElementAndIndex& r) const {
+            return l.compareWithBSONElement(r.element, _collator, false) < 0;
+        }
+
+        const CollatorInterface* collator() const {
+            return _collator;
+        }
+
+    private:
+        const CollatorInterface* _collator;
+    };
+
+    void _deduplicateElements();
+    std::vector<BSONElementAndIndex> _getElementsToAdd(mutablebson::Element* element) const;
+
     // The array of elements to be added.
     std::vector<BSONElement> _elements;
 
-    // The collator used to compare array elements for deduplication.
-    const CollatorInterface* _collator = nullptr;
+    // The set of elements to be added, pairsed with their index in the original _elements
+    // array.
+    absl::btree_set<BSONElementAndIndex, BSONElementAndIndexComparator> _elementsSet;
 };
 
 }  // namespace mongo
