@@ -517,6 +517,11 @@ public:
 
     bool isChangeStreamQuery{false};
 
+    // True iff this change stream cursor's updateLookup stage was wired on the optimized
+    // (Express/SBE) path. Recorded on the ClientCursor so the getMore precondition can
+    // kill-and-resume the cursor if the optimization flag is turned off.
+    bool usesOptimizedUpdateLookup{false};
+
     BSONObj execStats;  // Owned here.
 
     // The hash of the PlanCache key for the query being run. This may change depending on what

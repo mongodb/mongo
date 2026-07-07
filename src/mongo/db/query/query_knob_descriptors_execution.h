@@ -78,6 +78,10 @@
          kInternalOperationResponseMaxMSName,                                             \
          internalOperationResponseMaxMS,                                                  \
          getOperationResponseMaxMS)                                                       \
+    KNOB(kChangeStreamRespectsReadPreference,                                             \
+         kInternalChangeStreamRespectsReadPreferenceName,                                 \
+         internalChangeStreamRespectsReadPreference,                                      \
+         getChangeStreamRespectsReadPreference)                                           \
     /* End MONGO_EXPAND_QUERY_KNOBS_EXECUTION */
 // clang-format on
 

@@ -67,6 +67,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/optime.h"
@@ -140,10 +141,6 @@ static const ReadConcernSupportResult kSupportsReadConcernResult{
  */
 void ensureChangeStreamReadPreferenceCanBeSatisfied(OperationContext* opCtx,
                                                     ClientCursorPin& cursorPin) {
-    if (!cursorPin->isChangeStreamQuery()) {
-        return;
-    }
-
     if (!internalChangeStreamRespectsReadPreference.loadRelaxed()) {
         return;
     }
@@ -174,6 +171,50 @@ void ensureChangeStreamReadPreferenceCanBeSatisfied(OperationContext* opCtx,
                                 << ReadPreferenceSetting(readPref).toString()
                                 << "' can no longer be satisfied after a replica set election");
     }
+}
+
+/**
+ * For change stream cursors whose updateLookup stage was wired on the optimized (Express/SBE) path,
+ * enforces that the optimization feature flag is still enabled. If an operator has turned the flag
+ * off since the cursor was opened, kills the cursor and throws a resumable RetryChangeStream error,
+ * so the stream is reopened (built fresh with the flag's current value) on the legacy Aggregation
+ * path.
+ *
+ * This check is a no-op for cursors that never took the optimized path (non-change-stream cursors,
+ * cursors opened with the flag off, or streams that simply do not do an updateLookup).
+ */
+void ensureChangeStreamOptimizedLookupStillEnabled(OperationContext* opCtx,
+                                                   ClientCursorPin& cursorPin) {
+    if (!cursorPin->usesOptimizedUpdateLookup()) {
+        return;
+    }
+
+    // NOTE: Reading a fresh feature flag value, as opposed to snapshoted one, since we want to
+    // determine if the flag value has changed from the time the executor has been created.
+    if (feature_flags::gFeatureFlagChangeStreamOptimizedUpdateLookup.checkEnabled()) {
+        return;
+    }
+
+    // The flag got turned off after this cursor was wired on the optimized path. Kill the cursor
+    // before throwing and surface a resumable change stream error.
+    cursorPin.deleteUnderlying();
+    uasserted(ErrorCodes::RetryChangeStream,
+              "Optimized change-stream updateLookup was disabled; resuming on the legacy path");
+}
+
+/**
+ * The single method for all change-stream getMore preconditions.
+ */
+void ensureChangeStreamGetMorePreconditions(OperationContext* opCtx, ClientCursorPin& cursorPin) {
+    if (!cursorPin->isChangeStreamQuery()) {
+        return;
+    }
+
+    // Check if readPreference can still be satisfied after possible elections.
+    ensureChangeStreamReadPreferenceCanBeSatisfied(opCtx, cursorPin);
+
+    // Check if the updateLookup optimization flag was turned off on the updateLookup cursor.
+    ensureChangeStreamOptimizedLookupStillEnabled(opCtx, cursorPin);
 }
 
 /**
@@ -910,8 +951,8 @@ public:
 
             ClientCursorPin cursorPin = pinCursorWithRetry(opCtx, cursorId, nss);
 
-            // Check that readPreference can still be satisfied after possible elections.
-            ensureChangeStreamReadPreferenceCanBeSatisfied(opCtx, cursorPin);
+            // Run the change stream getMore preconditions before iterating the cursor.
+            ensureChangeStreamGetMorePreconditions(opCtx, cursorPin);
 
             // Get the read concern level here in case the cursor is exhausted while iterating.
             const auto isLinearizableReadConcern = cursorPin->getReadConcernArgs().getLevel() ==

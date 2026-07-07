@@ -266,6 +266,20 @@ export function isResumableChangeStreamError(error) {
     return "errorLabels" in error && error.errorLabels.includes("ResumableChangeStreamError");
 }
 
+/**
+ * Polls getMore until it fails with a resumable change stream error.
+ */
+export function assertGetMoreFailsWithExpectedError({db, cursorId, collName, expectedError, msg}) {
+    assert.soon(function () {
+        const res = db.runCommand({getMore: cursorId, collection: collName});
+        if (res.ok === 0) {
+            assert(expectedError(res), "Unexpected error: " + tojson(res), {res});
+            return true;
+        }
+        return false;
+    }, msg);
+}
+
 export function ChangeStreamTest(_db, options) {
     // Keeps track of cursors opened during the test so that we can be sure to
     // clean them up before the test completes.

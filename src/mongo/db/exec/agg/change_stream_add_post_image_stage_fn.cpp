@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/curop.h"
 #include "mongo/db/exec/agg/change_stream_add_post_image_stage.h"
 #include "mongo/db/exec/agg/change_stream_update_lookup_stage.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
@@ -61,10 +62,16 @@ std::unique_ptr<exec::agg::SingleDocumentLookupExecutor> buildUpdateLookupExecut
         return aggExecutor;
     }
 
+    OperationContext* opCtx = expCtx->getOperationContext();
+
+    // Record the effective wiring on this operation so it rides onto the ClientCursor. The getMore
+    // precondition uses it to kill-and-resume the cursor if the flag is later turned off.
+    CurOp::get(opCtx)->debug().usesOptimizedUpdateLookup = true;
+
     LocalLookupEligibilityFactoryImpl eligibilityFactory;
     auto expressExecutor = std::make_unique<ExpressSingleDocumentLookupExecutor>(
         std::make_unique<OnDemandCollectionAcquirer>(),
-        eligibilityFactory.makeLocalLookupEligibility(expCtx->getOperationContext()));
+        eligibilityFactory.makeLocalLookupEligibility(opCtx));
     return std::make_unique<PrimaryWithFallbackSingleDocumentLookupExecutor>(
         std::move(expressExecutor), std::move(aggExecutor));
 }

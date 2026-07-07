@@ -1,3 +1,5 @@
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
 // The single-document-lookup engine that enriched an updateLookup change event with its post-image.
 // The serverStatus key under 'changeStreams.updateLookup' is the value of each constant.
 export const UpdateLookupExecutor = Object.freeze({
@@ -7,34 +9,30 @@ export const UpdateLookupExecutor = Object.freeze({
 });
 
 /**
- * Computes numeric difference of server status metrics between 'after' and 'before'.
+ * combine() numeric value of server status metrics between 'a' and 'b'.
  */
-function _metricsDelta(before, after) {
-    if (typeof after === "number") {
-        // Treat a missing before-leaf as 0 so lazily-created metrics (absent in before-snapshot)
-        // produce a correct delta rather than NaN.
-        return after - (typeof before === "number" ? before : 0);
+function _combineMetrics(a, b, combine) {
+    if (typeof b === "number") {
+        return combine(typeof a === "number" ? a : 0, b);
     }
 
-    if (typeof after === "object" && after !== null) {
+    if (typeof b === "object" && b !== null) {
         // NumberLong / NumberInt override valueOf() to return a primitive JS number.
-        if (typeof after.valueOf() === "number") {
-            const beforeVal =
-                before != null && typeof before.valueOf() === "number" ? before.valueOf() : 0;
-            return after.valueOf() - beforeVal;
+        if (typeof b.valueOf() === "number") {
+            const aVal = a != null && typeof a.valueOf === "function" ? a.valueOf() : 0;
+            return combine(aVal, b.valueOf());
         }
 
-        // BSON leaf types with no sensible before/after delta (point-in-time values, not counters).
-        const kNonDiffableTypes = [Timestamp, Date, ObjectId, BinData, NumberDecimal];
-        if (!kNonDiffableTypes.some((BsonType) => after instanceof BsonType)) {
-            const delta = {};
-            for (const key of Object.keys(after)) {
-                delta[key] = _metricsDelta(before != null ? before[key] : undefined, after[key]);
+        const kNonCombinableTypes = [Timestamp, Date, ObjectId, BinData, NumberDecimal];
+        if (!kNonCombinableTypes.some((BsonType) => b instanceof BsonType)) {
+            const result = {};
+            for (const key of Object.keys(b)) {
+                result[key] = _combineMetrics(a != null ? a[key] : undefined, b[key], combine);
             }
-            return delta;
+            return result;
         }
     }
-    return after;
+    return b;
 }
 
 // Helper object for retrieving change stream metrics from the 'serverStatus' command's output.
@@ -67,14 +65,33 @@ export class ServerStatusMetrics {
         return this.getCsMetrics(db).error;
     }
 
-    // Snapshots the full serverStatus metrics before fn(), runs fn(), and returns the delta
-    // (after - before), treating a missing before-leaf as 0. Non-plain-object and non-numeric
-    // leaves hold the after value unchanged.
-    static withServerStatusMetrics(db, fn) {
-        const before = this.getSsMetrics(db);
+    /**
+     * Returns serverStatus metrics summed across every data-bearing node in the fixture (every
+     * node of a plain replica set, or every node of each shard for a sharded cluster).
+     */
+    static getSsMetricsAcrossCluster(db) {
+        const responses = FixtureHelpers.runCommandOnAllShards({
+            db,
+            cmdObj: {serverStatus: 1, metrics: 1},
+            primaryNodeOnly: false,
+        });
+        // Sum the per-node metrics into a single cluster-wide snapshot before diffing.
+        return responses.reduce(
+            (acc, res) => _combineMetrics(acc, res.metrics, (a, b) => a + b),
+            {},
+        );
+    }
+
+    /**
+     * Snapshots getSsMetricsAcrossCluster() before fn(), runs fn(), and returns the delta (after -
+     * before), treating a missing before-leaf as 0. Callers don't need to know or care whether
+     * they're talking to a replica set or a sharded cluster.
+     */
+    static withServerStatusMetricsAcrossCluster(db, fn) {
+        const before = this.getSsMetricsAcrossCluster(db);
         fn();
-        const after = this.getSsMetrics(db);
-        return _metricsDelta(before, after);
+        const after = this.getSsMetricsAcrossCluster(db);
+        return _combineMetrics(before, after, (beforeVal, afterVal) => afterVal - beforeVal);
     }
 }
 

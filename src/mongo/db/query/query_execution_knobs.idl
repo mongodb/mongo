@@ -1119,6 +1119,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: true
         redact: false
+        annotations:
+            query_knob:
+                wire_name: changeStreamRespectsReadPreference
 
     internalOperationResponseMaxMS:
         description: >-

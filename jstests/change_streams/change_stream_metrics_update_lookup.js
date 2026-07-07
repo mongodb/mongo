@@ -4,14 +4,14 @@
  * 'changeStreams.updateLookup.<engine>'.
  *
  * @tags: [
- *   featureFlagChangeStreamOptimizedUpdateLookup,
- *   # The metrics are per-process and only exposed on mongod today.
- *   # TODO SERVER-123932: relax once updateLookup metrics are aggregated on mongos.
- *   assumes_against_mongod_not_mongos,
- *   # The lookup runs on the node serving the getMore; pin reads to that node so serverStatus reads
- *   # the same process that recorded the metric.
- *   assumes_read_preference_unchanged,
+ *   requires_fcv_90,
  *   assumes_no_implicit_cursor_exhaustion,
+ *   # The 'gone' document's post-image lookup relies on observing the delete that immediately
+ *   # follows its update. The lookup's read concern is {level: "majority", afterClusterTime:
+ *   # <the update's own clusterTime T1>}, a minimum bound, not "now". A secondary servicing
+ *   # that read may not yet have majority-committed (or advanced its per-batch lastApplied past)
+ *   # the later delete at T2 > T1, so it can legitimately still see the pre-delete state.
+ *   assumes_read_preference_unchanged,
  * ]
  */
 import {before, beforeEach, after, afterEach, describe, it} from "jstests/libs/mochalite.js";
@@ -74,7 +74,7 @@ describe("change stream updateLookup single-document-lookup metrics", function (
             UpdateLookupExecutor.kAggregation,
         );
 
-        const delta = ServerStatusMetrics.withServerStatusMetrics(testDB, () => {
+        const delta = ServerStatusMetrics.withServerStatusMetricsAcrossCluster(testDB, () => {
             withChangeStreamTest(testDB, (cst) => {
                 const cursor = cst.startWatchingChanges({
                     pipeline: [{$changeStream: {fullDocument: "updateLookup"}}],

@@ -196,6 +196,10 @@ public:
         return _isChangeStreamQuery;
     }
 
+    bool usesOptimizedUpdateLookup() const {
+        return _usesOptimizedUpdateLookup;
+    }
+
     std::unique_ptr<query_stats::Key> takeKey() {
         return std::move(_queryStatsKey);
     }
@@ -539,6 +543,11 @@ private:
 
     // Flag if the current cursor is used for a change stream query.
     bool _isChangeStreamQuery{false};
+
+    // True iff this cursor's updateLookup stage was wired on the optimized (Express/SBE) path. Used
+    // by the getMore precondition to kill-and-resume the cursor if the optimization flag is later
+    // turned off.
+    bool _usesOptimizedUpdateLookup{false};
 
     // Flag to decide if diagnostic information should be omitted.
     bool _shouldOmitDiagnosticInformation{false};

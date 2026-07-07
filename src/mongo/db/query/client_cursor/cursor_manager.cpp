@@ -244,6 +244,8 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(
     CurOp::get(opCtx)->debug().getQueryStatsInfo().keyHash = cursor->_queryStatsKeyHash;
     // Pass along 'isChangeStreamQuery' for serverStatus metrics.
     CurOp::get(opCtx)->debug().isChangeStreamQuery = cursor->_isChangeStreamQuery;
+    // Pass along 'usesOptimizedUpdateLookup' so it detects IFR flag change at runtime.
+    CurOp::get(opCtx)->debug().usesOptimizedUpdateLookup = cursor->_usesOptimizedUpdateLookup;
 
     cursor->_operationUsingCursor = opCtx;
     cursor->_commandUsingCursor = std::string{commandName};
