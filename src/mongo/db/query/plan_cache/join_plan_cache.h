@@ -86,7 +86,11 @@ struct CachedJoinPlan {
 
 // A full join plan cache entry: a reconstructable plan tree and its invalidation metadata.
 struct JoinPlanCacheEntry {
+    JoinPlanCacheEntry(std::unique_ptr<CachedJoinPlan> joinTree, join_ordering::NodeId baseNode)
+        : joinTree(std::move(joinTree)), baseNode(baseNode) {}
+
     std::unique_ptr<const CachedJoinPlan> joinTree;
+    const join_ordering::NodeId baseNode;
     // TODO SERVER-129266: Add fingerprints
 };
 

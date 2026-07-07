@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/compiler/optimizer/join/join_cost_estimator_impl.h"
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator_helpers.h"
 #include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
@@ -988,6 +989,46 @@ TEST_F(CachedJoinPlanTest, SelfJoinRoundTrip) {
     ASSERT_EQ(qsn->children.size(), 2u);
     ASSERT_EQ(qsn->children[0]->getType(), STAGE_COLLSCAN);
     ASSERT_EQ(qsn->children[1]->getType(), STAGE_COLLSCAN);
+}
+
+TEST_F(CachedJoinPlanTest, ConstructSolutionBottomUpPopulatesCachedJoinPlan) {
+    // Set up a simple 2-node join graph A -- B to exercise constructSolutionBottomUp.
+    auto idA = addNssWithEmbedding({.collName = "a", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto idB = addNssWithEmbedding(
+        {.collName = "b", .embedPath = FieldPath{"b"}, .filter = {}, .indexes = {}});
+
+    resolvedPaths = {
+        ResolvedPath{.nodeId = idA, .fieldName = FieldPath{"a"}},
+        ResolvedPath{.nodeId = idB, .fieldName = FieldPath{"b"}},
+    };
+    graph.addSimpleEqualityEdge(idA, idB, 0 /*a*/, 1 /*b.b*/);
+
+    // Provide catalog stats required by JoinCostEstimatorImpl.
+    for (const auto& nss : namespaces) {
+        catStats.collStats.emplace(nss, CollectionStats{1000.0, 1000.0});
+    }
+
+    // toCachedJoinPlan requires cacheData on each leaf solution. Replace plans in cbrCqQsns
+    // with fresh collscan plans that carry SolutionCacheData.
+    for (auto& [cq, soln] : cbrCqQsns) {
+        soln = makeSolnWithCacheData(cq->nss());
+    }
+
+    auto jCtx = makeContext();
+    FakeJoinCardinalityEstimator cardEstimator(jCtx);
+    JoinCostEstimatorImpl costEstimator(jCtx, cardEstimator);
+
+    auto swResult =
+        constructSolutionBottomUp(jCtx,
+                                  cardEstimator,
+                                  costEstimator,
+                                  EnumerationStrategy{.planShape = PlanTreeShape::ZIG_ZAG,
+                                                      .mode = PlanEnumerationMode::CHEAPEST,
+                                                      .enableHJOrderPruning = true},
+                                  true);
+
+    ASSERT_OK(swResult.getStatus());
+    ASSERT_NE(nullptr, swResult.getValue().cachedJoinPlan);
 }
 
 }  // namespace mongo::join_ordering

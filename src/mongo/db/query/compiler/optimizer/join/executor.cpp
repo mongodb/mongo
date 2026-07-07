@@ -44,6 +44,8 @@
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
 #include "mongo/db/query/compiler/optimizer/join/reorder_joins.h"
 #include "mongo/db/query/compiler/optimizer/join/single_table_access.h"
+#include "mongo/db/query/plan_cache/join_plan_cache.h"
+#include "mongo/db/query/plan_cache/join_plan_cache_key.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_explainer_sbe.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
@@ -225,6 +227,26 @@ AvailableIndexes extractINLJEligibleIndexes(const QuerySolutionMap& cbrCqQsns,
     return perCollIdxs;
 }
 
+AvailableIndexes extractINLJEligibleIndexesFromGraph(const JoinGraph& graph,
+                                                     const MultipleCollectionAccessor& mca) {
+    AvailableIndexes perCollIdxs;
+    for (size_t n = 0; n < graph.numNodes(); ++n) {
+        const NamespaceString& ns = graph.getNode(n).collectionName;
+        if (perCollIdxs.contains(ns)) {
+            continue;
+        }
+        const auto& indexCatalog = *mca.lookupCollection(ns)->getIndexCatalog();
+        std::vector<std::shared_ptr<const IndexCatalogEntry>> entries;
+        for (auto&& ice : indexCatalog.getEntriesShared(IndexCatalog::InclusionPolicy::kReady)) {
+            if (indexIsValidForINLJ(ice)) {
+                entries.emplace_back(ice);
+            }
+        }
+        perCollIdxs.emplace(ns, std::move(entries));
+    }
+    return perCollIdxs;
+}
+
 CatalogStats createCatalogStats(OperationContext* opCtx, const MultipleCollectionAccessor& mca) {
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     stdx::unordered_map<NamespaceString, CollectionStats> collStats;
@@ -270,6 +292,88 @@ PerCollUniqueFieldInfo buildUniqueFieldInfo(const AvailableIndexes& perCollIdxs)
     }
     return uniqueFieldInfoMap;
 }
+
+std::pair<std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>,
+          std::unique_ptr<PlanYieldPolicySBE>>
+lowerToSbePlanStageTree(OperationContext* opCtx,
+                        const JoinGraph& graph,
+                        PlanYieldPolicy::YieldPolicy yieldPolicy,
+                        const MultipleCollectionAccessor& mca,
+                        NodeId baseNode,
+                        const QuerySolution& soln,
+                        const cost_based_ranker::EstimateMap* estimates,
+                        bool prepare) {
+    auto& baseCQ = *graph.accessPathAt(baseNode);
+    auto baseNss = baseCQ.nss();
+    auto sbeYieldPolicy = PlanYieldPolicySBE::make(opCtx, yieldPolicy, mca, baseNss);
+    auto planStagesAndData = stage_builder::buildSlotBasedExecutableTree(
+        opCtx, mca, baseCQ, soln, sbeYieldPolicy.get(), estimates);
+    if (prepare) {
+        // We don't need to prepare plans if we're not planning to execute them.
+        stage_builder::prepareSlotBasedExecutableTree(opCtx,
+                                                      planStagesAndData.first.get(),
+                                                      &planStagesAndData.second,
+                                                      baseCQ,
+                                                      mca,
+                                                      sbeYieldPolicy.get(),
+                                                      false /*preparingFromCache*/,
+                                                      nullptr /*remoteCursors*/);
+    }
+    return std::make_pair(std::move(planStagesAndData), std::move(sbeYieldPolicy));
+}
+
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> checkPlanCacheForPlan(
+    OperationContext* opCtx,
+    const JoinPlanCacheKey& cacheKey,
+    const MultipleCollectionAccessor& mca,
+    const AggJoinModel& model,
+    PlanYieldPolicy::YieldPolicy yieldPolicy) {
+    auto& cache = JoinPlanCache::get(opCtx->getServiceContext());
+    if (auto hit = cache.lookup(cacheKey)) {
+        LOGV2_DEBUG(11083906, 5, "Join plan cache hit, skipping join optimization");
+        auto perCollIdxs = extractINLJEligibleIndexesFromGraph(model.getGraph(), mca);
+        auto qsn = fromCachedJoinPlan(opCtx, model.getGraph(), mca, perCollIdxs, *hit->joinTree);
+        auto winnerSoln = std::make_unique<QuerySolution>();
+        winnerSoln->setRoot(std::move(qsn));
+
+        // TODO SERVER-130469: Pushdown SBE eligible suffix.
+        auto [planStagesAndData, sbeYieldPolicy] = lowerToSbePlanStageTree(opCtx,
+                                                                           model.getGraph(),
+                                                                           yieldPolicy,
+                                                                           mca,
+                                                                           hit->baseNode,
+                                                                           *winnerSoln,
+                                                                           nullptr /*estimates*/,
+                                                                           true /*prepare*/);
+
+        size_t plannerOptions = QueryPlannerParams::DEFAULT;
+        if (model.getSuffix() && model.getSuffix()->peekFront()) {
+            plannerOptions |= QueryPlannerParams::RETURN_OWNED_DATA;
+        }
+        cost_based_ranker::EstimateMap emptyEstimates;
+        auto exec = plan_executor_factory::make(opCtx,
+                                                nullptr /* cq */,
+                                                std::move(winnerSoln),
+                                                std::move(planStagesAndData),
+                                                mca,
+                                                plannerOptions,
+                                                mca.getMainCollection()->ns(),
+                                                std::move(sbeYieldPolicy),
+                                                true /* isFromPlanCache */,
+                                                false /* cachedPlanHash */,
+                                                true /*usedJoinOpt*/,
+                                                std::move(emptyEstimates),
+                                                {} /* rejectedPlans */,
+                                                nullptr /* remoteCursors */,
+                                                nullptr /* remoteExplains */,
+                                                nullptr /* classicRuntimePlannerStage */,
+                                                boost::none /* maybeExplainData */);
+        return exec;
+    }
+    return nullptr;
+}
+
+
 }  // namespace
 
 /**
@@ -326,15 +430,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                 "graph"_attr = swModel.getValue().toBSON());
     auto model = std::move(swModel.getValue());
 
-    // Select access plans for each table in the join.
     auto yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
-    SamplingEstimatorMap samplingEstimators =
-        makeSamplingEstimators(mca, model.getGraph(), yieldPolicy, model.getJoinExpCtx());
-    auto swAccessPlans = singleTableAccessPlans(opCtx, mca, model.getGraph(), samplingEstimators);
-    if (!swAccessPlans.isOK()) {
-        return swAccessPlans.getStatus();
-    }
-    auto singleTableAccess = std::move(swAccessPlans.getValue());
 
     // Retrieve a copy of the hint if present.
     boost::optional<EnumerationStrategy> hintedStrat;
@@ -345,6 +441,30 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     }
 
     const auto qkc = expCtx->getQueryKnobConfiguration();
+
+    // Consult the join plan cache before running single-table access planning.
+    const bool useJoinPlanCache = !hintedStrat &&
+        qkc.getJoinReorderMode() != JoinReorderModeEnum::kRandom && qkc.getEnableJoinPlanCache() &&
+        !expCtx->getExplain().has_value();
+    boost::optional<JoinPlanCacheKey> cacheKey;
+    if (useJoinPlanCache) {
+        cacheKey = makeJoinPlanCacheKey(model.getGraph(), model.getResolvedPaths(), mca);
+        auto exec = checkPlanCacheForPlan(opCtx, *cacheKey, mca, model, yieldPolicy);
+        if (exec) {
+            return JoinReorderedExecutorResult{.executor = std::move(exec),
+                                               .model = std::move(model)};
+        }
+        LOGV2_DEBUG(11083907, 5, "Join plan cache miss, running optimization");
+    }
+
+    // Select access plans for each table in the join.
+    SamplingEstimatorMap samplingEstimators =
+        makeSamplingEstimators(mca, model.getGraph(), yieldPolicy, model.getJoinExpCtx());
+    auto swAccessPlans = singleTableAccessPlans(opCtx, mca, model.getGraph(), samplingEstimators);
+    if (!swAccessPlans.isOK()) {
+        return swAccessPlans.getStatus();
+    }
+    auto singleTableAccess = std::move(swAccessPlans.getValue());
 
     // Pre-process indexes per collection to facilitate INLJ enumeration.
     auto indexesPerColl = extractINLJEligibleIndexes(singleTableAccess.cbrCqQsns, mca);
@@ -383,7 +503,8 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                                              cardEstimator,
                                              costEstimator,
                                              hintedStrat ? std::move(*hintedStrat)
-                                                         : getEnumerationStrategy(qkc));
+                                                         : getEnumerationStrategy(qkc),
+                                             useJoinPlanCache /* populateCachedJoinPlan */);
         }
 
         tassert(12016315,
@@ -402,6 +523,13 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     }();
     uassertStatusOK(swReordered.getStatus());
     auto reordered = std::move(swReordered.getValue());
+
+    // Store the winning plan in the join plan cache for future queries with the same shape.
+    if (useJoinPlanCache && reordered.cachedJoinPlan) {
+        auto entry = std::make_unique<JoinPlanCacheEntry>(std::move(reordered.cachedJoinPlan),
+                                                          reordered.baseNode);
+        JoinPlanCache::get(opCtx->getServiceContext()).put(std::move(*cacheKey), std::move(entry));
+    }
 
     // Identify suffix stages that are eligible for SBE pushdown & consequently lower them to the
     // SBE executor with the join-reordered prefix.
@@ -459,33 +587,17 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     // PathArraynessChecker monitors them during execution yields.
     baseNodeCQ.getExpCtx()->mergeNonArrayPathsForNss(
         model.getJoinExpCtx()->getNonArrayPathsForNss());
-    // Lower to SBE.
-    auto lower =
-        [&model, &opCtx, yieldPolicy, &mca](NodeId baseNode,
-                                            const QuerySolution& soln,
-                                            const cost_based_ranker::EstimateMap* estimates,
-                                            bool prepare) {
-            auto& baseCQ = *model.getGraph().accessPathAt(baseNode);
-            auto baseNss = baseCQ.nss();
-            auto sbeYieldPolicy = PlanYieldPolicySBE::make(opCtx, yieldPolicy, mca, baseNss);
-            auto planStagesAndData = stage_builder::buildSlotBasedExecutableTree(
-                opCtx, mca, baseCQ, soln, sbeYieldPolicy.get(), estimates);
-            if (prepare) {
-                // We don't need to prepare plans if we're not planning to execute them.
-                stage_builder::prepareSlotBasedExecutableTree(opCtx,
-                                                              planStagesAndData.first.get(),
-                                                              &planStagesAndData.second,
-                                                              baseCQ,
-                                                              mca,
-                                                              sbeYieldPolicy.get(),
-                                                              false /*preparingFromCache*/,
-                                                              nullptr /*remoteCursors*/);
-            }
-            return std::make_pair(std::move(planStagesAndData), std::move(sbeYieldPolicy));
-        };
 
-    auto [planStagesAndData, sbeYieldPolicy] =
-        lower(reordered.baseNode, *reordered.soln, &reordered.estimates, true /* prepare */);
+    // Lower to SBE.
+    auto [planStagesAndData, sbeYieldPolicy] = lowerToSbePlanStageTree(opCtx,
+                                                                       model.getGraph(),
+                                                                       yieldPolicy,
+                                                                       mca,
+                                                                       reordered.baseNode,
+                                                                       *reordered.soln,
+                                                                       &reordered.estimates,
+                                                                       true /* prepare */);
+
     sbe::DebugPrintInfo debugPrintInfo{};
     LOGV2_DEBUG(11083905,
                 5,
@@ -494,8 +606,9 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                     sbe::DebugPrinter{}.print(planStagesAndData.first->debugPrint(debugPrintInfo)),
                 "sbePlanStageData"_attr = planStagesAndData.second.debugString());
 
-    // If there is a pipeline suffix, then that suffix will execute inside a PlanExecutorPipeline,
-    // which expects to received owned BSON objects from the inner PlanExecutor.
+    // If there is a pipeline suffix, then that suffix will execute inside a
+    // PlanExecutorPipeline, which expects to received owned BSON objects from the inner
+    // PlanExecutor.
     size_t plannerOptions = QueryPlannerParams::DEFAULT;
     if (model.getSuffix() && model.getSuffix()->peekFront()) {
         plannerOptions |= QueryPlannerParams::RETURN_OWNED_DATA;
@@ -508,8 +621,14 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         for (auto&& rs : reordered.rejectedSolns) {
             auto soln = std::move(rs.first);
             auto baseNode = rs.second;
-            auto [stagesAndData, _] =
-                lower(baseNode, *soln, &reordered.estimates, false /* prepare */);
+            auto [stagesAndData, _] = lowerToSbePlanStageTree(opCtx,
+                                                              model.getGraph(),
+                                                              yieldPolicy,
+                                                              mca,
+                                                              baseNode,
+                                                              *soln,
+                                                              &reordered.estimates,
+                                                              false /* prepare */);
             rejectedPlans.push_back(JoinOptPlan{.soln = std::move(soln),
                                                 .stage = std::move(stagesAndData.first),
                                                 .data = std::move(stagesAndData.second)});
@@ -528,10 +647,10 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         maybeExplainData = std::move(explainData);
     }
 
-    // TODO SERVER-111913: Once we are no-longer cloning QSN for single-table plans, the estimate
-    // map from join-reordering 'reordered.estimates' can be combined with the estimate map from
-    // CBR 'ctx.singleTableAccess.estimate' before creating the executor below.
-    // We actually have several canonical queries, so we don't try to pass one in.
+    // TODO SERVER-111913: Once we are no-longer cloning QSN for single-table plans, the
+    // estimate map from join-reordering 'reordered.estimates' can be combined with the estimate
+    // map from CBR 'ctx.singleTableAccess.estimate' before creating the executor below. We
+    // actually have several canonical queries, so we don't try to pass one in.
     auto exec = plan_executor_factory::make(opCtx,
                                             nullptr /* cq */,
                                             std::move(reordered.soln),

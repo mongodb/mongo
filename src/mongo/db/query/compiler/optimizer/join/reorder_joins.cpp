@@ -533,8 +533,8 @@ StatusWith<ReorderedJoinSolution> constructSolutionWithRandomOrder(
 StatusWith<ReorderedJoinSolution> constructSolutionBottomUp(const JoinReorderingContext& ctx,
                                                             JoinCardinalityEstimator& estimator,
                                                             JoinCostEstimator& coster,
-                                                            EnumerationStrategy strategy) {
-
+                                                            EnumerationStrategy strategy,
+                                                            bool populateCachedJoinPlan) {
     PlanEnumeratorContext peCtx(ctx, &estimator, &coster, std::move(strategy));
     peCtx.enumerateJoinSubsets();
     if (!peCtx.enumerationSuccessful()) {
@@ -544,7 +544,11 @@ StatusWith<ReorderedJoinSolution> constructSolutionBottomUp(const JoinReordering
             "provided enumeration settings");
     }
 
-    return makeReorderedJoinSoln(ctx, peCtx);
+    auto out = makeReorderedJoinSoln(ctx, peCtx);
+    if (populateCachedJoinPlan) {
+        out.cachedJoinPlan = toCachedJoinPlan(ctx, peCtx.registry(), peCtx.getBestFinalPlan());
+    }
+    return out;
 }
 
 std::unique_ptr<CachedJoinPlan> toCachedJoinPlan(const JoinReorderingContext& ctx,

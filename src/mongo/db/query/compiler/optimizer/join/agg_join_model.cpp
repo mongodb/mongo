@@ -83,6 +83,9 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCQForJoinPipeline(
     ExpressionContext::PlanCacheOptions oldPlanCache = expCtx->getPlanCache();
     expCtx->setPlanCache(ExpressionContext::PlanCacheOptions::kDisablePlanCache);
     auto swCQ = createCanonicalQuery(expCtx, expCtx->getNamespaceString(), pipeline);
+    // Mark the CQ as SBE-compatible to work around the check in 'shouldCacheQuery()' that prevents
+    // caching of non-sbe collscan plans.
+    swCQ.getValue()->setSbeCompatible(true);
     expCtx->setPlanCache(oldPlanCache);
 
     if (!swCQ.isOK()) {

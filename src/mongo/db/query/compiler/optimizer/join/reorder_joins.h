@@ -49,6 +49,9 @@ struct ReorderedJoinSolution {
 
     // Only populated for explain. Estimate information for QuerySolutionNodes in 'soln'.
     cost_based_ranker::EstimateMap estimates;
+
+    // Populated by constructSolutionBottomUp only; nullptr signals "do not cache".
+    std::unique_ptr<CachedJoinPlan> cachedJoinPlan;
 };
 
 /**
@@ -85,7 +88,8 @@ StatusWith<ReorderedJoinSolution> constructSolutionWithRandomOrder(
 StatusWith<ReorderedJoinSolution> constructSolutionBottomUp(const JoinReorderingContext& ctx,
                                                             JoinCardinalityEstimator& estimator,
                                                             JoinCostEstimator& coster,
-                                                            EnumerationStrategy strategy);
+                                                            EnumerationStrategy strategy,
+                                                            bool populateCachedPlan);
 
 /**
  * Converts the join plan rooted at 'nodeId' in 'registry' into an owning 'CachedJoinPlan' tree

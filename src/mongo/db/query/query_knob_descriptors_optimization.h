@@ -234,6 +234,10 @@ inline AtomicWord<bool>& gKnobNoTableScan = storageGlobalParams.noTableScan;
          kInternalJoinEnumerateCollScanPlansName,                                         \
          internalJoinEnumerateCollScanPlans,                                              \
          getInternalJoinEnumerateCollScanPlans)                                           \
+    KNOB(kEnableJoinPlanCache,                                                            \
+         kInternalEnableJoinPlanCacheName,                                                \
+         internalEnableJoinPlanCache,                                                     \
+         getEnableJoinPlanCache)                                                          \
     /* Sampling / cardinality estimation */                                               \
     KNOB(kSamplingMarginOfError,                                                          \
          kSamplingMarginOfErrorName,                                                      \

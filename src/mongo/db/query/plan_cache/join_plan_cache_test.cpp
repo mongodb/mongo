@@ -34,6 +34,10 @@
 namespace mongo {
 namespace {
 
+std::unique_ptr<JoinPlanCacheEntry> makeEntry() {
+    return std::make_unique<JoinPlanCacheEntry>(nullptr, join_ordering::NodeId{0});
+}
+
 TEST(JoinPlanCacheTest, LookupOnEmptyCacheReturnsNull) {
     JoinPlanCache cache;
     ASSERT_EQ(nullptr, cache.lookup("key"));
@@ -41,7 +45,7 @@ TEST(JoinPlanCacheTest, LookupOnEmptyCacheReturnsNull) {
 
 TEST(JoinPlanCacheTest, PutAndLookupRoundtrip) {
     JoinPlanCache cache;
-    auto entry = std::make_unique<JoinPlanCacheEntry>();
+    auto entry = makeEntry();
     auto rawPtr = entry.get();
     cache.put("key", std::move(entry));
     ASSERT_EQ(rawPtr, cache.lookup("key").get());
@@ -49,9 +53,9 @@ TEST(JoinPlanCacheTest, PutAndLookupRoundtrip) {
 
 TEST(JoinPlanCacheTest, PutOverwritesExistingEntry) {
     JoinPlanCache cache;
-    cache.put("key", std::make_unique<JoinPlanCacheEntry>());
+    cache.put("key", makeEntry());
 
-    auto newEntry = std::make_unique<JoinPlanCacheEntry>();
+    auto newEntry = makeEntry();
     const JoinPlanCacheEntry* newRawPtr = newEntry.get();
     cache.put("key", std::move(newEntry));
 
@@ -61,14 +65,14 @@ TEST(JoinPlanCacheTest, PutOverwritesExistingEntry) {
 
 TEST(JoinPlanCacheTest, RemoveExistingEntry) {
     JoinPlanCache cache;
-    cache.put("key", std::make_unique<JoinPlanCacheEntry>());
+    cache.put("key", makeEntry());
     cache.remove("key");
     ASSERT_EQ(nullptr, cache.lookup("key"));
 }
 
 TEST(JoinPlanCacheTest, RemoveNonExistingEntry) {
     JoinPlanCache cache;
-    auto entry = std::make_unique<JoinPlanCacheEntry>();
+    auto entry = makeEntry();
     const JoinPlanCacheEntry* rawPtr = entry.get();
     cache.put("key", std::move(entry));
     cache.remove("nonexistent");
@@ -78,8 +82,8 @@ TEST(JoinPlanCacheTest, RemoveNonExistingEntry) {
 TEST(JoinPlanCacheTest, GetComplexEntry) {
     JoinPlanCache cache;
 
-    auto entry = std::make_unique<JoinPlanCacheEntry>(JoinPlanCacheEntry{
-        .joinTree = std::make_unique<CachedJoinPlan>(CachedJoinNode{
+    auto entry = std::make_unique<JoinPlanCacheEntry>(
+        std::make_unique<CachedJoinPlan>(CachedJoinNode{
             .method = join_ordering::JoinMethod::HJ,
             .joinPredicates = {QSNJoinPredicate{
                 .op = QSNJoinPredicate::ComparisonOp::Eq,
@@ -94,7 +98,8 @@ TEST(JoinPlanCacheTest, GetComplexEntry) {
                 .nodeId = 1,
                 .solnCacheData = std::make_unique<SolutionCacheData>(SolutionCacheData{}),
             }),
-        })});
+        }),
+        join_ordering::NodeId{0});
 
     const JoinPlanCacheEntry* rawPtr = entry.get();
     cache.put("key", std::move(entry));

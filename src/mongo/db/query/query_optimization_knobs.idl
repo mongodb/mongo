@@ -1280,6 +1280,18 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: transformHoistMaximumPaths
+
+    internalEnableJoinPlanCache:
+        description: >-
+            Enables the join plan cache. Join-eligible queries will consult the cache when this is enabled.
+        set_at: [startup, runtime]
+        cpp_varname: "internalEnableJoinPlanCache"
+        cpp_vartype: AtomicWord<bool>
+        default: false
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: enableJoinPlanCache
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'
