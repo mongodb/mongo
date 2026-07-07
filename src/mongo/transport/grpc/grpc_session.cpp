@@ -35,6 +35,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/rpc/object_check.h"
 #include "mongo/transport/grpc/util.h"
 #include "mongo/util/base64.h"
 

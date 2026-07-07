@@ -55,8 +55,7 @@ class Status;
  */
 template <>
 struct Validator<BSONObj> {
-
-    inline static Status validateLoad(const char* ptr, size_t length) {
+    static Status validateLoad(const char* ptr, size_t length) {
         if (!serverGlobalParams.objcheck) {
             return Status::OK();
         }
@@ -77,6 +76,8 @@ struct Validator<BSONObj> {
         return status;
     }
 
-    static Status validateStore(const BSONObj& toStore);
+    static Status validateStore(const BSONObj& toStore) {
+        return Status::OK();
+    }
 };
 }  // namespace mongo

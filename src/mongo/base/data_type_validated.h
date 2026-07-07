@@ -67,7 +67,7 @@ namespace mongo {
 template <typename T>
 struct Validator {
     // These methods are intentionally unimplemented so that if the default validator
-    // is instantiated, the resulting binary will not link.
+    // is instantiated, the resulting binary will not compile.
 
     /**
      * Checks that the provided buffer contains at least 1 valid object of type T.
@@ -75,12 +75,12 @@ struct Validator {
      * Specializations of this function should be hardened to malicious input from untrusted
      * sources.
      */
-    static Status validateLoad(const char* ptr, size_t length);
+    static Status validateLoad(const char* ptr, size_t length) = delete;  // See class comment
 
     /**
      * Checks that the provided object is valid to store in a buffer.
      */
-    static Status validateStore(const T& toStore);
+    static Status validateStore(const T& toStore) = delete;  // See class comment
 };
 
 template <typename T>

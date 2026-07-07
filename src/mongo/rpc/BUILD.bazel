@@ -132,7 +132,6 @@ mongo_cc_library(
         "legacy_reply.cpp",
         "legacy_reply_builder.cpp",
         "legacy_request.cpp",
-        "object_check.cpp",
         "reply_builder_interface.cpp",
         ":object_check_gen",
     ],
