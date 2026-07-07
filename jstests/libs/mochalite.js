@@ -64,7 +64,10 @@ try {
 
 const redText = (msg) => `\x1b[31m${msg}\x1b[0m`;
 const stdout = (msg) => jsTest.log.info(msg);
-const stderr = (msg) => jsTest.log.error(redText(msg));
+// 'attr' carries the structured data that shell Errors optionally attach as 'error.extraAttr' (see
+// _getErrorWithCode in src/mongo/shell/utils.js). Forward it to jsTest.log.error so it is preserved
+// as structured log data rather than dropped.
+const stderr = (msg, attr) => jsTest.log.error(redText(msg), attr);
 
 /**
  * Reporter class for logging test results.
@@ -121,7 +124,11 @@ class Reporter {
 
         if (this.#failed.length > 0) {
             this.#failed.forEach(({headline, error}) => {
-                stderr(`✘ ${headline}\n${error.message}\n${error.stack}`);
+                // Normally the shell's uncaught-exception handler (logStatus in
+                // src/mongo/scripting/mozjs/shell/implscope.cpp) surfaces 'error.extraAttr'. Since
+                // we intercept failures here to aggregate them, we must honor that same convention
+                // ourselves so an assertion's 'attr' object survives into the logs.
+                stderr(`✘ ${headline}\n${error.message}\n${error.stack}`, error.extraAttr);
             });
             // finally throw to signal failure to the shell
             throw new Error(`${this.#failed.length} failing tests detected`);
