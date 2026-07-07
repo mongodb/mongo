@@ -62,11 +62,11 @@ TEST_F(SBEBsonSizeTest, ComputesSizeForBsonDocument) {
 
     slotAccessor.reset(value::TypeTags::bsonObject,
                        value::bitcastFrom<const char*>(bsonObj.objdata()));
-    auto [tag, val] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(tag, val);
+    value::TagValueOwned size =
+        value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-    ASSERT_EQUALS(value::TypeTags::NumberInt32, tag);
-    ASSERT_EQUALS(value::bitcastTo<int32_t>(val), bsonObj.objsize());
+    ASSERT_EQUALS(value::TypeTags::NumberInt32, size.tag());
+    ASSERT_EQUALS(value::bitcastTo<int32_t>(size.value()), bsonObj.objsize());
 }
 
 TEST_F(SBEBsonSizeTest, ComputesSizeForSbeObject) {
@@ -77,19 +77,18 @@ TEST_F(SBEBsonSizeTest, ComputesSizeForSbeObject) {
     auto compiledExpr = compileExpression(*bsonSizeExpr);
 
     auto [tagArg1, valArg1] = value::makeNewString("Test string element");
-    auto [tagArg2, valArg2] = value::makeNewObject();
-    auto obj = value::getObjectView(valArg2);
-    obj->push_back_raw("name", tagArg1, valArg1);
-    obj->push_back_raw("age", value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(32));
-    obj->push_back_raw("citizen", value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
-    value::ValueGuard argGuard(tagArg2, valArg2);
+    value::TagValueOwned obj = value::TagValueOwned::fromRaw(value::makeNewObject());
+    auto objView = value::getObjectView(obj.value());
+    objView->push_back_raw("name", tagArg1, valArg1);
+    objView->push_back_raw("age", value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(32));
+    objView->push_back_raw("citizen", value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
 
-    slotAccessor.reset(value::TypeTags::Object, valArg2);
-    auto [tag, val] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(tag, val);
+    slotAccessor.reset(value::TypeTags::Object, obj.value());
+    value::TagValueOwned size =
+        value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-    ASSERT_EQUALS(value::TypeTags::NumberInt32, tag);
-    ASSERT_EQUALS(value::bitcastTo<int32_t>(val), 54);
+    ASSERT_EQUALS(value::TypeTags::NumberInt32, size.tag());
+    ASSERT_EQUALS(value::bitcastTo<int32_t>(size.value()), 54);
 }
 
 TEST_F(SBEBsonSizeTest, ComputesSizeForLargeSbeObject) {
@@ -107,21 +106,20 @@ TEST_F(SBEBsonSizeTest, ComputesSizeForLargeSbeObject) {
     auto [tagStr2, valStr2] = value::makeNewString(std::string(longStringLength, 'B'));
     auto [tagStr3, valStr3] = value::makeNewString(std::string(longStringLength, 'C'));
     auto [tagStr4, valStr4] = value::makeNewString(std::string(longStringLength, 'D'));
-    auto [tagObj, valObj] = value::makeNewObject();
-    auto obj = value::getObjectView(valObj);
-    obj->push_back_raw("a", tagStr1, valStr1);
-    obj->push_back_raw("b", tagStr2, valStr2);
-    obj->push_back_raw("c", tagStr3, valStr3);
-    obj->push_back_raw("d", tagStr4, valStr4);
-    value::ValueGuard argGuard(tagObj, valObj);
+    value::TagValueOwned obj = value::TagValueOwned::fromRaw(value::makeNewObject());
+    auto objView = value::getObjectView(obj.value());
+    objView->push_back_raw("a", tagStr1, valStr1);
+    objView->push_back_raw("b", tagStr2, valStr2);
+    objView->push_back_raw("c", tagStr3, valStr3);
+    objView->push_back_raw("d", tagStr4, valStr4);
 
-    slotAccessor.reset(value::TypeTags::Object, valObj);
-    auto [tag, val] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(tag, val);
+    slotAccessor.reset(value::TypeTags::Object, obj.value());
+    value::TagValueOwned size =
+        value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
     // Must not throw BSONObjectTooLarge for objects larger than 16MiB.
-    ASSERT_EQUALS(value::TypeTags::NumberInt32, tag);
-    ASSERT_GT(value::bitcastTo<int32_t>(val), static_cast<int32_t>(BSONObjMaxUserSize));
+    ASSERT_EQUALS(value::TypeTags::NumberInt32, size.tag());
+    ASSERT_GT(value::bitcastTo<int32_t>(size.value()), static_cast<int32_t>(BSONObjMaxUserSize));
 }
 
 TEST_F(SBEBsonSizeTest, ReturnsNothingForNonObject) {
@@ -131,26 +129,25 @@ TEST_F(SBEBsonSizeTest, ReturnsNothingForNonObject) {
         sbe::makeE<sbe::EFunction>(EFn::kBsonSize, sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*bsonSizeExpr);
 
-    auto [tagArg1, valArg1] = value::makeNewString("Test string element");
-    value::ValueGuard guard1(tagArg1, valArg1);
+    value::TagValueOwned str =
+        value::TagValueOwned::fromRaw(value::makeNewString("Test string element"));
 
-    auto [tagArg2, valArg2] = value::makeNewArray();
-    value::ValueGuard guard2(tagArg2, valArg2);
-    auto arr = value::getArrayView(valArg2);
-    arr->push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(32));
-    auto [tagArg3, valArg3] = value::copyValue(tagArg1, valArg1);
-    arr->push_back_raw(tagArg3, valArg3);
+    value::TagValueOwned arr = value::TagValueOwned::fromRaw(value::makeNewArray());
+    auto arrView = value::getArrayView(arr.value());
+    arrView->push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(32));
+    auto [tagStrCopy, valStrCopy] = value::copyValue(str.tag(), str.value());
+    arrView->push_back_raw(tagStrCopy, valStrCopy);
 
     std::vector<std::pair<value::TypeTags, value::Value>> testData = {
         std::make_pair(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(12789)),
-        std::make_pair(tagArg1, valArg1),
-        std::make_pair(tagArg2, valArg2)};
+        std::make_pair(str.tag(), str.value()),
+        std::make_pair(arr.tag(), arr.value())};
 
     for (size_t i = 0; i < testData.size(); i++) {
         slotAccessor.reset(testData[i].first, testData[i].second);
-        auto [tag, val] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(tag, val);
-        ASSERT_EQUALS(value::TypeTags::Nothing, tag);
+        value::TagValueOwned size =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
+        ASSERT_EQUALS(value::TypeTags::Nothing, size.tag());
     }
 }
 

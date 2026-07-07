@@ -347,17 +347,16 @@ TEST_F(SBEDateDiffTest, BasicDateDiff) {
             // Execute the "dateDiff" function.
             auto result = runCompiledExpression(
                 (testCase.startOfWeek ? compiledDateDiffWithStartOfWeek : compiledDateDiff).get());
-            auto [resultTag, resultValue] = result;
-            value::ValueGuard resultGuard(resultTag, resultValue);
+            value::TagValueOwned resultOwned = value::TagValueOwned::fromRaw(result);
 
-            auto [compResultTag, compResultValue] = compareValue(resultTag,
-                                                                 resultValue,
-                                                                 testCase.expectedValue.first,
-                                                                 testCase.expectedValue.second);
-            value::ValueGuard compResultGuard(compResultTag, compResultValue);
+            value::TagValueOwned compResult =
+                value::TagValueOwned::fromRaw(compareValue(resultOwned.tag(),
+                                                           resultOwned.value(),
+                                                           testCase.expectedValue.first,
+                                                           testCase.expectedValue.second));
 
-            ASSERT_EQUALS(compResultTag, value::TypeTags::NumberInt32);
-            ASSERT_EQUALS(compResultValue, 0)
+            ASSERT_EQUALS(compResult.tag(), value::TypeTags::NumberInt32);
+            ASSERT_EQUALS(compResult.value(), 0)
                 << "Failed test #" << testNumber << ", result: " << result
                 << ", expected: " << testCase.expectedValue;
             ++testNumber;
@@ -384,15 +383,13 @@ TEST_F(SBEDateDiffTest, BasicDateDiff) {
                                  value::bitcastFrom<value::ValueBlock*>(&bitset));
 
             // Execute the "valueBlockDateDiff" function.
-            auto result = runCompiledExpression((testCase.startOfWeek
-                                                     ? compiledValueBlockDateDiffWithStartOfWeek
-                                                     : compiledValueBlockDateDiff)
-                                                    .get());
-            auto [resultTag, resultValue] = result;
-            value::ValueGuard resultGuard(resultTag, resultValue);
+            value::TagValueOwned result = value::TagValueOwned::fromRaw(runCompiledExpression(
+                (testCase.startOfWeek ? compiledValueBlockDateDiffWithStartOfWeek
+                                      : compiledValueBlockDateDiff)
+                    .get()));
 
-            assertBlockEq(resultTag,
-                          resultValue,
+            assertBlockEq(result.tag(),
+                          result.value(),
                           std::vector{std::pair(testCase.expectedValue.first,
                                                 testCase.expectedValue.second)});
         }

@@ -48,27 +48,27 @@ const TimeZone kDefaultTimeZone = TimeZoneDatabase::utcZone();
 class SBEDateExpressionAcceptingTimezoneTest : public EExpressionTestFixture {
 public:
     void runAndAssertNothing(const vm::CodeFragment* compiledExpr) {
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(runTag, runVal);
-        ASSERT_EQUALS(runTag, sbe::value::TypeTags::Nothing);
-        ASSERT_EQUALS(runVal, 0);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
+        ASSERT_EQUALS(result.tag(), sbe::value::TypeTags::Nothing);
+        ASSERT_EQUALS(result.value(), 0);
     }
 
     void runAndAssertExpression(const vm::CodeFragment* compiledExpr, int32_t expectedResult) {
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
 
-        ASSERT_EQUALS(value::TypeTags::NumberInt32, runTag);
-        ASSERT_EQUALS(expectedResult, value::bitcastTo<int32_t>(runVal));
+        ASSERT_EQUALS(value::TypeTags::NumberInt32, result.tag());
+        ASSERT_EQUALS(expectedResult, value::bitcastTo<int32_t>(result.value()));
     }
 
     void runAndAssertIsoWeekYearExpression(const vm::CodeFragment* compiledExpr,
                                            int64_t expectedResult) {
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
 
-        ASSERT_EQUALS(value::TypeTags::NumberInt64, runTag);
-        ASSERT_EQUALS(expectedResult, value::bitcastTo<int64_t>(runVal));
+        ASSERT_EQUALS(value::TypeTags::NumberInt64, result.tag());
+        ASSERT_EQUALS(expectedResult, value::bitcastTo<int64_t>(result.value()));
     }
 };
 

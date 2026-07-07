@@ -123,17 +123,18 @@ TEST_F(SBEDateFromStringTest, BasicDateFromString) {
 
         // Execute the "DateFromString" function.
         auto result = runCompiledExpression(compiledDateFromString.get());
-        auto [resultTag, resultValue] = result;
-        value::ValueGuard resultGuard(resultTag, resultValue);
+        value::TagValueOwned resultOwned = value::TagValueOwned::fromRaw(result);
 
-        auto [compResultTag, compResultValue] = compareValue(
-            resultTag, resultValue, testCase.expectedValue.first, testCase.expectedValue.second);
-        value::ValueGuard compResultGuard(compResultTag, compResultValue);
+        value::TagValueOwned compResult =
+            value::TagValueOwned::fromRaw(compareValue(resultOwned.tag(),
+                                                       resultOwned.value(),
+                                                       testCase.expectedValue.first,
+                                                       testCase.expectedValue.second));
 
-        ASSERT_EQUALS(compResultTag, value::TypeTags::NumberInt32)
+        ASSERT_EQUALS(compResult.tag(), value::TypeTags::NumberInt32)
             << "Failed test #" << testNumber << " when running dateFromString, result: " << result
             << ", expected: " << testCase.expectedValue;
-        ASSERT_EQUALS(compResultValue, 0)
+        ASSERT_EQUALS(compResult.value(), 0)
             << "Failed test #" << testNumber << " when running dateFromString, result: " << result
             << ", expected: " << testCase.expectedValue;
         ++testNumber;
@@ -194,18 +195,19 @@ TEST_F(SBEDateFromStringTest, DateFromStringNoFormat) {
 
         // Execute the "DateFromString" function.
         auto result = runCompiledExpression(compiledDateFromStringWithoutFormat.get());
-        auto [resultTag, resultValue] = result;
-        value::ValueGuard resultGuard(resultTag, resultValue);
+        value::TagValueOwned resultOwned = value::TagValueOwned::fromRaw(result);
 
-        auto [compResultTag, compResultValue] = compareValue(
-            resultTag, resultValue, testCase.expectedValue.first, testCase.expectedValue.second);
-        value::ValueGuard compResultGuard(compResultTag, compResultValue);
+        value::TagValueOwned compResult =
+            value::TagValueOwned::fromRaw(compareValue(resultOwned.tag(),
+                                                       resultOwned.value(),
+                                                       testCase.expectedValue.first,
+                                                       testCase.expectedValue.second));
 
-        ASSERT_EQUALS(compResultTag, value::TypeTags::NumberInt32)
+        ASSERT_EQUALS(compResult.tag(), value::TypeTags::NumberInt32)
             << "Failed test #" << testNumber
             << " when running dateFromString without format specified, result: " << result
             << ", expected: " << testCase.expectedValue;
-        ASSERT_EQUALS(compResultValue, 0)
+        ASSERT_EQUALS(compResult.value(), 0)
             << "Failed test #" << testNumber
             << " when running dateFromString without format specified, result: " << result
             << ", expected: " << testCase.expectedValue;
@@ -282,18 +284,19 @@ TEST_F(SBEDateFromStringTest, DateFromStringNoThrow) {
 
         // Execute the "DateFromStringNoThrow" function.
         auto result = runCompiledExpression(compiledDateFromStringNoThrow.get());
-        auto [resultTag, resultValue] = result;
-        value::ValueGuard resultGuard(resultTag, resultValue);
+        value::TagValueOwned resultOwned = value::TagValueOwned::fromRaw(result);
 
-        auto [compResultTag, compResultValue] = compareValue(
-            resultTag, resultValue, testCase.expectedValue.first, testCase.expectedValue.second);
-        value::ValueGuard compResultGuard(compResultTag, compResultValue);
+        value::TagValueOwned compResult =
+            value::TagValueOwned::fromRaw(compareValue(resultOwned.tag(),
+                                                       resultOwned.value(),
+                                                       testCase.expectedValue.first,
+                                                       testCase.expectedValue.second));
 
-        ASSERT_EQUALS(compResultTag, value::TypeTags::NumberInt32)
+        ASSERT_EQUALS(compResult.tag(), value::TypeTags::NumberInt32)
             << "Failed test #" << testNumber
             << " when running dateFromStringNoThrow, result: " << result
             << ", expected: " << testCase.expectedValue;
-        ASSERT_EQUALS(compResultValue, 0)
+        ASSERT_EQUALS(compResult.value(), 0)
             << "Failed test #" << testNumber
             << " when running dateFromStringNoThrow, result: " << result
             << ", expected: " << testCase.expectedValue;
@@ -361,18 +364,19 @@ TEST_F(SBEDateFromStringTest, DateFromStringNoThrowNoFormat) {
 
         // Execute the "DateFromStringNoThrow" function.
         auto result = runCompiledExpression(compiledDateFromStringNoThrowWithoutFormat.get());
-        auto [resultTag, resultValue] = result;
-        value::ValueGuard resultGuard(resultTag, resultValue);
+        value::TagValueOwned resultOwned = value::TagValueOwned::fromRaw(result);
 
-        auto [compResultTag, compResultValue] = compareValue(
-            resultTag, resultValue, testCase.expectedValue.first, testCase.expectedValue.second);
-        value::ValueGuard compResultGuard(compResultTag, compResultValue);
+        value::TagValueOwned compResult =
+            value::TagValueOwned::fromRaw(compareValue(resultOwned.tag(),
+                                                       resultOwned.value(),
+                                                       testCase.expectedValue.first,
+                                                       testCase.expectedValue.second));
 
-        ASSERT_EQUALS(compResultTag, value::TypeTags::NumberInt32)
+        ASSERT_EQUALS(compResult.tag(), value::TypeTags::NumberInt32)
             << "Failed test #" << testNumber
             << " when running dateFromStringNoThrow without format specified, result: " << result
             << ", expected: " << testCase.expectedValue;
-        ASSERT_EQUALS(compResultValue, 0)
+        ASSERT_EQUALS(compResult.value(), 0)
             << "Failed test #" << testNumber
             << " when running dateFromStringNoThrow without format specified, result: " << result
             << ", expected: " << testCase.expectedValue;

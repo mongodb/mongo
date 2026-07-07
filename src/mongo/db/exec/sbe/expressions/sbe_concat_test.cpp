@@ -54,18 +54,18 @@ class SBEConcatTest : public EExpressionTestFixture {
 protected:
     void runAndAssertExpression(const vm::CodeFragment* compiledExpr,
                                 std::string_view expectedVal) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
 
-        ASSERT(value::isString(tag));
-        ASSERT_EQUALS(value::getStringView(tag, val), expectedVal);
+        ASSERT(value::isString(result.tag()));
+        ASSERT_EQUALS(value::getStringView(result.tag(), result.value()), expectedVal);
     }
 
     void runAndAssertNothing(const vm::CodeFragment* compiledExpr) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
 
-        ASSERT_EQUALS(value::TypeTags::Nothing, tag);
+        ASSERT_EQUALS(value::TypeTags::Nothing, result.tag());
     }
 };
 

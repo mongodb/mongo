@@ -44,10 +44,10 @@ namespace mongo::sbe {
 class SBEDateToPartsTest : public EExpressionTestFixture {
 public:
     void runAndAssertNothing(const vm::CodeFragment* compiledExpr) {
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(runTag, runVal);
-        ASSERT_EQUALS(runTag, sbe::value::TypeTags::Nothing);
-        ASSERT_EQUALS(runVal, 0);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
+        ASSERT_EQUALS(result.tag(), sbe::value::TypeTags::Nothing);
+        ASSERT_EQUALS(result.value(), 0);
     }
 
     void runAndAssertExpression(const vm::CodeFragment* compiledExpr,
@@ -58,9 +58,9 @@ public:
                                 const int32_t& minute,
                                 const int32_t& second,
                                 const int32_t& millisecond) {
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(runTag, runVal);
-        auto obj = value::getObjectView(runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
+        auto obj = value::getObjectView(result.value());
 
         auto [yearTag, yearVal] = obj->getField("year");
         ASSERT_EQUALS(yearTag, value::TypeTags::NumberInt32);

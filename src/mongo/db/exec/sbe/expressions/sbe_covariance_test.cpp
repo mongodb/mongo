@@ -95,9 +95,11 @@ public:
 
             aggAccessor.reset(runTag, runVal);
             auto outSamp = runCompiledExpression(compiledCovarianceFinalizeSamp.get());
-            value::ValueGuard guardSamp{outSamp.first, outSamp.second};
+            value::TagValueOwned outSampOwned =
+                value::TagValueOwned::fromRaw(outSamp.first, outSamp.second);
             auto outPop = runCompiledExpression(compiledCovarianceFinalizePop.get());
-            value::ValueGuard guardPop{outPop.first, outPop.second};
+            value::TagValueOwned outPopOwned =
+                value::TagValueOwned::fromRaw(outPop.first, outPop.second);
 
             const double precisionLimit = 0.0001;
             ASSERT_THAT(outSamp, ValueRoughEq(expValuesSamp[i].raw(), precisionLimit));

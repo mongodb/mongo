@@ -61,10 +61,11 @@ public:
         auto compiledExpr = compileExpression(*expr);
         printCompiledExpression(os, *compiledExpr);
 
-        auto [tagActual, valActual] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(tagActual, valActual);
+        value::TagValueOwned actual =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_THAT(std::make_pair(tagActual, valActual), ValueEq(std::make_pair(tag, val)));
+        ASSERT_THAT(std::make_pair(actual.tag(), actual.value()),
+                    ValueEq(std::make_pair(tag, val)));
     }
 };
 

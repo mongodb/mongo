@@ -203,16 +203,15 @@ TEST_F(SBEDateToStringTest, BasicDateToString) {
         formatAccessor.reset(testCase.format.first, testCase.format.second);
 
         // Execute the "DateToString" function.
-        auto result = runCompiledExpression(compiledDateToString.get());
-        auto [resultTag, resultValue] = result;
-        value::ValueGuard resultGuard(resultTag, resultValue);
+        value::TagValueOwned resultString =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledDateToString.get()));
 
-        ASSERT(value::isString(resultTag))
-            << "Failed test #" << testNumber << ", result tag: " << resultTag
+        ASSERT(value::isString(resultString.tag()))
+            << "Failed test #" << testNumber << ", result tag: " << resultString.tag()
             << ", expected a string";
-        auto resultString = value::getStringView(resultTag, resultValue);
-        ASSERT_EQUALS(resultString, testCase.expectedValue)
-            << "Failed test #" << testNumber << ", result: " << resultString
+        auto resultStringView = value::getStringView(resultString.tag(), resultString.value());
+        ASSERT_EQUALS(resultStringView, testCase.expectedValue)
+            << "Failed test #" << testNumber << ", result: " << resultStringView
             << ", expected: " << testCase.expectedValue;
         ++testNumber;
     }
@@ -222,12 +221,12 @@ TEST_F(SBEDateToStringTest, BasicDateToString) {
         formatAccessor.reset(testCase.format.first, testCase.format.second);
 
         // Execute the "DateToString" function.
-        auto result = runCompiledExpression(compiledDateToString.get());
-        auto [resultTag, resultValue] = result;
-        value::ValueGuard resultGuard(resultTag, resultValue);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledDateToString.get()));
 
-        ASSERT_EQUALS(resultTag, value::TypeTags::Nothing)
-            << "Failed test #" << testNumber << ", result: " << result << ", expected Nothing";
+        ASSERT_EQUALS(result.tag(), value::TypeTags::Nothing)
+            << "Failed test #" << testNumber << ", result: " << result.tag()
+            << ", expected Nothing";
         ++testNumber;
     }
 }

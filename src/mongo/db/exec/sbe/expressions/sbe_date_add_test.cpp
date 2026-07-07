@@ -50,17 +50,17 @@ namespace mongo::sbe {
 class SBEBuiltinDateAddTest : public EExpressionTestFixture {
 protected:
     void runAndAssertExpression(const vm::CodeFragment* compiledExpr, int64_t expectedDate) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned dateResult =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
 
-        ASSERT_EQUALS(tag, sbe::value::TypeTags::Date);
-        ASSERT_EQ(value::bitcastTo<int64_t>(val), expectedDate);
+        ASSERT_EQUALS(dateResult.tag(), sbe::value::TypeTags::Date);
+        ASSERT_EQ(value::bitcastTo<int64_t>(dateResult.value()), expectedDate);
     }
 
     void runAndAssertNothing(const vm::CodeFragment* compiledExpr) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
-        ASSERT_EQUALS(tag, sbe::value::TypeTags::Nothing);
+        value::TagValueOwned nothingResult =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
+        ASSERT_EQUALS(nothingResult.tag(), sbe::value::TypeTags::Nothing);
     }
 };
 
