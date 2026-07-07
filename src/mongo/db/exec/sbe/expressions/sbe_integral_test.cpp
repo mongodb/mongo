@@ -157,12 +157,12 @@ public:
             auto [runTag, runVal] = runCompiledExpression(compiledExpr);
 
             aggAccessor.reset(runTag, runVal);
-            auto [outTag, outVal] = runCompiledExpression(compiledIntegralFinalize.get());
-            value::ValueGuard outGuard{outTag, outVal};
+            value::TagValueOwned outOwned = value::TagValueOwned::fromRaw(
+                runCompiledExpression(compiledIntegralFinalize.get()));
 
-            ASSERT_EQ(expValues[i].tag(), outTag);
-            auto [compareTag, compareVal] =
-                value::compareValue(expValues[i].tag(), expValues[i].value(), outTag, outVal);
+            ASSERT_EQ(expValues[i].tag(), outOwned.tag());
+            auto [compareTag, compareVal] = value::compareValue(
+                expValues[i].tag(), expValues[i].value(), outOwned.tag(), outOwned.value());
             ASSERT_EQ(compareTag, value::TypeTags::NumberInt32);
             ASSERT_EQ(value::bitcastTo<int32_t>(compareVal), 0);
         }

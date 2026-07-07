@@ -114,7 +114,7 @@ protected:
      */
     void runAndAssertExpression(TypedValue array, TypedValue index, TypedValue expectedRes) {
         auto actualValue = runExpression(array, index);
-        value::ValueGuard guard{actualValue};
+        value::TagValueOwned actualValueOwner = value::TagValueOwned::fromRaw(actualValue);
 
         auto [compareTag, compareValue] = value::compareValue(
             actualValue.first, actualValue.second, expectedRes.first, expectedRes.second);
@@ -129,7 +129,7 @@ protected:
 TEST_F(SBEBuiltinGetElementTest, GetElementBSONArray) {
     for (const auto& testCase : testCases) {
         auto bsonArray = makeBsonArray(testCase.array);
-        value::ValueGuard guard{bsonArray};
+        value::TagValueOwned bsonArrayOwner = value::TagValueOwned::fromRaw(bsonArray);
         runAndAssertExpression(bsonArray, testCase.index, testCase.expected);
     }
 }
@@ -137,7 +137,7 @@ TEST_F(SBEBuiltinGetElementTest, GetElementBSONArray) {
 TEST_F(SBEBuiltinGetElementTest, GetElementArray) {
     for (const auto& testCase : testCases) {
         auto array = makeArray(testCase.array);
-        value::ValueGuard guard{array};
+        value::TagValueOwned arrayOwner = value::TagValueOwned::fromRaw(array);
         runAndAssertExpression(array, testCase.index, testCase.expected);
     }
 }
@@ -150,21 +150,21 @@ TEST_F(SBEBuiltinGetElementTest, GetElementArraySetNothing) {
         }
 
         auto array = makeArraySet(testCase.array);
-        value::ValueGuard guard{array};
+        value::TagValueOwned arrayOwner = value::TagValueOwned::fromRaw(array);
         runAndAssertExpression(array, testCase.index, testCase.expected);
     }
 }
 
 TEST_F(SBEBuiltinGetElementTest, GetElementArraySetElements) {
     auto array = makeArraySet(BSON_ARRAY(1 << 2 << 3));
-    value::ValueGuard guard{array};
+    value::TagValueOwned arrayOwner = value::TagValueOwned::fromRaw(array);
 
     const std::vector<std::pair<int32_t, int32_t>> indices = {{-3, -1}, {0, 2}};
     for (const auto& [begin, end] : indices) {
         std::vector<int32_t> elements;
         for (int32_t i = begin; i <= end; ++i) {
             auto result = runExpression(array, makeInt32(i));
-            value::ValueGuard guard{result};
+            value::TagValueOwned resultOwner = value::TagValueOwned::fromRaw(result);
             ASSERT_EQ(result.first, value::TypeTags::NumberInt32);
             elements.push_back(value::bitcastTo<int32_t>(result.second));
         }

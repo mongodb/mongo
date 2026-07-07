@@ -56,7 +56,7 @@ protected:
         auto compiledExpr = compileExpression(*isArrayEmptyExpr);
 
         auto actualValue = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard actualValueGuard{actualValue};
+        value::TagValueOwned actualValueOwned = value::TagValueOwned::fromRaw(actualValue);
 
         auto [compareTag, compareValue] = value::compareValue(
             actualValue.first, actualValue.second, expectedRes.first, expectedRes.second);
@@ -68,12 +68,12 @@ protected:
 TEST_F(SBEBuiltinIsArrayEmptyTest, Array) {
     for (auto makeArrayFn : {makeBsonArray, makeArray, makeArraySet}) {
         auto emptyArray = makeArrayFn(BSONArray());
-        value::ValueGuard emptyArrayGuard{emptyArray};
+        value::TagValueOwned emptyArrayOwned = value::TagValueOwned::fromRaw(emptyArray);
 
         runAndAssertExpression(emptyArray, makeBool(true));
 
         auto notEmptyArray = makeArrayFn(BSON_ARRAY(1 << 2 << 3));
-        value::ValueGuard notEmptyArrayGuard{notEmptyArray};
+        value::TagValueOwned notEmptyArrayOwned = value::TagValueOwned::fromRaw(notEmptyArray);
 
         runAndAssertExpression(notEmptyArray, makeBool(false));
     }

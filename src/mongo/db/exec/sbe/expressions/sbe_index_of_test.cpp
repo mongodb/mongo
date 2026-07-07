@@ -44,16 +44,16 @@ namespace mongo::sbe {
 class SBEIndexOfTest : public EExpressionTestFixture {
 public:
     void runAndAssertNothing(const vm::CodeFragment* compiledExpr) {
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(runTag, runVal);
-        ASSERT_EQUALS(runTag, sbe::value::TypeTags::Nothing);
+        value::TagValueOwned runResult =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
+        ASSERT_EQUALS(runResult.tag(), sbe::value::TypeTags::Nothing);
     }
 
     void runAndAssertExpression(const vm::CodeFragment* compiledExpr, int expectedIndex) {
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(runTag, runVal);
-        ASSERT_EQUALS(value::TypeTags::NumberInt32, runTag);
-        ASSERT_EQUALS(expectedIndex, value::bitcastTo<int32_t>(runVal));
+        value::TagValueOwned runResult =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
+        ASSERT_EQUALS(value::TypeTags::NumberInt32, runResult.tag());
+        ASSERT_EQUALS(expectedIndex, value::bitcastTo<int32_t>(runResult.value()));
     }
 
     value::OwnedValueAccessor stringAccessor;

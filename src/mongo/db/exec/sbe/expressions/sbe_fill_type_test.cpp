@@ -52,8 +52,8 @@ TEST_F(SBEFillTypeTest, FillType) {
                                                                makeE<EVariable>(fillSlot)));
     auto compiledExpr = compileExpression(*fillTypeExpr);
 
-    auto [fillTag, fillVal] = value::makeNewString("hello world!"sv);
-    value::ValueGuard fillGuard{fillTag, fillVal};
+    value::TagValueOwned fill =
+        value::TagValueOwned::fromRaw(value::makeNewString("hello world!"sv));
 
     {
         // Test invalid type mask.
@@ -63,7 +63,7 @@ TEST_F(SBEFillTypeTest, FillType) {
 
         typeMaskAccessor.reset(typeMaskTag, typeMaskVal);
         inputAccessor.reset(inputTag, inputVal);
-        fillAccessor.reset(fillTag, fillVal);
+        fillAccessor.reset(fill.tag(), fill.value());
 
         auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
         ASSERT_EQ(runTag, value::TypeTags::Nothing);
@@ -80,9 +80,10 @@ TEST_F(SBEFillTypeTest, FillType) {
             auto [inputTag, inputVal] = makeNull();
             inputAccessor.reset(inputTag, inputVal);
 
-            auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-            value::ValueGuard runGuard{runTag, runVal};
-            ASSERT_THAT((std::pair{runTag, runVal}), ValueEq(std::pair{fillTag, fillVal}));
+            value::TagValueOwned result =
+                value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
+            ASSERT_THAT((std::pair{result.tag(), result.value()}),
+                        ValueEq(std::pair{fill.tag(), fill.value()}));
         }
 
         {
@@ -91,9 +92,10 @@ TEST_F(SBEFillTypeTest, FillType) {
             value::Value inputVal = value::Value{0u};
             inputAccessor.reset(inputTag, inputVal);
 
-            auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-            value::ValueGuard runGuard{runTag, runVal};
-            ASSERT_THAT((std::pair{runTag, runVal}), ValueEq(std::pair{fillTag, fillVal}));
+            value::TagValueOwned result =
+                value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
+            ASSERT_THAT((std::pair{result.tag(), result.value()}),
+                        ValueEq(std::pair{fill.tag(), fill.value()}));
         }
 
         {
@@ -107,13 +109,14 @@ TEST_F(SBEFillTypeTest, FillType) {
 
         {
             // Test with non-Nothing input that won't match the type mask.
-            auto [inputTag, inputVal] = makeArray(BSON_ARRAY(1 << 2 << 3));
-            value::ValueGuard inputGuard{inputTag, inputVal};
-            inputAccessor.reset(inputTag, inputVal);
+            value::TagValueOwned input =
+                value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(1 << 2 << 3)));
+            inputAccessor.reset(input.tag(), input.value());
 
-            auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-            value::ValueGuard runGuard{runTag, runVal};
-            ASSERT_THAT((std::pair{runTag, runVal}), ValueEq(std::pair{inputTag, inputVal}));
+            value::TagValueOwned result =
+                value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
+            ASSERT_THAT((std::pair{result.tag(), result.value()}),
+                        ValueEq(std::pair{input.tag(), input.value()}));
         }
     }
 }

@@ -138,14 +138,14 @@ protected:
     template <typename T>
     void runAndAssertExpression(const TestCase& testCase, T makeArrayFn) {
         auto array = makeArrayFn(testCase.array);
-        value::ValueGuard arrayGuard{array};
+        value::TagValueOwned arrayOwned = value::TagValueOwned::fromRaw(array);
 
         auto expectedResult =
             testCase.expectedResult ? makeArrayFn(*testCase.expectedResult) : makeNothing();
-        value::ValueGuard expectedResultGuard{expectedResult};
+        value::TagValueOwned expectedResultOwned = value::TagValueOwned::fromRaw(expectedResult);
 
         auto actualResult = runExpression(array, testCase.limit, testCase.skip);
-        value::ValueGuard actualResultGuard{actualResult};
+        value::TagValueOwned actualResultOwned = value::TagValueOwned::fromRaw(actualResult);
 
         auto [compareTag, compareValue] = value::compareValue(
             actualResult.first, actualResult.second, expectedResult.first, expectedResult.second);
@@ -179,7 +179,7 @@ TEST_F(SBEBuiltinExtractSubArrayTest, ArraySetNothing) {
 
 TEST_F(SBEBuiltinExtractSubArrayTest, ArraySet) {
     auto array = makeArraySet(BSON_ARRAY(1 << 2 << 3));
-    value::ValueGuard guard{array};
+    value::TagValueOwned arrayOwned = value::TagValueOwned::fromRaw(array);
 
     const std::vector<std::pair<TypedValue, boost::optional<TypedValue>>> limitAndSkip = {
         {makeInt32(3), boost::none},
@@ -191,11 +191,11 @@ TEST_F(SBEBuiltinExtractSubArrayTest, ArraySet) {
         {makeInt32(10), makeInt32(-10)},
     };
     for (const auto& [limit, skip] : limitAndSkip) {
-        auto [resultTag, resultValue] = runExpression(array, limit, skip);
-        value::ValueGuard guard{resultTag, resultValue};
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runExpression(array, limit, skip));
 
         std::vector<int32_t> elements;
-        value::ArrayEnumerator enumerator{resultTag, resultValue};
+        value::ArrayEnumerator enumerator{result.tag(), result.value()};
         while (!enumerator.atEnd()) {
             auto [tag, value] = enumerator.getViewOfValue();
             ASSERT_EQ(tag, value::TypeTags::NumberInt32);
@@ -240,10 +240,10 @@ TEST_F(SBEBuiltinExtractSubArrayTest, MemoryManagement) {
 
         auto compiledExpr = compileExpression(*extractFromSubArrayExpr);
 
-        auto [tag, value] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(tag, value);
-        ASSERT_TRUE(value::isString(tag));
-        ASSERT_EQ("Item#3", value::getStringView(tag, value));
+        value::TagValueOwned actual =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
+        ASSERT_TRUE(value::isString(actual.tag()));
+        ASSERT_EQ("Item#3", value::getStringView(actual.tag(), actual.value()));
     }
     {
         const auto [objTag, objVal] = value::makeNewObject();
@@ -270,10 +270,10 @@ TEST_F(SBEBuiltinExtractSubArrayTest, MemoryManagement) {
 
         auto compiledExpr = compileExpression(*extractFromSubArrayExpr);
 
-        auto [tag, value] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(tag, value);
-        ASSERT_TRUE(value::isString(tag));
-        ASSERT_EQ("not so small string"sv, value::getStringView(tag, value));
+        value::TagValueOwned actual =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
+        ASSERT_TRUE(value::isString(actual.tag()));
+        ASSERT_EQ("not so small string"sv, value::getStringView(actual.tag(), actual.value()));
     }
 }
 }  // namespace mongo::sbe
