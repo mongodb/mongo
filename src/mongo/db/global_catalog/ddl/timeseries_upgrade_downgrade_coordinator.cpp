@@ -74,11 +74,11 @@ namespace {
  * - If the collection is tracked, sends to all shards in the cluster.
  * - If the collection is untracked, sends only to the primary shard (this shard).
  */
-std::vector<ShardRef> getParticipantShards(OperationContext* opCtx, bool isTracked) {
+std::vector<ShardId> getParticipantShards(OperationContext* opCtx, bool isTracked) {
     if (isTracked) {
-        return Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
+        return Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
     } else {
-        return {ShardingState::get(opCtx)->asShardRef(opCtx)};
+        return {ShardingState::get(opCtx)->shardId()};
     }
 }
 
@@ -240,7 +240,7 @@ void TimeseriesUpgradeDowngradeCoordinator::_releaseCriticalSectionFor(
     OperationContext* opCtx,
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token,
-    const std::vector<ShardRef>& participants,
+    const std::vector<ShardId>& participants,
     const NamespaceString& nss) {
     const auto session = getNewSession(opCtx);
     sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
@@ -508,7 +508,7 @@ ExecutorFuture<void> TimeseriesUpgradeDowngradeCoordinator::_runImpl(
                     boost::none /* targetUUID */,
                     boost::none /* newTargetUUID */,
                     _doc.getAuthoritativeMetadataAccessLevel(),
-                    Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx),
+                    Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
                     session,
                     executor,
                     token);

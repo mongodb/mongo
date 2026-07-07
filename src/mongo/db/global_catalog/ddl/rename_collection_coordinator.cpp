@@ -171,7 +171,7 @@ void checkCollectionUUIDConsistencyAcrossShards(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const UUID& collectionUuid,
-    const std::vector<mongo::ShardRef>& shardRefs,
+    const std::vector<mongo::ShardId>& shardIds,
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) {
     const BSONObj filterObj = BSON("name" << nss.coll());
@@ -180,7 +180,7 @@ void checkCollectionUUIDConsistencyAcrossShards(
     command.setDbName(nss.dbName());
     auto opts =
         std::make_shared<async_rpc::AsyncRPCOptions<ListCollections>>(**executor, token, command);
-    auto responses = sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardRefs);
+    auto responses = sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 
     struct MismatchedShard {
         std::string shardId;
@@ -225,7 +225,7 @@ void checkCollectionUUIDConsistencyAcrossShards(
 void checkTargetCollectionDoesNotExistInCluster(
     OperationContext* opCtx,
     const NamespaceString& toNss,
-    const std::vector<mongo::ShardRef>& shardRefs,
+    const std::vector<mongo::ShardId>& shardIds,
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) {
     const BSONObj filterObj = BSON("name" << toNss.coll());
@@ -234,7 +234,7 @@ void checkTargetCollectionDoesNotExistInCluster(
     command.setDbName(toNss.dbName());
     auto opts =
         std::make_shared<async_rpc::AsyncRPCOptions<ListCollections>>(**executor, token, command);
-    auto responses = sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardRefs);
+    auto responses = sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 
     std::vector<std::string> shardsContainingTargetCollection;
     for (const auto& cmdResponse : responses) {
@@ -271,7 +271,7 @@ void checkCatalogConsistencyAcrossShards(OperationContext* opCtx,
                                          std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                          const CancellationToken& token) {
 
-    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
+    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
     auto sourceCollUuid = *getCollectionUUID(opCtx, fromNss, fromCollType);
     checkCollectionUUIDConsistencyAcrossShards(
@@ -829,7 +829,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
                         opCtx,
                         nss,
-                        Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx),
+                        Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
                         mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites,
                         reason,
                         _doc.getAuthoritativeMetadataAccessLevel(),
@@ -957,8 +957,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                                                                opSessionInfo);
 
                 auto getOtherParticipants = [&](const ShardId& mainParticipant) {
-                    auto participants =
-                        Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
+                    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
                     participants.erase(
                         std::remove(participants.begin(), participants.end(), mainParticipant),
                         participants.end());
@@ -966,7 +965,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 };
 
                 auto sendRequestTo = [&](const ShardsvrRenameCollectionParticipant& request,
-                                         const std::vector<ShardRef>& participants) {
+                                         const std::vector<ShardId>& participants) {
                     auto opts = std::make_shared<
                         async_rpc::AsyncRPCOptions<ShardsvrRenameCollectionParticipant>>(
                         **executor, token, request);
@@ -1055,7 +1054,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         _doc.getTargetUUID(),
                         _doc.getNewTargetCollectionUuid(),
                         _doc.getAuthoritativeMetadataAccessLevel(),
-                        Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx),
+                        Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
                         session,
                         executor,
                         token);
@@ -1092,8 +1091,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     fromNss, _doc.getSourceUUID().value());
                 unblockParticipantRequest.setDbName(fromNss.dbName());
                 unblockParticipantRequest.setRenameCollectionRequest(_request);
-                auto participants =
-                    Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
+                auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
                 generic_argument_util::setMajorityWriteConcern(unblockParticipantRequest);
                 generic_argument_util::setOperationSessionInfo(unblockParticipantRequest,

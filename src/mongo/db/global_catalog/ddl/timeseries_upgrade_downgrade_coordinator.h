@@ -91,7 +91,7 @@ private:
     void _releaseCriticalSectionFor(OperationContext* opCtx,
                                     std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                     const CancellationToken& token,
-                                    const std::vector<ShardRef>& participants,
+                                    const std::vector<ShardId>& participants,
                                     const NamespaceString& nss);
 
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,

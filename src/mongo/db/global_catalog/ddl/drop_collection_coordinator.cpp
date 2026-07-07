@@ -288,12 +288,12 @@ void DropCollectionCoordinator::_enterCriticalSection(
     const CancellationToken& token) {
     LOGV2_DEBUG(7038100, 2, "Acquiring critical section", logAttrs(nss()));
 
-    const auto shardRefs = Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
+    const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
     const auto session = getNewSession(opCtx);
     sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
         opCtx,
         nss(),
-        shardRefs,
+        shardIds,
         mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites,
         _critSecReason,
         _doc.getAuthoritativeMetadataAccessLevel(),
@@ -387,7 +387,7 @@ void DropCollectionCoordinator::_commitDropCollection(
                 opCtx,
                 nss(),
                 _doc.getCollInfo()->getUuid(),
-                Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx),
+                Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
                 session,
                 executor,
                 token);
@@ -410,7 +410,7 @@ void DropCollectionCoordinator::_commitDropCollection(
     //    operations get cleaned up).
     //    The change streams notifier will be the only one emitting a user-visible commit op-entry
     //    (fromMigrate = false).
-    const auto sendParticipantCommand = [&](const std::vector<ShardRef> recipients,
+    const auto sendParticipantCommand = [&](const std::vector<ShardId> recipients,
                                             bool fromMigrate) {
         const auto session = getNewSession(opCtx);
         sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
@@ -427,7 +427,7 @@ void DropCollectionCoordinator::_commitDropCollection(
             false /* requireCollectionEmpty */);
     };
 
-    auto otherParticipants = Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
+    auto otherParticipants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
     otherParticipants.erase(std::remove(otherParticipants.begin(),
                                         otherParticipants.end(),
                                         changeStreamsNotifierShardId),
@@ -474,12 +474,12 @@ void DropCollectionCoordinator::_exitCriticalSection(
     const CancellationToken& token) {
     LOGV2_DEBUG(7038102, 2, "Releasing critical section", logAttrs(nss()));
 
-    const auto shardRefs = Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
+    const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
     const auto session = getNewSession(opCtx);
     sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
         opCtx,
         nss(),
-        shardRefs,
+        shardIds,
         CriticalSectionBlockTypeEnum::kUnblock,
         _critSecReason,
         _doc.getAuthoritativeMetadataAccessLevel(),

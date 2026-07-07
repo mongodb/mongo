@@ -35,7 +35,7 @@ template std::vector<AsyncRequestsSender::Response>
 sendAuthenticatedCommandToShards<write_ops::UpdateCommandRequest>(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<write_ops::UpdateCommandRequest>> originalOpts,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const boost::optional<std::vector<ShardVersion>>& shardVersions,
     ReadPreferenceSetting readPref,
     bool throwOnError);
@@ -44,7 +44,7 @@ template std::vector<AsyncRequestsSender::Response>
 sendAuthenticatedCommandToShards<ShardsvrDropCollectionParticipant>(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<ShardsvrDropCollectionParticipant>> originalOpts,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const boost::optional<std::vector<ShardVersion>>& shardVersions,
     ReadPreferenceSetting readPref,
     bool throwOnError);
@@ -53,7 +53,7 @@ template std::vector<AsyncRequestsSender::Response>
 sendAuthenticatedCommandToShards<ShardsvrCommitCreateDatabaseMetadata>(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<ShardsvrCommitCreateDatabaseMetadata>> originalOpts,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const boost::optional<std::vector<ShardVersion>>& shardVersions,
     ReadPreferenceSetting readPref,
     bool throwOnError);
@@ -62,7 +62,7 @@ template std::vector<AsyncRequestsSender::Response>
 sendAuthenticatedCommandToShards<ShardsvrCommitDropDatabaseMetadata>(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<ShardsvrCommitDropDatabaseMetadata>> originalOpts,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const boost::optional<std::vector<ShardVersion>>& shardVersions,
     ReadPreferenceSetting readPref,
     bool throwOnError);

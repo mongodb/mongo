@@ -330,18 +330,6 @@ public:
     std::vector<ShardId> getAllShardIds(OperationContext* opCtx);
 
     /**
-     * Returns a vector containing all known shards as ShardRefs.
-     * The order of the elements is not guaranteed. Do not add any usage of this method; Contact the
-     * Catalog And Routing team when in doubt.
-     *
-     * TODO SERVER-127411: temporary convenience until ShardRegistry data exposes ShardRefs
-     * directly. Always returns string-variant refs, so the results must NOT be compared against
-     * feature-flag-aware refs (e.g. ShardHandle::toShardRef(opCtx)), which may hold the UUID
-     * variant.
-     */
-    std::vector<ShardRef> getAllShardRefs_UNSAFE(OperationContext* opCtx);
-
-    /**
      * Returns the number of shards.
      */
     int getNumShards(OperationContext* opCtx);

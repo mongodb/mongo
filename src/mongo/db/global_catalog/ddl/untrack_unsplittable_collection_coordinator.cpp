@@ -154,7 +154,7 @@ void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
             opCtx,
             nss(),
             coll.getUuid(),
-            Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx),
+            Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
             session,
             executor,
             token);
@@ -167,7 +167,7 @@ void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
 
     // We need to send the drop to all the shards because movePrimary leaves garbage behind for
     // unsplittable collections.
-    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
+    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
     // Remove primary shard from participants
     const auto primaryShardId = ShardingState::get(opCtx)->shardId();
     participants.erase(std::remove(participants.begin(), participants.end(), primaryShardId),

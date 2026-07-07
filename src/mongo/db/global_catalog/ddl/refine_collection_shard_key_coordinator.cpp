@@ -98,14 +98,14 @@ std::vector<ShardId> getShardsWithDataForCollection(OperationContext* opCtx,
     return std::vector<ShardId>(vecsSet.begin(), vecsSet.end());
 }
 
-std::vector<ShardRef> getDataShardsAndDbPrimaryShard(OperationContext* opCtx,
-                                                     const NamespaceString& nss) {
+std::vector<ShardId> getDataShardsAndDbPrimaryShard(OperationContext* opCtx,
+                                                    const NamespaceString& nss) {
     auto shards = getShardsWithDataForCollection(opCtx, nss);
     const auto primaryShardId = ShardingState::get(opCtx)->shardId();
     if (std::find(shards.begin(), shards.end(), primaryShardId) == shards.end()) {
         shards.push_back(primaryShardId);
     }
-    return std::vector<ShardRef>(shards.cbegin(), shards.cend());
+    return shards;
 }
 
 }  // namespace

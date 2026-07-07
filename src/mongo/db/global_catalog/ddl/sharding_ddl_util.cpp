@@ -644,7 +644,7 @@ write_ops::UpdateCommandRequest buildNoopWriteRequestCommand() {
 void sendShardsvrParticipantBlockCommandToShards(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const CriticalSectionBlockTypeEnum blockType,
     boost::optional<BSONObj> reason,
     AuthoritativeMetadataAccessLevelEnum authoritativeMetadataAccessLevel,
@@ -670,12 +670,12 @@ void sendShardsvrParticipantBlockCommandToShards(
 
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
         **executor, token, std::move(request));
-    sendAuthenticatedCommandToShards(opCtx, opts, shardRefs);
+    sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
 void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
                                                   const NamespaceString& nss,
-                                                  const std::vector<ShardRef>& shardRefs,
+                                                  const std::vector<ShardId>& shardIds,
                                                   std::shared_ptr<executor::TaskExecutor> executor,
                                                   const CancellationToken& token,
                                                   const OperationSessionInfo& osi,
@@ -694,7 +694,7 @@ void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
     generic_argument_util::setMajorityWriteConcern(dropCollectionParticipant);
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrDropCollectionParticipant>>(
         executor, token, dropCollectionParticipant);
-    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardRefs);
+    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
 BSONObj getCriticalSectionReasonForRename(const NamespaceString& from, const NamespaceString& to) {
@@ -970,13 +970,12 @@ void commitDropDatabaseMetadataToShardCatalog(
 
 void sendFetchCollMetadataToShards(OperationContext* opCtx,
                                    const NamespaceString& nss,
-                                   const std::vector<ShardRef>& shardRefs,
-                                   const ShardRef& primaryShardRef,
+                                   const std::vector<ShardId>& shardIds,
+                                   const ShardId& primaryShardId,
                                    const OperationSessionInfo& osi,
                                    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
                                    const CancellationToken& token) {
-    // TODO SERVER-129097: getShardId() will fail once UUIDs are in play
-    ShardsvrFetchCollMetadata request(nss, primaryShardRef.getShardId());
+    ShardsvrFetchCollMetadata request(nss, primaryShardId);
     request.setDbName(DatabaseName::kAdmin);
 
     generic_argument_util::setMajorityWriteConcern(request);
@@ -985,7 +984,7 @@ void sendFetchCollMetadataToShards(OperationContext* opCtx,
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrFetchCollMetadata>>(
         **executor, token, std::move(request));
 
-    sendAuthenticatedCommandToShards(opCtx, opts, shardRefs);
+    sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
 void cloneAuthoritativeCollectionMetadataToShards(
@@ -1001,23 +1000,23 @@ void cloneAuthoritativeCollectionMetadataToShards(
     uassert(ErrorCodes::RequestAlreadyFulfilled,
             str::stream() << "The collection " << nss.toStringForErrorMsg() << " is not tracked",
             cm.hasRoutingTable());
-    std::set<ShardRef> shardRefs;
+    std::set<ShardId> shardSet;
     for (const auto& shardId : Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx)) {
-        shardRefs.insert(ShardRef(shardId));
+        shardSet.insert(shardId);
     }
 
     // The DB primary must always know that a collection is tracked, even when it owns no chunks.
-    shardRefs.insert(ShardRef(primaryShardId));
-    const std::vector<ShardRef> shardRefList(shardRefs.begin(), shardRefs.end());
+    shardSet.insert(primaryShardId);
+    const std::vector<ShardId> shardIds(shardSet.begin(), shardSet.end());
 
     sendFetchCollMetadataToShards(
-        opCtx, nss, shardRefList, primaryShardId, osiGenerator(), executor, token);
+        opCtx, nss, shardIds, primaryShardId, osiGenerator(), executor, token);
 }
 
 void commitRefineCollectionShardKeyToShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
@@ -1031,13 +1030,13 @@ void commitRefineCollectionShardKeyToShardCatalog(
         std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrCommitRefineCollectionShardKey>>(
             **executor, token, std::move(request));
 
-    sendAuthenticatedCommandToShards(opCtx, opts, shardRefs);
+    sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
 void commitCollModCollectionMetadataToShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
@@ -1051,14 +1050,14 @@ void commitCollModCollectionMetadataToShardCatalog(
         std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrCommitCollModCollectionMetadata>>(
             **executor, token, std::move(request));
 
-    sendAuthenticatedCommandToShards(opCtx, opts, shardRefs);
+    sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
 void commitDropCollectionMetadataToShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const UUID& uuid,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
@@ -1072,13 +1071,13 @@ void commitDropCollectionMetadataToShardCatalog(
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrCommitDropCollectionMetadata>>(
         **executor, token, std::move(request));
 
-    sendAuthenticatedCommandToShards(opCtx, opts, shardRefs);
+    sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
 void commitCreateCollectionMetadataToShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
@@ -1098,7 +1097,7 @@ void commitCreateCollectionMetadataToShardCatalog(
         std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrCommitCreateCollectionMetadata>>(
             **executor, token, std::move(request));
 
-    sendAuthenticatedCommandToShards(opCtx, opts, shardRefs);
+    sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
 void commitRenameCollectionMetadataToShardCatalog(
@@ -1109,7 +1108,7 @@ void commitRenameCollectionMetadataToShardCatalog(
     const boost::optional<UUID>& targetUuid,
     const boost::optional<UUID>& newTargetUuid,
     AuthoritativeMetadataAccessLevelEnum authoritativeAccessLevel,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
@@ -1135,13 +1134,13 @@ void commitRenameCollectionMetadataToShardCatalog(
     auto opts =
         std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrCommitRenameCollectionMetadata>>(
             **executor, token, request);
-    sendAuthenticatedCommandToShards(opCtx, std::move(opts), shardRefs);
+    sendAuthenticatedCommandToShards(opCtx, std::move(opts), shardIds);
 }
 
 void commitCreateCollectionChunklessMetadataToShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
@@ -1154,14 +1153,14 @@ void commitCreateCollectionChunklessMetadataToShardCatalog(
     auto opts = std::make_shared<
         async_rpc::AsyncRPCOptions<ShardsvrCommitCreateCollectionChunklessMetadata>>(
         **executor, token, std::move(request));
-    sendAuthenticatedCommandToShards(opCtx, opts, shardRefs);
+    sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
 void commitChunkOperationsMetadataToShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,
     std::vector<BSONObj> newChunkDocs,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
@@ -1181,7 +1180,7 @@ void commitChunkOperationsMetadataToShardCatalog(
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrCommitChunkOperationsMetadata>>(
         **executor, token, std::move(request));
 
-    sendAuthenticatedCommandToShards(opCtx, opts, shardRefs);
+    sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
 AuthoritativeMetadataAccessLevelEnum getGrantedAuthoritativeMetadataAccessLevel(

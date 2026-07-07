@@ -106,9 +106,7 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandWithOsiToShar
     WriteConcernOptions wc = WriteConcernOptions()) {
     generic_argument_util::setMajorityWriteConcern(opts->cmd.getGenericArguments(), &wc);
     generic_argument_util::setOperationSessionInfo(opts->cmd.getGenericArguments(), osi);
-    std::vector<ShardRef> shardRefs(shardIds.begin(), shardIds.end());
-    return sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, opts, shardRefs, throwOnError);
+    return sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds, throwOnError);
 }
 
 // Extract the first response from the list of shardResponses, and propagate to the global level of
@@ -163,12 +161,7 @@ void commitToShardCatalog(OperationContext* opCtx,
 
     const auto session = getSession();
     sharding_ddl_util::commitCollModCollectionMetadataToShardCatalog(
-        opCtx,
-        nss,
-        std::vector<ShardRef>(shardIds.cbegin(), shardIds.cend()),
-        session,
-        executor,
-        token);
+        opCtx, nss, shardIds, session, executor, token);
 }
 
 }  // namespace
@@ -401,7 +394,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                     sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
                         opCtx,
                         _collInfo->nsForTargeting,
-                        std::vector<ShardRef>(shards.cbegin(), shards.cend()),
+                        shards,
                         CriticalSectionBlockTypeEnum::kReadsAndWrites,
                         boost::none /* reason */,
                         _doc.getAuthoritativeMetadataAccessLevel(),
@@ -477,9 +470,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                             auto optsDryRun = std::make_shared<
                                 async_rpc::AsyncRPCOptions<ShardsvrCollModParticipant>>(
                                 **executor, token, dryRunRequest);
-                            std::vector<ShardRef> shards(
-                                _shardingInfo->participantsOwningChunks.cbegin(),
-                                _shardingInfo->participantsOwningChunks.cend());
+                            std::vector<ShardId> shards = _shardingInfo->participantsOwningChunks;
                             if (_shardingInfo->isPrimaryOwningChunks) {
                                 shards.push_back(_shardingInfo->primaryShard);
                             }

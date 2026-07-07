@@ -90,15 +90,15 @@ void tellShardsToRefreshCollection(OperationContext* opCtx,
 }
 
 void triggerFireAndForgetShardRefreshes(OperationContext* opCtx,
-                                        const std::vector<ShardRef>& shardRefs,
+                                        const std::vector<ShardId>& shardIds,
                                         const NamespaceString& nss) {
     auto cmd = FlushRoutingTableCacheUpdates(nss);
     cmd.setSyncFromConfig(true);
     cmd.setDbName(nss.dbName());
 
-    for (const auto& shardRef : shardRefs) {
+    for (const auto& shardId : shardIds) {
         auto recipientShard =
-            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardRef));
+            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
 
         recipientShard->runFireAndForgetCommand(opCtx,
                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},

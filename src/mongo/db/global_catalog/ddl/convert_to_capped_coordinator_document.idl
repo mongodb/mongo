@@ -73,7 +73,7 @@ structs:
                 type: uuid
                 optional: true
             dataShard:
-                type: shard_ref
+                type: shard_id
                 description: >-
                     The data shard that the collection lives on.
                 optional: true

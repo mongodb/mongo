@@ -80,14 +80,14 @@ sendAuthenticatedCommandToShards(
     const std::map<ShardId, ShardVersion>& shardIdsToShardVersions,
     const ReadPreferenceSetting readPref,
     bool throwOnError) {
-    std::vector<ShardRef> shardRefs;
+    std::vector<ShardId> shardIds;
     std::vector<ShardVersion> shardVersions;
     for (auto const& [shardId, shardVersion] : shardIdsToShardVersions) {
-        shardRefs.push_back(ShardRef{shardId});
+        shardIds.push_back(shardId);
         shardVersions.push_back(shardVersion);
     }
     return sharding_ddl_util_detail::sendAuthenticatedCommandToShards(
-        opCtx, originalOpts, shardRefs, shardVersions, readPref, throwOnError);
+        opCtx, originalOpts, shardIds, shardVersions, readPref, throwOnError);
 }
 
 template <typename CommandType>
@@ -95,12 +95,12 @@ MONGO_MOD_NEEDS_REPLACEMENT std::vector<AsyncRequestsSender::Response>
 sendAuthenticatedCommandToShards(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> originalOpts,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     bool throwOnError = true) {
     return sharding_ddl_util_detail::sendAuthenticatedCommandToShards(
         opCtx,
         originalOpts,
-        shardRefs,
+        shardIds,
         boost::none /* shardVersions */,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         throwOnError);
@@ -289,7 +289,7 @@ MONGO_MOD_NEEDS_REPLACEMENT write_ops::UpdateCommandRequest buildNoopWriteReques
 MONGO_MOD_PRIVATE void sendShardsvrParticipantBlockCommandToShards(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     CriticalSectionBlockTypeEnum blockType,
     boost::optional<BSONObj> reason,
     AuthoritativeMetadataAccessLevelEnum authoritativeMetadataAccessLevel,
@@ -304,7 +304,7 @@ MONGO_MOD_PRIVATE void sendShardsvrParticipantBlockCommandToShards(
 MONGO_MOD_NEEDS_REPLACEMENT void sendDropCollectionParticipantCommandToShards(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     std::shared_ptr<executor::TaskExecutor> executor,
     const CancellationToken& token,
     const OperationSessionInfo& osi,
@@ -419,8 +419,8 @@ MONGO_MOD_NEEDS_REPLACEMENT void commitDropDatabaseMetadataToShardCatalog(
 MONGO_MOD_NEEDS_REPLACEMENT void sendFetchCollMetadataToShards(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const std::vector<ShardRef>& shardRefs,
-    const ShardRef& primaryShardRef,
+    const std::vector<ShardId>& shardIds,
+    const ShardId& primaryShardId,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token);
@@ -446,7 +446,7 @@ MONGO_MOD_PARENT_PRIVATE void cloneAuthoritativeCollectionMetadataToShards(
 MONGO_MOD_PRIVATE void commitRefineCollectionShardKeyToShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token);
@@ -458,7 +458,7 @@ MONGO_MOD_PRIVATE void commitRefineCollectionShardKeyToShardCatalog(
 MONGO_MOD_PRIVATE void commitCollModCollectionMetadataToShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token);
@@ -471,7 +471,7 @@ MONGO_MOD_PRIVATE void commitDropCollectionMetadataToShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const UUID& uuid,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token);
@@ -490,7 +490,7 @@ MONGO_MOD_PRIVATE void commitDropCollectionMetadataToShardCatalog(
 MONGO_MOD_NEEDS_REPLACEMENT void commitCreateCollectionMetadataToShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token);
@@ -502,7 +502,7 @@ MONGO_MOD_NEEDS_REPLACEMENT void commitCreateCollectionMetadataToShardCatalog(
 MONGO_MOD_PRIVATE void commitCreateCollectionChunklessMetadataToShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token);
@@ -519,7 +519,7 @@ MONGO_MOD_PRIVATE void commitRenameCollectionMetadataToShardCatalog(
     const boost::optional<UUID>& targetUuid,
     const boost::optional<UUID>& newTargetUuid,
     AuthoritativeMetadataAccessLevelEnum authoritativeAccessLevel,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token);
@@ -541,7 +541,7 @@ MONGO_MOD_PRIVATE void commitChunkOperationsMetadataToShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,
     std::vector<BSONObj> newChunkDocs,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token);
