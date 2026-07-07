@@ -39,7 +39,15 @@ assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {x: 1}}));
 
 // shard0 owns docs with shard key [MinKey, 0), shard1 owns docs with shard key [0, MaxKey).
 assert.commandWorked(
-    st.s.adminCommand({moveRange: ns, min: {x: 0}, max: {x: MaxKey}, toShard: st.shard1.shardName}),
+    st.s.adminCommand({moveRange: ns, min: {x: 0}, max: {x: 10}, toShard: st.shard1.shardName}),
+);
+assert.commandWorked(
+    st.s.adminCommand({
+        moveRange: ns,
+        min: {x: 10},
+        max: {x: MaxKey},
+        toShard: st.shard1.shardName,
+    }),
 );
 
 // Insert ~20MB of docs with different shard keys (10MB on shard0 and 10MB on shard1)
@@ -52,8 +60,6 @@ for (let i = -10; i < 10; i++) {
     bulk.insert({x: jumboKey, big: big});
 }
 assert.commandWorked(bulk.execute());
-
-assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 10}}));
 
 // Check that there are 3 chunks before starting draining.
 const chunksBeforeDrain = findChunksUtil.findChunksByNs(configDB, ns).toArray();

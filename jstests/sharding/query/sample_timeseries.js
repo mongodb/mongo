@@ -37,19 +37,13 @@ assert.commandWorked(
 const testColl = testDB[collName];
 
 function defineChunks() {
-    function splitAndMove(city, minTime, destination) {
+    function move(city, minTime, destination) {
         assert.commandWorked(
             st.s.adminCommand({
-                split: getTimeseriesCollForDDLOps(testDB, testColl).getFullName(),
-                middle: {"meta.city": city, "control.min.time": minTime},
-            }),
-        );
-        assert.commandWorked(
-            st.s.adminCommand({
-                movechunk: getTimeseriesCollForDDLOps(testDB, testColl).getFullName(),
-                find: {"meta.city": city, "control.min.time": minTime},
-                to: destination.shardName,
-                _waitForDelete: true,
+                moveRange: getTimeseriesCollForDDLOps(testDB, testColl).getFullName(),
+                min: {"meta.city": city, "control.min.time": minTime},
+                toShard: destination.shardName,
+                waitForDelete: true,
             }),
         );
     }
@@ -59,9 +53,9 @@ function defineChunks() {
     // {Cork, 2021-05-18::9:00 - Dublin} - OtherShard
     // {Dublin - Galway,2021-05-18::8:00} - PrimaryShard
     // {Galway, 2021-05-18::9:00 - MaxKey} - OtherShard
-    splitAndMove("Cork", ISODate("2021-05-18T09:00:00.000Z"), otherShard);
-    splitAndMove("Dublin", MinKey, primary);
-    splitAndMove("Galway", ISODate("2021-05-18T08:00:00.000Z"), otherShard);
+    move("Cork", ISODate("2021-05-18T09:00:00.000Z"), otherShard);
+    move("Dublin", MinKey, primary);
+    move("Galway", ISODate("2021-05-18T08:00:00.000Z"), otherShard);
 }
 
 function setUpTestColl(generateAdditionalData) {

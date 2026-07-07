@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/db/global_catalog/type_chunk_range.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -74,6 +75,8 @@ public:
      * Constructs a start chunk clone command with the specified parameters and writes it to the
      * builder, without closing the builder. The builder must be empty, but callers are free to
      * append more fields once the command has been constructed.
+     *
+     * TODO (SERVER-127253) Make enclosingChunk parameter non-optional once v9.0 branches out.
      */
     static void appendAsCommand(BSONObjBuilder* builder,
                                 const NamespaceString& nss,
@@ -88,6 +91,7 @@ public:
                                 const BSONObj& chunkMaxKey,
                                 const BSONObj& shardKeyPattern,
                                 const MigrationSecondaryThrottleOptions& secondaryThrottle,
+                                const boost::optional<ChunkRange>& enclosingChunk,
                                 bool isAuthoritative);
 
     const NamespaceString& getNss() const {
@@ -135,6 +139,13 @@ public:
         return _maxKey;
     }
 
+    // The donor chunk enclosing the migrated range.
+    // Present only on the authoritative path (driven by the MoveRangeCoordinator), so its presence
+    // is also the signal that the recipient should run the shard-catalog PIT-reachability check.
+    const boost::optional<ChunkRange>& getEnclosingChunk() const {
+        return _enclosingChunk;
+    }
+
     const BSONObj& getShardKeyPattern() const {
         return _shardKeyPattern;
     }
@@ -177,6 +188,12 @@ private:
     // Exact min and max key of the chunk being moved
     BSONObj _minKey;
     BSONObj _maxKey;
+
+    // The donor chunk that encloses the migrated range (equal to it for a whole-chunk move, wider
+    // for a moveRange that splits the chunk). Absent on requests from a pre-upgrade donor and on
+    // the legacy (non-authoritative) path.
+    // TODO (SERVER-127253) Make this parameter non-optional once v9.0 branches out.
+    boost::optional<ChunkRange> _enclosingChunk;
 
     // Shard key pattern used by the collection
     BSONObj _shardKeyPattern;

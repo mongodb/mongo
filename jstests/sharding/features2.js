@@ -134,11 +134,14 @@ assert.eq(2, s.onNumShards("test", "mr"), "E1");
 
 doMR("after");
 
-s.adminCommand({split: "test.mr", middle: {x: 3}});
-s.adminCommand({split: "test.mr", middle: {x: 4}});
-s.adminCommand({movechunk: "test.mr", find: {x: 3}, to: s.getPrimaryShard("test").name});
+s.adminCommand({
+    moveRange: "test.mr",
+    min: {x: 3},
+    max: {x: 4},
+    toShard: s.getPrimaryShard("test").name,
+});
 
-doMR("after extra split");
+doMR("after moveRange");
 
 let cmd = {mapreduce: "mr", map: "emit( ", reduce: "fooz + ", out: "broken1"};
 

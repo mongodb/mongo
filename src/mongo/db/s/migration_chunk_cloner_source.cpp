@@ -324,6 +324,7 @@ Status MigrationChunkClonerSource::startClone(OperationContext* opCtx,
                                               const UUID& migrationId,
                                               const LogicalSessionId& lsid,
                                               TxnNumber txnNumber,
+                                              const boost::optional<ChunkRange>& enclosingChunk,
                                               bool isAuthoritative) {
     invariant(_state == kNew);
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
@@ -380,6 +381,7 @@ Status MigrationChunkClonerSource::startClone(OperationContext* opCtx,
                                             getMax(),
                                             _shardKeyPattern.toBSON(),
                                             secondaryThrottleOptions,
+                                            enclosingChunk,
                                             isAuthoritative);
 
     // Commands sent to shards that accept writeConcern, must always have writeConcern. So if the

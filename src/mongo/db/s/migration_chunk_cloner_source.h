@@ -36,6 +36,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
+#include "mongo/db/global_catalog/type_chunk_range.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
@@ -223,11 +224,17 @@ public:
      *
      * NOTE: Must be called without any locks and must succeed, before any other methods are called
      * (except for cancelClone and [insert/update/delete]Op).
+     *
+     * The parameter 'enclosingChunk' is NOT the range to be moved; instead it is the chunk that
+     * encloses the migrated range. It is required by the recipient to know whether the migration
+     * should be aborted to prevent losing point-in-time accessibility.
+     * TODO (SERVER-127253) Make this parameter non-optional once v9.0 branches out.
      */
     Status startClone(OperationContext* opCtx,
                       const UUID& migrationId,
                       const LogicalSessionId& lsid,
                       TxnNumber txnNumber,
+                      const boost::optional<ChunkRange>& enclosingChunk,
                       bool isAuthoritative);
 
     /**

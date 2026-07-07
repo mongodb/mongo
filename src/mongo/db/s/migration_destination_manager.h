@@ -265,6 +265,33 @@ public:
                                                                      const BSONObj& min,
                                                                      const BSONObj& max);
 
+    /**
+     * Returns true if accepting a migration would drop point-in-time (PIT) reachable ownership
+     * history from this shard's local catalog. In that case, the migration must be rejected.
+     *
+     * A migration performed through the MoveRangeCoordinator updates only the chunks that changed
+     * in the shard catalog: the control chunk and the chunks split and migrated as part of the
+     * move. The recipient is given the range that will be replaced on the shard catalog commit,
+     * called 'enclosingChunk' (the original donor chunk that encloses the migrated range).
+     *
+     * History would be lost if the catalog holds a stored chunk that:
+     *   - will be replaced when the recipient commits the move,
+     *   - is not fully covered by 'enclosingChunk', and
+     *   - is still reachable by PIT reads.
+     * The uncovered portion of such a chunk has no replacement after the commit, so its ownership
+     * history disappears.
+     *
+     * Example: this shard previously donated [0, 100) to another shard and still has a stale
+     * [0, 100) entry. That chunk was later split into [0, 50) and [50, 100), but this shard is
+     * unaware of the split because it no longer owns the chunk. If it later receives [50, 100)
+     * back, committing the migration will delete the stale [0, 100) entry, which would lose
+     * point-in-time read accessibility for the uncovered [0, 50) range.
+     */
+    static bool migrationWouldDropPITHistory(OperationContext* opCtx,
+                                             const UUID& collUuid,
+                                             const ShardId& recipientShardId,
+                                             const ChunkRange& enclosingChunk);
+
 private:
     /**
      * Set state to Fail without Logging.
@@ -383,6 +410,16 @@ private:
 
     BSONObj _min;
     BSONObj _max;
+
+    // The donor chunk that encloses the migrated range [_min, _max).
+    // Set in start() from the _recvChunkStart command. Present only on the authoritative path
+    // (driven by the MoveRangeCoordinator); its presence is the signal to run the shard-catalog
+    // PIT-reachability check. Absent on requests from a pre-upgrade donor and on the legacy path,
+    // which skip that check.
+    //
+    // TODO (SERVER-127253) Make this parameter non-optional once v9.0 branches out.
+    boost::optional<ChunkRange> _enclosingChunk;
+
     BSONObj _shardKeyPattern;
 
     WriteConcernOptions _writeConcern;

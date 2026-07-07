@@ -115,12 +115,12 @@ const testLookupDoesNotSeeDocumentsOutsideSnapshot = function () {
 testLookupDoesNotSeeDocumentsOutsideSnapshot();
 
 // Move some data to shard 0, so that the merging shard will be targeted.
-assert.commandWorked(st.s.adminCommand({split: shardedColl.getFullName(), middle: {_id: 0}}));
 assert.commandWorked(
     st.s.adminCommand({
-        moveChunk: shardedColl.getFullName(),
-        find: {_id: -1},
-        to: st.shard0.shardName,
+        moveRange: shardedColl.getFullName(),
+        min: {_id: MinKey},
+        max: {_id: 0},
+        toShard: st.shard0.shardName,
     }),
 );
 flushRoutersAndRefreshShardMetadata(st, {ns: shardedColl.getFullName()});

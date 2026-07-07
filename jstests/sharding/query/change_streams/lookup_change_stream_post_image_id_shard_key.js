@@ -75,14 +75,13 @@ for (let nextId of [1000, -1000]) {
 assert.commandWorked(mongosColl.update({_id: 1000}, {$set: {updatedCount: 2}}));
 assert.commandWorked(mongosColl.update({_id: -1000}, {$set: {updatedCount: 2}}));
 
-// Split the [0, MaxKey) chunk into 2: [0, 500), [500, MaxKey).
-assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {_id: 500}}));
-// Move the [500, MaxKey) chunk back to st.shard0.shardName.
+// Move the [500, MaxKey) sub-range back to shard0
 assert.commandWorked(
     mongosDB.adminCommand({
-        moveChunk: mongosColl.getFullName(),
-        find: {_id: 1000},
-        to: st.rs0.getURL(),
+        moveRange: mongosColl.getFullName(),
+        min: {_id: 500},
+        max: {_id: MaxKey},
+        toShard: st.shard0.shardName,
     }),
 );
 

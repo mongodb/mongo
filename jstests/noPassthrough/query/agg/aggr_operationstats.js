@@ -51,12 +51,11 @@ runCommonTests(mongos.getDB(dbName), 1);
 
 // Shard the collection.
 for (let i = 0; i < numShards; i++) {
-    assert.commandWorked(st.splitAt(namespace, {a: i + 1}));
     assert.commandWorked(
         admin.runCommand({
-            moveChunk: namespace,
-            find: {a: i + 2},
-            to: shards[(i + 1) % numShards]._id,
+            moveRange: namespace,
+            min: {a: i + 1},
+            toShard: shards[(i + 1) % numShards]._id,
         }),
     );
 }

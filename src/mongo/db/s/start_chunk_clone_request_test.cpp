@@ -75,6 +75,7 @@ TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
         BSON("Key" << 100),
         BSON("Key" << 1),
         MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
+        ChunkRange(BSON("Key" << -200), BSON("Key" << 200)),
         true /* isAuthoritative */);
 
     BSONObj cmdObj = builder.obj();
@@ -97,6 +98,9 @@ TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
     ASSERT_EQ("shard0002", request.getToShardId().toString());
     ASSERT_BSONOBJ_EQ(BSON("Key" << -100), request.getMinKey());
     ASSERT_BSONOBJ_EQ(BSON("Key" << 100), request.getMaxKey());
+    ASSERT_TRUE(request.getEnclosingChunk().has_value());
+    ASSERT_BSONOBJ_EQ(BSON("Key" << -200), request.getEnclosingChunk()->getMin());
+    ASSERT_BSONOBJ_EQ(BSON("Key" << 200), request.getEnclosingChunk()->getMax());
     ASSERT_BSONOBJ_EQ(BSON("Key" << 1), request.getShardKeyPattern());
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kOff,
               request.getSecondaryThrottle().getSecondaryThrottle());
@@ -124,6 +128,7 @@ TEST(StartChunkCloneRequest, IsAuthoritativeRoundTrip) {
             BSON("Key" << 100),
             BSON("Key" << 1),
             MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
+            boost::none /* enclosingChunk */,
             isAuthoritative);
 
         BSONObj cmdObj = builder.obj();
@@ -157,6 +162,7 @@ TEST(StartChunkCloneRequest, IsAuthoritativeDefaultsToFalseWhenAbsent) {
         BSON("Key" << 100),
         BSON("Key" << 1),
         MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
+        boost::none /* enclosingChunk */,
         true /* isAuthoritative */);
 
     // Drop the field to simulate a donor that does not send it.

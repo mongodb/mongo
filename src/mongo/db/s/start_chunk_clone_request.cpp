@@ -58,6 +58,11 @@ const char kFromShardId[] = "fromShardName";
 const char kToShardId[] = "toShardName";
 const char kChunkMinKey[] = "min";
 const char kChunkMaxKey[] = "max";
+// The donor chunk that encloses the migrated range (equal to it for a whole-chunk move, wider for a
+// moveRange that splits the chunk), as a {min, max} sub-object. The recipient uses this span for
+// the shard-catalog PIT-reachability check, and its presence is the signal that the migration is on
+// the authoritative path. Absent on requests from a pre-upgrade donor and on the legacy path.
+const char kEnclosingChunk[] = "enclosingChunk";
 const char kShardKeyPattern[] = "shardKeyPattern";
 // TODO (SERVER-127253): Remove this once v9.0 branches out.
 const char kIsAuthoritative[] = "isAuthoritative";
@@ -164,6 +169,21 @@ StatusWith<StartChunkCloneRequest> StartChunkCloneRequest::createFromCommand(Nam
     }
 
     {
+        // Optional: absent on requests from a pre-upgrade donor and on the legacy path. When
+        // present it carries the enclosing donor chunk used for the recipient's PIT-reachability
+        // check and marks the migration as being on the authoritative path.
+        BSONElement elem;
+        Status status = bsonExtractTypedField(obj, kEnclosingChunk, BSONType::object, &elem);
+        if (status.isOK()) {
+            const auto range = ChunkRange::fromBSON(elem.Obj());
+            request._enclosingChunk =
+                ChunkRange(range.getMin().getOwned(), range.getMax().getOwned());
+        } else if (status != ErrorCodes::NoSuchKey) {
+            return status;
+        }
+    }
+
+    {
         // Absent on the legacy path, so default to false to preserve the pre-existing refresh
         // behavior when the donor does not send the field.
         Status status = bsonExtractBooleanFieldWithDefault(
@@ -195,6 +215,7 @@ void StartChunkCloneRequest::appendAsCommand(
     const BSONObj& chunkMaxKey,
     const BSONObj& shardKeyPattern,
     const MigrationSecondaryThrottleOptions& secondaryThrottle,
+    const boost::optional<ChunkRange>& enclosingChunk,
     bool isAuthoritative) {
     invariant(builder->asTempObj().isEmpty());
     invariant(nss.isValid());
@@ -213,6 +234,9 @@ void StartChunkCloneRequest::appendAsCommand(
     builder->append(kToShardId, toShardId.toString());
     builder->append(kChunkMinKey, chunkMinKey);
     builder->append(kChunkMaxKey, chunkMaxKey);
+    if (enclosingChunk) {
+        builder->append(kEnclosingChunk, enclosingChunk->toBSON());
+    }
     builder->append(kShardKeyPattern, shardKeyPattern);
     // TODO (SERVER-127253): Remove this once v9.0 branches out.
     builder->append(kIsAuthoritative, isAuthoritative);

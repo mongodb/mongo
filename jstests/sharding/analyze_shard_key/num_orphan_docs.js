@@ -147,9 +147,8 @@ function testAnalyzeShardKeyShardedCollection(st) {
     // Analyze a shard key while two shards have orphan documents. Chunk distribution:
     // shard0: [MinKey, -5], [5, MaxKey]
     // shard1: [-5, 0], [0, 5]
-    assert.commandWorked(st.s.adminCommand({split: ns, middle: {currentKey: 5}}));
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns, find: {currentKey: 5}, to: st.shard0.shardName}),
+        st.s.adminCommand({moveRange: ns, min: {currentKey: 5}, toShard: st.shard0.shardName}),
     );
     res = assert.commandWorked(
         st.s.adminCommand({

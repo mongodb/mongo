@@ -116,6 +116,12 @@ export var ChunkHelper = (function () {
                 res.code === ErrorCodes.ConflictingOperationInProgress ||
                 res.code === ErrorCodes.ChunkRangeCleanupPending ||
                 res.code === ErrorCodes.LockTimeout ||
+                // The recipient aborts the migration when its local shard catalog still holds a
+                // chunk overlapping the range being moved back that is reachable by point-in-time
+                // reads. This is a by-design rejection; the move can succeed later, once the stale
+                // entry ages past the snapshot-history window.
+                (res.code === ErrorCodes.OperationFailed &&
+                    res.errmsg.includes("point-in-time reachable ownership history")) ||
                 // The chunk migration has surely been aborted if startCommit failed. This can
                 // happen for a variety of reasons: the system is slow (e.g. TSAN), a stepdown
                 // interrupted the commit, or a session being cloned on the recipient was killed

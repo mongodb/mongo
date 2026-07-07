@@ -4,7 +4,19 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-let st = new ShardingTest({shards: 2, mongos: 2});
+const st = new ShardingTest({
+    shards: 3,
+    mongos: 2,
+    other: {
+        // Reduce the snapshot history window to 0 to allow chunks to be migrated back and forth between shards.
+        configOptions: {
+            setParameter: {
+                minSnapshotHistoryWindowInSeconds: 0,
+            },
+        },
+        rsOptions: {setParameter: {minSnapshotHistoryWindowInSeconds: 0}},
+    },
+});
 let admin = st.s0.getDB("admin");
 let testDb = "test";
 let testNs = "test.foo";
@@ -14,17 +26,18 @@ assert.commandWorked(admin.runCommand({shardCollection: testNs, key: {_id: 1}}))
 let curShardIndex = 0;
 
 for (let i = 0; i < 100; i += 10) {
-    assert.commandWorked(st.s0.getDB("admin").runCommand({split: testNs, middle: {_id: i}}));
-    st.configRS.awaitLastOpCommitted(); // Ensure that other mongos sees the split
-    let nextShardIndex = (curShardIndex + 1) % 2;
-    let toShard = nextShardIndex == 0 ? st.shard0.name : st.shard1.name;
+    let shardIndex = i % 3;
+    let toShard =
+        shardIndex == 0 ? st.shard0.name : shardIndex == 1 ? st.shard1.name : st.shard2.name;
+    let mongos = i % 2 == 0 ? st.s0 : st.s1;
     assert.commandWorked(
-        st.s1
+        mongos
             .getDB("admin")
-            .runCommand({moveChunk: testNs, find: {_id: i + 5}, to: toShard, _waitForDelete: true}),
+            .runCommand({moveRange: testNs, min: {_id: i}, toShard: toShard, waitForDelete: true}),
     );
-    curShardIndex = nextShardIndex;
-    st.configRS.awaitLastOpCommitted(); // Ensure that other mongos sees the move
+
+    // Ensure that other mongos sees the move
+    st.configRS.awaitLastOpCommitted();
 }
 
 st.stop();

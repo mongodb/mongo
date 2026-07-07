@@ -509,8 +509,23 @@ void MigrationSourceManager::startClone() {
         preparedTxnResolved.get(_opCtx);
     }
 
+    // Only the authoritative path (driven by the MoveRangeCoordinator) runs the recipient's
+    // shard-catalog PIT-reachability check, so the enclosing donor chunk is computed and sent only
+    // there. On the legacy path it stays unset and is omitted from the _recvChunkStart command.
+    boost::optional<ChunkRange> enclosingChunk;
+
     {
         const auto metadata = _getCurrentMetadataAndCheckForConflictingErrors();
+
+        if (_managementMode == ManagementModeEnum::kMoveRangeCoordinator) {
+            // The donor chunk that encloses the migrated range. For a moveRange that splits a chunk
+            // this is wider than [min, max); for a whole-chunk move it equals it.
+            const auto intersectingChunk =
+                metadata.getChunkManager()->findIntersectingChunkWithSimpleCollation(
+                    *_args.getMin());
+            enclosingChunk = ChunkRange(intersectingChunk.getMin().getOwned(),
+                                        intersectingChunk.getMax().getOwned());
+        }
 
         auto scopedCsr = CollectionShardingRuntime::acquireExclusive(_opCtx, nss());
 
@@ -563,6 +578,7 @@ void MigrationSourceManager::startClone() {
                                                      _coordinator->getMigrationId(),
                                                      _coordinator->getLsid(),
                                                      _coordinator->getTxnNumber(),
+                                                     enclosingChunk,
                                                      isAuthoritative);
     withChangelogErrMsg(startCloneStatus.reason(), [&] { uassertStatusOK(startCloneStatus); });
 

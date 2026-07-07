@@ -60,6 +60,7 @@
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/write_ops/delete.h"
 #include "mongo/db/query/write_ops/update_result.h"
@@ -104,6 +105,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
@@ -595,6 +597,7 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
     _toShard = cloneRequest.getToShardId();
     _min = cloneRequest.getMinKey();
     _max = cloneRequest.getMaxKey();
+    _enclosingChunk = cloneRequest.getEnclosingChunk();
     _shardKeyPattern = cloneRequest.getShardKeyPattern();
 
     _writeConcern = writeConcern;
@@ -1534,6 +1537,26 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             outerOpCtx->sleepFor(Milliseconds(1000));
         }
 
+        // On the authoritative path the recipient serves point-in-time (PIT) filtering-metadata
+        // reads from its local shard catalog. The donor sends the enclosing source chunk, which
+        // spans the range the migration commit will refresh. Abort the migration if committing it
+        // would drop PIT-reachable ownership history: that happens when the shard catalog holds a
+        // chunk that is not fully covered by that span, is owned by another shard, and is still
+        // reachable by PIT reads, since the uncovered portion has no replacement after the refresh.
+        // This check is only needed on the authoritative path. The source chunk is absent on the
+        // legacy path and on requests from a pre-upgrade donor, so the check is skipped there.
+        if (_enclosingChunk.has_value()) {
+            uassert(ErrorCodes::ConflictingOperationInProgress,
+                    str::stream() << "Migration aborted: committing it would drop point-in-time "
+                                     "reachable ownership history for a chunk only partially "
+                                     "covered by source chunk "
+                                  << _enclosingChunk->toString() << ".",
+                    !migrationWouldDropPITHistory(outerOpCtx,
+                                                  donorCollectionOptionsAndIndexes.uuid,
+                                                  ShardingState::get(outerOpCtx)->shardId(),
+                                                  *_enclosingChunk));
+        }
+
         timing->done(1);
         migrateThreadHangAtStep1.pauseWhileSet();
 
@@ -2433,6 +2456,84 @@ boost::optional<BSONObj> MigrationDestinationManager::checkForExistingDocumentsI
                                 << ", " << max << ") on collection " << nss.toStringForErrorMsg()
                                 << ": " << PlanExecutor::stateToStr(state));
     }
+}
+
+bool MigrationDestinationManager::migrationWouldDropPITHistory(OperationContext* opCtx,
+                                                               const UUID& collUuid,
+                                                               const ShardId& recipientShardId,
+                                                               const ChunkRange& enclosingChunk) {
+    // Oldest timestamp the storage engine still retains a snapshot for. A point-in-time read below
+    // it is rejected with SnapshotTooOld, so it is the exact lower bound of PIT reachability.
+    const auto oldestTimestamp =
+        opCtx->getServiceContext()->getStorageEngine()->getOldestTimestamp();
+
+    // A stored chunk drops PIT history when it is owned by another shard, is not fully covered by
+    // 'enclosingChunk', and its most recent ownership transition is still reachable by PIT reads.
+    // The uncovered portion is deleted on refresh without a committed chunk to replace its history.
+    // The two queries below only return chunks that overlap 'enclosingChunk', so overlap need not
+    // be rechecked here.
+    //
+    // The local shard catalog only holds chunks where this shard is the current owner or a past
+    // owner recorded in history (see fetchOwnedChunks()); a chunk not currently owned by the
+    // recipient therefore records it as a past owner, and onCurrentShardSince (the newest ownership
+    // transition) bounds the reachability of that past ownership, so history need not be scanned.
+    const auto isConflict = [&](const ChunkType& chunk) {
+        if (chunk.getShard() == ShardRef(recipientShardId)) {
+            return false;
+        }
+        if (!enclosingChunk.overlaps(chunk.getRange())) {
+            return false;
+        }
+        const auto& onCurrentShardSince = chunk.getOnCurrentShardSince();
+        if (!onCurrentShardSince || *onCurrentShardSince <= oldestTimestamp) {
+            return false;
+        }
+        return !enclosingChunk.covers(chunk.getRange());
+    };
+
+    DBDirectClient client(opCtx);
+
+    const auto findsConflict = [&](FindCommandRequest findOp) {
+        auto cursor = client.find(std::move(findOp));
+        while (cursor->more()) {
+            const auto chunk = uassertStatusOK(
+                ChunkType::parseFromConfigBSON(cursor->nextSafe().getOwned(), OID(), Timestamp()));
+            if (isConflict(chunk)) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    // Stored chunks are non-overlapping and indexed by {collectionUUID, min}, so only the few
+    // chunks near 'enclosingChunk' can overlap it. Read them with two bounded queries instead of
+    // scanning the whole collection (mirrors reconcileOverlappingChunks()): the single chunk whose
+    // min is below the enclosingChunk but whose range may extend into it, and every chunk whose min
+    // falls within the enclosingChunk.
+    {
+        FindCommandRequest findOp{NamespaceString::kConfigShardCatalogChunksNamespace};
+        findOp.setFilter(BSON(ChunkType::collectionUUID()
+                              << collUuid << ChunkType::min()
+                              << BSON("$lt" << enclosingChunk.getMin())));
+        findOp.setSort(BSON(ChunkType::min() << -1));
+        findOp.setLimit(1);
+        if (findsConflict(std::move(findOp))) {
+            return true;
+        }
+    }
+
+    {
+        FindCommandRequest findOp{NamespaceString::kConfigShardCatalogChunksNamespace};
+        findOp.setFilter(
+            BSON(ChunkType::collectionUUID()
+                 << collUuid << ChunkType::min()
+                 << BSON("$gte" << enclosingChunk.getMin() << "$lt" << enclosingChunk.getMax())));
+        if (findsConflict(std::move(findOp))) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 }  // namespace mongo
