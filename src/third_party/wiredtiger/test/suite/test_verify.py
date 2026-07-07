@@ -176,8 +176,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
             outfilename='dump_corrupt.out', errfilename="dump_corrupt.err", failure=True)
         self.assertEqual(self.count_file_contains("dump_corrupt.out",
             "Read failure while accessing a page from the "), 1)
-        self.assertEqual(self.count_file_contains("stderr.txt",
-            "calculated block checksum of"), 1)
+        self.assertEqual(self.count_file_contains("stderr.txt", "read checksum error"), 1)
 
     def test_verify_api_read_corrupt_pages(self):
         """
@@ -263,8 +262,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(["-p", "verify", "-c", "table:" + self.tablename],
             errfilename="verifyerr.out", failure=True)
         self.check_non_empty_file("verifyerr.out")
-        self.assertEqual(self.count_file_contains("verifyerr.out",
-            "calculated block checksum of"), 1)
+        self.assertEqual(self.count_file_contains("verifyerr.out", "read checksum error"), 1)
 
     def test_verify_process_25pct_junk(self):
         """
@@ -284,8 +282,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(["-p", "verify", "-c", "table:" + self.tablename],
             errfilename="verifyerr.out", failure=True)
         self.check_non_empty_file("verifyerr.out")
-        self.assertEqual(self.count_file_contains("verifyerr.out",
-            "calculated block checksum of"), 1)
+        self.assertEqual(self.count_file_contains("verifyerr.out", "read checksum error"), 1)
 
     def test_verify_process_read_corrupt_pages(self):
         """
@@ -319,8 +316,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         # not necessarily detect all three corruptions - e.g. we won't detect
         # a corruption if we overwrite free space or overwrite a page that is
         # a child of another page that we overwrite.
-        self.assertGreater(self.count_file_contains("verifyerr.out",
-            "calculated block checksum of"), 1)
+        self.assertGreater(self.count_file_contains("verifyerr.out", "read checksum error"), 1)
 
     def test_verify_process_truncated(self):
         """
