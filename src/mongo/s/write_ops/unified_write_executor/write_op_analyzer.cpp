@@ -117,9 +117,9 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
         (isMultiWrite && !enableMultiWriteBlockingMigrations &&
          write_op_helpers::isOnlyTargetDataOwningShardsForMultiWritesEnabled());
 
-    if (isTimeseriesCollection && op.isFindAndModify()) {
+    if (isTimeseriesCollection && isSharded && op.isFindAndModify()) {
         uassert(ErrorCodes::InvalidOptions,
-                "Cannot perform findAndModify with sort on a timeseries collection",
+                "Cannot perform findAndModify with sort on a sharded timeseries collection",
                 !op.getSort() || isRawData);
     }
 

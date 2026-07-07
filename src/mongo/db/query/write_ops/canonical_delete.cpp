@@ -84,14 +84,6 @@ std::unique_ptr<TimeseriesWritesQueryExprs> maybeTranslateTimeseriesDelete(
         return nullptr;
     }
 
-    // TODO: Due to the complexity which is related to the efficient sort support, we don't
-    // support yet findAndModify with a query and sort but it should not be impossible. This
-    // code assumes that in findAndModify code path, make() is called with
-    // isRequestToTimeseries = true for a time-series collection.
-    uassert(ErrorCodes::InvalidOptions,
-            "Cannot perform a findAndModify with a query and sort on a time-series collection.",
-            request.getMulti() || request.getSort().isEmpty());
-
     // If we're deleting documents from a time-series collection, splits the match expression
     // into a bucket-level match expression and a residual expression so that we can push down
     // the bucket-level match expression to the system bucket collection SCAN or FETCH/IXSCAN.
