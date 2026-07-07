@@ -227,6 +227,29 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "observable_mutex_metrics",
+    srcs = ["observable_mutex_metrics.cpp"],
+    hdrs = ["observable_mutex_metrics.h"],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/mongo/otel/metrics:metric_unit",
+        "//src/mongo/otel/metrics:otel_metric_name_validation",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+        "//src/mongo/util:periodic_runner",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "observable_mutex_metrics_test",
+    srcs = ["observable_mutex_metrics_test.cpp"],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":observable_mutex_metrics",
+        "//src/mongo/otel/metrics:metrics_test_util",
+    ],
+)
+
+mongo_cc_library(
     name = "metrics_installer",
     srcs = ["metrics_installer.cpp"],
     hdrs = ["metrics_installer.h"],
@@ -236,6 +259,7 @@ mongo_cc_library(
         ":global_lock_metrics",
         ":index_build_metrics",
         ":mongodb_build_info_metrics",
+        ":observable_mutex_metrics",
         ":process_health_metrics",
         ":system_health_metrics",
         ":system_mount_metrics",
