@@ -187,7 +187,12 @@ mongo_cc_unit_test(
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/shard_role:service_context_non_d",
         "//src/mongo/otel/metrics:metrics_test_util",
-    ],
+    ] + select({
+        "@platforms//os:linux": [
+            "//src/mongo/util:fail_point",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 mongo_cc_library(

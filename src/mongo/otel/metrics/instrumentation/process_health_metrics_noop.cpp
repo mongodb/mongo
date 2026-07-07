@@ -37,6 +37,7 @@ ProcessHealthMetrics::ProcessHealthMetrics() : _impl(std::make_unique<Impl>()) {
 ProcessHealthMetrics::~ProcessHealthMetrics() = default;
 
 void ProcessHealthMetrics::update(const ProcessHealthSnapshot&) {}
+void ProcessHealthMetrics::recordCollectError() {}
 
 void installProcessHealthOtelMetrics(ServiceContext*) {}
 

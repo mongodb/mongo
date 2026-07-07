@@ -29,6 +29,8 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/otel/metrics/instrumentation/process_health_metrics.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metric_unit.h"
@@ -36,11 +38,17 @@
 #include "mongo/otel/metrics/metrics_gauge.h"
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/otel/metrics/metrics_updown_counter.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/processinfo.h"
 
 #include <array>
 #include <string_view>
+
+#include <boost/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 namespace mongo {
 
@@ -94,6 +102,8 @@ const AttributeDefinition<std::string_view> kPagingFaultTypeAttr{
 
 }  // namespace
 
+MONGO_FAIL_POINT_DEFINE(failCollectProcessHealthSnapshot);
+
 class ProcessHealthMetrics::Impl {
 public:
     Impl()
@@ -121,7 +131,11 @@ public:
               MetricNames::kProcessPagingFaults,
               "Number of page faults the process has made, by major and minor",
               MetricUnit::kCount,
-              kPagingFaultTypeAttr)) {}
+              kPagingFaultTypeAttr)),
+          _collectErrors(MetricsService::instance().createInt64Counter(
+              MetricNames::kProcessHealthCollectErrors,
+              "Number of times process info reading failed during process health collection",
+              MetricUnit::kCount)) {}
 
     void update(const ProcessHealthSnapshot& snap);
     void updateCpuTime(const ProcessHealthSnapshot& snap);
@@ -129,12 +143,17 @@ public:
     void updateThreadCount(const ProcessHealthSnapshot& snap);
     void updatePagingFaults(const ProcessHealthSnapshot& snap);
 
+    void recordCollectError() {
+        _collectErrors.add(1);
+    }
+
 private:
     Counter<int64_t, std::string_view>& _cpuTime;
     Gauge<double, std::string_view>& _cpuUtilization;
     Counter<int64_t, std::string_view>& _contextSwitches;
     UpDownCounter<int64_t>& _threadCount;
     Counter<int64_t, std::string_view>& _pagingFaults;
+    Counter<int64_t>& _collectErrors;
 
     ProcessHealthSnapshot _prev;
 };
@@ -144,6 +163,10 @@ ProcessHealthMetrics::~ProcessHealthMetrics() = default;
 
 void ProcessHealthMetrics::update(const ProcessHealthSnapshot& snap) {
     _impl->update(snap);
+}
+
+void ProcessHealthMetrics::recordCollectError() {
+    _impl->recordCollectError();
 }
 
 void ProcessHealthMetrics::Impl::update(const ProcessHealthSnapshot& snap) {
@@ -213,10 +236,28 @@ void ProcessHealthMetrics::Impl::updatePagingFaults(const ProcessHealthSnapshot&
     record("minor"sv, _prev.minorPagingFaults, snap.minorPagingFaults);
 }
 
-ProcessHealthSnapshot collectProcessHealthSnapshot() {
+boost::optional<ProcessHealthSnapshot> collectProcessHealthSnapshot() {
+    if (MONGO_unlikely(failCollectProcessHealthSnapshot.shouldFail()))
+        return boost::none;
+
     ProcessInfo pi;
     BSONObjBuilder infoBuilder;
-    pi.getExtraInfo(infoBuilder);
+
+    // getExtraInfo can throw if we fail to open an fd
+    try {
+        pi.getExtraInfo(infoBuilder);
+    } catch (const DBException& e) {
+        static logv2::SeveritySuppressor suppressor(
+            Minutes{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(3));
+        if (auto sev = suppressor(); shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, sev)) {
+            LOGV2_DEBUG(13043600,
+                        sev.toInt(),
+                        "Failed to collect process health metrics",
+                        "error"_attr = e.toStatus());
+        }
+        return boost::none;
+    }
+
     BSONObj info = infoBuilder.obj();
 
     ProcessHealthSnapshot snap;
@@ -231,8 +272,10 @@ ProcessHealthSnapshot collectProcessHealthSnapshot() {
 }
 
 void runProcessHealthCollectionCycle(ProcessHealthMetrics& metrics) {
-    auto snap = collectProcessHealthSnapshot();
-    metrics.update(snap);
+    if (auto snap = collectProcessHealthSnapshot())
+        metrics.update(*snap);
+    else
+        metrics.recordCollectError();
 }
 
 void installProcessHealthOtelMetrics(ServiceContext* svcCtx) {

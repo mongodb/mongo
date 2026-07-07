@@ -471,6 +471,8 @@ public:
         MetricNameMaker::make("mongodb.process.threads.count");
     static constexpr MetricName kProcessPagingFaults =
         MetricNameMaker::make("mongodb.process.paging.faults");
+    static constexpr MetricName kProcessHealthCollectErrors =
+        MetricNameMaker::make("mongodb.process.collectErrors");
 
     // Global Lock
     static constexpr MetricName kGlobalLockTotalTime =

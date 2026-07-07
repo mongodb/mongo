@@ -57,6 +57,7 @@ public:
     ~ProcessHealthMetrics();
 
     void update(const ProcessHealthSnapshot& snap);
+    void recordCollectError();
 
 private:
     class Impl;

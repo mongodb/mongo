@@ -35,6 +35,13 @@
 
 #include <string_view>
 
+#ifdef __linux__
+#include "mongo/util/fail_point.h"
+namespace mongo {
+extern void runProcessHealthCollectionCycle(ProcessHealthMetrics&);
+}
+#endif
+
 namespace mongo {
 namespace {
 
@@ -236,6 +243,14 @@ TEST_F(ProcessHealthOtelMetricsTest, PagingFaults) {
                           MetricNames::kProcessPagingFaults, {typeField.type}));
     }
 }
+
+#ifdef __linux__
+TEST_F(ProcessHealthOtelMetricsTest, CollectErrorsIncrementOnParseFailure) {
+    FailPointEnableBlock fp("failCollectProcessHealthSnapshot");
+    runProcessHealthCollectionCycle(_metrics);
+    ASSERT_EQ(1, _capturer.readInt64Counter(MetricNames::kProcessHealthCollectErrors));
+}
+#endif
 
 }  // namespace
 }  // namespace mongo
