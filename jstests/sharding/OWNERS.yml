@@ -83,6 +83,9 @@ filters:
   - "create_unsplittable_collection.js":
     approvers:
       - 10gen/server-catalog-and-routing-ddl
+  - "create_system_session.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
   - "list_cluster_catalog*":
     approvers:
       - 10gen/server-catalog-and-routing-ddl

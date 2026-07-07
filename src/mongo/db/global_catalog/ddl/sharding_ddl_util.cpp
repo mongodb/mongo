@@ -1093,7 +1093,13 @@ void commitCreateCollectionMetadataToShardCatalog(
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
-    ShardsvrCommitCreateCollectionMetadata request(nss, ShardingState::get(opCtx)->shardId());
+    // config.system.sessions is created by a coordinator running on the first shard rather than the
+    // DB primary (the config server), so correct it manually to make sure the (chunkless)
+    // collection entry is created correctly in the authoritative shard catalog.
+    const auto primaryShardId =
+        nss.isConfigDB() ? ShardId::kConfigServerId : ShardingState::get(opCtx)->shardId();
+
+    ShardsvrCommitCreateCollectionMetadata request(nss, primaryShardId);
     request.setDbName(DatabaseName::kAdmin);
 
     generic_argument_util::setMajorityWriteConcern(request);

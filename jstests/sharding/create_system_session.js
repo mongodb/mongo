@@ -8,6 +8,7 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const kConfig = "config";
@@ -47,6 +48,8 @@ function cleanUpSystemSessions(st) {
     let uuid = st.config.collections.find({_id: kNs}).toArray()[0].uuid;
     st.config.collections.remove({_id: kNs});
     st.config.chunks.remove({uuid: uuid});
+    // Also clear the config server's authoritative shard catalog entry.
+    st.config.shard.catalog.collections.remove({_id: kNs});
     assert.eq(0, st.config.collections.find().toArray().length);
     assert.eq(0, st.config.chunks.find().toArray().length);
     // force a refresh
@@ -78,6 +81,19 @@ function runTest(st, createFn) {
         result[0].unsplittable,
         "config.system.collection must exists as sharded, but found " + tojson(result),
     );
+
+    // The config server is the DB primary for config.system.sessions,
+    // so it must have the authoritative shard catalog entry.
+    const shardCatalogEntry = st.config.shard.catalog.collections.findOne({_id: kNs});
+    if (FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary(), "AuthoritativeShardsCRUD")) {
+        assert(
+            shardCatalogEntry,
+            "config.system.sessions missing from the authoritative shard catalog",
+        );
+        assert.eq(result[0].uuid, shardCatalogEntry.uuid);
+    } else {
+        assert.eq(null, shardCatalogEntry);
+    }
 }
 
 jsTest.log("Creating system.sessions as unsharded");

@@ -2305,8 +2305,10 @@ void CreateCollectionCoordinator::_commitOnShardCatalog(
         Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss()));
     cm.getAllShardIds(&involvedShards);
     // The DB primary shard must always know that a collection is tracked, even when it does not
-    // own any chunks.
-    involvedShards.emplace(ShardingState::get(opCtx)->shardId());
+    // own any chunks. For config.system.sessions, the DB primary is the config server, but the
+    // coordinator runs on the first shard instead, so add it explicitly.
+    involvedShards.emplace(nss().isConfigDB() ? ShardId::kConfigServerId
+                                              : ShardingState::get(opCtx)->shardId());
     // The original data shard may no longer own chunks after applying the final placement (for
     // example, due to zones), but it still needs the shard catalog commit to clear the previous
     // unsplittable collection metadata.
