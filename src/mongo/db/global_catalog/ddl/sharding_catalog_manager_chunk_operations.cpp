@@ -142,6 +142,9 @@ MONGO_FAIL_POINT_DEFINE(migrationCommitVersionError);
 MONGO_FAIL_POINT_DEFINE(migrateCommitInvalidChunkQuery);
 MONGO_FAIL_POINT_DEFINE(skipExpiringOldChunkHistory);
 MONGO_FAIL_POINT_DEFINE(mergeAllChunksFailAfterCommit);
+MONGO_FAIL_POINT_DEFINE(commitChunkSplitFailAfterCommit);
+MONGO_FAIL_POINT_DEFINE(commitChunksMergeFailAfterCommit);
+MONGO_FAIL_POINT_DEFINE(commitChunkMigrationFailAfterCommit);
 
 const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
 
@@ -962,6 +965,15 @@ ShardingCatalogManager::_commitChunkSplitImpl(
                                                      splitPoints,
                                                      coll);
 
+    // Fail after the split has been durably committed but before returning success. Only fire on a
+    // fresh commit (non-empty 'newChunks'); on the idempotent retry the split is detected as
+    // already done inside _splitChunkInTransaction and 'newChunks' is empty, so we skip the
+    // failpoint and let the retry return success.
+    if (MONGO_unlikely(commitChunkSplitFailAfterCommit.shouldFail()) &&
+        !splitChunkResult.newChunks.empty()) {
+        uasserted(ErrorCodes::LockBusy, "Failing because of commitChunkSplitFailAfterCommit");
+    }
+
     // Build the result while still holding the chunk-operation lock so that any catalog reads used
     // to rebuild the idempotent response are consistent with the commit. A fresh commit produces
     // sub-chunks; an already-applied split leaves 'newChunks' empty and bumps no version.
@@ -1359,6 +1371,13 @@ ShardingCatalogManager::_commitChunksMergeImpl(
     // 4. apply the batch of updates to local metadata
     _mergeChunksInTransaction(
         opCtx, nss, coll.getUuid(), mergeVersion, validAfter, chunkRange, shardId, chunksToMerge);
+
+    // Fail after the merge has been durably committed but before returning success. On the
+    // idempotent retry the merge is detected as already done above (single chunk exactly filling
+    // the range) and returns before reaching this point, so an alwaysOn failpoint does not loop.
+    if (MONGO_unlikely(commitChunksMergeFailAfterCommit.shouldFail())) {
+        uasserted(ErrorCodes::LockBusy, "Failing because of commitChunksMergeFailAfterCommit");
+    }
 
     // 5. build the result while still holding the chunk-operation lock so that the read of the
     // merged chunk used for the changed-chunks response is consistent with the commit. A merge
@@ -2018,6 +2037,13 @@ ShardingCatalogManager::_commitChunkMigrationImpl(
 
     _commitChunkMigrationInTransaction(
         opCtx, nss, newMigratedChunk, newSplitChunks, newControlChunk, fromShard);
+
+    // Fail after the migration has been durably committed but before returning success. On the
+    // idempotent retry the chunk is detected as already living on 'toShard' above and returns
+    // before reaching this point, so an alwaysOn failpoint does not loop.
+    if (MONGO_unlikely(commitChunkMigrationFailAfterCommit.shouldFail())) {
+        uasserted(ErrorCodes::LockBusy, "Failing because of commitChunkMigrationFailAfterCommit");
+    }
 
     ChunkOpCommitOutcome outcome;
 
