@@ -322,6 +322,10 @@ CatalogCache::~CatalogCache() {
 }
 
 void CatalogCache::shutDownAndJoin() {
+    if (_hasShutDownAndJoined.swap(true)) {
+        return;
+    }
+
     // The CatalogCache must be shuted down before shutting down the CatalogCacheLoader as the
     // CatalogCache may try to schedule work on CatalogCacheLoader and fail.
     _executor.shutdown();

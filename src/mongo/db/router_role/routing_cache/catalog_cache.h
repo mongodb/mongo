@@ -617,6 +617,9 @@ private:
     // Executor on which the caches below will execute their blocking work
     ThreadPool _executor;
 
+    // Used to make the shutdowns idempotent.
+    AtomicWord<bool> _hasShutDownAndJoined{false};
+
     // Flags set at construction time to determine whether the database and collection catalog cache
     // loaders should be shut down at destruction time. This allows for independent control if they
     // do not share the same loader instance.

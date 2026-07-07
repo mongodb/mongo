@@ -298,7 +298,15 @@ void ShardingMongoDTestFixture::tearDown() {
         if (Grid::get(operationContext())->shardRegistry()) {
             Grid::get(operationContext())->shardRegistry()->shutdown();
         }
+
+        // Drain the CatalogCache and its catalog cache loader background threads before clearing
+        // the sharding state factories.
+        if (auto* catalogCache = Grid::get(operationContext())->catalogCache()) {
+            catalogCache->shutDownAndJoin();
+        }
     }
+    // Also drains the shard-server loader when the dual-catalog cache is enabled; no-op otherwise.
+    FilteringMetadataCache::get(getServiceContext())->shutDown();
 
     CollectionShardingStateFactory::clear(getServiceContext());
     DatabaseShardingStateFactory::clear(getServiceContext());
