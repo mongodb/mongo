@@ -3,6 +3,7 @@
 
 import datetime
 import logging
+import subprocess
 import unittest
 
 import mock
@@ -688,6 +689,257 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
             "mongodb-mongo-master", "abc123"
         )
 
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.Github")
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    def test_is_revert_build_true_for_revert_pr(
+        self, mock_config, mock_get_expansion, mock_github_cls
+    ):
+        """_is_revert_build returns True when the PR title starts with 'Revert'."""
+        mock_config.EVERGREEN_REQUESTER = "github_pr"
+        mock_get_expansion.side_effect = lambda key, default=None: {
+            "github_pr_number": "12345",
+            "github_token_mongo": "fake_token",
+        }.get(key, default)
+        mock_github_cls.return_value = _build_pr_title_github('Revert "SERVER-12345 Some change"')
+
+        self.assertTrue(self.cbr_hook._is_revert_build())
+        mock_github_cls.return_value.get_repo.assert_called_once_with(cbr.GITHUB_REPO_NAME)
+        mock_github_cls.return_value.get_repo.return_value.get_pull.assert_called_once_with(12345)
+
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.Github")
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    def test_is_revert_build_false_for_normal_pr(
+        self, mock_config, mock_get_expansion, mock_github_cls
+    ):
+        """_is_revert_build returns False when the PR title does not start with 'Revert'."""
+        mock_config.EVERGREEN_REQUESTER = "github_pr"
+        mock_get_expansion.side_effect = lambda key, default=None: {
+            "github_pr_number": "12345",
+            "github_token_mongo": "fake_token",
+        }.get(key, default)
+        mock_github_cls.return_value = _build_pr_title_github("SERVER-12345 Some change")
+
+        self.assertFalse(self.cbr_hook._is_revert_build())
+
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.Github")
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    def test_is_revert_build_false_for_revert_prefixed_words(
+        self, mock_config, mock_get_expansion, mock_github_cls
+    ):
+        """_is_revert_build returns False for titles like 'Reverted' or 'Revertible'."""
+        mock_config.EVERGREEN_REQUESTER = "github_pr"
+        mock_get_expansion.side_effect = lambda key, default=None: {
+            "github_pr_number": "12345",
+            "github_token_mongo": "fake_token",
+        }.get(key, default)
+        mock_github_cls.return_value = _build_pr_title_github("Revertible optimization")
+
+        self.assertFalse(self.cbr_hook._is_revert_build())
+
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.Github")
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    def test_is_revert_build_caches_pr_result(
+        self, mock_config, mock_get_expansion, mock_github_cls
+    ):
+        """_is_revert_build caches the result so the GitHub API is only called once."""
+        mock_config.EVERGREEN_REQUESTER = "github_pr"
+        mock_get_expansion.side_effect = lambda key, default=None: {
+            "github_pr_number": "12345",
+            "github_token_mongo": "fake_token",
+        }.get(key, default)
+        mock_github_cls.return_value = _build_pr_title_github("Revert something")
+
+        self.cbr_hook._is_revert_build()
+        self.cbr_hook._is_revert_build()
+        mock_github_cls.return_value.get_repo.return_value.get_pull.assert_called_once()
+
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.Github")
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    def test_is_revert_build_pr_api_error(self, mock_config, mock_get_expansion, mock_github_cls):
+        """_is_revert_build returns False and logs an error when the GitHub API fails."""
+        mock_config.EVERGREEN_REQUESTER = "github_pr"
+        mock_get_expansion.side_effect = lambda key, default=None: {
+            "github_pr_number": "12345",
+            "github_token_mongo": "fake_token",
+        }.get(key, default)
+        mock_github_cls.return_value.get_repo.side_effect = GithubException(
+            500, data={"message": "Server Error"}, headers={}
+        )
+
+        with self.assertLogs("hook_logger", level="ERROR") as cm:
+            self.assertFalse(self.cbr_hook._is_revert_build())
+        self.assertTrue(
+            any("Failed to check PR title for revert" in msg for msg in cm.output),
+            f"Expected error about GitHub API failure in {cm.output}",
+        )
+
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.Github")
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    def test_is_revert_build_missing_pr_number(
+        self, mock_config, mock_get_expansion, mock_github_cls
+    ):
+        """_is_revert_build returns False and logs an error when github_pr_number is missing."""
+        mock_config.EVERGREEN_REQUESTER = "github_pr"
+        mock_get_expansion.side_effect = lambda key, default=None: {
+            "github_token_mongo": "fake_token",
+        }.get(key, default)
+
+        with self.assertLogs("hook_logger", level="ERROR") as cm:
+            self.assertFalse(self.cbr_hook._is_revert_build())
+        self.assertTrue(
+            any("github_pr_number" in msg for msg in cm.output),
+            f"Expected error about missing PR number in {cm.output}",
+        )
+        mock_github_cls.assert_not_called()
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.subprocess.check_output"
+    )
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    def test_is_revert_build_true_for_revert_commit(self, mock_config, mock_check_output):
+        """_is_revert_build returns True for mainline revert commits (git log fallback)."""
+        mock_config.EVERGREEN_REQUESTER = "commit"
+        mock_check_output.return_value = 'Revert "SERVER-12345 Some change"'
+        self.assertTrue(self.cbr_hook._is_revert_build())
+        mock_check_output.assert_called_once()
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.subprocess.check_output"
+    )
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    def test_is_revert_build_false_for_normal_commit(self, mock_config, mock_check_output):
+        """_is_revert_build returns False for normal mainline commits."""
+        mock_config.EVERGREEN_REQUESTER = "commit"
+        mock_check_output.return_value = "SERVER-12345 Some change"
+        self.assertFalse(self.cbr_hook._is_revert_build())
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.subprocess.check_output"
+    )
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    def test_is_revert_build_handles_git_error(self, mock_config, mock_check_output):
+        """_is_revert_build returns False and logs an error when git log fails."""
+        mock_config.EVERGREEN_REQUESTER = "commit"
+        mock_check_output.side_effect = subprocess.CalledProcessError(1, "git")
+        with self.assertLogs("hook_logger", level="ERROR") as cm:
+            self.assertFalse(self.cbr_hook._is_revert_build())
+        self.assertTrue(
+            any("Failed to check if this is a revert commit" in msg for msg in cm.output),
+            f"Expected error about git failure in {cm.output}",
+        )
+
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.Github")
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.CheckPerfResultTestCase"
+    )
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.evergreen_conn.get_evergreen_api"
+    )
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    def test_check_pass_fail_skips_for_revert_pr(
+        self,
+        mock_config,
+        mock_get_api,
+        MockCheckPerfResultTestCase,
+        mock_get_expansion,
+        mock_github_cls,
+    ):
+        """Revert PRs skip threshold checks: _before_suite_impl detects the revert and returns
+        early without loading thresholds, so _check_pass_fail finds no thresholds to check."""
+        mock_config.EVERGREEN_PROJECT_NAME = "mongodb-mongo-master"
+        mock_config.EVERGREEN_REQUESTER = "github_pr"
+        mock_config.EVERGREEN_REVISION = "abc123"
+        mock_get_expansion.side_effect = lambda key, default=None: {
+            "github_pr_number": "12345",
+            "github_token_mongo": "fake_token",
+        }.get(key, default)
+        mock_github_cls.return_value = _build_pr_title_github('Revert "SERVER-12345 Some change"')
+
+        self.cbr_hook.variant = "test-variant"
+
+        # _before_suite_impl detects the revert and returns before loading thresholds.
+        self.cbr_hook._before_suite_impl(mock.MagicMock())
+        self.assertEqual(self.cbr_hook.performance_thresholds, {})
+
+        benchmark_reports = self.cbr_hook._parse_report(_BM_FULL_REPORT)
+        cedar_formatted_results = self.cbr_hook._generate_cedar_report(benchmark_reports)
+
+        self.cbr_hook._check_pass_fail(
+            benchmark_reports,
+            cedar_formatted_results,
+            mock.MagicMock(),
+            mock.MagicMock(),
+        )
+
+        # No dynamic test case should be created, no Evergreen API call.
+        MockCheckPerfResultTestCase.create_after_test.assert_not_called()
+        mock_get_api.assert_not_called()
+        self.assertFalse(self.cbr_hook.has_checked_results)
+
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.Github")
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    def test_after_suite_no_error_for_revert_pr(
+        self, mock_config, mock_get_expansion, mock_github_cls
+    ):
+        """_after_suite_impl does not log a 'no results checked' error for revert PRs."""
+        mock_config.EVERGREEN_PROJECT_NAME = "mongodb-mongo-master"
+        mock_config.EVERGREEN_REQUESTER = "github_pr"
+        mock_config.EVERGREEN_REVISION = "abc123"
+        mock_get_expansion.side_effect = lambda key, default=None: {
+            "github_pr_number": "12345",
+            "github_token_mongo": "fake_token",
+        }.get(key, default)
+        mock_github_cls.return_value = _build_pr_title_github('Revert "SERVER-12345 Some change"')
+
+        self.cbr_hook.variant = "test-variant"
+        self.cbr_hook.check_result = True
+        self.cbr_hook.cedar_report_file = None
+
+        # _before_suite_impl detects the revert and returns early without loading thresholds.
+        self.cbr_hook._before_suite_impl(mock.MagicMock())
+        self.assertEqual(self.cbr_hook.performance_thresholds, {})
+
+        benchmark_reports = self.cbr_hook._parse_report(_BM_FULL_REPORT)
+        cedar_formatted_results = self.cbr_hook._generate_cedar_report(benchmark_reports)
+
+        # _check_pass_fail finds no thresholds to check, so has_checked_results stays False.
+        self.cbr_hook._check_pass_fail(
+            benchmark_reports,
+            cedar_formatted_results,
+            mock.MagicMock(),
+            mock.MagicMock(),
+        )
+        self.assertFalse(self.cbr_hook.has_checked_results)
+
+        # after_suite should NOT log an ERROR even though check_result=True and
+        # has_checked_results=False, because this is a revert build.
+        with self.assertNoLogs("hook_logger", level="ERROR"):
+            self.cbr_hook.after_suite(mock.MagicMock())
+
 
 class TestBenchmarkThreadsReport(GenerateAndCheckPerfResultsFixture):
     def test_thread_from_name(self):
@@ -851,6 +1103,18 @@ def _make_comment(body, login):
     return comment
 
 
+def _build_pr_title_github(title, pr_number=12345):
+    """Build a mock GitHub client whose PR has the given title (for revert-title checks)."""
+    mock_github = mock.MagicMock()
+    mock_pr = mock.MagicMock()
+    mock_pr.number = pr_number
+    mock_pr.title = title
+    mock_repo = mock.MagicMock()
+    mock_repo.get_pull.return_value = mock_pr
+    mock_github.get_repo.return_value = mock_repo
+    return mock_github
+
+
 def _build_override_github(
     *,
     issue_comments=(),
@@ -860,7 +1124,7 @@ def _build_override_github(
     pending_members=(),
     membership_error=None,
 ):
-    """Build a mock Github client for exercising the override-check path.
+    """Build a mock GitHub client for exercising the override-check path.
 
     active_members:   logins resolved as active members of the approver team.
     pending_members:  logins resolved as having a non-active ('pending') membership.

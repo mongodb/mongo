@@ -33,6 +33,8 @@ MAINLINE_REQUESTERS = frozenset(["commit", "gitter_request", "github_tag", "git_
 OVERRIDE_APPROVER_ORG = "10gen"
 OVERRIDE_APPROVER_TEAMS = frozenset(["performance"])
 THRESHOLD_OVERRIDE_COMMENT = "perf threshold check override"
+REVERT_PREFIX = "Revert "
+GITHUB_REPO_NAME = "10gen/mongo"
 
 TRACER = trace.get_tracer("resmoke")
 
@@ -40,7 +42,7 @@ TRACER = trace.get_tracer("resmoke")
 def _log_perf_error(logger, message: str):
     """Log an error and report it to the current OpenTelemetry span.
 
-    Since this hook is run in PR checks, errors in the hook should not fail the task (and block developers due tooling failures).
+    Since this hook is run in PR checks, errors in the hook should not fail the task (and block developers due to tooling failures).
     Instead, errors in the hook are logged and reported to OpenTelemetry.
     """
 
@@ -111,6 +113,7 @@ class GenerateAndCheckPerfResults(interface.Hook):
         # Flag to see if we have checked any results against thresholds. Initialize to false here.
         self.has_checked_results = False
         self._base_version: Optional[tuple[str, Optional[str]]] = None
+        self._is_revert: Optional[bool] = None
 
     @staticmethod
     def _strftime(time):
@@ -240,6 +243,62 @@ class GenerateAndCheckPerfResults(interface.Hook):
             hook_test_case.configure(self.fixture)
             hook_test_case.run_dynamic_test(test_report)
 
+    def _get_build_subject(self) -> Optional[str]:
+        """Return the subject that identifies whether this build is a revert, or None on failure.
+
+        For PR builds (github_pr / github_merge_queue) the PR title is fetched via the GitHub API.
+        For mainline/waterfall builds the HEAD commit subject is fetched via git log.
+        """
+        if _config.EVERGREEN_REQUESTER in ("github_pr", "github_merge_queue"):
+            try:
+                github_pr_number = int(get_expansion("github_pr_number", 0))
+            except (TypeError, ValueError):
+                github_pr_number = 0
+            if not github_pr_number:
+                _log_perf_error(
+                    self.logger,
+                    "Missing 'github_pr_number' expansion, cannot check PR title for revert.",
+                )
+                return None
+            try:
+                github = Github(get_expansion("github_token_mongo"))
+                pr = github.get_repo(GITHUB_REPO_NAME).get_pull(github_pr_number)
+            except Exception as exc:
+                _log_perf_error(
+                    self.logger,
+                    f"Failed to check PR title for revert: {exc}. "
+                    "Proceeding with threshold check.",
+                )
+                return None
+            return pr.title
+        try:
+            return subprocess.check_output(
+                ["git", "log", "-1", "--pretty=format:%s", "HEAD"], cwd=".", text=True
+            ).strip()
+        except Exception as exc:
+            _log_perf_error(
+                self.logger,
+                f"Failed to check if this is a revert commit: {exc}. "
+                "Proceeding with threshold check.",
+            )
+            return None
+
+    def _is_revert_build(self) -> bool:
+        """Return whether the current build is a revert.
+
+        Returns False on any failure, so the normal threshold check proceeds.
+        """
+        if self._is_revert is not None:
+            return self._is_revert
+        self._is_revert = False
+        subject = self._get_build_subject()
+        if subject is not None and subject.startswith(REVERT_PREFIX):
+            self._is_revert = True
+            self.logger.info(
+                f"Detected revert (subject: '{subject}'), skipping performance threshold check."
+            )
+        return self._is_revert
+
     def _get_base_version(self) -> tuple[str, Optional[str]]:
         """Return the base version (project, version_id)."""
         if self._base_version is None:
@@ -316,6 +375,10 @@ class GenerateAndCheckPerfResults(interface.Hook):
     def _before_suite_impl(self, test_report):
         self.create_time = datetime.datetime.now()
 
+        # If this is a revert build, skip threshold checks to avoid blocking the merge
+        if self._is_revert_build():
+            return
+
         try:
             with open(THRESHOLD_LOCATION, encoding="utf8") as fh:
                 self.performance_thresholds = yaml.safe_load(fh)["tests"]
@@ -353,7 +416,7 @@ class GenerateAndCheckPerfResults(interface.Hook):
                 " Results were checked against thresholds, but configuration"
                 " indicated there shouldn't be.",
             )
-        if not self.has_checked_results and self.check_result:
+        if not self.has_checked_results and self.check_result and not self._is_revert_build():
             _log_perf_error(
                 self.logger,
                 "Running generate_and_check_perf_results."
@@ -597,12 +660,12 @@ class CheckPerfResultTestCase(interface.DynamicTestCase):
                         "Missing 'github_pr_number' expansion, cannot determine PR to check for threshold check override.",
                     )
                 else:
-                    pr = self.github.get_repo("10gen/mongo").get_pull(github_pr_number)
+                    pr = self.github.get_repo(GITHUB_REPO_NAME).get_pull(github_pr_number)
                     self.logger.info(
                         f"Checking PR #{pr.number} for threshold check override comments."
                     )
 
-                    # Generals comments made on the main PR thread, not on a specific line of code - most likely to be used
+                    # General comments made on the main PR thread, not on a specific line of code - most likely to be used
                     for comment in pr.get_issue_comments():
                         if (
                             THRESHOLD_OVERRIDE_COMMENT in comment.body.lower()
