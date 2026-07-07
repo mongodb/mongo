@@ -944,17 +944,11 @@ void commitRenameOfTemporaryCollection(OperationContext* opCtx,
 void commitDropOfStaleChunksForRename(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       const UUID& oldUuid) {
-    const auto ensureCollectionDoesNotExist = [&]() {
-        try {
-            auto catalogClient = Grid::get(opCtx)->catalogClient();
-            const auto _ = catalogClient->getCollection(opCtx, oldUuid);
-            tasserted(ErrorCodes::IllegalOperation,
-                      "Collection entry must not exist in the global catalog to drop stale chunks");
-        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-            // This is actually the expected path.
-        }
-    };
-    ensureCollectionDoesNotExist();
+    // Sanity check: Ensure the old collection does not exist anymore in the global catalog
+    const auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
+    tassert(ErrorCodes::IllegalOperation,
+            "Found collection with stale UUID in the global catalog while dropping stale chunks",
+            coll.getUuid() != oldUuid);
 
     // This function gets called without holding a critical section but the DDL lock as well as
     // migrations are disabled. The order of operations here is quite deliberate in order to make
@@ -981,8 +975,9 @@ void commitDropOfStaleChunksForRename(OperationContext* opCtx,
         shard_catalog_commit::executeLocalDelete(
             dbClient,
             NamespaceString::kConfigShardCatalogCollectionsNamespace,
-            BSON(CollectionType::kUuidFieldName << oldUuid),
-            true /* multi */);
+            BSON(CollectionType::kNssFieldName << shard_catalog_commit::serializeNss(nss)
+                                               << CollectionType::kUuidFieldName << oldUuid),
+            false /* multi */);
     }
     shard_catalog_commit::commitDropOfStaleChunksForRename(opCtx, oldUuid);
 
