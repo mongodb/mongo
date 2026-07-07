@@ -740,6 +740,15 @@ class TestExceptionExtraction(unittest.TestCase):
         expected = "The following tests had errors:\n    buildscripts/tests/resmoke_end2end/failtestfiles/js_failure.js\n        Traceback (most recent call last):\n"
         assert expected in output
 
+    def test_check_metadata_consistency_background_hook_fails_on_inconsistency(self):
+        resmoke_args = [
+            "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_metadata_consistency_background_hook_failure.yml",
+        ]
+        result = execute_resmoke(resmoke_args)
+
+        self.assertIn("Found metadata inconsistencies", result.stdout)
+        self.assertNotEqual(result.returncode, 0)
+
 
 class TestForceExcludedTest(unittest.TestCase):
     def test_no_force_exclude(self):
