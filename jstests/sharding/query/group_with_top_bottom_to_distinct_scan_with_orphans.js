@@ -16,14 +16,10 @@
 import {prepareShardedCollectionWithOrphans} from "jstests/libs/query/group_to_distinct_scan_utils.js";
 import {runGroupWithTopBottomToDistinctScanTests} from "jstests/libs/query/group_with_top_bottom_to_distinct_scan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 TestData.skipCheckOrphans = true;
 
 const st = new ShardingTest({shards: 2});
-
-// TODO (SERVER-129885): Enable once prepareShardedCollectionWithOrphans is adapted with authoritative shards.
-skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
 
 const db = prepareShardedCollectionWithOrphans(st);
 
