@@ -168,6 +168,13 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistency(
     OperationContext* opCtx, const DatabaseType& dbInGlobalCatalog);
 
 /**
+ * Checks that this shard's config database shard catalog collections match the current FCV
+ * (e.g. on FCV 9.0+, the legacy config.cache.* collections should not exist).
+ */
+std::vector<MetadataInconsistencyItem> checkShardCatalogCollectionsConsistentWithAuthoritativeness(
+    OperationContext* opCtx);
+
+/**
  * Main check consistency metadata logic ran by the participant commands (i.e.
  * _shardsvrCheckMetadataConsistencyParticipant and
  * _shardsvrCheckMetadataConsistencySecondaryParticipant).

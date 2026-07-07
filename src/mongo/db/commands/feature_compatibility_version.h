@@ -41,6 +41,8 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/version/releases.h"
 
+#include <type_traits>
+
 #include <boost/optional/optional.hpp>
 
 namespace MONGO_MOD_PUB mongo {
@@ -198,5 +200,48 @@ public:
 private:
     Lock::SharedLock _lk;
 };
+
+/*
+ * Optimistically runs the specified checks over a stable (fully upgraded / fully downgraded) FCV.
+ * This is intended for commands such as `validate` or `checkMetadataConsistency` to check the
+ * metadata is consistent with FCV, avoiding both acquiring locks and false positives.
+ * Returns boost::none if a concurrent upgrade/downgrade happened during the check.
+ */
+template <typename Fn>
+auto tryCheckUnderStableFCV(OperationContext* opCtx, Fn&& checkFn)
+    -> boost::optional<std::invoke_result_t<Fn, ServerGlobalParams::FCVSnapshot>> {
+    // Without Symmetric FCV, the FCV document may show the fully upgraded/downgraded state
+    // but there may still be metadata changes being done by setFCV.
+    if (!gFeatureFlagSymmetricFCV.isEnabled()) {
+        return boost::none;
+    }
+
+    // TODO SERVER-130577: Generalize changeTimestamp to replica sets to lift this restriction.
+    tassert(12797701,
+            "tryCheckUnderStableFCV currently only supports sharded clusters",
+            serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
+
+    auto readFCVDocument = [&] {
+        return FeatureCompatibilityVersionDocument::parse(uassertStatusOK(
+            FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(opCtx)));
+    };
+
+    const auto initialFCVDocument = readFCVDocument();
+    if (initialFCVDocument.getTargetVersion()) {
+        // We are upgrading or downgrading, so the check can not be reliably run.
+        return boost::none;
+    }
+
+    auto result = checkFn(ServerGlobalParams::FCVSnapshot(initialFCVDocument.getVersion()));
+
+    if (readFCVDocument() != initialFCVDocument) {
+        // An upgrade or downgrade happened during the check, so discard to avoid false positives.
+        // Note that the FCV document includes a `changeTimestamp`, so we will correctly discard the
+        // result even if a full downgrade + full upgrade cycle happened across the check.
+        return boost::none;
+    }
+
+    return result;
+}
 
 }  // namespace MONGO_MOD_PUB mongo

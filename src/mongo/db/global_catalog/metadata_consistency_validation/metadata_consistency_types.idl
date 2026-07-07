@@ -68,6 +68,8 @@ enums:
             kMalformedTimeseriesBucketsCollection: "MalformedTimeseriesBucketsCollection"
             kInconsistentShardCatalogCollectionMetadata: "InconsistentShardCatalogCollectionMetadata"
             kIncompatibleUniqueIndexOnShardedCollection: "IncompatibleUniqueIndexOnShardedCollection"
+            kLegacyShardCacheCollectionsPresent: "LegacyShardCacheCollectionsPresent"
+            kAuthoritativeShardCatalogCollectionsPresent: "AuthoritativeShardCatalogCollectionsPresent"
 
     MetadataInconsistencyDescription:
         description: "Description of each metadata inconsistency."
@@ -101,6 +103,8 @@ enums:
             kMalformedTimeseriesBucketsCollection: "Found malformed timeseries collection"
             kInconsistentShardCatalogCollectionMetadata: "Found inconsistencies between collection metadata in the global catalog and the shard catalog"
             kIncompatibleUniqueIndexOnShardedCollection: "Found incompatible index options with uniqueness in a sharded collection"
+            kLegacyShardCacheCollectionsPresent: "Found legacy non-authoritative shard catalog cache collections on a shard that is fully upgraded"
+            kAuthoritativeShardCatalogCollectionsPresent: "Found authoritative shard catalog collections on a shard that is fully downgraded"
 
     MetadataInconsistencySeverity:
         description: "Severity level of a metadata inconsistency."
@@ -352,6 +356,18 @@ structs:
             shardKeyPattern:
                 type: object
                 description: "The shard key pattern of the collection."
+
+    UnexpectedShardCatalogCollectionDetails:
+        description: "Details about a shard catalog collection unexpectedly found on a shard given the cluster's current FCV."
+        strict: false
+        fields:
+            namespace:
+                cpp_name: nss
+                type: namespacestring
+                description: "The namespace of the collection found."
+            shard:
+                type: shard_id
+                description: "The shard on which the collection was found."
 
     HiddenShardedCollectionDetails:
         description: "Details about a hidden sharded collection inconsistency."

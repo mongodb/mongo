@@ -373,7 +373,10 @@ public:
                 }
             }
 
-            return _mergeCursors(opCtx, nss, std::move(cursors));
+            auto localInconsistencies = metadata_consistency_util::
+                checkShardCatalogCollectionsConsistentWithAuthoritativeness(opCtx);
+
+            return _mergeCursors(opCtx, nss, std::move(cursors), std::move(localInconsistencies));
         }
 
         Response _runDatabaseLevel(OperationContext* opCtx, const NamespaceString& nss) {
@@ -397,7 +400,7 @@ public:
                 }
             }();
 
-            return _mergeCursors(opCtx, nss, std::move(dbCursors));
+            return _mergeCursors(opCtx, nss, std::move(dbCursors), {});
         }
 
         Response _runCollectionLevel(OperationContext* opCtx, const NamespaceString& nss) {
@@ -411,7 +414,7 @@ public:
                 return _establishCursorOnParticipants(opCtx, nss);
             }();
 
-            return _mergeCursors(opCtx, nss, std::move(collCursors));
+            return _mergeCursors(opCtx, nss, std::move(collCursors), {});
         }
 
         /*
@@ -478,7 +481,8 @@ public:
 
         CursorInitialReply _mergeCursors(OperationContext* opCtx,
                                          const NamespaceString& nss,
-                                         std::vector<RemoteCursor>&& cursors) {
+                                         std::vector<RemoteCursor>&& cursors,
+                                         std::vector<MetadataInconsistencyItem>&& inconsistencies) {
 
             ResolvedNamespaceMap resolvedNamespaces;
             resolvedNamespaces[nss] = {nss, std::vector<BSONObj>{}};
@@ -496,12 +500,13 @@ public:
             auto pipeline = Pipeline::create({std::move(docSourceMergeStage)}, expCtx);
             auto exec = plan_executor_factory::make(expCtx, std::move(pipeline));
 
-            return metadata_consistency_util::createInitialCursorReplyMongod(opCtx,
-                                                                             nss,
-                                                                             {} /*inconsistencies*/,
-                                                                             request().getCursor(),
-                                                                             request().toBSON(),
-                                                                             std::move(exec));
+            return metadata_consistency_util::createInitialCursorReplyMongod(
+                opCtx,
+                nss,
+                std::move(inconsistencies),
+                request().getCursor(),
+                request().toBSON(),
+                std::move(exec));
         }
 
         NamespaceString ns() const override {

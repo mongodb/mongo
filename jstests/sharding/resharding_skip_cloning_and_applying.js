@@ -130,6 +130,10 @@ function runTest(testOptions) {
             nodes: 2,
             setParameter: testOptions.setParameters,
         },
+        other: {
+            configOptions: {setParameter: testOptions.setParameters},
+            mongosOptions: {setParameter: testOptions.setParameters},
+        },
         // By default, our test infrastructure sets the election timeout to a very high value (24
         // hours). For this test, we need a shorter election timeout because it relies on nodes
         // running an election when they do not detect an active primary. Therefore, we are setting
