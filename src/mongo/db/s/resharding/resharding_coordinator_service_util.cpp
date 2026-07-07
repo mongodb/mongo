@@ -643,11 +643,16 @@ CollectionType createTempReshardingCollectionType(
         collType.setReshardingFields(std::move(tempEntryReshardingFields));
     }
 
-    // Block migrations on the temporary resharding collection until resharding completes.
+    // Block chunk operations on the temporary resharding collection until resharding completes.
     // unshardCollection and moveCollection produce unsplittable collections, which are not subject
-    // to migrations.
+    // to chunk operations.
     if (isOrdinaryReshardCollection(provenance) || isRewriteCollection(provenance)) {
-        collType.setAllowMigrations(false);
+        if (coordinatorDoc.getAuthoritativeMetadataAccessLevel() >=
+            ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
+            collType.setAllowChunkOperations(false);
+        } else {
+            collType.setAllowMigrations(false);
+        }
     }
 
     return collType;
@@ -775,6 +780,10 @@ void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
                     str::stream() << "collection " << CollectionType::kAllowMigrationsFieldName
                                   << " setting is already set to false",
                     configCollDoc.getAllowMigrations());
+            uassert(13050500,
+                    str::stream() << "collection " << CollectionType::kAllowChunkOperationsFieldName
+                                  << " setting is already set to false",
+                    configCollDoc.getAllowChunkOperations());
 
             // Insert the coordinator document to config.reshardingOperations.
             writeToCoordinatorStateNss(opCtx, metrics, coordinatorDoc, txnNumber);

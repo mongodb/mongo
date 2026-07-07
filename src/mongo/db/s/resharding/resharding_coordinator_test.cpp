@@ -489,7 +489,7 @@ protected:
     }
 
     // Reads the temporary collection's catalog entry from disk and validates that the
-    // reshardingFields and allowMigration matches the expected.
+    // reshardingFields and allowChunkOperations matches the expected.
     void assertTemporaryCollectionCatalogEntryMatchesExpected(
         OperationContext* opCtx, boost::optional<CollectionType> expectedCollType) {
         DBDirectClient client(opCtx);
@@ -592,8 +592,8 @@ protected:
         OID collectionEpoch) {
         readReshardingCoordinatorDocAndAssertMatchesExpected(opCtx, expectedCoordinatorDoc);
 
-        // Check the resharding fields and allowMigrations in the config.collections entry for the
-        // original collection
+        // Check the resharding fields and allowChunkOperations in the config.collections entry for
+        // the original collection
         TypeCollectionReshardingFields expectedReshardingFields(
             expectedCoordinatorDoc.getReshardingUUID());
         expectedReshardingFields.setState(expectedCoordinatorDoc.getState());
@@ -616,8 +616,8 @@ protected:
         assertOriginalCollectionCatalogEntryMatchesExpected(
             opCtx, expectedOriginalCollType, expectedCoordinatorDoc);
 
-        // Check the resharding fields and allowMigrations in the config.collections entry for the
-        // temp collection. If the expected state is >= kCommitting, the entry for the temp
+        // Check the resharding fields and allowChunkOperations in the config.collections entry for
+        // the temp collection. If the expected state is >= kCommitting, the entry for the temp
         // collection should have been removed.
         boost::optional<CollectionType> expectedTempCollType = boost::none;
         if (expectedCoordinatorDoc.getState() < CoordinatorStateEnum::kCommitting) {

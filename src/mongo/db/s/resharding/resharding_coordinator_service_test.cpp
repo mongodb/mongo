@@ -177,11 +177,8 @@ public:
         if (reshardingFields)
             collType.setReshardingFields(std::move(reshardingFields.value()));
 
-        if (coordinatorDoc.getState() == CoordinatorStateEnum::kDone ||
-            coordinatorDoc.getState() == CoordinatorStateEnum::kAborting) {
-            collType.setAllowMigrations(true);
-        } else if (coordinatorDoc.getState() >= CoordinatorStateEnum::kPreparingToDonate) {
-            collType.setAllowMigrations(false);
+        if (coordinatorDoc.getState() >= CoordinatorStateEnum::kPreparingToDonate) {
+            collType.setAllowChunkOperations(false);
         }
         return collType;
     }
@@ -397,7 +394,7 @@ public:
 
         for (const auto state : states) {
             stateTransitionsGuard->wait(state);
-            ASSERT_FALSE(getCollectionCatalogEntry(opCtx).getAllowMigrations());
+            ASSERT_FALSE(getCollectionCatalogEntry(opCtx).getAllowChunkOperations());
             runFunctionForState(state);
             stateTransitionsGuard->unset(state);
 
@@ -453,7 +450,7 @@ public:
             }
         }
         coordinator->getCompletionFuture().get(opCtx);
-        ASSERT_TRUE(getCollectionCatalogEntry(opCtx).getAllowMigrations());
+        ASSERT_TRUE(getCollectionCatalogEntry(opCtx).getAllowChunkOperations());
 
         BSONObjBuilder bob;
         ReshardingCumulativeMetrics::getForResharding(operationContext()->getServiceContext())
@@ -664,8 +661,8 @@ public:
         // Wait for completion and verify the original abort reason is still used.
         ASSERT_EQ(coordinator->getCompletionFuture().getNoThrow(), abortReason0);
 
-        // Verify allowMigrations is restored after abort completes.
-        ASSERT_TRUE(getCollectionCatalogEntry(opCtx).getAllowMigrations());
+        // Verify allowChunkOperations is restored after abort completes.
+        ASSERT_TRUE(getCollectionCatalogEntry(opCtx).getAllowChunkOperations());
 
         // There should be no quiescing regardless of the abort type after failover, i.e. the wait
         // should finish immediately.
@@ -718,8 +715,8 @@ public:
         // Wait for the coordinator to transition to the "quiesced" state.
         waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kQuiesced);
 
-        // Verify allowMigrations is restored after reaching kQuiesced.
-        ASSERT_TRUE(getCollectionCatalogEntry(opCtx).getAllowMigrations());
+        // Verify allowChunkOperations is restored after reaching kQuiesced.
+        ASSERT_TRUE(getCollectionCatalogEntry(opCtx).getAllowChunkOperations());
 
         stepDown(opCtx);
         coordinator.reset();
@@ -1267,39 +1264,40 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorFailsIfMigrationNo
 
     {
         DBDirectClient client(opCtx);
-        client.update(NamespaceString::kConfigsvrCollectionsNamespace,
-                      BSON(CollectionType::kNssFieldName << _originalNss.ns_forTest()),
-                      BSON("$set" << BSON(CollectionType::kAllowMigrationsFieldName << false)));
+        client.update(
+            NamespaceString::kConfigsvrCollectionsNamespace,
+            BSON(CollectionType::kNssFieldName << _originalNss.ns_forTest()),
+            BSON("$set" << BSON(CollectionType::kAllowChunkOperationsFieldName << false)));
     }
 
     auto coordinator = ReshardingCoordinator::getOrCreate(opCtx, _service, doc.toBSON());
-    ASSERT_THROWS_CODE(coordinator->getCompletionFuture().get(opCtx), DBException, 5808201);
+    ASSERT_THROWS_CODE(coordinator->getCompletionFuture().get(opCtx), DBException, 13050500);
 
-    // Check that reshardCollection keeps allowMigrations setting intact.
+    // Check that reshardCollection keeps allowChunkOperations setting intact.
     {
         DBDirectClient client(opCtx);
         CollectionType collDoc(
             client.findOne(NamespaceString::kConfigsvrCollectionsNamespace,
                            BSON(CollectionType::kNssFieldName << _originalNss.ns_forTest())));
-        ASSERT_FALSE(collDoc.getAllowMigrations());
+        ASSERT_FALSE(collDoc.getAllowChunkOperations());
     }
 }
 
 TEST_F(ReshardingCoordinatorServiceTest,
-       AllowMigrationsRestoredOnAbortBeforeInitializationCompletes) {
+       AllowChunkOperationsRestoredOnAbortBeforeInitializationCompletes) {
     auto fpAfterStopMigrations =
         globalFailPointRegistry().find("pauseAfterStoppingActiveMigrations");
     auto timesEnteredFailPoint = fpAfterStopMigrations->setMode(FailPoint::alwaysOn, 0);
     auto coordinator = initializeAndGetCoordinator();
     fpAfterStopMigrations->waitForTimesEntered(timesEnteredFailPoint + 1);
 
-    ASSERT_FALSE(getCollectionCatalogEntry(operationContext()).getAllowMigrations());
+    ASSERT_FALSE(getCollectionCatalogEntry(operationContext()).getAllowChunkOperations());
 
     coordinator->abort({resharding::kUserAbortReason, resharding::AbortType::kAbortSkipQuiesce});
     fpAfterStopMigrations->setMode(FailPoint::off, 0);
     coordinator->getCompletionFuture().wait();
 
-    ASSERT_TRUE(getCollectionCatalogEntry(operationContext()).getAllowMigrations());
+    ASSERT_TRUE(getCollectionCatalogEntry(operationContext()).getAllowChunkOperations());
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, MultipleReshardingOperationsFail) {

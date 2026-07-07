@@ -312,7 +312,7 @@ protected:
                             Date_t::now(),
                             env.sourceUuid,
                             BSON(kShardKey << 1));
-        coll.setAllowMigrations(false);
+        coll.setAllowChunkOperations(false);
 
         const auto chunksWithXShardKey = createChunks(env.version.placementVersion().epoch(),
                                                       env.sourceUuid,

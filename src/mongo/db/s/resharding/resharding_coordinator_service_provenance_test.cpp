@@ -244,9 +244,9 @@ TEST_P(ReshardingCoordinatorServiceProvenanceTest, FullLifecycleSucceeds) {
 
     waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
     if (sourceMigrationsAreBlocked()) {
-        ASSERT_FALSE(getCollectionCatalogEntry(opCtx).getAllowMigrations());
+        ASSERT_FALSE(getCollectionCatalogEntry(opCtx).getAllowChunkOperations());
     } else {
-        ASSERT_TRUE(getCollectionCatalogEntry(opCtx).getAllowMigrations());
+        ASSERT_TRUE(getCollectionCatalogEntry(opCtx).getAllowChunkOperations());
     }
     makeDonorsReadyToDonateWithAssert(opCtx);
 
@@ -265,9 +265,9 @@ TEST_P(ReshardingCoordinatorServiceProvenanceTest, FullLifecycleSucceeds) {
 
     coordinator->getCompletionFuture().get(opCtx);
 
-    // After commit the source collection's reshardingFields are removed and migrations are
+    // After commit the source collection's reshardingFields are removed and chunk operations are
     // re-allowed (default true).
-    ASSERT_TRUE(getCollectionCatalogEntry(opCtx).getAllowMigrations());
+    ASSERT_TRUE(getCollectionCatalogEntry(opCtx).getAllowChunkOperations());
 
     if (resharding::isUnshardCollection(GetParam())) {
         ASSERT_TRUE(getCollectionCatalogEntry(opCtx).getUnsplittable());

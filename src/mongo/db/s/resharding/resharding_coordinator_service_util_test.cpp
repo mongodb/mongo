@@ -486,6 +486,9 @@ protected:
         recipientCtx.setState(RecipientStateEnum::kUnused);
         doc.setRecipientShards({RecipientShardEntry(ShardId("recipient0"), recipientCtx)});
 
+        doc.setAuthoritativeMetadataAccessLevel(
+            ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed);
+
         return doc;
     }
 };
@@ -529,7 +532,7 @@ TEST_P(ReshardingCoordinatorServiceUtilProvenanceTest,
 
     const bool expectMigrationsBlocked =
         isOrdinaryReshardCollection(GetParam()) || isRewriteCollection(GetParam());
-    ASSERT_EQ(collType.getAllowMigrations(), !expectMigrationsBlocked);
+    ASSERT_EQ(collType.getAllowChunkOperations(), !expectMigrationsBlocked);
 }
 
 TEST_P(ReshardingCoordinatorServiceUtilProvenanceTest,

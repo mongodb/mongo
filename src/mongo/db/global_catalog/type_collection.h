@@ -192,6 +192,11 @@ public:
         return GlobalCatalogCollectionTypeBase::getAllowChunkOperations().get_value_or(true);
     }
 
+    void setAllowChunkOperations(bool allowChunkOperations) {
+        GlobalCatalogCollectionTypeBase::setAllowChunkOperations(
+            allowChunkOperations ? boost::none : boost::make_optional(false));
+    }
+
     // TODO SERVER-61033: remove after permitMigrations have been merge with allowMigrations.
     bool getPermitMigrations() const {
         return GlobalCatalogCollectionTypeBase::getPermitMigrations().get_value_or(true);
