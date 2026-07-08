@@ -74,4 +74,9 @@ MONGO_MOD_PUBLIC bool shouldUseReplicatedFastCountContainers(OperationContext* o
  */
 MONGO_MOD_PUBLIC bool isReplicatedFastCountListCollectionsEnabled(OperationContext* opCtx);
 
+/**
+ * Returns true if initial sync should fetch the replicated fast count timestamp store timestamp.
+ */
+MONGO_MOD_PUBLIC bool isReplicatedFastCountInitialSyncEnabled(OperationContext* opCtx);
+
 }  // namespace mongo

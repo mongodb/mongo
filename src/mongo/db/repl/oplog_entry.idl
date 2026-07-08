@@ -156,7 +156,7 @@ structs:
                 optional: true
                 description:
                     "The ident of the container targeted by the container op. Used for op
-                    types 'ci' and 'cd'."
+                    types 'ci', 'cu', and 'cd'."
             o:
                 cpp_name: object
                 type: object

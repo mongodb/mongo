@@ -359,6 +359,36 @@ mongo_cc_unit_test(
     ],
 )
 
+mongo_cc_library(
+    name = "size_count_timestamp_store_oplog",
+    srcs = [
+        "size_count_timestamp_store_oplog.cpp",
+    ],
+    deps = [
+        "size_count_store",
+        "//src/mongo/db/repl:apply_ops_command_info",
+        "//src/mongo/db/repl:oplog_entry",
+        "//src/mongo/db/storage:ident",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "size_count_timestamp_store_oplog_test",
+    srcs = [
+        "size_count_timestamp_store_oplog_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_fifth_group",
+    ],
+    deps = [
+        "size_count_store",
+        "size_count_timestamp_store_oplog",
+        "//src/mongo/db:expression_context_builder",
+        "//src/mongo/db:query_matcher",
+        "//src/mongo/db/storage:ident",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "size_count_store_test",
     srcs = [

@@ -395,6 +395,39 @@ private:
      *   _getBeginFetchingOpTimeCallback()
      *         |
      *         |
+     *         +--------------------------------------------------+
+     *         |                                                  |
+     *         |                                                  |
+     *         | (replicated fast count enabled)                  |
+     *         |                                                  |
+     *         |                                                  |
+     *         V                                                  |
+     *    _scheduleGetFastCountTimestampStoreWrite()              |
+     *         |                                                  |
+     *         |                                                  |
+     *         V                                                  |
+     *    _handleFastCountTimestampStoreWriteResponse()           |
+     *         |                    |                             |
+     *         |                    |                             |
+     *  (store write found,         | (no store write in          | (replicated fast count disabled)
+     *   clamp beginFetching)       |  retained oplog)            |
+     *         |                    |                             |
+     *         |                    |                             |
+     *         |                    V                             |
+     *         |    _scheduleGetOldestOplogEntryForFastCount()    |
+     *         |                    |                             |
+     *         |                    |                             |
+     *         |                    V                             |
+     *         |    _handleOldestOplogEntryForFastCountResponse() |
+     *         |                    |                             |
+     *         |                    |                             |
+     *         +--------+-----------+                             |
+     *         |                                                  |
+     *         |                                                  |
+     *         V                                                  |
+     *    _scheduleBeginApplyingTimestampFetcher() <--------------+
+     *         |
+     *         |
      *         V
      *    _lastOplogEntryFetcherCallbackForBeginApplyingTimestamp()
      *         |
@@ -549,6 +582,52 @@ private:
         const StatusWith<Fetcher::QueryResponse>& result,
         std::shared_ptr<OnCompletionGuard> onCompletionGuard,
         OpTime& beginFetchingOpTime);
+
+    /**
+     * Schedules the '_lastOplogEntryFetcher' that determines the beginApplyingTimestamp, routing
+     * its response to _lastOplogEntryFetcherCallbackForBeginApplyingTimestamp with the provided
+     * (possibly fast-count-clamped) 'beginFetchingOpTime'.
+     */
+    void _scheduleBeginApplyingTimestampFetcher(
+        WithLock lock,
+        std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+        OpTime beginFetchingOpTime);
+
+    /**
+     * Scans the sync source's oplog for the most recent write to the replicated fast count
+     * timestamp store and routes the response to _handleFastCountTimestampStoreWriteResponse. Only
+     * used when replicated fast count is enabled.
+     */
+    void _scheduleGetFastCountTimestampStoreWrite(
+        WithLock lock,
+        std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+        OpTime beginFetchingOpTime);
+
+    /**
+     * Handles the response to the fast count timestamp store oplog scan. Extracts the persisted
+     * validAsOf from the returned entry (via getTimestampStoreValidAsOfFromOplogEntry) and, if it
+     * is earlier than 'beginFetchingOpTime', clamps 'beginFetchingOpTime' down to it (using the
+     * term from the store-write entry, which shares validAsOf's term). Then schedules the
+     * beginApplying timestamp fetch. A missing write is treated as best-effort (no clamp).
+     */
+    void _handleFastCountTimestampStoreWriteResponse(
+        const StatusWith<Fetcher::QueryResponse>& result,
+        std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+        OpTime beginFetchingOpTime);
+
+    /**
+     * Schedules and handles a fallback scan for the oldest oplog entry when the retained oplog has
+     * no replicated fast count timestamp store write with a validAsOf timestamp.
+     */
+    void _scheduleGetOldestOplogEntryForFastCount(
+        WithLock lock,
+        std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+        OpTime beginFetchingOpTime);
+
+    void _handleOldestOplogEntryForFastCountResponse(
+        const StatusWith<Fetcher::QueryResponse>& result,
+        std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+        OpTime beginFetchingOpTime);
 
     /**
      * Callback for the '_fCVFetcher'. A successful response lets us check if the remote node
@@ -888,17 +967,19 @@ private:
     // The operation, if any, currently being retried because of a network error.
     InitialSyncSharedData::RetryableOperation _retryingOperation;  // (M)
 
-    std::unique_ptr<InitialSyncState> _initialSyncState;   // (M)
-    std::unique_ptr<OplogFetcher> _oplogFetcher;           // (S)
-    std::unique_ptr<Fetcher> _beginFetchingOpTimeFetcher;  // (S)
-    std::unique_ptr<Fetcher> _lastOplogEntryFetcher;       // (S)
-    std::unique_ptr<Fetcher> _fCVFetcher;                  // (S)
-    std::unique_ptr<Fetcher> _earliestOplogEntryFetcher;   // (S)
-    std::unique_ptr<MultiApplier> _applier;                // (M)
-    HostAndPort _syncSource;                               // (M)
-    std::unique_ptr<DBClientConnection> _client;           // (M)
-    OpTime _lastFetched;                                   // (MX)
-    OpTimeAndWallTime _lastApplied;                        // (MX)
+    std::unique_ptr<InitialSyncState> _initialSyncState;         // (M)
+    std::unique_ptr<OplogFetcher> _oplogFetcher;                 // (S)
+    std::unique_ptr<Fetcher> _beginFetchingOpTimeFetcher;        // (S)
+    std::unique_ptr<Fetcher> _lastOplogEntryFetcher;             // (S)
+    std::unique_ptr<Fetcher> _fastCountTimestampStoreFetcher;    // (S)
+    std::unique_ptr<Fetcher> _fastCountOldestOplogEntryFetcher;  // (S)
+    std::unique_ptr<Fetcher> _fCVFetcher;                        // (S)
+    std::unique_ptr<Fetcher> _earliestOplogEntryFetcher;         // (S)
+    std::unique_ptr<MultiApplier> _applier;                      // (M)
+    HostAndPort _syncSource;                                     // (M)
+    std::unique_ptr<DBClientConnection> _client;                 // (M)
+    OpTime _lastFetched;                                         // (MX)
+    OpTimeAndWallTime _lastApplied;                              // (MX)
 
     std::unique_ptr<OplogBuffer> _oplogBuffer;    // (M)
     std::unique_ptr<OplogApplier> _oplogApplier;  // (M)

@@ -187,6 +187,33 @@ TEST_F(IsReplicatedFastCountEnabledTest, ListCollectionsDisabledWhenTestCommands
     EXPECT_FALSE(isReplicatedFastCountListCollectionsEnabled(operationContext()));
 }
 
+// Test that we only try to move initial sync's beginFetchingOptime when replicated fast count and
+// test commands are enabled.
+TEST_F(IsReplicatedFastCountEnabledTest, InitialSyncDisabledWhenReplicatedFastCountOff) {
+    unittest::ServerParameterGuard ffReplicatedFastCount("featureFlagReplicatedFastCount", false);
+    EXPECT_FALSE(isReplicatedFastCountInitialSyncEnabled(operationContext()));
+}
+
+TEST_F(IsReplicatedFastCountEnabledTest, InitialSyncEnabledWhenReplicatedFastCountOn) {
+    unittest::ServerParameterGuard ffReplicatedFastCount("featureFlagReplicatedFastCount", true);
+    EXPECT_TRUE(isReplicatedFastCountInitialSyncEnabled(operationContext()));
+}
+
+TEST_F(IsReplicatedFastCountEnabledTest, InitialSyncDisabledWhenTestCommandsOff) {
+    unittest::ServerParameterGuard ffReplicatedFastCount("featureFlagReplicatedFastCount", true);
+    setTestCommandsEnabled(false);
+    const auto restoreTestCommands = ScopeGuard([] { setTestCommandsEnabled(true); });
+    EXPECT_FALSE(isReplicatedFastCountInitialSyncEnabled(operationContext()));
+}
+
+TEST_F(IsReplicatedFastCountEnabledTest,
+       InitialSyncDisabledWhenReplicatedFastCountOffAndTestCommandsOn) {
+    unittest::ServerParameterGuard ffReplicatedFastCount("featureFlagReplicatedFastCount", false);
+    setTestCommandsEnabled(false);
+    const auto restoreTestCommands = ScopeGuard([] { setTestCommandsEnabled(true); });
+    EXPECT_FALSE(isReplicatedFastCountInitialSyncEnabled(operationContext()));
+}
+
 // The following tests verify that listCollections fast count emission is gated solely on the
 // feature flags and is NOT enabled by persistence provider traits.
 TEST_F(IsReplicatedFastCountListCollectionsWithProviderTest,

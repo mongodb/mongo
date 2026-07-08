@@ -66,6 +66,8 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
+#include "mongo/db/replicated_fast_count/size_count_timestamp_store_oplog.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/session_txn_record_gen.h"
@@ -382,6 +384,8 @@ void InitialSyncer::_cancelRemainingWork(WithLock lk) {
     _shutdownComponent(lk, _fCVFetcher);
     _shutdownComponent(lk, _lastOplogEntryFetcher);
     _shutdownComponent(lk, _beginFetchingOpTimeFetcher);
+    _shutdownComponent(lk, _fastCountTimestampStoreFetcher);
+    _shutdownComponent(lk, _fastCountOldestOplogEntryFetcher);
     _shutdownComponent(lk, _earliestOplogEntryFetcher);
     (*_attemptExec)->shutdown();
     (*_clonerAttemptExec)->shutdown();
@@ -1060,11 +1064,31 @@ void InitialSyncer::_getBeginFetchingOpTimeCallback(
         initialSyncHangAfterGettingBeginFetchingTimestamp.pauseWhileSet();
     }
 
+    // When replicated fast count is enabled, beginFetchingTimestamp must be no later than the sync
+    // source's persisted fast-count validAsOf so that, after seeding the counts during cloning, we
+    // retain the oplog needed to advance them. We discover validAsOf by scanning the sync source's
+    // oplog for the last write to the fast count timestamp store before fetching the
+    // beginApplyingTimestamp. Otherwise we proceed directly to fetching the beginApplyingTimestamp.
+    const bool fastCountEnabled = [&] {
+        auto gateOpCtx = makeOpCtx();
+        return isReplicatedFastCountInitialSyncEnabled(gateOpCtx.get());
+    }();
+    if (fastCountEnabled) {
+        _scheduleGetFastCountTimestampStoreWrite(lock, onCompletionGuard, beginFetchingOpTime);
+    } else {
+        _scheduleBeginApplyingTimestampFetcher(lock, onCompletionGuard, beginFetchingOpTime);
+    }
+}
+
+void InitialSyncer::_scheduleBeginApplyingTimestampFetcher(
+    WithLock lock,
+    std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+    OpTime beginFetchingOpTime) {
     // Since the beginFetchingOpTime is retrieved before significant work is done copying
     // data from the sync source, we allow the OplogEntryFetcher to use its default retry strategy
-    // which retries up to 'numInitialSyncOplogFindAttempts' times'.  This will fail relatively
+    // which retries up to 'numInitialSyncOplogFindAttempts' times'. This will fail relatively
     // quickly in the presence of network errors, allowing us to choose a different sync source.
-    status = _scheduleLastOplogEntryFetcher(
+    auto status = _scheduleLastOplogEntryFetcher(
         lock,
         [=, this](const StatusWith<mongo::Fetcher::QueryResponse>& response,
                   mongo::Fetcher::NextAction*,
@@ -1075,8 +1099,153 @@ void InitialSyncer::_getBeginFetchingOpTimeCallback(
         kFetcherHandlesRetries);
     if (!status.isOK()) {
         onCompletionGuard->setResultAndCancelRemainingWork(lock, status);
+    }
+}
+
+void InitialSyncer::_scheduleGetFastCountTimestampStoreWrite(
+    WithLock lock,
+    std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+    OpTime beginFetchingOpTime) {
+    // Find the most recent oplog write to the fast count timestamp store and extract the validAsOf
+    // it persisted.
+    BSONObj query = BSON("find" << NamespaceString::kRsOplogNamespace.coll() << "filter"
+                                << replicated_fast_count::fastCountValidAsOfScanFilter() << "sort"
+                                << BSON("$natural" << -1) << "limit" << 1
+                                << ReadConcernArgs::kReadConcernFieldName
+                                << ReadConcernArgs::kLocal.toBSONInner());
+
+    _fastCountTimestampStoreFetcher = std::make_unique<Fetcher>(
+        *_attemptExec,
+        _syncSource,
+        NamespaceString::kRsOplogNamespace.dbName(),
+        query,
+        [=, this](const StatusWith<mongo::Fetcher::QueryResponse>& response,
+                  mongo::Fetcher::NextAction*,
+                  mongo::BSONObjBuilder*) mutable {
+            _handleFastCountTimestampStoreWriteResponse(
+                response, onCompletionGuard, beginFetchingOpTime);
+        },
+        ReadPreferenceSetting::secondaryPreferredMetadata(),
+        RemoteCommandRequest::kNoTimeout /* find network timeout */,
+        RemoteCommandRequest::kNoTimeout /* getMore network timeout */,
+        std::make_unique<DefaultRetryStrategy>(numInitialSyncOplogFindAttempts.load()));
+    Status scheduleStatus = _fastCountTimestampStoreFetcher->schedule();
+    if (!scheduleStatus.isOK()) {
+        _fastCountTimestampStoreFetcher.reset();
+        onCompletionGuard->setResultAndCancelRemainingWork(lock, scheduleStatus);
+    }
+}
+
+void InitialSyncer::_handleFastCountTimestampStoreWriteResponse(
+    const StatusWith<Fetcher::QueryResponse>& result,
+    std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+    OpTime beginFetchingOpTime) {
+    std::unique_lock<std::mutex> lock(_mutex);
+    auto status = _checkForShutdownAndConvertStatus(
+        lock, result.getStatus(), "error scanning sync source oplog for fast count validAsOf");
+    if (!status.isOK()) {
+        onCompletionGuard->setResultAndCancelRemainingWork(lock, status);
         return;
     }
+
+    // If the sync source has a fast count timestamp store write in its retained oplog, clamp
+    // beginFetchingTimestamp to be no later than the validAsOf it persisted, so that the oplog
+    // history needed to advance the seeded counts is retained. validAsOf is the timestamp of the
+    // newest oplog entry the sync source had applied when it flushed the store, so it is itself a
+    // real oplog entry timestamp and can be used directly as a beginFetchingTimestamp; we do not
+    // need a second scan to resolve it. The oplog fetcher requires a full OpTime (ts and term)
+    // whose first fetched entry matches exactly; the store write is emitted in the same term as the
+    // entry at validAsOf, so we take the term from the write entry (already in this response).
+    //
+    // If there is no such write (the store was never flushed), fall back to the oldest oplog entry
+    // because a future fast count flush from the sync source can have a validAsOf at any retained
+    // point in the oplog.
+    const auto docs = result.getValue().documents;
+    if (docs.empty()) {
+        _scheduleGetOldestOplogEntryForFastCount(lock, onCompletionGuard, beginFetchingOpTime);
+        return;
+    }
+
+    const auto validAsOf =
+        replicated_fast_count::getTimestampStoreValidAsOfFromOplogEntry(docs.front());
+
+    if (validAsOf < beginFetchingOpTime.getTimestamp()) {
+        const auto writeOpTime = OpTime::parseFromOplogEntry(docs.front());
+        const auto term =
+            writeOpTime.isOK() ? writeOpTime.getValue().getTerm() : beginFetchingOpTime.getTerm();
+        const OpTime validAsOfOpTime(validAsOf, term);
+        LOGV2(12984800,
+              "Clamping beginFetchingTimestamp to sync source's replicated fast count validAsOf",
+              "beginFetchingOpTime"_attr = beginFetchingOpTime,
+              "validAsOfOpTime"_attr = validAsOfOpTime);
+        beginFetchingOpTime = validAsOfOpTime;
+    }
+
+    _scheduleBeginApplyingTimestampFetcher(lock, onCompletionGuard, beginFetchingOpTime);
+}
+
+void InitialSyncer::_scheduleGetOldestOplogEntryForFastCount(
+    WithLock lock,
+    std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+    OpTime beginFetchingOpTime) {
+    BSONObj query =
+        BSON("find" << NamespaceString::kRsOplogNamespace.coll() << "sort" << BSON("$natural" << 1)
+                    << "limit" << 1 << ReadConcernArgs::kReadConcernFieldName
+                    << ReadConcernArgs::kLocal.toBSONInner());
+
+    _fastCountOldestOplogEntryFetcher = std::make_unique<Fetcher>(
+        *_attemptExec,
+        _syncSource,
+        NamespaceString::kRsOplogNamespace.dbName(),
+        query,
+        [=, this](const StatusWith<mongo::Fetcher::QueryResponse>& response,
+                  mongo::Fetcher::NextAction*,
+                  mongo::BSONObjBuilder*) mutable {
+            _handleOldestOplogEntryForFastCountResponse(
+                response, onCompletionGuard, beginFetchingOpTime);
+        },
+        ReadPreferenceSetting::secondaryPreferredMetadata(),
+        RemoteCommandRequest::kNoTimeout /* find network timeout */,
+        RemoteCommandRequest::kNoTimeout /* getMore network timeout */,
+        std::make_unique<DefaultRetryStrategy>(numInitialSyncOplogFindAttempts.load()));
+    Status scheduleStatus = _fastCountOldestOplogEntryFetcher->schedule();
+    if (!scheduleStatus.isOK()) {
+        _fastCountOldestOplogEntryFetcher.reset();
+        onCompletionGuard->setResultAndCancelRemainingWork(lock, scheduleStatus);
+    }
+}
+
+void InitialSyncer::_handleOldestOplogEntryForFastCountResponse(
+    const StatusWith<Fetcher::QueryResponse>& result,
+    std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+    OpTime beginFetchingOpTime) {
+    std::unique_lock<std::mutex> lock(_mutex);
+    auto status = _checkForShutdownAndConvertStatus(
+        lock, result.getStatus(), "error getting oldest oplog entry for fast count validAsOf");
+    if (!status.isOK()) {
+        onCompletionGuard->setResultAndCancelRemainingWork(lock, status);
+        return;
+    }
+
+    const auto docs = result.getValue().documents;
+    tassert(12984807,
+            "sync source's oplog must not be empty when fetching the oldest entry for fast "
+            "count beginFetchingTimestamp",
+            !docs.empty());
+
+    const auto opTimeResult = parseOpTimeAndWallTime(result);
+    status = opTimeResult.getStatus();
+    if (!status.isOK()) {
+        onCompletionGuard->setResultAndCancelRemainingWork(lock, status);
+        return;
+    }
+
+    const auto oldestOplogEntryOpTime = opTimeResult.getValue().opTime;
+    LOGV2(12984801,
+          "Using sync source's oldest oplog entry as replicated fast count beginFetchingTimestamp",
+          "beginFetchingOpTime"_attr = beginFetchingOpTime,
+          "oldestOplogEntryOpTime"_attr = oldestOplogEntryOpTime);
+    _scheduleBeginApplyingTimestampFetcher(lock, onCompletionGuard, oldestOplogEntryOpTime);
 }
 
 void InitialSyncer::_lastOplogEntryFetcherCallbackForBeginApplyingTimestamp(

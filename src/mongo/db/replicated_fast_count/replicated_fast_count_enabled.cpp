@@ -111,4 +111,14 @@ bool isReplicatedFastCountListCollectionsEnabled(OperationContext* opCtx) {
         feature_flags::gContainerWrites.isEnabledUseLatestFCVWhenUninitialized(vCtx, fcvSnapshot);
 }
 
+bool isReplicatedFastCountInitialSyncEnabled(OperationContext* opCtx) {
+    if (!getTestCommandsEnabled()) {
+        return false;
+    }
+    const auto vCtx = VersionContext::getDecoration(opCtx);
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    return gFeatureFlagReplicatedFastCount.isEnabledUseLatestFCVWhenUninitialized(vCtx,
+                                                                                  fcvSnapshot);
+}
+
 }  // namespace mongo
