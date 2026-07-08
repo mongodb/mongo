@@ -47,7 +47,6 @@ async function checkMultikeyConsistencyForReplicaSet(hosts) {
     const {ReplSetTest} = await import("jstests/libs/replsettest.js");
     const {findIndexByName, readCatalogIndexesAtClusterTime, readWildcardMultikeyPaths} =
         await import("jstests/libs/multikey_consistency_check.js");
-    const {FeatureFlagUtil} = await import("jstests/libs/feature_flag_util.js");
 
     const hookConfig = TestData.multikeyHook || {};
     const MAX_COLLECTIONS = hookConfig.maxCollectionsPerIteration ?? null;
@@ -214,23 +213,6 @@ async function checkMultikeyConsistencyForReplicaSet(hosts) {
         return {ok: 1};
     }
 
-    // The cross-member multikey-consistency invariant only holds when multikeyness is replicated in
-    // the transaction. Skip for legacy path (e.g. multiversion suites) to avoid divergence.
-    // TODO(SERVER-129361): Remove this skip once 9.0 becomes last-LTS and the legacy path is gone.
-    if (
-        !FeatureFlagUtil.isPresentAndEnabled(
-            primary.getDB("admin"),
-            "ReplicateMultikeynessInTransactions",
-        )
-    ) {
-        print(
-            "Skipping multikey consistency check: featureFlagReplicateMultikeynessInTransactions " +
-                "is not enabled, so multikey state is not timestamp-consistent across members on " +
-                rst.getURL(),
-        );
-        return {ok: 1};
-    }
-
     // Filter to currently-readable members. Initial sync and recovering members are expected to
     // diverge; arbiters have no data.
     const statusByHost = {};
@@ -247,6 +229,7 @@ async function checkMultikeyConsistencyForReplicaSet(hosts) {
         }
         members.push(conn);
     }
+
     if (members.length < 2) {
         print(
             "Skipping multikey consistency check: fewer than 2 readable members on " + rst.getURL(),

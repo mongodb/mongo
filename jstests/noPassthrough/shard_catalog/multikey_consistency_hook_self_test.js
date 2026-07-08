@@ -12,23 +12,18 @@
  * the test index. The hook must fail reporting the divergence.
  *
  * @tags: [
+ *   featureFlagReplicateMultikeynessInTransactions,
  *   requires_persistence,
  *   requires_replication,
  *   requires_sharding,
  *   requires_snapshot_read,
  *   requires_wiredtiger,
- *   uses_atclustertime,
  *   uses_transactions,
  * ]
  */
 
 import {rewriteCatalogTable} from "jstests/disk/libs/wt_file_helper.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {describe, it} from "jstests/libs/mochalite.js";
-import {
-    findIndexByName,
-    readCatalogIndexesAtClusterTime,
-} from "jstests/libs/multikey_consistency_check.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -268,130 +263,6 @@ describe("multikey consistency hook self-test", () => {
             );
         } finally {
             rst.stopSet(undefined, false, {skipCheckDBHashes: true, skipValidation: true});
-        }
-    });
-
-    it("skips the check on the legacy multikey-replication path instead of flagging a false divergence", () => {
-        const dbName = `${jsTestName()}_legacy_path`;
-        const collName = "coll";
-        const indexName = "a_1";
-        const ns = `${dbName}.${collName}`;
-
-        // No feature flag: featureFlagReplicateMultikeynessInTransactions is disabled, so the
-        // server uses the legacy multikey-replication path. The multikey transition is carried by
-        // a placeholder noop oplog entry rather than a replicated setMultikeyMetadata entry, and
-        // is therefore not timestamp-consistent across members. This mirrors a downgraded-FCV
-        // multiversion suite, where this hook originally reported a false divergence.
-        const rst = new ReplSetTest({nodes: 2});
-        rst.startSet();
-        rst.initiate();
-
-        try {
-            const primary = rst.getPrimary();
-            const secondary = rst.getSecondary();
-            secondary.setSecondaryOk();
-
-            assert(
-                !FeatureFlagUtil.isPresentAndEnabled(
-                    primary.getDB("admin"),
-                    "ReplicateMultikeynessInTransactions",
-                ),
-                "test requires featureFlagReplicateMultikeynessInTransactions to be disabled",
-            );
-
-            const coll = primary.getDB(dbName).getCollection(collName);
-            assert.commandWorked(coll.createIndex({a: 1}, {name: indexName}));
-            // A scalar value keeps the index non-multikey...
-            assert.commandWorked(coll.insert({_id: 0, a: 1}, {writeConcern: kWriteConcern}));
-            // ...then an array value flips it to multikey. The legacy noop is only emitted when the
-            // multikey-triggering write runs inside a multi-document transaction (a plain insert
-            // sets multikey in the catalog directly, with no separately-timestamped oplog entry).
-            // This mirrors the original failure, whose Queryable Encryption bulkWrite ran in an
-            // internal transaction.
-            const session = primary.startSession();
-            const sessionColl = session.getDatabase(dbName).getCollection(collName);
-            session.startTransaction();
-            assert.commandWorked(sessionColl.insert({_id: 1, a: [1, 2]}));
-            assert.commandWorked(session.commitTransaction_forTesting());
-            session.endSession();
-            rst.awaitReplication();
-
-            // The legacy path stamps the multikey transition at a placeholder noop on the primary,
-            // ordered strictly before the triggering document. Capture that timestamp.
-            const noop = primary
-                .getDB("local")
-                .oplog.rs.find({"o.msg": "Setting index to multikey", "o.coll": ns})
-                .sort({ts: -1})
-                .limit(1)
-                .toArray();
-            assert.eq(1, noop.length, "expected a 'Setting index to multikey' noop entry", {ns});
-            const T = noop[0].ts;
-
-            // Reproduce the cross-node divergence: at the boundary timestamp T the primary has
-            // already committed the multikey change in its side transaction, while the secondary
-            // only sets the index multikey when it later applies the triggering document. A
-            // snapshot read at T therefore legitimately disagrees across members.
-            function multikeyAt(conn) {
-                const indexes = readCatalogIndexesAtClusterTime(conn, dbName, collName, T);
-                assert(indexes, `expected catalog for ${ns} at clusterTime ${tojson(T)}`);
-                const md = findIndexByName(indexes, indexName);
-                assert(md, `expected index ${indexName} at clusterTime ${tojson(T)}`);
-                return md.multikey;
-            }
-            const primaryMultikey = multikeyAt(primary);
-            const secondaryMultikey = multikeyAt(secondary);
-            jsTestLog(
-                `Multikey state at boundary T=${tojson(T)}: primary=${primaryMultikey}, ` +
-                    `secondary=${secondaryMultikey}`,
-            );
-
-            assert.eq(true, primaryMultikey, "primary should be multikey at the noop timestamp");
-            assert.eq(
-                false,
-                secondaryMultikey,
-                "secondary should not yet be multikey at the noop timestamp",
-            );
-            // This boolean mismatch is exactly what the hook compares; before the fix the
-            // background hook reported "multikey divergence (regular index)" whenever it happened
-            // to sample this boundary timestamp.
-            assert.neq(
-                primaryMultikey,
-                secondaryMultikey,
-                "expected the legacy path to produce a transient cross-node multikey divergence",
-            );
-
-            // The fix: the hook detects that multikeyness is not replicated and skips the check
-            // rather than reporting this false divergence.
-            const hookTestData = {multikeyHook: kHookConfig};
-            clearRawMongoProgramOutput();
-            const hookExitCode = runMongoProgram(
-                "mongo",
-                "--host",
-                rst.getURL(),
-                "--eval",
-                `TestData = ${tojson(hookTestData)};`,
-                "jstests/hooks/run_check_multikey_consistency.js",
-            );
-            const hookOutput = rawMongoProgramOutput(
-                "multikey divergence|featureFlagReplicateMultikeynessInTransactions",
-            );
-
-            assert.eq(0, hookExitCode, "hook should skip (exit 0) on the legacy path", {
-                hookExitCode,
-                hookOutput,
-            });
-            assert(
-                !hookOutput.includes("multikey divergence"),
-                "hook must not report a divergence on the legacy path",
-                {hookOutput},
-            );
-            assert(
-                hookOutput.includes("featureFlagReplicateMultikeynessInTransactions"),
-                "hook should log that it skipped because the feature flag is disabled",
-                {hookOutput},
-            );
-        } finally {
-            rst.stopSet();
         }
     });
 
