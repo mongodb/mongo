@@ -7,24 +7,24 @@ notifications:
     thresholds:
       overall:
         hot:
-          count: 110
+          count: 60
           grace_period_days: 5
         cold:
-          count: 80
+          count: 40
           grace_period_days: 5
       group:
         hot:
-          count: 20
+          count: 10
           grace_period_days: 5
         cold:
-          count: 16
+          count: 7
           grace_period_days: 5
       team:
         hot:
-          count: 5
+          count: 3
           grace_period_days: 2
         cold:
-          count: 6
+          count: 3
           grace_period_days: 2
     slack:
       overall_scope_tags:

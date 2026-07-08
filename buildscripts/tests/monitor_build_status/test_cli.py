@@ -124,21 +124,21 @@ class TestSummarize(unittest.TestCase):
         self.assertEqual(summary, expected_summary)
 
 
-def _make_notification_config(group_hot: int = 20, group_cold: int = 16) -> NotificationsConfig:
+def _make_notification_config(group_hot: int = 10, group_cold: int = 7) -> NotificationsConfig:
     return NotificationsConfig(
         scopes=[ScopesConfig(name="test", jira_queries=JiraQueriesConfig(hot="", cold=""))],
         thresholds=ThresholdsConfig(
             overall=IssueThresholds(
-                hot=ThresholdConfig(count=110, grace_period_days=0),
-                cold=ThresholdConfig(count=80, grace_period_days=0),
+                hot=ThresholdConfig(count=60, grace_period_days=0),
+                cold=ThresholdConfig(count=40, grace_period_days=0),
             ),
             group=IssueThresholds(
                 hot=ThresholdConfig(count=group_hot, grace_period_days=0),
                 cold=ThresholdConfig(count=group_cold, grace_period_days=0),
             ),
             team=IssueThresholds(
-                hot=ThresholdConfig(count=5, grace_period_days=0),
-                cold=ThresholdConfig(count=6, grace_period_days=0),
+                hot=ThresholdConfig(count=3, grace_period_days=0),
+                cold=ThresholdConfig(count=3, grace_period_days=0),
             ),
         ),
         slack=SlackConfig(overall_scope_tags=[], message_footer=""),
@@ -192,7 +192,7 @@ class TestGetIssueCountsStatusGroupThreshold(unittest.TestCase):
         self.assertEqual(cold_pct, 0.0)
 
     def test_group_without_override_uses_default(self):
-        # Group has no override; 25 hot issues against default hot=20 → 125%
+        # Group has no override; 25 hot issues against default hot=10 → 250%
         config = CodeLockdownConfig(
             notifications=[],
             teams=[TeamConfig(name="Query Execution", slack_tags=None, thresholds=None)],
@@ -209,11 +209,11 @@ class TestGetIssueCountsStatusGroupThreshold(unittest.TestCase):
         for i in range(25):
             report.add_issue(IssueCategory.HOT, _make_issue(f"BF-{i}", "Query Execution"))
 
-        percentages = self._run(config, report, _make_notification_config(group_hot=20))
+        percentages = self._run(config, report, _make_notification_config())
 
         group_key = next(k for k in percentages if "[Group] Query" in k)
         hot_pct, _ = percentages[group_key]
-        self.assertEqual(hot_pct, 125.0)  # 25/20 * 100
+        self.assertEqual(hot_pct, 250.0)  # 25/10 * 100
 
 
 if __name__ == "__main__":
