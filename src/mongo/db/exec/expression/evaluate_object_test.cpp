@@ -31,6 +31,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
@@ -129,6 +130,79 @@ TEST(ExpressionObjectEvaluate, ShouldEvaluateToEmptyDocumentIfAllFieldsAreMissin
     auto objectWithNestedObject = ExpressionObject::create(&expCtx, {{"nested", object}});
     ASSERT_VALUE_EQ(Value(Document{{"nested", Document{}}}),
                     objectWithNestedObject->evaluate(Document(), &(expCtx.variables), {}));
+}
+
+namespace {
+boost::intrusive_ptr<Expression> makeFieldPathObject(ExpressionContextForTest* expCtx) {
+    return ExpressionObject::create(
+        expCtx,
+        {{"a", ExpressionFieldPath::createPathFromString(expCtx, "a", expCtx->variablesParseState)},
+         {"b",
+          ExpressionFieldPath::createPathFromString(expCtx, "b", expCtx->variablesParseState)}});
+}
+}  // namespace
+
+TEST(ExpressionObjectEvaluate, TracksOutputMemoryAndReleasesAfterEvaluation) {
+    auto expCtx = ExpressionContextForTest{};
+    auto object = makeFieldPathObject(&expCtx);
+
+    SimpleMemoryUsageTracker tracker{4096};
+    EvaluationContext ctx{.tracker = &tracker};
+
+    Document doc{{"a", "hello"sv}, {"b", "world"sv}};
+    ASSERT_VALUE_EQ(object->evaluate(doc, &expCtx.variables, ctx),
+                    Value(Document{{"a", "hello"sv}, {"b", "world"sv}}));
+
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(tracker.peakTrackedMemoryBytes(), 0);
+}
+
+TEST(ExpressionObjectEvaluate, ThrowsExceededMemoryLimitWhenOverLimit) {
+    auto expCtx = ExpressionContextForTest{};
+    auto object = makeFieldPathObject(&expCtx);
+
+    SimpleMemoryUsageTracker tracker{8};
+    EvaluationContext ctx{.tracker = &tracker};
+
+    Document doc{{"a", std::string(100, 'x')}, {"b", std::string(100, 'y')}};
+    try {
+        object->evaluate(doc, &expCtx.variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$object");
+    }
+
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
+}
+
+TEST(ExpressionObjectEvaluate, ThrowsExceededMemoryLimitWhenQueryLimitExceeded) {
+    auto expCtx = ExpressionContextForTest{};
+    auto object = makeFieldPathObject(&expCtx);
+
+    SimpleMemoryUsageTracker operationTracker{8};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, 100 * 1024 * 1024};
+    EvaluationContext ctx{.tracker = &stageTracker};
+
+    Document doc{{"a", std::string(100, 'x')}, {"b", std::string(100, 'y')}};
+    try {
+        object->evaluate(doc, &expCtx.variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$object");
+    }
+
+    ASSERT_EQ(stageTracker.inUseTrackedMemoryBytes(), 0);
+}
+
+TEST(ExpressionObjectEvaluate, NoTrackerDoesNotThrow) {
+    auto expCtx = ExpressionContextForTest{};
+    auto object = makeFieldPathObject(&expCtx);
+
+    Document doc{{"a", std::string(100, 'x')}, {"b", std::string(100, 'y')}};
+    ASSERT_VALUE_EQ(object->evaluate(doc, &expCtx.variables),
+                    Value(Document{{"a", std::string(100, 'x')}, {"b", std::string(100, 'y')}}));
 }
 
 }  // namespace expression_evaluation_test

@@ -3126,6 +3126,8 @@ public:
                    const EvaluationContext& ctx) const final;
     Value serialize(const query_shape::SerializationOptions& options = {}) const final;
 
+    const char* getOpName() const;
+
     static boost::intrusive_ptr<ExpressionObject> create(
         ExpressionContext* expCtx,
         std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>>&&

@@ -1730,6 +1730,10 @@ Expression::ComputedPaths ExpressionObject::getComputedPaths(const std::string& 
     return outputPaths;
 }
 
+const char* ExpressionObject::getOpName() const {
+    return "$object";
+}
+
 /* --------------------- ExpressionFieldPath --------------------------- */
 
 // this is the new version that supports every syntax
