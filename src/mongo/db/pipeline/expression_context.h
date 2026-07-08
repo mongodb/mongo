@@ -37,6 +37,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
@@ -511,12 +512,38 @@ public:
     void ignoreFeatureInParserOrRejectAndThrow(std::string_view name, FeatureFlag& flag);
 
     void setOperationContext(OperationContext* opCtx) {
+        if (_params.opCtx != opCtx) {
+            // The expression fallback tracker can be a child of the current operation's memory
+            // tracker (see getExpressionFallbackTracker()), i.e. it caches a base pointer into that
+            // operation. Drop it whenever the OperationContext changes so we never keep a base
+            // pointer into a previous operation's (possibly destroyed) tracker; it is rebuilt
+            // lazily against the current OperationContext on next use.
+            _expressionFallbackTracker.reset();
+        }
         _params.opCtx = opCtx;
     }
 
     OperationContext* getOperationContext() const {
         return _params.opCtx;
     }
+
+    /**
+     * Returns a query-scoped fallback tracker used to account expression-evaluation memory when no
+     * stage-level tracker was wired to the EvaluationContext. Created lazily on first use and
+     * reused for the lifetime of this ExpressionContext, so evaluators do not allocate a tracker
+     * per document. When an OperationContext is available and both query/expression memory-tracking
+     * feature flags are enabled, the fallback is a child of the operation-wide tracker, so its
+     * usage rolls up into the query's total memory and is bounded by the per-query limit. Otherwise
+     * it is a standalone tracker bounded by the per-expression safety cap
+     * internalQueryMaxSingleExpressionMemoryUsageBytes.
+     *
+     * Not safe for concurrent use: this tracker is shared, mutable state on the ExpressionContext.
+     * Callers that may evaluate expressions against a shared ExpressionContext from multiple
+     * threads (e.g. collection validators evaluating $expr from concurrent writers) must not use
+     * it; they should supply a per-call tracker on the EvaluationContext instead (see
+     * exec::matcher::evaluateExpression()).
+     */
+    SimpleMemoryUsageTracker& getExpressionFallbackTracker();
 
     VersionContext& getVersionContext() {
         return _params.vCtx;
@@ -1360,6 +1387,11 @@ protected:
 
 private:
     std::unique_ptr<ExpressionCounters> _expressionCounters;
+
+    // Query-scoped fallback tracker for expression evaluation; see getExpressionFallbackTracker().
+    // Created lazily and reused across all documents/expressions in this query.
+    boost::optional<SimpleMemoryUsageTracker> _expressionFallbackTracker;
+
     bool _gotTemporarilyUnavailableException = false;
 
     bool _isCappedDelete = false;

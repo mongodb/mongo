@@ -1376,7 +1376,7 @@ Value performConversion(const ExpressionConvert& expr,
     // against the operation-wide memory tracker before building the array, so
     // an oversized conversion fails with ExceededMemoryLimit without ever materializing it.
     SimpleMemoryUsageToken memToken;
-    if (ctx.tracker && targetTypeInfo.type == BSONType::array && inputType == BSONType::binData) {
+    if (targetTypeInfo.type == BSONType::array && inputType == BSONType::binData) {
         auto binData = inputValue.getBinData();
         if (binData.type == BinDataType::Vector) {
             if (auto view = convert_utils::parseBinDataVector(binData)) {
@@ -1388,8 +1388,9 @@ Value performConversion(const ExpressionConvert& expr,
                         view->dtype == convert_utils::dType::PACKED_BIT ||
                             view->dtype == convert_utils::dType::INT8 ||
                             view->dtype == convert_utils::dType::FLOAT32);
-                memToken = SimpleMemoryUsageToken(view->elementCount * sizeof(Value), ctx.tracker);
-                ctx.tracker->assertWithinMemoryLimit("$convert", ctx.stageName);
+                auto& tracker = getMemoryTracker(expr, ctx);
+                memToken = SimpleMemoryUsageToken(view->elementCount * sizeof(Value), &tracker);
+                tracker.assertWithinMemoryLimit("$convert", ctx.stageName);
             }
         }
     }

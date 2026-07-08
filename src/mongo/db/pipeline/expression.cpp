@@ -57,12 +57,10 @@
 #include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_parser_gen.h"
 #include "mongo/db/pipeline/variable_validation.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
@@ -2482,31 +2480,11 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
         }
     }
 
-    EvaluationContext evalCtx;
-    SimpleMemoryUsageTracker foldingTracker;
-    auto ensureTracker = [&]() -> EvaluationContext& {
-        if (!evalCtx.tracker && feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
-            feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
-            if (getExpressionContext()->getOperationContext()) {
-                foldingTracker =
-                    OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
-                        *getExpressionContext(),
-                        internalQueryMaxConstantFoldingBytes.loadRelaxed());
-            } else {
-                foldingTracker =
-                    SimpleMemoryUsageTracker{internalQueryMaxConstantFoldingBytes.loadRelaxed()};
-            }
-            evalCtx.tracker = &foldingTracker;
-        }
-        return evalCtx;
-    };
-
     // If all the operands are constant expressions, collapse the expression into one constant
     // expression.
     if (constOperandCount == _children.size()) {
         return intrusive_ptr<Expression>(ExpressionConstant::create(
-            getExpressionContext(),
-            evaluate(Document(), &(getExpressionContext()->variables), ensureTracker())));
+            getExpressionContext(), evaluate(Document(), &(getExpressionContext()->variables))));
     }
 
     // An operator cannot be left-associative and commutative, because left-associative
@@ -2559,8 +2537,7 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
                     _children = std::move(constExpressions);
                     optimizedOperands.emplace_back(ExpressionConstant::create(
                         getExpressionContext(),
-                        evaluate(
-                            Document(), &(getExpressionContext()->variables), ensureTracker())));
+                        evaluate(Document(), &(getExpressionContext()->variables))));
                     _children = std::move(childrenSave);
                 } else {
                     optimizedOperands.insert(
@@ -2586,7 +2563,7 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
             _children = std::move(constExpressions);
             optimizedOperands.emplace_back(ExpressionConstant::create(
                 getExpressionContext(),
-                evaluate(Document(), &(getExpressionContext()->variables), ensureTracker())));
+                evaluate(Document(), &(getExpressionContext()->variables))));
         } else {
             optimizedOperands.insert(
                 optimizedOperands.end(), constExpressions.begin(), constExpressions.end());

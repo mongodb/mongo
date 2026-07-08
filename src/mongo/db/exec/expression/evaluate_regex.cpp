@@ -583,10 +583,8 @@ void trackReplaceOutput(const EvaluationContext& ctx,
                         SimpleMemoryUsageToken& memToken,
                         int64_t currentLength,
                         std::string_view opName) {
-    if (ctx.tracker) {
-        memToken.set(currentLength);
-        ctx.tracker->assertWithinMemoryLimit(opName, ctx.stageName);
-    }
+    memToken.set(currentLength);
+    memToken.tracker()->assertWithinMemoryLimit(opName, ctx.stageName);
 }
 }  // namespace
 
@@ -631,8 +629,8 @@ Value evaluate(const ExpressionReplaceAll& expr,
                const EvaluationContext& ctx) {
     auto replaceAllOpStr =
         [&](std::string_view input, std::string_view find, std::string_view replacement) -> Value {
-        SimpleMemoryUsageToken memToken =
-            ctx.tracker ? SimpleMemoryUsageToken{0, ctx.tracker} : SimpleMemoryUsageToken{};
+        auto& tracker = getMemoryTracker(expr, ctx);
+        SimpleMemoryUsageToken memToken{0, &tracker};
 
         // An empty string matches at every position, so replaceAll should insert 'replacement'
         // at every position when 'find' is empty. Handling this as a special case lets us
@@ -673,8 +671,8 @@ Value evaluate(const ExpressionReplaceAll& expr,
     auto replaceAllOpRegEx = [&](std::string_view input,
                                  RegexExecutionState executionState,
                                  std::string_view replacement) -> Value {
-        SimpleMemoryUsageToken memToken =
-            ctx.tracker ? SimpleMemoryUsageToken{0, ctx.tracker} : SimpleMemoryUsageToken{};
+        auto& tracker = getMemoryTracker(expr, ctx);
+        SimpleMemoryUsageToken memToken{0, &tracker};
         StringBuilder output;
 
         // Condition uses <= instead of < to also capture possible empty matches at the end of the

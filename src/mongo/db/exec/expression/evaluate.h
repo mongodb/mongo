@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_find_internal.h"
 #include "mongo/db/pipeline/expression_function.h"
@@ -48,9 +49,18 @@
 
 namespace mongo {
 
-class SimpleMemoryUsageTracker;
-
 namespace exec::expression {
+
+/**
+ * Resolves the memory-usage tracker an expression evaluator should use. Returns the stage-owned
+ * tracker when one was wired to 'ctx' (so usage is attributed to the stage); otherwise returns the
+ * query-scoped fallback tracker owned by the expression's ExpressionContext (see
+ * getExpressionFallbackTracker()).
+ */
+inline SimpleMemoryUsageTracker& getMemoryTracker(const Expression& expr,
+                                                  const EvaluationContext& ctx) {
+    return ctx.tracker ? *ctx.tracker : expr.getExpressionContext()->getExpressionFallbackTracker();
+}
 
 /**
  * Calls function 'function' with zero parameters and returns the result. If AssertionException is

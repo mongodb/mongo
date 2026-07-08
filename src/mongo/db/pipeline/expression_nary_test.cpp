@@ -749,38 +749,48 @@ TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnCommutativeAndAssoc
     assertContents(_associativeAndCommutative, expectedContent);
 }
 
-TEST_F(ExpressionNaryTest, ConstantFoldingCreatesOperationTrackerWhenFlagsEnabled) {
+TEST_F(ExpressionNaryTest, ConstantFoldingObeysExpressionCapWithoutOperationContext) {
     unittest::ServerParameterGuard queryFlag("featureFlagQueryMemoryTracking", true);
     unittest::ServerParameterGuard exprFlag("featureFlagExpressionMemoryTracking", true);
+    // Constant folding evaluates with a default EvaluationContext, so it charges the
+    // ExpressionContext's fallback tracker. With no OperationContext that fallback is a standalone
+    // tracker bounded by the per-expression cap, which is the only limit folding can exceed here.
+    unittest::ServerParameterGuard exprCap("internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                           100LL);
 
-    _associativeOnly->addOperand(ExpressionConstant::create(&expCtx, Value(1)));
-    _associativeOnly->addOperand(ExpressionConstant::create(&expCtx, Value(2)));
+    BSONArrayBuilder arr1, arr2;
+    for (int i = 0; i < 10; ++i)
+        arr1.append(i);
+    for (int i = 10; i < 20; ++i)
+        arr2.append(i);
+    auto expr =
+        Expression::parseExpression(&expCtx,
+                                    BSON("$concatArrays" << BSON_ARRAY(arr1.arr() << arr2.arr())),
+                                    expCtx.variablesParseState);
 
-    (void)_associativeOnly->optimize();
+    // Null the opCtx so the fallback tracker is standalone (bounded by the per-expression cap).
+    auto* savedOpCtx = expCtx.getOperationContext();
+    expCtx.setOperationContext(nullptr);
+    ON_BLOCK_EXIT([&] { expCtx.setOperationContext(savedOpCtx); });
 
-    ASSERT_NE(nullptr,
-              OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(expCtx.getOperationContext()));
+    ASSERT_THROWS_CODE(expr->optimize(), AssertionException, ErrorCodes::ExceededMemoryLimit);
 }
 
-TEST_F(ExpressionNaryTest, ConstantFoldingDoesNotCreateOperationTrackerWhenFlagDisabled) {
-    unittest::ServerParameterGuard queryFlag("featureFlagQueryMemoryTracking", false);
-    unittest::ServerParameterGuard exprFlag("featureFlagExpressionMemoryTracking", false);
-
-    _associativeOnly->addOperand(ExpressionConstant::create(&expCtx, Value(1)));
-    _associativeOnly->addOperand(ExpressionConstant::create(&expCtx, Value(2)));
-
-    (void)_associativeOnly->optimize();
-
-    ASSERT_EQ(nullptr,
-              OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(expCtx.getOperationContext()));
-}
-
-TEST_F(ExpressionNaryTest, ConstantFoldingThrowsWhenFoldingLimitExceeded) {
+TEST_F(ExpressionNaryTest, ConstantFoldingObeysOperationMemoryLimit) {
     unittest::ServerParameterGuard queryFlag("featureFlagQueryMemoryTracking", true);
     unittest::ServerParameterGuard exprFlag("featureFlagExpressionMemoryTracking", true);
-    // 100 bytes is far smaller than the memory needed to hold 20 integers via
-    // Value::getApproximateSize(), so $concatArrays will throw during constant folding.
-    unittest::ServerParameterGuard limitGuard("internalQueryMaxConstantFoldingBytes", 100LL);
+    // Constant folding evaluates with a default EvaluationContext, so it charges the
+    // ExpressionContext's fallback tracker. Pin the per-expression cap large so it cannot be the
+    // cause of the throw -- the folded array is only a few hundred bytes. With an OperationContext
+    // present, the fallback tracker rolls up into the per-operation tracker, so the tiny per-query
+    // limit is the only limit it can exceed.
+    unittest::ServerParameterGuard exprCap("internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                           1LL << 30);
+    unittest::ServerParameterGuard limitGuard("internalQueryMaxMemoryUsageBytesPerOperation",
+                                              100LL);
+    // The opCtx-path fallback is chunked; disable chunking so the small folded array propagates to
+    // the operation tracker immediately instead of being buffered below the chunk threshold.
+    unittest::ServerParameterGuard chunkSize("internalQueryMaxWriteToCurOpMemoryUsageBytes", 0);
 
     BSONArrayBuilder arr1, arr2;
     for (int i = 0; i < 10; ++i)
@@ -793,48 +803,6 @@ TEST_F(ExpressionNaryTest, ConstantFoldingThrowsWhenFoldingLimitExceeded) {
                                     expCtx.variablesParseState);
 
     ASSERT_THROWS_CODE(expr->optimize(), AssertionException, ErrorCodes::ExceededMemoryLimit);
-}
-
-TEST_F(ExpressionNaryTest, NestedConstantFoldingThrowsWhenFoldingLimitExceeded) {
-    unittest::ServerParameterGuard queryFlag("featureFlagQueryMemoryTracking", true);
-    unittest::ServerParameterGuard exprFlag("featureFlagExpressionMemoryTracking", true);
-    unittest::ServerParameterGuard limitGuard("internalQueryMaxConstantFoldingBytes", 100LL);
-
-    BSONArrayBuilder arr1, arr2, arr3;
-    for (int i = 0; i < 10; ++i)
-        arr1.append(i);
-    for (int i = 10; i < 20; ++i)
-        arr2.append(i);
-    for (int i = 20; i < 30; ++i)
-        arr3.append(i);
-
-    auto expr = Expression::parseExpression(
-        &expCtx,
-        BSON("$concatArrays" << BSON_ARRAY(
-                 BSON("$concatArrays" << BSON_ARRAY(
-                          BSON("$concatArrays" << BSON_ARRAY("$x" << arr1.arr())) << arr2.arr()))
-                 << arr3.arr())),
-        expCtx.variablesParseState);
-
-    ASSERT_THROWS_CODE(expr->optimize(), AssertionException, ErrorCodes::ExceededMemoryLimit);
-}
-
-TEST_F(ExpressionNaryTest, ConstantFoldingWorksWithoutOperationContext) {
-    unittest::ServerParameterGuard queryFlag("featureFlagQueryMemoryTracking", true);
-    unittest::ServerParameterGuard exprFlag("featureFlagExpressionMemoryTracking", true);
-
-    // Null the opCtx to exercise the standalone-tracker branch in optimize().
-    auto* savedOpCtx = expCtx.getOperationContext();
-    expCtx.setOperationContext(nullptr);
-    ON_BLOCK_EXIT([&] { expCtx.setOperationContext(savedOpCtx); });
-
-    _associativeOnly->addOperand(ExpressionConstant::create(&expCtx, Value(1)));
-    _associativeOnly->addOperand(ExpressionConstant::create(&expCtx, Value(2)));
-
-    auto result = _associativeOnly->optimize();
-
-    // Folding must still produce a constant even when there is no opCtx.
-    ASSERT_NE(nullptr, dynamic_cast<ExpressionConstant*>(result.get()));
 }
 
 }  // anonymous namespace

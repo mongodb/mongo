@@ -34,6 +34,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
@@ -48,6 +49,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
@@ -492,6 +494,116 @@ TEST_F(ExpressionContextTest, SetIsIdHackQueryIsIdempotent) {
     // Calling setIsIdHackQuery(true) again must not throw or tassert.
     expCtx->setIsIdHackQuery(true);
     ASSERT_TRUE(expCtx->isIdHackQuery());
+}
+
+// The expression fallback tracker rolls up into the per-query OperationMemoryUsageTracker (so the
+// per-query limit is enforced) only when both memory-tracking feature flags are enabled.
+TEST_F(ExpressionContextTest,
+       ExpressionFallbackTrackerRollsUpOnlyWhenBothMemoryTrackingFlagsEnabled) {
+    struct Case {
+        bool queryTracking;
+        bool expressionTracking;
+        bool expectPerQueryLimitEnforced;
+    };
+    const Case cases[] = {
+        {true, true, true},    // Both on: fallback is a child of the operation tracker.
+        {true, false, false},  // Guarded specifically by the expression-tracking flag check.
+        {false, true, false},
+        {false, false, false},
+    };
+
+    for (const auto& c : cases) {
+        unittest::ServerParameterGuard queryMemTracking{"featureFlagQueryMemoryTracking",
+                                                        c.queryTracking};
+        unittest::ServerParameterGuard exprMemTracking{"featureFlagExpressionMemoryTracking",
+                                                       c.expressionTracking};
+        // Generous per-expression cap, tiny per-query limit: only a rolled-up fallback can exceed
+        // the per-query limit, since it is checked via the operation-tracker base chain.
+        unittest::ServerParameterGuard exprCap{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                               10 * 1024 * 1024};
+        unittest::ServerParameterGuard perQueryLimit{"internalQueryMaxMemoryUsageBytesPerOperation",
+                                                     4};
+        // Disable chunking so the small increment below propagates to the operation tracker
+        // immediately (a chunked tracker only forwards to its base at chunk-size boundaries).
+        // TODO SERVER-129201: Remove this explicit knob set.
+        unittest::ServerParameterGuard chunkSize{"internalQueryMaxWriteToCurOpMemoryUsageBytes", 0};
+
+        auto opCtx = makeOperationContext();
+        auto expCtx = ExpressionContextBuilder{}
+                          .opCtx(opCtx.get())
+                          .ns(NamespaceString::createNamespaceString_forTest("test"sv, "coll"sv))
+                          .build();
+
+        auto& tracker = expCtx->getExpressionFallbackTracker();
+        tracker.add(100);  // Exceeds the per-query limit but stays under the per-expression cap.
+        ASSERT_EQ(!tracker.withinMemoryLimit(), c.expectPerQueryLimitEnforced)
+            << "queryTracking=" << c.queryTracking
+            << " expressionTracking=" << c.expressionTracking;
+        tracker.add(-100);  // Release so the tracker is left balanced.
+    }
+}
+
+// When both memory-tracking flags are enabled and an OperationContext is available, the fallback
+// tracker is bounded solely by the per-query limit.
+TEST_F(ExpressionContextTest, ExpressionFallbackTrackerIgnoresPerExpressionCapWhenRolledUp) {
+    unittest::ServerParameterGuard queryMemTracking{"featureFlagQueryMemoryTracking", true};
+    unittest::ServerParameterGuard exprMemTracking{"featureFlagExpressionMemoryTracking", true};
+    // Tiny per-expression cap, generous per-query limit: if the cap were still enforced on the
+    // rolled-up path the tracker would report over-limit; it must not.
+    unittest::ServerParameterGuard exprCap{"internalQueryMaxSingleExpressionMemoryUsageBytes", 4};
+    unittest::ServerParameterGuard perQueryLimit{"internalQueryMaxMemoryUsageBytesPerOperation",
+                                                 10 * 1024 * 1024};
+    // Disable chunking so the increment below propagates to the operation tracker immediately.
+    // TODO SERVER-129201: Remove this explicit knob set.
+    unittest::ServerParameterGuard chunkSize{"internalQueryMaxWriteToCurOpMemoryUsageBytes", 0};
+
+    auto opCtx = makeOperationContext();
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx.get())
+                      .ns(NamespaceString::createNamespaceString_forTest("test"sv, "coll"sv))
+                      .build();
+
+    auto& tracker = expCtx->getExpressionFallbackTracker();
+    tracker.add(100);  // Far exceeds the per-expression cap but stays under the per-query limit.
+    ASSERT_TRUE(tracker.withinMemoryLimit());
+    tracker.add(-100);  // Release so the tracker is left balanced.
+}
+
+// Changing the OperationContext must drop the cached fallback tracker, so it never retains a base
+// pointer into a previous operation's (possibly destroyed) tracker.
+TEST_F(ExpressionContextTest, ExpressionFallbackTrackerRebuiltWhenOperationContextChanges) {
+    unittest::ServerParameterGuard queryMemTracking{"featureFlagQueryMemoryTracking", true};
+    unittest::ServerParameterGuard exprMemTracking{"featureFlagExpressionMemoryTracking", true};
+    unittest::ServerParameterGuard exprCap{"internalQueryMaxSingleExpressionMemoryUsageBytes", 4};
+    unittest::ServerParameterGuard perQueryLimit{"internalQueryMaxMemoryUsageBytesPerOperation",
+                                                 10 * 1024 * 1024};
+    // Disable chunking so the increment below propagates to the operation tracker immediately.
+    unittest::ServerParameterGuard chunkSize{"internalQueryMaxWriteToCurOpMemoryUsageBytes", 0};
+
+    auto opCtx = makeOperationContext();
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx.get())
+                      .ns(NamespaceString::createNamespaceString_forTest("test"sv, "coll"sv))
+                      .build();
+
+    // With an OperationContext, the fallback rolls up to the operation tracker and is bounded by
+    // the generous per-query limit, so it ignores the tiny per-expression cap.
+    {
+        auto& tracker = expCtx->getExpressionFallbackTracker();
+        tracker.add(100);
+        ASSERT_TRUE(tracker.withinMemoryLimit());
+        tracker.add(-100);  // Release so the operation tracker is left balanced.
+    }
+
+    // Detaching the OperationContext drops the cached fallback; it is rebuilt as a standalone
+    // tracker bounded by the per-expression cap. If the stale cached tracker were returned instead,
+    // it would still be bounded by the generous per-query limit and stay within limit.
+    expCtx->setOperationContext(nullptr);
+
+    auto& rebuilt = expCtx->getExpressionFallbackTracker();
+    rebuilt.add(100);
+    ASSERT_FALSE(rebuilt.withinMemoryLimit());  // 100 > per-expression cap of 4.
+    rebuilt.add(-100);
 }
 
 }  // namespace

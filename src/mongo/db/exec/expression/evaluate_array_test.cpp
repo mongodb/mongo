@@ -37,6 +37,7 @@
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 
@@ -71,11 +72,13 @@ TEST(ExpressionArrayTest, TracksOutputMemoryAndReleasesAfterEvaluation) {
     ASSERT_GT(tracker.peakTrackedMemoryBytes(), 0);
 }
 
-TEST(ExpressionArrayTest, ThrowsExceededMemoryLimitWhenOverLimit) {
+TEST(ExpressionArrayTest, MemoryTrackerThrowsWhenQueryLimitExceeded) {
     auto expCtx = ExpressionContextForTest{};
     auto expr = parseArrayLiteral(&expCtx, BSON_ARRAY("$a"sv << "$b"sv));
 
-    SimpleMemoryUsageTracker tracker{8};
+    const int64_t limit = 8;
+    SimpleMemoryUsageTracker operationTracker{limit};
+    SimpleMemoryUsageTracker tracker{&operationTracker, 100 * 1024 * 1024};
     EvaluationContext ctx{.tracker = &tracker};
 
     Document doc{{"a", std::string(100, 'x')}, {"b", std::string(100, 'y')}};
@@ -87,16 +90,53 @@ TEST(ExpressionArrayTest, ThrowsExceededMemoryLimitWhenOverLimit) {
         ASSERT_STRING_CONTAINS(ex.reason(), "$array");
     }
 
-    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_EQ(operationTracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(operationTracker.peakTrackedMemoryBytes(), limit);
 }
 
-TEST(ExpressionArrayTest, NoTrackerDoesNotThrow) {
+TEST(ExpressionArrayTest, FallbackTrackerWithinLimitDoesNotThrow) {
     auto expCtx = ExpressionContextForTest{};
     auto expr = parseArrayLiteral(&expCtx, BSON_ARRAY("$a"sv << "$b"sv));
 
+    const int64_t limit = 10 * 1024 * 1024;
+    // Disable expression tracking so the fallback is standalone and enforces the per-expression cap
+    unittest::ServerParameterGuard exprFlag{"featureFlagExpressionMemoryTracking", false};
+    unittest::ServerParameterGuard limitGuard{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                              limit};
+
+    EvaluationContext ctx{};
     Document doc{{"a", std::string(100, 'x')}, {"b", std::string(100, 'y')}};
-    ASSERT_VALUE_EQ(expr->evaluate(doc, &expCtx.variables),
+    ASSERT_VALUE_EQ(expr->evaluate(doc, &expCtx.variables, ctx),
                     Value(BSON_ARRAY(std::string(100, 'x') << std::string(100, 'y'))));
+
+    // The fallback tracker recorded usage but stayed within the configured limit.
+    auto& tracker = expCtx.getExpressionFallbackTracker();
+    ASSERT_GT(tracker.peakTrackedMemoryBytes(), 0);
+    ASSERT_LT(tracker.peakTrackedMemoryBytes(), limit);
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
+}
+
+TEST(ExpressionArrayTest, FallbackTrackerEnforcesLimit) {
+    auto expCtx = ExpressionContextForTest{};
+    auto expr = parseArrayLiteral(&expCtx, BSON_ARRAY("$a"sv << "$b"sv));
+
+    const int64_t limit = 8;
+    // Disable expression tracking so the fallback is standalone and enforces the per-expression cap
+    unittest::ServerParameterGuard exprFlag{"featureFlagExpressionMemoryTracking", false};
+    unittest::ServerParameterGuard limitGuard{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                              limit};
+
+    EvaluationContext ctx{};
+    Document doc{{"a", std::string(100, 'x')}, {"b", std::string(100, 'y')}};
+    try {
+        expr->evaluate(doc, &expCtx.variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$array");
+    }
+    ASSERT_EQ(expCtx.getExpressionFallbackTracker().inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(expCtx.getExpressionFallbackTracker().peakTrackedMemoryBytes(), limit);
 }
 
 /* ------------------------- ExpressionArrayToObject -------------------------- */
@@ -287,7 +327,7 @@ TEST(ExpressionSortArrayTest, NonObjectElementsSortAsNullKeyByPattern) {
 }
 
 TEST(ExpressionSortArrayTest, TrackerIsDeductedAfterPatternSort) {
-    // After a successful sort, the tracker should return to 5 — the ScopeGuard
+    // After a successful sort, the tracker should return to 5 — the MemoryUsageToken
     // must have fired and deducted the key bytes.
     auto expCtx = ExpressionContextForTest{};
     BSONObj expr = fromjson(
@@ -297,7 +337,7 @@ TEST(ExpressionSortArrayTest, TrackerIsDeductedAfterPatternSort) {
 
     SimpleMemoryUsageTracker tracker{1024 * 1024};
     tracker.set(5);
-    EvaluationContext ctx{&tracker};
+    EvaluationContext ctx{.tracker = &tracker};
     Value val = expressionSortArray->evaluate(MutableDocument().freeze(), &expCtx.variables, ctx);
 
     ASSERT_VALUE_EQ(val, Value(BSON_ARRAY(BSON("x" << 1) << BSON("x" << 2) << BSON("x" << 3))));
@@ -305,21 +345,24 @@ TEST(ExpressionSortArrayTest, TrackerIsDeductedAfterPatternSort) {
 }
 
 TEST(ExpressionSortArrayTest, TrackerDeductedAfterMemoryLimitException) {
-    // When the limit is exceeded, assertWithinMemoryLimit throws. The ScopeGuard must still
-    // fire and deduct the bytes so the tracker is not left in an inflated state.
+    // When the limit is exceeded, assertWithinMemoryLimit throws. The MemoryUsageToken
+    // must still fire and deduct the bytes so the tracker is not left in an inflated state.
     auto expCtx = ExpressionContextForTest{};
     BSONObj expr = fromjson(
         "{ $sortArray: { input: { $literal: [ {x: 3}, {x: 1}, {x: 2} ] }, sortBy: { x: 1 } } }");
     auto expressionSortArray =
         ExpressionSortArray::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
 
-    SimpleMemoryUsageTracker tracker{6};  // 6-byte limit; always exceeded by any key
+    const int64_t limit = 6;  // always exceeded by any key
+    SimpleMemoryUsageTracker operationTracker{limit};
+    SimpleMemoryUsageTracker tracker{&operationTracker, 100 * 1024 * 1024};
     tracker.set(5);
-    EvaluationContext ctx{&tracker};
+    EvaluationContext ctx{.tracker = &tracker};
 
     ASSERT_THROWS(expressionSortArray->evaluate(MutableDocument().freeze(), &expCtx.variables, ctx),
                   AssertionException);
     ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 5);
+    ASSERT_GT(tracker.peakTrackedMemoryBytes(), limit);
 }
 
 TEST(ExpressionSortArrayTest, NoMemoryTrackerNoProblems) {
@@ -334,6 +377,31 @@ TEST(ExpressionSortArrayTest, NoMemoryTrackerNoProblems) {
     Value val = expressionSortArray->evaluate(MutableDocument().freeze(), &expCtx.variables, ctx);
 
     ASSERT_VALUE_EQ(val, Value(BSON_ARRAY(BSON("x" << 1) << BSON("x" << 2) << BSON("x" << 3))));
+}
+
+TEST(ExpressionSortArrayTest, FallbackTrackerEnforcesLimit) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson(
+        "{ $sortArray: { input: { $literal: [ {x: 3}, {x: 1}, {x: 2} ] }, sortBy: { x: 1 } } }");
+    auto expressionSortArray =
+        ExpressionSortArray::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+
+    const int64_t limit = 1;
+    // Disable expression tracking so the fallback is standalone and enforces the per-expression cap
+    unittest::ServerParameterGuard exprFlag{"featureFlagExpressionMemoryTracking", false};
+    unittest::ServerParameterGuard limitGuard{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                              limit};
+
+    EvaluationContext ctx{};
+    try {
+        expressionSortArray->evaluate(MutableDocument().freeze(), &expCtx.variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$sortArray");
+    }
+    ASSERT_EQ(expCtx.getExpressionFallbackTracker().inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(expCtx.getExpressionFallbackTracker().peakTrackedMemoryBytes(), limit);
 }
 
 /* ------------------------ ExpressionTopN -------------------- */
@@ -995,28 +1063,6 @@ TEST(ExpressionConcatArraysTest, MemoryTrackerAccumulatesOutputSize) {
     ASSERT_GT(tracker.peakTrackedMemoryBytes(), 0);
 }
 
-TEST(ExpressionConcatArraysTest, MemoryTrackerThrowsWhenLimitExceeded) {
-    auto expCtx = ExpressionContextForTest{};
-    std::vector<Value> arr1, arr2;
-    for (int i = 0; i < 10; ++i)
-        arr1.push_back(Value(i));
-    for (int i = 10; i < 20; ++i)
-        arr2.push_back(Value(i));
-    auto expr = Expression::parseExpression(
-        &expCtx, BSON("$concatArrays" << BSON_ARRAY("$a"sv << "$b"sv)), expCtx.variablesParseState);
-    Document doc{{"a", Value(arr1)}, {"b", Value(arr2)}};
-
-    SimpleMemoryUsageTracker tracker{100};
-    EvaluationContext ctx{.tracker = &tracker};
-    try {
-        expr->evaluate(doc, &expCtx.variables, ctx);
-        FAIL("Expected ExceededMemoryLimit to be thrown");
-    } catch (const AssertionException& ex) {
-        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
-        ASSERT_STRING_CONTAINS(ex.reason(), "$concatArrays");
-    }
-}
-
 TEST(ExpressionConcatArraysTest, MemoryTrackerThrowsWhenQueryLimitExceeded) {
     auto expCtx = ExpressionContextForTest{};
     std::vector<Value> arr1, arr2;
@@ -1028,9 +1074,10 @@ TEST(ExpressionConcatArraysTest, MemoryTrackerThrowsWhenQueryLimitExceeded) {
         &expCtx, BSON("$concatArrays" << BSON_ARRAY("$a"sv << "$b"sv)), expCtx.variablesParseState);
     Document doc{{"a", Value(arr1)}, {"b", Value(arr2)}};
 
-    // Root (operation-wide) tracker carries the 100-byte cap; the stage tracker reports into it but
+    // Root (operation-wide) tracker carries the cap; the stage tracker reports into it but
     // has a large local limit of its own. Usage rolls up via the base chain.
-    SimpleMemoryUsageTracker operationTracker{100};
+    const int64_t limit = 100;
+    SimpleMemoryUsageTracker operationTracker{limit};
     SimpleMemoryUsageTracker stageTracker{&operationTracker, 100 * 1024 * 1024};
     EvaluationContext ctx{.tracker = &stageTracker};
     try {
@@ -1040,22 +1087,66 @@ TEST(ExpressionConcatArraysTest, MemoryTrackerThrowsWhenQueryLimitExceeded) {
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
         ASSERT_STRING_CONTAINS(ex.reason(), "$concatArrays");
     }
+    ASSERT_EQ(operationTracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(operationTracker.peakTrackedMemoryBytes(), limit);
 }
 
-TEST(ExpressionConcatArraysTest, NoTrackerDoesNotThrow) {
+TEST(ExpressionConcatArraysTest, FallbackTrackerWithinLimitDoesNotThrow) {
     auto expCtx = ExpressionContextForTest{};
-    BSONArrayBuilder arr1, arr2;
-    for (int i = 0; i < 10; ++i)
-        arr1.append(i);
-    for (int i = 10; i < 20; ++i)
-        arr2.append(i);
-    auto expr =
-        Expression::parseExpression(&expCtx,
-                                    BSON("$concatArrays" << BSON_ARRAY(arr1.arr() << arr2.arr())),
-                                    expCtx.variablesParseState);
+    auto expr = Expression::parseExpression(
+        &expCtx, BSON("$concatArrays" << BSON_ARRAY("$a"sv << "$b"sv)), expCtx.variablesParseState);
 
-    // No tracker, must evaluate normally regardless of output size.
-    ASSERT_DOES_NOT_THROW(expr->evaluate({}, &expCtx.variables));
+    std::vector<Value> arr1, arr2;
+    for (int i = 0; i < 10; ++i)
+        arr1.push_back(Value(i));
+    for (int i = 10; i < 20; ++i)
+        arr2.push_back(Value(i));
+    Document doc{{"a", Value(arr1)}, {"b", Value(arr2)}};
+
+    const int64_t limit = 10 * 1024 * 1024;
+    // Disable expression tracking so the fallback is standalone and enforces the per-expression cap
+    unittest::ServerParameterGuard exprFlag{"featureFlagExpressionMemoryTracking", false};
+    unittest::ServerParameterGuard limitGuard{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                              limit};
+
+    // Within the configured limit, evaluation succeeds and charges the fallback tracker.
+    EvaluationContext ctx{};
+    ASSERT_DOES_NOT_THROW(expr->evaluate(doc, &expCtx.variables, ctx));
+
+    auto& tracker = expCtx.getExpressionFallbackTracker();
+    ASSERT_GT(tracker.peakTrackedMemoryBytes(), 0);
+    ASSERT_LT(tracker.peakTrackedMemoryBytes(), limit);
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
+}
+
+TEST(ExpressionConcatArraysTest, FallbackTrackerEnforcesLimit) {
+    auto expCtx = ExpressionContextForTest{};
+    auto expr = Expression::parseExpression(
+        &expCtx, BSON("$concatArrays" << BSON_ARRAY("$a"sv << "$b"sv)), expCtx.variablesParseState);
+
+    std::vector<Value> arr1, arr2;
+    for (int i = 0; i < 10; ++i)
+        arr1.push_back(Value(i));
+    for (int i = 10; i < 20; ++i)
+        arr2.push_back(Value(i));
+    Document doc{{"a", Value(arr1)}, {"b", Value(arr2)}};
+
+    const int64_t limit = 8;
+    // Disable expression tracking so the fallback is standalone and enforces the per-expression cap
+    unittest::ServerParameterGuard exprFlag{"featureFlagExpressionMemoryTracking", false};
+    unittest::ServerParameterGuard limitGuard{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                              limit};
+
+    EvaluationContext ctx{};
+    try {
+        expr->evaluate(doc, &expCtx.variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$concatArrays");
+    }
+    ASSERT_EQ(expCtx.getExpressionFallbackTracker().inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(expCtx.getExpressionFallbackTracker().peakTrackedMemoryBytes(), limit);
 }
 
 
@@ -1076,28 +1167,6 @@ TEST(ExpressionSetUnionTest, MemoryTrackerAccumulatesOutputSize) {
     ASSERT_GT(tracker.peakTrackedMemoryBytes(), 0);
 }
 
-TEST(ExpressionSetUnionTest, MemoryTrackerThrowsWhenLimitExceeded) {
-    auto expCtx = ExpressionContextForTest{};
-    std::vector<Value> arr1, arr2;
-    for (int i = 0; i < 10; ++i)
-        arr1.push_back(Value(i));
-    for (int i = 10; i < 20; ++i)
-        arr2.push_back(Value(i));
-    auto expr = Expression::parseExpression(
-        &expCtx, BSON("$setUnion" << BSON_ARRAY("$a"sv << "$b"sv)), expCtx.variablesParseState);
-    Document doc{{"a", Value(arr1)}, {"b", Value(arr2)}};
-
-    SimpleMemoryUsageTracker tracker{256};
-    EvaluationContext ctx{.tracker = &tracker};
-    try {
-        expr->evaluate(doc, &expCtx.variables, ctx);
-        FAIL("Expected ExceededMemoryLimit to be thrown");
-    } catch (const AssertionException& ex) {
-        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
-        ASSERT_STRING_CONTAINS(ex.reason(), "$setUnion");
-    }
-}
-
 TEST(ExpressionSetUnionTest, MemoryTrackerThrowsWhenQueryLimitExceeded) {
     auto expCtx = ExpressionContextForTest{};
     std::vector<Value> arr1, arr2;
@@ -1111,7 +1180,8 @@ TEST(ExpressionSetUnionTest, MemoryTrackerThrowsWhenQueryLimitExceeded) {
 
     // Root (operation-wide) tracker carries the cap; the stage tracker reports into it but
     // has a large local limit of its own. Usage rolls up via the base chain.
-    SimpleMemoryUsageTracker operationTracker{256};
+    const int64_t limit = 256;
+    SimpleMemoryUsageTracker operationTracker{limit};
     SimpleMemoryUsageTracker stageTracker{&operationTracker, 100 * 1024 * 1024};
     EvaluationContext ctx{.tracker = &stageTracker};
     try {
@@ -1121,21 +1191,66 @@ TEST(ExpressionSetUnionTest, MemoryTrackerThrowsWhenQueryLimitExceeded) {
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
         ASSERT_STRING_CONTAINS(ex.reason(), "$setUnion");
     }
+    ASSERT_EQ(operationTracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(operationTracker.peakTrackedMemoryBytes(), limit);
 }
 
-TEST(ExpressionSetUnionTest, NoTrackerDoesNotThrow) {
+TEST(ExpressionSetUnionTest, FallbackTrackerWithinLimitDoesNotThrow) {
     auto expCtx = ExpressionContextForTest{};
-    BSONArrayBuilder arr1, arr2;
-    for (int i = 0; i < 10; ++i)
-        arr1.append(i);
-    for (int i = 10; i < 20; ++i)
-        arr2.append(i);
-    auto expr =
-        Expression::parseExpression(&expCtx,
-                                    BSON("$setUnion" << BSON_ARRAY(arr1.arr() << arr2.arr())),
-                                    expCtx.variablesParseState);
+    auto expr = Expression::parseExpression(
+        &expCtx, BSON("$setUnion" << BSON_ARRAY("$a"sv << "$b"sv)), expCtx.variablesParseState);
 
-    ASSERT_DOES_NOT_THROW(expr->evaluate({}, &expCtx.variables));
+    std::vector<Value> arr1, arr2;
+    for (int i = 0; i < 10; ++i)
+        arr1.push_back(Value(i));
+    for (int i = 10; i < 20; ++i)
+        arr2.push_back(Value(i));
+    Document doc{{"a", Value(arr1)}, {"b", Value(arr2)}};
+
+    const int64_t limit = 10 * 1024 * 1024;
+    // Disable expression tracking so the fallback is standalone and enforces the per-expression cap
+    unittest::ServerParameterGuard exprFlag{"featureFlagExpressionMemoryTracking", false};
+    unittest::ServerParameterGuard limitGuard{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                              limit};
+
+    // Within the configured limit, evaluation succeeds and charges the fallback tracker.
+    EvaluationContext ctx{};
+    ASSERT_DOES_NOT_THROW(expr->evaluate(doc, &expCtx.variables, ctx));
+
+    auto& tracker = expCtx.getExpressionFallbackTracker();
+    ASSERT_GT(tracker.peakTrackedMemoryBytes(), 0);
+    ASSERT_LT(tracker.peakTrackedMemoryBytes(), limit);
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
+}
+
+TEST(ExpressionSetUnionTest, FallbackTrackerEnforcesLimit) {
+    auto expCtx = ExpressionContextForTest{};
+    auto expr = Expression::parseExpression(
+        &expCtx, BSON("$setUnion" << BSON_ARRAY("$a"sv << "$b"sv)), expCtx.variablesParseState);
+
+    std::vector<Value> arr1, arr2;
+    for (int i = 0; i < 10; ++i)
+        arr1.push_back(Value(i));
+    for (int i = 10; i < 20; ++i)
+        arr2.push_back(Value(i));
+    Document doc{{"a", Value(arr1)}, {"b", Value(arr2)}};
+
+    const int64_t limit = 8;
+    // Disable expression tracking so the fallback is standalone and enforces the per-expression cap
+    unittest::ServerParameterGuard exprFlag{"featureFlagExpressionMemoryTracking", false};
+    unittest::ServerParameterGuard limitGuard{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                              limit};
+
+    EvaluationContext ctx{};
+    try {
+        expr->evaluate(doc, &expCtx.variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$setUnion");
+    }
+    ASSERT_EQ(expCtx.getExpressionFallbackTracker().inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(expCtx.getExpressionFallbackTracker().peakTrackedMemoryBytes(), limit);
 }
 
 /* ----------------------- ExpressionZip memory tracking ----------------------- */
@@ -1170,7 +1285,9 @@ TEST(ExpressionZipTest, MemoryTrackerThrowsWhenInputExceedsLimit) {
                                     expCtx.variablesParseState);
     Document doc{{"a", Value(arr1)}, {"b", Value(arr2)}};
 
-    SimpleMemoryUsageTracker tracker{100};
+    const int64_t limit = 100;
+    SimpleMemoryUsageTracker operationTracker{limit};
+    SimpleMemoryUsageTracker tracker{&operationTracker, 100 * 1024 * 1024};
     EvaluationContext ctx{.tracker = &tracker};
     try {
         expr->evaluate(doc, &expCtx.variables, ctx);
@@ -1179,6 +1296,8 @@ TEST(ExpressionZipTest, MemoryTrackerThrowsWhenInputExceedsLimit) {
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
         ASSERT_STRING_CONTAINS(ex.reason(), "$zip");
     }
+    ASSERT_EQ(operationTracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(operationTracker.peakTrackedMemoryBytes(), limit);
 }
 
 TEST(ExpressionZipTest, MemoryTrackerThrowsWhenQueryLimitExceeded) {
@@ -1197,7 +1316,8 @@ TEST(ExpressionZipTest, MemoryTrackerThrowsWhenQueryLimitExceeded) {
 
     // Root (operation-wide) tracker carries the limited cap; the stage tracker reports into it but
     // has a large local limit of its own. Usage rolls up via the base chain.
-    SimpleMemoryUsageTracker operationTracker{100};
+    const int64_t limit = 100;
+    SimpleMemoryUsageTracker operationTracker{limit};
     SimpleMemoryUsageTracker stageTracker{&operationTracker, 100 * 1024 * 1024};
     EvaluationContext ctx{.tracker = &stageTracker};
     try {
@@ -1207,22 +1327,70 @@ TEST(ExpressionZipTest, MemoryTrackerThrowsWhenQueryLimitExceeded) {
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
         ASSERT_STRING_CONTAINS(ex.reason(), "$zip");
     }
+    ASSERT_EQ(operationTracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(operationTracker.peakTrackedMemoryBytes(), limit);
 }
 
-TEST(ExpressionZipTest, NoTrackerDoesNotThrow) {
+TEST(ExpressionZipTest, FallbackTrackerWithinLimitDoesNotThrow) {
     auto expCtx = ExpressionContextForTest{};
-    BSONArrayBuilder arr1, arr2;
-    for (int i = 0; i < 10; ++i)
-        arr1.append(i);
-    for (int i = 10; i < 20; ++i)
-        arr2.append(i);
-    auto expr = Expression::parseExpression(
-        &expCtx,
-        BSON("$zip" << BSON("inputs" << BSON_ARRAY(arr1.arr() << arr2.arr()))),
-        expCtx.variablesParseState);
+    auto expr =
+        Expression::parseExpression(&expCtx,
+                                    BSON("$zip" << BSON("inputs" << BSON_ARRAY("$a"sv << "$b"sv))),
+                                    expCtx.variablesParseState);
 
-    // No tracker, must evaluate normally regardless of output size.
-    ASSERT_DOES_NOT_THROW(expr->evaluate({}, &expCtx.variables));
+    std::vector<Value> arr1, arr2;
+    for (int i = 0; i < 10; ++i)
+        arr1.push_back(Value(i));
+    for (int i = 10; i < 20; ++i)
+        arr2.push_back(Value(i));
+    Document doc{{"a", Value(arr1)}, {"b", Value(arr2)}};
+
+    const int64_t limit = 10 * 1024 * 1024;
+    // Disable expression tracking so the fallback is standalone and enforces the per-expression cap
+    unittest::ServerParameterGuard exprFlag{"featureFlagExpressionMemoryTracking", false};
+    unittest::ServerParameterGuard limitGuard{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                              limit};
+
+    // Within the configured limit, evaluation succeeds and charges the fallback tracker.
+    EvaluationContext ctx{};
+    ASSERT_DOES_NOT_THROW(expr->evaluate(doc, &expCtx.variables, ctx));
+
+    auto& tracker = expCtx.getExpressionFallbackTracker();
+    ASSERT_GT(tracker.peakTrackedMemoryBytes(), 0);
+    ASSERT_LT(tracker.peakTrackedMemoryBytes(), limit);
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
+}
+
+TEST(ExpressionZipTest, FallbackTrackerEnforcesLimit) {
+    auto expCtx = ExpressionContextForTest{};
+    auto expr =
+        Expression::parseExpression(&expCtx,
+                                    BSON("$zip" << BSON("inputs" << BSON_ARRAY("$a"sv << "$b"sv))),
+                                    expCtx.variablesParseState);
+
+    std::vector<Value> arr1, arr2;
+    for (int i = 0; i < 10; ++i)
+        arr1.push_back(Value(i));
+    for (int i = 10; i < 20; ++i)
+        arr2.push_back(Value(i));
+    Document doc{{"a", Value(arr1)}, {"b", Value(arr2)}};
+
+    const int64_t limit = 8;
+    // Disable expression tracking so the fallback is standalone and enforces the per-expression cap
+    unittest::ServerParameterGuard exprFlag{"featureFlagExpressionMemoryTracking", false};
+    unittest::ServerParameterGuard limitGuard{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                              limit};
+
+    EvaluationContext ctx{};
+    try {
+        expr->evaluate(doc, &expCtx.variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$zip");
+    }
+    ASSERT_EQ(expCtx.getExpressionFallbackTracker().inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(expCtx.getExpressionFallbackTracker().peakTrackedMemoryBytes(), limit);
 }
 
 TEST(ExpressionZipTest, MemoryTrackerThrowsWhenDefaultExceedsLimit) {
@@ -1241,7 +1409,9 @@ TEST(ExpressionZipTest, MemoryTrackerThrowsWhenDefaultExceedsLimit) {
         {"a", Value(std::vector<Value>{Value(1)})},
         {"b", Value(std::vector<Value>{Value(1), Value(2), Value(3), Value(4), Value(5)})}};
 
-    SimpleMemoryUsageTracker tracker{2000};
+    const int64_t limit = 2000;
+    SimpleMemoryUsageTracker operationTracker{limit};
+    SimpleMemoryUsageTracker tracker{&operationTracker, 100 * 1024 * 1024};
     EvaluationContext ctx{.tracker = &tracker};
     try {
         expr->evaluate(doc, &expCtx.variables, ctx);
@@ -1250,6 +1420,8 @@ TEST(ExpressionZipTest, MemoryTrackerThrowsWhenDefaultExceedsLimit) {
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
         ASSERT_STRING_CONTAINS(ex.reason(), "$zip");
     }
+    ASSERT_EQ(operationTracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(operationTracker.peakTrackedMemoryBytes(), limit);
 }
 
 TEST(ExpressionZipTest, MemoryTrackerThrowsWhenInputAndDefaultCombinationExceedsLimit) {
@@ -1283,7 +1455,8 @@ TEST(ExpressionZipTest, MemoryTrackerThrowsWhenInputAndDefaultCombinationExceeds
                                      << true)),
         expCtx.variablesParseState);
 
-    SimpleMemoryUsageTracker tracker{limit};
+    SimpleMemoryUsageTracker operationTracker{limit};
+    SimpleMemoryUsageTracker tracker{&operationTracker, 100 * 1024 * 1024};
     EvaluationContext ctx{.tracker = &tracker};
     try {
         expr->evaluate({}, &expCtx.variables, ctx);
@@ -1292,6 +1465,8 @@ TEST(ExpressionZipTest, MemoryTrackerThrowsWhenInputAndDefaultCombinationExceeds
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
         ASSERT_STRING_CONTAINS(ex.reason(), "$zip");
     }
+    ASSERT_EQ(operationTracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(operationTracker.peakTrackedMemoryBytes(), limit);
 }
 
 TEST(ExpressionZipTest, MemoryTrackerThrowsWhenOutputExceedsLimit) {
@@ -1320,7 +1495,8 @@ TEST(ExpressionZipTest, MemoryTrackerThrowsWhenOutputExceedsLimit) {
     int64_t limit = inputsSize + 3 * nullSize;
 
     Document doc{{"a", Value(vArr1)}, {"b", Value(vArr2)}, {"c", Value(vArr3)}};
-    SimpleMemoryUsageTracker tracker{limit};
+    SimpleMemoryUsageTracker operationTracker{limit};
+    SimpleMemoryUsageTracker tracker{&operationTracker, 100 * 1024 * 1024};
     EvaluationContext ctx{.tracker = &tracker};
     try {
         expr->evaluate(doc, &expCtx.variables, ctx);
@@ -1329,6 +1505,8 @@ TEST(ExpressionZipTest, MemoryTrackerThrowsWhenOutputExceedsLimit) {
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
         ASSERT_STRING_CONTAINS(ex.reason(), "$zip");
     }
+    ASSERT_EQ(operationTracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(operationTracker.peakTrackedMemoryBytes(), limit);
 }
 
 }  // namespace expression_evaluation_test

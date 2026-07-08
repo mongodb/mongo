@@ -61,17 +61,18 @@ RedactStage::RedactStage(std::string_view stageName,
       _redactProcessor{redactProcessor},
       _memoryTracker(OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(
           *expCtx, loadMemoryLimit(StageMemoryLimit::RedactStageMaxExpressionEvaluationBytes))) {
-    _trackMemory = feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
-        feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled();
+    if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
+        feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
+        _expressionEvalCtx.tracker = &_memoryTracker;
+    }
+    _expressionEvalCtx.stageName = _commonStats.stageTypeStr;
 }
 
 GetNextResult RedactStage::doGetNext() {
-    const EvaluationContext evalCtx =
-        _trackMemory ? EvaluationContext{.tracker = &_memoryTracker} : EvaluationContext{};
     auto nextInput = pSource->getNext();
     for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
         if (boost::optional<Document> result =
-                _redactProcessor->process(nextInput.releaseDocument(), evalCtx)) {
+                _redactProcessor->process(nextInput.releaseDocument(), _expressionEvalCtx)) {
             return std::move(*result);
         }
     }

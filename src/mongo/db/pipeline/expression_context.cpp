@@ -34,8 +34,11 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/version_context.h"
@@ -49,6 +52,26 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+
+SimpleMemoryUsageTracker& ExpressionContext::getExpressionFallbackTracker() {
+    if (!_expressionFallbackTracker) {
+        if (getOperationContext() && feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
+            feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
+            // Memory tracking is enabled and an OperationContext is available: wire the fallback to
+            // the operation-wide tracker so expression memory on call sites without a stage tracker
+            // still counts toward the operation's total memory usage. Per-stage attribution is lost
+            // (all such usage is lumped together), but whole-query accounting stays accurate.
+            _expressionFallbackTracker =
+                OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*this);
+        } else {
+            // Memory tracking is disabled, or there is no OperationContext: fall back to a
+            // standalone tracker that just enforces the per-expression safety cap.
+            _expressionFallbackTracker.emplace(
+                internalQueryMaxSingleExpressionMemoryUsageBytes.loadRelaxed());
+        }
+    }
+    return *_expressionFallbackTracker;
+}
 
 ExpressionContext::ExpressionContext(ExpressionContextParams&& params)
     : variablesParseState(variables.useIdGenerator()),

@@ -111,24 +111,6 @@ TEST_F(EvaluateConvertTest, TracksOutputMemoryAndReleasesAfterEvaluation) {
     ASSERT_GT(tracker.peakTrackedMemoryBytes(), 0);
 }
 
-TEST_F(EvaluateConvertTest, ThrowsExceededMemoryLimitWhenOutputTooLarge) {
-    unittest::ServerParameterGuard convertFlag{"featureFlagConvertBinDataVectors", true};
-    auto expCtx = getExpCtx();
-    auto spec = BSON("$convert" << BSON("input" << makeVectorBinData() << "to"
-                                                << "array"));
-    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
-
-    // A tracker limit smaller than the size of the converted array forces the limit to be hit.
-    SimpleMemoryUsageTracker tracker{4};
-    EvaluationContext ctx{.tracker = &tracker};
-
-    ASSERT_THROWS_CODE(convertExp->evaluate({}, &expCtx->variables, ctx),
-                       AssertionException,
-                       ErrorCodes::ExceededMemoryLimit);
-
-    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
-}
-
 TEST_F(EvaluateConvertTest, ThrowsExceededMemoryLimitWhenQueryLimitExceeded) {
     unittest::ServerParameterGuard convertFlag{"featureFlagConvertBinDataVectors", true};
     auto expCtx = getExpCtx();
@@ -139,7 +121,8 @@ TEST_F(EvaluateConvertTest, ThrowsExceededMemoryLimitWhenQueryLimitExceeded) {
     // The operation-wide (root) tracker holds the small cap; the stage tracker reporting into it
     // has a generous local limit, so the throw must come from the per-operation cap via the base
     // chain rollup, not the local stage limit.
-    SimpleMemoryUsageTracker operationTracker{4};
+    const int64_t limit = 4;
+    SimpleMemoryUsageTracker operationTracker{limit};
     SimpleMemoryUsageTracker stageTracker{&operationTracker, 100 * 1024 * 1024};
     EvaluationContext ctx{.tracker = &stageTracker};
 
@@ -150,17 +133,56 @@ TEST_F(EvaluateConvertTest, ThrowsExceededMemoryLimitWhenQueryLimitExceeded) {
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
         ASSERT_STRING_CONTAINS(ex.reason(), "$convert");
     }
+    ASSERT_EQ(operationTracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(operationTracker.peakTrackedMemoryBytes(), limit);
 }
 
-TEST_F(EvaluateConvertTest, NoTrackerDoesNotThrow) {
+TEST_F(EvaluateConvertTest, FallbackTrackerWithinLimitDoesNotThrow) {
     unittest::ServerParameterGuard convertFlag{"featureFlagConvertBinDataVectors", true};
     auto expCtx = getExpCtx();
     auto spec = BSON("$convert" << BSON("input" << makeVectorBinData() << "to"
                                                 << "array"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
-    // No tracker, must evaluate normally regardless of output size.
-    ASSERT_DOES_NOT_THROW(convertExp->evaluate({}, &expCtx->variables));
+    const int64_t limit = 10 * 1024 * 1024;
+    // Disable expression tracking so the fallback is standalone and enforces the per-expression cap
+    unittest::ServerParameterGuard exprFlag{"featureFlagExpressionMemoryTracking", false};
+    unittest::ServerParameterGuard limitGuard{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                              limit};
+
+    EvaluationContext ctx{};
+    ASSERT_DOES_NOT_THROW(convertExp->evaluate({}, &expCtx->variables, ctx));
+
+    // The fallback tracker recorded usage but stayed within the configured limit.
+    auto& tracker = expCtx->getExpressionFallbackTracker();
+    ASSERT_GT(tracker.peakTrackedMemoryBytes(), 0);
+    ASSERT_LT(tracker.peakTrackedMemoryBytes(), limit);
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
+}
+
+TEST_F(EvaluateConvertTest, FallbackTrackerEnforcesLimit) {
+    unittest::ServerParameterGuard convertFlag{"featureFlagConvertBinDataVectors", true};
+    auto expCtx = getExpCtx();
+    auto spec = BSON("$convert" << BSON("input" << makeVectorBinData() << "to"
+                                                << "array"));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    const int64_t limit = 4;
+    // Disable expression tracking so the fallback is standalone and enforces the per-expression cap
+    unittest::ServerParameterGuard exprFlag{"featureFlagExpressionMemoryTracking", false};
+    unittest::ServerParameterGuard limitGuard{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                              limit};
+
+    EvaluationContext ctx{};
+    try {
+        convertExp->evaluate({}, &expCtx->variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$convert");
+    }
+    ASSERT_EQ(expCtx->getExpressionFallbackTracker().inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(expCtx->getExpressionFallbackTracker().peakTrackedMemoryBytes(), limit);
 }
 
 TEST_F(EvaluateConvertTest, ConvertToBinDataWithNonNumericSubtypeFails) {

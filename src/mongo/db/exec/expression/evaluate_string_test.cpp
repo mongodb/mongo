@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 
@@ -833,13 +834,39 @@ TEST(ExpressionConcatTest, TracksOutputMemoryAndReleasesAfterEvaluation) {
     ASSERT_GTE(tracker.peakTrackedMemoryBytes(), 10);
 }
 
-TEST(ExpressionConcatTest, ThrowsExceededMemoryLimitWhenOverLimit) {
+TEST(ExpressionConcatTest, FallbackTrackerWithinLimitDoesNotThrow) {
     auto expCtx = ExpressionContextForTest{};
     auto expr = parseConcat(&expCtx, BSON("$concat" << BSON_ARRAY("$a"sv << "$b"sv)));
 
-    SimpleMemoryUsageTracker tracker{8};
-    EvaluationContext ctx{.tracker = &tracker};
+    const int64_t limit = 10 * 1024 * 1024;
+    // Disable expression tracking so the fallback is standalone and enforces the per-expression cap
+    unittest::ServerParameterGuard exprFlag{"featureFlagExpressionMemoryTracking", false};
+    unittest::ServerParameterGuard limitGuard{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                              limit};
 
+    EvaluationContext ctx{};
+    Document doc{{"a", std::string(10, 'x')}, {"b", std::string(10, 'y')}};
+    ASSERT_VALUE_EQ(expr->evaluate(doc, &expCtx.variables, ctx),
+                    Value(std::string(10, 'x') + std::string(10, 'y')));
+
+    // The fallback tracker recorded usage but stayed within the configured limit.
+    auto& tracker = expCtx.getExpressionFallbackTracker();
+    ASSERT_GT(tracker.peakTrackedMemoryBytes(), 0);
+    ASSERT_LT(tracker.peakTrackedMemoryBytes(), limit);
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
+}
+
+TEST(ExpressionConcatTest, FallbackTrackerEnforcesLimit) {
+    auto expCtx = ExpressionContextForTest{};
+    auto expr = parseConcat(&expCtx, BSON("$concat" << BSON_ARRAY("$a"sv << "$b"sv)));
+
+    const int64_t limit = 8;
+    // Disable expression tracking so the fallback is standalone and enforces the per-expression cap
+    unittest::ServerParameterGuard exprFlag{"featureFlagExpressionMemoryTracking", false};
+    unittest::ServerParameterGuard limitGuard{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                              limit};
+
+    EvaluationContext ctx{};
     Document doc{{"a", std::string(10, 'x')}, {"b", std::string(10, 'y')}};
     try {
         expr->evaluate(doc, &expCtx.variables, ctx);
@@ -848,24 +875,16 @@ TEST(ExpressionConcatTest, ThrowsExceededMemoryLimitWhenOverLimit) {
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
         ASSERT_STRING_CONTAINS(ex.reason(), "$concat");
     }
-
-    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
-}
-
-TEST(ExpressionConcatTest, NoTrackerDoesNotThrow) {
-    auto expCtx = ExpressionContextForTest{};
-    auto expr = parseConcat(&expCtx, BSON("$concat" << BSON_ARRAY("$a"sv << "$b"sv)));
-
-    Document doc{{"a", std::string(10, 'x')}, {"b", std::string(10, 'y')}};
-    ASSERT_VALUE_EQ(expr->evaluate(doc, &expCtx.variables),
-                    Value(std::string(10, 'x') + std::string(10, 'y')));
+    ASSERT_EQ(expCtx.getExpressionFallbackTracker().inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(expCtx.getExpressionFallbackTracker().peakTrackedMemoryBytes(), limit);
 }
 
 TEST(ExpressionConcatTest, ThrowsExceededMemoryLimitWhenQueryLimitExceeded) {
     auto expCtx = ExpressionContextForTest{};
     auto expr = parseConcat(&expCtx, BSON("$concat" << BSON_ARRAY("$a"sv << "$b"sv)));
 
-    SimpleMemoryUsageTracker operationTracker{8};
+    const int64_t limit = 8;
+    SimpleMemoryUsageTracker operationTracker{limit};
     SimpleMemoryUsageTracker stageTracker{&operationTracker, 100 * 1024 * 1024};
     EvaluationContext ctx{.tracker = &stageTracker};
 
@@ -877,6 +896,8 @@ TEST(ExpressionConcatTest, ThrowsExceededMemoryLimitWhenQueryLimitExceeded) {
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
         ASSERT_STRING_CONTAINS(ex.reason(), "$concat");
     }
+    ASSERT_EQ(operationTracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(operationTracker.peakTrackedMemoryBytes(), limit);
 }
 
 }  // namespace concat

@@ -90,6 +90,12 @@ struct EvaluationContext {
     /**
      * When non-null, accumulates memory usage observed while evaluating an expression and its
      * sub-expressions, so the entire evaluation is accounted against the same tracker.
+     *
+     * Invariant: a supplied tracker must be owned by the calling thread's operation. Trackers are
+     * not synchronized, so a tracker reachable concurrently from multiple threads must not be set
+     * here. Callers that evaluate expressions against an ExpressionContext shared across threads
+     * (e.g. collection validators evaluating $expr from concurrent writers) must leave this null
+     * and rely on a per-call tracker instead (see exec::matcher::evaluateExpression()).
      */
     SimpleMemoryUsageTracker* tracker = nullptr;
 

@@ -36,6 +36,8 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_max_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -53,6 +55,22 @@ Value evaluateExpression(const ExprMatchExpression* expr,
     // processes documents from multiple threads simultaneously. Hence we make a copy of the
     // 'Variables' object per-caller.
     Variables variables = expr->getExpressionContext()->variables;
+
+    // We must be careful which memory tracker charges this evaluation, because an ExpressionContext
+    // may be shared across threads (e.g. a collection validator evaluates $expr from multiple
+    // writer threads). A caller-supplied tracker is used as-is (it is assumed to be owned by this
+    // thread's operation). Otherwise, choose based on the OperationContext:
+    //  - Bound to an OperationContext: the ExpressionContext belongs to a single operation running
+    //    on one thread, so its shared fallback tracker is safe to use here.
+    //  - No OperationContext: the ExpressionContext may be shared across threads, so charging its
+    //    shared fallback tracker would race. Use a per-call standalone tracker instead.
+    if (!ctx.tracker && !expr->getExpressionContext()->getOperationContext()) {
+        SimpleMemoryUsageTracker perCallFallbackTracker{
+            internalQueryMaxSingleExpressionMemoryUsageBytes.loadRelaxed()};
+        EvaluationContext localCtx = ctx;
+        localCtx.tracker = &perCallFallbackTracker;
+        return expr->getExpression()->evaluate(document, &variables, localCtx);
+    }
     return expr->getExpression()->evaluate(document, &variables, ctx);
 }
 

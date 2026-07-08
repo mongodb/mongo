@@ -74,20 +74,16 @@ Value evaluate(const ExpressionArray& expr,
     std::vector<Value> values;
     values.reserve(children.size());
 
-    SimpleMemoryUsageToken memToken;
-    if (ctx.tracker) {
-        memToken = SimpleMemoryUsageToken(0, ctx.tracker);
-    }
+    auto& tracker = getMemoryTracker(expr, ctx);
+    SimpleMemoryUsageToken memToken(0, &tracker);
 
     for (auto&& child : children) {
         Value elemVal = child->evaluate(root, variables, ctx);
         Value& stored =
             values.emplace_back(elemVal.missing() ? Value(BSONNULL) : std::move(elemVal));
 
-        if (ctx.tracker) {
-            memToken.add(static_cast<int64_t>(stored.getApproximateSize()));
-            ctx.tracker->assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
-        }
+        memToken.add(static_cast<int64_t>(stored.getApproximateSize()));
+        tracker.assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
     }
     return Value(std::move(values));
 }
@@ -301,10 +297,8 @@ Value evaluate(const ExpressionConcatArrays& expr,
     const size_t n = children.size();
     std::vector<Value> values;
 
-    SimpleMemoryUsageToken token;
-    if (ctx.tracker) {
-        token = SimpleMemoryUsageToken(0, ctx.tracker);
-    }
+    auto& tracker = getMemoryTracker(expr, ctx);
+    SimpleMemoryUsageToken token(0, &tracker);
 
     for (size_t i = 0; i < n; ++i) {
         Value val = children[i]->evaluate(root, variables, ctx);
@@ -318,14 +312,12 @@ Value evaluate(const ExpressionConcatArrays& expr,
                 val.isArray());
 
         const auto& subValues = val.getArray();
-        if (ctx.tracker) {
-            size_t valuesSize = 0;
-            for (const auto& v : subValues) {
-                valuesSize += v.getApproximateSize();
-            }
-            token.add(static_cast<int64_t>(valuesSize));
-            ctx.tracker->assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
+        size_t valuesSize = 0;
+        for (const auto& v : subValues) {
+            valuesSize += v.getApproximateSize();
         }
+        token.add(static_cast<int64_t>(valuesSize));
+        tracker.assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
         values.insert(values.end(), subValues.begin(), subValues.end());
     }
     return Value(std::move(values));
@@ -500,12 +492,8 @@ Value evaluate(const ExpressionSortArray& expr,
     // Pre-extract sort keys once per element rather than re-extracting inside the comparator on
     // every comparison. Each extraction requires a Value->BSONObj conversion and dotted-path
     // traversal, which dominates sort cost for pattern-based sorts on arrays of objects.
-    int64_t keyBytes = 0;
-    ScopeGuard deductKeyMemory([&] {
-        if (ctx.tracker && keyBytes > 0) {
-            ctx.tracker->add(-keyBytes);
-        }
-    });
+    auto& tracker = getMemoryTracker(expr, ctx);
+    SimpleMemoryUsageToken memToken(0, &tracker);
     // Note that we use an ordinary int for the array indexes rather than a size_t here.
     // We get a solid 5% bump in performance with a 32-bit int, which seems worth it
     // given that arrays larger than INT_MAX are too large to fit in a BSON document.
@@ -514,12 +502,8 @@ Value evaluate(const ExpressionSortArray& expr,
     keysAndIdx.reserve(array.size());
     for (int i = 0; i < std::ssize(array); ++i) {
         auto key = cmp.extractSortKey(array[i]);
-        if (ctx.tracker) {
-            const size_t sz = key.objsize() + sizeof(int);
-            keyBytes += sz;
-            ctx.tracker->add(sz);
-            ctx.tracker->assertWithinMemoryLimit(ExpressionSortArray::kName, ctx.stageName);
-        }
+        memToken.add(static_cast<int64_t>(key.objsize() + sizeof(int)));
+        tracker.assertWithinMemoryLimit(ExpressionSortArray::kName, ctx.stageName);
         keysAndIdx.emplace_back(std::move(key), i);
     }
 
@@ -865,10 +849,8 @@ Value evaluate(const ExpressionSetUnion& expr,
     auto& children = expr.getChildren();
     const size_t n = children.size();
 
-    SimpleMemoryUsageToken token;
-    if (ctx.tracker) {
-        token = SimpleMemoryUsageToken(0, ctx.tracker);
-    }
+    auto& tracker = getMemoryTracker(expr, ctx);
+    SimpleMemoryUsageToken token(0, &tracker);
 
     for (size_t i = 0; i < n; i++) {
         const Value newEntries = children[i]->evaluate(root, variables, ctx);
@@ -882,17 +864,15 @@ Value evaluate(const ExpressionSetUnion& expr,
                               << typeName(newEntries.getType()),
                 newEntries.isArray());
 
-        if (ctx.tracker) {
-            // Count all elements including duplicates already in the set, to keep the bulk insert
-            // below on the hot path. This overestimates memory for inputs with many duplicates but
-            // avoids the ~15% overhead of per-element tracking and insertion.
-            size_t newEntriesSize = 0;
-            for (const auto& v : newEntries.getArray()) {
-                newEntriesSize += v.getApproximateSize();
-            }
-            token.add(static_cast<int64_t>(newEntriesSize));
-            ctx.tracker->assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
+        // Count all elements including duplicates already in the set, to keep the bulk insert
+        // below on the hot path. This overestimates memory for inputs with many duplicates but
+        // avoids the ~15% overhead of per-element tracking and insertion.
+        size_t newEntriesSize = 0;
+        for (const auto& v : newEntries.getArray()) {
+            newEntriesSize += v.getApproximateSize();
         }
+        token.add(static_cast<int64_t>(newEntriesSize));
+        tracker.assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
 
         unionedSet.insert(newEntries.getArray().begin(), newEntries.getArray().end());
     }
@@ -1496,10 +1476,8 @@ Value evaluate(const ExpressionZip& expr,
     auto& inputs = expr.getInputs();
     inputValues.reserve(inputs.size());
 
-    SimpleMemoryUsageToken token;
-    if (ctx.tracker) {
-        token = SimpleMemoryUsageToken(0, ctx.tracker);
-    }
+    auto& tracker = getMemoryTracker(expr, ctx);
+    SimpleMemoryUsageToken token(0, &tracker);
 
     size_t minArraySize = 0;
     size_t maxArraySize = 0;
@@ -1514,10 +1492,8 @@ Value evaluate(const ExpressionZip& expr,
                               << " found a non-array expression in input: " << evalExpr.toString(),
                 evalExpr.isArray());
 
-        if (ctx.tracker) {
-            token.add(static_cast<int64_t>(evalExpr.getApproximateSize()));
-            ctx.tracker->assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
-        }
+        token.add(static_cast<int64_t>(evalExpr.getApproximateSize()));
+        tracker.assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
 
         inputValues.push_back(evalExpr.getArray());
 
@@ -1536,21 +1512,17 @@ Value evaluate(const ExpressionZip& expr,
     std::vector<Value> evaluatedDefaults(inputs.size(), Value(BSONNULL));
     int64_t defaultsSize =
         inputs.size() ? static_cast<int64_t>(evaluatedDefaults[0].getApproximateSize()) : 0;
-    if (ctx.tracker) {
-        token.add(static_cast<int64_t>(inputs.size()) * defaultsSize);
-        ctx.tracker->assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
-    }
+    token.add(static_cast<int64_t>(inputs.size()) * defaultsSize);
+    tracker.assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
 
     // If we need default values, evaluate each expression.
     if (minArraySize != maxArraySize) {
         auto& defaults = expr.getDefaults();
         for (size_t i = 0; i < defaults.size(); i++) {
             evaluatedDefaults[i] = defaults[i].get()->evaluate(root, variables, ctx);
-            if (ctx.tracker) {
-                token.add(static_cast<int64_t>(evaluatedDefaults[i].getApproximateSize()) -
-                          defaultsSize);
-                ctx.tracker->assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
-            }
+            token.add(static_cast<int64_t>(evaluatedDefaults[i].getApproximateSize()) -
+                      defaultsSize);
+            tracker.assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
         }
     }
 
@@ -1562,23 +1534,21 @@ Value evaluate(const ExpressionZip& expr,
     // Used to construct each array in the output, e.g. [1, 2, 3].
     std::vector<Value> outputChild;
 
-    if (ctx.tracker) {
-        // Track the memory for the output and outputChild vectors. Per-element tracking is
-        // unnecessary: large heap-allocated values (strings, arrays, documents) were already
-        // accounted for when evaluating inputs and defaults above, and a copy merely bumps
-        // their ref-count. Inline scalars are bounded by sizeof(Value) per slot.
+    // Track the memory for the output and outputChild vectors. Per-element tracking is
+    // unnecessary: large heap-allocated values (strings, arrays, documents) were already
+    // accounted for when evaluating inputs and defaults above, and a copy merely bumps
+    // their ref-count. Inline scalars are bounded by sizeof(Value) per slot.
 
-        // outputChild memory usage
-        token.add(static_cast<int64_t>(inputs.size()) * static_cast<int64_t>(sizeof(Value)));
-        // Per-row output memory: one Value slot in the outer vector, one RCVector<Value> heap
-        // allocation, and inputs.size() Value slots inside it.
-        // Total: outputLength * (sizeof(Value) + sizeof(RCVector<Value>) + inputs.size() *
-        // sizeof(Value))
-        token.add(static_cast<int64_t>(outputLength) *
-                  (static_cast<int64_t>(sizeof(Value) + sizeof(RCVector<Value>)) +
-                   static_cast<int64_t>(inputs.size()) * static_cast<int64_t>(sizeof(Value))));
-        ctx.tracker->assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
-    }
+    // outputChild memory usage
+    token.add(static_cast<int64_t>(inputs.size()) * static_cast<int64_t>(sizeof(Value)));
+    // Per-row output memory: one Value slot in the outer vector, one RCVector<Value> heap
+    // allocation, and inputs.size() Value slots inside it.
+    // Total: outputLength * (sizeof(Value) + sizeof(RCVector<Value>) + inputs.size() *
+    // sizeof(Value))
+    token.add(static_cast<int64_t>(outputLength) *
+              (static_cast<int64_t>(sizeof(Value) + sizeof(RCVector<Value>)) +
+               static_cast<int64_t>(inputs.size()) * static_cast<int64_t>(sizeof(Value))));
+    tracker.assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
     output.reserve(outputLength);
     outputChild.reserve(inputs.size());
 
