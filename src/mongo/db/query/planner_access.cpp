@@ -74,6 +74,7 @@
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_planner_params.h"
@@ -1784,10 +1785,12 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
         andResult = std::move(ixscanNodes[0]);
     } else {
         if ((params.mainCollectionInfo.options & QueryPlannerParams::TARGET_SBE_STAGE_BUILDER) &&
-            !internalQueryForceIntersectionPlans.load()) {
+            !query.getExpCtx()->getQueryKnobConfiguration().getForceIntersectionPlans()) {
             // When targeting the SBE Stage Builder, we don't allow sort-based intersection or
-            // hash-based intersection when 'internalQueryForceIntersectionPlans' is false because
-            // SBE's implementation of STAGE_AND_HASH and STAGE_AND_SORTED is not complete.
+            // hash-based intersection unless the 'forceIntersectionPlans' query knob (the
+            // 'internalQueryForceIntersectionPlans' server parameter, overridable per query via
+            // query settings) is set, because SBE's implementation of STAGE_AND_HASH and
+            // STAGE_AND_SORTED is not complete.
             LOGV2_DEBUG(9081800,
                         5,
                         "Can't build index intersection solution: AND_SORTED and AND_HASH are not "
@@ -1813,11 +1816,16 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
                 break;
             }
         }
-        if (allSortedByDiskLoc && internalQueryPlannerEnableSortIndexIntersection.loadRelaxed()) {
+        if (allSortedByDiskLoc &&
+            query.getExpCtx()
+                ->getQueryKnobConfiguration()
+                .getPlannerEnableSortIndexIntersection()) {
             auto asn = std::make_unique<AndSortedNode>();
             asn->addChildren(std::move(ixscanNodes));
             andResult = std::move(asn);
-        } else if (internalQueryPlannerEnableHashIntersection.load()) {
+        } else if (query.getExpCtx()
+                       ->getQueryKnobConfiguration()
+                       .getPlannerEnableHashIntersection()) {
             {
                 auto ahn = std::make_unique<AndHashNode>();
                 ahn->addChildren(std::move(ixscanNodes));

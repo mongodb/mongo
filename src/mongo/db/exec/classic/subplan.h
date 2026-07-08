@@ -42,11 +42,8 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
-#include "mongo/db/query/query_integration_knobs_gen.h"
-#include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -103,7 +100,7 @@ public:
 
     static bool canUseSubplanning(const CanonicalQuery& query);
     static bool needsSubplanning(const CanonicalQuery& query) {
-        return internalQueryPlanOrChildrenIndependently.load() &&
+        return query.getExpCtx()->getQueryKnobConfiguration().getPlanOrChildrenIndependently() &&
             SubPlanningUtils::canUseSubplanning(query);
     }
 

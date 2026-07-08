@@ -36,6 +36,7 @@
 #include "mongo/db/query/distinct_access.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/planner_ixselect.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_settings_decoration.h"
 #include "mongo/db/query/wildcard_multikey_paths.h"
@@ -498,7 +499,8 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
     // We will not output collection scans unless there are no indexed solutions. NO_TABLE_SCAN
     // overrides this behavior by not outputting a collscan even if there are no indexed
     // solutions.
-    if (canonicalQuery.getExpCtx()->getQueryKnobConfiguration().getNoTableScan()) {
+    const auto& knobConfig = canonicalQuery.getExpCtx()->getQueryKnobConfiguration();
+    if (knobConfig.getNoTableScan()) {
         const auto& nss = canonicalQuery.nss();
         // There are certain cases where we ignore this restriction:
         bool ignore =
@@ -508,15 +510,15 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
         }
     }
 
-    if (internalQueryPlannerEnableIndexIntersection.load()) {
+    if (knobConfig.getPlannerEnableIndexIntersection()) {
         mainCollectionInfo.options |= QueryPlannerParams::INDEX_INTERSECTION;
     }
 
-    if (internalQueryEnumerationPreferLockstepOrEnumeration.load()) {
+    if (knobConfig.getEnumerationPreferLockstepOrEnumeration()) {
         mainCollectionInfo.options |= QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP;
     }
 
-    if (internalQueryPlannerGenerateCoveredWholeIndexScans.load()) {
+    if (knobConfig.getPlannerGenerateCoveredWholeIndexScans()) {
         mainCollectionInfo.options |= QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     }
 

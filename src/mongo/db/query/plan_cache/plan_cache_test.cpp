@@ -73,6 +73,7 @@
 #include "mongo/db/shard_role/shard_role_mock.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
@@ -1644,11 +1645,8 @@ TEST_F(CachePlanSelectionTest,
        CachedPlanForSelfIntersectionOfMultikeyIndexNonPointRangesCannotIntersectBounds) {
     // Enable a hash-based index intersection plan to be generated because we are scanning a
     // non-point range on the "a" field.
-    bool oldEnableHashIntersection = internalQueryPlannerEnableHashIntersection.load();
-    ON_BLOCK_EXIT([oldEnableHashIntersection] {
-        internalQueryPlannerEnableHashIntersection.store(oldEnableHashIntersection);
-    });
-    internalQueryPlannerEnableHashIntersection.store(true);
+    unittest::ServerParameterGuard enableHashIntersection{
+        "internalQueryPlannerEnableHashIntersection", true};
     params.mainCollectionInfo.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
 
@@ -1690,11 +1688,8 @@ TEST_F(CachePlanSelectionTest, CachedPlanForIntersectionOfMultikeyIndexesWhenUsi
 TEST_F(CachePlanSelectionTest, CachedPlanForIntersectionWithNonMultikeyIndexCanIntersectBounds) {
     // Enable a hash-based index intersection plan to be generated because we are scanning a
     // non-point range on the "a.c" field.
-    bool oldEnableHashIntersection = internalQueryPlannerEnableHashIntersection.load();
-    ON_BLOCK_EXIT([oldEnableHashIntersection] {
-        internalQueryPlannerEnableHashIntersection.store(oldEnableHashIntersection);
-    });
-    internalQueryPlannerEnableHashIntersection.store(true);
+    unittest::ServerParameterGuard enableHashIntersection{
+        "internalQueryPlannerEnableHashIntersection", true};
     params.mainCollectionInfo.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
 
@@ -1832,11 +1827,8 @@ TEST_F(CachePlanSelectionTest, ContainedOr) {
 }
 
 TEST_F(CachePlanSelectionTest, ContainedOrAndIntersection) {
-    bool oldEnableHashIntersection = internalQueryPlannerEnableHashIntersection.load();
-    ON_BLOCK_EXIT([oldEnableHashIntersection] {
-        internalQueryPlannerEnableHashIntersection.store(oldEnableHashIntersection);
-    });
-    internalQueryPlannerEnableHashIntersection.store(true);
+    unittest::ServerParameterGuard enableHashIntersection{
+        "internalQueryPlannerEnableHashIntersection", true};
     params.mainCollectionInfo.options =
         QueryPlannerParams::INCLUDE_COLLSCAN | QueryPlannerParams::INDEX_INTERSECTION;
     addIndex(BSON("a" << 1 << "b" << 1), "a_1_b_1");

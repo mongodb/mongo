@@ -34,6 +34,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration_test_util.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
@@ -3036,35 +3037,33 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationWithNestedOrWhereInnerOrHitsEnumer
 }
 
 TEST_F(QueryPlannerTest, NoOrSolutionsIfMaxOrSolutionsIsZero) {
-    auto defaultMaxOr = internalQueryEnumerationMaxOrSolutions.load();
-    ON_BLOCK_EXIT([&] { internalQueryEnumerationMaxOrSolutions.store(defaultMaxOr); });
-    internalQueryEnumerationMaxOrSolutions.store(0);
     addIndex(BSON("one" << 1));
     addIndex(BSON("two" << 1));
-    runQuery(BSON(
-        "$or" << BSON_ARRAY(BSON("one" << 0 << "two" << 0) << BSON("one" << 1 << "two" << 1))));
-    assertNumSolutions(1U);
-    assertSolutionExists(
-        "{cscan: {"
-        "    filter:"
-        "        {'$or': ["
-        "            {'$and': [{one: {$eq: 0}}, {two: {$eq: 0}}]},"
-        "            {'$and': [{one: {$eq: 1}}, {two: {$eq: 1}}]}"
-        "        ]},"
-        "    collation: {},"
-        "    dir: 1}}");
+    {
+        QueryKnobGuardForTest maxOrSolutions{
+            opCtx.get(), "internalQueryEnumerationMaxOrSolutions", 0};
+        runQuery(BSON(
+            "$or" << BSON_ARRAY(BSON("one" << 0 << "two" << 0) << BSON("one" << 1 << "two" << 1))));
+        assertNumSolutions(1U);
+        assertSolutionExists(
+            "{cscan: {"
+            "    filter:"
+            "        {'$or': ["
+            "            {'$and': [{one: {$eq: 0}}, {two: {$eq: 0}}]},"
+            "            {'$and': [{one: {$eq: 1}}, {two: {$eq: 1}}]}"
+            "        ]},"
+            "    collation: {},"
+            "    dir: 1}}");
+    }
     // Ensure that when set to 1 we get a different result.
-    internalQueryEnumerationMaxOrSolutions.store(1);
+    QueryKnobGuardForTest maxOrSolutions{opCtx.get(), "internalQueryEnumerationMaxOrSolutions", 1};
     runQuery(BSON(
         "$or" << BSON_ARRAY(BSON("one" << 0 << "two" << 0) << BSON("one" << 1 << "two" << 1))));
     assertNumSolutions(2U);
 }
 
 TEST_F(QueryPlannerTest, HitIndexedOrLimitIsReportedOnAllSolutions) {
-    auto defaultMaxOr = internalQueryEnumerationMaxOrSolutions.load();
-    ON_BLOCK_EXIT([&] { internalQueryEnumerationMaxOrSolutions.store(defaultMaxOr); });
-
-    internalQueryEnumerationMaxOrSolutions.store(2);
+    QueryKnobGuardForTest maxOrSolutions{opCtx.get(), "internalQueryEnumerationMaxOrSolutions", 2};
 
     // Each $or branch can be satisfied by more than one index, so the enumerator has several
     // combinations to walk through and will exceed the OR enumeration limit.
@@ -3089,9 +3088,8 @@ TEST_F(QueryPlannerTest, HitIndexedOrLimitIsReportedOnAllSolutions) {
 TEST_F(QueryPlannerTest, HitIndexedAndLimitIsReportedOnAllSolutions) {
     params.mainCollectionInfo.options |= QueryPlannerParams::INDEX_INTERSECTION;
 
-    auto defaultMaxIntersect = internalQueryEnumerationMaxIntersectPerAnd.load();
-    ON_BLOCK_EXIT([&] { internalQueryEnumerationMaxIntersectPerAnd.store(defaultMaxIntersect); });
-    internalQueryEnumerationMaxIntersectPerAnd.store(1);
+    QueryKnobGuardForTest maxIntersectPerAnd{
+        opCtx.get(), "internalQueryEnumerationMaxIntersectPerAnd", 1};
 
     // Three single-field indexes give the enumerator three candidate intersection pairs, which
     // exceeds the limit of one.

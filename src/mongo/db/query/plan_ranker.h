@@ -37,13 +37,10 @@
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
-#include "mongo/db/query/query_integration_knobs_gen.h"
-#include "mongo/db/query/query_optimization_knobs_gen.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/util/modules.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -153,7 +150,7 @@ public:
             }());
 
 
-        if (internalQueryForceIntersectionPlans.load()) {
+        if (cq.getExpCtx()->getQueryKnobConfiguration().getForceIntersectionPlans()) {
             if (hasStage(STAGE_AND_HASH, stats) || hasStage(STAGE_AND_SORTED, stats)) {
                 // The boost should be >2.001 to make absolutely sure the ixisect plan will win due
                 // to the combination of 1) productivity, 2) eof bonus, and 3) no ixisect bonus.

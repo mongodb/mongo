@@ -53,6 +53,7 @@
 #include "mongo/db/query/plan_cache/plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_ranking_decision.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration_test_util.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/service_context.h"
@@ -145,8 +146,8 @@ private:
     std::vector<std::unique_ptr<QuerySolution>> _bestCBRPlan;
 
     // Run all tests with hash-based intersection enabled.
-    unittest::ServerParameterGuard _enableHashIntersection{
-        "internalQueryPlannerEnableHashIntersection", true};
+    QueryKnobGuardForTest _enableHashIntersection{
+        &_opCtx, "internalQueryPlannerEnableHashIntersection", true};
 
     // Configure Sampling CE with a large sample
     unittest::ServerParameterGuard _samplingMarginOfError{"samplingMarginOfError", 1.0};
@@ -274,10 +275,10 @@ public:
         ASSERT(QueryPlannerTestLib::solutionMatches(expectedPlan, cbrSoln->root()).isOK());
 
         // Turn on the "force intersect" option.
-        unittest::ServerParameterGuard forceIntersectionPlans{"internalQueryForceIntersectionPlans",
-                                                              true};
-        unittest::ServerParameterGuard enableSortIntersection{
-            "internalQueryPlannerEnableSortIndexIntersection", true};
+        QueryKnobGuardForTest forceIntersectionPlans{
+            opCtx(), "internalQueryForceIntersectionPlans", true};
+        QueryKnobGuardForTest enableSortIntersection{
+            opCtx(), "internalQueryPlannerEnableSortIndexIntersection", true};
 
         // And run the same query again.
         findCommand = std::make_unique<FindCommandRequest>(nss);
@@ -327,8 +328,8 @@ public:
 
         // Turn on the "force intersect" option.
         // This will be reverted by PlanRankingTestBase's destructor when the test completes.
-        unittest::ServerParameterGuard forceIntersectionPlans{"internalQueryForceIntersectionPlans",
-                                                              true};
+        QueryKnobGuardForTest forceIntersectionPlans{
+            opCtx(), "internalQueryForceIntersectionPlans", true};
 
         const std::string expectedMPPlan(
             "{fetch: {node: {andHash: {nodes: ["

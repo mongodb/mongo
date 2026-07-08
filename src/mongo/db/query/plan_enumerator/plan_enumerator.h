@@ -37,10 +37,7 @@
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/plan_enumerator/enumerator_memo.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
-#include "mongo/db/query/query_integration_knobs_gen.h"
-#include "mongo/db/query/query_optimization_knobs_gen.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/modules.h"
@@ -68,10 +65,11 @@ namespace plan_enumerator {
 using namespace plan_enumerator;
 
 struct PlanEnumeratorParams {
-    PlanEnumeratorParams()
-        : maxSolutionsPerOr(internalQueryEnumerationMaxOrSolutions.load()),
-          maxIntersectPerAnd(internalQueryEnumerationMaxIntersectPerAnd.load()),
-          disableOrPushdown(disableMatchExpressionOptimization.shouldFail()) {}
+    explicit PlanEnumeratorParams(const QueryKnobConfiguration& knobConfig)
+        : maxSolutionsPerOr(static_cast<size_t>(knobConfig.getEnumerationMaxOrSolutions())),
+          maxIntersectPerAnd(static_cast<size_t>(knobConfig.getEnumerationMaxIntersectPerAnd())),
+          disableOrPushdown(disableMatchExpressionOptimization.shouldFail()),
+          enableIndexPruning(knobConfig.getPlannerEnableIndexPruning()) {}
 
     // Do we provide solutions that use more indices than the minimum required to provide
     // an indexed solution?
@@ -111,6 +109,9 @@ struct PlanEnumeratorParams {
 
     // TODO SERVER-94155: Enable index pruning for distinct-like queries when feature flag is on.
     bool shouldPruneDistinct;
+
+    // Whether to prune memo entries that use duplicate indexes.
+    bool enableIndexPruning;
 };
 
 /**
@@ -589,6 +590,9 @@ private:
 
     // TODO SERVER-94155: Enable index pruning for distinct-like queries when feature flag is on.
     const bool _shouldPruneDistinct;
+
+    // Whether to prune memo entries that use duplicate indexes.
+    const bool _enableIndexPruning;
 };
 
 }  // namespace plan_enumerator

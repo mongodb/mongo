@@ -382,11 +382,6 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
     // forcing a fetch.
     BSONObj shardKey;
 
-    // What's the max number of indexed solutions we want to output?  It's expensive to compare
-    // plans via the MultiPlanStage, and the set of possible plans is very large for certain
-    // index+query combinations.
-    size_t maxIndexedSolutions = internalQueryPlannerMaxIndexedSolutions.load();
-
     // Specifies the clusteredIndex information necessary to utilize the cluster key in bounded
     // collection scans and other query operations.
     boost::optional<ClusteredCollectionInfo> clusteredInfo = boost::none;

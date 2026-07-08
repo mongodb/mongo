@@ -264,6 +264,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: forceIntersectionPlans
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryPlannerEnableIndexIntersection:
         description: "Controls whether the planner will generate and consider index intersection plans."
@@ -275,6 +278,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: plannerEnableIndexIntersection
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryPlannerEnableHashIntersection:
         description: "Controls whether we use hash-based intersection for rooted $and queries."
@@ -286,6 +292,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: plannerEnableHashIntersection
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryPlannerEnableSortIndexIntersection:
         description: "Controls whether we use sort-based intersection for rooted $and queries."
@@ -297,6 +306,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: plannerEnableSortIndexIntersection
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryPlannerEnableIndexPruning:
         description: "Prunes unnecessary candidate plans so we trial less duplicate options."
@@ -308,6 +320,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: plannerEnableIndexPruning
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryConcurrentMultiPlanningThreshold:
         description: "The number of concurrent trialing multiplan candidates required to enable the MultiPlan rate limiter."
@@ -506,6 +521,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: plannerMaxIndexedSolutions
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryEnumerationPreferLockstepOrEnumeration:
         description: >-
@@ -530,6 +548,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: enumerationPreferLockstepOrEnumeration
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryEnumerationMaxOrSolutions:
         description: "How many solutions will the enumerator consider at each OR?"
@@ -543,6 +564,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: enumerationMaxOrSolutions
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryEnumerationMaxIntersectPerAnd:
         description: "How many intersections will the enumerator consider at each AND?"
@@ -556,6 +580,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: enumerationMaxIntersectPerAnd
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryPlanOrChildrenIndependently:
         description: "Do we want to plan each child of the OR independently?"
@@ -567,6 +594,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: planOrChildrenIndependently
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryMaxScansToExplode:
         description: >-
@@ -595,6 +625,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: plannerGenerateCoveredWholeIndexScans
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryPlannerUseMultiplannerForSingleSolutions:
         description: >-

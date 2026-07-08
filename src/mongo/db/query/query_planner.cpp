@@ -1498,7 +1498,8 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     // If we have any relevant indices, we try to create indexed plans.
     if (!relevantIndices.empty()) {
         // The enumerator spits out trees tagged with IndexTag(s).
-        plan_enumerator::PlanEnumeratorParams enumParams;
+        plan_enumerator::PlanEnumeratorParams enumParams(
+            query.getExpCtx()->getQueryKnobConfiguration());
         enumParams.intersect =
             params.mainCollectionInfo.options & QueryPlannerParams::INDEX_INTERSECTION;
         enumParams.root = query.getPrimaryMatchExpression();
@@ -1519,9 +1520,11 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         plan_enumerator::PlanEnumerator planEnumerator(enumParams);
         uassertStatusOKWithContext(planEnumerator.init(), "failed to initialize plan enumerator");
 
+        const size_t maxIndexedSolutions = static_cast<size_t>(
+            QueryKnobConfiguration::get(query.getExpCtx()->getOperationContext())
+                .getPlannerMaxIndexedSolutions());
         unique_ptr<MatchExpression> nextTaggedTree;
-        while ((nextTaggedTree = planEnumerator.getNext()) &&
-               (out.size() < params.maxIndexedSolutions)) {
+        while ((nextTaggedTree = planEnumerator.getNext()) && (out.size() < maxIndexedSolutions)) {
             LOGV2_DEBUG(20976,
                         5,
                         "About to build solntree from tagged tree",

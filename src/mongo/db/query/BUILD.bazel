@@ -696,6 +696,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline",
         "//src/mongo/db/query/compiler/optimizer/index_bounds_builder:index_bounds_builder_test_fixture",
         "//src/mongo/db/query/plan_ranking:plan_ranking_test_fixture",
+        "//src/mongo/db/query/query_knobs:query_knob_configuration_test_util",
         "//src/mongo/db/shard_role/shard_catalog:collection_mock",
         "//src/mongo/db/shard_role/shard_catalog:index_catalog_mock",
     ],

@@ -36,6 +36,7 @@
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration_test_util.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
 #include "mongo/platform/atomic_word.h"
@@ -1059,7 +1060,8 @@ TEST_F(QueryPlannerTest, IntersectDisabledAndSort) {
 // Ensure that disabling AND_HASH intersection works properly.
 TEST_F(QueryPlannerTest, IntersectDisableAndHash) {
     // Turn index intersection on but disable hash-based intersection.
-    internalQueryPlannerEnableHashIntersection.store(false);
+    QueryKnobGuardForTest disableHashIntersection{
+        opCtx.get(), "internalQueryPlannerEnableHashIntersection", false};
     params.mainCollectionInfo.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
 
