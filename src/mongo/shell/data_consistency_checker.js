@@ -509,6 +509,10 @@ class DataConsistencyChecker {
             print(`${msgPrefix}, ${outputMsg}`);
         };
 
+        const isMultiversion =
+            Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+            Boolean(TestData.multiversionBinVersion);
+
         const arraySymmetricDifference = (a, b) => {
             const inAOnly = a.filter(function (elem) {
                 return b.indexOf(elem) < 0;
@@ -594,6 +598,14 @@ class DataConsistencyChecker {
                     }
                     if (syncingInfo.idIndex) {
                         delete syncingInfo.idIndex.ns;
+                    }
+
+                    // TODO(SERVER-95599): Remove this workaround once 9.0 becomes last LTS.
+                    // Binaries before 9.0 don't populate 'configDebugDump' the same way, so under
+                    // mixed binary versions this field can legitimately differ between nodes.
+                    if (isMultiversion) {
+                        delete sourceInfo.info?.configDebugDump;
+                        delete syncingInfo.info?.configDebugDump;
                     }
 
                     // If the servers are using encryption and they specify an encryption option
