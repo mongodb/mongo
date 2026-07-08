@@ -2006,7 +2006,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
         "shard.catalog.chunks",
     ];
     for (const collName of collNames) {
-        assert.commandWorked(configDB.createCollection(collName));
+        assert.commandWorked(configDB.getCollection(collName).insert({foo: "bar"}));
     }
 
     const inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();

@@ -92,8 +92,6 @@ export var MetadataConsistencyChecker = (function () {
                 "MalformedTimeseriesBucketsCollection",
                 // TODO(SERVER-130695): Fix underlying issues and remove inconsistency type
                 "InconsistentShardCatalogCollectionMetadata",
-                // TODO(SERVER-130706): Fix underlying issues and remove inconsistency type
-                "AuthoritativeShardCatalogCollectionsPresent",
             ];
             if (ignoreInconsistenciesTempWorkaround) {
                 inconsistencies = inconsistencies.filter((inconsistency) => {

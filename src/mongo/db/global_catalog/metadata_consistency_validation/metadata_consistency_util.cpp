@@ -2530,16 +2530,52 @@ namespace {
 
 // Returns a MetadataInconsistencyItem for each config collection on this shard matching 'filter'.
 std::vector<MetadataInconsistencyItem> checkConfigCollectionsDoNotExistLocally(
-    OperationContext* opCtx, MetadataInconsistencyTypeEnum inconsistencyType, BSONObj filter) {
+    OperationContext* opCtx,
+    MetadataInconsistencyTypeEnum inconsistencyType,
+    BSONObj filter,
+    bool validateNonEmptyAndConfigSvrFcvStable = false) {
     std::vector<MetadataInconsistencyItem> inconsistencies;
 
     DBDirectClient client(opCtx);
     for (const auto& collInfo : client.getCollectionInfos(DatabaseName::kConfig, filter)) {
+        const auto nss =
+            NamespaceStringUtil::deserialize(DatabaseName::kConfig, collInfo["name"].str());
+        // TODO(SERVER-98118): remove this branch once 9.0 is last LTS
+        // For the Authoritative Shard catalog collections, we have the following edge cases:
+        // - For config.shard.catalog.databases, the config server may enter kUpgrading and insert
+        //   documents to it while the shard is still fully downgraded.
+        // - For config.shard.catalog.collections/chunks, each shard creates the collections before
+        //   entering kUpgrading, so those collections may exist (but be empty) on fully downgraded.
+        // Therefore we only flag an inconsistency if the collection is non-empty & the configsvr's
+        // FCV is stable (in addition to the caller making sure the shard is fully downgraded).
+        // Then we can be sure we only report unexpected documents on a fully downgraded cluster.
+        if (validateNonEmptyAndConfigSvrFcvStable) {
+            auto readConfigServerFCVDocument = [&] {
+                auto response = uassertStatusOK(
+                    Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+                        opCtx,
+                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                        repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern),
+                        NamespaceString::kServerConfigurationNamespace,
+                        BSON("_id" << multiversion::kParameterName),
+                        BSONObj{},
+                        1 /* limit */));
+                tassert(
+                    13070900,
+                    "Could not find the featureCompatibilityVersion document on the config server",
+                    !response.docs.empty());
+                return FeatureCompatibilityVersionDocument::parse(response.docs.front());
+            };
+
+            const auto initialConfigFCV = readConfigServerFCVDocument();
+            if (initialConfigFCV.getTargetVersion() || client.findOne(nss, BSONObj{}).isEmpty() ||
+                readConfigServerFCVDocument() != initialConfigFCV) {
+                continue;
+            }
+        }
         inconsistencies.emplace_back(makeInconsistency(
             inconsistencyType,
-            UnexpectedShardCatalogCollectionDetails{
-                NamespaceStringUtil::deserialize(DatabaseName::kConfig, collInfo["name"].str()),
-                ShardingState::get(opCtx)->shardId()}));
+            UnexpectedShardCatalogCollectionDetails{nss, ShardingState::get(opCtx)->shardId()}));
     }
 
     return inconsistencies;
@@ -2562,7 +2598,8 @@ std::vector<MetadataInconsistencyItem> checkShardCatalogCollectionsConsistentWit
                          "$in" << BSON_ARRAY(
                              NamespaceString::kConfigShardCatalogDatabasesNamespace.coll()
                              << NamespaceString::kConfigShardCatalogCollectionsNamespace.coll()
-                             << NamespaceString::kConfigShardCatalogChunksNamespace.coll()))));
+                             << NamespaceString::kConfigShardCatalogChunksNamespace.coll()))),
+                true /* validateNonEmptyAndConfigSvrFcvStable */);
         }
 
         if (accessLevel == AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed) {

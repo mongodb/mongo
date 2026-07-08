@@ -69,6 +69,7 @@ enums:
             kInconsistentShardCatalogCollectionMetadata: "InconsistentShardCatalogCollectionMetadata"
             kIncompatibleUniqueIndexOnShardedCollection: "IncompatibleUniqueIndexOnShardedCollection"
             kLegacyShardCacheCollectionsPresent: "LegacyShardCacheCollectionsPresent"
+            # TODO(SERVER-98118): remove this inconsistency once 9.0 is last LTS
             kAuthoritativeShardCatalogCollectionsPresent: "AuthoritativeShardCatalogCollectionsPresent"
 
     MetadataInconsistencyDescription:
