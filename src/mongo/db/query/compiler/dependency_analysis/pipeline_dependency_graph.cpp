@@ -659,7 +659,7 @@ public:
 
                 // Check if the shadowing field has an alias to a collection path. If so, resolve
                 // the full path and query the PathArrayness API with it.
-                if (auto* alias = getAlias(fieldId)) {
+                if (auto* alias = getCollectionAlias(fieldId)) {
                     auto suffix = skipPathComponents(path, prefix.size() + 1);
                     return _canPathBeArray(buildDottedPath(*alias, suffix));
                 }
@@ -1271,9 +1271,9 @@ private:
     /**
      * Returns the collection path alias for the given field, or nullptr if none.
      */
-    const ParsedPath* getAlias(FieldId fieldId) const {
-        auto it = _aliases.find(fieldId);
-        return it != _aliases.end() ? &it->second : nullptr;
+    const ParsedPath* getCollectionAlias(FieldId fieldId) const {
+        auto it = _collectionAliases.find(fieldId);
+        return it != _collectionAliases.end() ? &it->second : nullptr;
     }
 
     /// Record 'value' as the known constant for the leaf of 'path' in 'scope'. Must be called
@@ -1559,7 +1559,7 @@ private:
                                 // Track transitive alias. If the prefix contains arrays
                                 // we skip this: canFieldBeArray is already true and any
                                 // downstream alias resolution would also yield true.
-                                if (auto* alias = getAlias(oldPathField)) {
+                                if (auto* alias = getCollectionAlias(oldPathField)) {
                                     aliasCollectionPath = *alias;
                                 }
                                 constant = getConstantForField(oldPathField);
@@ -1579,7 +1579,7 @@ private:
                                 // The old path is shadowed: e.g., b.z where b has no
                                 // embedded scope. Check if the shadowing field has an alias
                                 // so we can resolve through it.
-                                if (auto* alias = getAlias(oldPathField)) {
+                                if (auto* alias = getCollectionAlias(oldPathField)) {
                                     aliasCollectionPath = *alias;
                                     size_t consumed = prefix.size() + 1;
                                     for (size_t i = consumed; i < parsedOldPath.size(); ++i) {
@@ -1643,7 +1643,7 @@ private:
                     if (!aliasCollectionPath.empty()) {
                         auto [leafFieldId, _] = lookupField(scopeId, parsedNewPath);
                         tassert(12193201, "Missing leafFieldId", leafFieldId);
-                        _aliases[leafFieldId] = std::move(aliasCollectionPath);
+                        _collectionAliases[leafFieldId] = std::move(aliasCollectionPath);
                     }
                     if (constant) {
                         setConstant(scopeId, parsedNewPath, *std::move(constant));
@@ -1883,7 +1883,7 @@ private:
         auto [invalidScope, invalidField] = earliestDescendants(invalidStage);
 
         // Clean up constants and aliases for invalidated fields.
-        absl::erase_if(_aliases,
+        absl::erase_if(_collectionAliases,
                        [invalidField](const auto& entry) { return entry.first >= invalidField; });
         absl::erase_if(_constants,
                        [invalidField](const auto& entry) { return entry.first >= invalidField; });
@@ -1961,7 +1961,7 @@ private:
     // Maps a FieldId to the collection path it aliases (as interned StringPool IDs).
     // Only populated for fields created via RenamePath that reference collection fields
     // (directly or transitively through other aliases).
-    absl::flat_hash_map<FieldId, ParsedPath> _aliases;
+    absl::flat_hash_map<FieldId, ParsedPath> _collectionAliases;
 
     // Side table of known constant Values, keyed by FieldId.
     absl::flat_hash_map<FieldId, Value> _constants;
@@ -2159,7 +2159,7 @@ private:
         if (!field.metadata.isDefault()) {
             serializeMetadata(fieldId, field.metadata, bob);
         }
-        if (auto* alias = _graph.getAlias(fieldId)) {
+        if (auto* alias = _graph.getCollectionAlias(fieldId)) {
             bob.append("collectionAlias", _graph.buildDottedPath(*alias));
         }
         serializeDependencies(field.dependencies, bob);
