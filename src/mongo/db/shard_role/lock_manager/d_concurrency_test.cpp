@@ -743,6 +743,12 @@ TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsInterruptible) {
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsInterruptibleBlockedOnRSTL) {
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        // With intent registration enabled, GlobalLock no longer acquires the RSTL, so a raw
+        // RSTL acquisition on opCtx1 does not conflict with opCtx2's GlobalLock and this
+        // scenario is not reproducible.
+        return;
+    }
     auto clients = makeKClientsWithLockers(2);
     auto opCtx1 = clients[0].second.get();
     auto opCtx2 = clients[1].second.get();
