@@ -55,10 +55,10 @@ namespace mongo {
  * When the auto-merger is enabled, it works as follows:
  * - Identify all the <shard, collection uuid> pairs for which there are mergeable chunks.
  * - While auto-merge is possible:
- * --- For each shard:
- * ----- For each namespace
- * ------- Schedule a mergeAllChunksOnShard command (max 1000 chunks per time)
- * ----- Apply throttling of `defaultAutoMergerThrottlingMS`
+ * -- For each shard:
+ * --- For each namespace
+ * ----- Schedule a mergeAllChunksOnShard command (max `autoMergerMaxChunksToMerge` chunks per time)
+ * --- Apply throttling of `autoMergerThrottlingMS`
  * - Sleep for `autoMergerIntervalSecs`
  */
 class AutoMergerPolicy : public ActionsStreamPolicy {
@@ -92,11 +92,6 @@ public:
     void applyActionResult(OperationContext* opCtx,
                            const BalancerStreamAction& action,
                            const BalancerStreamActionResponse& result) override;
-
-    /*
-     * Maximum number of chunks to merge in one request
-     */
-    inline static constexpr int MAX_NUMBER_OF_CHUNKS_TO_MERGE = 1000;
 
 private:
     void _init(OperationContext* opCtx, WithLock lk);

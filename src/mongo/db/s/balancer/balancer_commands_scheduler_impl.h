@@ -314,7 +314,7 @@ public:
         ShardSvrMergeAllChunksOnShard req(getNameSpace());
         req.setDbName(DatabaseName::kAdmin);
         req.setShard(getTarget());
-        req.setMaxNumberOfChunksToMerge(AutoMergerPolicy::MAX_NUMBER_OF_CHUNKS_TO_MERGE);
+        req.setMaxNumberOfChunksToMerge(autoMergerMaxChunksToMerge.load());
         req.setMaxTimeProcessingChunksMS(autoMergerMaxTimeProcessingChunksMS.load());
         return req.toBSON();
     }

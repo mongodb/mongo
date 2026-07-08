@@ -136,6 +136,18 @@ server_parameters:
         default: 500 # 500 milliseconds
         redact: false
 
+    autoMergerMaxChunksToMerge:
+        description: >-
+            The maximum number of chunks merged in a single mergeAllChunksOnShard request
+            issued by the auto-merger.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: autoMergerMaxChunksToMerge
+        validator:
+            gte: 2
+        default: 100
+        redact: false
+
     placementHistoryCleanerMinEntries:
         description: >-
             Minimum number of entries in config.placementHistory before the periodic cleaner
