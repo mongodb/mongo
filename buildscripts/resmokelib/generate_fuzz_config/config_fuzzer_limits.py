@@ -462,6 +462,26 @@ config_fuzzer_params = {
             "choices": [{"mode": "off"}, {"mode": "alwaysOn"}],
             "fuzz_at": ["startup"],
         },
+        # Randomly cause the chunk operations to fail with a retryable error after durably persisting changes transactionally.
+        # The expectation is that these failures are retried by the coordinators and don't cause inconsistencies. Note that
+        # leaving them alwaysOn is deliberate as the code locations are such that they should only be hit at most once per
+        # operation.
+        "failpoint.mergeAllChunksFailAfterCommit": {
+            "choices": [{"mode": "off"}, {"mode": "alwaysOn"}],
+            "fuzz_at": ["startup"],
+        },
+        "failpoint.commitChunkSplitFailAfterCommit": {
+            "choices": [{"mode": "off"}, {"mode": "alwaysOn"}],
+            "fuzz_at": ["startup"],
+        },
+        "failpoint.commitChunksMergeFailAfterCommit": {
+            "choices": [{"mode": "off"}, {"mode": "alwaysOn"}],
+            "fuzz_at": ["startup"],
+        },
+        "failpoint.commitChunkMigrationFailAfterCommit": {
+            "choices": [{"mode": "off"}, {"mode": "alwaysOn"}],
+            "fuzz_at": ["startup"],
+        },
         # TODO(SERVER-98867): re-enable config fuzzer signal testing.
         "failpoint.enableSignalTesting": {
             "choices": [{"mode": "off"}],
