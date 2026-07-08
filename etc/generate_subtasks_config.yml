@@ -9,7 +9,6 @@ build_variant_large_distro_exceptions:
   - atlas-amazon2023
   # TODO(SERVER-85904) - enterprise-amazon2023-lto
   - enterprise-amazon2023-arm64
-  - atlas-amazon2023-arm64
   - enterprise-amazon2023-arm64-fuzzers
   - enterprise-amazon2023-arm64-fuzzers-roll-back-incremental-feature-flags
   - enterprise-amazon2023-arm64-grav4
