@@ -38,6 +38,16 @@ feature_flags:
         version: 9.0
         fcv_gated: true
 
+    featureFlagChangeStreamReaderV2:
+        description:
+            "IFR kill switch gating the change stream v2 (precise shard targeting) reader. Disabling
+            at runtime retires open v2 cursors with a resumable RetryChangeStream error so they
+            resume on the v1 path."
+        cpp_varname: gFeatureFlagChangeStreamReaderV2
+        default: true
+        fcv_gated: false
+        incremental_rollout_phase: release
+
     featureFlagSbeAccumulators:
         description: "Feature flag to enable single-purpose SBE $group accumulators."
         cpp_varname: gFeatureFlagSbeAccumulators

@@ -19,6 +19,7 @@ selector:
     - jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_collection.js
     - jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_cluster.js
     - jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_database.js
+    - jstests/sharding/query/change_streams/change_stream_resumes_on_v2_disable.js
   exclude_with_any_tags:
     # This suite runs change streams as v2; v1-pinned tests use scaffolding (e.g.
     # 'shardedAggregateHangBeforeEstablishingShardCursors') that v2 doesn't trigger.

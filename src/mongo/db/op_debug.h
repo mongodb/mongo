@@ -517,6 +517,11 @@ public:
 
     bool isChangeStreamQuery{false};
 
+    // True iff this change-stream cursor was opened on the v2 precise shard-targeting path (router
+    // only). Recorded on the ClusterClientCursor (mirroring isChangeStreamQuery) so the getMore
+    // precondition can kill-and-resume the cursor if the IFR flag is turned off.
+    bool usesChangeStreamV2ShardTargeting{false};
+
     // True iff this change stream cursor's updateLookup stage was wired on the optimized
     // (Express/SBE) path. Recorded on the ClientCursor so the getMore precondition can
     // kill-and-resume the cursor if the optimization flag is turned off.

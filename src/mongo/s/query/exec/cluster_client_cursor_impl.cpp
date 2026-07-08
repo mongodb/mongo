@@ -113,7 +113,9 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
       _queryStatsKeyHash(CurOp::get(opCtx)->debug().getQueryStatsInfo().keyHash),
       _queryStatsKey(std::move(CurOp::get(opCtx)->debug().getQueryStatsInfo().key)),
-      _isChangeStreamQuery(CurOp::get(opCtx)->debug().isChangeStreamQuery) {
+      _isChangeStreamQuery(CurOp::get(opCtx)->debug().isChangeStreamQuery),
+      _usesChangeStreamV2ShardTargeting(
+          CurOp::get(opCtx)->debug().usesChangeStreamV2ShardTargeting) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));
@@ -141,7 +143,9 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
       _queryStatsKeyHash(CurOp::get(opCtx)->debug().getQueryStatsInfo().keyHash),
       _queryStatsKey(std::move(CurOp::get(opCtx)->debug().getQueryStatsInfo().key)),
-      _isChangeStreamQuery(CurOp::get(opCtx)->debug().isChangeStreamQuery) {
+      _isChangeStreamQuery(CurOp::get(opCtx)->debug().isChangeStreamQuery),
+      _usesChangeStreamV2ShardTargeting(
+          CurOp::get(opCtx)->debug().usesChangeStreamV2ShardTargeting) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));
@@ -328,6 +332,10 @@ Date_t ClusterClientCursorImpl::getLastUseDate() const {
 
 bool ClusterClientCursorImpl::isChangeStreamCursor() const {
     return _isChangeStreamQuery;
+}
+
+bool ClusterClientCursorImpl::usesChangeStreamV2ShardTargeting() const {
+    return _usesChangeStreamV2ShardTargeting;
 }
 
 void ClusterClientCursorImpl::setLastUseDate(Date_t now) {

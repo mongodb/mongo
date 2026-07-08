@@ -133,6 +133,8 @@ public:
 
     bool isChangeStreamCursor() const final;
 
+    bool usesChangeStreamV2ShardTargeting() const final;
+
     void setLastUseDate(Date_t now) final;
 
     boost::optional<uint32_t> getPlanCacheShapeHash() const final;

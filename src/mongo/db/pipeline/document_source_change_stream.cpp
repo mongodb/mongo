@@ -30,6 +30,7 @@
 #include "mongo/db/pipeline/document_source_change_stream.h"
 
 #include "mongo/db/commands/server_status/server_status_metric.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/pipeline/change_stream.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
@@ -431,6 +432,12 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromB
 
     if (changeStreamVersion == ChangeStreamReaderVersionEnum::kV2) {
         OperationContext* opCtx = expCtx->getOperationContext();
+
+        // Record on CurOp so it rides onto the ClusterClientCursor at registration (mirroring
+        // isChangeStreamQuery). The router getMore precondition uses this to kill-and-resume the
+        // cursor on the v1 path if the IFR flag is later turned off.
+        CurOp::get(opCtx)->debug().usesChangeStreamV2ShardTargeting = true;
+
         ChangeStreamReaderBuilder* readerBuilder =
             ChangeStreamReaderBuilder::get(opCtx->getServiceContext());
         tassert(10743908, "expecting ChangeStreamReaderBuilder to be available", readerBuilder);
@@ -498,6 +505,15 @@ ChangeStreamReaderVersionEnum DocumentSourceChangeStream::_determineChangeStream
     }
 
     OperationContext* opCtx = expCtx->getOperationContext();
+
+    // Check the IFR kill switch for v2 shard targeting. This is a runtime-toggleable flag that
+    // allows emergency rollback of v2.
+    const auto& ifrContext = expCtx->getIfrContext();
+    const bool v2Enabled = ifrContext &&
+        ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagChangeStreamReaderV2);
+    if (!v2Enabled) {
+        return ChangeStreamReaderVersionEnum::kV1;
+    }
 
     // Check feature flag 'featureFlagChangeStreamPreciseShardTargeting' that is required to enable
     // v2 change stream readers.

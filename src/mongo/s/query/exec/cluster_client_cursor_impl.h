@@ -146,6 +146,8 @@ public:
 
     bool isChangeStreamCursor() const final;
 
+    bool usesChangeStreamV2ShardTargeting() const final;
+
     void setLastUseDate(Date_t now) final;
 
     boost::optional<uint32_t> getPlanCacheShapeHash() const final;
@@ -238,6 +240,10 @@ private:
     std::unique_ptr<query_stats::Key> _queryStatsKey;
 
     bool _isChangeStreamQuery = false;
+
+    // True iff this change stream cursor was opened on the v2 precise shard-targeting path. Used by
+    // the router getMore precondition to kill-and-resume the cursor if the IFR flag is turned off.
+    bool _usesChangeStreamV2ShardTargeting = false;
 
     // Tracks if kill() has been called on the cursor. Multiple calls to kill() is an error.
     bool _hasBeenKilled = false;

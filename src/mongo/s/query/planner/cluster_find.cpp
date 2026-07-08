@@ -676,6 +676,25 @@ StatusWith<ClusterCursorManager::PinnedCursor> checkOutCursorWithRetries(
     MONGO_UNREACHABLE_TASSERT(10546600);
 }
 
+/**
+ * IFR kill switch for change stream v2 precise shard targeting. If this cursor was opened on the v2
+ * path but an operator has since disabled the IFR flag, retire it with a resumable error so the
+ * stream reopens on the v1 path. This is a no-op for v1 and non-change-stream cursors.
+ */
+void ensureChangeStreamShardTargetingStillEnabled(
+    ClusterCursorManager::PinnedCursor& pinnedCursor) {
+    // NOTE: we deliberately read the live flag value via checkEnabled() here, NOT the saved value
+    // from the operation's IFR context. The IFR context records the value seen when the cursor was
+    // opened, which for a v2 cursor is always 'true', reading it would defeat the kill switch.
+    if (pinnedCursor->usesChangeStreamV2ShardTargeting() &&
+        !feature_flags::gFeatureFlagChangeStreamReaderV2.checkEnabled()) {
+        // Throw a resumable error and leave 'pinnedCursor' unreturned, so its destructor kills the
+        // cursor instead of returning it to the manager as still-open.
+        uasserted(ErrorCodes::RetryChangeStream,
+                  "Change stream v2 shard targeting was disabled; resuming on the v1 path");
+    }
+}
+
 }  // namespace
 
 
@@ -1087,6 +1106,8 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
                                                  pinnedCursor.getValue()->getOriginatingCommand());
         CurOp::get(opCtx)->setGenericCursor(lk, pinnedCursor.getValue().toGenericCursor());
     }
+
+    ensureChangeStreamShardTargetingStillEnabled(pinnedCursor.getValue());
 
     // If the 'failGetMoreAfterCursorCheckout' failpoint is enabled, throw an exception with the
     // specified 'errorCode' value, or ErrorCodes::InternalError if 'errorCode' is omitted.
