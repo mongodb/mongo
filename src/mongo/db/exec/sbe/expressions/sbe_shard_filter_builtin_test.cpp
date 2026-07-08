@@ -113,9 +113,8 @@ TEST_F(SbeShardFilterBuiltinTest, ShardKeyAsObjectNotBsonObjIsRejected) {
     value::ViewOfValueAccessor inputSlotAccessor;
     auto inputSlot = bindAccessor(&inputSlotAccessor);
 
-    auto [tagEmptyObj, valEmptyObj] = value::makeNewObject();
-    value::ValueGuard objGuard{tagEmptyObj, valEmptyObj};
-    inputSlotAccessor.reset(tagEmptyObj, valEmptyObj);
+    value::TagValueOwned emptyObj = value::TagValueOwned::fromRaw(value::makeNewObject());
+    inputSlotAccessor.reset(emptyObj.tag(), emptyObj.value());
 
     runAndAssertExpression(makeAlwaysPassShardFilter(), inputSlot, false);
     runAndAssertExpression(makeAlwaysFailShardFilter(), inputSlot, false);

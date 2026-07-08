@@ -49,16 +49,16 @@ class SBEReplaceOneExprTest : public EExpressionTestFixture {
 protected:
     void runAndAssertExpression(const vm::CodeFragment* compiledExpr,
                                 const std::string& expectedVal) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
-        ASSERT_TRUE(sbe::value::isString(tag));
-        ASSERT_EQUALS(sbe::value::getStringView(tag, val), expectedVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
+        ASSERT_TRUE(sbe::value::isString(result.tag()));
+        ASSERT_EQUALS(sbe::value::getStringView(result.tag(), result.value()), expectedVal);
     }
 
     void runAndAssertNothing(const vm::CodeFragment* compiledExpr) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
-        ASSERT_EQUALS(value::TypeTags::Nothing, tag);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
+        ASSERT_EQUALS(value::TypeTags::Nothing, result.tag());
     }
 
     void bindStringToSlot(value::OwnedValueAccessor& slot, const std::string& str) {

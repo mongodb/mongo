@@ -63,10 +63,10 @@ protected:
         auto compiledExpr = compileExpression(*reverseArrayExpr);
 
         auto actual = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard actualGuard{actual};
+        value::TagValueOwned actualOwned = value::TagValueOwned::fromRaw(actual);
 
-        auto [compareTag, compareValue] =
-            value::compareValue(actual.first, actual.second, expected.first, expected.second);
+        auto [compareTag, compareValue] = value::compareValue(
+            actualOwned.tag(), actualOwned.value(), expected.first, expected.second);
         ASSERT_EQ(compareTag, value::TypeTags::NumberInt32);
         ASSERT_EQ(compareValue, 0);
     }
@@ -75,10 +75,10 @@ protected:
 TEST_F(SBEBuiltinReverseArrayTest, Array) {
     for (auto makeArrayFn : {makeBsonArray, makeArray}) {
         auto testArray = makeArrayFn(BSON_ARRAY(1 << 2 << 3));
-        value::ValueGuard testArrayGuard{testArray};
+        value::TagValueOwned testArrayOwned = value::TagValueOwned::fromRaw(testArray);
 
         auto expectedResult = makeArray(BSON_ARRAY(3 << 2 << 1));
-        value::ValueGuard expectedResultGuard{expectedResult};
+        value::TagValueOwned expectedResultOwned = value::TagValueOwned::fromRaw(expectedResult);
 
         runAndAssertExpression(testArray, expectedResult);
     }
@@ -89,13 +89,13 @@ TEST_F(SBEBuiltinReverseArrayTest, ArraySet) {
     // internal order is determined by it's hash function and not the order that elements are added
     // to it.
     auto testArray = makeArraySet(BSON_ARRAY(1 << 2 << 3));
-    value::ValueGuard testArrayGuard{testArray};
-    value::ArrayEnumerator testEnumerator{testArray.first, testArray.second};
+    value::TagValueOwned testArrayOwned = value::TagValueOwned::fromRaw(testArray);
+    value::ArrayEnumerator testEnumerator{testArrayOwned.tag(), testArrayOwned.value()};
 
     std::vector<value::TagValueView> testArrayContents;
     auto expectedResult = value::makeNewArray();
-    value::ValueGuard expectedResultGuard{expectedResult};
-    auto expectedResultView = value::getArrayView(expectedResult.second);
+    value::TagValueOwned expectedResultOwned = value::TagValueOwned::fromRaw(expectedResult);
+    auto expectedResultView = value::getArrayView(expectedResultOwned.value());
 
     while (!testEnumerator.atEnd()) {
         testArrayContents.push_back(testEnumerator.getViewOfValue());

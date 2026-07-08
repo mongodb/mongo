@@ -47,30 +47,30 @@ class SBEBuiltinSetOpTest : public EExpressionTestFixture {
 protected:
     void runAndAssertExpression(const vm::CodeFragment* compiledExpr,
                                 std::pair<value::TypeTags, value::Value> expectedArray) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
 
-        ASSERT(isArray(tag));
-        auto [cmpTag, cmpVal] =
-            value::compareValue(tag, val, expectedArray.first, expectedArray.second);
+        ASSERT(isArray(result.tag()));
+        auto [cmpTag, cmpVal] = value::compareValue(
+            result.tag(), result.value(), expectedArray.first, expectedArray.second);
         ASSERT_EQUALS(cmpTag, sbe::value::TypeTags::NumberInt32);
         ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), 0);
     }
 
     void runAndAssertNothing(const vm::CodeFragment* compiledExpr) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
 
-        ASSERT_EQUALS(tag, sbe::value::TypeTags::Nothing);
-        ASSERT_EQUALS(val, 0);
+        ASSERT_EQUALS(result.tag(), sbe::value::TypeTags::Nothing);
+        ASSERT_EQUALS(result.value(), 0);
     }
 
     void runAndAssertBoolean(const vm::CodeFragment* compiledExpr, bool expected) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
 
-        ASSERT(tag == value::TypeTags::Boolean);
-        ASSERT_EQUALS(value::bitcastTo<bool>(val), expected);
+        ASSERT(result.tag() == value::TypeTags::Boolean);
+        ASSERT_EQUALS(value::bitcastTo<bool>(result.value()), expected);
     }
 };
 
@@ -86,17 +86,17 @@ TEST_F(SBEBuiltinSetOpTest, ComputesSetUnion) {
     slotAccessor1.reset(arrTag1, arrVal1);
     auto [arrTag2, arrVal2] = makeArray(BSON_ARRAY(2 << 5 << 3));
     slotAccessor2.reset(arrTag2, arrVal2);
-    auto [resArrTag, resArrVal] = makeArraySet(BSON_ARRAY(1 << 2 << 3 << 5));
-    value::ValueGuard resGuard(resArrTag, resArrVal);
-    runAndAssertExpression(compiledExpr.get(), {resArrTag, resArrVal});
+    value::TagValueOwned unionResult =
+        value::TagValueOwned::fromRaw(makeArraySet(BSON_ARRAY(1 << 2 << 3 << 5)));
+    runAndAssertExpression(compiledExpr.get(), {unionResult.tag(), unionResult.value()});
 
     std::tie(arrTag1, arrVal1) = makeArray(BSON_ARRAY(1 << 2 << 3));
     slotAccessor1.reset(arrTag1, arrVal1);
     std::tie(arrTag2, arrVal2) = value::makeNewArray();
     slotAccessor2.reset(arrTag2, arrVal2);
-    auto [resArrTag1, resArrVal1] = makeArraySet(BSON_ARRAY(1 << 2 << 3));
-    value::ValueGuard resGuard1(resArrTag1, resArrVal1);
-    runAndAssertExpression(compiledExpr.get(), {resArrTag1, resArrVal1});
+    value::TagValueOwned unionResult1 =
+        value::TagValueOwned::fromRaw(makeArraySet(BSON_ARRAY(1 << 2 << 3)));
+    runAndAssertExpression(compiledExpr.get(), {unionResult1.tag(), unionResult1.value()});
 }
 
 TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetUnion) {
@@ -153,17 +153,19 @@ TEST_F(SBEBuiltinSetOpTest, ComputesSetIntersection) {
     slotAccessor1.reset(arrTag1, arrVal1);
     auto [arrTag2, arrVal2] = makeArray(BSON_ARRAY(2 << 5 << 3));
     slotAccessor2.reset(arrTag2, arrVal2);
-    auto [resArrTag, resArrVal] = makeArraySet(BSON_ARRAY(2 << 3));
-    value::ValueGuard resGuard(resArrTag, resArrVal);
-    runAndAssertExpression(compiledExpr.get(), {resArrTag, resArrVal});
+    value::TagValueOwned intersectionResult =
+        value::TagValueOwned::fromRaw(makeArraySet(BSON_ARRAY(2 << 3)));
+    runAndAssertExpression(compiledExpr.get(),
+                           {intersectionResult.tag(), intersectionResult.value()});
 
     std::tie(arrTag1, arrVal1) = makeArray(BSON_ARRAY(1 << 2 << 3));
     slotAccessor1.reset(arrTag1, arrVal1);
     std::tie(arrTag2, arrVal2) = value::makeNewArray();
     slotAccessor2.reset(arrTag2, arrVal2);
-    auto [resArrTag1, resArrVal1] = value::makeNewArraySet();
-    value::ValueGuard resGuard1(resArrTag1, resArrVal1);
-    runAndAssertExpression(compiledExpr.get(), {resArrTag1, resArrVal1});
+    value::TagValueOwned intersectionResult1 =
+        value::TagValueOwned::fromRaw(value::makeNewArraySet());
+    runAndAssertExpression(compiledExpr.get(),
+                           {intersectionResult1.tag(), intersectionResult1.value()});
 }
 
 TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetIntersection) {
@@ -194,23 +196,23 @@ TEST_F(SBEBuiltinSetOpTest, ComputesSetDifference) {
     slotAccessor1.reset(arrTag1, arrVal1);
     auto [arrTag2, arrVal2] = makeArray(BSON_ARRAY(2 << 5 << 7));
     slotAccessor2.reset(arrTag2, arrVal2);
-    auto [resArrTag, resArrVal] = makeArraySet(BSON_ARRAY(1 << 3));
-    value::ValueGuard resGuard(resArrTag, resArrVal);
-    runAndAssertExpression(compiledExpr.get(), {resArrTag, resArrVal});
+    value::TagValueOwned diffResult =
+        value::TagValueOwned::fromRaw(makeArraySet(BSON_ARRAY(1 << 3)));
+    runAndAssertExpression(compiledExpr.get(), {diffResult.tag(), diffResult.value()});
 
     std::tie(arrTag1, arrVal1) = makeArray(BSON_ARRAY(1 << 2 << 3 << 1 << 2 << 3));
     slotAccessor1.reset(arrTag1, arrVal1);
     std::tie(arrTag2, arrVal2) = makeArray(BSON_ARRAY(2 << 5 << 7));
     slotAccessor2.reset(arrTag2, arrVal2);
-    runAndAssertExpression(compiledExpr.get(), {resArrTag, resArrVal});
+    runAndAssertExpression(compiledExpr.get(), {diffResult.tag(), diffResult.value()});
 
     std::tie(arrTag1, arrVal1) = makeArray(BSON_ARRAY(1 << 2 << 3));
     slotAccessor1.reset(arrTag1, arrVal1);
     std::tie(arrTag2, arrVal2) = value::makeNewArray();
     slotAccessor2.reset(arrTag2, arrVal2);
-    auto [resArrTag1, resArrVal1] = makeArraySet(BSON_ARRAY(1 << 2 << 3));
-    value::ValueGuard resGuard1(resArrTag1, resArrVal1);
-    runAndAssertExpression(compiledExpr.get(), {resArrTag1, resArrVal1});
+    value::TagValueOwned diffResult1 =
+        value::TagValueOwned::fromRaw(makeArraySet(BSON_ARRAY(1 << 2 << 3)));
+    runAndAssertExpression(compiledExpr.get(), {diffResult1.tag(), diffResult1.value()});
 }
 
 TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetDifference) {

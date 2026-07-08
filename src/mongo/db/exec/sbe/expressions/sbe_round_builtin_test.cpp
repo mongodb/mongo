@@ -100,14 +100,16 @@ TEST_F(EExpressionTestFixture, RoundOneArg) {
     int testNum = 0;
     for (auto&& testCase : testCases) {
         numAccessor.reset(testCase.num.first, testCase.num.second);
-        ValueGuard expectedResultGuard(testCase.result.first, testCase.result.second);
+        TagValueOwned expectedResultOwned = TagValueOwned::fromRaw(testCase.result);
 
         // Execute the round function.
-        auto [resultTag, resultValue] = runCompiledExpression(compiledRound.get());
-        ValueGuard actualResultGuard(resultTag, resultValue);
+        TagValueOwned actualResultOwned =
+            TagValueOwned::fromRaw(runCompiledExpression(compiledRound.get()));
 
-        auto [compTag, compVal] =
-            compareValue(resultTag, resultValue, testCase.result.first, testCase.result.second);
+        auto [compTag, compVal] = compareValue(actualResultOwned.tag(),
+                                               actualResultOwned.value(),
+                                               testCase.result.first,
+                                               testCase.result.second);
         ASSERT_EQUALS(compTag, TypeTags::NumberInt32) << "unexpected tag for test " << testNum;
         ASSERT_EQUALS(compVal, bitcastFrom<int32_t>(0)) << "unexpected value for test " << testNum;
 
@@ -191,14 +193,16 @@ TEST_F(EExpressionTestFixture, RoundTwoArgs) {
     for (auto&& testCase : testCases) {
         numAccessor.reset(testCase.num.first, testCase.num.second);
         placeAccessor.reset(testCase.place.first, testCase.place.second);
-        ValueGuard expectedResultGuard(testCase.result.first, testCase.result.second);
+        TagValueOwned expectedResultOwned = TagValueOwned::fromRaw(testCase.result);
 
         // Execute the round function.
-        auto [resultTag, resultValue] = runCompiledExpression(compiledRound.get());
-        ValueGuard actualResultGuard(resultTag, resultValue);
+        TagValueOwned actualResultOwned =
+            TagValueOwned::fromRaw(runCompiledExpression(compiledRound.get()));
 
-        auto [compTag, compVal] =
-            compareValue(resultTag, resultValue, testCase.result.first, testCase.result.second);
+        auto [compTag, compVal] = compareValue(actualResultOwned.tag(),
+                                               actualResultOwned.value(),
+                                               testCase.result.first,
+                                               testCase.result.second);
         ASSERT_EQUALS(compTag, TypeTags::NumberInt32) << "unexpected tag for test " << testNum;
         ASSERT_EQUALS(compVal, bitcastFrom<int32_t>(0)) << "unexpected value for test " << testNum;
 

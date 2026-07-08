@@ -66,9 +66,9 @@ TEST(SBERuntimeEnvironmentTest, CanDeepCopy) {
     auto env = std::make_unique<RuntimeEnvironment>();
 
     value::SlotIdGenerator _slotIdGenerator;
-    auto [tag, val] = value::makeNewString("Test string element");
-    value::ValueGuard guard(tag, val);
-    auto slotID = env->registerSlot(tag, val, false, &_slotIdGenerator);
+    value::TagValueOwned str1Owned =
+        value::TagValueOwned::fromRaw(value::makeNewString("Test string element"));
+    auto slotID = env->registerSlot(str1Owned.tag(), str1Owned.value(), false, &_slotIdGenerator);
 
     // Make a "deep" copy. "State" in the RuntimeEnvironment is unique and owned.
     auto envCopy = env->makeDeepCopy();
@@ -76,20 +76,21 @@ TEST(SBERuntimeEnvironmentTest, CanDeepCopy) {
     auto [tagCopy, valCopy] = envCopy->getAccessor(slotID)->getViewOfValue();
 
     ASSERT_EQUALS(value::getStringView(tagEnv, valEnv), value::getStringView(tagCopy, valCopy));
-    ASSERT_EQUALS(value::getStringView(tag, val), value::getStringView(tagCopy, valCopy));
+    ASSERT_EQUALS(value::getStringView(str1Owned.tag(), str1Owned.value()),
+                  value::getStringView(tagCopy, valCopy));
 
-    auto [tag2, val2] = value::makeNewString("Modified");
-    value::ValueGuard guard2(tag2, val2);
+    value::TagValueOwned str2Owned =
+        value::TagValueOwned::fromRaw(value::makeNewString("Modified"));
     // Modify the slot value in 'env'.
-    env->resetSlot(slotID, tag2, val2, false);
+    env->resetSlot(slotID, str2Owned.tag(), str2Owned.value(), false);
 
     // The slot value of 'envCopy' should not be modified since 'envCopy' is a deep copy.
     auto [tagEnvModified, valEnvModified] = env->getAccessor(slotID)->getViewOfValue();
     auto [tagCopyNotModified, valCopyNotModified] = envCopy->getAccessor(slotID)->getViewOfValue();
     ASSERT_EQUALS(value::getStringView(tagEnvModified, valEnvModified),
-                  value::getStringView(tag2, val2));
+                  value::getStringView(str2Owned.tag(), str2Owned.value()));
     ASSERT_EQUALS(value::getStringView(tagCopyNotModified, valCopyNotModified),
-                  value::getStringView(tag, val));
+                  value::getStringView(str1Owned.tag(), str1Owned.value()));
 }
 
 }  // namespace mongo::sbe
