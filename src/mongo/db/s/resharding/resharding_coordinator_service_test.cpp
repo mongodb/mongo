@@ -530,14 +530,27 @@ public:
         if (coordinatorDoc.getState() < CoordinatorStateEnum::kBlockingWrites) {
             return;
         }
-        for (auto& donorShardEntry : coordinatorDoc.getDonorShards()) {
-            if (coordinatorDoc.getCommonReshardingMetadata().getPerformVerification()) {
-                ASSERT_EQUALS(donorShardEntry.getDocumentsFinal(),
-                              *donorShardEntry.getDocumentsToCopy() +
-                                  getDocumentsDeltaForDonor(donorShardEntry.getId()));
-            } else {
+        if (!coordinatorDoc.getCommonReshardingMetadata().getPerformVerification()) {
+            for (const auto& donorShardEntry : coordinatorDoc.getDonorShards()) {
                 ASSERT_FALSE(donorShardEntry.getDocumentsFinal().has_value());
             }
+            return;
+        }
+        // documentsFinal is persisted by the delta collector in a separate write within the
+        // kBlockingWrites phase, after the state transition write itself, so re-read until it
+        // lands.
+        auto doc = coordinatorDoc;
+        const auto deadline = Date_t::now() + Minutes{1};
+        while (!doc.getDonorShards().front().getDocumentsFinal()) {
+            ASSERT_LT(Date_t::now(), deadline)
+                << "timed out waiting for donor documentsFinal to be persisted";
+            sleepmillis(50);
+            doc = getCoordinatorDoc(operationContext());
+        }
+        for (const auto& donorShardEntry : doc.getDonorShards()) {
+            ASSERT_EQUALS(donorShardEntry.getDocumentsFinal(),
+                          *donorShardEntry.getDocumentsToCopy() +
+                              getDocumentsDeltaForDonor(donorShardEntry.getId()));
         }
     }
 
