@@ -72,7 +72,10 @@ const secondary = rst.add({
     rsConfig: {priority: 0, votes: 0},
     setParameter: {
         numInitialSyncAttempts: 1,
-        // Manually configure this parameter to 3600 since it is set to 0 in JS test infrastructure.
+        // The default threshold is 0, so the skip would only fire while the sync source's stable
+        // recovery timestamp is still at the initiating-set entry. This test writes data first (so
+        // the stable timestamp has advanced), then verifies the skip resets beginApplyingTimestamp;
+        // set a large threshold to force the skip to fire regardless.
         initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs: 3600,
     },
 });

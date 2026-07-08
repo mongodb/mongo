@@ -785,14 +785,17 @@ server_parameters:
         description: >-
             If the earliest oplog entry on the sync source is the "initiating set" entry and the
             sync source's lastStableRecoveryTimestamp is within this many seconds of that entry,
-            initial sync skips waiting for the stable recovery timestamp to advance. This covers the
-            case where the replica set was just created and the sync source has not yet had time to
-            advance its stable recovery timestamp far from the initiating set timestamp. Default is
-            1 hour. No effect if 'initialSyncWaitForSyncSourceLastStableRecoveryTs' is set to false.
+            initial sync skips waiting for the stable recovery timestamp to advance and resets
+            beginApplyingTimestamp back to the initiating set entry. The default is 0, which requires
+            an exact match: the skip fires only when the stable recovery timestamp is still at the
+            initiating-set entry, the all-at-once replSetInitiate case where the primary cannot
+            self-commit and it stays pinned there for all of initial sync. Retained (settable at
+            runtime) as an escape hatch to widen the window. No effect if
+            'initialSyncWaitForSyncSourceLastStableRecoveryTs' is set to false.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs
-        default: 3600
+        default: 0
         validator:
             gte: 0
         redact: false

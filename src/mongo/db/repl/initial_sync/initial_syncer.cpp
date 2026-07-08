@@ -1312,9 +1312,17 @@ void InitialSyncer::_initiatingSetStableTimestampCallback(
     const int64_t diff = static_cast<int64_t>(lastStableRecoveryTs.getSecs()) -
         static_cast<int64_t>(earliestTs.getSecs());
 
+    // 'thresholdSecs' defaults to 0. With the default the skip only fires when the stable recovery
+    // timestamp is *exactly* at the initiating-set entry (full Timestamp compare, not the
+    // seconds-granular 'diff') — the all-at-once replSetInitiate case, where the primary cannot
+    // self-commit and the stable timestamp stays pinned there for the whole initial sync. A
+    // widened threshold (> 0) falls back to the seconds window, since the threshold is in seconds.
     const int64_t thresholdSecs =
         initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs.load();
-    if (isInitiatingSet && diff <= thresholdSecs) {
+    const bool withinInitiatingSetThreshold = thresholdSecs == 0
+        ? lastStableRecoveryTs == earliestTs
+        : (diff >= 0 && diff <= thresholdSecs);
+    if (isInitiatingSet && withinInitiatingSetThreshold) {
         LOGV2(11318412,
               "Skipping wait for sync source stable recovery timestamp: sync source was recently "
               "initiated and its stable recovery timestamp is within threshold of the initiating "

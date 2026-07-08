@@ -5500,9 +5500,12 @@ TEST_F(InitialSyncerTest, InitialSyncerDoesNotSkipWaitWhenNotInitiatingSet) {
 TEST_F(InitialSyncerTest, InitialSyncerDoesNotSkipWaitWhenInitiatingSetOutsideThreshold) {
     initialSyncWaitForSyncSourceLastStableRecoveryTs.store(true);
     // Lower the threshold so we can test with easily-constructed timestamps.
+    const auto originalThreshold =
+        initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs.load();
     initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs.store(10);
-    const ScopeGuard resetThreshold([] {
-        initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs.store(3600);
+    const ScopeGuard resetThreshold([originalThreshold] {
+        initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs.store(
+            originalThreshold);
     });
 
     // Use t=5 for beginApplyingTimestamp so it is distinguishable from the initiating-set entry
@@ -5523,6 +5526,44 @@ TEST_F(InitialSyncerTest, InitialSyncerDoesNotSkipWaitWhenInitiatingSetOutsideTh
 
         // _checkIfInitiatingSet did not take the skip path because lastStableRecoveryTimestamp
         // (t=101) is outside the threshold (10 s) of the initiating-set entry (t=1).
+        // beginApplyingTimestamp must remain at its original value (t=5), not be reset to t=1.
+        auto progress = initialSyncer->getInitialSyncProgress();
+        ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(5, 1)) << progress;
+
+        ASSERT_OK(initialSyncer->shutdown());
+        net->runReadyNetworkOperations();
+    }
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+}
+
+TEST_F(
+    InitialSyncerTest,
+    InitialSyncerDoesNotSkipWaitWhenInitiatingSetSameSecondButLaterIncrementWithDefaultThreshold) {
+    initialSyncWaitForSyncSourceLastStableRecoveryTs.store(true);
+    // Leave the threshold at its default (0). With the default the skip must require an exact
+    // Timestamp match with the initiating-set entry, not merely the same second.
+    ASSERT_EQUALS(
+        0, initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs.load());
+
+    // Use t=5 for beginApplyingTimestamp so it is distinguishable from the initiating-set entry
+    // timestamp (t=1). This lets us verify the timestamp was NOT overridden to t=1.
+    runWaitStableTsPreamble(5);
+    auto initialSyncer = &getInitialSyncer();
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        // Earliest oplog entry is the initiating-set noop at ts(1,1).
+        processSuccessfulEarliestOplogEntryFetcherResponse({makeInitiatingSetOplogEntryObj(1)});
+
+        // lastStableRecoveryTimestamp is in the same second (1) but a later increment (5), so it
+        // has advanced past the initiating-set entry. The seconds-granular diff is 0, but the full
+        // Timestamp comparison is not equal, so with the default threshold the skip must NOT fire.
+        auto replSetGetStatusRequest = net->scheduleSuccessfulResponse(
+            BSON("ok" << 1 << "lastStableRecoveryTimestamp" << Timestamp(1, 5)));
+        assertRemoteCommandNameEquals("replSetGetStatus", replSetGetStatusRequest);
+        net->runReadyNetworkOperations();
+
         // beginApplyingTimestamp must remain at its original value (t=5), not be reset to t=1.
         auto progress = initialSyncer->getInitialSyncProgress();
         ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(5, 1)) << progress;
