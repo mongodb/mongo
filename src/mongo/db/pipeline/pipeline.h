@@ -244,7 +244,7 @@ public:
      * Checks whether the pipeline can run on the specified collection using catalog data. It is the
      * caller's responsibility to ensure the catalog data is accurate.
      *
-     * TODO SERVER-117803 Delete these functions once they're fully replaced by their LPP
+     * TODO SERVER-121094 Delete these functions once they're fully replaced by their LPP
      * counterparts.
      */
     void validateWithCollectionMetadata(const CollectionOrViewAcquisition& collOrView) const;

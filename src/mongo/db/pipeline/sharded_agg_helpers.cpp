@@ -1657,7 +1657,7 @@ BSONObj finalizePipelineAndTargetShardsForExplain(
             if (hybridSearchFlagEnabled) {
                 liteParsedPipeline.validateWithCollectionMetadata(cri);
             } else {
-                // TODO SERVER-117803 Delete this duplicated check.
+                // TODO SERVER-121094 Delete this duplicated check.
                 pipelineToTarget->validateWithCollectionMetadata(cri);
             }
 
@@ -1989,7 +1989,7 @@ std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
             if (hybridSearchFlagEnabled) {
                 liteParsedPipeline.validateWithCollectionMetadata(cri);
             } else {
-                // TODO SERVER-117803 Delete this duplicated check.
+                // TODO SERVER-121094 Delete this duplicated check.
                 pipelineToTarget->validateWithCollectionMetadata(cri);
             }
 

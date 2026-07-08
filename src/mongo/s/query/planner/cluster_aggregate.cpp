@@ -608,7 +608,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
         pipeline = Pipeline::parseFromLiteParsed(clonedLPP, expCtx);
     }
 
-    // TODO SERVER-117803 Delete this duplicated check.
+    // TODO SERVER-121094 Delete this duplicated check.
     if (cri && cri->hasRoutingTable()) {
         pipeline->validateWithCollectionMetadata(cri.get());
     }

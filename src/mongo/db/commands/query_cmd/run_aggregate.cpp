@@ -1193,7 +1193,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     expCtx->stopExpressionCounters();
 
     // Validate the entire pipeline with the view definition.
-    // TODO SERVER-117803 Delete this duplicated check.
+    // TODO SERVER-121094 Delete this duplicated check.
     if (aggCatalogState.lockAcquired()) {
         pipeline->validateWithCollectionMetadata(aggCatalogState.getMainCollectionOrView());
     }

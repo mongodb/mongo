@@ -80,7 +80,7 @@ assert.commandWorked(bulk.execute());
     searchPipelines.forEach((pipeline) => {
         assert.commandFailedWithCode(
             tsColl.runCommand("aggregate", {pipeline: pipeline, cursor: {}}),
-            // TODO SERVER-117803 Delete code 10557302 once we only validate in LPP.
+            // TODO SERVER-121094 Delete code 10557302 once we only validate in LPP.
             [10557302, 12093200, 10623000],
             `Expected failure for pipeline: ${tojson(pipeline)}`,
         );
@@ -107,7 +107,7 @@ assert.commandWorked(bulk.execute());
             ],
             cursor: {},
         }),
-        // TODO SERVER-117803 Delete code 10557302 once we only validate in LPP.
+        // TODO SERVER-121094 Delete code 10557302 once we only validate in LPP.
         [10557302, 12093200, 10623000],
         "Expected failure for $_internalDocumentResultsAndMetadata wrapping $search on timeseries",
     );
@@ -118,7 +118,7 @@ assert.commandWorked(bulk.execute());
     searchPipelines.forEach((pipeline) => {
         assert.commandFailedWithCode(
             db[viewName].runCommand("aggregate", {pipeline: pipeline, cursor: {}}),
-            // TODO SERVER-117803 Delete code 10557302 once we only validate in LPP.
+            // TODO SERVER-121094 Delete code 10557302 once we only validate in LPP.
             [10557302, 12093200, 10623000, 40602],
             `Expected failure for pipeline: ${tojson(pipeline)}`,
         );
@@ -134,7 +134,7 @@ assert.commandWorked(bulk.execute());
     );
     assert.commandFailedWithCode(
         db[searchView].runCommand("aggregate", {pipeline: [{$match: {}}], cursor: {}}),
-        // TODO SERVER-117803 Delete code 10557302 once we only validate in LPP.
+        // TODO SERVER-121094 Delete code 10557302 once we only validate in LPP.
         [10557302, 12093200, 10623000, 40602],
         `Expected failure for pipeline: ${tojson([{$match: {}}])}`,
     );
@@ -170,7 +170,7 @@ assert.commandWorked(bulk.execute());
     subPipelines.forEach((pipeline) => {
         assert.commandFailedWithCode(
             nonTSColl.runCommand("aggregate", {pipeline: pipeline, cursor: {}}),
-            // TODO SERVER-117803 Delete code 10557302 once we only validate in LPP.
+            // TODO SERVER-121094 Delete code 10557302 once we only validate in LPP.
             [10557302, 12093200, 10623000, 40602],
             `Expected failure for pipeline: ${tojson(pipeline)}`,
         );
