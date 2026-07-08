@@ -29,6 +29,8 @@
 
 
 #include <absl/container/node_hash_set.h>
+#include <algorithm>
+#include <array>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
@@ -238,6 +240,46 @@ void TLConnection::cancelTimeout() {
     _timer->cancelTimeout();
 }
 
+Status filterInternalAuthSaslMechs(const BSONObj& helloReply,
+                                   const HostAndPort& remoteHost,
+                                   std::vector<std::string>* mechs) {
+    // Only mechanisms known to be safe for internal authentication are accepted. The
+    // saslSupportedMechs array comes from the peer's unauthenticated hello reply, so a forged reply
+    // must not be able to downgrade us to PLAIN (which would send the raw keyfile in cleartext) or
+    // any other unexpected mechanism.
+    static constexpr std::array<StringData, 3> kInternalAuthAllowlist = {
+        auth::kMechanismScramSha256, auth::kMechanismScramSha1, auth::kMechanismMongoX509};
+
+    // The filtered result is derived solely from this reply, so discard anything already present.
+    mechs->clear();
+
+    const auto saslMechsElem = helloReply.getField("saslSupportedMechs");
+    if (saslMechsElem.type() != BSONType::Array) {
+        return Status::OK();
+    }
+
+    bool advertisedAny = false;
+    for (const auto& elem : saslMechsElem.Array()) {
+        advertisedAny = true;
+        auto mech = elem.checkAndGetStringData();
+        if (std::find(kInternalAuthAllowlist.begin(), kInternalAuthAllowlist.end(), mech) !=
+            kInternalAuthAllowlist.end()) {
+            mechs->push_back(std::string{mech});
+        }
+    }
+
+    // If the peer advertised mechanisms but none survived filtering, fail rather than silently
+    // falling back to a default mechanism.
+    if (advertisedAny && mechs->empty()) {
+        return {ErrorCodes::AuthenticationFailed,
+                str::stream() << "Peer at " << remoteHost
+                              << " advertised no acceptable SASL mechanisms for internal "
+                                 "authentication"};
+    }
+
+    return Status::OK();
+}
+
 namespace {
 
 class TLConnectionSetupHook : public executor::NetworkConnectionHook {
@@ -267,17 +309,16 @@ public:
                         const RemoteCommandResponse& helloReply) override try {
         const auto& reply = helloReply.data;
 
-        // X.509 auth only means we only want to use a single mechanism regards of what hello says
+        // X.509 auth only means we only want to use a single mechanism regardless of what hello
+        // says
         if (_x509AuthOnly) {
             _saslMechsForInternalAuth.clear();
             _saslMechsForInternalAuth.push_back("MONGODB-X509");
         } else {
-            const auto saslMechsElem = reply.getField("saslSupportedMechs");
-            if (saslMechsElem.type() == Array) {
-                auto array = saslMechsElem.Array();
-                for (const auto& elem : array) {
-                    _saslMechsForInternalAuth.push_back(elem.checkAndGetStringData().toString());
-                }
+            auto status =
+                filterInternalAuthSaslMechs(reply, remoteHost, &_saslMechsForInternalAuth);
+            if (!status.isOK()) {
+                return status;
             }
         }
 

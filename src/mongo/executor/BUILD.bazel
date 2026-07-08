@@ -405,6 +405,7 @@ mongo_cc_unit_test(
         "//src/mongo/executor:cancelable_executor_test.cpp",
         "//src/mongo/executor:connection_pool_test.cpp",
         "//src/mongo/executor:connection_pool_test_fixture.cpp",
+        "//src/mongo/executor:connection_pool_tl_test.cpp",
         "//src/mongo/executor:hedge_options_util_test.cpp",
         "//src/mongo/executor:hedged_async_rpc_test.cpp",
         "//src/mongo/executor:inline_executor_test.cpp",

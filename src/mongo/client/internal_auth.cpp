@@ -114,6 +114,13 @@ BSONObj getInternalAuthParams(size_t idx, StringData mechanism) {
         return BSONObj();
     }
 
+    // Defence in depth: PLAIN must never be used for internal authentication, as it would send the
+    // raw keyfile as a cleartext credential. This mirrors the speculative-auth guard in
+    // authenticate.cpp and backstops the mechanism allowlist applied during connection setup.
+    if (mechanism == kMechanismSaslPlain) {
+        return BSONObj();
+    }
+
     auto password = internalAuthKeys.at(idx);
     auto systemUser = internalSecurity.getUser();
     if (mechanism == kMechanismScramSha1) {
