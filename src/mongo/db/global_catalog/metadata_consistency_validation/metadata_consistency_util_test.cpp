@@ -55,6 +55,7 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
@@ -1526,6 +1527,40 @@ protected:
         write_ops::checkWriteErrors(res);
     }
 
+    void insertDurableShardCatalogChunkDocs(const std::vector<BSONObj>& docs) {
+        DBDirectClient client(operationContext());
+        auto res = client.insert(write_ops::InsertCommandRequest{
+            NamespaceString::kConfigShardCatalogChunksNamespace, docs});
+        write_ops::checkWriteErrors(res);
+    }
+
+    void assertDurableCatalogCollectionReadErrorIsRethrown(ErrorCodes::Error errorCode) {
+        const auto localUuid = setUpLocalCollection();
+        auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
+        auto chunk = generateChunkForCollection(globalCatalogColl,
+                                                _shardId,
+                                                _keyPattern.globalMin(),
+                                                _keyPattern.globalMax(),
+                                                kShard0History);
+
+        setShardCatalogMetadata(localUuid, _keyPattern, {chunk});
+        setCSRAuthoritative();
+
+        insertDurableShardCatalogCollection(globalCatalogColl);
+        insertDurableShardCatalogChunks({chunk});
+        _catalogClient->setChunksToReturn({chunk});
+
+        FailPointEnableBlock failDurableRead(
+            "failCommand",
+            BSON("failCommands"
+                 << BSON_ARRAY("find") << "namespace"
+                 << NamespaceString::kConfigShardCatalogCollectionsNamespace.toStringForErrorMsg()
+                 << "failLocalClients" << true << "failInternalCommands" << true << "errorCode"
+                 << errorCode));
+
+        ASSERT_THROWS_CODE(checkConsistency(globalCatalogColl), DBException, errorCode);
+    }
+
     void clearDurableShardCatalog() {
         DBDirectClient client(operationContext());
         client.remove(write_ops::DeleteCommandRequest{
@@ -2197,6 +2232,30 @@ TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_AllMatch) {
     ASSERT_EQ(0, countInconsistenciesWithReasonField(inconsistencies));
 }
 
+TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_MalformedChunkDocumentIsInconsistency) {
+    const auto localUuid = setUpLocalCollection();
+    auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
+    auto chunk = generateChunkForCollection(globalCatalogColl,
+                                            _shardId,
+                                            _keyPattern.globalMin(),
+                                            _keyPattern.globalMax(),
+                                            kShard0History);
+
+    setShardCatalogMetadata(localUuid, _keyPattern, {chunk});
+    setCSRAuthoritative();
+
+    insertDurableShardCatalogCollection(globalCatalogColl);
+    insertDurableShardCatalogChunkDocs({chunk.toConfigBSON().removeField(ChunkType::shard())});
+    _catalogClient->setChunksToReturn({chunk});
+
+    const auto inconsistencies = checkConsistency(globalCatalogColl);
+
+    ASSERT_EQ(1, countInconsistenciesWithReasonField(inconsistencies));
+    ASSERT_STRING_CONTAINS(
+        inconsistencies[0].getDetails().getObjectField("details").getStringField("reason"),
+        ChunkType::shard());
+}
+
 TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_TransientInterruptionIsRethrown) {
     const auto localUuid = setUpLocalCollection();
     auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
@@ -2221,6 +2280,14 @@ TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_TransientInterruptionIsR
     ASSERT_THROWS_CODE(checkConsistency(globalCatalogColl),
                        DBException,
                        ErrorCodes::InterruptedDueToReplStateChange);
+}
+
+TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_SnapshotReadErrorIsRethrown) {
+    assertDurableCatalogCollectionReadErrorIsRethrown(ErrorCodes::SnapshotTooOld);
+}
+
+TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_ShutdownReadErrorIsRethrown) {
+    assertDurableCatalogCollectionReadErrorIsRethrown(ErrorCodes::ShutdownInProgress);
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_UuidMismatch) {
