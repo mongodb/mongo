@@ -1313,8 +1313,10 @@ std::vector<MetadataInconsistencyItem> _checkInconsistenciesBetweenBothCatalogs(
     // Check shardKey index inconsistencies.
     // Skip the check in case of unsplittable collections as we don't strictly require an index on
     // the shard key for unsplittable collections.
+    //
+    // TODO (SERVER-130807): Re-enable shard-key indexes check on secondaries
     const bool isSharded = !catalogColl.getUnsplittable();
-    if (catalogUUID == localUUID && isSharded) {
+    if (asRSPrimaryNode && catalogUUID == localUUID && isSharded) {
         _checkShardKeyIndexInconsistencies(opCtx,
                                            nss,
                                            shardId,
@@ -2752,7 +2754,8 @@ std::vector<MetadataInconsistencyItem> runCheckMetadataConsistencyOnParticipant(
                                                               collCatalogSnapshot,
                                                               localCatalogCollections,
                                                               checkRangeDeletionIndexes,
-                                                              checkIndexes);
+                                                              checkIndexes,
+                                                              asRSPrimaryNode);
 
     // If this is the primary shard of the db coordinate index check across shards
     if (shardId == primaryShardId) {

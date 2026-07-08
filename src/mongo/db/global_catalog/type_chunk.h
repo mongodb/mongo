@@ -275,6 +275,22 @@ public:
         return _history;
     }
 
+    /**
+     * Returns true if the given shard currently owns this chunk or previously owned it, i.e. it
+     * appears anywhere in the chunk's ownership history.
+     */
+    bool isOwnedNowOrHistoricallyBy(const ShardRef& shard) const {
+        if (getShard() == shard) {
+            return true;
+        }
+        for (const auto& entry : _history) {
+            if (entry.getShard() == shard) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     void addHistoryToBSON(BSONObjBuilder& builder) const;
 
     /**

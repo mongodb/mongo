@@ -119,10 +119,16 @@ void commitSetAllowChunkOperationsLocally(OperationContext* opCtx,
  * removed so the collection stays non-overlapping once the new chunks are inserted. After
  * persisting the delta, both the in-memory CollectionShardingRuntime and the secondaries (via an
  * oplog 'c' entry) are updated with the new chunks.
+ *
+ * When receivingFirstChunk is true, this shard owned no chunks for the collection before this
+ * operation, so there is no valid in-memory base to apply the delta on top of. In that case the
+ * collection metadata is bootstrapped from the global catalog (a full install that invalidates and
+ * reinstalls the metadata) instead of applying an incremental delta.
  */
 void commitChunkOperationsMetadataLocally(OperationContext* opCtx,
                                           const NamespaceString& nss,
-                                          const std::vector<BSONObj>& newChunks);
+                                          const std::vector<BSONObj>& newChunks,
+                                          bool receivingFirstChunk = false);
 
 }  // namespace MONGO_MOD_PARENT_PRIVATE shard_catalog_commit
 

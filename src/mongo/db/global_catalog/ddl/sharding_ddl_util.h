@@ -536,15 +536,21 @@ MONGO_MOD_PRIVATE void commitRenameCollectionMetadataToShardCatalog(
  * be sent to the specified shards. This method does not assert that every chunk is currently owned
  * by a target shard, because unowned chunks may still need to be sent to preserve history for
  * point-in-time reads.
+ *
+ * `receivingFirstChunk` marks that the target shards owned no chunks for the collection before this
+ * operation, in which case they bootstrap the collection metadata from the global catalog instead
+ * of applying an incremental delta. Only pass true for a shard that is genuinely gaining its first
+ * chunk (e.g. a migration recipient); split/merge and donor commits leave it false.
  */
-MONGO_MOD_PRIVATE void commitChunkOperationsMetadataToShardCatalog(
+MONGO_MOD_NEEDS_REPLACEMENT void commitChunkOperationsMetadataToShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,
     std::vector<BSONObj> newChunkDocs,
     const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& token);
+    const CancellationToken& token,
+    bool receivingFirstChunk = false);
 
 /**
  * Based on the FCV, get the where the DDL needs to act accordingly to the database

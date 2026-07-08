@@ -337,37 +337,6 @@ void invalidateCollectionMetadata(OperationContext* opCtx,
         opCtx, repl::OplogEntry(oplogEntry.toBSON()));
 }
 
-void updateCollectionMetadata(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              const UUID& uuid,
-                              const std::vector<ChunkType>& changedChunks) {
-    if (changedChunks.size() > kMaxChangedChunksInDeltaOplogEntry) {
-        invalidateCollectionMetadata(opCtx, nss, uuid, false /* forDroppedCollection */);
-        return;
-    }
-
-    std::vector<BSONObj> changedChunkDocs;
-    changedChunkDocs.reserve(changedChunks.size());
-    for (const auto& chunk : changedChunks) {
-        changedChunkDocs.push_back(chunk.toConfigBSON());
-    }
-
-    auto entry =
-        UpdateCollectionMetadataOplogEntry{std::string(nss.coll()), std::move(changedChunkDocs)};
-
-    auto oplogEntry = makeShardCatalogCommandOplogEntry(opCtx, nss, uuid, entry.toBSON());
-    if (oplogEntry.toBSON().objsize() > kMaxUpdateCollectionMetadataOplogEntryObjectSizeBytes) {
-        invalidateCollectionMetadata(opCtx, nss, uuid, false /* forDroppedCollection */);
-        return;
-    }
-
-    logShardCatalogCommandOplogEntry(opCtx, oplogEntry, "updateCollectionMetadata");
-
-    // Apply the update on the current (primary) node after the timestamp has been assigned.
-    opCtx->getServiceContext()->getOpObserver()->onUpdateCollectionMetadata(
-        opCtx, repl::OplogEntry(oplogEntry.toBSON()));
-}
-
 void setAllowChunkOperationsOnSecondaries(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const UUID& uuid,
@@ -421,6 +390,47 @@ void updateShardCatalogCache(OperationContext* opCtx,
     scopedCsr->setAllowChunkOperations(coll.getAllowChunkOperations());
     setAllowChunkOperationsOnSecondaries(
         opCtx, nss, coll.getUuid(), coll.getAllowChunkOperations());
+}
+
+void updateCollectionMetadata(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const CollectionType& coll,
+                              const std::vector<ChunkType>& changedChunks) {
+    const auto& uuid = coll.getUuid();
+    if (changedChunks.size() > kMaxChangedChunksInDeltaOplogEntry) {
+        invalidateCollectionMetadata(opCtx, nss, uuid, false /* forDroppedCollection */);
+        return;
+    }
+
+    std::vector<BSONObj> changedChunkDocs;
+    changedChunkDocs.reserve(changedChunks.size());
+    for (const auto& chunk : changedChunks) {
+        changedChunkDocs.push_back(chunk.toConfigBSON());
+    }
+
+    auto entry =
+        UpdateCollectionMetadataOplogEntry{std::string(nss.coll()), std::move(changedChunkDocs)};
+
+    auto oplogEntry = makeShardCatalogCommandOplogEntry(opCtx, nss, uuid, entry.toBSON());
+    if (oplogEntry.toBSON().objsize() > kMaxUpdateCollectionMetadataOplogEntryObjectSizeBytes) {
+        invalidateCollectionMetadata(opCtx, nss, uuid, false /* forDroppedCollection */);
+        return;
+    }
+
+    // This function is only reached for a shard that already owns chunks for the collection at the
+    // current generation; a shard receiving its first chunk bootstraps its metadata instead (see
+    // commitChunkOperationsMetadataLocally). The in-memory base, if present, is therefore always
+    // for the same generation as the delta, so the delta can be applied directly without a
+    // generation-mismatch check. A legacy full routing table (same generation but does not allow
+    // gaps, which can linger after an FCV upgrade) is a compatible base once converted to allow
+    // gaps, which onUpdateCollectionMetadata does on each node before merging the delta.
+
+    // Apply the incremental metadata update on the secondary nodes.
+    logShardCatalogCommandOplogEntry(opCtx, oplogEntry, "updateCollectionMetadata");
+
+    // Apply the incremental metadata update on the primary node.
+    opCtx->getServiceContext()->getOpObserver()->onUpdateCollectionMetadata(
+        opCtx, repl::OplogEntry(oplogEntry.toBSON()));
 }
 
 struct CommitCollectionMetadataOptions {
@@ -882,9 +892,18 @@ void commitSetAllowChunkOperationsLocally(OperationContext* opCtx,
 
 void commitChunkOperationsMetadataLocally(OperationContext* opCtx,
                                           const NamespaceString& nss,
-                                          const std::vector<BSONObj>& newChunks) {
-    // The collection entry may not be on disk yet on the first chunk operation. Read it from
-    // the global catalog and persist it here.
+                                          const std::vector<BSONObj>& newChunks,
+                                          bool receivingFirstChunk) {
+    if (receivingFirstChunk) {
+        // This shard owned no chunks for the collection before this operation, so there is no valid
+        // in-memory base to apply an incremental delta on top of.
+        //
+        // The value of isDbPrimaryShard is irrelevant here because it is only used when the shard
+        // does not own any chunks, which cannot be the case since this shard is receiving a chunk.
+        commitCollectionMetadataLocally(opCtx, nss, false /* isDbPrimaryShard */);
+        return;
+    }
+
     auto coll = fetchCollection(opCtx, nss);
 
     auto chunksToInsert = ChunkType::parseConfigBSONDocuments(
@@ -902,13 +921,14 @@ void commitChunkOperationsMetadataLocally(OperationContext* opCtx,
     writeCollectionMetadataLocally(
         opCtx, nss, coll.asShardCatalogType(), chunksToInsert, true /* rewritePersistedChunks */);
 
-    updateCollectionMetadata(opCtx, nss, coll.getUuid(), chunksToInsert);
+    updateCollectionMetadata(opCtx, nss, coll, chunksToInsert);
 
     LOGV2_INFO(12721506,
                "Committed chunk operations metadata to the local shard catalog",
                "nss"_attr = nss,
                "uuid"_attr = coll.getUuid(),
-               "numNewChunks"_attr = chunksToInsert.size());
+               "numNewChunks"_attr = chunksToInsert.size(),
+               "receivingFirstChunk"_attr = receivingFirstChunk);
 }
 
 }  // namespace shard_catalog_commit

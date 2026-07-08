@@ -93,8 +93,9 @@ private:
         std::shared_ptr<executor::ScopedTaskExecutor> executor);
 
     // Drives the kGlobalCatalogCommit phase: sends the idempotent commit command, built from
-    // durable state so it can be re-sent after a failover.
-    void _commitToGlobalCatalog(OperationContext* opCtx);
+    // durable state so it can be re-sent after a failover. Returns the chunks changed by the commit
+    // (in config BSON format) so the caller can persist them for the shard-catalog commit phase.
+    std::vector<BSONObj> _commitToGlobalCatalog(OperationContext* opCtx);
 
     // Drives the kPostGlobalCatalogCommit phase: runs the post-commit bookkeeping after the
     // global-catalog commit (change-stream event, in-memory bookkeeping via the migration attempt

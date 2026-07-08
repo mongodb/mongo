@@ -111,11 +111,14 @@ assert.commandFailedWithCode(
     ErrorCodes.StaleDbVersion,
 );
 
-// Note: secondary metadata gets cleared when replicating recoverable critical section.
+// With the incremental authoritative commit, a shard drained to zero chunks keeps KNOWN
+// "tracked-unowned" metadata on secondaries: the collection version is known, the shard version is
+// 0|0, and it owns no chunks. (The old invalidation commit cleared this to {}.)
 let version = assert.commandWorked(
     configConn.adminCommand({getShardVersion: "sharded.user", fullMetadata: true}),
 );
-assert.eq({}, version.metadata);
+assert.eq(1, timestampCmp(version.metadata.collVersion, shardVersion.v), tojson(version));
+assert.eq(0, timestampCmp(version.metadata.shardVersion, Timestamp(0, 0)), tojson(version));
 
 findCmd = {
     find: "user",

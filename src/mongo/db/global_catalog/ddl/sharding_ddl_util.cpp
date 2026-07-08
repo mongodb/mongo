@@ -1163,10 +1163,12 @@ void commitChunkOperationsMetadataToShardCatalog(
     const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& token) {
+    const CancellationToken& token,
+    bool receivingFirstChunk) {
     ShardsvrCommitChunkOperationsMetadata request(nss);
     request.setDbName(DatabaseName::kAdmin);
     request.setNewChunks(std::move(newChunkDocs));
+    request.setReceivingFirstChunk(receivingFirstChunk);
 
     generic_argument_util::setMajorityWriteConcern(request);
     generic_argument_util::setOperationSessionInfo(request, osi);

@@ -75,6 +75,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -226,6 +227,75 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
     ASSERT(chunkDoc1.getOnCurrentShardSince().has_value());
     ASSERT_EQ(controlChunk.getOnCurrentShardSince(), chunkDoc1.getOnCurrentShardSince());
     ASSERT(chunkDoc1.getJumbo());
+}
+
+TEST_F(CommitChunkMigrate, RejectMigrationWhenChangedChunksExceedSizeLimit) {
+    const auto collUUID = UUID::gen();
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = Timestamp(42);
+
+    ShardType shard0;
+    shard0.setHandle(ShardHandle{ShardId("shard0"), boost::none});
+    shard0.setHost("shard0:12");
+
+    ShardType shard1;
+    shard1.setHandle(ShardHandle{ShardId("shard1"), boost::none});
+    shard1.setHost("shard1:12");
+
+    setupShards({shard0, shard1});
+
+    // Use a multi-megabyte shard-key boundary shared by the two chunks. Each chunk document stays
+    // under the 16MB BSON limit on its own, so setup and any single write are valid, but the
+    // combined set of chunks changed by the migration (the migrated chunk plus the control chunk
+    // the donor keeps) exceeds BSONObjMaxUserSize / 2.
+    const std::string bigValue(9 * 1024 * 1024, 'x');
+
+    ChunkType migratedChunk, controlChunk;
+    {
+        ChunkVersion origVersion({collEpoch, collTimestamp}, {12, 7});
+
+        migratedChunk.setName(OID::gen());
+        migratedChunk.setCollectionUUID(collUUID);
+        migratedChunk.setVersion(origVersion);
+        migratedChunk.setShard(ShardRef{shard0.getName()});
+        migratedChunk.setOnCurrentShardSince(Timestamp(100, 0));
+        migratedChunk.setHistory(
+            {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), ShardRef{shard0.getName()})});
+        // A large string sorts after every number but before MaxKey in BSON order, so it is a valid
+        // interior boundary between MinKey and MaxKey.
+        migratedChunk.setRange({BSON("a" << MINKEY), BSON("a" << bigValue)});
+
+        origVersion.incMinor();
+
+        controlChunk.setName(OID::gen());
+        controlChunk.setCollectionUUID(collUUID);
+        controlChunk.setVersion(origVersion);
+        controlChunk.setShard(ShardRef{shard0.getName()});
+        controlChunk.setOnCurrentShardSince(Timestamp(50, 0));
+        controlChunk.setHistory(
+            {ChunkHistory(*controlChunk.getOnCurrentShardSince(), ShardRef{shard0.getName()})});
+        controlChunk.setRange({BSON("a" << bigValue), BSON("a" << MAXKEY)});
+    }
+
+    setupCollection(kNamespace, kKeyPattern, {migratedChunk, controlChunk});
+
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->commitChunkMigration(operationContext(),
+                                                  kNamespace,
+                                                  migratedChunk,
+                                                  migratedChunk.getVersion().epoch(),
+                                                  collTimestamp,
+                                                  ShardId(shard0.getName()),
+                                                  ShardId(shard1.getName())),
+                       DBException,
+                       ErrorCodes::BSONObjectTooLarge);
+
+    // The commit must have been rejected before it changed the catalog: the migrated chunk still
+    // belongs to the donor with its original version.
+    auto chunkDoc = uassertStatusOK(
+        getChunkDoc(operationContext(), migratedChunk.getMin(), collEpoch, collTimestamp));
+    ASSERT_EQ("shard0", chunkDoc.getShard().toString());
+    ASSERT_EQ(migratedChunk.getVersion(), chunkDoc.getVersion());
 }
 
 TEST_F(CommitChunkMigrate, RejectDuringFCVTransitionWithStableOperationFCV) {

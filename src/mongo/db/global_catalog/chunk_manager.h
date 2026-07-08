@@ -320,7 +320,7 @@ public:
                     : boost::make_optional(std::prev(chunkVectorMapEnd)->second->cend())};
     }
 
-    ChunkMap createMerged(ChunkVector changedChunks) const;
+    ChunkMap createMerged(ChunkVector changedChunks, bool forceAllowGaps = false) const;
 
     BSONObj toBSON() const;
 
@@ -342,7 +342,7 @@ private:
     _overlappingVectorSlotBounds(const std::string& minShardKeyStr,
                                  const std::string& maxShardKeyStr,
                                  bool isMaxInclusive) const;
-    ChunkMap _makeUpdated(ChunkVector&& changedChunks) const;
+    ChunkMap _makeUpdated(ChunkVector&& changedChunks, bool forceAllowGaps) const;
 
     void _updateShardVersionFromDiscardedChunk(const ChunkInfo& chunk);
     void _updateShardVersionFromUpdateChunk(const ChunkInfo& chunk,
@@ -443,13 +443,16 @@ public:
      * timeseriesFields/reshardingFields parameter implies that the field was not present, and will
      * clear any currently held timeseries/resharding fields inside the resulting
      * RoutingTableHistory.
+     *
+     * TODO (SERVER-130830) Remove forceAllowGaps once v9.0 branches out
      */
     RoutingTableHistory makeUpdated(
         boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
         boost::optional<TypeCollectionReshardingFields> reshardingFields,
         bool allowMigrations,
         bool unsplittable,
-        const std::vector<ChunkType>& changedChunks) const;
+        const std::vector<ChunkType>& changedChunks,
+        bool forceAllowGaps = false) const;
 
     const NamespaceString& nss() const {
         return _nss;
@@ -500,6 +503,14 @@ public:
 
     size_t numChunks() const {
         return _chunkMap.size();
+    }
+
+    /**
+     * Returns true if this routing table may have gaps in the key range (it holds only a subset of
+     * the collection's chunks). See ChunkManagerBase::allowGaps().
+     */
+    bool allowGaps() const {
+        return _chunkMap.allowGaps();
     }
 
     template <typename Callable>
@@ -856,6 +867,16 @@ public:
         return _rt->optRt ? _rt->optRt->numChunks() : 1;
     }
 
+    /**
+     * Returns true if the routing table only holds a subset of the collection's chunks and may
+     * therefore have gaps in the key range. Shard filtering tables built from the authoritative
+     * shard catalog contain only this shard's owned chunks and allow gaps; a full routing table
+     * (every chunk of the collection) does not. Returns false when there is no routing table.
+     */
+    bool allowGaps() const {
+        return _rt->optRt ? _rt->optRt->allowGaps() : false;
+    }
+
     std::string toString() const;
 
     // Methods only supported on collections registered in the sharding catalog (caller must check
@@ -1135,7 +1156,8 @@ public:
      * Returns a new CurrentChunkManager with the given chunk changes applied to this manager's
      * routing table.
      */
-    CurrentChunkManager makeUpdated(const std::vector<ChunkType>& changedChunks) const;
+    CurrentChunkManager makeUpdated(const std::vector<ChunkType>& changedChunks,
+                                    bool forceAllowGaps = false) const;
 
     /**
      * Returns the ids of all shards on which the collection has any chunks.

@@ -303,13 +303,14 @@ ChunkMap::ChunkMapIterator ChunkMap::findClosestInDirection(const BSONObj& shard
     return ChunkMapIterator(_chunkVectorMap, it, chunkIt);
 }
 
-ChunkMap ChunkMap::createMerged(std::vector<std::shared_ptr<ChunkInfo>> changedChunks) const {
-    auto updatedChunkMap = _makeUpdated(std::move(changedChunks));
+ChunkMap ChunkMap::createMerged(std::vector<std::shared_ptr<ChunkInfo>> changedChunks,
+                                bool forceAllowGaps) const {
+    auto updatedChunkMap = _makeUpdated(std::move(changedChunks), forceAllowGaps);
     tassert(6752900,
             "Chunk map found to be empty after refresh",
             (updatedChunkMap._chunkVectorMap.size() &&
              updatedChunkMap._chunkVectorMap.begin()->second->size()) ||
-                _allowGaps);
+                updatedChunkMap._allowGaps);
     return updatedChunkMap;
 }
 
@@ -476,8 +477,16 @@ void ChunkMap::_updateShardVersionFromUpdateChunk(
     }
 }
 
-ChunkMap ChunkMap::_makeUpdated(ChunkVector&& updateChunks) const {
+ChunkMap ChunkMap::_makeUpdated(ChunkVector&& updateChunks, bool forceAllowGaps) const {
     ChunkMap newMap{*this};
+
+    // The rebuilt map may be asked to permit gaps even when this source does not (e.g. adapting a
+    // legacy full routing table so an incremental delta can be merged onto it). A gap-free source
+    // already satisfies the gap-allowing invariant, so this only relaxes the merge checks; it never
+    // tightens them. Set it on the fresh copy so the flip piggybacks on the copy this update
+    // already makes, avoiding a separate pass over the map.
+    newMap._allowGaps = _allowGaps || forceAllowGaps;
+    const bool allowGaps = newMap._allowGaps;
 
     if (updateChunks.empty()) {
         // No updates, just clone the original map
@@ -500,7 +509,7 @@ ChunkMap ChunkMap::_makeUpdated(ChunkVector&& updateChunks) const {
             // we do not update `lastCommitedIsNew` flag.
         } else {
             if (!newVectorPtr->empty() && lastCommittedIsNew) {
-                checkChunksAreContiguous(*newVectorPtr->back(), *nextChunkPtr, _allowGaps);
+                checkChunksAreContiguous(*newVectorPtr->back(), *nextChunkPtr, allowGaps);
             }
             lastCommittedIsNew = false;
             newVectorPtr->emplace_back(nextChunkPtr);
@@ -527,7 +536,7 @@ ChunkMap ChunkMap::_makeUpdated(ChunkVector&& updateChunks) const {
                      compareResult == std::partial_ordering::equivalent));
 
         if (!newVectorPtr->empty()) {
-            checkChunksAreContiguous(*newVectorPtr->back(), *nextChunkPtr, _allowGaps);
+            checkChunksAreContiguous(*newVectorPtr->back(), *nextChunkPtr, allowGaps);
         }
         lastCommittedIsNew = true;
         newVectorPtr->emplace_back(std::move(nextChunkPtr));
@@ -985,15 +994,16 @@ boost::optional<Chunk> CurrentChunkManager::getNextChunkOnShard(OperationContext
     return optChunk;
 }
 
-CurrentChunkManager CurrentChunkManager::makeUpdated(
-    const std::vector<ChunkType>& changedChunks) const {
+CurrentChunkManager CurrentChunkManager::makeUpdated(const std::vector<ChunkType>& changedChunks,
+                                                     bool forceAllowGaps) const {
     tassert(12775501, "Expected routing table to be initialized", _rt->optRt);
 
     auto rt = _rt->optRt->makeUpdated(getTimeseriesFields(),
                                       getReshardingFields(),
                                       allowMigrations(),
                                       isUnsplittable(),
-                                      changedChunks);
+                                      changedChunks,
+                                      forceAllowGaps);
     auto version = rt.getVersion();
     auto rtHandle =
         RoutingTableHistoryValueHandle(std::make_shared<RoutingTableHistory>(std::move(rt)),
@@ -1129,10 +1139,11 @@ RoutingTableHistory RoutingTableHistory::makeUpdated(
     boost::optional<TypeCollectionReshardingFields> reshardingFields,
     bool allowMigrations,
     bool unsplittable,
-    const std::vector<ChunkType>& changedChunks) const {
+    const std::vector<ChunkType>& changedChunks,
+    bool forceAllowGaps) const {
 
     auto changedChunkInfos = flatten(changedChunks);
-    auto chunkMap = _chunkMap.createMerged(std::move(changedChunkInfos));
+    auto chunkMap = _chunkMap.createMerged(std::move(changedChunkInfos), forceAllowGaps);
 
     // Only update the same collection.
     invariant(getVersion().isSameCollection(chunkMap.getVersion()));

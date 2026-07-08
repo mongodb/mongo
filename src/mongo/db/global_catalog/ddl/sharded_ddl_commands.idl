@@ -1277,4 +1277,8 @@ commands:
                     "Chunk documents to insert into the shard catalog. The shard reconciles overlaps
                     with pre-existing chunks locally, splitting or removing them so the durable
                     catalog stays contiguous and non-overlapping."
+            receivingFirstChunk:
+                type: bool
+                description: "True when this shard owned no chunks for the collection before this operation."
+                default: false
         reply_type: OkReply

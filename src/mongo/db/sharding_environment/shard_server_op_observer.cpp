@@ -838,11 +838,12 @@ void ShardServerOpObserver::onUpdateCollectionMetadata(OperationContext* opCtx,
         return;
     }
 
-    // Without known collection metadata there is no base to apply this delta to. Clear the
-    // in-memory metadata so the next user performs a full recovery from disk.
+    // We cannot apply an incremental delta without a known metadata base. The same is true when
+    // this shard is UNOWNED and owns no chunks yet. Clear the in-memory metadata so the next access
+    // performs a full recovery from disk.
     const auto collectionUuid = *op.getUuid();
     auto currentMetadata = scopedCsr->getCurrentMetadataIfKnown();
-    if (!currentMetadata) {
+    if (!currentMetadata || scopedCsr->isUnowned()) {
         scopedCsr->clearCollectionMetadata(opCtx);
         return;
     }
@@ -867,7 +868,8 @@ void ShardServerOpObserver::onUpdateCollectionMetadata(OperationContext* opCtx,
             ChunkType::parseConfigBSONDocuments(entry.getChangedChunks(),
                                                 currentMetadata->getUUID(),
                                                 collPlacementVersion.epoch(),
-                                                collPlacementVersion.getTimestamp())),
+                                                collPlacementVersion.getTimestamp()),
+            true /* forceAllowGaps */),
         CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 }
 

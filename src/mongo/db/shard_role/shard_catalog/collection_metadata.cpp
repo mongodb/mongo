@@ -61,8 +61,8 @@ CollectionMetadata::CollectionMetadata(CurrentChunkManager cm, const ShardId& th
 CollectionMetadata::CollectionMetadata(PointInTimeChunkManager cm, const ShardId& thisShardId)
     : _cm(std::move(cm)), _thisShardId(thisShardId) {}
 
-CollectionMetadata CollectionMetadata::makeUpdated(
-    const std::vector<ChunkType>& changedChunks) const {
+CollectionMetadata CollectionMetadata::makeUpdated(const std::vector<ChunkType>& changedChunks,
+                                                   bool forceAllowGaps) const {
     tassert(12775502, "Expected metadata to have a routing table", hasRoutingTable());
 
     const auto currentChunkManager = getCurrentChunkManager();
@@ -88,7 +88,8 @@ CollectionMetadata CollectionMetadata::makeUpdated(
         }
     }
 
-    return CollectionMetadata(currentChunkManager->makeUpdated(changedChunks), _thisShardId);
+    return CollectionMetadata(currentChunkManager->makeUpdated(changedChunks, forceAllowGaps),
+                              _thisShardId);
 }
 
 bool CollectionMetadata::allowMigrations() const {

@@ -37,6 +37,7 @@
 #include "mongo/db/global_catalog/ddl/commit_chunk_migration_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
+#include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
@@ -47,6 +48,7 @@
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/write_concern_options.h"
@@ -55,6 +57,8 @@
 #include "mongo/util/future_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
 
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
@@ -75,9 +79,11 @@ MONGO_FAIL_POINT_DEFINE(hangInMoveRangeCoordinatorShardCatalogCommit);
 //
 // - ConflictingOperationInProgress: allowChunkOperations has been disabled concurrently.
 // - ShardNotFound: the recipient shard no longer exists or has started draining.
+// - BSONObjectTooLarge: the resulting changed-chunk set would exceed the BSON size limit, so the
+//   commit is rejected before it changes the global catalog.
 bool isFatalGlobalCatalogCommitError(const Status& status) {
     return status == ErrorCodes::ConflictingOperationInProgress ||
-        status == ErrorCodes::ShardNotFound;
+        status == ErrorCodes::ShardNotFound || status == ErrorCodes::BSONObjectTooLarge;
 }
 
 // Rebuild the wire-format ShardsvrMoveRange command from the request struct stored on the
@@ -264,7 +270,14 @@ ExecutorFuture<void> MoveRangeCoordinator::_runImpl(
                                      hangInMoveRangeCoordinatorGlobalCatalogCommit.pauseWhileSet(
                                          opCtx);
 
-                                     _commitToGlobalCatalog(opCtx);
+                                     auto changedChunks = _commitToGlobalCatalog(opCtx);
+
+                                     // Persist the changed chunks so the shard catalog commit phase
+                                     // can install them even after a failover, without contacting
+                                     // the config server again.
+                                     auto newDoc = MoveRangeCoordinatorDocument(_doc);
+                                     newDoc.setChangedChunks(std::move(changedChunks));
+                                     _updateStateDocument(opCtx, std::move(newDoc));
                                  }))
         .then(_buildPhaseHandler(Phase::kPostGlobalCatalogCommit,
                                  [this, anchor = shared_from_this()](OperationContext* opCtx) {
@@ -413,7 +426,7 @@ void MoveRangeCoordinator::MigrationAttempt::finalize(OperationContext* opCtx) {
     _msm->finishCommit();
 }
 
-void MoveRangeCoordinator::_commitToGlobalCatalog(OperationContext* opCtx) {
+std::vector<BSONObj> MoveRangeCoordinator::_commitToGlobalCatalog(OperationContext* opCtx) {
     auto doc = _getMigrationCoordinatorDocumentIfExists(opCtx);
     tassert(12953607,
             "MigrationCoordinator document must exist before committing to the global catalog",
@@ -453,6 +466,18 @@ void MoveRangeCoordinator::_commitToGlobalCatalog(OperationContext* opCtx) {
         builder.obj(),
         Shard::RetryPolicy::kIdempotent);
     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));
+
+    // Collect the chunks the commit changed so the shard-catalog commit phase can install exactly
+    // those, avoiding a full metadata refresh on donor and recipient.
+    auto reply = ConfigSvrCommitMoveRangeResponse::parse(
+        response.getValue().response, IDLParserContext("ConfigSvrCommitMoveRangeResponse"));
+
+    std::vector<BSONObj> changedChunks;
+    changedChunks.reserve(reply.getChangedChunks().size());
+    for (const auto& chunk : reply.getChangedChunks()) {
+        changedChunks.push_back(chunk.getOwned());
+    }
+    return changedChunks;
 }
 
 
@@ -487,20 +512,65 @@ void MoveRangeCoordinator::_commitToShardCatalog(
     OperationContext* opCtx,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
-    // Donor and recipient are the only shards whose ownership of the moved range changed; both must
-    // refresh their authoritative local shard catalog.
-    std::set<ShardId> involvedShards{_request.getFromShard(), _request.getToShard()};
+    // A committed migration always changes at least one chunk (the migrated chunk gets a new owning
+    // shard and version). Reaching this phase without any persisted changed chunks means the global
+    // catalog commit result was not persisted, which would silently install nothing.
+    tassert(
+        12953612,
+        "Expected persisted changed chunks after committing the migration to the global catalog",
+        _doc.getChangedChunks() && !_doc.getChangedChunks()->empty());
 
+    const auto& changedChunks = *_doc.getChangedChunks();
+    const auto& toShard = _request.getToShard();
 
-    // TODO (SERVER-129536): Replace the invalidation authoritative commit with an incremental
-    // authoritative commit.
-    sharding_ddl_util::commitCreateCollectionMetadataToShardCatalog(
+    // The donor receives every changed chunk. It owns the control chunk (unless the donor is
+    // donating the last chunk) and any split side chunks, must overwrite its now-stale ownership of
+    // the migrated range, and appears in the migrated chunk's history, so holding all of them in
+    // its shard catalog is valid.
+    sharding_ddl_util::commitChunkOperationsMetadataToShardCatalog(
         opCtx,
         nss(),
-        {involvedShards.begin(), involvedShards.end()},
+        changedChunks,
+        {ShardRef(_request.getFromShard())},
         getNewSession(opCtx),
         executor,
         token);
+
+    // The recipient keeps only chunks it currently owns or has owned before (that is, chunks whose
+    // history includes the recipient). This always includes the migrated chunk, because its history
+    // is prepended with the recipient. It drops the control chunk and donor-owned side chunks,
+    // which recipient never owned.
+    std::vector<BSONObj> recipientChunks;
+    for (const auto& chunkDoc : changedChunks) {
+        const auto chunk =
+            uassertStatusOK(ChunkType::parseFromConfigBSON(chunkDoc, OID(), Timestamp()));
+        if (chunk.isOwnedNowOrHistoricallyBy(toShard)) {
+            recipientChunks.push_back(chunkDoc);
+        }
+    }
+
+    // The migrated chunk always lists the recipient as its current owner, so the recipient set can
+    // never be empty.
+    tassert(12953613,
+            "Expected the recipient to receive at least the migrated chunk",
+            !recipientChunks.empty());
+
+    // If this is the recipient's first chunk, its local config/chunks entries may be stale,
+    // so it cannot rely on its own CSR. Mark it as a first chunk so it installs the full
+    // metadata from scratch.
+    const bool recipientReceivingFirstChunk = [&] {
+        const auto doc = _getMigrationCoordinatorDocumentIfExists(opCtx);
+        tassert(13059501, "Migration document should exist at this point", doc.has_value());
+        return doc->getTransfersFirstCollectionChunkToRecipient().value_or(false);
+    }();
+    sharding_ddl_util::commitChunkOperationsMetadataToShardCatalog(opCtx,
+                                                                   nss(),
+                                                                   std::move(recipientChunks),
+                                                                   {ShardRef(toShard)},
+                                                                   getNewSession(opCtx),
+                                                                   executor,
+                                                                   token,
+                                                                   recipientReceivingFirstChunk);
 }
 
 void MoveRangeCoordinator::_persistMigrationDecision(OperationContext* opCtx,

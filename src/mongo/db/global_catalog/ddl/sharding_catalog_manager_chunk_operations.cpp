@@ -2061,6 +2061,29 @@ ShardingCatalogManager::_commitChunkMigrationImpl(
             {currentCollectionPlacementVersion.majorVersion() + 1, minVersionIncrement++}));
     }
 
+    // These are exactly the documents that will populate the outcome's changed chunks below. They
+    // are returned to the coordinator, persisted on its state document, re-serialized into the
+    // shard catalog, and echoed in the command response. If their combined BSON size is too large,
+    // those downstream serializations would fail with BSONObjectTooLarge only after the migration
+    // has already committed, forcing the coordinator to retry a deterministically failing
+    // operation. Reject the migration here, before the commit changes the global catalog, so the
+    // caller can abort cleanly. Half of the max user object size leaves headroom for the wrapping
+    // BSON: the array element overhead, the command/response envelope, and the state document's
+    // other fields.
+    int changedChunksSize = newMigratedChunk.toConfigBSON().objsize();
+    for (const auto& splitChunk : newSplitChunks) {
+        changedChunksSize += splitChunk.toConfigBSON().objsize();
+    }
+    if (newControlChunk) {
+        changedChunksSize += newControlChunk->toConfigBSON().objsize();
+    }
+    uassert(ErrorCodes::BSONObjectTooLarge,
+            str::stream() << "Rejecting migration commit for namespace "
+                          << nss.toStringForErrorMsg() << " because the resulting changed chunks "
+                          << "size " << changedChunksSize << " bytes exceeds the maximum allowed "
+                          << (BSONObjMaxUserSize / 2) << " bytes",
+            changedChunksSize * 2 <= BSONObjMaxUserSize);
+
     _commitChunkMigrationInTransaction(
         opCtx, nss, newMigratedChunk, newSplitChunks, newControlChunk, fromShard);
 

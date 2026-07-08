@@ -30,6 +30,7 @@
 #include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
 
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/sharding_catalog_client_mock.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
@@ -286,6 +287,34 @@ protected:
             client.insert(NamespaceString::kConfigShardCatalogChunksNamespace,
                           chunk.toConfigBSON());
         }
+    }
+
+    // Installs an in-memory CSR whose routing table holds ALL of the collection's chunks and does
+    // not allow gaps: a legacy, non-authoritative full routing table (as built by the router-style
+    // catalog cache). This is the shape a shard's CSR can be left in after an FCV downgrade, before
+    // the authoritative-catalog upgrade migrates it.
+    void installLegacyFullTableCsr(const CollectionType& collType,
+                                   const std::vector<ChunkType>& chunks) {
+        auto rt = RoutingTableHistory::makeNew(kTestNss,
+                                               collType.getUuid(),
+                                               collType.getKeyPattern(),
+                                               false /* unsplittable */,
+                                               nullptr /* defaultCollator */,
+                                               collType.getUnique(),
+                                               collType.getEpoch(),
+                                               collType.getTimestamp(),
+                                               boost::none /* timeseriesFields */,
+                                               boost::none /* reshardingFields */,
+                                               true /* allowMigrations */,
+                                               chunks);
+        auto version = rt.getVersion();
+        auto rtHandle = RoutingTableHistoryValueHandle(
+            std::make_shared<RoutingTableHistory>(std::move(rt)),
+            ComparableChunkVersion::makeComparableChunkVersion(version));
+        CollectionMetadata metadata(CurrentChunkManager(std::move(rtHandle)), kMyShardName);
+
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(operationContext(), kTestNss);
+        scopedCsr->setCollectionMetadata(operationContext(), std::move(metadata));
     }
 
     BSONObj findLastOplogEntry() {
@@ -623,6 +652,119 @@ TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsPreservesGapsInOwnedC
     ASSERT(metadata->keyBelongsToMe(key(55)));
 }
 
+TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsAppliesDeltaOntoLegacyFullTableCsr) {
+    // The collection has a single chunk covering the whole key space.
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    // The shard's in-memory CSR is a legacy full routing table (does not allow gaps), the shape it
+    // can be left in after an FCV downgrade because the authoritative-catalog upgrade does not
+    // touch the CSR. The commit below is not marked as receiving a first chunk, so it takes the
+    // incremental delta path and must merge onto this legacy base rather than reject it.
+    installLegacyFullTableCsr(collType, chunks);
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+        ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown()->allowGaps());
+    }
+
+    // A chunk operation delivers a single chunk covering only the upper part of the key space (e.g.
+    // a moveRange recipient receiving [50, MaxKey)). It overlaps the base's [MinKey, MaxKey) chunk.
+    // Applying it as an incremental delta on the legacy full table directly would discard
+    // [MinKey, MaxKey) and leave a routing table whose first chunk no longer starts at MinKey,
+    // which a non-gapped table rejects with ChunkMetadataInconsistency. The commit must instead
+    // convert the base to allow gaps and then merge the delta, so this call must not throw.
+    auto deltaVersion = chunks.back().getVersion();
+    deltaVersion.incMajor();
+    auto deltaChunk = makeChunk(collType, key(50), key(MAXKEY), deltaVersion, kMyShardName);
+
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, toConfigBSONVector({deltaChunk}));
+
+    // The delta was merged onto the (converted) gap-allowing base, leaving this shard owning the
+    // received chunk.
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadata);
+    ASSERT_TRUE(metadata->hasRoutingTable());
+    ASSERT_TRUE(metadata->allowGaps());
+    ASSERT_EQ(metadata->getChunkManager()->numChunks(), 1);
+    ASSERT(metadata->keyBelongsToMe(key(55)));
+}
+
+// A shard receiving its FIRST chunk (as flagged by the caller) must not merge a delta onto whatever
+// its CSR happens to hold: that base may be stale (here a legacy full routing table left by an FCV
+// downgrade). Instead it bootstraps the collection metadata from the global catalog, so the CSR
+// reflects the authoritative owned set rather than the stale full table.
+TEST_F(CommitCollectionMetadataLocallyTest,
+       ChunkOperationsReceivingFirstChunkBootstrapsFromGlobalCatalog) {
+    // The authoritative global catalog has a single chunk covering the whole key space, at a
+    // placement version newer than the stale CSR installed below -- as it always is in practice,
+    // since the migration that hands over the first chunk bumps the collection placement version.
+    auto [collType, _] = makeCollectionMetadata(1);
+    auto authoritativeChunk =
+        makeChunk(collType,
+                  key(MINKEY),
+                  key(MAXKEY),
+                  ChunkVersion({collType.getEpoch(), collType.getTimestamp()}, {10, 0}),
+                  kMyShardName);
+    mockCatalogClient()->setCollectionMetadata(collType, {authoritativeChunk});
+
+    // The in-memory CSR is a stale legacy full routing table with a different, two-chunk view of
+    // the same collection at an older version (does not allow gaps).
+    auto staleChunks = makeCoveringChunks(
+        collType, 2, ChunkVersion({collType.getEpoch(), collType.getTimestamp()}, {1, 0}));
+    installLegacyFullTableCsr(collType, staleChunks);
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+        auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+        ASSERT_EQ(metadata->getChunkManager()->numChunks(), 2);
+        ASSERT_FALSE(metadata->allowGaps());
+    }
+
+    // Commit while flagged as receiving the first chunk. The passed chunks are ignored; the
+    // metadata is bootstrapped from the global catalog instead of merged as a delta.
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(),
+        kTestNss,
+        toConfigBSONVector({authoritativeChunk}),
+        true /* receivingFirstChunk */);
+
+    // The bootstrap clears the CSR via an invalidate rather than replicating a delta.
+    ASSERT_EQ(countCommandOplogEntries("updateCollectionMetadata", kTestNss), 0);
+    ASSERT_GTE(countCommandOplogEntries("invalidateCollectionMetadata", kTestNss), 1);
+
+    // The installed metadata reflects the global catalog (one chunk, gap-allowing), NOT the stale
+    // two-chunk legacy CSR.
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 1);
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadata);
+    ASSERT_TRUE(metadata->hasRoutingTable());
+    ASSERT_TRUE(metadata->allowGaps());
+    ASSERT_EQ(metadata->getChunkManager()->numChunks(), 1);
+}
+
+// Bootstrapping on a first-chunk commit is idempotent: a retry produces the same durable and
+// in-memory state.
+TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsReceivingFirstChunkIsIdempotent) {
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+    auto chunkDocs = toConfigBSONVector(chunks);
+
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, chunkDocs, true /* receivingFirstChunk */);
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, chunkDocs, true /* receivingFirstChunk */);
+
+    ASSERT_EQ(countCommandOplogEntries("updateCollectionMetadata", kTestNss), 0);
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 1);
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadata);
+    ASSERT_TRUE(metadata->hasRoutingTable());
+    ASSERT_EQ(metadata->getChunkManager()->numChunks(), 1);
+}
+
 TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsMergeDeletesAllCoveredChunks) {
     // Start with the key space tiled as [MIN,1) [1,2) [2,3) [3,MAX).
     auto [collType, _] = makeCollectionMetadata(0);
@@ -826,6 +968,54 @@ TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsDeltaOplogEntryIsIdem
     ASSERT_EQ(metadata->getCollPlacementVersion(), splitChunks.back().getVersion());
 }
 
+// A secondary applies chunk-operation deltas by replaying the oplog entry through
+// onUpdateCollectionMetadata against its own CSR. If that CSR is a legacy full routing table (does
+// not allow gaps), merging a delta that discards the lower-bound chunk would be rejected as
+// inconsistent -- fatal during oplog application. The op observer must convert the base to a
+// gap-allowing table first and then merge. The result keeps the other shard's chunks (a
+// non-canonical full table with gaps) but routes correctly, and is corrected on the next full
+// recovery. Each node makes this decision from its own CSR.
+TEST_F(CommitCollectionMetadataLocallyTest,
+       OnUpdateCollectionMetadataMergesDeltaOntoLegacyFullTableCsr) {
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    // Produce a delta oplog entry that hands this shard the middle range [50, 100). The CSR is left
+    // unknown here (not bootstrapped): the commit only needs to emit the oplog entry, and applying
+    // it on the primary is a no-op on an unknown base, so the legacy CSR installed below starts
+    // fresh at a version older than the delta.
+    auto deltaVersion = chunks.back().getVersion();
+    deltaVersion.incMajor();
+    auto deltaChunk = makeChunk(collType, key(50), key(100), deltaVersion, kMyShardName);
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, toConfigBSONVector({deltaChunk}));
+    auto oplogEntry = repl::OplogEntry(findLastOplogEntry());
+    ASSERT_EQ(oplogEntry.getObject().firstElementFieldNameStringData(), "updateCollectionMetadata");
+
+    // Put this node's CSR into a legacy full-table shape owned entirely by another shard:
+    // [MinKey, 100) and [100, MaxKey), contiguous and not allowing gaps.
+    auto baseVersion = ChunkVersion({collType.getEpoch(), collType.getTimestamp()}, {1, 0});
+    auto base1 = makeChunk(collType, key(MINKEY), key(100), baseVersion, ShardId("0"));
+    baseVersion.incMinor();
+    auto base2 = makeChunk(collType, key(100), key(MAXKEY), baseVersion, ShardId("0"));
+    installLegacyFullTableCsr(collType, {base1, base2});
+
+    // Replay the delta as a secondary would. This must not throw.
+    ShardServerOpObserver observer;
+    observer.onUpdateCollectionMetadata(operationContext(), oplogEntry);
+
+    // The delta was merged onto the (converted) gap-allowing base rather than cleared: this shard
+    // now owns [50, 100), the other shard's [100, MaxKey) is retained, and [MinKey, 50) is a gap.
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadata);
+    ASSERT_TRUE(metadata->allowGaps());
+    ASSERT_EQ(metadata->getChunkManager()->numChunks(), 2);
+    ASSERT(metadata->keyBelongsToMe(key(70)));    // owned: [50, 100)
+    ASSERT(!metadata->keyBelongsToMe(key(150)));  // other shard: [100, MaxKey)
+    ASSERT(!metadata->keyBelongsToMe(key(10)));   // gap: [MinKey, 50)
+}
+
 TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsBootstrapsLocalCollectionMetadata) {
     auto [collType, chunks] = makeCollectionMetadata(1);
     mockCatalogClient()->setCollectionMetadata(collType, chunks);
@@ -841,6 +1031,88 @@ TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsBootstrapsLocalCollec
     auto collDocs = findLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace);
     ASSERT_EQ(collDocs.size(), 1u);
     ASSERT_EQ(UUID::fromCDR(collDocs[0].getField("uuid").uuid()), collType.getUuid());
+}
+
+// A migration recipient that currently owns no chunks has a known-but-unowned CSR (no routing
+// table). It is flagged as receiving its first chunk, so the commit bootstraps the collection
+// metadata from the global catalog rather than applying a delta on top of the absent routing table.
+// This leaves the recipient primary with a usable routing table right away, without forcing a lazy
+// recovery on the next access.
+TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsHandlesUnownedCsr) {
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    // Put the CSR into the kUnowned state: known metadata, but no routing table.
+    CollectionShardingRuntime::acquireExclusive(operationContext(), kTestNss)
+        ->setCollectionMetadata(operationContext(),
+                                CollectionMetadata{},
+                                CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+        auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+        ASSERT_TRUE(metadata);
+        ASSERT_FALSE(metadata->hasRoutingTable());
+    }
+
+    // Receiving the first chunk bootstraps from the global catalog. It must not throw.
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, toConfigBSONVector(chunks), true /* receivingFirstChunk */);
+
+    // The metadata is durable, and the in-memory metadata is installed as known (with a routing
+    // table) from the global catalog instead of left cleared.
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 1);
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadata);
+    ASSERT_TRUE(metadata->hasRoutingTable());
+    ASSERT_EQ(metadata->getChunkManager()->numChunks(), 1);
+    ASSERT_EQ(metadata->getCollPlacementVersion(), chunks.back().getVersion());
+}
+
+// A donor that gives up its last chunk must end with a correct, known CSR: it still knows the
+// collection's routing table and version, but owns no chunks (tracked-unowned, shard placement
+// version unset). It must not be left owning the migrated chunk, nor cleared to unknown.
+TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsHandlesDonorGivingUpLastChunk) {
+    const auto myShardId = ShardingState::get(operationContext())->shardId();
+
+    // Build a collection whose single chunk is owned by this shard.
+    auto [collType, _] = makeCollectionMetadata(1);
+    auto ownedChunk =
+        makeChunk(collType,
+                  key(MINKEY),
+                  key(MAXKEY),
+                  ChunkVersion({collType.getEpoch(), collType.getTimestamp()}, {1, 0}),
+                  myShardId);
+    mockCatalogClient()->setCollectionMetadata(collType, {ownedChunk});
+
+    // Bootstrap the CSR owning its single chunk.
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+        auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+        ASSERT_TRUE(metadata);
+        ASSERT_TRUE(metadata->getShardPlacementVersion().isSet());
+    }
+
+    // The single chunk is migrated to another shard with a bumped version, at the same generation;
+    // this shard keeps nothing.
+    auto migratedVersion = ownedChunk.getVersion();
+    migratedVersion.incMajor();
+    auto migratedChunk = makeChunk(
+        collType, ownedChunk.getMin(), ownedChunk.getMax(), migratedVersion, ShardId("otherShard"));
+
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, toConfigBSONVector({migratedChunk}));
+
+    // The CSR is known with a routing table but owns no chunks (tracked-unowned), at the new
+    // collection version.
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadata);
+    ASSERT_TRUE(metadata->hasRoutingTable());
+    ASSERT_FALSE(scopedCsr->isUnowned());
+    ASSERT_FALSE(metadata->getShardPlacementVersion().isSet());
+    ASSERT_EQ(metadata->getCollPlacementVersion(), migratedChunk.getVersion());
 }
 
 // This test verifies that chunks are inserted before collections. This is necessary because

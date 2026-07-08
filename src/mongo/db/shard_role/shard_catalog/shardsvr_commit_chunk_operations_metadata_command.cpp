@@ -109,7 +109,10 @@ public:
                     Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor());
 
                 shard_catalog_commit::commitChunkOperationsMetadataLocally(
-                    newOpCtx.get(), ns(), request().getNewChunks());
+                    newOpCtx.get(),
+                    ns(),
+                    request().getNewChunks(),
+                    request().getReceivingFirstChunk());
             }
 
             LOGV2_INFO(12698802,

@@ -91,7 +91,8 @@ public:
      * This is determined by comparing the collection version against the highest chunk version
      * among the changed chunks.
      */
-    CollectionMetadata makeUpdated(const std::vector<ChunkType>& changedChunks) const;
+    CollectionMetadata makeUpdated(const std::vector<ChunkType>& changedChunks,
+                                   bool forceAllowGaps = false) const;
 
     /**
      * Returns a CollectionMetadata object for an untracked collection.
@@ -116,6 +117,16 @@ public:
 
     bool hasRoutingTable() const {
         return _cm && getChunkManagerBase().hasRoutingTable();
+    }
+
+    /**
+     * Returns true if the routing table holds only this shard's owned chunks and may have gaps in
+     * the key range (an authoritative shard-catalog filtering table). A legacy full routing table
+     * that holds every chunk of the collection does not allow gaps. Returns false when there is no
+     * routing table.
+     */
+    bool allowGaps() const {
+        return hasRoutingTable() && getChunkManagerBase().allowGaps();
     }
 
     bool allowMigrations() const;

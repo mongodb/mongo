@@ -87,3 +87,7 @@ structs:
                 type: ChunkVersion
                 optional: true
                 description: "Donor shard placement version captured before the migration."
+            changedChunks:
+                type: array<object_owned>
+                optional: true
+                description: "Chunks changed by the migration commit, in config BSON format."
