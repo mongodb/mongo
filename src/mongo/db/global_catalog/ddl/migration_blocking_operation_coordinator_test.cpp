@@ -65,7 +65,8 @@ protected:
     }
 
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
-        return std::make_unique<Service>(serviceContext, std::move(_externalStateFactory));
+        return std::make_unique<Service>(
+            serviceContext, std::move(_externalStateFactory), [](ServiceContext*) {});
     }
 
     ShardingCoordinatorId getCoordinatorId() const {

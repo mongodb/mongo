@@ -78,6 +78,7 @@
 #include "mongo/db/router_role/routing_cache/shard_server_catalog_cache_loader_impl.h"
 #include "mongo/db/s/max_key_orphan_detection.h"
 #include "mongo/db/s/migration_util.h"
+#include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
@@ -688,8 +689,7 @@ void ShardingInitializationMongoD::onStepUpBegin(OperationContext* opCtx, long l
                 [&]() -> bool { return _isPrimary.load(); });
         });
     }
-    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
-        ShardingState::get(opCtx)->enabled()) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         migrationutil::registerMigrationRecoveryJobs(opCtx, term);
     }
 }
@@ -776,6 +776,12 @@ void ShardingInitializationMongoD::onStepUpComplete(OperationContext* opCtx, lon
             // Kick off the one-shot MaxKey orphan detector for this term. Runs asynchronously
             // and is cancelled on stepdown.
             launchMaxKeyOrphanDetectionOnStepUp(opCtx, term);
+        } else {
+            // ShardingState isn't enabled yet, so none of the recovery work above can run
+            // meaningfully. Still resolve the legacy migration recovery job registered in
+            // onStepUpBegin, so it doesn't block RangeDeleterService recovery for the rest of the
+            // term.
+            RangeDeleterService::get(opCtx)->notifyRecoveryJobComplete(term);
         }
 
         // The code above will only be executed after a stepdown happens, however the code below

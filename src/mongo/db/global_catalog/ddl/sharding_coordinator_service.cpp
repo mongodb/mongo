@@ -319,11 +319,19 @@ void ShardingCoordinatorService::waitForOngoingCoordinatorsToFinish(
 }
 
 void ShardingCoordinatorService::_onServiceInitialization() {
-    std::lock_guard lg(_mutex);
-    invariant(_state == State::kPaused);
-    invariant(_numCoordinatorsToWait == 0);
-    invariant(_numActiveCoordinatorsPerTypeAndOfcv.empty());
-    _state = State::kRecovering;
+    {
+        std::lock_guard lg(_mutex);
+        invariant(_state == State::kPaused);
+        invariant(_numCoordinatorsToWait == 0);
+        invariant(_numActiveCoordinatorsPerTypeAndOfcv.empty());
+        _state = State::kRecovering;
+    }
+
+    // TODO SERVER-130762: This this being called from here mostly because it was convenient, but
+    // we should reconsider if there is a better way to handle this. Specifically, this is not in
+    // migration_util.cpp because it would cause a dependency cycle between sharding_runtime_d and
+    // sharding_ddl_coordinators_d.
+    _moveRangeRecoveryNotifier(getGlobalServiceContext());
 }
 
 void ShardingCoordinatorService::_onServiceTermination() {

@@ -167,8 +167,8 @@ void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const Namespa
 }
 
 void registerMigrationRecoveryJobs(OperationContext* opCtx, long long term) {
-    // Reset the stat before either recovery path (standalone batch or per-coordinator) contributes
-    // its count via fetchAndAdd on onStepUpComplete.
+    // Reset the stat before either recovery path (standalone batch or MoveRangeCoordinator batch)
+    // contributes its count via fetchAndAdd on onStepUpComplete.
     ShardingStatistics::get(opCtx).unfinishedMigrationFromPreviousPrimary.store(0);
 
     // Register a recovery job for migrationutil::resumeMigrationCoordinationsOnStepUp(), which
@@ -176,14 +176,9 @@ void registerMigrationRecoveryJobs(OperationContext* opCtx, long long term) {
     // notifyRecoveryJobComplete once when the entire batch finishes.
     RangeDeleterService::get(opCtx)->registerRecoveryJob(term);
 
-    // Register one recovery job per unfinished MoveRangeCoordinator. Each coordinator calls
-    // notifyRecoveryJobComplete individually at the end of its _recoveryFlow.
-    DBDirectClient client(opCtx);
-    const auto count = client.count(NamespaceString::kShardingDDLCoordinatorsNamespace,
-                                    BSON("_id.operationType" << "moveRange"));
-    for (long long i = 0; i < count; ++i) {
-        RangeDeleterService::get(opCtx)->registerRecoveryJob(term);
-    }
+    // Register a second recovery job on behalf of MoveRangeCoordinator recovery, resolved later
+    // from ShardingCoordinatorService::_onServiceInitialization().
+    RangeDeleterService::get(opCtx)->registerRecoveryJob(term);
 }
 
 BSONObj getQueryFilterForRangeDeletionTask(const UUID& collectionUuid, const ChunkRange& range) {

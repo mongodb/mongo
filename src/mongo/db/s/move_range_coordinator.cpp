@@ -38,12 +38,10 @@
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
 #include "mongo/db/persistent_task_store.h"
-#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/migration_util.h"
-#include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
@@ -606,11 +604,6 @@ void MoveRangeCoordinator::_releaseCriticalSectionAndFinalize(OperationContext* 
             store.count(
                 opCtx, BSON(MigrationCoordinatorDocument::kIdFieldName << _doc.getMigrationId())) ==
                 0);
-
-    if (_recoveredFromDisk) {
-        const auto term = repl::ReplicationCoordinator::get(opCtx)->getTerm();
-        RangeDeleterService::get(opCtx)->notifyRecoveryJobComplete(term);
-    }
 
     _scopedDonateChunk->signalComplete(outcome);
 }

@@ -37,6 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/active_migrations_registry.h"
+#include "mongo/db/s/notify_range_deleter_after_move_range_recovery.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
 #include "mongo/executor/scoped_task_executor.h"
@@ -71,9 +72,12 @@ public:
     explicit ShardingCoordinatorService(
         ServiceContext* serviceContext,
         std::unique_ptr<ShardingCoordinatorExternalStateFactory> externalStateFactory =
-            std::make_unique<ShardingCoordinatorExternalStateFactoryImpl>())
+            std::make_unique<ShardingCoordinatorExternalStateFactoryImpl>(),
+        std::function<void(ServiceContext*)> moveRangeRecoveryNotifier =
+            asyncNotifyRangeDeleterAfterMoveRangeRecovery)
         : PrimaryOnlyService(serviceContext),
-          _externalStateFactory(std::move(externalStateFactory)) {}
+          _externalStateFactory(std::move(externalStateFactory)),
+          _moveRangeRecoveryNotifier(std::move(moveRangeRecoveryNotifier)) {}
 
 
     ~ShardingCoordinatorService() override = default;
@@ -184,6 +188,7 @@ private:
         _numActiveCoordinatorsPerTypeAndOfcv;
 
     std::unique_ptr<ShardingCoordinatorExternalStateFactory> _externalStateFactory;
+    std::function<void(ServiceContext*)> _moveRangeRecoveryNotifier;
 };
 
 }  // namespace mongo

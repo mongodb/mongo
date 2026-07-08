@@ -68,7 +68,10 @@ public:
         repl::StorageInterface::set(serviceContext, std::move(storageMock));
 
         auto registry = repl::PrimaryOnlyServiceRegistry::get(serviceContext);
-        registry->registerService(std::make_unique<ShardingCoordinatorService>(serviceContext));
+        registry->registerService(std::make_unique<ShardingCoordinatorService>(
+            serviceContext,
+            std::make_unique<ShardingCoordinatorExternalStateFactoryImpl>(),
+            [](ServiceContext*) {}));
     }
 
     void tearDown() override {

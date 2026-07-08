@@ -220,14 +220,17 @@ MONGO_MOD_NEEDS_REPLACEMENT void assertNoMigrationsRemaining(OperationContext* o
 void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const NamespaceString& nss);
 
 /**
- * Registers RangeDeleterService recovery jobs for all migration coordinator recovery work that
- * will run in onStepUpComplete. Must be called during onStepUpBegin so that all jobs are
- * registered before the RangeDeleterService scan can complete and unblock range deletions.
+ * Registers two RangeDeleterService recovery jobs. Must be called during onStepUpBegin so both
+ * jobs are registered before the RangeDeleterService scan can complete and unblock range
+ * deletions.
  *
- * Registers one job for the legacy standalone migration recovery path
+ * The first is for the legacy standalone migration recovery path
  * (resumeMigrationCoordinationsOnStepUp), which recovers all standalone coordinators as a single
- * batch. Registers one additional job per unfinished MoveRangeCoordinator, each of which notifies
- * completion individually at the end of its _recoveryFlow.
+ * batch and resolves the job once the batch finishes.
+ *
+ * The second is on behalf of MoveRangeCoordinator recovery, resolved later from
+ * ShardingCoordinatorService::_onServiceInitialization() (see
+ * notify_range_deleter_after_move_range_recovery.h).
  */
 MONGO_MOD_PUBLIC void registerMigrationRecoveryJobs(OperationContext* opCtx, long long term);
 
