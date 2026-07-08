@@ -1,0 +1,13 @@
+load("@rules_python//python:defs.bzl", "py_test")
+
+py_test(
+    name = "test_generate_extension_configs",
+    srcs = [
+        "__init__.py",
+        "test_generate_extension_configs.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib/extensions",
+    ],
+)

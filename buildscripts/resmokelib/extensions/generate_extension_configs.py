@@ -58,9 +58,11 @@ def generate_extension_configs(
 
     extension_names = []
 
-    # Create the output directory with restricted permissions so it is not world-writable.
+    # Create the output directory with restricted permissions so it is not world-writable. The
+    # mode passed to makedirs() is ignored if the directory already exists, so chmod explicitly.
     conf_out_dir = get_conf_out_dir()
     os.makedirs(conf_out_dir, mode=0o700, exist_ok=True)
+    os.chmod(conf_out_dir, 0o700)
 
     for so_file in so_files:
         # path/to/libfoo_mongo_extension.so -> libfoo_mongo_extension
