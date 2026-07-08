@@ -3078,6 +3078,20 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_unit_test(
+    name = "feature_compatibility_version_metrics_test",
+    srcs = [
+        "feature_compatibility_version_metrics_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":feature_compatibility_version_metrics",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/unittest:server_parameter_guard",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "server_lifecycle_monitor_test",
     srcs = [
         "server_lifecycle_monitor_test.cpp",

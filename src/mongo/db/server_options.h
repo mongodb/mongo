@@ -32,10 +32,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
+#include "mongo/db/feature_compatibility_version_document_gen.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/logv2/log_format.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/platform/rwmutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/cidr.h"
@@ -44,6 +46,8 @@
 
 #include <algorithm>
 #include <ctime>
+#include <mutex>
+#include <shared_mutex>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -303,16 +307,31 @@ struct MONGO_MOD_PUB ServerGlobalParams {
         }
 
         void reset() {
-            _version.store(FCV::kUnsetDefaultLastLTSBehavior);
+            setVersion(FCV::kUnsetDefaultLastLTSBehavior);
         }
 
+        // if you have an FeatureCompatibilityVersionDocument, you should use
+        // setVersionFromFCVDocument() instead of this function
         void setVersion(FCV version) {
-            return _version.store(version);
+            std::unique_lock lk(_fcvDocMutex);
+            _fcvDoc = boost::none;
+            _version.store(version);
+        }
+
+        void setVersionFromFCVDocument(const FeatureCompatibilityVersionDocument& fcvDoc);
+
+        // fcvDoc is null if setVersion(doc) was never called. callback must be fast.
+        template <typename Callback>
+        void withAcquiredFCVDocument(Callback&& callback) const {
+            std::shared_lock lk(_fcvDocMutex);
+            callback(_fcvDoc ? &*_fcvDoc : nullptr);
         }
 
     private:
+        // Protects both _fcvDoc and _version.
+        mutable RWMutex _fcvDocMutex;
+        boost::optional<FeatureCompatibilityVersionDocument> _fcvDoc;
         Atomic<FCV> _version{FCV::kUnsetDefaultLastLTSBehavior};
-
     } mutableFCV;
 
     // Const reference for featureCompatibilityVersion checks.

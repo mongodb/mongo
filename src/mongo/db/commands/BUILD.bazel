@@ -1257,6 +1257,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_seventh_group"],
     deps = [
         "mongod_fcv",
+        "//src/mongo/db/op_observer:fcv_op_observer",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
     ],
 )

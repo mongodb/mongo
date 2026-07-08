@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/feature_compatibility_version_document_gen.h"
 #include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_util.h"
@@ -77,7 +78,7 @@ MONGO_FAIL_POINT_DEFINE(pauseBeforeCloseCxns);
 MONGO_FAIL_POINT_DEFINE(finishedDropConnections);
 
 void FcvOpObserver::_setVersion(OperationContext* opCtx,
-                                multiversion::FeatureCompatibilityVersion newVersion,
+                                const FeatureCompatibilityVersionDocument& fcvDoc,
                                 bool onRollback,
                                 bool withinRecoveryUnit,
                                 boost::optional<Timestamp> commitTs) {
@@ -91,9 +92,12 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
     if (prevFcvSnapshot.isVersionInitialized()) {
         prevVersion = prevFcvSnapshot.getVersion();
     }
-    serverGlobalParams.mutableFCV.setVersion(newVersion);
+    serverGlobalParams.mutableFCV.setVersionFromFCVDocument(fcvDoc);
 
     const auto newFcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    // The effective (possibly transitional) FCV that was just stored; used below for wire-version
+    // and connection-handling decisions.
+    const auto newVersion = newFcvSnapshot.getVersion();
     newFcvSnapshot.logFCVWithContext("setFCV"sv);
     FeatureCompatibilityVersion::updateMinWireVersion(opCtx);
 
@@ -203,6 +207,7 @@ void FcvOpObserver::_onInsertOrUpdate(OperationContext* opCtx, const BSONObj& do
         return;
     }
     auto newVersion = uassertStatusOK(FeatureCompatibilityVersionParser::parse(doc));
+    auto fcvDoc = FeatureCompatibilityVersionDocument::parse(doc);
 
     // To avoid extra log messages when the targetVersion is set/unset, only log when the
     // version changes.
@@ -221,8 +226,8 @@ void FcvOpObserver::_onInsertOrUpdate(OperationContext* opCtx, const BSONObj& do
     }
 
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-        [newVersion](OperationContext* opCtx, boost::optional<Timestamp> ts) {
-            _setVersion(opCtx, newVersion, false /*onRollback*/, true /*withinRecoveryUnit*/, ts);
+        [fcvDoc](OperationContext* opCtx, boost::optional<Timestamp> ts) {
+            _setVersion(opCtx, fcvDoc, false /*onRollback*/, true /*withinRecoveryUnit*/, ts);
         });
 }
 
@@ -280,11 +285,13 @@ void FcvOpObserver::onReplicationRollback(OperationContext* opCtx,
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
         if (swVersion.isOK() && (swVersion.getValue() != memoryFcv)) {
             auto diskFcv = swVersion.getValue();
+            auto fcvDoc = FeatureCompatibilityVersionDocument::parse(featureCompatibilityVersion);
             LOGV2(4675801,
                   "Setting featureCompatibilityVersion as part of rollback",
                   "newVersion"_attr = multiversion::toString(diskFcv),
                   "oldVersion"_attr = multiversion::toString(memoryFcv));
-            _setVersion(opCtx, diskFcv, true /*onRollback*/, false /*withinRecoveryUnit*/);
+            _setVersion(
+                opCtx, fcvDoc, true /*onRollback*/, false /*withinRecoveryUnit*/, boost::none);
             // The rollback FCV is already in the stable snapshot.
             FeatureCompatibilityVersion::clearLastFCVUpdateTimestamp();
         }

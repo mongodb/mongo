@@ -31,6 +31,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status/server_status.h"
+#include "mongo/db/feature_compatibility_version_document_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/version/releases.h"
 
@@ -54,26 +55,24 @@ public:
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
         BSONObjBuilder bob;
-        const ServerGlobalParams::FCVSnapshot fcvSnapshot =
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-        if (fcvSnapshot.isVersionInitialized()) {
-            bob.append("major", multiversion::majorVersion(fcvSnapshot.getVersion()));
-            bob.append("minor", multiversion::minorVersion(fcvSnapshot.getVersion()));
-
-            int currentlyTransitioning = 0;
-            // (Generic FCV reference): append information to serverStatus on if we are in a state
-            // of transitioning to a new FCV (upgrading or downgrading).
-            if (fcvSnapshot.isUpgradingOrDowngrading()) {
-                const auto transitionInfo =
-                    multiversion::getTransitionFCVInfo(fcvSnapshot.getVersion());
-                currentlyTransitioning = 1;
-                // from is greater, we are downgrading
-                if (transitionInfo.from > transitionInfo.to) {
-                    currentlyTransitioning = -1;
+        serverGlobalParams.featureCompatibility.withAcquiredFCVDocument(
+            [&](const FeatureCompatibilityVersionDocument* fcvDoc) {
+                if (!fcvDoc) {
+                    return;
                 }
-            }
-            bob.append("transitioning", currentlyTransitioning);
-        }
+                auto to = fcvDoc->getTargetVersion();
+                auto version = to.value_or(fcvDoc->getVersion());
+                bob.append("major", multiversion::majorVersion(version));
+                bob.append("minor", multiversion::minorVersion(version));
+
+                int currentlyTransitioning = 0;
+                if (to) {
+                    auto from = fcvDoc->getPreviousVersion().value_or(fcvDoc->getVersion());
+                    // from is greater, we are downgrading
+                    currentlyTransitioning = (from > *to) ? -1 : 1;
+                }
+                bob.append("transitioning", currentlyTransitioning);
+            });
 
         return bob.obj();
     }

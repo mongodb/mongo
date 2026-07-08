@@ -29,11 +29,14 @@
 
 #include "mongo/db/commands/feature_compatibility_version.h"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/feature_compatibility_version_gen.h"
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"
 #include "mongo/db/feature_compatibility_version_document_gen.h"
 #include "mongo/db/feature_compatibility_version_parser.h"
+#include "mongo/db/op_observer/fcv_op_observer.h"
+#include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -59,6 +62,7 @@ namespace {
 using FCV = multiversion::FeatureCompatibilityVersion;
 
 class FeatureCompatibilityVersionTestFixture : public CatalogTestFixture {
+protected:
     void setUp() override {
         CatalogTestFixture::setUp();
 
@@ -651,6 +655,116 @@ TEST_F(FeatureCompatibilityVersionTestFixture,
 
     ASSERT_OK(
         FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(operationContext()));
+}
+
+// ---- InitializeForStartup tests ----
+
+static FeatureCompatibilityVersionDocument getFCVDocument() {
+    FeatureCompatibilityVersionDocument doc;
+    serverGlobalParams.mutableFCV.withAcquiredFCVDocument(
+        [&](const FeatureCompatibilityVersionDocument* fcvDoc) {
+            ASSERT(fcvDoc);
+            doc = *fcvDoc;
+        });
+    return doc;
+}
+
+struct StartupFCVScenario {
+    std::string name;
+    FCV targetVersion;  // Steady or transitional FCV to write before startup.
+    boost::optional<SetFCVPhaseEnum> phase;
+    FCV expectedVersion;
+};
+
+class InitializeForStartupTest : public FeatureCompatibilityVersionTestFixture,
+                                 public testing::WithParamInterface<StartupFCVScenario> {};
+
+INSTANTIATE_TEST_SUITE_P(
+    InitializeForStartup,
+    InitializeForStartupTest,
+    testing::ValuesIn(std::vector<StartupFCVScenario>{
+        {"SteadyState",
+         multiversion::GenericFCV::kLatest,
+         boost::none,
+         multiversion::GenericFCV::kLatest},
+        {"EarlyUpgrade",
+         multiversion::GenericFCV::kUpgradingFromLastLTSToLatest,
+         SetFCVPhaseEnum::kStart,
+         multiversion::GenericFCV::kUpgradingFromLastLTSToLatest},
+        {"LateUpgrade",
+         multiversion::GenericFCV::kUpgradingFromLastLTSToLatest,
+         SetFCVPhaseEnum::kEnableTargetFeatures,
+         multiversion::GenericFCV::kLatest},
+        {"Downgrade",
+         multiversion::GenericFCV::kDowngradingFromLatestToLastLTS,
+         SetFCVPhaseEnum::kStart,
+         multiversion::GenericFCV::kDowngradingFromLatestToLastLTS},
+    }),
+    [](const testing::TestParamInfo<InitializeForStartupTest::ParamType>& info) {
+        return info.param.name;
+    });
+
+TEST_P(InitializeForStartupTest, InitializeForStartupSetsFCVDocument) {
+    const auto& s = GetParam();
+
+    doStartupFCVSequence(multiversion::GenericFCV::kLatest);
+
+    FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
+        operationContext(), s.targetVersion, s.phase, boost::none, boost::none);
+
+    serverGlobalParams.mutableFCV.reset();
+
+    {
+        Lock::GlobalWrite lk(operationContext());
+        FeatureCompatibilityVersion::initializeForStartup(operationContext());
+    }
+
+    auto snapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    ASSERT_EQ(snapshot.getVersion(), s.expectedVersion);
+
+    auto swOnDiskFCVDoc =
+        FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(operationContext());
+    ASSERT_OK(swOnDiskFCVDoc.getStatus());
+
+    auto fcvDoc = getFCVDocument();
+    ASSERT_BSONOBJ_EQ(swOnDiskFCVDoc.getValue(), fcvDoc.toBSON());
+}
+
+TEST_F(InitializeForStartupTest, InitializeForStartupNoDocument) {
+    Lock::GlobalWrite lk(operationContext());
+    FeatureCompatibilityVersion::initializeForStartup(operationContext());
+
+    auto snapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    ASSERT_FALSE(snapshot.isVersionInitialized());
+}
+
+// ---- FCVOpObserver E2E test ----
+
+class FCVOpObserverE2ETest : public FeatureCompatibilityVersionTestFixture {
+public:
+    void setUp() override {
+        FeatureCompatibilityVersionTestFixture::setUp();
+        auto* registry = checked_cast<OpObserverRegistry*>(getServiceContext()->getOpObserver());
+        registry->addObserver(std::make_unique<FcvOpObserver>());
+    }
+};
+
+TEST_F(FCVOpObserverE2ETest, SetsFCVDocumentOnDocumentWrite) {
+    doStartupFCVSequence(multiversion::GenericFCV::kLastLTS);
+
+    FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
+        operationContext(),
+        multiversion::GenericFCV::kUpgradingFromLastLTSToLatest,
+        SetFCVPhaseEnum::kEnableTargetFeatures,
+        boost::none,
+        boost::none);
+
+    auto snapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    ASSERT_EQ(snapshot.getVersion(), multiversion::GenericFCV::kLatest);
+
+    auto fcvDoc = getFCVDocument();
+    ASSERT_EQ(fcvDoc.getTargetVersion(), multiversion::GenericFCV::kLatest);
+    ASSERT_EQ(fcvDoc.getPreviousVersion(), multiversion::GenericFCV::kLastLTS);
 }
 
 }  // namespace

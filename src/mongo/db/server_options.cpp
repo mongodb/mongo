@@ -29,10 +29,13 @@
 
 #include "mongo/db/server_options.h"
 
+#include "mongo/db/feature_compatibility_version_document_gen.h"
+#include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
 #include "mongo/util/version/releases.h"
 
+#include <mutex>
 #include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
@@ -49,6 +52,14 @@ ServerGlobalParams serverGlobalParams;
 
 std::string ServerGlobalParams::getPortSettingHelpText() {
     return str::stream() << "Specify port number - " << serverGlobalParams.port << " by default";
+}
+
+void ServerGlobalParams::MutableFCV::setVersionFromFCVDocument(
+    const FeatureCompatibilityVersionDocument& fcvDoc) {
+    auto version = uassertStatusOK(FeatureCompatibilityVersionParser::parse(fcvDoc.toBSON()));
+    std::unique_lock lk(_fcvDocMutex);
+    _fcvDoc = fcvDoc;
+    _version.store(version);
 }
 
 void ServerGlobalParams::FCVSnapshot::logFCVWithContext(std::string_view context) const {

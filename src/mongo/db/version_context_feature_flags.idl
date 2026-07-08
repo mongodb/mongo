@@ -58,3 +58,9 @@ feature_flags:
         default: true
         version: 8.2
         fcv_gated: true
+
+    featureFlagSymmetricFCV:
+        description: Enable the persistence and resumability of setFCV by phases, as well as the extra metadata upgrade phase
+        cpp_varname: gFeatureFlagSymmetricFCV
+        default: true
+        fcv_gated: false

@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/feature_compatibility_version_document_gen.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/operation_context.h"
@@ -95,7 +96,7 @@ private:
      * servers and closing open transactions if necessary. Increments the server TopologyVersion.
      */
     static void _setVersion(OperationContext* opCtx,
-                            multiversion::FeatureCompatibilityVersion newVersion,
+                            const FeatureCompatibilityVersionDocument& fcvDoc,
                             bool onRollback,
                             bool withinRecoveryUnit,
                             boost::optional<Timestamp> commitTs = boost::none);

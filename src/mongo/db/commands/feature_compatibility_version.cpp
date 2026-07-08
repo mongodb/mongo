@@ -63,6 +63,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
+#include "mongo/db/version_context_feature_flags_gen.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/idl_parser.h"
@@ -835,14 +836,15 @@ void FeatureCompatibilityVersion::initializeForStartup(OperationContext* opCtx) 
     }
 
     auto version = swVersion.getValue();
-    serverGlobalParams.mutableFCV.setVersion(version);
+    auto onDiskFCVDoc =
+        FeatureCompatibilityVersionDocument::parse(featureCompatibilityVersion.getValue());
+    serverGlobalParams.mutableFCV.setVersionFromFCVDocument(onDiskFCVDoc);
     FeatureCompatibilityVersion::updateMinWireVersion(opCtx);
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-
     fcvSnapshot.logFCVWithContext("startup"sv);
 
-    // On startup, if the version is in an upgrading or downgrading state, print a warning.
-    if (fcvSnapshot.isUpgradingOrDowngrading()) {
+    // A target version means that the last setFCV command did not complete, so we print a warning.
+    if (onDiskFCVDoc.getTargetVersion()) {
         LOGV2_WARNING_OPTIONS(
             4978301,
             {logv2::LogTag::kStartupWarnings},
