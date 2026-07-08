@@ -197,18 +197,6 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const Data
             21030, "Failed to repair database", logAttrs(dbName), "error"_attr = status);
     }
 
-    try {
-        // Restore oplog Collection pointer cache.
-        repl::acquireOplogCollectionForLogging(opCtx);
-    } catch (...) {
-        // The only expected exception is an interrupt.
-        opCtx->checkForInterrupt();
-        LOGV2_FATAL_CONTINUE(
-            21031,
-            "Unexpected exception encountered while reacquiring oplog collection after repair.");
-        std::terminate();  // Logs additional info about the specific error.
-    }
-
     return status;
 }
 

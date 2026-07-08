@@ -69,7 +69,6 @@ mongo_cc_library(
         ":record_store_base",
         ":recovery_unit_base",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:shard_role_api",
         "//src/mongo/db/storage/kv:kv_engine",
     ],
 )

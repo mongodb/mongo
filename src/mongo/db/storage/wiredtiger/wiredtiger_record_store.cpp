@@ -1557,10 +1557,6 @@ std::unique_ptr<SeekableRecordCursor> WiredTigerRecordStore::Oplog::getRawCursor
     return cursor;
 }
 
-WiredTigerRecordStore::Oplog::~Oplog() {
-    _kvEngine->getOplogManager()->stop(this);
-}
-
 std::unique_ptr<SeekableRecordCursor> WiredTigerRecordStore::Oplog::getCursor(
     OperationContext* opCtx, RecoveryUnit& ru, bool forward) const {
     return std::make_unique<WiredTigerOplogCursor>(opCtx, ru, *this, forward);

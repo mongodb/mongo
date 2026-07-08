@@ -57,7 +57,6 @@ protected:
         auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service);
         ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
         repl::ReplicationCoordinator::set(service, std::move(replCoord));
-        repl::createOplog(_opCtx);
     }
     NamespaceString testNss = NamespaceString::createNamespaceString_forTest("test.curColl");
 };

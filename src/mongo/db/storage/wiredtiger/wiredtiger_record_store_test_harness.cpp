@@ -105,7 +105,11 @@ static const auto kOplogOptions = [] {
     return oplogRecordStoreOptions;
 }();
 
-std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStore() {
+RecordStore& WiredTigerHarnessHelper::oplogRecordStore() {
+    if (_oplog) {
+        return *_oplog;
+    }
+
     std::string ident = _identForNs(redactTenant(NamespaceString::kRsOplogNamespace));
     ServiceContext::UniqueOperationContext opCtx(newOperationContext());
     auto& provider = rss::ReplicatedStorageService::get(opCtx.get()).getPersistenceProvider();
@@ -114,34 +118,10 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStore() {
     const auto res = _engine->createRecordStore(
         provider, ru, NamespaceString::kRsOplogNamespace, ident, kOplogOptions);
     wuow.commit();
-    return _engine->getRecordStore(
+    _oplog = _engine->getRecordStore(
         opCtx.get(), NamespaceString::kRsOplogNamespace, ident, kOplogOptions, UUID::gen());
-}
-
-std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit() {
-    std::string ident = _identForNs(redactTenant(NamespaceString::kRsOplogNamespace));
-    ServiceContext::UniqueOperationContext opCtx(newOperationContext());
-    auto& provider = rss::ReplicatedStorageService::get(opCtx.get()).getPersistenceProvider();
-    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-    WriteUnitOfWork wuow(opCtx.get());
-    const auto res = _engine->createRecordStore(
-        provider, ru, NamespaceString::kRsOplogNamespace, ident, kOplogOptions);
-    wuow.commit();
-
-    // Cannot use 'getRecordStore', which automatically starts the the oplog manager.
-    return std::make_unique<WiredTigerRecordStore::Oplog>(
-        _engine.get(),
-        WiredTigerRecoveryUnit::get(ru),
-        WiredTigerRecordStore::Oplog::Params{.uuid = UUID::gen(),
-                                             .ident = ident,
-                                             .engineName = std::string{kWiredTigerEngineName},
-                                             .inMemory = false,
-                                             // Large enough not to exceed capped limits.
-                                             .oplogMaxSize = kOplogOptions.oplogMaxSize,
-                                             .sizeStorer = nullptr,
-                                             .tracksSizeAdjustments = true,
-                                             .isLogged = true,
-                                             .forceUpdateWithFullDocument = false});
+    _engine->getOplogManager()->start(opCtx.get(), *_engine, *_oplog);
+    return *_oplog;
 }
 
 std::unique_ptr<RecoveryUnit> WiredTigerHarnessHelper::newRecoveryUnit() {

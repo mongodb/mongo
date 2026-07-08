@@ -58,7 +58,7 @@ public:
     virtual std::unique_ptr<RecordStore> newRecordStore(const std::string& ns,
                                                         const RecordStore::Options& rsOptions) = 0;
 
-    virtual std::unique_ptr<RecordStore> newOplogRecordStore() = 0;
+    virtual RecordStore& oplogRecordStore() = 0;
 
     virtual KVEngine* getEngine() = 0;
 

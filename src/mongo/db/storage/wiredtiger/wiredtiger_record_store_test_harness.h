@@ -62,6 +62,7 @@ public:
 #else
         constexpr bool memLeakAllowed = true;
 #endif
+        _engine->getOplogManager()->stop(_oplog.get());
         _engine->cleanShutdown(memLeakAllowed);
     }
 
@@ -85,18 +86,13 @@ public:
                                                 const RecordStore::Options& recordStoreOptions,
                                                 boost::optional<UUID> uuid);
 
-    std::unique_ptr<RecordStore> newOplogRecordStore() override;
+    RecordStore& oplogRecordStore() override;
 
     KVEngine* getEngine() final {
         return _engine.get();
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() override;
-
-    /**
-     * Create an oplog record store without starting the oplog manager.
-     */
-    std::unique_ptr<RecordStore> newOplogRecordStoreNoInit();
 
     WiredTigerConnection& connection() {
         return _engine->getConnection();
@@ -116,6 +112,7 @@ private:
     unittest::TempDir _dbpath;
     ClockSourceMock _cs;
     std::unique_ptr<WiredTigerKVEngine> _engine;
+    std::unique_ptr<RecordStore> _oplog;
     bool _isReplSet;
 };
 }  // namespace mongo

@@ -681,6 +681,10 @@ public:
         return _oplogManager.get();
     }
 
+    bool isReplSet() const final {
+        return _isReplSet;
+    }
+
     /**
      * Specifies what data will get flushed to disk in a WiredTigerConnection::waitUntilDurable()
      * call.

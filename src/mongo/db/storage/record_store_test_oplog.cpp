@@ -57,13 +57,13 @@ namespace {
 
 StatusWith<RecordId> insertBSON(ServiceContext::UniqueOperationContext& opCtx,
                                 KVEngine* engine,
-                                std::unique_ptr<RecordStore>& rs,
+                                RecordStore* rs,
                                 const Timestamp& opTime) {
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
     BSONObj obj = BSON("ts" << opTime);
     StorageWriteTransaction txn(ru);
     Status status = engine->oplogDiskLocRegister(
-        *shard_role_details::getRecoveryUnit(opCtx.get()), rs.get(), opTime, false);
+        *shard_role_details::getRecoveryUnit(opCtx.get()), rs, opTime, false);
     if (!status.isOK())
         return StatusWith<RecordId>(status);
     StatusWith<RecordId> res = rs->insertRecord(opCtx.get(),
@@ -78,11 +78,11 @@ StatusWith<RecordId> insertBSON(ServiceContext::UniqueOperationContext& opCtx,
 
 RecordId _oplogOrderInsertOplog(OperationContext* opCtx,
                                 KVEngine* engine,
-                                const std::unique_ptr<RecordStore>& rs,
+                                RecordStore* rs,
                                 int inc) {
     Timestamp opTime = Timestamp(5, inc);
     Status status = engine->oplogDiskLocRegister(
-        *shard_role_details::getRecoveryUnit(opCtx), rs.get(), opTime, false);
+        *shard_role_details::getRecoveryUnit(opCtx), rs, opTime, false);
     ASSERT_OK(status);
     BSONObj obj = BSON("ts" << opTime);
     StatusWith<RecordId> res = rs->insertRecord(
@@ -93,7 +93,7 @@ RecordId _oplogOrderInsertOplog(OperationContext* opCtx,
 
 TEST(RecordStoreTest, SeekOplog) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
-    std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
+    auto rs = &harnessHelper->oplogRecordStore();
     auto engine = harnessHelper->getEngine();
 
     {
@@ -139,7 +139,7 @@ TEST(RecordStoreTest, SeekOplog) {
     // Make sure all are visible.
     {
         auto opCtx = harnessHelper->newOperationContext();
-        engine->waitForAllEarlierOplogWritesToBeVisible(opCtx.get(), rs.get());
+        engine->waitForAllEarlierOplogWritesToBeVisible(opCtx.get(), rs);
     }
 
     // Forward cursor seeks
@@ -230,7 +230,7 @@ TEST(RecordStoreTest, SeekOplog) {
 
 TEST(RecordStoreTest, OplogInsertOutOfOrder) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
-    std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
+    auto rs = &harnessHelper->oplogRecordStore();
     auto engine = harnessHelper->getEngine();
 
     {
@@ -243,7 +243,7 @@ TEST(RecordStoreTest, OplogInsertOutOfOrder) {
     }
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        engine->waitForAllEarlierOplogWritesToBeVisible(opCtx.get(), rs.get());
+        engine->waitForAllEarlierOplogWritesToBeVisible(opCtx.get(), rs);
         auto cursor = rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
         ASSERT_EQ(cursor->next()->id, RecordId(1, 1));
         ASSERT_EQ(cursor->next()->id, RecordId(1, 2));
@@ -254,7 +254,7 @@ TEST(RecordStoreTest, OplogInsertOutOfOrder) {
 
 /**
  * Stringifies the current 'record', as well as any more records in the 'cursor'. Additionally adds
- * the latest oplog visibitility timestamp (this is the current oplog read timestamp, but may not
+ * the latest oplog visibility timestamp (this is the current oplog read timestamp, but may not
  * have been the timestamp used by the cursor).
  */
 std::string stringifyForDebug(OperationContext* opCtx,
@@ -284,7 +284,7 @@ std::string stringifyForDebug(OperationContext* opCtx,
 
 TEST(RecordStoreTest, OplogOrder) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
-    std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
+    auto rs = &harnessHelper->oplogRecordStore();
     auto engine = harnessHelper->getEngine();
 
     RecordId id1, id2, id3;
@@ -302,7 +302,7 @@ TEST(RecordStoreTest, OplogOrder) {
     // Make sure it is visible.
     {
         auto opCtx = harnessHelper->newOperationContext();
-        engine->waitForAllEarlierOplogWritesToBeVisible(opCtx.get(), rs.get());
+        engine->waitForAllEarlierOplogWritesToBeVisible(opCtx.get(), rs);
     }
 
     {
@@ -420,7 +420,7 @@ TEST(RecordStoreTest, OplogOrder) {
 
     {
         auto opCtx = harnessHelper->newOperationContext();
-        engine->waitForAllEarlierOplogWritesToBeVisible(opCtx.get(), rs.get());
+        engine->waitForAllEarlierOplogWritesToBeVisible(opCtx.get(), rs);
     }
 
     {  // now all 3 docs should be visible
@@ -461,7 +461,7 @@ TEST(RecordStoreTest, OplogOrder) {
 
     {
         auto opCtx = harnessHelper->newOperationContext();
-        engine->waitForAllEarlierOplogWritesToBeVisible(opCtx.get(), rs.get());
+        engine->waitForAllEarlierOplogWritesToBeVisible(opCtx.get(), rs);
     }
 
     {
@@ -532,7 +532,7 @@ TEST(RecordStoreTest, OplogOrder) {
 
     {
         auto opCtx = harnessHelper->newOperationContext();
-        engine->waitForAllEarlierOplogWritesToBeVisible(opCtx.get(), rs.get());
+        engine->waitForAllEarlierOplogWritesToBeVisible(opCtx.get(), rs);
     }
 
     {  // now all 3 docs should be visible
@@ -552,7 +552,7 @@ TEST(RecordStoreTest, OplogOrder) {
 TEST(RecordStoreTest, OplogVisibilityStandalone) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(
         newRecordStoreHarnessHelper(RecordStoreHarnessHelper::Options::Standalone));
-    std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
+    auto rs = &harnessHelper->oplogRecordStore();
 
     RecordId id1;
 

@@ -161,9 +161,8 @@ public:
 
         ReplSettings replSettings;
         replSettings.setReplSetString("rs0/host1");
-        ReplicationCoordinator::set(sc,
-                                    std::unique_ptr<repl::ReplicationCoordinator>(
-                                        new repl::ReplicationCoordinatorMock(sc, replSettings)));
+        ReplicationCoordinator::set(
+            sc, std::make_unique<repl::ReplicationCoordinatorMock>(sc, replSettings));
         ASSERT_OK(ReplicationCoordinator::get(sc)->setFollowerMode(MemberState::RS_PRIMARY));
 
         // Since the Client object persists across tests, even though the global
@@ -179,16 +178,15 @@ public:
         // Prevent upgrading from MODE_IX to MODE_X when deleteAll() is issued.
         Lock::GlobalWrite lk(&_opCtx);
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        WriteUnitOfWork wuow(&_opCtx);
 
         const Collection* c =
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
         if (!c) {
+            WriteUnitOfWork wuow(&_opCtx);
             c = ctx.db()->createCollection(&_opCtx, nss());
+            wuow.commit();
         }
-
         ASSERT(c->getIndexCatalog()->haveIdIndex(&_opCtx));
-        wuow.commit();
 
         _opCtx.getServiceContext()->getStorageEngine()->setOldestTimestamp(Timestamp(1, 1),
                                                                            false /*force*/);

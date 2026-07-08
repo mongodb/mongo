@@ -777,8 +777,9 @@ void createOplog(OperationContext* opCtx,
             auto databaseHolder = DatabaseHolder::get(opCtx);
             db = databaseHolder->openDb(opCtx, oplogCollectionName.dbName(), nullptr);
         }
-        invariant(db->createCollection(opCtx, oplogCollectionName, options));
-        acquireOplogCollectionForLogging(opCtx);
+        auto oplog = db->createCollection(opCtx, oplogCollectionName, options);
+        invariant(oplog);
+        establishOplogRecordStoreForLogging(opCtx, oplog->getRecordStore());
         if (!isReplSet) {
             service->getOpObserver()->onOpMessage(opCtx, BSONObj());
         }

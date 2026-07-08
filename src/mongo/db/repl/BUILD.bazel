@@ -1849,6 +1849,7 @@ mongo_cc_unit_test(
         "idempotency_document_structure_test.cpp",
         "insert_group_test.cpp",
         "isself_test.cpp",
+        "local_oplog_info_test.cpp",
         "member_config_test.cpp",
         "optime_extract_test.cpp",
         "primary_only_service_test.cpp",
@@ -2429,6 +2430,7 @@ mongo_cc_library(
         "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/storage:oplog_truncate_markers",
         "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/db/storage:storage_oplog_manager",
         "//src/mongo/db/topology/vector_clock:vector_clock_mutable",
     ],
 )

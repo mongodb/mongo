@@ -1165,8 +1165,8 @@ const Collection* CollectionCatalog::_instantiateCollectionIfTesting(
     // same as the latest one and cause a false positive failure.
     shouldInstantiateCollection &=
         nssOrUUID.isNamespaceString() && !nssOrUUID.nss().isFLE2StateCollection();
-    // TODO SERVER-122142: The oplog is handled specially here since it seems we would constantly
-    // start oplog visibility threads.
+    // TODO SERVER-129611: Instantiating the oplog on each access makes some jstests time out so we
+    // need a mechanism for those tests to opt-out of it before we can enable it by default.
     shouldInstantiateCollection &= nssOrUUID.isNamespaceString() && !nssOrUUID.nss().isOplog();
     // Viewless timeseries upgrade/downgrade relies on a hack that for a brief window will make
     // the durable state not correspond with what's in memory but expect the in-memory version

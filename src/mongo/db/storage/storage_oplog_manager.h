@@ -81,7 +81,7 @@ public:
      * timestamp. Every call to start() must be followed by at least one call to stop() before
      * start() can be called again.
      */
-    void start(OperationContext*, const KVEngine&, RecordStore& oplog, bool isReplSet);
+    void start(OperationContext*, const KVEngine&, RecordStore& oplog);
 
     /**
      * Stops the oplog manager if it is running for the given oplog.
@@ -131,6 +131,11 @@ public:
     bool isRunning_forTest() const {
         std::lock_guard lk(_oplogVisibilityStateMutex);
         return _oplog != nullptr;
+    }
+
+    bool isRunningForSpecificRS_forTest(const RecordStore* oplog) const {
+        std::lock_guard lk(_oplogVisibilityStateMutex);
+        return _oplog == oplog;
     }
 
 private:

@@ -461,8 +461,6 @@ public:
 
     Oplog(WiredTigerKVEngine*, WiredTigerRecoveryUnit&, Params);
 
-    ~Oplog() override;
-
     std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext*,
                                                     RecoveryUnit&,
                                                     bool forward = true) const override;

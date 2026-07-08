@@ -35,6 +35,7 @@
 #include "mongo/db/repl/oplog_visibility_manager.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/oplog_truncate_markers.h"
+#include "mongo/db/storage/storage_oplog_manager.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/timer.h"
 
@@ -173,6 +174,8 @@ private:
     // gFeatureFlagOplogVisibility is disabled.
     // TODO SERVER-85788: Update/remove this comment once the feature flag is removed.
     repl::OplogVisibilityManager _oplogVisibilityManager;
+
+    StorageOplogManager* _oplogManager = nullptr;
 };
 
 }  // namespace MONGO_MOD_PUB mongo

@@ -55,9 +55,8 @@
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
-#include "mongo/db/query/write_ops/write_ops.h"
-#include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -113,20 +112,34 @@ void insertOplogDocument(OperationContext* opCtx, Timestamp ts, std::string_view
         Lock::ResourceLock heldUntilEndOfWUOW{
             opCtx, ResourceId(RESOURCE_METADATA, coll->ns()), MODE_X};
     }
-    auto status = collection_internal::insertDocument(opCtx, *coll, stmt, nullptr);
-    if (!status.isOK()) {
-        std::cout << "Failed to insert oplog document: " << status.toString() << std::endl;
-    }
+    ASSERT_OK(collection_internal::insertDocument(opCtx, *coll, stmt, nullptr));
     wuow.commit();
 }
 
-void deleteAll(OperationContext& opCtx, const NamespaceString& ns) {
-    // Delete one-at-a-time because deleting all at once may used a batched delete which will fail
-    // upon encountering a document that does not contain an _id.
-    DBDirectClient client{&opCtx};
-    while (client.count(ns)) {
-        write_ops::checkWriteErrors(client.remove({ns, {{{}, false}}}));
+void dropCollection(OperationContext* opCtx, const NamespaceString& ns) {
+    auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, ns, AcquisitionPrerequisites::kWrite),
+        MODE_X);
+    if (!collection.exists()) {
+        return;
     }
+    auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, ns.dbName());
+    WriteUnitOfWork wuow(opCtx);
+    ASSERT_OK(db->dropCollectionEvenIfSystem(opCtx, ns));
+    wuow.commit();
+}
+
+void createOplog(OperationContext* opCtx, const NamespaceString& nss, size_t size) {
+    repl::ReplSettings replSettings;
+    replSettings.setOplogSizeBytes(size);
+    auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(opCtx->getServiceContext(),
+                                                                        replSettings);
+    ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+    repl::ReplicationCoordinator::set(opCtx->getServiceContext(), std::move(replCoord));
+
+    dropCollection(opCtx, nss);
+    repl::createOplog(opCtx, nss, false);
 }
 
 Database* getDbOrCreate(OperationContext* opCtx, const NamespaceString& nss) {
@@ -721,18 +734,7 @@ public:
             return;
         }
 
-        // Create a capped collection of size 10.
-        _client.dropCollection(_nss);
-        _client.createCollection(_nss, 10, true);
-        // WiredTiger storage engines forbid dropping of the oplog. Evergreen reuses nodes for
-        // testing, so the oplog may already exist on the test node; in this case, trying to create
-        // the oplog once again would fail.
-        //
-        // To ensure we are working with a clean oplog (an oplog without entries), we resort
-        // to truncating the oplog instead.
-        if (_opCtx.getServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
-            deleteAll(_opCtx, _nss);
-        }
+        createOplog(&_opCtx, _nss, 4096);
         const auto ns = _nss.ns_forTest();
         insertOplogDocument(&_opCtx, Timestamp(1000, 0), ns);
         insertOplogDocument(&_opCtx, Timestamp(1000, 1), ns);
@@ -769,18 +771,7 @@ public:
             return;
         }
 
-        // Create a capped collection of size 10.
-        _client.dropCollection(_nss);
-        _client.createCollection(_nss, 10, true);
-        // WiredTiger storage engines forbid dropping of the oplog. Evergreen reuses nodes for
-        // testing, so the oplog may already exist on the test node; in this case, trying to create
-        // the oplog once again would fail.
-        //
-        // To ensure we are working with a clean oplog (an oplog without entries), we resort
-        // to truncating the oplog instead.
-        if (_opCtx.getServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
-            deleteAll(_opCtx, _nss);
-        }
+        createOplog(&_opCtx, _nss, 4096);
 
         const auto ns = _nss.ns_forTest();
         insertOplogDocument(&_opCtx, Timestamp(1000, 0), ns);
@@ -1548,20 +1539,8 @@ public:
             return;
         }
 
-        BSONObj info;
-        _client.runCommand(DatabaseName::kLocal,
-                           BSON("create" << "oplog.querytests.findingstart"
-                                         << "capped" << true << "size" << 4096),
-                           info);
-        // WiredTiger storage engines forbid dropping of the oplog. Evergreen reuses nodes for
-        // testing, so the oplog may already exist on the test node; in this case, trying to create
-        // the oplog once again would fail.
-        //
-        // To ensure we are working with a clean oplog (an oplog without entries), we resort
-        // to truncating the oplog instead.
-        if (_opCtx.getServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
-            deleteAll(_opCtx, NamespaceString::createNamespaceString_forTest(ns()));
-        }
+        auto nss = NamespaceString::createNamespaceString_forTest(ns());
+        createOplog(&_opCtx, nss, 4096);
 
         unsigned i = 0;
         int max = 1;
@@ -1594,7 +1573,7 @@ public:
                 ASSERT_EQUALS((j > min ? j : min), next["ts"].timestamp().getInc());
             }
         }
-        _client.dropCollection(nss());
+        dropCollection(&_opCtx, nss);
     }
 };
 
@@ -1613,20 +1592,8 @@ public:
 
         size_t startNumCursors = numCursorsOpen();
 
-        BSONObj info;
-        _client.runCommand(DatabaseName::kLocal,
-                           BSON("create" << "oplog.querytests.findingstart"
-                                         << "capped" << true << "size" << 4096),
-                           info);
-        // WiredTiger storage engines forbid dropping of the oplog. Evergreen reuses nodes for
-        // testing, so the oplog may already exist on the test node; in this case, trying to create
-        // the oplog once again would fail.
-        //
-        // To ensure we are working with a clean oplog (an oplog without entries), we resort
-        // to truncating the oplog instead.
-        if (_opCtx.getServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
-            deleteAll(_opCtx, NamespaceString::createNamespaceString_forTest(ns()));
-        }
+        auto nss = NamespaceString::createNamespaceString_forTest(ns());
+        createOplog(&_opCtx, nss, 4096);
 
         unsigned i = 0;
         for (; i < 150; insertOplogDocument(&_opCtx, Timestamp(1000, i++), ns()))
@@ -1649,7 +1616,7 @@ public:
             }
         }
         ASSERT_EQUALS(startNumCursors, numCursorsOpen());
-        _client.dropCollection(nss());
+        dropCollection(&_opCtx, nss);
     }
 };
 
@@ -1672,27 +1639,17 @@ public:
 
         size_t startNumCursors = numCursorsOpen();
 
+        auto nss = NamespaceString::createNamespaceString_forTest(ns());
+
         // Check oplog replay mode with missing collection.
+        dropCollection(&_opCtx, nss);
         FindCommandRequest findRequestMissingColl{
             NamespaceString::createNamespaceString_forTest("local.oplog.querytests.missing")};
         findRequestMissingColl.setFilter(BSON("ts" << GTE << Timestamp(1000, 50)));
         std::unique_ptr<DBClientCursor> c0 = _client.find(std::move(findRequestMissingColl));
         ASSERT(!c0->more());
 
-        BSONObj info;
-        _client.runCommand(DatabaseName::kLocal,
-                           BSON("create" << "oplog.querytests.findingstart"
-                                         << "capped" << true << "size" << 4096),
-                           info);
-        // WiredTiger storage engines forbid dropping of the oplog. Evergreen reuses nodes for
-        // testing, so the oplog may already exist on the test node; in this case, trying to create
-        // the oplog once again would fail.
-        //
-        // To ensure we are working with a clean oplog (an oplog without entries), we resort
-        // to truncating the oplog instead.
-        if (_opCtx.getServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
-            deleteAll(_opCtx, NamespaceString::createNamespaceString_forTest(ns()));
-        }
+        createOplog(&_opCtx, nss, 4096);
 
         // Check oplog replay mode with empty collection.
         FindCommandRequest findRequest{NamespaceString::createNamespaceString_forTest(ns())};
@@ -1710,7 +1667,7 @@ public:
         // Check that no persistent cursors outlast our queries above.
         ASSERT_EQUALS(startNumCursors, numCursorsOpen());
 
-        _client.dropCollection(nss());
+        dropCollection(&_opCtx, nss);
     }
 };
 

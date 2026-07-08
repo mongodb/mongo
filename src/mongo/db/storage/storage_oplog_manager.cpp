@@ -58,8 +58,7 @@ constexpr int kDelayMillis = 100;
 
 void StorageOplogManager::start(OperationContext* opCtx,
                                 const KVEngine& engine,
-                                RecordStore& oplog,
-                                bool isReplSet) {
+                                RecordStore& oplog) {
     _oplogIdent = std::string{oplog.getIdent()};
 
     // Prime the oplog read timestamp.
@@ -77,7 +76,7 @@ void StorageOplogManager::start(OperationContext* opCtx,
                     1,
                     "Initializing the oplog read timestamp (oplog visibility).",
                     "oplogReadTimestamp"_attr = topOfOplogTimestamp);
-    } else if (isReplSet) {
+    } else if (engine.isReplSet()) {
         // Avoid setting oplog visibility to 0. That means "everything is visible".
         setOplogReadTimestamp(Timestamp(StorageEngine::kMinimumTimestamp));
     } else {
@@ -124,11 +123,6 @@ void StorageOplogManager::stop(const RecordStore* oplog) {
             return;
         }
 
-        // There are three things which stop the manager: clean shutdown, destroying a
-        // WiredTigerRecordStore::Oplog instance, and *creating* a WiredTigerRecordStore::Oplog
-        // instance. Creating a new Oplog instance stops the existing thread (if any) and starts a
-        // new one, and this may happen before the old Oplog instance is destroyed. If this happens,
-        // the destruction of the old instance needs to not stop the new thread.
         if (oplog && oplog != _oplog) {
             LOGV2_DEBUG(11996400,
                         1,

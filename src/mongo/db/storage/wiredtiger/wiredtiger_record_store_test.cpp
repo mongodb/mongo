@@ -291,11 +291,11 @@ TEST(WiredTigerRecordStoreTest, Isolation2) {
 
 RecordId oplogOrderInsertOplog(OperationContext* opCtx,
                                KVEngine* engine,
-                               const std::unique_ptr<RecordStore>& rs,
+                               RecordStore* rs,
                                int inc) {
     Timestamp opTime = Timestamp(5, inc);
     Status status = engine->oplogDiskLocRegister(
-        *shard_role_details::getRecoveryUnit(opCtx), rs.get(), opTime, false);
+        *shard_role_details::getRecoveryUnit(opCtx), rs, opTime, false);
     ASSERT_OK(status);
     BSONObj obj = BSON("ts" << opTime);
     StatusWith<RecordId> res = rs->insertRecord(
@@ -310,7 +310,7 @@ RecordId oplogOrderInsertOplog(OperationContext* opCtx,
  */
 TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityInOrder) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
-    std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
+    auto rs = &harnessHelper->oplogRecordStore();
     auto engine = static_cast<WiredTigerKVEngine*>(harnessHelper->getEngine());
     engine->getOplogManager()->stop(nullptr);
 
@@ -346,7 +346,7 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityInOrder) {
  */
 TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityOutOfOrder) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
-    std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
+    auto rs = &harnessHelper->oplogRecordStore();
     auto engine = static_cast<WiredTigerKVEngine*>(harnessHelper->getEngine());
     engine->getOplogManager()->stop(nullptr);
 
@@ -382,9 +382,8 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityOutOfOrder) {
     ASSERT(isOpHidden(id1));
     ASSERT(isOpHidden(id2));
 
-    bool isReplSet = false;
-    engine->getOplogManager()->start(longLivedOp.get(), *engine, *rs, isReplSet);
-    engine->waitForAllEarlierOplogWritesToBeVisible(longLivedOp.get(), rs.get());
+    engine->getOplogManager()->start(longLivedOp.get(), *engine, *rs);
+    engine->waitForAllEarlierOplogWritesToBeVisible(longLivedOp.get(), rs);
 
     ASSERT_FALSE(isOpHidden(id1));
     ASSERT_FALSE(isOpHidden(id2));
@@ -546,10 +545,10 @@ DEATH_TEST(WiredTigerRecordStoreTestDeathTest,
 
 TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
-    std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
+    auto rs = &harnessHelper->oplogRecordStore();
     auto engine = harnessHelper->getEngine();
 
-    auto wtRS = checked_cast<WiredTigerRecordStore::Oplog*>(rs.get());
+    auto wtRS = checked_cast<WiredTigerRecordStore::Oplog*>(rs);
 
     // 1) Initialize the top of oplog to "1".
     ServiceContext::UniqueOperationContext op1(harnessHelper->newOperationContext());
@@ -602,10 +601,10 @@ TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
 
 TEST(WiredTigerRecordStoreTest, CachedEarliestOplogTimestamp) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
-    std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
+    auto rs = &harnessHelper->oplogRecordStore();
     auto engine = harnessHelper->getEngine();
 
-    auto wtRS = checked_cast<WiredTigerRecordStore::Oplog*>(rs.get());
+    auto wtRS = checked_cast<WiredTigerRecordStore::Oplog*>(rs);
 
     ServiceContext::UniqueOperationContext op(harnessHelper->newOperationContext());
     auto& ru = *shard_role_details::getRecoveryUnit(op.get());
@@ -654,46 +653,6 @@ TEST(WiredTigerRecordStoreTest, CachedEarliestOplogTimestamp) {
         txn.abort();
     }
     ASSERT_EQ(ts2, wtRS->getCachedEarliestTimestamp());
-}
-
-TEST(WiredTigerRecordStoreTest, OplogDestructorAutomaticallyStopsOplogManager) {
-    auto harnessHelper = newRecordStoreHarnessHelper();
-    auto oplogManager =
-        static_cast<WiredTigerKVEngine*>(harnessHelper->getEngine())->getOplogManager();
-
-    ASSERT_FALSE(oplogManager->isRunning_forTest());
-    auto rs(harnessHelper->newOplogRecordStore());
-    ASSERT_TRUE(oplogManager->isRunning_forTest());
-    rs.reset();
-    ASSERT_FALSE(oplogManager->isRunning_forTest());
-}
-
-TEST(WiredTigerRecordStoreTest, OplogDestructorOnlyStopsCorrectOplogManager) {
-    auto harnessHelper = newRecordStoreHarnessHelper();
-    auto oplogManager =
-        static_cast<WiredTigerKVEngine*>(harnessHelper->getEngine())->getOplogManager();
-
-    ASSERT_FALSE(oplogManager->isRunning_forTest());
-
-    // Creating rs2 stops the thread for rs1 and starts it for itself, so destroying rs1 should not
-    // stop the thread.
-    auto rs1 = harnessHelper->newOplogRecordStore();
-    ASSERT_TRUE(oplogManager->isRunning_forTest());
-    auto rs2 = harnessHelper->newOplogRecordStore();
-    ASSERT_TRUE(oplogManager->isRunning_forTest());
-    rs1.reset();
-    ASSERT_TRUE(oplogManager->isRunning_forTest());
-    rs2.reset();
-    ASSERT_FALSE(oplogManager->isRunning_forTest());
-
-    // Destroying rs2 first should stop the thread even though rs1 still exists
-    rs1 = harnessHelper->newOplogRecordStore();
-    rs2 = harnessHelper->newOplogRecordStore();
-    ASSERT_TRUE(oplogManager->isRunning_forTest());
-    rs2.reset();
-    ASSERT_FALSE(oplogManager->isRunning_forTest());
-    rs1.reset();
-    ASSERT_FALSE(oplogManager->isRunning_forTest());
 }
 
 TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterNext) {
