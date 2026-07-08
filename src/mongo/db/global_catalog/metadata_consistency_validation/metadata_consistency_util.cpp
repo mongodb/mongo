@@ -534,13 +534,6 @@ const stdx::unordered_set<std::string_view> kStrictChunkValidationIgnoredFields 
     // A shard catalog commit can copy it into the durable catalog, but the shard catalog never
     // needs to read it.
     "jumbo",
-    // lastmod: on the authoritative resharding path, coordinator state transitions can bump
-    // config.chunks placement versions even when the config.collections writes are no-ops.
-    // Participants learn about resharding via explicit commands rather than placement refreshes,
-    // so the shard catalog is not updated and its chunk lastmod can legitimately lag global
-    // config.chunks. TODO(SERVER-128917): stop ignoring once those placement version bumps are
-    // skipped for non-committing coordinator transitions.
-    "lastmod",
 };
 
 /**
@@ -552,6 +545,7 @@ BSONObj chunkToStrictComparableBSON(const ChunkType& chunk) {
     BSONObjBuilder builder;
     chunk.getRange().serialize(&builder);
     chunk.getShard().serialize(ChunkType::shard.name(), &builder);
+    builder.appendTimestamp(ChunkType::lastmod.name(), chunk.getVersion().toLong());
     if (const auto& onCurrentShardSince = chunk.getOnCurrentShardSince()) {
         builder.append(ChunkType::onCurrentShardSince.name(), *onCurrentShardSince);
     }

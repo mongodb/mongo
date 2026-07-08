@@ -1770,10 +1770,6 @@ TEST_F(MetadataConsistencyShardCatalogTest,
 
 TEST_F(MetadataConsistencyShardCatalogTest,
        ValidateCollectionMetadata_StrictChunks_ReportsMismatchedField_Lastmod) {
-    // TODO(SERVER-128917): Remove this skip once placement version bumps are skipped on the
-    // authoritative resharding path and strict validation compares chunk lastmod again.
-    GTEST_SKIP();
-
     const auto localUuid = setUpLocalCollection();
     auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
     const OID epoch = OID::gen();
