@@ -44,7 +44,9 @@ function runAndAssertThrows(operand, code) {
 // Test BinData subtype.
 runAndAssert(BinData(0, "gf1UcxdHTJ2HQ/EGQrO7mQ=="), 0);
 runAndAssert(BinData(1, "gf1UcxdHTJ2HQ/EGQrO7mQ=="), 1);
-runAndAssert(BinData(2, "gf1UcxdHTJ2HQ/EGQrO7mQ=="), 2);
+// ByteArrayDeprecated (2): bytes[0..3] must encode (total - 4) as a LE int32.
+// Here total=16, so bytes[0..3] = 12 (0x0C 0x00 0x00 0x00).
+runAndAssert(BinData(2, "DAAAAAAAAAAAAAAAAAAAAA=="), 2);
 runAndAssert(BinData(3, "gf1UcxdHTJ2HQ/EGQrO7mQ=="), 3);
 runAndAssert(BinData(4, "gf1UcxdHTJ2HQ/EGQrO7mQ=="), 4);
 runAndAssert(BinData(5, "gf1UcxdHTJ2HQ/EGQrO7mQ=="), 5);

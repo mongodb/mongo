@@ -4258,6 +4258,98 @@ TEST_F(EvaluateConvertTest, ConvertDoubleToBinDataQuietNan) {
                         {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
 }
 
+TEST_F(EvaluateConvertTest, ConvertToBinDataByteArrayDeprecatedSubtypeBanned) {
+    auto expCtx = getExpCtx();
+    auto convertExp = Expression::parseExpression(
+        expCtx.get(),
+        BSON("$convert" << BSON("input" << "$path1"
+                                        << "to" << BSON("type" << "binData" << "subtype" << 2)
+                                        << "format" << toStringData(BinDataFormat::kBase64))),
+        expCtx->variablesParseState);
+    Document input{{"path1", "AAAAAAAAAAAAAAAAAAAAAA=="_sd}};
+    ASSERT_THROWS_CODE(
+        convertExp->evaluate(input, &expCtx->variables), AssertionException, 13016800);
+}
+
+TEST_F(EvaluateConvertTest, ConvertToBinDataEncryptSubtypeBanned) {
+    auto expCtx = getExpCtx();
+    auto convertExp = Expression::parseExpression(
+        expCtx.get(),
+        BSON("$convert" << BSON("input" << "$path1"
+                                        << "to" << BSON("type" << "binData" << "subtype" << 6)
+                                        << "format" << toStringData(BinDataFormat::kBase64))),
+        expCtx->variablesParseState);
+    Document input{{"path1", "AAAAAAAAAAAAAAAAAAAAAA=="_sd}};
+    ASSERT_THROWS_CODE(
+        convertExp->evaluate(input, &expCtx->variables), AssertionException, 13016801);
+}
+
+TEST_F(EvaluateConvertTest, ConvertToBinDataBdtUUIDWrongSizeFails) {
+    auto expCtx = getExpCtx();
+    auto convertExp = Expression::parseExpression(
+        expCtx.get(),
+        BSON("$convert" << BSON("input" << "$path1"
+                                        << "to" << BSON("type" << "binData" << "subtype" << 3)
+                                        << "format" << toStringData(BinDataFormat::kBase64))),
+        expCtx->variablesParseState);
+    // "AAAAAA==" base64-decodes to 4 bytes, not the required 16.
+    Document input{{"path1", "AAAAAA=="_sd}};
+    ASSERT_THROWS_CODE(
+        convertExp->evaluate(input, &expCtx->variables), AssertionException, 13016802);
+}
+
+TEST_F(EvaluateConvertTest, ConvertToBinDataMD5TypeWrongSizeFails) {
+    auto expCtx = getExpCtx();
+    auto convertExp = Expression::parseExpression(
+        expCtx.get(),
+        BSON("$convert" << BSON("input" << "$path1"
+                                        << "to" << BSON("type" << "binData" << "subtype" << 5)
+                                        << "format" << toStringData(BinDataFormat::kBase64))),
+        expCtx->variablesParseState);
+    // "AAAAAA==" base64-decodes to 4 bytes, not the required 16.
+    Document input{{"path1", "AAAAAA=="_sd}};
+    ASSERT_THROWS_CODE(
+        convertExp->evaluate(input, &expCtx->variables), AssertionException, 13016802);
+}
+
+TEST_F(EvaluateConvertTest, ConvertIntToBinDataBdtUUIDFailsSizeCheck) {
+    auto expCtx = getExpCtx();
+    auto convertExp =
+        Expression::parseExpression(expCtx.get(),
+                                    fromjson("{$convert: {input: '$path1', to: {type: 'binData', "
+                                             "subtype: 3}, byteOrder: 'little'}}"),
+                                    expCtx->variablesParseState);
+    // int32 is 4 bytes; bdtUUID requires exactly 16.
+    ASSERT_THROWS_CODE(convertExp->evaluate({{"path1", Value(42)}}, &expCtx->variables),
+                       AssertionException,
+                       13016802);
+}
+
+TEST_F(EvaluateConvertTest, ConvertLongToBinDataMD5TypeFailsSizeCheck) {
+    auto expCtx = getExpCtx();
+    auto convertExp =
+        Expression::parseExpression(expCtx.get(),
+                                    fromjson("{$convert: {input: '$path1', to: {type: 'binData', "
+                                             "subtype: 5}, byteOrder: 'little'}}"),
+                                    expCtx->variablesParseState);
+    // int64 is 8 bytes; MD5Type requires exactly 16.
+    ASSERT_THROWS_CODE(convertExp->evaluate({{"path1", Value(42LL)}}, &expCtx->variables),
+                       AssertionException,
+                       13016802);
+}
+
+TEST_F(EvaluateConvertTest, ConvertDoubleToBinDataBdtUUIDFailsSizeCheck) {
+    auto expCtx = getExpCtx();
+    auto convertExp =
+        Expression::parseExpression(expCtx.get(),
+                                    fromjson("{$convert: {input: '$path1', to: {type: 'binData', "
+                                             "subtype: 3}, byteOrder: 'little'}}"),
+                                    expCtx->variablesParseState);
+    // double is 8 bytes; bdtUUID requires exactly 16.
+    ASSERT_THROWS_CODE(convertExp->evaluate({{"path1", Value(1.5)}}, &expCtx->variables),
+                       AssertionException,
+                       13016802);
+}
 
 }  // namespace evaluate_convert_test
 
