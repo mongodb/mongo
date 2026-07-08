@@ -356,8 +356,9 @@ RetryStrategy::Result<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig
     invariant(readConcern.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern ||
               readConcern.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern);
 
-    repl::ReadConcernArgs commandReadConcern{configTime /* afterClusterTime */,
-                                             readConcern.getLevel()};
+    auto commandReadConcern = readConcern.getArgsAtClusterTime()
+        ? readConcern
+        : repl::ReadConcernArgs{configTime /* afterClusterTime */, readConcern.getLevel()};
 
     const Milliseconds maxTimeMS = getExhaustiveFindOnConfigMaxTimeMS(opCtx, nss);
 

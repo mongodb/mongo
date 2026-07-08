@@ -123,59 +123,69 @@ RetryStrategy::Result<Shard::QueryResponse> RSLocalClient::queryOnce(
     const boost::optional<BSONObj>& projection) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     boost::optional<ScopeGuard<std::function<void()>>> readSourceGuard;
+    boost::optional<ScopedReadConcern> scopedReadConcern;
 
     if (readConcern.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern ||
         readConcern.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
         invariant(!shard_role_details::getLocker(opCtx)->isLocked());
         invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
-        // Resets to the original read source at the end of this operation.
-        auto originalReadSource =
-            shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource();
-        boost::optional<Timestamp> originalReadTimestamp;
-        if (originalReadSource == RecoveryUnit::ReadSource::kProvided) {
-            originalReadTimestamp =
-                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
-        }
-        readSourceGuard.emplace([opCtx, originalReadSource, originalReadTimestamp] {
+        if (const auto atClusterTime = readConcern.getArgsAtClusterTime();
+            !atClusterTime.has_value()) {
+            // Resets to the original read source at the end of this operation.
+            auto originalReadSource =
+                shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource();
+            boost::optional<Timestamp> originalReadTimestamp;
             if (originalReadSource == RecoveryUnit::ReadSource::kProvided) {
-                shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
-                    originalReadSource, originalReadTimestamp);
-            } else {
-                shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
-                    originalReadSource);
+                originalReadTimestamp =
+                    shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
             }
-        });
-        // Sets up operation context with majority read snapshot so correct optime can be
-        // retrieved.
-        shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
-            RecoveryUnit::ReadSource::kMajorityCommitted);
-        Status status =
-            shard_role_details::getRecoveryUnit(opCtx)->majorityCommittedSnapshotAvailable();
-        if (!status.isOK()) {
-            return status;
-        }
+            readSourceGuard.emplace([opCtx, originalReadSource, originalReadTimestamp] {
+                if (originalReadSource == RecoveryUnit::ReadSource::kProvided) {
+                    shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
+                        originalReadSource, originalReadTimestamp);
+                } else {
+                    shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
+                        originalReadSource);
+                }
+            });
 
-        // Waits for any writes performed by this ShardLocal instance to be committed and
-        // visible. We hardcode majority here even if using snaphsot as both operations will do the
-        // initial snapshot at the majority timestamp.
-        Status readConcernStatus = replCoord->waitUntilOpTimeForRead(
-            opCtx,
-            repl::ReadConcernArgs{_getLastOpTime(), repl::ReadConcernLevel::kMajorityReadConcern});
-        if (!readConcernStatus.isOK()) {
-            return readConcernStatus;
-        }
-
-        status = shard_role_details::getRecoveryUnit(opCtx)->majorityCommittedSnapshotAvailable();
-        if (!status.isOK()) {
-            return status;
-        }
-        if (readConcern.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
-            // Snapshot readConcern starts a snapshot at the majority timestamp, acquire the
-            // timestamp now and overwrite the majority readConcern used above.
-            auto opTime = replCoord->getCurrentCommittedSnapshotOpTime();
+            // Sets up operation context with majority read snapshot so correct optime can be
+            // retrieved.
             shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
-                RecoveryUnit::ReadSource::kProvided, opTime.getTimestamp());
+                RecoveryUnit::ReadSource::kMajorityCommitted);
+            Status status =
+                shard_role_details::getRecoveryUnit(opCtx)->majorityCommittedSnapshotAvailable();
+            if (!status.isOK()) {
+                return status;
+            }
+            // Waits for any writes performed by this ShardLocal instance to be committed and
+            // visible. We hardcode majority here even if using snaphsot as both operations will do
+            // the initial snapshot at the majority timestamp.
+            Status readConcernStatus = replCoord->waitUntilOpTimeForRead(
+                opCtx,
+                repl::ReadConcernArgs{_getLastOpTime(),
+                                      repl::ReadConcernLevel::kMajorityReadConcern});
+            if (!readConcernStatus.isOK()) {
+                return readConcernStatus;
+            }
+
+            status =
+                shard_role_details::getRecoveryUnit(opCtx)->majorityCommittedSnapshotAvailable();
+            if (!status.isOK()) {
+                return status;
+            }
+            if (readConcern.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
+                // Snapshot readConcern starts a snapshot at the majority timestamp, acquire the
+                // timestamp now and overwrite the majority readConcern used above.
+                const auto opTime = replCoord->getCurrentCommittedSnapshotOpTime();
+                shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
+                    RecoveryUnit::ReadSource::kProvided, opTime.getTimestamp());
+            }
+        } else {
+            // If atClusterTime was specified, just use a ScopedReadConcern and let the
+            // DBDirectClient sort it out.
+            scopedReadConcern.emplace(opCtx, readConcern);
         }
     } else {
         invariant(readConcern.getLevel() == repl::ReadConcernLevel::kLocalReadConcern);
