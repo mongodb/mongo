@@ -98,6 +98,9 @@ std::vector<BSONObj> buildPipelineForConfigServerV2(
     auto clonedExpCtx = makeBlankExpressionContext(opCtx, nss);
     clonedExpCtx->setChangeStreamSpec(spec);
 
+    // No need to update feature counter metrics for the change stream again.
+    clonedExpCtx->setUpdateChangeStreamFeatureCounters(false);
+
     // Build pipeline with change stream stages.
     std::list<boost::intrusive_ptr<DocumentSource>> stages;
 

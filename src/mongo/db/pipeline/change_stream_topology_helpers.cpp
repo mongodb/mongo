@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/util/assert_util.h"
@@ -116,6 +117,7 @@ BSONObj createUpdatedCommandForNewShard(
     // the pipeline.
     pipeline_factory::MakePipelineOptions opts{.alreadyOptimized = false,
                                                .attachCursorSource = false};
+
     auto pipeline = pipeline_factory::makePipeline(
         shardCommand[AggregateCommandRequest::kPipelineFieldName], expCtx, opts);
 

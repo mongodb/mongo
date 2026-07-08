@@ -1057,6 +1057,14 @@ public:
         return _params.wasRateLimited;
     }
 
+    void setUpdateChangeStreamFeatureCounters(bool v) {
+        _params.updateChangeStreamFeatureCounters = v;
+    }
+
+    bool updateChangeStreamFeatureCounters() const {
+        return _params.updateChangeStreamFeatureCounters;
+    }
+
     bool isFeatureFlagMqlJsEngineGapEnabled() const {
         return _featureFlagMqlJsEngineGap.get(versionContextForFeatureFlagCheck());
     }
@@ -1268,6 +1276,11 @@ protected:
 
         // Indicates that the query is replanned after being rate-limited.
         bool wasRateLimited = false;
+
+        // If true, updates feature counter metrics for change stream queries on mongos/mongod.
+        // Can be set to false so that the same command does not update the feature counter
+        // metrics multiple times when opening additional cursors for the change stream.
+        bool updateChangeStreamFeatureCounters = true;
 
         // PathArrayness information keyed by namespace, covering the main collection and any
         // secondary collections involved in the query. An entry is absent if a collection

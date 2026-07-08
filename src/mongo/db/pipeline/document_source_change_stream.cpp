@@ -79,10 +79,6 @@ otel::metrics::Counter<int64_t>& makeCsCounter(otel::metrics::MetricName name,
         name, std::move(desc), otel::metrics::MetricUnit::kEvents, opts);
 }
 
-// Preserved on mongos at the old path until per-process option metrics are implemented.
-// When the follow-on mongos ticket lands, retire this alongside the new mongos counter.
-auto& csShowExpandedEventsRouter = *MetricBuilder<Counter64>{"changeStreams.showExpandedEvents"};
-
 // Renamed from "changeStreams.showExpandedEvents"; see downstream DWH/TOOLS ticket.
 auto& csOptShowExpandedEvents =
     makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionShowExpandedEvents,
@@ -456,9 +452,9 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromB
     // Save a copy of the spec on the expression context. Used when building the oplog filter.
     expCtx->setChangeStreamSpec(spec);
 
-    // Only increment on mongod (not router) during actual execution, not query shape parsing.
-    if (!expCtx->getInRouter() &&
-        expCtx->getMongoProcessInterface()->isExpectedToExecuteQueries()) {
+    // Only increment during actual execution, not query shape parsing.
+    if (expCtx->getMongoProcessInterface()->isExpectedToExecuteQueries() &&
+        expCtx->updateChangeStreamFeatureCounters()) {
         if (spec.getShowExpandedEvents().value_or(false))
             csOptShowExpandedEvents.add(1);
         if (spec.getShowMigrationEvents().value_or(false))
@@ -482,11 +478,9 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromB
         incrementFullDocumentMetric(spec.getFullDocument());
         incrementFullDocumentBeforeChangeMetric(spec.getFullDocumentBeforeChange());
         incrementScopeMetric(changeStream.getChangeStreamType());
-    }
 
-    // Preserve the legacy mongos metric at its old path until per-process option metrics land.
-    if (expCtx->getInRouter() && expCtx->getMongoProcessInterface()->isExpectedToExecuteQueries()) {
-        csShowExpandedEventsRouter.increment(spec.getShowExpandedEvents().value_or(false));
+        // Prevent updating the feature counters again for the same query.
+        expCtx->setUpdateChangeStreamFeatureCounters(false);
     }
 
     return change_stream::pipeline_helpers::buildPipeline(expCtx, spec, resumeToken);
