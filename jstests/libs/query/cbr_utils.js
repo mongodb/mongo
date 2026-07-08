@@ -124,6 +124,7 @@ export function getCBRConfig(db) {
             featureFlagCostBasedRanker: 1,
             internalQueryCBRCEMode: 1,
             automaticCEPlanRankingStrategy: 1,
+            internalSamplingSizeOverride: 1,
         }),
     );
 
@@ -131,6 +132,7 @@ export function getCBRConfig(db) {
         featureFlagCostBasedRanker: config.featureFlagCostBasedRanker.value,
         internalQueryCBRCEMode: config.internalQueryCBRCEMode,
         automaticCEPlanRankingStrategy: config.automaticCEPlanRankingStrategy,
+        internalSamplingSizeOverride: config.internalSamplingSizeOverride,
     };
 }
 
@@ -140,6 +142,7 @@ export function setCBRConfig(
         featureFlagCostBasedRanker = true,
         internalQueryCBRCEMode = "automaticCE",
         automaticCEPlanRankingStrategy = "CBRForNoMultiplanningResults",
+        internalSamplingSizeOverride = 0,
     } = {},
 ) {
     assert.commandWorked(
@@ -148,6 +151,7 @@ export function setCBRConfig(
             featureFlagCostBasedRanker,
             internalQueryCBRCEMode,
             automaticCEPlanRankingStrategy,
+            internalSamplingSizeOverride,
         }),
     );
 }

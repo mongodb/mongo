@@ -45,9 +45,11 @@
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration_test_util.h"
 #include "mongo/db/query/random_utils.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string_view>
@@ -594,6 +596,42 @@ TEST_F(SamplingEstimatorTest, SampleSize) {
             SamplingEstimatorForTesting::calculateSampleSize(el.first.first, el.first.second);
         ASSERT_EQUALS(size, el.second);
     }
+}
+
+TEST_F(SamplingEstimatorTest, SampleSizeRespectsSampleSizeParamState) {
+    const size_t card = 500;
+    insertDocuments(kTestNss, createDocuments(card));
+
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+
+    // When 'internalSamplingSizeOverride' is not set, the sample size is derived from confidence
+    // interval and margin of error (k95, 5.0 -> 384).
+    const size_t defaultSampleSize =
+        SamplingEstimatorForTesting::calculateSampleSize(SamplingConfidenceIntervalEnum::k95, 5.0);
+
+    auto cq =
+        createCanonicalQueryFromMatchExpression(*this, std::make_unique<AndMatchExpression>());
+    auto estimatorDefault = SamplingEstimatorImpl::makeDefaultSamplingEstimator(
+        *cq,
+        SamplingEstimatorTest::makeCardinalityEstimate(card),
+        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+        colls);
+    ASSERT_EQUALS(estimatorDefault->getSampleSize(), defaultSampleSize);
+
+    const int overrideSize = 100;
+    QueryKnobGuardForTest samplingSizeOverrideGuard{
+        operationContext(), "internalSamplingSizeOverride", overrideSize};
+
+    auto cqOverride =
+        createCanonicalQueryFromMatchExpression(*this, std::make_unique<AndMatchExpression>());
+    auto estimatorOverride = SamplingEstimatorImpl::makeDefaultSamplingEstimator(
+        *cqOverride,
+        SamplingEstimatorTest::makeCardinalityEstimate(card),
+        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+        colls);
+    ASSERT_EQUALS(estimatorOverride->getSampleSize(), static_cast<size_t>(overrideSize));
 }
 
 TEST_F(SamplingEstimatorTest, EstimateCardinality) {

@@ -110,6 +110,8 @@ mongo_cc_unit_test(
         "//src/mongo/db:query_exec",
         "//src/mongo/db/query:random_utils",
         "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:cbr_test_utils",
+        "//src/mongo/db/query/query_knobs:query_knob_configuration_test_util",
+        "//src/mongo/unittest:server_parameter_guard",
     ],
 )
 

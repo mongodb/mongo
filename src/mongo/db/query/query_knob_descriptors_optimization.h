@@ -243,6 +243,10 @@ inline AtomicWord<bool>& gKnobNoTableScan = storageGlobalParams.noTableScan;
          kSamplingMarginOfErrorName,                                                      \
          samplingMarginOfError,                                                           \
          getSamplingMarginOfError)                                                        \
+    KNOB(kSamplingSizeOverride,                                                           \
+         kInternalSamplingSizeOverrideName,                                               \
+         internalSamplingSizeOverride,                                                    \
+         getSamplingSizeOverride)                                                         \
     KNOB(kNumChunksForChunkBasedSampling,                                                 \
          kInternalQueryNumChunksForChunkBasedSamplingName,                                \
          internalQueryNumChunksForChunkBasedSampling,                                     \

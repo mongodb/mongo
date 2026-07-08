@@ -174,6 +174,34 @@ try {
     assertAllPlansUseSampling({a: {$lt: 100}}, 268.2291666666667);
     assertAllPlansUseSampling({a: {$lt: 100}}, 268.2291666666667);
 
+    // Test that internalSamplingSizeOverride directly controls the sample size, bypassing
+    // samplingConfidenceInterval and samplingMarginOfError. The sequential scan is still active
+    // here so the sample is deterministic; we verify that the explain metadata reflects the
+    // exact count requested via the override.
+    {
+        const overrideSize = 50;
+        setCBRConfig(db, {
+            featureFlagCostBasedRanker: true,
+            internalQueryCBRCEMode: "samplingCE",
+            internalSamplingSizeOverride: overrideSize,
+        });
+        const explain = coll.find({a: {$lt: 100}}).explain();
+        const ns = coll.getFullName();
+        const meta = explain.queryPlanner.ceSamplingMetadata[ns];
+        assert(meta, "expected ceSamplingMetadata in explain", {explain});
+        assert.eq(
+            meta.sampleRequestedDocCount,
+            overrideSize,
+            "sampleRequestedDocCount should match internalSamplingSizeOverride",
+            {meta},
+        );
+        setCBRConfig(db, {
+            featureFlagCostBasedRanker: true,
+            internalQueryCBRCEMode: "samplingCE",
+            internalSamplingSizeOverride: 0,
+        });
+    }
+
     // Require a sample larger than the collection and test that a full scan of the collection was
     // done to collect the sample. With the effective sample covering every document,
     // SamplingEstimatorImpl::makeScaledEstimate tags the CE as 'Code' (authoritative),

@@ -343,12 +343,18 @@ std::unique_ptr<CanonicalQuery> SamplingEstimatorImpl::makeEmptyCanonicalQuery(
 
 
 size_t SamplingEstimatorImpl::calculateSampleSize(SamplingConfidenceIntervalEnum ci,
-                                                  double marginOfError) {
+                                                  double marginOfError,
+                                                  int32_t sampleSizeOverride) {
+    if (sampleSizeOverride > 0) {
+        return static_cast<size_t>(sampleSizeOverride);
+    }
     uassert(9406301, "Margin of error should be larger than 0.", marginOfError > 0);
     double z = getZScore(ci);
     double ciWidth = 2 * marginOfError / 100.0;
+    size_t sampleSize = static_cast<size_t>(std::lround((z * z) / (ciWidth * ciWidth)));
+    tassert(sampleSize > 0, "Sample size should be larger than 0.", 113010001);
 
-    return static_cast<size_t>(std::lround((z * z) / (ciWidth * ciWidth)));
+    return sampleSize;
 }
 
 std::pair<std::unique_ptr<sbe::PlanStage>, mongo::stage_builder::PlanStageData>
@@ -1324,16 +1330,17 @@ std::unique_ptr<SamplingEstimator> SamplingEstimatorImpl::makeDefaultSamplingEst
     const MultipleCollectionAccessor& collections,
     SamplingSourceEnum samplingSource) {
     const auto& qkc = cq.getExpCtx()->getQueryKnobConfiguration();
+    const size_t sampleSize = calculateSampleSize(
+        qkc.getConfidenceInterval(), qkc.getSamplingMarginOfError(), qkc.getSamplingSizeOverride());
     return std::unique_ptr<ce::SamplingEstimatorImpl>(
         new ce::SamplingEstimatorImpl(cq.getOpCtx(),
                                       collections,
                                       cq.nss(),
                                       yieldPolicy,
+                                      sampleSize,
                                       qkc.getInternalQuerySamplingCEMethod(),
-                                      collCard,
-                                      qkc.getConfidenceInterval(),
-                                      qkc.getSamplingMarginOfError(),
                                       qkc.getNumChunksForChunkBasedSampling(),
+                                      collCard,
                                       cq.getExpCtx(),
                                       samplingSource));
 }

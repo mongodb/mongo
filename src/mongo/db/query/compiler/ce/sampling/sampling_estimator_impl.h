@@ -315,7 +315,9 @@ public:
      * where Z is the z-score for the confidence interval and
      * W is the width of the confidence interval, W = 2 * MoE.
      */
-    static size_t calculateSampleSize(SamplingConfidenceIntervalEnum ci, double marginOfError);
+    static size_t calculateSampleSize(SamplingConfidenceIntervalEnum ci,
+                                      double marginOfError,
+                                      int32_t sampleSizeOverride = 0);
 
 protected:
     /*
