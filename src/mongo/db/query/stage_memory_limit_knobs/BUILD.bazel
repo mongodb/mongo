@@ -24,11 +24,16 @@ mongo_cc_library(
     name = "stage_memory_limit_knobs",
     srcs = [
         "knobs.cpp",
+        "query_knob_descriptors.cpp",
         "stage_memory_limit_knobs_gen",
+    ],
+    hdrs = [
+        "query_knob_descriptors.h",
     ],
     local_defines = ["QUERY_STAGE_MEMORY_LIMITS_KNOBS_PRIVATE_OVERRIDE"],
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db/query:on_parameter_change_updaters",
+        "//src/mongo/db/query/query_knobs:query_knob",
     ],
 )

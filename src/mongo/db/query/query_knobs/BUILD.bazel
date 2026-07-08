@@ -42,6 +42,7 @@ mongo_cc_library(
         "//src/mongo/db/query:query_knobs",
         "//src/mongo/db/query:query_lifespan",
         "//src/mongo/db/query/query_settings",
+        "//src/mongo/db/query/stage_memory_limit_knobs",
     ],
 )
 
@@ -55,6 +56,7 @@ mongo_cc_library(
     ],
     deps = [
         ":query_knob_configuration",
+        "//src/mongo/db/query/stage_memory_limit_knobs",
         "//src/mongo/unittest:server_parameter_guard",
     ],
 )

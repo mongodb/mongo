@@ -59,6 +59,23 @@ const excludeKnobs = [
     // legitimate NoQueryExecutionPlans server-side guardrail, not a correctness divergence, so it
     // can't be compared against a forced-COLLSCAN control.
     "notablescan",
+    // Non-spilling stage memory limits: small values uassert instead of returning results, a
+    // server-side guardrail rather than a correctness divergence.
+    "internalDocumentSourceDensifyMaxMemoryBytes",
+    "internalQueryFacetBufferSizeBytes",
+    "internalOrStageMaxMemoryBytes",
+    "internalMergeSortStageMaxMemoryBytes",
+    "internalIndexScanStageMaxMemoryBytes",
+    "internalSlotBasedExecutionUniqueStageMaxMemoryBytes",
+    "internalSlotBasedExecutionMergeJoinStageMaxMemoryBytes",
+    "internalSlotBasedExecutionAndHashStageMaxMemoryBytes",
+    "internalUpdateStageMaxMemoryBytes",
+    "internalCountScanStageMaxMemoryBytes",
+    // Expression-evaluation byte limits: uassert (no spill) and apply to internal pipelines.
+    "internalSingleDocumentTransformationStageMaxExpressionEvaluationBytes",
+    "internalMatchStageMaxExpressionEvaluationBytes",
+    "internalLookupStageMaxExpressionEvaluationBytes",
+    "internalRedactStageMaxExpressionEvaluationBytes",
 ];
 
 const knobSchema = db

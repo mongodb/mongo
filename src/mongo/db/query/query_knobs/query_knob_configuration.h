@@ -39,6 +39,7 @@
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_settings/query_settings.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
+#include "mongo/db/query/stage_memory_limit_knobs/query_knob_descriptors.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -49,7 +50,8 @@ namespace mongo {
  */
 class QueryKnobConfiguration
     : public query_knobs::AccessorMixinQueryOptimizationKnobs<QueryKnobConfiguration>,
-      public query_knobs::AccessorMixinQueryExecutionKnobs<QueryKnobConfiguration> {
+      public query_knobs::AccessorMixinQueryExecutionKnobs<QueryKnobConfiguration>,
+      public query_knobs::AccessorMixinQueryStageMemoryLimitKnobs<QueryKnobConfiguration> {
 public:
     /**
      * NOTE: QueryKnobConfiguration construction requires 'querySettings', because settings may

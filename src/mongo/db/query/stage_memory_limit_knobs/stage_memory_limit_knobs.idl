@@ -31,7 +31,9 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/platform/atomic_word.h"
-        - "mongo/db/query/stage_memory_limit_knobs/knobs_protector.h"
+        # TODO SERVER-129580: knobs_protector.h temporarily removed while the memory-limit knobs
+        # are migrated to be read through QueryKnobConfiguration; re-add the private-access guard
+        # afterward.
 
 server_parameters:
     internalDocumentSourceLookupCacheSizeBytes:
@@ -46,6 +48,9 @@ server_parameters:
         validator:
             gte: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: documentSourceLookupCacheSizeBytes
 
     internalDocumentSourceGraphLookupMaxMemoryBytes:
         description: >-
@@ -59,6 +64,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: documentSourceGraphLookupMaxMemoryBytes
 
     internalDocumentSourceGroupMaxMemoryBytes:
         description: >-
@@ -72,6 +80,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: documentSourceGroupMaxMemoryBytes
 
     internalDocumentSourceSetWindowFieldsMaxMemoryBytes:
         description: >-
@@ -85,6 +96,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: documentSourceSetWindowFieldsMaxMemoryBytes
 
     internalDocumentSourceBucketAutoMaxMemoryBytes:
         description: >-
@@ -98,6 +112,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: documentSourceBucketAutoMaxMemoryBytes
 
     internalDocumentSourceDensifyMaxMemoryBytes:
         description: "Limits the number of bytes densification can use to store partition information."
@@ -109,6 +126,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: documentSourceDensifyMaxMemoryBytes
 
     internalQueryFacetBufferSizeBytes:
         description: "The number of bytes to buffer at once during a $facet stage."
@@ -120,6 +140,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: queryFacetBufferSizeBytes
 
     internalTextOrStageMaxMemoryBytes:
         description: >-
@@ -133,6 +156,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: textOrStageMaxMemoryBytes
 
     internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill:
         description: >-
@@ -146,6 +172,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: sbeHashLookupApproxMemoryUseInBytesBeforeSpill
 
     internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill:
         description: >-
@@ -159,6 +188,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: sbeHashAggApproxMemoryUseInBytesBeforeSpill
 
     internalQueryMaxSpoolMemoryUsageBytes:
         description: >-
@@ -173,6 +205,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: queryMaxSpoolMemoryUsageBytes
 
     internalQueryMaxBlockingSortMemoryUsageBytes:
         description: >-
@@ -187,6 +222,9 @@ server_parameters:
         validator:
             gte: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: queryMaxBlockingSortMemoryUsageBytes
 
     internalOrStageMaxMemoryBytes:
         description: >-
@@ -200,6 +238,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: orStageMaxMemoryBytes
 
     internalNearStageMaxMemoryBytes:
         description: >-
@@ -213,6 +254,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: nearStageMaxMemoryBytes
 
     internalMergeSortStageMaxMemoryBytes:
         description: >-
@@ -226,6 +270,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: mergeSortStageMaxMemoryBytes
 
     internalIndexScanStageMaxMemoryBytes:
         description: >-
@@ -239,6 +286,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: indexScanStageMaxMemoryBytes
 
     internalSlotBasedExecutionUniqueStageMaxMemoryBytes:
         description: >-
@@ -252,6 +302,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: sbeUniqueStageMaxMemoryBytes
 
     internalSlotBasedExecutionMergeJoinStageMaxMemoryBytes:
         description: >-
@@ -265,6 +318,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: sbeMergeJoinStageMaxMemoryBytes
 
     internalSlotBasedExecutionAndHashStageMaxMemoryBytes:
         description: >-
@@ -278,6 +334,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: sbeAndHashStageMaxMemoryBytes
 
     internalQuerySlotBasedExecutionHashJoinApproxMemoryUseInBytesBeforeSpill:
         description: >-
@@ -291,6 +350,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: sbeHashJoinApproxMemoryUseInBytesBeforeSpill
 
     internalUpdateStageMaxMemoryBytes:
         description: >-
@@ -304,6 +366,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: updateStageMaxMemoryBytes
 
     internalCountScanStageMaxMemoryBytes:
         description: >-
@@ -317,6 +382,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: countScanStageMaxMemoryBytes
 
     internalSingleDocumentTransformationStageMaxExpressionEvaluationBytes:
         description: >-
@@ -331,6 +399,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: singleDocumentTransformationStageMaxExpressionEvaluationBytes
 
     internalMatchStageMaxExpressionEvaluationBytes:
         description: >-
@@ -344,6 +415,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: matchStageMaxExpressionEvaluationBytes
 
     internalLookupStageMaxExpressionEvaluationBytes:
         description: >-
@@ -357,6 +431,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: lookupStageMaxExpressionEvaluationBytes
 
     internalRedactStageMaxExpressionEvaluationBytes:
         description: >-
@@ -370,3 +447,6 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: redactStageMaxExpressionEvaluationBytes
