@@ -106,6 +106,23 @@ SamplingConfig TracingSamplerImpl::getConfig() const {
     return _samplingConfig;
 }
 
+TracingSamplerStats TracingSamplerImpl::getStats() const {
+    auto snapshot = _samplerState.makeSnapshot();
+
+    TracingSamplerStats stats;
+    for (const auto& [name, rateLimiter] : snapshot->rateLimiterMap) {
+        const auto& rateLimiterStats = rateLimiter->stats();
+        stats.internalSpans.admitted += rateLimiterStats.successfulAdmissions();
+        stats.internalSpans.rejected += rateLimiterStats.rejectedAdmissions();
+    }
+
+    const auto& externalStats = snapshot->externalRateLimiter->stats();
+    stats.externalSpan.admitted = externalStats.successfulAdmissions();
+    stats.externalSpan.rejected = externalStats.rejectedAdmissions();
+
+    return stats;
+}
+
 void TracingSamplerImpl::sampleByDefault(SpanName name) {
     std::lock_guard lk(_mutex);
     if (_defaultSampledSpanNames.emplace(name.getName()).second) {

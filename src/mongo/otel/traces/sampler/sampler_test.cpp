@@ -338,6 +338,135 @@ TEST(SamplerTest, ExternalRateLimiterPreservedAfterRebuild) {
     EXPECT_FALSE(sampler.shouldAcceptExternalTrace());
 }
 
+TEST(SamplerTest, StatsStartAtZero) {
+    TracingSamplerImpl sampler;
+    const auto stats = sampler.getStats();
+    EXPECT_EQ(stats.internalSpans.admitted, 0);
+    EXPECT_EQ(stats.internalSpans.rejected, 0);
+    EXPECT_EQ(stats.externalSpan.admitted, 0);
+    EXPECT_EQ(stats.externalSpan.rejected, 0);
+}
+
+TEST(SamplerTest, InternalStatsRecordAdmissionAndRejection) {
+    TickSourceMock<Milliseconds> clock;
+    TracingSamplerImpl sampler(&clock);
+    sampler.updateInternalConfig(SamplingParameters{.factor = 1.0, .rateLimits = {.maxTokens = 1}},
+                                 {});
+    sampler.sampleByDefault(span_names::kTest1);
+
+    // First call consumes the single token and is admitted.
+    EXPECT_TRUE(sampler.shouldSample(span_names::kTest1.getName(), 0.0));
+    auto stats = sampler.getStats();
+    EXPECT_EQ(stats.internalSpans.admitted, 1);
+    EXPECT_EQ(stats.internalSpans.rejected, 0);
+
+    // Second call at the frozen time finds the bucket empty and is rejected.
+    EXPECT_FALSE(sampler.shouldSample(span_names::kTest1.getName(), 0.0));
+    stats = sampler.getStats();
+    EXPECT_EQ(stats.internalSpans.admitted, 1);
+    EXPECT_EQ(stats.internalSpans.rejected, 1);
+
+    // External stats are untouched by internal sampling.
+    EXPECT_EQ(stats.externalSpan.admitted, 0);
+    EXPECT_EQ(stats.externalSpan.rejected, 0);
+}
+
+TEST(SamplerTest, InternalStatsUnchangedForUnregisteredSpan) {
+    TracingSamplerImpl sampler;
+    sampler.updateInternalConfig(SamplingParameters{.factor = 1.0}, {});
+
+    // An unregistered span returns before reaching the rate limiter, so no stat is updated.
+    EXPECT_FALSE(sampler.shouldSample("unknown.span", 0.0));
+    const auto stats = sampler.getStats();
+    EXPECT_EQ(stats.internalSpans.admitted, 0);
+    EXPECT_EQ(stats.internalSpans.rejected, 0);
+}
+
+TEST(SamplerTest, InternalStatsUnchangedWhenDroppedByFactor) {
+    TracingSamplerImpl sampler;
+    sampler.updateInternalConfig(SamplingParameters{.factor = 0.5}, {});
+    sampler.sampleByDefault(span_names::kTest1);
+
+    // sampleValue >= factor is dropped before reaching the rate limiter, so no stat is updated.
+    EXPECT_FALSE(sampler.shouldSample(span_names::kTest1.getName(), 0.7));
+    const auto stats = sampler.getStats();
+    EXPECT_EQ(stats.internalSpans.admitted, 0);
+    EXPECT_EQ(stats.internalSpans.rejected, 0);
+}
+
+TEST(SamplerTest, ExternalStatsRecordAdmissionAndRejection) {
+    TickSourceMock<Milliseconds> clock;
+    TracingSamplerImpl sampler(&clock);
+    sampler.updateExternalConfig({.refillRate = 1.0, .maxTokens = 1});
+
+    // First call consumes the single external token and is admitted.
+    EXPECT_TRUE(sampler.shouldAcceptExternalTrace());
+    auto stats = sampler.getStats();
+    EXPECT_EQ(stats.externalSpan.admitted, 1);
+    EXPECT_EQ(stats.externalSpan.rejected, 0);
+
+    // Second call at the frozen time finds the bucket empty and is rejected.
+    EXPECT_FALSE(sampler.shouldAcceptExternalTrace());
+    stats = sampler.getStats();
+    EXPECT_EQ(stats.externalSpan.admitted, 1);
+    EXPECT_EQ(stats.externalSpan.rejected, 1);
+
+    // Internal stats are untouched by external sampling.
+    EXPECT_EQ(stats.internalSpans.admitted, 0);
+    EXPECT_EQ(stats.internalSpans.rejected, 0);
+}
+
+TEST(SamplerTest, StatsAccumulateAcrossMultipleCalls) {
+    TickSourceMock<Milliseconds> clock;
+    TracingSamplerImpl sampler(&clock);
+    // Internal limiter with 3 tokens, external limiter with 2 tokens; frozen clock, no refills.
+    sampler.updateInternalConfig(
+        SamplingParameters{.factor = 1.0, .rateLimits = {.refillRate = 1.0, .maxTokens = 3}}, {});
+    sampler.updateExternalConfig({.refillRate = 1.0, .maxTokens = 2});
+    sampler.sampleByDefault(span_names::kTest1);
+
+    // 5 internal calls: 3 admitted, 2 rejected.
+    for (int i = 0; i < 5; ++i) {
+        sampler.shouldSample(span_names::kTest1.getName(), 0.0);
+    }
+    auto stats = sampler.getStats();
+    EXPECT_EQ(stats.internalSpans.admitted, 3);
+    EXPECT_EQ(stats.internalSpans.rejected, 2);
+
+    // 4 external calls: 2 admitted, 2 rejected.
+    for (int i = 0; i < 4; ++i) {
+        sampler.shouldAcceptExternalTrace();
+    }
+    stats = sampler.getStats();
+    EXPECT_EQ(stats.externalSpan.admitted, 2);
+    EXPECT_EQ(stats.externalSpan.rejected, 2);
+}
+
+TEST(SamplerTest, StatsAccumulateAcrossDifferentSpans) {
+    TickSourceMock<Milliseconds> clock;
+    TracingSamplerImpl sampler(&clock);
+    // Default internal limiters with 3 tokens, override limiter with 2 tokens.
+    sampler.updateInternalConfig(
+        SamplingParameters{.factor = 1.0, .rateLimits = {.refillRate = 1.0, .maxTokens = 3}},
+        {{std::string(span_names::kTest3.getName()),
+          {.factor = 1.0, .rateLimits = {.refillRate = 1.0, .maxTokens = 2}}}});
+    sampler.sampleByDefault(span_names::kTest1);
+    sampler.sampleByDefault(span_names::kTest2);
+
+    // 5 internal calls:
+    // 3 accepted and 2 rejected for kTest1.
+    // 3 accepted and 2 rejected for kTest2.
+    // 2 accepted and 3 rejected for kTest3.
+    for (int i = 0; i < 5; ++i) {
+        sampler.shouldSample(span_names::kTest1.getName(), 0.0);
+        sampler.shouldSample(span_names::kTest2.getName(), 0.0);
+        sampler.shouldSample(span_names::kTest3.getName(), 0.0);
+    }
+    auto stats = sampler.getStats();
+    EXPECT_EQ(stats.internalSpans.admitted, 8);
+    EXPECT_EQ(stats.internalSpans.rejected, 7);
+}
+
 TEST(SamplerTest, ConcurrentAccessTest) {
     unittest::ThreadAssertionMonitor monitor;
     monitor

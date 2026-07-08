@@ -10,11 +10,15 @@ exports_files(
 
 mongo_cc_library(
     name = "sampler",
-    srcs = ["sampler.cpp"],
+    srcs = [
+        "sampler.cpp",
+        "sampler_server_status_section.cpp",
+    ],
     deps = [
         ":sampling_config",
         "//src/mongo:base",
         "//src/mongo/db/admission:rate_limiter",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/otel/traces/span:span_names",
     ],
 )

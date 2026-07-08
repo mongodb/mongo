@@ -40,6 +40,7 @@
 #include "mongo/util/system_tick_source.h"
 #include "mongo/util/versioned_value.h"
 
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -47,6 +48,18 @@
 #include <utility>
 
 namespace mongo::otel::traces {
+struct MONGO_MOD_PUBLIC RateLimiterStats {
+    int64_t admitted = 0;
+    int64_t rejected = 0;
+};
+
+/** A snapshot of the tracing sampler's admission stats. For simplicity in reporting, the stats for
+ * each internal span are aggregated under `internalSpans`.
+ */
+struct MONGO_MOD_PUBLIC TracingSamplerStats {
+    RateLimiterStats internalSpans;
+    RateLimiterStats externalSpan;
+};
 
 /** Decides whether a span should initiate a trace. */
 class MONGO_MOD_PUBLIC TracingSampler {
@@ -79,6 +92,13 @@ public:
     /** Returns the current sampling configuration. */
     virtual SamplingConfig getConfig() const {
         return SamplingConfig{};
+    }
+
+    /**
+     * Returns a snapshot of the aggregate admission statistics.
+     */
+    virtual TracingSamplerStats getStats() const {
+        return TracingSamplerStats{};
     }
 
     /**
@@ -124,6 +144,12 @@ public:
     void updateExternalConfig(RateLimitParams rateLimits) override;
     SamplingConfig getConfig() const override;
     void sampleByDefault(SpanName name) override;
+
+    /**
+     * Returns a TracingSamplerStats by summing the succeeded and rejected admissions across the
+     * currently-configured rate limiters.
+     */
+    TracingSamplerStats getStats() const override;
 
 private:
     /** Rebuilds _samplingFactors from _defaultSampledSpanNames and _samplingConfig. */
