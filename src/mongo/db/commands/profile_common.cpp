@@ -92,10 +92,21 @@ Status ProfileCmdBase::checkAuthForOperation(OperationContext* opCtx,
         }
     }
 
-    return authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbName),
-                                                          ActionType::enableProfiler)
-        ? Status::OK()
-        : Status(ErrorCodes::Unauthorized, "unauthorized");
+    if (!authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbName),
+                                                        ActionType::enableProfiler)) {
+        return Status(ErrorCodes::Unauthorized, "unauthorized");
+    }
+
+    // 'slowms' and 'sampleRate' write to process-global parameters that affect all databases.
+    if (request.getSlowms() || request.getSampleRate()) {
+        if (!authzSession->isAuthorizedForActionsOnResource(
+                ResourcePattern::forAnyNormalResource(dbName.tenantId()),
+                ActionType::enableProfiler)) {
+            return Status(ErrorCodes::Unauthorized, "unauthorized");
+        }
+    }
+
+    return Status::OK();
 }
 
 bool ProfileCmdBase::run(OperationContext* opCtx,
