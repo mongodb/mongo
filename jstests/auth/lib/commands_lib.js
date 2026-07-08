@@ -6149,16 +6149,36 @@ export const authCommandsLib = {
           testcases: [
               {
                 runOnDb: firstDbName,
-                roles: roles_dbAdmin,
+                roles: roles_dbAdminAny,
                 privileges:
-                    [{resource: {db: firstDbName, collection: ""}, actions: ["enableProfiler"]}]
+                    [{resource: {db: "", collection: ""}, actions: ["enableProfiler"]}]
               },
               {
-                runOnDb: secondDbName,
-                roles: roles_dbAdminAny,
+                runOnDb: firstDbName,
                 privileges: [
-                    {resource: {db: secondDbName, collection: ""}, actions: ["enableProfiler"]}
-                ]
+                    {resource: {db: firstDbName, collection: ""}, actions: ["enableProfiler"]}
+                ],
+                expectAuthzFailure: true
+              }
+          ]
+        },
+        {
+          testname: "profileSetSlowms",
+          command: {profile: -1, slowms: 100},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_dbAdminAny,
+                privileges:
+                    [{resource: {db: "", collection: ""}, actions: ["enableProfiler"]}]
+              },
+              {
+                runOnDb: firstDbName,
+                privileges: [
+                    {resource: {db: firstDbName, collection: ""}, actions: ["enableProfiler"]}
+                ],
+                expectAuthzFailure: true
               }
           ]
         },
@@ -6180,7 +6200,7 @@ export const authCommandsLib = {
         },
         {
           testname: "profile_mongos",
-          command: {profile: 0, slowms: 10, sampleRate: 0.5},
+          command: {profile: 0},
           skipUnlessSharded: true,
           testcases: [
               {
@@ -6192,6 +6212,48 @@ export const authCommandsLib = {
               {
                 runOnDb: firstDbName,
                 roles: roles_dbAdmin,
+                privileges:
+                    [{resource: {db: firstDbName, collection: ""}, actions: ["enableProfiler"]}]
+              }
+          ]
+        },
+        {
+          testname: "profileSetSlowms_mongos",
+          command: {profile: 0, slowms: 10},
+          skipUnlessSharded: true,
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_dbAdminAny,
+                privileges:
+                    [{resource: {db: "", collection: ""}, actions: ["enableProfiler"]}]
+              },
+              {
+                runOnDb: firstDbName,
+                privileges: [
+                    {resource: {db: firstDbName, collection: ""}, actions: ["enableProfiler"]}
+                ],
+                expectAuthzFailure: true
+              }
+          ]
+        },
+        {
+          testname: "profileSetSampleRate_mongos",
+          command: {profile: 0, sampleRate: 0.5},
+          skipUnlessSharded: true,
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_dbAdminAny,
+                privileges:
+                    [{resource: {db: "", collection: ""}, actions: ["enableProfiler"]}]
+              },
+              {
+                runOnDb: firstDbName,
+                privileges: [
+                    {resource: {db: firstDbName, collection: ""}, actions: ["enableProfiler"]}
+                ],
+                expectAuthzFailure: true
               }
           ]
         },
