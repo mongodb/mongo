@@ -36,21 +36,21 @@ namespace mongo::sbe {
 using namespace std::literals::string_view_literals;
 VirtualScanStage::VirtualScanStage(PlanNodeId planNodeId,
                                    value::SlotId out,
-                                   value::TypeTags arrTag,
-                                   value::Value arrVal,
+                                   value::TagValueMaybeOwned arr,
                                    PlanYieldPolicySBE* yieldPolicy,
-                                   bool participateInTrialRunTracking,
-                                   bool owned /*=true*/)
+                                   bool participateInTrialRunTracking)
     : PlanStage("virtualscan"sv, yieldPolicy, planNodeId, participateInTrialRunTracking),
       _outField(out),
-      _arr(owned, arrTag, arrVal) {
-    tassert(11094700, "expect arr parameter to be an array", value::isArray(arrTag));
+      _arr(std::move(arr)) {
+    tassert(11094700, "expect arr parameter to be an array", value::isArray(_arr.tag()));
 }
 
 std::unique_ptr<PlanStage> VirtualScanStage::clone() const {
-    auto [tag, val] = value::copyValue(_arr.tag(), _arr.value());
-    return std::make_unique<VirtualScanStage>(
-        _commonStats.nodeId, _outField, tag, val, _yieldPolicy, participateInTrialRunTracking());
+    return std::make_unique<VirtualScanStage>(_commonStats.nodeId,
+                                              _outField,
+                                              _arr.getOwnedCopy(),
+                                              _yieldPolicy,
+                                              participateInTrialRunTracking());
 }
 
 void VirtualScanStage::prepare(CompileCtx& ctx) {

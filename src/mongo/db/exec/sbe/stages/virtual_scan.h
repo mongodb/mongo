@@ -44,7 +44,7 @@
 
 namespace mongo::sbe {
 /**
- * VirtualScanStage stores the array 'arrVal' and getNext() returns each value from the array.
+ * VirtualScanStage stores the array 'arr' and getNext() returns each value from the array.
  *
  * This stage mimics the resource management behavior like an actual scan stage. getNext() and
  * doSaveState() release the memory of the returned values. This is useful to expose the potential
@@ -54,11 +54,9 @@ class VirtualScanStage final : public PlanStage {
 public:
     explicit VirtualScanStage(PlanNodeId planNodeId,
                               value::SlotId out,
-                              value::TypeTags arrTag,
-                              value::Value arrVal,
+                              value::TagValueMaybeOwned arr,
                               PlanYieldPolicySBE* yieldPolicy = nullptr,
-                              bool participateInTrialRunTracking = true,
-                              bool owned = true);
+                              bool participateInTrialRunTracking = true);
 
     ~VirtualScanStage() final = default;
 
@@ -87,7 +85,7 @@ protected:
 private:
     const value::SlotId _outField;
 
-    // Owns the input array if and only if the 'owned' constructor argument was true.
+    // Owns the input array if and only if the 'arr' constructor argument owned its value.
     value::TagValueMaybeOwned _arr;
 
     std::unique_ptr<value::ViewOfValueAccessor> _outFieldOutputAccessor;

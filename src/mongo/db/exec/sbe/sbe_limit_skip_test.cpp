@@ -65,7 +65,8 @@ protected:
 
         // Make a "limit <limitValue> skip <skipValue>" stage.
         inputGuard.reset();
-        auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+        auto [scanSlot, scanStage] =
+            generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
         auto limit = makeS<LimitSkipStage>(
             std::move(scanStage), std::move(limitExpr), std::move(skipExpr), kEmptyPlanNodeId);
         return {std::move(limit), scanSlot};

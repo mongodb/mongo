@@ -60,20 +60,11 @@ void PlanStageTestFixture::assertValuesEqual(value::TypeTags lhsTag,
 }
 
 std::pair<value::SlotId, std::unique_ptr<PlanStage>> PlanStageTestFixture::generateVirtualScan(
-    value::TypeTags arrTag,
-    value::Value arrVal,
-    PlanNodeId planNodeId /*= kEmptyPlanNodeId*/,
-    bool owned /*=true*/) {
-    invariant(sbe::value::isArray(arrTag));
+    value::TagValueMaybeOwned arr, PlanNodeId planNodeId /*= kEmptyPlanNodeId*/) {
+    invariant(sbe::value::isArray(arr.tag()));
 
     auto outputSlot = _slotIdGenerator->generate();
-    auto virtualScan = sbe::makeS<sbe::VirtualScanStage>(planNodeId,
-                                                         outputSlot,
-                                                         arrTag,
-                                                         arrVal,
-                                                         nullptr /*yieldPolicy*/,
-                                                         true /*participateInTrialRunTracking*/,
-                                                         owned /*owned*/);
+    auto virtualScan = sbe::makeS<sbe::VirtualScanStage>(planNodeId, outputSlot, std::move(arr));
 
     // Return the VirtualScanStage and its output slot.
     return {outputSlot, std::move(virtualScan)};
@@ -82,7 +73,7 @@ std::pair<value::SlotId, std::unique_ptr<PlanStage>> PlanStageTestFixture::gener
 std::pair<value::SlotId, std::unique_ptr<PlanStage>> PlanStageTestFixture::generateVirtualScan(
     const BSONArray& array) {
     auto [arrTag, arrVal] = stage_builder::makeValue(array);
-    return generateVirtualScan(arrTag, arrVal);
+    return generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, arrTag, arrVal));
 }
 
 std::pair<value::SlotVector, std::unique_ptr<PlanStage>>
@@ -94,7 +85,8 @@ PlanStageTestFixture::generateVirtualScanMulti(int32_t numSlots,
     invariant(numSlots >= 1);
 
     // Generate a mock scan with a single output slot.
-    auto [scanSlot, scanStage] = generateVirtualScan(arrTag, arrVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, arrTag, arrVal));
 
     // Create a ProjectStage that will read the data from 'scanStage' and split it up
     // across multiple output slots.
@@ -115,6 +107,12 @@ PlanStageTestFixture::generateVirtualScanMulti(int32_t numSlots,
     return {std::move(projectSlots),
             sbe::makeS<sbe::ProjectStage>(
                 std::move(scanStage), std::move(projections), kEmptyPlanNodeId)};
+}
+
+std::pair<value::SlotVector, std::unique_ptr<PlanStage>>
+PlanStageTestFixture::generateVirtualScanMulti(int32_t numSlots, value::TagValueOwned arr) {
+    auto [arrTag, arrVal] = arr.releaseToRaw();
+    return generateVirtualScanMulti(numSlots, arrTag, arrVal);
 }
 
 std::pair<value::SlotVector, std::unique_ptr<PlanStage>>
@@ -239,7 +237,8 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::runTest(
     value::Value inputVal,
     const MakeStageFn<value::SlotId>& makeStage) {
     // Generate a mock scan from `input` with a single output slot.
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Call the `makeStage` callback to create the PlanStage that we want to test, passing in
     // the mock scan subtree and its output slot.
@@ -266,6 +265,14 @@ void PlanStageTestFixture::runTest(value::TypeTags inputTag,
     value::ValueGuard resultGuard{resultsTag, resultsVal};
     // Compare the results produced with the expected output and assert that they match.
     assertValuesEqual(resultsTag, resultsVal, expectedTag, expectedVal);
+}
+
+void PlanStageTestFixture::runTest(value::TagValueOwned input,
+                                   value::TagValueOwned expected,
+                                   const MakeStageFn<value::SlotId>& makeStage) {
+    auto [inputTag, inputVal] = input.releaseToRaw();
+    auto [expectedTag, expectedVal] = expected.releaseToRaw();
+    runTest(inputTag, inputVal, expectedTag, expectedVal, makeStage);
 }
 
 std::pair<value::TypeTags, value::Value> PlanStageTestFixture::runTestMulti(

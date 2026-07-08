@@ -175,7 +175,8 @@ void HashAggStageTest::performHashAggWithSpillChecking(
 
     // Generate a mock scan from 'input' with a single output slot.
     inputGuard.reset();
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     auto [outputSlot, stage] = makeStageFn(scanSlot, std::move(scanStage));
     auto resultAccessor = prepareTree(ctx.get(), stage.get(), outputSlot);
@@ -349,7 +350,8 @@ TEST_F(HashAggStageTest, HashAggAddToSetTest) {
 
     // Generate a mock scan from 'input' with a single output slot.
     inputGuard.reset();
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Call the 'makeStage' callback to create the PlanStage that we want to test, passing in
     // the mock scan subtree and its output slot.
@@ -422,7 +424,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpill) {
     // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
     auto [inputTag, inputVal] =
         stage_builder::makeValue(BSON_ARRAY(5 << 6 << 7 << 5 << 6 << 7 << 6 << 7 << 7));
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, group by the scanSlot and compute a simple count.
     auto countsSlot = generateSlotId();
@@ -476,7 +479,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountForceSpill) {
     // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
     auto [inputTag, inputVal] =
         stage_builder::makeValue(BSON_ARRAY(5 << 6 << 7 << 5 << 6 << 7 << 6 << 7 << 7));
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, group by the scanSlot and compute a simple count.
     auto countsSlot = generateSlotId();
@@ -557,7 +561,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpill) {
     // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
     auto [inputTag, inputVal] =
         stage_builder::makeValue(BSON_ARRAY(5 << 6 << 7 << 5 << 6 << 7 << 6 << 7 << 7));
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, group by the scanSlot and compute a simple count.
     auto countsSlot = generateSlotId();
@@ -628,7 +633,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillIfNoMemCheck) {
     // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
     auto [inputTag, inputVal] =
         stage_builder::makeValue(BSON_ARRAY(5 << 6 << 7 << 5 << 6 << 7 << 6 << 7 << 7));
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, group by the scanSlot and compute a simple count.
     auto countsSlot = generateSlotId();
@@ -687,7 +693,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpillDouble) {
     // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
     auto [inputTag, inputVal] = stage_builder::makeValue(
         BSON_ARRAY(5.0 << 6.0 << 7.0 << 5.0 << 6.0 << 7.0 << 6.0 << 7.0 << 7.0));
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, group by the scanSlot and compute a simple count.
     auto countsSlot = generateSlotId();
@@ -749,7 +756,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillWithNoGroupByDouble) {
 
     auto [inputTag, inputVal] =
         stage_builder::makeValue(BSON_ARRAY(1.0 << 2.0 << 3.0 << 4.0 << 5.0));
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, with an empty group by slot and compute a simple count.
     auto countsSlot = generateSlotId();
@@ -809,7 +817,8 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpill) {
     // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
     auto [inputTag, inputVal] =
         stage_builder::makeValue(BSON_ARRAY(5 << 6 << 7 << 5 << 6 << 7 << 6 << 7 << 7));
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, group by the scanSlot and compute a simple count.
     auto countsSlot = generateSlotId();
@@ -884,7 +893,8 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpillAllToDisk) {
     // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
     auto [inputTag, inputVal] =
         stage_builder::makeValue(BSON_ARRAY(5 << 6 << 7 << 5 << 6 << 7 << 6 << 7 << 7));
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, group by the scanSlot and compute a simple count.
     auto countsSlot = generateSlotId();
@@ -954,7 +964,8 @@ TEST_F(HashAggStageTest, HashAggMultipleAccForceSpill) {
     // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
     auto [inputTag, inputVal] =
         stage_builder::makeValue(BSON_ARRAY(5 << 6 << 7 << 5 << 6 << 7 << 6 << 7 << 7));
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, group by the scanSlot and compute a simple count.
     auto countsSlot = generateSlotId();
@@ -1052,7 +1063,8 @@ TEST_F(HashAggStageTest, HashAggMultipleAccForceSpillAfterSpill) {
     // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
     auto [inputTag, inputVal] =
         stage_builder::makeValue(BSON_ARRAY(5 << 6 << 7 << 5 << 6 << 7 << 6 << 7 << 7));
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, group by the scanSlot and compute a simple count.
     auto countsSlot = generateSlotId();
@@ -1147,7 +1159,8 @@ TEST_F(HashAggStageTest, HashAggSum10Groups) {
     }
 
     auto [inputTag, inputVal] = stage_builder::makeValue(BSONArray(builder.done()));
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, group by the scanSlot and compute a sum for each group.
     auto sumsSlot = generateSlotId();
@@ -1194,7 +1207,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountWithRecordIds) {
         auto [ridTag, ridVal] = sbe::value::makeNewRecordId(id);
         testData->push_back_raw(ridTag, ridVal);
     }
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, group by the scanSlot and compute a simple count.
     auto countsSlot = generateSlotId();

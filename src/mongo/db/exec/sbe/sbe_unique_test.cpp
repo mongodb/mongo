@@ -139,7 +139,8 @@ TEST_F(UniqueStageTest, DeduplicatesMultipleSlotsInKey) {
 TEST_F(UniqueStageTest, ResetsStateAfterClose) {
     auto [tag, val] = stage_builder::makeValue(BSON_ARRAY(
         BSON_ARRAY(1 << 1) << BSON_ARRAY(2 << 2) << BSON_ARRAY(1 << 1) << BSON_ARRAY(3 << 3)));
-    auto [scanSlot, scanStage] = generateVirtualScan(tag, val);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, tag, val));
 
     auto [expectedTag, expectedVal] = stage_builder::makeValue(
         BSON_ARRAY(BSON_ARRAY(1 << 1) << BSON_ARRAY(2 << 2) << BSON_ARRAY(3 << 3)));
@@ -169,7 +170,8 @@ TEST_F(UniqueStageTest, ResetsStateAfterClose) {
 
 TEST_F(UniqueRoaringStageTest, ResetsStateAfterClose) {
     auto [tag, val] = stage_builder::makeValue(BSON_ARRAY(1 << 2 << 1 << 3));
-    auto [scanSlot, scanStage] = generateVirtualScan(tag, val);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, tag, val));
 
     auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3));
     value::ValueGuard expectedGuard{expectedTag, expectedVal};
@@ -199,7 +201,8 @@ TEST_F(UniqueRoaringStageTest, ResetsStateAfterClose) {
 TEST_F(UniqueStageTest, ResetsStateAfterReopen) {
     auto [tag, val] = stage_builder::makeValue(BSON_ARRAY(
         BSON_ARRAY(1 << 1) << BSON_ARRAY(2 << 2) << BSON_ARRAY(1 << 1) << BSON_ARRAY(3 << 3)));
-    auto [scanSlot, scanStage] = generateVirtualScan(tag, val);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, tag, val));
 
     auto [expectedTag, expectedVal] = stage_builder::makeValue(
         BSON_ARRAY(BSON_ARRAY(1 << 1) << BSON_ARRAY(2 << 2) << BSON_ARRAY(3 << 3)));
@@ -229,7 +232,8 @@ TEST_F(UniqueStageTest, UniqueStageTracksMemory) {
     // Mix short and long strings to exercise the how we estimate memory used.
     auto [tag, val] = stage_builder::makeValue(
         BSON_ARRAY("a" << "b-enormous" << "c" << "d-enormous" << "e" << "f-enormous"));
-    auto [scanSlot, scanStage] = generateVirtualScan(tag, val);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, tag, val));
 
     auto unique = makeS<UniqueStage>(std::move(scanStage), sbe::makeSV(scanSlot), kEmptyPlanNodeId);
     auto ctx = makeCompileCtx();
@@ -250,7 +254,8 @@ TEST_F(UniqueStageTest, UniqueStageTracksMemory) {
 
 TEST_F(UniqueRoaringStageTest, ResetsStateAfterReopen) {
     auto [tag, val] = stage_builder::makeValue(BSON_ARRAY(1 << 2 << 1 << 3));
-    auto [scanSlot, scanStage] = generateVirtualScan(tag, val);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, tag, val));
 
     auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3));
     value::ValueGuard expectedGuard{expectedTag, expectedVal};
@@ -279,7 +284,8 @@ TEST_F(UniqueRoaringStageTest, UniqueRoaringStageTracksMemory) {
     // Mix short and long strings to exercise the how we estimate memory used.
     auto [tag, val] =
         stage_builder::makeValue(BSON_ARRAY(1 << 100 << 2 << 1 << 3 << 2 << 4 << 100));
-    auto [scanSlot, scanStage] = generateVirtualScan(tag, val);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, tag, val));
 
     auto unique = makeS<UniqueRoaringStage>(std::move(scanStage), scanSlot, kEmptyPlanNodeId);
     auto ctx = makeCompileCtx();

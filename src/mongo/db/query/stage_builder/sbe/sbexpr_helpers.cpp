@@ -608,7 +608,10 @@ std::pair<SbStage, SbSlot> SbBuilder::makeVirtualScan(sbe::value::TypeTags input
     auto outSlotId = _state.slotId();
     auto outSlot = SbSlot{outSlotId};
 
-    return {sbe::makeS<sbe::VirtualScanStage>(_nodeId, outSlotId, inputTag, inputVal), outSlot};
+    return {
+        sbe::makeS<sbe::VirtualScanStage>(
+            _nodeId, outSlotId, sbe::value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal)),
+        outSlot};
 }
 
 SbStage SbBuilder::makeCoScan() {

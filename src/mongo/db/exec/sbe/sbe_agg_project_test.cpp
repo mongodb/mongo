@@ -47,13 +47,11 @@ namespace mongo::sbe {
 using AggProjectStageTest = PlanStageTestFixture;
 
 TEST_F(AggProjectStageTest, SimpleCountTest) {
-    auto [inputTag, inputVal] =
-        stage_builder::makeValue(BSON_ARRAY(10LL << 20LL << 30LL << 40LL << 50LL));
-    value::ValueGuard inputGuard{inputTag, inputVal};
+    value::TagValueOwned input = value::TagValueOwned::fromRaw(
+        stage_builder::makeValue(BSON_ARRAY(10LL << 20LL << 30LL << 40LL << 50LL)));
 
-    auto [expectedTag, expectedVal] =
-        stage_builder::makeValue(BSON_ARRAY(1LL << 2LL << 3LL << 4LL << 5LL));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expected = value::TagValueOwned::fromRaw(
+        stage_builder::makeValue(BSON_ARRAY(1LL << 2LL << 3LL << 4LL << 5LL)));
 
     auto makeStageFn = [&](value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
         auto outSlot = generateSlotId();
@@ -69,19 +67,15 @@ TEST_F(AggProjectStageTest, SimpleCountTest) {
         return std::make_pair(outSlot, std::move(aggProject));
     };
 
-    inputGuard.reset();
-    expectedGuard.reset();
-    runTest(inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
+    runTest(std::move(input), std::move(expected), makeStageFn);
 }
 
 TEST_F(AggProjectStageTest, SimpleSumTest) {
-    auto [inputTag, inputVal] =
-        stage_builder::makeValue(BSON_ARRAY(10LL << 20LL << 30LL << 40LL << 50LL));
-    value::ValueGuard inputGuard{inputTag, inputVal};
+    value::TagValueOwned input = value::TagValueOwned::fromRaw(
+        stage_builder::makeValue(BSON_ARRAY(10LL << 20LL << 30LL << 40LL << 50LL)));
 
-    auto [expectedTag, expectedVal] =
-        stage_builder::makeValue(BSON_ARRAY(10LL << 30LL << 60LL << 100LL << 150LL));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expected = value::TagValueOwned::fromRaw(
+        stage_builder::makeValue(BSON_ARRAY(10LL << 30LL << 60LL << 100LL << 150LL)));
 
     auto makeStageFn = [&](value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
         auto outSlot = generateSlotId();
@@ -92,19 +86,15 @@ TEST_F(AggProjectStageTest, SimpleSumTest) {
         return std::make_pair(outSlot, std::move(aggProject));
     };
 
-    inputGuard.reset();
-    expectedGuard.reset();
-    runTest(inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
+    runTest(std::move(input), std::move(expected), makeStageFn);
 }
 
 TEST_F(AggProjectStageTest, SumWithInitTest) {
-    auto [inputTag, inputVal] =
-        stage_builder::makeValue(BSON_ARRAY(10LL << 20LL << 30LL << 40LL << 50LL));
-    value::ValueGuard inputGuard{inputTag, inputVal};
+    value::TagValueOwned input = value::TagValueOwned::fromRaw(
+        stage_builder::makeValue(BSON_ARRAY(10LL << 20LL << 30LL << 40LL << 50LL)));
 
-    auto [expectedTag, expectedVal] =
-        stage_builder::makeValue(BSON_ARRAY(110LL << 130LL << 160LL << 200LL << 250LL));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expected = value::TagValueOwned::fromRaw(
+        stage_builder::makeValue(BSON_ARRAY(110LL << 130LL << 160LL << 200LL << 250LL)));
 
     auto makeStageFn = [&](value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
         auto outSlot = generateSlotId();
@@ -118,9 +108,7 @@ TEST_F(AggProjectStageTest, SumWithInitTest) {
         return std::make_pair(outSlot, std::move(aggProject));
     };
 
-    inputGuard.reset();
-    expectedGuard.reset();
-    runTest(inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
+    runTest(std::move(input), std::move(expected), makeStageFn);
 }
 
 }  // namespace mongo::sbe
