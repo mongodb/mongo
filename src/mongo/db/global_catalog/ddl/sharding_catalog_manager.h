@@ -373,9 +373,16 @@ public:
      * the critical section). Chunk versions in `newChunks` are ignored/recomputed under the
      * chunk-op lock against the current collection placement version.
      *
-     * Returns the new placement version.
+     * Idempotency is detected by range: because the whole list is committed in a single
+     * transaction, if the first precomputed range already exists as a single chunk on the shard the
+     * merge ran on, the commit is skipped. This makes the command safe to re-run under any session
+     * (e.g. after a failover), so the caller need not persist the returned chunks.
+     *
+     * Returns the new placement version and the chunk documents changed by the commit -- read back
+     * from the durable catalog by their precomputed ranges, so the result is identical on a fresh
+     * commit and on a retry. Participants use the changed chunks to update their shard catalog.
      */
-    StatusWith<ShardingCatalogManager::ShardAndCollectionPlacementVersions>
+    StatusWith<std::pair<ShardAndCollectionPlacementVersions, std::vector<ChunkType>>>
     commitMergeAllPrecomputedChunksOnShard(OperationContext* opCtx,
                                            const NamespaceString& nss,
                                            const ShardId& shardId,

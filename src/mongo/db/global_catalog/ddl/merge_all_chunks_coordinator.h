@@ -82,8 +82,6 @@ private:
                                          const CancellationToken& token,
                                          const Status& status) noexcept override;
 
-    bool _allowedToInvalidateOSI() const noexcept override;
-
     void _onCleanup(OperationContext* opCtx) override;
 
     const ShardsvrMergeAllChunksOnShardRequest _request;

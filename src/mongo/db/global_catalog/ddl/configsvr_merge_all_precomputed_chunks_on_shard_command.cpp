@@ -112,11 +112,18 @@ public:
                 newChunks.emplace_back(std::move(chunkBson));
             }
 
-            auto const response = uassertStatusOK(
+            auto const [placementVersions, changedChunks] = uassertStatusOK(
                 ShardingCatalogManager::get(opCtx)->commitMergeAllPrecomputedChunksOnShard(
                     opCtx, ns(), request().getShard(), std::move(newChunks)));
 
-            return {response.collectionPlacementVersion};
+            std::vector<BSONObj> changedChunkDocs;
+            changedChunkDocs.reserve(changedChunks.size());
+            for (const auto& chunk : changedChunks) {
+                changedChunkDocs.push_back(chunk.toConfigBSON());
+            }
+
+            return ConfigsvrMergeAllPrecomputedChunksOnShardResponse{
+                placementVersions.collectionPlacementVersion, std::move(changedChunkDocs)};
         }
 
     private:

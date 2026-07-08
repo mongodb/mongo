@@ -1595,5 +1595,146 @@ TEST_F(CommitMergeTest, ChangedChunksHaveSameFormatAsDurableChunks) {
               sortedFieldNames(fromCatalog.toConfigBSON()));
 }
 
+class CommitMergeAllPrecomputedChunksOnShardTest : public MergeAllChunksOnShardTest {
+protected:
+    ShardId shard0() const {
+        return ShardId{_shards.at(0).getName()};
+    }
+
+    // Sets up '_nss' with two contiguous mergeable chunks on shard0 spanning [MinKey, 0) and
+    // [0, MaxKey).
+    void setupTwoContiguousChunksOnShard0() {
+        const ShardRef shardRef{shard0()};
+        auto version = ChunkVersion{{_epoch, _ts}, {1, 0}};
+
+        ChunkType chunk;
+        chunk.setName(OID::gen());
+        chunk.setCollectionUUID(_collUuid);
+        chunk.setVersion(version);
+        chunk.setShard(shardRef);
+        chunk.setRange({_keyPattern.globalMin(), BSON("x" << 0)});
+        chunk.setOnCurrentShardSince(Timestamp(0, 1));
+        chunk.setHistory({ChunkHistory{Timestamp(0, 1), shardRef}});
+
+        version.incMinor();
+        ChunkType chunk2;
+        chunk2.setName(OID::gen());
+        chunk2.setCollectionUUID(_collUuid);
+        chunk2.setVersion(version);
+        chunk2.setShard(shardRef);
+        chunk2.setRange({BSON("x" << 0), _keyPattern.globalMax()});
+        chunk2.setOnCurrentShardSince(Timestamp(0, 1));
+        chunk2.setHistory({ChunkHistory{Timestamp(0, 1), shardRef}});
+
+        setupCollection(_nss, _keyPattern, {chunk, chunk2});
+    }
+
+    // Builds the precomputed post-merge layout to commit: a single chunk on shard0 spanning the
+    // whole key space. The embedded version is ignored (recomputed under the chunk-op lock).
+    std::vector<ChunkType> makeMergedChunkList() {
+        const ShardRef shardRef{shard0()};
+        ChunkType merged;
+        merged.setName(OID::gen());
+        merged.setCollectionUUID(_collUuid);
+        merged.setVersion(ChunkVersion{{_epoch, _ts}, {1, 0}});
+        merged.setShard(shardRef);
+        merged.setRange({_keyPattern.globalMin(), _keyPattern.globalMax()});
+        merged.setOnCurrentShardSince(Timestamp(0, 1));
+        merged.setHistory({ChunkHistory{Timestamp(0, 1), shardRef}});
+        return {merged};
+    }
+
+    std::pair<ShardingCatalogManager::ShardAndCollectionPlacementVersions, std::vector<ChunkType>>
+    commitPrecomputed(std::vector<ChunkType> newChunks) {
+        return assertGet(ShardingCatalogManager::get(operationContext())
+                             ->commitMergeAllPrecomputedChunksOnShard(
+                                 operationContext(), _nss, shard0(), std::move(newChunks)));
+    }
+
+    // Simulates a concurrent DDL disabling chunk operations on the collection by clearing the
+    // allowChunkOperations flag on its config.collections document.
+    void disallowChunkOperations(const NamespaceString& nss) {
+        DBDirectClient client(operationContext());
+        client.update(
+            NamespaceString::kConfigsvrCollectionsNamespace,
+            BSON(CollectionType::kNssFieldName
+                 << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
+            BSON("$set" << BSON(CollectionType::kAllowChunkOperationsFieldName << false)));
+    }
+
+    // Asserts two changed-chunks lists describe the same chunks (keyed by chunk min).
+    void assertSameChangedChunks(std::vector<ChunkType> lhs, std::vector<ChunkType> rhs) {
+        ASSERT_EQ(lhs.size(), rhs.size());
+        const auto byMin = [](const ChunkType& l, const ChunkType& r) {
+            return l.getMin().woCompare(r.getMin()) < 0;
+        };
+        std::sort(lhs.begin(), lhs.end(), byMin);
+        std::sort(rhs.begin(), rhs.end(), byMin);
+        for (size_t i = 0; i < lhs.size(); ++i) {
+            ASSERT_BSONOBJ_EQ(lhs[i].getMin(), rhs[i].getMin());
+            ASSERT_BSONOBJ_EQ(lhs[i].getMax(), rhs[i].getMax());
+            ASSERT_EQ(lhs[i].getShard(), rhs[i].getShard());
+            ASSERT_EQ(lhs[i].getVersion(), rhs[i].getVersion());
+        }
+    }
+};
+
+// A fresh commit merges the precomputed ranges and returns the resulting chunk(s), which match the
+// durable catalog exactly (same fields, same version as the new collection placement version).
+TEST_F(CommitMergeAllPrecomputedChunksOnShardTest, ReturnsMergedChunks) {
+    setupTwoContiguousChunksOnShard0();
+
+    auto [placement, changedChunks] = commitPrecomputed(makeMergedChunkList());
+
+    ASSERT_EQ(1U, changedChunks.size());
+    ASSERT_BSONOBJ_EQ(_keyPattern.globalMin(), changedChunks[0].getMin());
+    ASSERT_BSONOBJ_EQ(_keyPattern.globalMax(), changedChunks[0].getMax());
+    ASSERT_EQ(shard0(), changedChunks[0].getShard());
+    ASSERT_EQ(changedChunks[0].getVersion(), placement.collectionPlacementVersion);
+
+    const auto durableChunks = getChunks();
+    ASSERT_EQ(1U, durableChunks.size());
+    ASSERT_BSONOBJ_EQ(changedChunks[0].toConfigBSON(), durableChunks[0].toConfigBSON());
+}
+
+// Re-running the commit with the same precomputed input and no retryable-write session must be
+// idempotent: because there is no session to deduplicate against, this can only succeed through the
+// range-based already-committed detection. It returns the same chunks and does not bump the
+// version.
+TEST_F(CommitMergeAllPrecomputedChunksOnShardTest, IdempotentRetryReturnsSameChangedChunks) {
+    setupTwoContiguousChunksOnShard0();
+    const auto newChunks = makeMergedChunkList();
+
+    const auto firstChanged = commitPrecomputed(newChunks).second;
+    const auto versionAfterFirst = firstChanged[0].getVersion();
+
+    const auto secondChanged = commitPrecomputed(newChunks).second;
+
+    assertSameChangedChunks(firstChanged, secondChanged);
+
+    // The retry must not re-merge or bump any version.
+    const auto durableChunks = getChunks();
+    ASSERT_EQ(1U, durableChunks.size());
+    ASSERT_EQ(versionAfterFirst, durableChunks[0].getVersion());
+    ASSERT_EQ(versionAfterFirst, secondChanged[0].getVersion());
+}
+
+// An idempotent retry of an already-applied commit must return OK even when chunk operations have
+// since been disallowed on the collection. The allowChunkOperations check runs only on the fresh
+// (non-already-committed) path.
+TEST_F(CommitMergeAllPrecomputedChunksOnShardTest,
+       IdempotentRetrySucceedsWhenChunkOperationsDisallowed) {
+    setupTwoContiguousChunksOnShard0();
+    const auto newChunks = makeMergedChunkList();
+
+    const auto firstChanged = commitPrecomputed(newChunks).second;
+
+    disallowChunkOperations(_nss);
+
+    const auto secondChanged = commitPrecomputed(newChunks).second;
+
+    assertSameChangedChunks(firstChanged, secondChanged);
+}
+
 }  // namespace
 }  // namespace mongo

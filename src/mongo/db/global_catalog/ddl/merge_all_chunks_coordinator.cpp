@@ -172,8 +172,8 @@ bool isSafeToAbortOnGlobalCatalogCommitError(const Status& status) {
 // while this coordinator was running. This should be impossible: all DDL operations that modify
 // a collection's sharding state or UUID call setAllowChunkOperations(false) and drain in-flight
 // chunk coordinators before making any change, so this coordinator cannot be running at the same
-// time. If either error is seen at kGlobalCatalogCommit the DDL serialization invariant has been
-// violated.
+// time. If either error is seen during the global-catalog commit the DDL serialization invariant
+// has been violated.
 bool isNotExpectedOnGlobalCatalogCommitError(const Status& status) {
     return status == ErrorCodes::NamespaceNotSharded || status == ErrorCodes::StaleEpoch;
 }
@@ -215,10 +215,6 @@ bool MergeAllChunksCoordinator::_mustAlwaysMakeProgress() {
     // loop to keep running so transient failures in either path cannot leave the critical section
     // held.
     return _doc.getPhase() >= Phase::kAcquireCriticalSection;
-}
-
-bool MergeAllChunksCoordinator::_allowedToInvalidateOSI() const noexcept {
-    return _cleaningUp || _doc.getPhase() != Phase::kGlobalCatalogCommit;
 }
 
 void MergeAllChunksCoordinator::_onCleanup(OperationContext* opCtx) {
@@ -379,54 +375,55 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
                       "shard"_attr = _request.getShard());
 
                 acquireCriticalSection(opCtx, nss(), _critSecReason);
-
-                // Generate a new OSI to be used during next phase
-                getNewSession(opCtx);
             }))
         .then(_buildPhaseHandler(
-            Phase::kGlobalCatalogCommit,
-            [this, anchor = shared_from_this()](auto* opCtx) {
+            Phase::kCommit,
+            [this, executor, token, anchor = shared_from_this()](auto* opCtx) {
+                tassert(12744402,
+                        "Expected precomputed chunk list to be set before committing",
+                        _doc.getNewChunks().has_value());
+
                 LOGV2(12578605,
                       "Committing merge all chunks on shard operation to the global catalog",
                       logAttrs(nss()),
                       "shard"_attr = _request.getShard());
 
-                tassert(12744402,
-                        "Expected precomputed chunk list to be set before committing to the global "
-                        "catalog",
-                        _doc.getNewChunks().has_value());
-
-                // _configSvrCommitMergeAllPrecomputedChunksOnShard is idempotent through
-                // retryable writes, so we need to use the same session (i.e. same lsid/txnNumber)
-                // on every retry. For this reason, we don't generate a new OSI but rather reuse
-                // the current one. This OSI was generated at the end of the previous phase.
-                const auto session = getCurrentSession(opCtx);
-                tassert(12834402, "There must be a persisted session", session.has_value());
-
+                // Commit to the global catalog to obtain the changed chunks. The config command is
+                // idempotent by range, so re-running it on a retry or after a failover returns the
+                // same chunks without re-merging. This lets the changed chunks live only in this
+                // local response rather than being persisted in the state document (which already
+                // holds the precomputed chunk list and could otherwise approach the BSON limit).
                 auto response = commitToGlobalCatalog(
-                    opCtx, nss(), _request.getShard(), *_doc.getNewChunks(), *session);
+                    opCtx, nss(), _request.getShard(), *_doc.getNewChunks(), getNewSession(opCtx));
 
-                auto newDoc = _doc;
-                newDoc.setShardVersion(response.getShardVersion());
-                _updateStateDocument(opCtx, std::move(newDoc));
+                // Persist the shard version the first time the commit applies: it survives to
+                // kReleaseCriticalSection (where the response is built) and marks the
+                // global-catalog commit as applied for the onError handler. Guarded so retries do
+                // not rewrite the (potentially large) precomputed chunk list held in the state
+                // document.
+                if (!_doc.getShardVersion()) {
+                    auto newDoc = _doc;
+                    newDoc.setShardVersion(response.getShardVersion());
+                    _updateStateDocument(opCtx, std::move(newDoc));
+                }
 
                 // Checkpoint the configTime to ensure that, in the case of a stepdown, the new
                 // primary will start-up from a configTime that is inclusive of the metadata update
                 // that has been committed.
                 VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
-            }))
-        .then(_buildPhaseHandler(
-            Phase::kShardCatalogCommit,
-            [this, executor, token, anchor = shared_from_this()](auto* opCtx) {
+
                 LOGV2(12578607,
-                      "Installing new chunk layout into the shard catalog after merge all chunks",
+                      "Installing changed chunks into the shard catalog after merge all chunks",
                       logAttrs(nss()),
                       "shard"_attr = _request.getShard());
 
-                // Install the new chunk layout into the local shard catalog.
-                sharding_ddl_util::commitCreateCollectionMetadataToShardCatalog(
+                // Install only the changed chunks into the local shard catalog. The shard commit
+                // uses its own session (distinct from the global-catalog commit): on a config
+                // shard both commits target the same node, so they must use different txnNumbers.
+                sharding_ddl_util::commitChunkOperationsMetadataToShardCatalog(
                     opCtx,
                     nss(),
+                    response.getChangedChunks(),
                     {ShardingState::get(opCtx)->shardId()},
                     getNewSession(opCtx),
                     executor,
@@ -459,16 +456,18 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
 
             const auto phase = _doc.getPhase();
 
-            // Before the kGlobalCatalogCommit phase the merge has not been committed anywhere, so
-            // a non-retryable error is safe to abort on. Persist an abort reason so the critical
+            // Before the kCommit phase the merge has not been committed anywhere, so a
+            // non-retryable error is safe to abort on. Persist an abort reason so the critical
             // section (if already held) is released via _cleanupOnAbort.
-            if (phase < Phase::kGlobalCatalogCommit) {
+            if (phase < Phase::kCommit) {
                 auto opCtxHolder = makeOperationContext();
                 triggerCleanup(opCtxHolder.get(), status);
                 MONGO_UNREACHABLE_TASSERT(12578610);
             }
 
-            if (phase == Phase::kGlobalCatalogCommit) {
+            // Allow aborting only if the global catalog commit fails. Within kCommit the persisted
+            // shard version marks whether the global catalog commit has applied.
+            if (phase == Phase::kCommit && !_doc.getShardVersion()) {
                 // These errors indicate the DDL serialization invariant was violated: all DDL
                 // operations drain in-flight chunk coordinators before modifying the collection,
                 // so they cannot be observed here under correct operation.
@@ -487,7 +486,7 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
                 }
             }
 
-            // Retry the operation when kGlobalCatalogCommit or a greater phase fails.
+            // Retry the operation when kCommit or a greater phase fails.
             return status;
         });
 }

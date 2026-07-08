@@ -47,8 +47,7 @@ enums:
             kCheckPreconditions: "checkPreconditions"
             kPrecomputeChunkList: "precomputeChunkList"
             kAcquireCriticalSection: "acquireCriticalSection"
-            kGlobalCatalogCommit: "globalCatalogCommit"
-            kShardCatalogCommit: "shardCatalogCommit"
+            kCommit: "commit"
             kReleaseCriticalSection: "releaseCriticalSection"
 
 structs:

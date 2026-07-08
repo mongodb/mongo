@@ -114,6 +114,9 @@ structs:
                 type: ChunkVersion
                 description: "Latest data placement of the shard."
                 optional: false
+            changedChunks:
+                type: array<object_owned>
+                description: "The list of the chunks changed by the merge commit, in config BSON format."
 
     ConfigSvrCommitMergeChunksResponse:
         description: "Response of the _configsvrCommitMergeChunks command."
