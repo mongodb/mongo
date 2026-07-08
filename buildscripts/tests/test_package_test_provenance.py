@@ -268,12 +268,18 @@ class PackageTestProvenanceTest(unittest.TestCase):
             self.assertEqual("mongos.exe", Path(provenance["binaries"]["mongos"]["path"]).name)
 
     def test_release_binary_name_accepts_crypt_shared_library(self):
-        self.assertEqual(
-            "mongo_crypt_v1.so",
-            under_test.release_binary_name_from_path(
-                "mongodb/lib/mongo_crypt_v1.so", under_test.CRYPT_RELEASE_BINARY_NAMES
-            ),
-        )
+        for filename in (
+            "mongodb/lib/mongo_crypt_v1.so",
+            "mongodb/lib/mongo_crypt_v1.dylib",
+            "mongodb/lib/mongo_crypt_v1.dll",
+        ):
+            with self.subTest(filename=filename):
+                self.assertEqual(
+                    "mongo_crypt_v1.so",
+                    under_test.release_binary_name_from_path(
+                        filename, under_test.CRYPT_RELEASE_BINARY_NAMES
+                    ),
+                )
 
     def test_release_binary_provenance_rejects_hash_mismatch(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -383,6 +389,58 @@ class PackageTestProvenanceTest(unittest.TestCase):
             self.assertEqual(
                 under_test.hash_file(crypt_library),
                 provenance["binaries"]["mongo_crypt_v1.so"]["sha256"],
+            )
+
+    def test_make_release_binary_provenance_hashes_crypt_dylib_archive_binary(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            build_command_file = temp_path / "build_command.txt"
+            build_command_file.write_text(
+                f"bazel build archive-mongo_crypt-stripped {release_local_suffix()}"
+            )
+            archive_path = temp_path / "mongo_crypt.tgz"
+            crypt_library = temp_path / "mongo_crypt_v1.dylib"
+            crypt_library.write_text("crypt bytes")
+            with tarfile.open(archive_path, "w:gz") as archive:
+                archive.add(crypt_library, arcname="mongodb/lib/mongo_crypt_v1.dylib")
+
+            provenance = under_test.make_release_binary_provenance(
+                build_command_file, archive_path, under_test.CRYPT_RELEASE_BINARY_NAMES
+            )
+
+            self.assertEqual(
+                under_test.hash_file(crypt_library),
+                provenance["binaries"]["mongo_crypt_v1.so"]["sha256"],
+            )
+            self.assertEqual(
+                "mongodb/lib/mongo_crypt_v1.dylib",
+                provenance["binaries"]["mongo_crypt_v1.so"]["path"],
+            )
+
+    def test_make_release_binary_provenance_hashes_crypt_dll_zip_archive_binary(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            build_command_file = temp_path / "build_command.txt"
+            build_command_file.write_text(
+                f"bazel build archive-mongo_crypt-stripped {release_local_suffix()}"
+            )
+            archive_path = temp_path / "mongo_crypt.zip"
+            crypt_library = temp_path / "mongo_crypt_v1.dll"
+            crypt_library.write_text("crypt bytes")
+            with zipfile.ZipFile(archive_path, "w") as archive:
+                archive.write(crypt_library, arcname="mongodb/bin/mongo_crypt_v1.dll")
+
+            provenance = under_test.make_release_binary_provenance(
+                build_command_file, archive_path, under_test.CRYPT_RELEASE_BINARY_NAMES
+            )
+
+            self.assertEqual(
+                under_test.hash_file(crypt_library),
+                provenance["binaries"]["mongo_crypt_v1.so"]["sha256"],
+            )
+            self.assertEqual(
+                "mongodb/bin/mongo_crypt_v1.dll",
+                provenance["binaries"]["mongo_crypt_v1.so"]["path"],
             )
 
     def test_release_binary_provenance_validates_against_archive(self):
@@ -522,18 +580,20 @@ class PackageTestProvenanceTest(unittest.TestCase):
         ):
             self.assertTrue(under_test.should_create_release_binary_provenance())
 
-    def test_package_task_can_create_provenance_in_versioned_server_release_project(self):
-        with mock.patch.dict(
-            "os.environ",
-            {
-                "is_patch": "false",
-                "is_release": "false",
-                "project": "mongo-release-v8.0",
-                "task_name": "package",
-            },
-            clear=False,
-        ):
-            self.assertTrue(under_test.should_create_release_binary_provenance())
+    def test_package_task_can_create_provenance_in_prefixed_server_release_project(self):
+        for project in ("mongo-release-v8.0", "mongo-release-testing"):
+            with self.subTest(project=project):
+                with mock.patch.dict(
+                    "os.environ",
+                    {
+                        "is_patch": "false",
+                        "is_release": "false",
+                        "project": project,
+                        "task_name": "package",
+                    },
+                    clear=False,
+                ):
+                    self.assertTrue(under_test.should_create_release_binary_provenance())
 
 
 if __name__ == "__main__":

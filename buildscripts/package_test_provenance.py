@@ -145,13 +145,24 @@ def hash_file(path: Path) -> str:
 def release_binary_name_from_path(
     path: str, binary_names: Iterable[str] = RELEASE_BINARY_NAMES
 ) -> str | None:
-    """Return the canonical release binary name for a path, accepting Windows .exe suffixes."""
+    """Return the canonical release binary name for a path, accepting platform suffixes."""
 
     filename = path.replace("\\", "/").rsplit("/", 1)[-1].lower()
 
     for binary_name in binary_names:
         normalized_binary_name = binary_name.lower()
-        if filename in {normalized_binary_name, f"{normalized_binary_name}.exe"}:
+        accepted_filenames = {normalized_binary_name}
+        if "." not in normalized_binary_name:
+            accepted_filenames.add(f"{normalized_binary_name}.exe")
+        if normalized_binary_name.endswith(".so"):
+            shared_library_stem = normalized_binary_name.removesuffix(".so")
+            accepted_filenames.update(
+                {
+                    f"{shared_library_stem}.dylib",
+                    f"{shared_library_stem}.dll",
+                }
+            )
+        if filename in accepted_filenames:
             return binary_name
 
     return None
