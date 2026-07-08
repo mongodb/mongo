@@ -455,6 +455,30 @@ void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
     // Compact 4.e, Calculate pathLength := #Edges_SPH(lb, lb, uh, prc, theta)
     const auto pathLength = getEdgesLength(fieldType, fieldPath, queryTypeConfig);
     // Compact 4.f, Calculate numPads := ceil( gamma * (pathLength * uniqueLeaves - len(C_f)) )
+    // This assumes that (pathLength * uniqueLeaves) >= uniqueTokens: if this doesn't hold, then
+    // it could mean that the parameters for calculating the path length have changed. In that case
+    // skip padding insertions for this field.
+    if (uniqueLeaves > 0 && pathLength > (std::numeric_limits<std::size_t>::max() / uniqueLeaves)) {
+        // Skip padding insertions if pathLength * uniqueLeaves would overflow.
+        LOGV2_DEBUG(13062801,
+                    2,
+                    "Skipping insertion of padding documents for range field",
+                    "field"_attr = fieldPath,
+                    "edgesLength"_attr = pathLength,
+                    "uniqueLeaves"_attr = uniqueLeaves,
+                    "uniqueTokens"_attr = uniqueTokens);
+        return;
+    }
+    if ((pathLength * uniqueLeaves) < uniqueTokens) {
+        LOGV2_WARNING(13062802,
+                      "Encountered invalid edges length when compacting a range field",
+                      "field"_attr = fieldPath,
+                      "edgesLength"_attr = pathLength,
+                      "uniqueLeaves"_attr = uniqueLeaves,
+                      "uniqueTokens"_attr = uniqueTokens);
+        uasserted(13062800, "Encountered invalid edges length when compacting a range field");
+    }
+
     const size_t numPads =
         std::ceil(anchorPaddingFactor * ((pathLength * uniqueLeaves) - uniqueTokens));
     if (numPads <= 0) {
