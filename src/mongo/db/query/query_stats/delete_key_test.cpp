@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_stats/delete_key.h"
-
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
@@ -36,6 +34,7 @@
 #include "mongo/db/query/query_bm_constants.h"
 #include "mongo/db/query/query_shape/delete_cmd_shape.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/query/query_stats/write_key.h"
 #include "mongo/db/query/write_ops/delete_request_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"

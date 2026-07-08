@@ -30,7 +30,7 @@
 #include "mongo/db/query/query_bm_constants.h"
 #include "mongo/db/query/query_fcv_environment_for_test.h"
 #include "mongo/db/query/query_shape/insert_cmd_shape.h"
-#include "mongo/db/query/query_stats/insert_key.h"
+#include "mongo/db/query/query_stats/write_key.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/duration.h"
 

@@ -55,12 +55,12 @@ statistics. As one example, you can find the [`FindKey`](find_key.h) which will 
 things tracked in the `FindCmdQueryStatsStoreKeyComponents` (including `batchSize` shown in this
 example).
 
-Write commands have their own keys as well. The [`DeleteKey`](delete_key.h) wraps the base `Key`
-class and a [`DeleteCmdShape`](../query_shape/delete_cmd_shape.h), and adds the
-`DeleteCmdComponents` for delete-specific dimensions (`ordered` and `bypassDocumentValidation`).
-Similarly, the [`UpdateKey`](update_key.h) and [`InsertKey`](insert_key.h) capture the dimensions
-specific to update and insert commands. See [Write Commands](#write-commands) below for how these
-keys are registered.
+Write commands use a single templated key class, [`WriteKey<Request>`](write_key.h), which wraps the
+base `Key` class and adds `WriteCmdComponents` for write-specific dimensions (`ordered` and
+`bypassDocumentValidation`). The three concrete types — `UpdateKey`, `InsertKey`, and `DeleteKey` —
+are type aliases for `WriteKey<UpdateCommandRequest>`, `WriteKey<InsertCommandRequest>`, and
+`WriteKey<DeleteCommandRequest>` respectively. See [Write Commands](#write-commands) below for how
+these keys are registered.
 
 ### Query Stats Store Cache Size
 

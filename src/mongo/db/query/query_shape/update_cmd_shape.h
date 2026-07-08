@@ -92,7 +92,7 @@ struct UpdateCmdShapeComponents : public query_shape::CmdSpecificShapeComponents
 };
 
 /**
- * A class representing the query shape of an aggregate command. The components are listed above.
+ * A class representing the query shape of an update command. The components are listed above.
  * This class knows how to utilize those components to serialize to BSON with any
  * query_shape::SerializationOptions. Mostly this involves correctly setting up an ExpressionContext
  * to re-parse the request if needed.

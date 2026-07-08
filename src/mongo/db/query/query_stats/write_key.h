@@ -32,13 +32,10 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection_type.h"
 #include "mongo/util/modules.h"
-
-#include <memory>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -46,12 +43,13 @@
 namespace mongo::query_stats {
 
 /**
- * Struct representing the delete command's unique arguments that are included in the query stats
- * key. Tracks 'ordered' and 'bypassDocumentValidation'. Other fields (maxTimeMS, writeConcern,
- * comment, hint) are handled by the base Key class.
+ * Struct representing the unique arguments that are included in the query stats key for write
+ * commands (insert, update, and delete). Tracks 'ordered' and 'bypassDocumentValidation'. Other
+ * fields (maxTimeMS, writeConcern, comment) are handled by the base Key class.
  */
-struct DeleteCmdComponents : public SpecificKeyComponents {
-    explicit DeleteCmdComponents(const write_ops::DeleteCommandRequest& request);
+template <typename Request>
+struct WriteCmdComponents : public SpecificKeyComponents {
+    explicit WriteCmdComponents(const Request& request);
 
     void HashValue(absl::HashState state) const final;
 
@@ -64,29 +62,45 @@ struct DeleteCmdComponents : public SpecificKeyComponents {
 };
 
 /**
- * An implementation of the query stats store key for the delete command. Wraps the base 'Key'
- * class and 'DeleteCmdShape', and includes DeleteCmdComponents for delete-specific fields
- * (ordered, bypassDocumentValidation).
+ * An implementation of the query stats store key for write commands (insert, update, and delete).
+ * Wraps the base 'Key' class, and includes WriteCmdComponents for write-specific fields (ordered,
+ * bypassDocumentValidation).
  */
-class DeleteKey final : public Key {
+template <typename Request>
+class WriteKey final : public Key {
 public:
-    DeleteKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-              const write_ops::DeleteCommandRequest& request,
-              const boost::optional<BSONObj>& hint,
-              std::unique_ptr<query_shape::Shape> deleteShape,
-              query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown);
+    /**
+     * Constructor for insert
+     */
+    WriteKey(OperationContext* opCtx,
+             const write_ops::InsertCommandRequest& request,
+             std::unique_ptr<query_shape::Shape> insertShape,
+             query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown)
+    requires std::same_as<Request, write_ops::InsertCommandRequest>;
+
+    /**
+     * Constructor for update and delete
+     */
+    WriteKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+             const Request& request,
+             const boost::optional<BSONObj>& hint,
+             std::unique_ptr<query_shape::Shape> shape,
+             query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown);
+
+    // The default implementation of hashing for smart pointers is not a good one for our purposes.
+    // Here we overload them to actually take the hash of the object, rather than hashing the
+    // pointer itself.
+    template <typename H>
+    friend H AbslHashValue(H h, const std::unique_ptr<const WriteKey<Request>>& key) {
+        return H::combine(std::move(h), *key);
+    }
+    template <typename H>
+    friend H AbslHashValue(H h, const std::shared_ptr<const WriteKey<Request>>& key) {
+        return H::combine(std::move(h), *key);
+    }
 
     const SpecificKeyComponents& specificComponents() const final {
         return _components;
-    }
-
-    template <typename H>
-    friend H AbslHashValue(H h, const std::unique_ptr<const DeleteKey>& key) {
-        return H::combine(std::move(h), *key);
-    }
-    template <typename H>
-    friend H AbslHashValue(H h, const std::shared_ptr<const DeleteKey>& key) {
-        return H::combine(std::move(h), *key);
     }
 
 protected:
@@ -94,8 +108,22 @@ protected:
                                          const query_shape::SerializationOptions& opts) const final;
 
 private:
-    const DeleteCmdComponents _components;
+    const WriteCmdComponents<Request> _components;
 };
+
+using UpdateCmdComponents = WriteCmdComponents<write_ops::UpdateCommandRequest>;
+using InsertCmdComponents = WriteCmdComponents<write_ops::InsertCommandRequest>;
+using DeleteCmdComponents = WriteCmdComponents<write_ops::DeleteCommandRequest>;
+
+using UpdateKey = WriteKey<write_ops::UpdateCommandRequest>;
+using InsertKey = WriteKey<write_ops::InsertCommandRequest>;
+using DeleteKey = WriteKey<write_ops::DeleteCommandRequest>;
+
+static_assert(sizeof(UpdateKey) == sizeof(Key) + sizeof(UpdateCmdComponents),
+              "If the class' members have changed, this assert may need to be updated.");
+
+static_assert(sizeof(InsertKey) == sizeof(Key) + sizeof(InsertCmdComponents),
+              "If the class' members have changed, this assert may need to be updated.");
 
 static_assert(sizeof(DeleteKey) == sizeof(Key) + sizeof(DeleteCmdComponents),
               "If the class' members have changed, this assert may need to be updated.");

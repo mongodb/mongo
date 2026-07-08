@@ -31,7 +31,7 @@
 #include "mongo/db/query/query_bm_constants.h"
 #include "mongo/db/query/query_fcv_environment_for_test.h"
 #include "mongo/db/query/query_shape/delete_cmd_shape.h"
-#include "mongo/db/query/query_stats/delete_key.h"
+#include "mongo/db/query/query_stats/write_key.h"
 #include "mongo/db/query/write_ops/delete_request_gen.h"
 #include "mongo/db/query/write_ops/parsed_delete.h"
 #include "mongo/db/query/write_ops/parsed_writes_common.h"

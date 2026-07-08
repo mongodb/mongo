@@ -78,9 +78,10 @@ mongo_cc_library(
         "write_cmd_query_stats_registrar.cpp",
     ],
     deps = [
-        "//src/mongo/db/query/query_stats:delete_key",
-        "//src/mongo/db/query/query_stats:insert_key",
-        "//src/mongo/db/query/query_stats:update_key",
+        "//src/mongo/db/query/query_shape:delete_cmd_shape",
+        "//src/mongo/db/query/query_shape:insert_cmd_shape",
+        "//src/mongo/db/query/query_shape:update_cmd_shape",
+        "//src/mongo/db/query/query_stats:write_key",
     ],
 )
 

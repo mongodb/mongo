@@ -27,12 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_stats/update_key.h"
-
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_shape/update_cmd_shape.h"
+#include "mongo/db/query/query_stats/write_key.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"

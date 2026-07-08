@@ -33,7 +33,7 @@
 #include "mongo/db/query/query_fcv_environment_for_test.h"
 #include "mongo/db/query/query_shape/update_cmd_builder.h"
 #include "mongo/db/query/query_shape/update_cmd_shape.h"
-#include "mongo/db/query/query_stats/update_key.h"
+#include "mongo/db/query/query_stats/write_key.h"
 #include "mongo/db/query/write_ops/parsed_update.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/rpc/metadata/client_metadata.h"
