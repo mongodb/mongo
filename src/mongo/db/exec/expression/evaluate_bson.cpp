@@ -45,20 +45,15 @@ Value evaluate(const ExpressionObject& expr,
     auto& expressions = expr.getChildExpressions();
     MutableDocument outputDoc(expressions.size());
 
-    SimpleMemoryUsageToken memToken;
-    if (ctx.tracker) {
-        memToken = SimpleMemoryUsageToken(0, ctx.tracker);
-    }
+    auto& tracker = getMemoryTracker(expr, ctx);
+    SimpleMemoryUsageToken memToken(0, &tracker);
 
     for (auto&& pair : expressions) {
         Value fieldVal = pair.second->evaluate(root, variables, ctx);
 
-        if (ctx.tracker) {
-            // Account for the evaluated value plus the field name
-            memToken.add(
-                static_cast<int64_t>(pair.first.size() + 1 + fieldVal.getApproximateSize()));
-            ctx.tracker->assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
-        }
+        // Account for the evaluated value plus the field name
+        memToken.add(static_cast<int64_t>(pair.first.size() + 1 + fieldVal.getApproximateSize()));
+        tracker.assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
 
         outputDoc.addField(pair.first, std::move(fieldVal));
     }
