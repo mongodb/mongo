@@ -3253,24 +3253,44 @@ TEST_F(BSONColumnTest, DBRefAfterChangeBack) {
     verifyDecompression(binData, {elemInt32, dbRef, dbRef});
 }
 
-TEST_F(BSONColumnTest, CodeWScopeAppendRejects) {
-    // Creation: BSONColumnBuilder must reject CodeWScope elements.
-    auto codeWScope = createCodeWScope("code", BSONObj());
-    ASSERT_THROWS_CODE(cb.append(codeWScope), DBException, ErrorCodes::InvalidBSONColumn);
+TEST_F(BSONColumnTest, CodeWScopeBasic) {
+    auto first = createCodeWScope("code", BSONObj());
+    auto second = createCodeWScope("diffCode", BSONObj());
+    cb.append(first);
+    cb.append(second);
+    cb.append(second);
+
+    BufBuilder expected;
+    appendLiteral(expected, first);
+    appendLiteral(expected, second);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {first, second, second});
 }
 
-TEST_F(BSONColumnTest, CodeWScopeDecompressRejects) {
-    // Decompression: iterating a column that contains a CodeWScope literal must throw, even
-    // when the bytes were stored by bypassing BSONColumnBuilder.
+TEST_F(BSONColumnTest, CodeWScopeAfterChangeBack) {
     auto codeWScope = createCodeWScope("code", BSONObj());
-    BufBuilder raw;
-    appendLiteral(raw, codeWScope);
-    appendEOO(raw);
+    auto elemInt32 = createElementInt32(0);
 
-    BSONColumn col(createBSONColumn(raw.buf(), raw.len()));
-    ASSERT_THROWS_CODE(std::for_each(col.begin(), col.end(), [](const auto&) {}),
-                       DBException,
-                       ErrorCodes::InvalidBSONColumn);
+    cb.append(elemInt32);
+    cb.append(codeWScope);
+    cb.append(codeWScope);
+
+    BufBuilder expected;
+    appendLiteral(expected, elemInt32);
+    appendLiteral(expected, codeWScope);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
+
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemInt32, codeWScope, codeWScope});
 }
 
 TEST_F(BSONColumnTest, SymbolBasic) {
@@ -8346,6 +8366,7 @@ TEST_F(BSONColumnTest, InvalidDeltaAfterInterleaved) {
 TEST_F(BSONColumnTest, InvalidDelta) {
     testInvalidDelta(createRegex());
     testInvalidDelta(createDBRef("ns", OID{"112233445566778899AABBCC"}));
+    testInvalidDelta(createCodeWScope("code", BSONObj{}));
     testInvalidDelta(createSymbol("symbol"));
     testInvalidDelta(BSON("obj" << BSON("a" << 1)).firstElement());
     testInvalidDelta(BSON("arr" << BSON_ARRAY("a")).firstElement());
