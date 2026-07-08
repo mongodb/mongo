@@ -337,7 +337,7 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Not authorized to cleanup structured encryption data",
                     as->isAuthorizedForActionsOnResource(
-                        ResourcePattern::forExactNamespace(request().getNamespace()),
+                        ResourcePattern::forDatabaseName(request().getDbName()),
                         ActionType::cleanupStructuredEncryptionData));
         }
 

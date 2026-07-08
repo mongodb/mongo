@@ -3339,8 +3339,9 @@ export const authCommandsLib = {
         {
           testname: "compactStructuredEncryptionData",
           command: {compactStructuredEncryptionData: "foo", compactionTokens : {}},
-          skipSharded: true,
-          skipUnlessReplicaSet: true,
+          skipTest: (conn) => {
+              return isStandalone(conn);
+          },
           setup: function(db) {
               assert.commandWorked(db.createCollection("foo", {
                 encryptedFields: {
@@ -3363,23 +3364,31 @@ export const authCommandsLib = {
                 runOnDb: firstDbName,
                 roles: { readWrite : 1, readWriteAnyDatabase : 1, dbOwner : 1, root : 1, __system : 1 },
                 privileges:
-                    [{resource: {db: firstDbName, collection: "foo"}, actions: ["compactStructuredEncryptionData"]}],
+                    [{resource: {db: firstDbName, collection: ""}, actions: ["compactStructuredEncryptionData"]}],
                 expectFail: true // Missing compaction token.
               },
               {
                 runOnDb: secondDbName,
                 roles: { readWriteAnyDatabase : 1, root : 1, __system : 1 },
                 privileges:
-                    [{resource: {db: secondDbName, collection: "foo"}, actions: ["compactStructuredEncryptionData"]}],
+                    [{resource: {db: secondDbName, collection: ""}, actions: ["compactStructuredEncryptionData"]}],
                 expectFail: true // Missing compaction token.
-              }
+              },
+              {
+                // privilege must be conferred at db scope, not exact-namespace scope
+                expectAuthzFailure: true,
+                runOnDb: firstDbName,
+                privileges:
+                    [{resource: {db: firstDbName, collection: "foo"}, actions: ["compactStructuredEncryptionData"]}],
+              },
           ]
         },
         {
           testname: "cleanupStructuredEncryptionData",
           command: {cleanupStructuredEncryptionData: "foo", cleanupTokens : {}},
-          skipSharded: true,
-          skipUnlessReplicaSet: true,
+          skipTest: (conn) => {
+              return isStandalone(conn);
+          },
           setup: function(db) {
               assert.commandWorked(db.createCollection("foo", {
                 encryptedFields: {
@@ -3402,16 +3411,23 @@ export const authCommandsLib = {
                 runOnDb: firstDbName,
                 roles: { readWrite : 1, readWriteAnyDatabase : 1, dbOwner : 1, root : 1, __system : 1 },
                 privileges:
-                    [{resource: {db: firstDbName, collection: "foo"}, actions: ["cleanupStructuredEncryptionData"]}],
-                expectFail: true // Missing compaction token.
+                    [{resource: {db: firstDbName, collection: ""}, actions: ["cleanupStructuredEncryptionData"]}],
+                expectFail: true // Missing cleanup token.
               },
               {
                 runOnDb: secondDbName,
                 roles: { readWriteAnyDatabase : 1, root : 1, __system : 1 },
                 privileges:
-                    [{resource: {db: secondDbName, collection: "foo"}, actions: ["cleanupStructuredEncryptionData"]}],
-                expectFail: true // Missing compaction token.
-              }
+                    [{resource: {db: secondDbName, collection: ""}, actions: ["cleanupStructuredEncryptionData"]}],
+                expectFail: true // Missing cleanup token.
+              },
+              {
+                // privilege must be conferred at db scope, not exact-namespace scope
+                expectAuthzFailure: true,
+                runOnDb: firstDbName,
+                privileges:
+                    [{resource: {db: firstDbName, collection: "foo"}, actions: ["cleanupStructuredEncryptionData"]}],
+              },
           ]
         },
         {
