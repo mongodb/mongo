@@ -132,11 +132,30 @@ if [[ ${compile_flags} == *"--lto"* ]]; then
   mkdir -p tmp && $sudo mount --bind ./tmp /tmp
 fi
 
-eval ${compile_env} $python ./buildscripts/scons.py \
-  ${compile_flags} ${task_compile_flags} ${task_compile_flags_extra} \
-  ${scons_cache_args} $extra_args \
-  ${targets} MONGO_VERSION=${version} ${patch_compile_flags} | tee scons_stdout.log
-exit_status=$?
+# Retry the build since it's deterministic and may fail due to transient issues
+# (e.g. flaky network to the build cache, or transient toolchain/OOM errors). A
+# genuine build error is deterministic and will still fail the task once the
+# retries are exhausted. Relax errexit so a failed attempt doesn't abort the
+# script before we can retry; capture the status and restore errexit afterward.
+set +o errexit
+exit_status=1
+for i in {1..3}; do
+  eval ${compile_env} $python ./buildscripts/scons.py \
+    ${compile_flags} ${task_compile_flags} ${task_compile_flags_extra} \
+    ${scons_cache_args} $extra_args \
+    ${targets} MONGO_VERSION=${version} ${patch_compile_flags} | tee scons_stdout.log
+  exit_status=$?
+  if [[ $exit_status -eq 0 ]]; then
+    break
+  fi
+  if [[ $i -lt 3 ]]; then
+    echo "SCons build failed (attempt ${i}/3, exit ${exit_status}), retrying..."
+    sleep 5
+  else
+    echo "SCons build failed (attempt ${i}/3, exit ${exit_status})."
+  fi
+done
+set -o errexit
 
 # If compile fails we do not run any tests
 if [[ $exit_status -ne 0 ]]; then
