@@ -1,6 +1,8 @@
 /**
- * Tests that $const and $literal reject BinData subtype 7 (Column), which is reserved for the
- * internal BSONColumn format, including when it is nested inside a document or array.
+ * Tests that $const and $literal reject restricted BinData subtypes, including when the value is
+ * nested inside a document or array.
+ *
+ * @tags: [requires_fcv_80]
  */
 
 const coll = db[jsTestName()];
@@ -63,3 +65,33 @@ for (const testCase of testCases) {
     assertProjectionWorks({$const: testCase(genericBinData)});
     assertProjectionWorks({$literal: testCase(genericBinData)});
 }
+
+// Subtype 2 (ByteArrayDeprecated): first 4 bytes as LE int32 must equal (total - 4).
+// 16-byte buffer: bytes[0..3] = 12 (LE int32) - correct inner prefix.
+const subtype2Valid = BinData(2, "DAAAAAAAAAAAAAAAAAAAAA==");
+
+// 16-byte buffer: all zeros - inner prefix = 0 != 12.
+const subtype2BadPrefix = BinData(2, "AAAAAAAAAAAAAAAAAAAAAA==");
+
+assertProjectionWorks({$const: subtype2Valid});
+assertProjectionWorks({$literal: subtype2Valid});
+assertProjectionFails({$const: subtype2BadPrefix});
+assertProjectionFails({$literal: subtype2BadPrefix});
+
+// Subtypes 3 (bdtUUID deprecated) and 5 (MD5Type): must be exactly 16 bytes.
+const k16BytesBase64 = "AAAAAAAAAAAAAAAAAAAAAA==";
+const k4BytesBase64 = "AAAAAA==";
+
+assertProjectionWorks({$const: BinData(3, k16BytesBase64)});
+assertProjectionWorks({$literal: BinData(3, k16BytesBase64)});
+assertProjectionFails({$const: BinData(3, k4BytesBase64)});
+assertProjectionFails({$literal: BinData(3, k4BytesBase64)});
+
+assertProjectionWorks({$const: BinData(5, k16BytesBase64)});
+assertProjectionWorks({$literal: BinData(5, k16BytesBase64)});
+assertProjectionFails({$const: BinData(5, k4BytesBase64)});
+assertProjectionFails({$literal: BinData(5, k4BytesBase64)});
+
+// Subtype 6 (Encrypt): allowed (FLE range queries embed subtype-6 payloads as expression operands).
+assertProjectionWorks({$const: BinData(6, "CAABAA==")});
+assertProjectionWorks({$literal: BinData(6, "CAABAA==")});

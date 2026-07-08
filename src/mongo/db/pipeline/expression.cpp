@@ -52,6 +52,7 @@
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 
 #include "mongo/base/data_range.h"
+#include "mongo/base/data_view.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsonmisc.h"
@@ -1320,19 +1321,38 @@ const char* ExpressionCond::getOpName() const {
 /* ---------------------- ExpressionConstant --------------------------- */
 
 namespace {
-// The Column (7) BinData subtype is not allowed in $const or $literal.
-void assertNoBSONColumn(const BSONElement& elem) {
+// Subtype 7 (Column) is banned; subtypes 2, 3, and 5 are structurally validated.
+void assertNoRestrictedBinDataSubtype(const BSONElement& elem) {
     if (elem.type() == BSONType::BinData) {
+        const auto subtype = elem.binDataType();
+        if (subtype == BinDataType::ByteArrayDeprecated) {
+            int len;
+            const char* data = elem.binData(len);
+            uassert(ErrorCodes::FailedToParse,
+                    "BinData subtype ByteArrayDeprecated (2) requires a valid inner length prefix",
+                    len >= 4 &&
+                        ConstDataView(data).read<LittleEndian<int32_t>>() ==
+                            static_cast<int32_t>(len - 4));
+        }
+        if (subtype == BinDataType::bdtUUID || subtype == BinDataType::MD5Type) {
+            int len;
+            elem.binData(len);
+            uassert(ErrorCodes::FailedToParse,
+                    str::stream() << "BinData subtype " << static_cast<int>(subtype)
+                                  << " requires exactly " << UUID::kNumBytes
+                                  << " bytes as an expression literal",
+                    len == UUID::kNumBytes);
+        }
         uassert(ErrorCodes::FailedToParse,
                 "BSONColumn (BinData subtype 7) is not allowed as an expression literal",
-                elem.binDataType() != BinDataType::Column);
+                subtype != BinDataType::Column);
     } else if (elem.type() == BSONType::Object || elem.type() == BSONType::Array) {
         for (const auto& child : elem.embeddedObject()) {
-            assertNoBSONColumn(child);
+            assertNoRestrictedBinDataSubtype(child);
         }
     } else if (elem.type() == BSONType::CodeWScope) {
         for (const auto& child : elem.codeWScopeObject()) {
-            assertNoBSONColumn(child);
+            assertNoRestrictedBinDataSubtype(child);
         }
     }
 }
@@ -1341,7 +1361,7 @@ void assertNoBSONColumn(const BSONElement& elem) {
 intrusive_ptr<Expression> ExpressionConstant::parse(ExpressionContext* const expCtx,
                                                     BSONElement exprElement,
                                                     const VariablesParseState& vps) {
-    assertNoBSONColumn(exprElement);
+    assertNoRestrictedBinDataSubtype(exprElement);
     return new ExpressionConstant(expCtx, Value(exprElement));
 }
 
@@ -7114,6 +7134,16 @@ private:
         };
     }
 
+    static void validateFixedSizeBinDataSubtype(BinDataType binDataType, int actualSize) {
+        static_assert(UUID::kNumBytes == 16);
+        if (binDataType == BinDataType::bdtUUID || binDataType == BinDataType::MD5Type) {
+            uassert(13016802,
+                    str::stream() << "$convert to BinData subtype " << static_cast<int>(binDataType)
+                                  << " requires exactly " << UUID::kNumBytes << " bytes",
+                    actualSize == UUID::kNumBytes);
+        }
+    }
+
     static Value parseStringToBinData(ExpressionContext* const expCtx,
                                       Value inputValue,
                                       FormatArg format,
@@ -7121,31 +7151,27 @@ private:
         auto input = inputValue.getStringData();
         auto binDataType = computeBinDataType(subtypeValue);
 
+        std::string decoded;
         try {
             uassert(4341116,
                     "Only the 'uuid' format is allowed with the UUID subtype",
                     (format == BinDataFormat::kUuid) == (binDataType == BinDataType::newUUID));
 
             switch (format) {
-                case BinDataFormat::kBase64: {
-                    auto decoded = base64::decode(input);
-                    return Value(BSONBinData(decoded.data(), decoded.size(), binDataType));
-                }
-                case BinDataFormat::kBase64Url: {
-                    auto decoded = base64url::decode(input);
-                    return Value(BSONBinData(decoded.data(), decoded.size(), binDataType));
-                }
-                case BinDataFormat::kHex: {
-                    auto decoded = hexblob::decode(input);
-                    return Value(BSONBinData(decoded.data(), decoded.size(), binDataType));
-                }
-                case BinDataFormat::kUtf8: {
+                case BinDataFormat::kBase64:
+                    decoded = base64::decode(input);
+                    break;
+                case BinDataFormat::kBase64Url:
+                    decoded = base64url::decode(input);
+                    break;
+                case BinDataFormat::kHex:
+                    decoded = hexblob::decode(input);
+                    break;
+                case BinDataFormat::kUtf8:
                     uassert(
                         4341119, str::stream() << "Invalid UTF-8: " << input, isValidUTF8(input));
-
-                    auto decoded = input.toString();
-                    return Value(BSONBinData(decoded.data(), decoded.size(), binDataType));
-                }
+                    decoded = input.toString();
+                    break;
                 case BinDataFormat::kUuid: {
                     auto uuid = uassertStatusOK(UUID::parse(input));
                     return Value(uuid);
@@ -7159,6 +7185,10 @@ private:
                       str::stream() << "Failed to parse BinData '" << inputValue.getString()
                                     << "' in $convert with no onError value: " << ex.reason());
         }
+
+        validateFixedSizeBinDataSubtype(binDataType, static_cast<int>(decoded.size()));
+
+        return Value(BSONBinData(decoded.data(), decoded.size(), binDataType));
     }
 
     static Value performConvertToTrue(ExpressionContext* const expCtx, Value inputValue) {
@@ -7251,11 +7281,25 @@ private:
                     str::stream() << "In $convert, numeric value for 'subtype' does not correspond "
                                      "to a BinData type: "
                                   << typeCode,
-                    // Allowed ranges are 0-8 (pre-defined types) and 128-255 (user-defined types).
                     isValidBinDataType(typeCode) || isValidUserDefinedBinDataType(typeCode));
-            uassert(12910300,
-                    "$convert to BinData subtype Column (7) is not allowed",
-                    typeCode != static_cast<int>(BinDataType::Column));
+            struct BannedSubtype {
+                int subtypeCode;
+                int errCode;
+                const char* name;
+            };
+            static constexpr BannedSubtype kBannedSubtypes[] = {
+                {static_cast<int>(BinDataType::ByteArrayDeprecated),
+                 13016800,
+                 "ByteArrayDeprecated (2)"},
+                {static_cast<int>(BinDataType::Encrypt), 13016801, "Encrypt (6)"},
+                {static_cast<int>(BinDataType::Column), 12910300, "Column (7)"},
+            };
+            for (const auto& banned : kBannedSubtypes) {
+                uassert(banned.errCode,
+                        str::stream()
+                            << "$convert to BinData subtype " << banned.name << " is not allowed",
+                        typeCode != banned.subtypeCode);
+            }
 
             return static_cast<BinDataType>(typeCode);
         }

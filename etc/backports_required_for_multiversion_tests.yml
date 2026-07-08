@@ -25,15 +25,15 @@ last-continuous:
     ticket: SERVER-130139
   - test_file: jstests/aggregation/accumulators/percentiles_syntax.js
     ticket: SERVER-129617
+  - test_file: jstests/aggregation/expressions/const_literal_bindata_restricted_subtypes.js
+    ticket: SERVER-130168
+  - test_file: jstests/aggregation/expressions/convert_bindata_restricted_subtypes.js
+    ticket: SERVER-130168
   - test_file: jstests/aggregation/expressions/percentile_expression_syntax.js
     ticket: SERVER-129617
   - test_file: jstests/aggregation/expressions/subtype.js
     ticket: SERVER-129103
-  - test_file: jstests/aggregation/expressions/const_literal_bsoncolumn.js
-    ticket: SERVER-129103
   - test_file: jstests/aggregation/expressions/convert_bindata.js
-    ticket: SERVER-129103
-  - test_file: jstests/aggregation/expressions/convert_bindata_bsoncolumn.js
     ticket: SERVER-129103
   - test_file: jstests/core/index/elemmatch_index.js
     ticket: SERVER-108945
@@ -976,15 +976,15 @@ last-lts:
     ticket: SERVER-130139
   - test_file: jstests/aggregation/accumulators/percentiles_syntax.js
     ticket: SERVER-129617
+  - test_file: jstests/aggregation/expressions/const_literal_bindata_restricted_subtypes.js
+    ticket: SERVER-130168
+  - test_file: jstests/aggregation/expressions/convert_bindata_restricted_subtypes.js
+    ticket: SERVER-130168
   - test_file: jstests/aggregation/expressions/percentile_expression_syntax.js
     ticket: SERVER-129617
   - test_file: jstests/aggregation/expressions/subtype.js
     ticket: SERVER-129103
-  - test_file: jstests/aggregation/expressions/const_literal_bsoncolumn.js
-    ticket: SERVER-129103
   - test_file: jstests/aggregation/expressions/convert_bindata.js
-    ticket: SERVER-129103
-  - test_file: jstests/aggregation/expressions/convert_bindata_bsoncolumn.js
     ticket: SERVER-129103
   - test_file: jstests/core/index/elemmatch_index.js
     ticket: SERVER-108945

@@ -3722,6 +3722,76 @@ TEST_F(ExpressionConvertTest, FormatDecimal) {
         convertExp->evaluate(negativeNaNInput, &expCtx->variables), "NaN"_sd, BSONType::String);
 }
 
+TEST_F(ExpressionConvertTest, ConvertToBinDataByteArrayDeprecatedSubtypeBanned) {
+    auto expCtx = getExpCtx();
+    auto convertExp = Expression::parseExpression(
+        expCtx.get(),
+        BSON("$convert" << BSON("input"
+                                << "$path1"
+                                << "to"
+                                << BSON("type"
+                                        << "binData"
+                                        << "subtype" << 2)
+                                << "format" << toStringData(BinDataFormat::kBase64))),
+        expCtx->variablesParseState);
+    Document input{{"path1", "AAAAAAAAAAAAAAAAAAAAAA=="_sd}};
+    ASSERT_THROWS_CODE(
+        convertExp->evaluate(input, &expCtx->variables), AssertionException, 13016800);
+}
+
+TEST_F(ExpressionConvertTest, ConvertToBinDataEncryptSubtypeBanned) {
+    auto expCtx = getExpCtx();
+    auto convertExp = Expression::parseExpression(
+        expCtx.get(),
+        BSON("$convert" << BSON("input"
+                                << "$path1"
+                                << "to"
+                                << BSON("type"
+                                        << "binData"
+                                        << "subtype" << 6)
+                                << "format" << toStringData(BinDataFormat::kBase64))),
+        expCtx->variablesParseState);
+    Document input{{"path1", "AAAAAAAAAAAAAAAAAAAAAA=="_sd}};
+    ASSERT_THROWS_CODE(
+        convertExp->evaluate(input, &expCtx->variables), AssertionException, 13016801);
+}
+
+TEST_F(ExpressionConvertTest, ConvertToBinDataBdtUUIDWrongSizeFails) {
+    auto expCtx = getExpCtx();
+    auto convertExp = Expression::parseExpression(
+        expCtx.get(),
+        BSON("$convert" << BSON("input"
+                                << "$path1"
+                                << "to"
+                                << BSON("type"
+                                        << "binData"
+                                        << "subtype" << 3)
+                                << "format" << toStringData(BinDataFormat::kBase64))),
+        expCtx->variablesParseState);
+    // "AAAAAA==" base64-decodes to 4 bytes, not the required 16.
+    Document input{{"path1", "AAAAAA=="_sd}};
+    ASSERT_THROWS_CODE(
+        convertExp->evaluate(input, &expCtx->variables), AssertionException, 13016802);
+}
+
+TEST_F(ExpressionConvertTest, ConvertToBinDataMD5TypeWrongSizeFails) {
+    auto expCtx = getExpCtx();
+    auto convertExp = Expression::parseExpression(
+        expCtx.get(),
+        BSON("$convert" << BSON("input"
+                                << "$path1"
+                                << "to"
+                                << BSON("type"
+                                        << "binData"
+                                        << "subtype" << 5)
+                                << "format" << toStringData(BinDataFormat::kBase64))),
+        expCtx->variablesParseState);
+    // "AAAAAA==" base64-decodes to 4 bytes, not the required 16.
+    Document input{{"path1", "AAAAAA=="_sd}};
+    ASSERT_THROWS_CODE(
+        convertExp->evaluate(input, &expCtx->variables), AssertionException, 13016802);
+}
+
 }  // namespace ExpressionConvertTest
 
 namespace ExpressionConvertShortcutsTest {
