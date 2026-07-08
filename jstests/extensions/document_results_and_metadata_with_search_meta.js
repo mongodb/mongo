@@ -138,6 +138,24 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
         assert.sameMembers(result, expected, {result, nShards});
     });
 
+    it("returns all docs when the document stream exceeds the Exchange buffer", function () {
+        const numDocs = 40;
+        const docPad = 512 * 1024;
+        const result = coll
+            .aggregate([
+                {$extensionMultiStream: {numDocs, docPad, meta: expectedMeta}},
+                {$project: {name: 1, meta: "$$SEARCH_META"}},
+            ])
+            .toArray();
+        const perShardDocs = Array.from({length: numDocs}, (_, i) => ({
+            _id: i,
+            name: `doc_${i}`,
+            meta: expectedMeta,
+        }));
+        const expected = expandPerShard(nShards, perShardDocs);
+        assert.sameMembers(result, expected, {result, nShards});
+    });
+
     it("[sharded] globally merge-sorts doc results by score across shards", function () {
         if (!isSharded) return;
         const result = coll

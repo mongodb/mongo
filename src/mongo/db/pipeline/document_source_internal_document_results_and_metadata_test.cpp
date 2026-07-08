@@ -424,13 +424,16 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
     ASSERT_NE(additionalCursorPipeline, nullptr);
     ASSERT_EQ(additionalCursorPipeline->pipelineType, CursorTypeEnum::SearchMetaResult);
 
-    // Verify the stashed meta pipeline has exactly 2 stages: Exchange consumer + replaceRoot.
+    // Verify the stashed meta pipeline has exactly 3 stages: Exchange consumer + replaceRoot +
+    // the $limit:1 that bounds the metadata stream.
     const auto& metaStages = additionalCursorPipeline->getSources();
-    ASSERT_EQ(metaStages.size(), 2u);
+    ASSERT_EQ(metaStages.size(), 3u);
     auto stageIt = metaStages.begin();
     ASSERT_EQ((*stageIt)->getSourceName(), DocumentSourceExchange::kStageName);
     ++stageIt;
     ASSERT_EQ(std::string_view((*stageIt)->getSourceName()), "$replaceRoot"sv);
+    ++stageIt;
+    ASSERT_EQ(std::string_view((*stageIt)->getSourceName()), "$limit"sv);
 }
 
 TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,

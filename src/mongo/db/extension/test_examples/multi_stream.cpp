@@ -49,6 +49,7 @@ constexpr std::string_view kByShardField = "byShard"sv;
 constexpr std::string_view kMetaField = "meta"sv;
 constexpr std::string_view kNumMetaField = "numMeta"sv;
 constexpr std::string_view kNumDocsField = "numDocs"sv;
+constexpr std::string_view kDocPadField = "docPad"sv;
 constexpr std::string_view kAddStreamTypeField = "addStreamTypeField"sv;
 constexpr std::string_view kSortPatternField = "sortPattern"sv;
 constexpr std::string_view kMergePipelineField = "mergePipeline"sv;
@@ -97,11 +98,15 @@ BSONObj resolveEffectiveArgs(const BSONObj& args, const std::string& shardId) {
 
 struct DocEmitConfig {
     int numDocs = 0;
+    // Number of filler bytes appended to each document result via a "pad" string field. Lets a test
+    // inflate the document stream past the Exchange's per-consumer buffer with fewer documents.
+    int docPad = 0;
     bool addStreamTypeField = false;
 
     static DocEmitConfig parse(const BSONObj& args) {
         return {
             args[kNumDocsField].isNumber() ? args[kNumDocsField].safeNumberInt() : 0,
+            args[kDocPadField].isNumber() ? args[kDocPadField].safeNumberInt() : 0,
             args[kAddStreamTypeField].booleanSafe(),
         };
     }
@@ -158,11 +163,8 @@ struct DplConfig {
 };
 
 /**
- * Emits numMeta metadata docs (kMetaResult) followed by numDocs document results (kDocResult).
- * numMeta drives three test scenarios:
- *   1 (default when "meta" present) — normal two-stream path
- *   0 — triggers $setVariableFromSubPipeline error 625296 (no metadata doc)
- *   2 — triggers $setVariableFromSubPipeline error 625297 (duplicate metadata)
+ * Emits numMeta metadata docs (kMetaResult) followed by numDocs document results (kDocResult). Each
+ * source _should_ emit exactly one metadata document; numMeta lets tests deviate from that.
  */
 class MultiStreamSourceExecStage : public sdk::ExecAggStageResultsAndMetadataSource {
 public:
@@ -189,6 +191,9 @@ public:
         builder.append("_id", i);
         builder.append(kScoreField, score);
         builder.append("name", "doc_" + std::to_string(i));
+        if (_docConfig.docPad > 0) {
+            builder.append("pad", std::string(_docConfig.docPad, 'x'));
+        }
         if (_docConfig.addStreamTypeField) {
             builder.append(kStreamTypeField, -1);
         }
@@ -347,6 +352,7 @@ extension::AggStageAstNodeHandle expandToDrm(const BSONObj& args) {
  *
  * Arguments (all optional, also accepted under byShard.<shardId> overrides):
  *   numDocs:            <int>   number of document results to emit
+ *   docPad:             <int>   filler bytes appended to each document (inflates stream size)
  *   numMeta:            <int>   number of metadata docs (0/1/2 exercise DRM edge cases)
  *   meta:               <obj>   metadata payload; presence activates the metadata stream
  *   addStreamTypeField: <bool>  append a debug _streamType field to each document
