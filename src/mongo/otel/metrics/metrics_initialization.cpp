@@ -64,6 +64,18 @@
 
 namespace mongo::otel::metrics {
 
+namespace metrics_initialization_detail {
+OtelMetricsFileExporterConfig makeMetricsFileExporterConfig(std::string_view directory,
+                                                            std::string_view pid) {
+    // Split exported file into 8MB chunks to stay under the mongo shell cat()'s 16MB limit.
+    static constexpr std::size_t kMaxFileSizeBytes = 8 * 1024 * 1024;
+    return OtelMetricsFileExporterConfig{
+        fmt::format("{}/mongodb-{}-%Y%m%d-%N-metrics.jsonl", directory, pid),
+        kMaxFileSizeBytes,
+    };
+}
+}  // namespace metrics_initialization_detail
+
 namespace {
 
 namespace otlp = opentelemetry::exporter::otlp;
@@ -140,7 +152,9 @@ Status initializeFile(const std::string& directory) {
 
     otlp::OtlpFileMetricExporterOptions fmeOpts;
     otlp::OtlpFileClientFileSystemOptions sysOpts;
-    sysOpts.file_pattern = fmt::format("{}/mongodb-{}-%Y%m%d-metrics.jsonl", directory, pid);
+    auto fileConfig = metrics_initialization_detail::makeMetricsFileExporterConfig(directory, pid);
+    sysOpts.file_pattern = fileConfig.filePattern;
+    sysOpts.file_size = fileConfig.fileSize;
     fmeOpts.backend_options = sysOpts;
 
     auto exporter = otlp::OtlpFileMetricExporterFactory::Create(fmeOpts);

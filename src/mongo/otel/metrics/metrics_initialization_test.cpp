@@ -38,13 +38,23 @@
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
+#include <chrono>
+#include <vector>
+
+#include <boost/filesystem.hpp>
+#include <opentelemetry/exporters/otlp/otlp_file_client.h>
+#include <opentelemetry/exporters/otlp/otlp_file_client_options.h>
+#include <opentelemetry/exporters/otlp/otlp_file_client_runtime_options.h>
 #include <opentelemetry/metrics/noop.h>
 #include <opentelemetry/metrics/provider.h>
+#include <opentelemetry/proto/resource/v1/resource.pb.h>
 
 namespace mongo::otel::metrics {
 namespace {
 
 using testing::HasSubstr;
+using testing::MatchesRegex;
+using testing::UnorderedElementsAre;
 using unittest::match::StatusIs;
 
 class OtelMetricsInitializationTest : public unittest::Test {
@@ -104,6 +114,69 @@ TEST_F(OtelMetricsInitializationTest, FileMeterProvider) {
 
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
     ASSERT_FALSE(isNoopMeterProvider(provider.get()));
+}
+
+// The mongo shell's cat() refuses to load any file >= 16MB. The OTLP file metric exporter appends
+// records to its output file, so without size-based rotation a long-running server (e.g. under
+// TSAN) produces a single metrics file that exceeds this limit, breaking shell-based readers like
+// jstests otel_metrics.js. These tests pin the exporter configuration that prevents that: a
+// rotation index in the file name and a per-file size cap below the 16MB limit.
+TEST_F(OtelMetricsInitializationTest, FileExporterConfigRotatesAndStaysUnderCatLimit) {
+    // Must match kFileSizeLimit in src/mongo/shell/shell_utils_extended.cpp.
+    constexpr std::size_t kCatFileSizeLimit = 16 * 1024 * 1024;
+
+    auto config = metrics_initialization_detail::makeMetricsFileExporterConfig(
+        "/var/log/mongodb/metrics", "12345");
+
+    // The file name must carry the rotation index (%N) so the exporter rotates into distinct files
+    // instead of appending to one unbounded file.
+    ASSERT_STRING_CONTAINS(config.filePattern, "%N");
+    ASSERT_TRUE(config.filePattern.ends_with("-metrics.jsonl"))
+        << "unexpected pattern: " << config.filePattern;
+    ASSERT_STRING_CONTAINS(config.filePattern, "/var/log/mongodb/metrics/mongodb-12345-");
+
+    // Each rotated file must stay strictly below the shell cat() limit so tooling can read it.
+    ASSERT_LT(config.fileSize, kCatFileSizeLimit)
+        << "per-file size cap " << config.fileSize << " must be below the cat() limit "
+        << kCatFileSizeLimit;
+    ASSERT_GT(config.fileSize, 0);
+}
+
+// Verifies that the production file pattern's rotation index (%N) is expanded by the OTLP file
+// client and that size-based rotation produces distinct, sequentially-numbered files. Uses the real
+// exporter config but shrinks file_size so rotation happens after every record, then checks the
+// resulting file names (mongodb-999-<date>-0-metrics.jsonl, -1-, -2-, ...).
+TEST_F(OtelMetricsInitializationTest, DemoRotationFillsNPlaceholder) {
+    namespace otlp = opentelemetry::exporter::otlp;
+    const std::string dir = getMetricsDir();
+
+    auto cfg = metrics_initialization_detail::makeMetricsFileExporterConfig(dir, "999");
+    ASSERT_EQ(cfg.filePattern, fmt::format("{}/mongodb-999-%Y%m%d-%N-metrics.jsonl", dir));
+
+    otlp::OtlpFileClientFileSystemOptions sysOpts;
+    sysOpts.file_pattern = cfg.filePattern;  // real "...-%N-metrics.jsonl" pattern
+    sysOpts.file_size = 1;                   // tiny -> rotate after each written record
+    sysOpts.rotate_size = 3;
+    sysOpts.flush_count = 1;
+
+    otlp::OtlpFileClientOptions options;
+    options.backend_options = sysOpts;
+    otlp::OtlpFileClient client(std::move(options), otlp::OtlpFileClientRuntimeOptions{});
+
+    opentelemetry::proto::resource::v1::Resource msg;
+    for (int i = 0; i < 3; ++i) {
+        client.Export(msg, 1);
+    }
+    client.ForceFlush(std::chrono::microseconds{5'000'000});
+
+    std::vector<std::string> names;
+    for (const auto& entry : boost::filesystem::directory_iterator(dir)) {
+        names.push_back(entry.path().filename().string());
+    }
+    EXPECT_THAT(names,
+                UnorderedElementsAre(MatchesRegex(R"(mongodb-999-[0-9]{8}-0-metrics\.jsonl)"),
+                                     MatchesRegex(R"(mongodb-999-[0-9]{8}-1-metrics\.jsonl)"),
+                                     MatchesRegex(R"(mongodb-999-[0-9]{8}-2-metrics\.jsonl)")));
 }
 
 TEST_F(OtelMetricsInitializationTest, HttpMeterProvider) {

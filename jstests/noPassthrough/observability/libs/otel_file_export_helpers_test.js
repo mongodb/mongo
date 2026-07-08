@@ -10,6 +10,7 @@ import {
     extractPrometheusMetricIntValue,
     extractPrometheusMetricTime,
     getLatestMetrics,
+    getLatestRawRecord,
 } from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
 
 function makeRecord(metrics) {

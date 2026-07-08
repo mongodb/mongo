@@ -369,9 +369,12 @@ Export metrics to local JSONL files by specifying a directory:
 mongod --openTelemetryMetricsDirectory=/var/log/mongodb/metrics
 ```
 
-Metrics are written to files with the pattern: `mongodb-{pid}-%Y%m%d-metrics.jsonl`
+Metrics are written to files with the pattern: `mongodb-{pid}-%Y%m%d-%N-metrics.jsonl`, where `%N`
+is the rotation index. Each file is rotated once it reaches ~8MB to keep individual files small
+enough to be consumed by tooling (for example, the mongo shell's `cat()`), so the most recent
+metrics may be spread across a small number of rotated files.
 
-For example: `mongodb-12345-20251218-metrics.jsonl`
+For example: `mongodb-12345-20251218-0-metrics.jsonl`
 
 ### HTTP Exporter
 
