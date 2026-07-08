@@ -1,0 +1,147 @@
+test_kind: fsm_workload_test
+
+selector:
+  roots:
+    - jstests/concurrency/fsm_workloads/**/*reshard*.js
+    - jstests/concurrency/fsm_workloads/**/*move_collection*.js
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*reshard*.js
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*move_collection*.js
+
+    # tests that calls moveCollection and reshardCollection.
+    - jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_setFCV_operations_with_metadata_check.js
+    - jstests/concurrency/fsm_workloads/crud/random_ddl_crud_operations.js
+    - jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_bulkWrite_operations.js
+    - jstests/concurrency/fsm_workloads/ddl/transaction_crud_ddl_isolation.js
+    - jstests/concurrency/fsm_workloads/ddl/rename_collection/collection_uuid_sharded.js
+
+  exclude_files:
+    # Should only remove from exclusion only after all TODOs are resolved:
+    # TODO SERVER-130466: Reenable once we investigated why timeseries apply is so slow and cannot converge.
+    # TODO SERVER-130080: Reenable after the test will no longer trigger fassert.
+    - jstests/concurrency/fsm_workloads/timeseries/timeseries_reshard_with_inserts.js
+
+  exclude_with_any_tags:
+    - requires_standalone
+    - assumes_against_mongod_not_mongos
+    - requires_replication
+    - requires_non_retryable_writes
+    - assumes_balancer_on
+    # Curop requires readConcern local.
+    - uses_curop_agg_stage
+    # mongos has no system.profile collection.
+    - requires_profiling
+    - does_not_support_stepdowns
+    - assumes_unsharded_collection
+    # TODO (SERVER-89682): Remove this
+    - requires_getmore
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+    tests: true
+  config:
+    shell_options:
+      eval: >-
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+      global_vars:
+        TestData:
+          runningWithLightweightStepdowns: true
+          runningWithBalancer: false
+          implicitlyShardOnCreateCollectionOnly: true
+          useActionPermittedFile: [ContinuousLightweightReshardingStepdown]
+          shardCollectionProbability: 0.5
+  hooks:
+    - class: ContinuousLightweightReshardingStepdown
+      config_stepdown: true
+      shard_stepdown: true
+      is_fsm_workload: true
+      stepdown_interval_ms: 800
+    # TODO SERVER-120162: Re-enable once all the false positive have been addressed and the test is stable.
+    # - class: CheckIdleCursors
+    - class: CheckShardFilteringMetadata
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: CheckOrphansDeleted
+    - class: CheckRoutingTableConsistency
+    - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
+    - class: CleanupConcurrencyWorkloads
+  fixture:
+    class: ShardedClusterFixture
+    enable_balancer: false
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        # The replica set monitor's exhaust hello can otherwise sit on an already-outstanding
+        # long-poll for up to the default 10s before it can reconfirm a primary, which is much
+        # longer than the stepdown interval below and can stall targeting of a shard whose
+        # topology was spuriously marked unknown by a lightweight stepdown side effect.
+        failpoint.overrideMaxAwaitTimeMS:
+          mode: alwaysOn
+          data:
+            maxAwaitTimeMS: 100
+    configsvr_options:
+      # 1 node to make w: majority writes fast enough and tolerate quick stepdowns.
+      num_nodes: 1
+      all_nodes_electable: true
+      mongod_options:
+        set_parameters:
+          reshardingMinimumOperationDurationMillis: 0
+          # Defaults to 1s, but we want the sleep to be much shorter because the stepdown interval
+          # is less than 1s.
+          reshardingOplogFetcherSleepMillisBeforeCriticalSection: 50
+          # Defaults to 30s, we want the interval to be much shorter so commit monitor can detect
+          # recipients are ready much sooner.
+          reshardingMaxDelayBetweenRemainingOperationTimeQueriesMillis: 200
+          # Defaults to 5000, but a full batch's apply-and-checkpoint (ReshardingOplogApplier::run())
+          # must complete inside a single stepdown interval or the recipient can never make forward
+          # progress, since it gets torn down and restarted from the same unadvanced checkpoint every
+          # cycle otherwise.
+          reshardingOplogBatchLimitOperations: 100
+          # Defaults to 5 min, which far exceeds the stepdown interval, so the change-streams monitor
+          # only persists (checkpoints) its resume token once per batch time limit. A monitor torn
+          # down by a stepdown before that loses its whole scan window and restarts from the same
+          # unadvanced resume token, livelocking under frequent stepdowns. Checkpoint ~every 100ms so
+          # progress survives a stepdown. Production keeps the 5-min default and its low write rate.
+          reshardingVerificationChangeStreamsEventsBatchTimeLimitMillis: 100
+          # Defaults to 1000ms. An idle (awaitData) getMore only returns once this deadline elapses,
+          # so keep it under the batch time limit above so the monitor loop can observe the time
+          # limit and checkpoint promptly rather than blocking a full second per getMore.
+          reshardingVerificationChangeStreamsGetMoreMaxTimeMS: 50
+          # See comment on mongos_options above: keeps replica set monitor reconfirmation of a
+          # primary well within the stepdown interval instead of up to the default 10s.
+          failpoint.overrideMaxAwaitTimeMS:
+            mode: alwaysOn
+            data:
+              maxAwaitTimeMS: 100
+      replset_config_options:
+        settings:
+          catchUpTimeoutMillis: 0
+    shard_options:
+      all_nodes_electable: true
+      mongod_options:
+        oplogSize: 1024
+      replset_config_options:
+        settings:
+          catchUpTimeoutMillis: 0
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        enableElectionHandoff: 0
+        roleGraphInvalidationIsFatal: 1
+        queryAnalysisWriterIntervalSecs: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        reshardingOplogFetcherSleepMillisBeforeCriticalSection: 50
+        reshardingOplogBatchLimitOperations: 100
+        reshardingVerificationChangeStreamsEventsBatchTimeLimitMillis: 100
+        reshardingVerificationChangeStreamsGetMoreMaxTimeMS: 50
+        failpoint.overrideMaxAwaitTimeMS:
+          mode: alwaysOn
+          data:
+            maxAwaitTimeMS: 100
+    num_rs_nodes_per_shard: 1
+    num_shards: 2
+    num_mongos: 2

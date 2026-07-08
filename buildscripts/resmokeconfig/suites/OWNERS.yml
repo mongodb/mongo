@@ -273,3 +273,6 @@ filters:
   - "product_limits.yml":
     approvers:
       - 10gen/query-optimization-correctness
+  - "concurrency_resharding_with_lightweight_stepdowns.yml":
+    approvers:
+      - 10gen/server-cluster-scalability

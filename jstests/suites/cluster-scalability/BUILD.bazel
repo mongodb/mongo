@@ -433,3 +433,23 @@ resmoke_suite_test(
         "//src/mongo/shell:mongo",
     ],
 )
+
+resmoke_suite_test(
+    name = "concurrency_resharding_with_lightweight_stepdowns",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_resharding_with_lightweight_stepdowns.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+        "concurrency",
+        "has_bazel_target",
+        "large",
+        "resources:cpu:2",
+        "sharded",
+        "stepdowns",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)

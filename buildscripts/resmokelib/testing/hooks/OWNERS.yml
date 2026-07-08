@@ -100,3 +100,6 @@ filters:
   - "check_multikey_consistency_background.py":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "lightweight_resharding_stepdown.py":
+    approvers:
+      - 10gen/server-cluster-scalability
