@@ -48,11 +48,7 @@ const checkMongosResponse = function (
 ) {
     if (expectedErrorCode) {
         assert.eq(0, res.ok, tojson(res));
-        if (Array.isArray(expectedErrorCode)) {
-            assert.contains(res.code, expectedErrorCode, tojson(res));
-        } else {
-            assert.eq(expectedErrorCode, res.code, tojson(res));
-        }
+        assert.eq(expectedErrorCode, res.code, tojson(res));
     } else {
         assert.eq(1, res.ok, tojson(res));
     }
@@ -152,15 +148,7 @@ const runCommitTests = function (commandSentToShard) {
         closeConnection: true,
     });
     res = mongosSession.commitTransaction_forTesting();
-    // closeConnection peer-close (FIN or RST) now surfaces as ConnectionClosedByPeer;
-    // HostUnreachable is kept for any other network-failure path. Both are network errors and carry
-    // no transaction error label here.
-    checkMongosResponse(
-        res,
-        [ErrorCodes.HostUnreachable, ErrorCodes.ConnectionClosedByPeer],
-        false /* expectedErrorLabel */,
-        null,
-    );
+    checkMongosResponse(res, ErrorCodes.HostUnreachable, false /* expectedErrorLabel */, null);
     turnOffFailCommand(st.rs0);
 };
 
@@ -263,14 +251,7 @@ failCommandWithError(st.rs0, {
     closeConnection: true,
 });
 res = startTransaction(mongosSession, dbName, collName);
-// closeConnection peer-close (FIN or RST) now surfaces as ConnectionClosedByPeer; HostUnreachable
-// is kept for any other network-failure path.
-checkMongosResponse(
-    res,
-    [ErrorCodes.HostUnreachable, ErrorCodes.ConnectionClosedByPeer],
-    "TransientTransactionError",
-    null,
-);
+checkMongosResponse(res, ErrorCodes.HostUnreachable, "TransientTransactionError", null);
 turnOffFailCommand(st.rs0);
 assert.commandFailedWithCode(
     mongosSession.abortTransaction_forTesting(),

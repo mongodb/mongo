@@ -591,14 +591,12 @@ TEST(AsioTransportLayer, ThrowOnNetworkErrorInEnsureSync) {
     connectThread.close();
 
     // On Mac, setsockopt will immediately throw a SocketException since the socket is closed.
-    // On Linux, reading the closed socket yields EOF, which maps to ConnectionClosedByPeer.
-    // We allow for any of these here.
+    // On Linux, we will throw HostUnreachable once we try to actually read the socket.
+    // We allow for either exception here.
     using namespace unittest::match;
-    ASSERT_THAT(st.session()->sourceMessage().getStatus(),
-                StatusIs(AnyOf(Eq(ErrorCodes::HostUnreachable),
-                               Eq(ErrorCodes::SocketException),
-                               Eq(ErrorCodes::ConnectionClosedByPeer)),
-                         Any()));
+    ASSERT_THAT(
+        st.session()->sourceMessage().getStatus(),
+        StatusIs(AnyOf(Eq(ErrorCodes::HostUnreachable), Eq(ErrorCodes::SocketException)), Any()));
 }
 
 /* check that timeouts actually time out */
