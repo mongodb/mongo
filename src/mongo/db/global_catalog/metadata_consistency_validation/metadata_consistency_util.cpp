@@ -79,11 +79,13 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
+#include <exception>
 #include <memory>
 #include <set>
 #include <string>
@@ -861,6 +863,58 @@ void validateDurableShardCatalogEntries(const NamespaceString& nss,
                                 inconsistencies);
 }
 
+/**
+ * Allows optimistic checks under the assumption that a FCV-gated feature flag is stable.
+ * This does not prevent the feature flag from changing, it merely allows detecting the change.
+ * Unlike two feature flag checks, this class detects a full FCV upgrade+downgrade (ABA problem).
+ *
+ * Sample usage:
+ * ```cpp
+ * OptimisticFCVFeatureFlagGuard flagGuard(opCtx, myFlag);
+ * if (flagGuard.wasEnabled()) {
+ *   auto work = doCheckAssumingMyFlagIsEnabled();
+ *   if (flagGuard.validateUnchanged()) {
+ *     return work;
+ *   } else {
+ *     return {}; // The flag was disabled during the check, so discard the result.
+ *   }
+ * }
+ * ```
+ *
+ * TODO(SERVER-98118): remove once 9.0 is last LTS
+ */
+class OptimisticFCVFeatureFlagGuard {
+public:
+    explicit OptimisticFCVFeatureFlagGuard(OperationContext* opCtx,
+                                           FCVGatedFeatureFlag& featureFlag)
+        : _opCtx(opCtx), _featureFlag(featureFlag) {
+        const auto initialFcvDoc = readFCVDocument(opCtx);
+        _initialEnabled = _featureFlag.isEnabledOnVersion(initialFcvDoc.getVersion());
+        _initialChangeTimestamp = initialFcvDoc.getChangeTimestamp();
+    }
+
+    bool wasEnabled() const {
+        return _initialEnabled;
+    }
+
+    bool validateUnchanged() const {
+        const auto currentFcvDoc = readFCVDocument(_opCtx);
+        return _featureFlag.isEnabledOnVersion(currentFcvDoc.getVersion()) == _initialEnabled &&
+            currentFcvDoc.getChangeTimestamp() == _initialChangeTimestamp;
+    }
+
+private:
+    static FeatureCompatibilityVersionDocument readFCVDocument(OperationContext* opCtx) {
+        return FeatureCompatibilityVersionDocument::parse(uassertStatusOK(
+            FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(opCtx)));
+    }
+
+    OperationContext* _opCtx;
+    FCVGatedFeatureFlag& _featureFlag;
+    bool _initialEnabled;
+    boost::optional<Timestamp> _initialChangeTimestamp;
+};
+
 void checkCollectionMetadataInShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -874,9 +928,23 @@ void checkCollectionMetadataInShardCatalog(
     ChunkVersion collectionPlacementVersion;
     bool csrIsUnowned = false;
 
-    const bool authoritativeShardsCRUDEnabled = feature_flags::gAuthoritativeShardsCRUD.isEnabled(
-        VersionContext::getDecoration(opCtx),
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    const OptimisticFCVFeatureFlagGuard authoritativeShardsCRUD(
+        opCtx, feature_flags::gAuthoritativeShardsCRUD);
+
+    // Any inconsistency in this vector is discarded if AuthoritativeShardsCRUD gets disabled
+    // TODO(SERVER-98118): simplify once 9.0 is last LTS
+    std::vector<MetadataInconsistencyItem> authShardsInconsistencies;
+    ON_BLOCK_EXIT([&] {
+        tassert(13071400,
+                "authShardsInconsistencies is not empty, but AuthShards was disabled",
+                authoritativeShardsCRUD.wasEnabled() || authShardsInconsistencies.empty());
+        if (!authShardsInconsistencies.empty() && !std::uncaught_exceptions() &&
+            authoritativeShardsCRUD.validateUnchanged()) {
+            inconsistencies.insert(inconsistencies.end(),
+                                   std::make_move_iterator(authShardsInconsistencies.begin()),
+                                   std::make_move_iterator(authShardsInconsistencies.end()));
+        }
+    });
 
     // Optimistic approach to avoid holding the CSR lock during the remote call to fetch information
     // about the global catalog: snapshot the shard catalog metadata and its placement version under
@@ -901,7 +969,7 @@ void checkCollectionMetadataInShardCatalog(
     }
 
     if (!inMemoryShardCatalogMetadata && TestingProctor::instance().isEnabled() &&
-        authoritativeShardsCRUDEnabled &&
+        authoritativeShardsCRUD.wasEnabled() &&
         opCtx->getClient()->getPrng().trueWithProbability(
             gProbabilityOfFilteringMetadataRecovery.loadRelaxed())) {
         // Trigger a filtering metadata recovery if no data is present in memory since otherwise
@@ -921,10 +989,10 @@ void checkCollectionMetadataInShardCatalog(
     if (!inMemoryShardCatalogMetadata) {
         // Even when in-memory metadata is unknown, authoritative shards must not have orphan
         // durable entries (for untracked collections)
-        if (authoritativeShardsCRUDEnabled) {
+        if (authoritativeShardsCRUD.wasEnabled()) {
             if (!collectionInGlobalCatalog) {
                 validateNoDurableShardCatalogEntries(
-                    opCtx, nss, localCollectionPtr->uuid(), inconsistencies);
+                    opCtx, nss, localCollectionPtr->uuid(), authShardsInconsistencies);
             }
         }
         return;
@@ -941,9 +1009,10 @@ void checkCollectionMetadataInShardCatalog(
     // The corner-case when for tracked collection CSR is authoritative has no routing table.
     // This condition will be checked later.
     const bool isPrimaryWithNoRoutingTable =
-        expectTracked && !csrHasRoutingTable && isPrimary && authoritativeShardsCRUDEnabled;
+        expectTracked && !csrHasRoutingTable && isPrimary && authoritativeShardsCRUD.wasEnabled();
     if (!csrIsUnowned && !isPrimaryWithNoRoutingTable &&
-        ((!expectTracked && csrHasRoutingTable) || (expectTracked && !csrHasRoutingTable))) {
+        ((!expectTracked && csrHasRoutingTable) || (expectTracked && !csrHasRoutingTable)) &&
+        authoritativeShardsCRUD.validateUnchanged()) {
         inconsistencies.emplace_back(makeInconsistency(
             MetadataInconsistencyTypeEnum::kInconsistentShardCatalogCollectionMetadata,
             InconsistentShardCatalogCollectionMetadataDetails{
@@ -958,8 +1027,8 @@ void checkCollectionMetadataInShardCatalog(
     // Unowned is a token only of the authoritative shards. Without authoritative shards, a shard
     // can keep a leftover unowned state from a previous state, but it is harmless even if used. If
     // the cluster upgrades again, the clone DDL will clean it up.
-    if (authoritativeShardsCRUDEnabled && csrIsUnowned && isPrimary) {
-        inconsistencies.emplace_back(makeInconsistency(
+    if (authoritativeShardsCRUD.wasEnabled() && csrIsUnowned && isPrimary) {
+        authShardsInconsistencies.emplace_back(makeInconsistency(
             MetadataInconsistencyTypeEnum::kInconsistentShardCatalogCollectionMetadata,
             InconsistentShardCatalogCollectionMetadataDetails{
                 nss,
@@ -973,9 +1042,9 @@ void checkCollectionMetadataInShardCatalog(
 
     // If the collection is not tracked in the global catalog, we can stop the checks.
     if (!expectTracked) {
-        if (authoritativeShardsCRUDEnabled) {
+        if (authoritativeShardsCRUD.wasEnabled()) {
             validateNoDurableShardCatalogEntries(
-                opCtx, nss, localCollectionPtr->uuid(), inconsistencies);
+                opCtx, nss, localCollectionPtr->uuid(), authShardsInconsistencies);
         }
         return;
     }
@@ -1008,13 +1077,13 @@ void checkCollectionMetadataInShardCatalog(
         scopedCsr.reset();
 
         auto durableCollection = readCollectionFromDurableShardCatalog(
-            opCtx, nss, collectionInGlobalCatalog->getUuid(), inconsistencies);
+            opCtx, nss, collectionInGlobalCatalog->getUuid(), authShardsInconsistencies);
         if (!durableCollection) {
             return;
         }
 
         auto durableChunks =
-            readChunksFromDurableShardCatalog(opCtx, *durableCollection, inconsistencies);
+            readChunksFromDurableShardCatalog(opCtx, *durableCollection, authShardsInconsistencies);
         if (!durableChunks) {
             return;
         }
@@ -1034,9 +1103,9 @@ void checkCollectionMetadataInShardCatalog(
                                            chunksInGlobalCatalog,
                                            *durableCollection,
                                            *durableChunks,
-                                           authoritativeShardsCRUDEnabled,
+                                           authoritativeShardsCRUD.wasEnabled(),
                                            asRSPrimaryNode,
-                                           inconsistencies);
+                                           authShardsInconsistencies);
         return;
     }
 
@@ -1062,16 +1131,18 @@ void checkCollectionMetadataInShardCatalog(
             *collectionInGlobalCatalog, currentlyOwnedGlobalChunks, inconsistencies);
         return;
     } else {
+        bool useStrictChunkValidation =
+            authoritativeShardsCRUD.wasEnabled() && authoritativeShardsCRUD.validateUnchanged();
         validateInMemoryShardCatalogEntries(*inMemoryShardCatalogMetadata,
                                             *collectionInGlobalCatalog,
                                             chunksInGlobalCatalog,
                                             shardId,
-                                            authoritativeShardsCRUDEnabled,
+                                            useStrictChunkValidation,
                                             asRSPrimaryNode,
                                             inconsistencies);
     }
 
-    if (!authoritativeShardsCRUDEnabled) {
+    if (!authoritativeShardsCRUD.wasEnabled()) {
         return;
     }
 
@@ -1080,13 +1151,13 @@ void checkCollectionMetadataInShardCatalog(
     scopedCsr.reset();
 
     auto durableCollection = readCollectionFromDurableShardCatalog(
-        opCtx, nss, collectionInGlobalCatalog->getUuid(), inconsistencies);
+        opCtx, nss, collectionInGlobalCatalog->getUuid(), authShardsInconsistencies);
     if (!durableCollection) {
         return;
     }
 
     auto durableChunks =
-        readChunksFromDurableShardCatalog(opCtx, *durableCollection, inconsistencies);
+        readChunksFromDurableShardCatalog(opCtx, *durableCollection, authShardsInconsistencies);
     if (!durableChunks) {
         return;
     }
@@ -1107,9 +1178,9 @@ void checkCollectionMetadataInShardCatalog(
                                        chunksInGlobalCatalog,
                                        *durableCollection,
                                        *durableChunks,
-                                       authoritativeShardsCRUDEnabled,
+                                       authoritativeShardsCRUD.wasEnabled(),
                                        asRSPrimaryNode,
-                                       inconsistencies);
+                                       authShardsInconsistencies);
 }
 
 void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,

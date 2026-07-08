@@ -36,10 +36,12 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_catalog/sharding_catalog_client_mock.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/collation/collator_factory_icu.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
@@ -191,6 +193,12 @@ protected:
         _catalogClient =
             dynamic_cast<CatalogClientWithChunks*>(Grid::get(operationContext())->catalogClient());
         invariant(_catalogClient);
+        // TODO(SERVER-98118): for `OptimisticFCVFeatureFlagGuard`, remove once 9.0 is last LTS
+        // (Generic FCV reference): used for testing
+        FeatureCompatibilityVersion::setIfCleanStartup(
+            operationContext(),
+            repl::StorageInterface::get(getServiceContext()),
+            multiversion::GenericFCV::kLatest);
     }
 
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override {
