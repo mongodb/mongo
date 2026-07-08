@@ -197,9 +197,3 @@
         # operation and cluster times aren't shared between shells.
         # "Cowardly refusing to run test with network retries enabled when it uses startParallelShell()"
         - uses_parallel_shell
-
-- name: kill_stepdown_terminate_jscore_passthrough_extra_files
-  value:
-    exclude_files:
-      # TODO SERVER-130517: enable the tests
-      - jstests/core/ddl/create_collection.js
