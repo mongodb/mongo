@@ -3248,8 +3248,11 @@ export const authCommandsLib = {
         {
           testname: "compactStructuredEncryptionData",
           command: {compactStructuredEncryptionData: "foo", compactionTokens : {}},
-          skipSharded: true,
-          skipUnlessReplicaSet: true,
+          skipTest: (conn) => {
+              const hello = assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
+              const isStandalone = hello.msg !== "isdbgrid" && !hello.hasOwnProperty('setName');
+              return isStandalone;
+          },
           setup: function(db) {
               assert.commandWorked(db.createCollection("foo", {
                 encryptedFields: {
@@ -3272,16 +3275,23 @@ export const authCommandsLib = {
                 runOnDb: firstDbName,
                 roles: { readWrite : 1, readWriteAnyDatabase : 1, dbOwner : 1, root : 1, __system : 1 },
                 privileges:
-                    [{resource: {db: firstDbName, collection: "foo"}, actions: ["compactStructuredEncryptionData"]}],
+                    [{resource: {db: firstDbName, collection: ""}, actions: ["compactStructuredEncryptionData"]}],
                 expectFail: true // Missing compaction token.
               },
               {
                 runOnDb: secondDbName,
                 roles: { readWriteAnyDatabase : 1, root : 1, __system : 1 },
                 privileges:
-                    [{resource: {db: secondDbName, collection: "foo"}, actions: ["compactStructuredEncryptionData"]}],
+                    [{resource: {db: secondDbName, collection: ""}, actions: ["compactStructuredEncryptionData"]}],
                 expectFail: true // Missing compaction token.
-              }
+              },
+              {
+                // privilege must be conferred at db scope, not exact-namespace scope
+                expectAuthzFailure: true,
+                runOnDb: firstDbName,
+                privileges:
+                    [{resource: {db: firstDbName, collection: "foo"}, actions: ["compactStructuredEncryptionData"]}],
+              },
           ]
         },
         {
