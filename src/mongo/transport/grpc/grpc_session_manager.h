@@ -48,6 +48,8 @@ public:
         : SessionManagerCommon(svcCtx, std::move(observers)),
           _clientCache(std::move(clientCache)) {}
 
+    void startSession(std::shared_ptr<Session> session) override;
+
     void appendStats(BSONObjBuilder* bob) const;
     void endSessionByClient(mongo::Client* client) override;
 

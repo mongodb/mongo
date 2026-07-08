@@ -38,6 +38,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/message.h"
 #include "mongo/transport/handoff/session_handoff_message_gen.h"
+#include "mongo/transport/message_filter_hooks.h"
 #include "mongo/transport/proxy_protocol_header_parser.h"
 #include "mongo/transport/proxy_protocol_tlv_extraction.h"
 #include "mongo/transport/transport_options_gen.h"
@@ -723,6 +724,9 @@ transport::ParserResults HandoffSession::_parseProxyProtocolHeader() {
         uassertStatusOK(_syncRead(proxyBuf.data() + kProxyV2FixedHeaderSize, addrLen));
     }
 
+    MessageHooks::onProxyHeaderReceived(
+        *this, proxyBuf.data(), proxyBuf.size(), /*isUnixSocket=*/true);
+
     std::string_view proxyData(proxyBuf.data(), proxyBuf.size());
     auto results = transport::parseProxyProtocolHeader(proxyData, /*isProxyUnixSock=*/true);
     uassert(ErrorCodes::ProtocolError,
@@ -742,6 +746,7 @@ void HandoffSession::prelude() {
         };
     }
     applyProxyProtocolTlvs(proxyHeader, shared_from_this());
+    MessageHooks::onConnectionEstablished(*this);
 }
 
 StatusWith<Message> HandoffSession::sourceMessage() {
@@ -783,6 +788,8 @@ StatusWith<Message> HandoffSession::sourceMessage() {
         }
             MONGO_UNREACHABLE;
     }
+
+    MessageHooks::onHeaderReceived(*this, headerBuf, kHeaderSize);
 
     // Validate message length and read the body.
     MSGHEADER::ConstView headerView(headerBuf);

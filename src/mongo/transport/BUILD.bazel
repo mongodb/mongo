@@ -140,6 +140,7 @@ mongo_cc_library(
         "//conditions:default": [],
     }],
     deps = [
+        ":message_filter_hooks",
         ":service_executor",
         ":session_manager",
         ":session_util",

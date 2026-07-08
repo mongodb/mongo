@@ -58,6 +58,8 @@ class MONGO_MOD_NEEDS_REPLACEMENT AsioSessionManager : public SessionManagerComm
 public:
     using SessionManagerCommon::SessionManagerCommon;
 
+    void startSession(std::shared_ptr<Session> session) override;
+
     ConnectionsStatsSnapshot getConnectionsStatsSnapshot() const;
 
     bool shouldIncludeInConnectionsServerStatus() const override {

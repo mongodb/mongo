@@ -33,6 +33,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/transport/grpc/grpc_session.h"
 #include "mongo/transport/hello_metrics.h"
+#include "mongo/transport/message_filter_hooks.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/transport_layer_manager.h"
 
@@ -59,6 +60,12 @@ GRPCSessionManager* getSessionManager(Client* client) {
 }
 
 }  // namespace
+
+void GRPCSessionManager::startSession(std::shared_ptr<Session> session) {
+    invariant(session);
+    MessageHooks::onConnectionEstablished(*session);
+    SessionManagerCommon::startSession(std::move(session));
+}
 
 std::string GRPCSessionManager::getClientThreadName(const Session& session) const {
     const auto* s = checked_cast<const IngressSession*>(&session);

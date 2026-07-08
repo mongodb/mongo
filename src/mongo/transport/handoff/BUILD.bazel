@@ -45,6 +45,7 @@ mongo_cc_library(
         ":handoff_posix_interface",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
+        "//src/mongo/transport:message_filter_hooks",
         "//src/mongo/transport:service_executor",
         "//src/mongo/transport:session_manager",
         "//src/mongo/transport:transport_layer",

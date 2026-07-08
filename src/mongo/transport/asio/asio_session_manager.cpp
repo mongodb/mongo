@@ -30,6 +30,7 @@
 #include "mongo/transport/asio/asio_session_manager.h"
 
 #include "mongo/db/service_context.h"
+#include "mongo/transport/message_filter_hooks.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_manager.h"
@@ -49,6 +50,12 @@ void AsioSessionManager::configureServiceExecutorContext(Client& client,
     seCtx->setCanUseReserved(isPrivilegedSession);
     std::lock_guard lk(client);
     ServiceExecutorContext::set(&client, std::move(seCtx));
+}
+
+void AsioSessionManager::startSession(std::shared_ptr<Session> session) {
+    invariant(session);
+    MessageHooks::onConnectionEstablished(*session);
+    SessionManagerCommon::startSession(std::move(session));
 }
 
 ConnectionsStatsSnapshot AsioSessionManager::getConnectionsStatsSnapshot() const {
