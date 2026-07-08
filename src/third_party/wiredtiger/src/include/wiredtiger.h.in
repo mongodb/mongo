@@ -2755,9 +2755,10 @@ struct __wt_connection {
      * specified timestamp in tables configured with \c "log=(enabled=false)". Values must be
      * monotonically increasing.  The value must not be older than the current oldest timestamp.
      * See @ref timestamp_global_api., a string; default empty.}
-     * @config{step_down_ts, the cutover timestamp for a planned step-down of disaggregated storage:
-     * committed writes after this timestamp are directed to the ingest constituent and writes at or
-     * before it to the stable constituent.  Only valid on a leader., a string; default empty.}
+     * @config{step_down_timestamp, the cutover timestamp for a planned step-down of disaggregated
+     * storage: committed writes after this timestamp are directed to the ingest constituent and
+     * writes at or before it to the stable constituent.  Only valid on a leader., a string; default
+     * empty.}
      * @configend
      * @errors
      */

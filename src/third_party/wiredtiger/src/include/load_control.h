@@ -10,8 +10,6 @@
 
 struct __wt_connection_load_control {
     uint16_t control_threshold;        /* threshold when the load control starts rejecting work */
-    wt_shared uint16_t read_load;      /* connection read load */
-    wt_shared uint16_t write_load;     /* connection write load */
     wt_shared uint64_t read_load_max;  /* cache max bytes equivalent eviction trigger */
     wt_shared uint64_t write_load_max; /* cache max dirty bytes equivalent to dirty trigger */
 

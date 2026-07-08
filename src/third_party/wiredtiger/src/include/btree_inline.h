@@ -360,7 +360,6 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size,
     bool is_disagg = __wt_conn_is_disagg(session);
 
     (void)__wt_atomic_add_uint64_relaxed(&cache->bytes_inmem, size);
-    __wt_conn_calc_read_load(session);
     if (is_disagg) {
         if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
             (void)__wt_atomic_add_uint64_relaxed(&cache->bytes_inmem_ingest, size);
@@ -414,7 +413,6 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size,
                 (void)__wt_atomic_add_uint64_relaxed(&btree->bytes_dirty_leaf, size);
             }
             (void)__wt_atomic_add_uint64_relaxed(&page->modify->bytes_dirty, size);
-            __wt_conn_calc_write_load(session);
         }
     }
 }
@@ -606,7 +604,6 @@ __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
     __wt_cache_decr_check_size(session, &page->memory_footprint, size, "WT_PAGE.memory_footprint");
     __wt_cache_decr_check_uint64(session, &btree->bytes_inmem, size, "WT_BTREE.bytes_inmem");
     __wt_cache_decr_check_uint64(session, &cache->bytes_inmem, size, "WT_CACHE.bytes_inmem");
-    __wt_conn_calc_read_load(session);
     if (is_disagg) {
         if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
             __wt_cache_decr_check_uint64(
@@ -619,7 +616,6 @@ __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
         __wt_cache_page_byte_updates_decr(session, page, size);
     if (__wt_page_is_modified(page)) {
         __wt_cache_page_byte_dirty_decr(session, page, size);
-        __wt_conn_calc_write_load(session);
     }
     /* Track internal size in cache. */
     if (WT_PAGE_IS_INTERNAL(page)) {

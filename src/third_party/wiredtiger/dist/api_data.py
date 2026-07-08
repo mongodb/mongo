@@ -2331,7 +2331,7 @@ methods = {
         checkpoints will not include commits that are newer than the specified timestamp in tables
         configured with \c "log=(enabled=false)". Values must be monotonically increasing. The value
         must not be older than the current oldest timestamp. See @ref timestamp_global_api'''),
-    Config('step_down_ts', '', r'''
+    Config('step_down_timestamp', '', r'''
         the cutover timestamp for a planned step-down of disaggregated storage: committed writes
         after this timestamp are directed to the ingest constituent and writes at or before it to
         the stable constituent. Only valid on a leader'''),

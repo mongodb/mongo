@@ -3679,8 +3679,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing live_restore_state */
     stats->read_reject_count = 0;
     stats->write_reject_count = 0;
-    stats->read_load = 0;
-    stats->write_load = 0;
+    /* not clearing read_load */
+    /* not clearing write_load */
     stats->lock_btree_page_count = 0;
     stats->lock_btree_page_wait_application = 0;
     stats->lock_btree_page_wait_internal = 0;

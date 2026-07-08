@@ -359,6 +359,15 @@ operations(u_int ops_seconds, u_int run_current, u_int run_total)
 
     replay_run_begin(session);
 
+    if (GV(RUNS_PREDICTABLE_REPLAY)) {
+        char replay_log_path[MAX_FORMAT_PATH];
+        testutil_snprintf(
+          replay_log_path, sizeof(replay_log_path), "%s/replay_ops_%u.log", g.home, run_current);
+        g.replay_op_log = fopen(replay_log_path, "w");
+        testutil_assertfmt(g.replay_op_log != NULL, "failed to open %s", replay_log_path);
+        __wt_stream_set_line_buffer(g.replay_op_log);
+    }
+
     for (i = 0; i < GV(RUNS_THREADS); ++i) {
         tinfo = tinfo_list[i];
         testutil_check(__wt_thread_create(NULL, &tinfo->tid, ops, tinfo));
@@ -503,6 +512,11 @@ operations(u_int ops_seconds, u_int run_current, u_int run_total)
     rollback_to_stable(session);
 
     disagg_sync_multi_node(session);
+
+    if (g.replay_op_log != NULL) {
+        fclose(g.replay_op_log);
+        g.replay_op_log = NULL;
+    }
 
     replay_run_end(session);
 
@@ -1012,13 +1026,19 @@ ops(void *arg)
     iso_level_t iso_level;
     thread_op op;
     uint64_t reset_op, session_op, throttle_delay, truncate_op;
+    uint64_t rlog_key, rlog_lane, rlog_read_ts, rlog_replay_ts;
     uint32_t max_rows, ntries, range, rnd;
-    u_int i, throttle_delay_max;
-    const char *iso_config;
+    u_int i, rlog_table_id, throttle_delay_max;
+    int rlog_ret;
+    const char *iso_config, *rlog_op_name;
     bool greater_than, intxn, prepared, mirrored_truncate;
 
     tinfo = arg;
     mirrored_truncate = false;
+    rlog_key = rlog_lane = rlog_read_ts = rlog_replay_ts = 0;
+    rlog_table_id = 0;
+    rlog_ret = 0;
+    rlog_op_name = NULL;
 
     /*
      * Characterize the per-thread random number generator. Normally we want independent behavior so
@@ -1070,13 +1090,15 @@ rollback_retry:
 
         ++tinfo->ops;
 
-        if (!tinfo->replay_again)
+        if (!tinfo->replay_again) {
             /*
              * Number of failures so far for the current operation and key. In predictable replay,
              * unless we have a read operation, we cannot give up on any operation and maintain the
              * integrity of the replay.
              */
             ntries = 0;
+            rlog_op_name = NULL;
+        }
 
         /* Number of tries only gets incremented during predictable replay. */
         testutil_assert(ntries == 0 || (!intxn && tinfo->replay_again));
@@ -1216,6 +1238,23 @@ rollback_retry:
         }
         replay_adjust_key(tinfo, max_rows);
 
+        /* Once the operation and key have been finalized, construct a replay log entry. */
+        if (GV(RUNS_PREDICTABLE_REPLAY)) {
+            static const char *const op_names[] = {[INSERT] = "INSERT",
+              [MODIFY] = "MODIFY",
+              [READ] = "READ",
+              [REMOVE] = "REMOVE",
+              [TRUNCATE] = "TRUNCATE",
+              [UPDATE] = "UPDATE"};
+            rlog_lane = tinfo->lane;
+            rlog_replay_ts = tinfo->replay_ts;
+            rlog_read_ts = tinfo->read_ts;
+            rlog_key = tinfo->keyno;
+            rlog_table_id = table->id;
+            rlog_ret = 0;
+            rlog_op_name = op_names[op];
+        }
+
         /*
          * If the operation is a truncate, select a range.
          *
@@ -1323,6 +1362,8 @@ rollback_retry:
             testutil_assert(ret == 0 || ret == WT_ROLLBACK);
             if (GV(RUNS_PREDICTABLE_REPLAY) && ret == WT_ROLLBACK)
                 goto rollback;
+            if (GV(RUNS_PREDICTABLE_REPLAY))
+                rlog_ret = tinfo->op_ret;
             skip2 = table;
         }
         if (ret == 0 && table->mirror) {
@@ -1422,6 +1463,14 @@ skip_operation:
             __wt_yield(); /* Encourage races */
             commit_transaction(tinfo, prepared);
             snap_repeat_update(tinfo, true);
+            if (rlog_op_name != NULL) {
+                fprintf(g.replay_op_log,
+                  "%s lane=%" PRIu64 " commit_ts=%" PRIu64 " read_ts=%" PRIu64 " key=%" PRIu64
+                  " table=%u ret=%d\n",
+                  rlog_op_name, rlog_lane, rlog_replay_ts, rlog_read_ts, rlog_key, rlog_table_id,
+                  rlog_ret);
+                rlog_op_name = NULL;
+            }
             break;
         case 5: /* 10% */
 rollback:

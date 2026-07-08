@@ -75,11 +75,15 @@ class test_layered_eviction07(wttest.WiredTigerTestCase):
 
         # Dirty the same page again, above the last checkpoint timestamp, and do
         # NOT checkpoint. This update belongs to the current leader epoch and is
-        # never flushed to shared storage, so it stays dirty and resident.
+        # never flushed to shared storage.
         #
         # Keep this cursor OPEN across step-down. An open cursor pins its data
-        # handle's in-use count above zero for its whole lifetime, so the handle
-        # is not swept while it is marked read-only.
+        # handle's in-use count above zero for its whole lifetime. Committing the
+        # transaction resets the cursor (it drops its hazard pointer on the page,
+        # so eviction is not blocked) but does not close it, so the pin survives.
+        # That pin is the whole point: when eviction later opens a handle for this
+        # table, the in-use count keeps it bound to this now read-only handle
+        # instead of being rerouted to a freshly opened one.
         cursor = self.session.open_cursor(self.uri, None, None)
         self.session.begin_transaction()
         cursor['a'] = 'c'
@@ -89,18 +93,10 @@ class test_layered_eviction07(wttest.WiredTigerTestCase):
         # and visible to a follower read. The page stays dirty with 'c' resident.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
 
-        # Open the eviction cursor now, while the handle is still live and
-        # writable. The cursor binds to this data handle and keeps that binding
-        # for its lifetime; a later reconfigure does not re-resolve it by URI. This
-        # is how eviction reaches the dirty resident page on the old handle after
-        # step-down, without relying on handle lookup returning an outdated handle.
-        evict_cursor = self.session.open_cursor(self.uri, None, 'debug=(release_evict)')
-
         # Step down to follower. This marks the btree read-only and the dhandle
         # outdated; it deliberately does not checkpoint, so the dirty page stays
-        # resident on the handle the eviction cursor is bound to. The still-open
-        # cursors keep the in-use count above zero, so the read-only handle is not
-        # swept.
+        # resident. The still-open cursor keeps the in-use count above zero, so
+        # the read-only handle is neither swept nor bypassed by handle lookup.
         self.conn.reconfigure('disaggregated=(role="follower")')
 
         # Step back up to leader. The stale handle keeps its read-only/outdated
@@ -113,18 +109,19 @@ class test_layered_eviction07(wttest.WiredTigerTestCase):
         # read-only btree trips the read-only assertion.
         self.conn.reconfigure('disaggregated=(role="leader")')
 
-        # Force eviction of the now read-only page. The eviction cursor is still
-        # bound to the stale handle, so positioning it reads the resident dirty
-        # page; reading back 'c' confirms we are on the dirty handle rather than
-        # the checkpointed image. The reset then drives release_eviction on the
-        # dirty read-only page.
+        # Force eviction of the now read-only page. Because the leader handle is
+        # still pinned in use, this cursor binds to it (not a freshly opened
+        # handle) and positions on the resident dirty page; reading back 'c'
+        # confirms we are on the dirty handle rather than the checkpointed image.
+        # The reset then drives release_eviction on the dirty read-only page.
         self.session.begin_transaction()
+        evict_cursor = self.session.open_cursor(self.uri, None, 'debug=(release_evict)')
         evict_val = evict_cursor['a']
         evict_cursor.reset()
         evict_cursor.close()
         self.session.rollback_transaction()
 
-        # Drop the write cursor pin now that eviction has run.
+        # Drop the pin now that eviction has run.
         cursor.close()
 
         self.assertEqual(evict_val, 'c')

@@ -1750,6 +1750,26 @@ __conn_chunk_cache_check(WT_SESSION_IMPL *session, const char *config, const cha
 }
 
 /*
+ * __conn_rename_bad_base_config --
+ *     Move an invalid base configuration file aside so a later open can start from defaults.
+ */
+static int
+__conn_rename_bad_base_config(WT_SESSION_IMPL *session, bool *renamedp)
+{
+    *renamedp = false;
+
+    /* A readonly connection must not modify the database, so leave the file in place. */
+    if (F_ISSET(S2C(session), WT_CONN_READONLY))
+        return (0);
+
+    WT_RET(__wt_fs_rename(session, WT_BASECONFIG, WT_BASECONFIG_BAD, true));
+    *renamedp = true;
+    __wt_errx(session, "the bad base configuration file has been renamed from '%s' to '%s'",
+      WT_BASECONFIG, WT_BASECONFIG_BAD);
+    return (0);
+}
+
+/*
  * __conn_config_file --
  *     Read WiredTiger config files from the home directory.
  */
@@ -1882,13 +1902,18 @@ __conn_config_file(
 err:
     WT_TRET(__wt_close(session, &fh));
 
-    /**
-     * Encountering an invalid configuration string from the base configuration file suggests
-     * that there is corruption present in the file.
+    /*
+     * An EINVAL from the base configuration file means there is corruption and we could not process
+     * it. Rename it if possible and tell the user how to recover. An earlier error message should
+     * have provided specifics by this point.
      */
     if (!is_user && ret == EINVAL) {
-        F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
-        return (WT_ERROR);
+        bool renamed = false;
+        WT_TRET(__conn_rename_bad_base_config(session, &renamed));
+        WT_RET_MSG(session, WT_ERROR,
+          "the base configuration file '%s' is invalid. Either correct the file, or reopen with "
+          "config_base=false",
+          renamed ? WT_BASECONFIG_BAD : WT_BASECONFIG);
     }
 
     return (ret);

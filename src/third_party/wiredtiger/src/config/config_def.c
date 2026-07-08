@@ -934,7 +934,7 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_set_timestamp[] = {
     WT_CONFIG_COMPILED_TYPE_STRING, 325, INT64_MIN, INT64_MAX, NULL},
   {"stable_timestamp", "string", NULL, NULL, NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_STRING, 169,
     INT64_MIN, INT64_MAX, NULL},
-  {"step_down_ts", "string", NULL, NULL, NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_STRING, 326,
+  {"step_down_timestamp", "string", NULL, NULL, NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_STRING, 326,
     INT64_MIN, INT64_MAX, NULL},
   {NULL, NULL, NULL, NULL, NULL, 0, NULL, 0, 0, 0, 0, NULL}};
 
@@ -4244,7 +4244,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
   {"WT_CONNECTION.set_timestamp",
     "durable_timestamp=,force=false,oldest_timestamp=,"
     "stable_disaggregated_schema_epoch=,stable_timestamp=,"
-    "step_down_ts=",
+    "step_down_timestamp=",
     confchk_WT_CONNECTION_set_timestamp, 6, confchk_WT_CONNECTION_set_timestamp_jump, 15,
     WT_CONF_SIZING_NONE, false},
   {"WT_CURSOR.bound", "action=set,bound=,inclusive=true", confchk_WT_CURSOR_bound, 3,

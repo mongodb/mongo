@@ -181,12 +181,23 @@
         WT_RET_TEST(__ret == (e), e); \
     } while (0)
 /*
+ * __WT_TRET_DOMINANT --
+ *     True when an error code can override another because it is stronger.
+ */
+#define __WT_TRET_DOMINANT(__ret) ((__ret) == WT_PANIC)
+
+/*
+ * __WT_TRET_SOFT --
+ *     True when an error code is weak enough that another can override it.
+ */
+#define __WT_TRET_SOFT(__ret) \
+    ((__ret) == 0 || (__ret) == WT_DUPLICATE_KEY || (__ret) == WT_NOTFOUND || (__ret) == WT_RESTART)
+
+/*
  * __WT_TRET_WINS --
  *     True when __ret should override the current value of ret. Requires ret to be in scope.
  */
-#define __WT_TRET_WINS(__ret)                                                          \
-    (__ret == WT_PANIC || ret == 0 || ret == WT_DUPLICATE_KEY || ret == WT_NOTFOUND || \
-      ret == WT_RESTART)
+#define __WT_TRET_WINS(__ret) (__WT_TRET_DOMINANT(__ret) || __WT_TRET_SOFT(ret))
 
 #ifdef INLINE_FUNCTIONS_INSTEAD_OF_MACROS
 /* Set "ret" if not already set. */

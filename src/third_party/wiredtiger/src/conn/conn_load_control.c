@@ -95,46 +95,47 @@ __conn_calc_load_pct(uint64_t part, uint64_t whole)
 
 /*
  * __wt_conn_calc_read_load --
- *     Calculate the read load at the system level.
+ *     Calculate and return the read load at the system level. Computed on demand from the load-shed
+ *     check and the statistics path rather than in the cache accounting hot path. The load is
+ *     always calculated; the load control enable flag only governs whether work is shed.
  */
-void
+uint16_t
 __wt_conn_calc_read_load(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_LOAD_CONTROL *load_control;
-    uint64_t bytes_inuse, bytes_max;
-    uint16_t load;
 
     load_control = &S2C(session)->load_control;
-    if (F_ISSET(load_control, WT_CONN_LOAD_CONTROL)) {
-        bytes_max = load_control->read_load_max;
-        bytes_inuse = __wt_cache_bytes_inuse(S2C(session)->cache);
+    return (__conn_calc_load_pct(
+      __wt_cache_bytes_inuse(S2C(session)->cache), load_control->read_load_max));
+}
 
-        load = __conn_calc_load_pct(bytes_inuse, bytes_max);
-        __wt_atomic_store_uint16_relaxed(&load_control->read_load, load);
-        WT_STAT_CONN_SET(session, read_load, load);
-    }
-    return;
+/*
+ * __wti_conn_load_control_stats_update --
+ *     Update the read and write load statistics.
+ */
+void
+__wti_conn_load_control_stats_update(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_STATS **stats;
+
+    stats = S2C(session)->stats;
+
+    WT_STATP_CONN_SET(session, stats, read_load, __wt_conn_calc_read_load(session));
+    WT_STATP_CONN_SET(session, stats, write_load, __wt_conn_calc_write_load(session));
 }
 
 /*
  * __wt_conn_calc_write_load --
- *     Calculate the write load at the system level.
+ *     Calculate and return the write load at the system level. Computed on demand from the
+ *     load-shed check and the statistics path rather than in the cache accounting hot path. The
+ *     load is always calculated; the load control enable flag only governs whether work is shed.
  */
-void
+uint16_t
 __wt_conn_calc_write_load(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_LOAD_CONTROL *load_control;
-    uint64_t bytes_dirty, bytes_max;
-    uint16_t load;
 
     load_control = &S2C(session)->load_control;
-    if (F_ISSET(load_control, WT_CONN_LOAD_CONTROL)) {
-        bytes_max = load_control->write_load_max;
-        bytes_dirty = __wt_cache_dirty_inuse(S2C(session)->cache);
-
-        load = __conn_calc_load_pct(bytes_dirty, bytes_max);
-        __wt_atomic_store_uint16_relaxed(&load_control->write_load, load);
-        WT_STAT_CONN_SET(session, write_load, load);
-    }
-    return;
+    return (__conn_calc_load_pct(
+      __wt_cache_dirty_inuse(S2C(session)->cache), load_control->write_load_max));
 }

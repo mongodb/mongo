@@ -62,7 +62,7 @@ def main():
 
     destination_dir = args.destination_dir
 
-    regex = re.compile(r'WiredTigerStat.*')
+    regex = re.compile(r'(WiredTigerStat.*|replay_ops_.*\.log)')
     for walk_dir, _, files in os.walk("."):
         if destination_dir in walk_dir:
             # Skip searching for stat files in the destination directory, since that's where we're collecting them and we don't want to copy files that we've already collected.

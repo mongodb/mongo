@@ -279,6 +279,7 @@ typedef struct {
     wt_timestamp_t replay_cached_committed; /* Our committed timestamp, cached */
     uint32_t replay_calculate_committed;    /* Times before recalculating cached committed */
     wt_timestamp_t replay_start_timestamp;  /* Timestamp at the beginning of a run */
+    FILE *replay_op_log;                    /* Predictable replay per-run operation log */
     wt_timestamp_t stop_timestamp;          /* If non-zero, stop when stable reaches this */
     wt_timestamp_t timestamp_copy;          /* A copy of the timestamp, for safety checks */
 

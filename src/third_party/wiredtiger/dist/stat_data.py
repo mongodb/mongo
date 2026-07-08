@@ -671,9 +671,9 @@ conn_stats = [
     ##########################################
     # Load Control statistics
     ##########################################
-    LoadControlStat('read_load', 'read load at the system level'),
+    LoadControlStat('read_load', 'read load at the system level', 'no_clear,no_scale'),
     LoadControlStat('read_reject_count', 'number of read operations rejected due to load control'),
-    LoadControlStat('write_load', 'write load at the system level'),
+    LoadControlStat('write_load', 'write load at the system level', 'no_clear,no_scale'),
     LoadControlStat('write_reject_count', 'number of write operations rejected due to load control'),
 
     ##########################################

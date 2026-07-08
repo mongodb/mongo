@@ -350,7 +350,7 @@
 #define WT_CONF_ID_start_generation 119ULL
 #define WT_CONF_ID_start_timestamp 135ULL
 #define WT_CONF_ID_statistics 155ULL
-#define WT_CONF_ID_step_down_ts 326ULL
+#define WT_CONF_ID_step_down_timestamp 326ULL
 #define WT_CONF_ID_storage_path 337ULL
 #define WT_CONF_ID_storage_tier 22ULL
 #define WT_CONF_ID_stress_skiplist 246ULL
@@ -808,7 +808,7 @@ static const struct {
     uint64_t stable_disaggregated_schema_epoch;
     uint64_t stable_timestamp;
     uint64_t statistics;
-    uint64_t step_down_ts;
+    uint64_t step_down_timestamp;
     uint64_t strict;
     uint64_t sync;
     uint64_t target;
@@ -1239,7 +1239,7 @@ static const struct {
   WT_CONF_ID_stable_disaggregated_schema_epoch,
   WT_CONF_ID_stable_timestamp,
   WT_CONF_ID_statistics,
-  WT_CONF_ID_step_down_ts,
+  WT_CONF_ID_step_down_timestamp,
   WT_CONF_ID_strict,
   WT_CONF_ID_sync,
   WT_CONF_ID_target,
