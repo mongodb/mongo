@@ -124,6 +124,24 @@ void OperationContext::setDeadlineByDate(Date_t when, ErrorCodes::Error timeoutE
     setDeadlineAndMaxTime(when, computeMaxTimeFromDeadline(when), timeoutError);
 }
 
+void OperationContext::setMaxTimeFromTotalBudget(Microseconds total,
+                                                 ErrorCodes::Error timeoutError) {
+    if (total <= Microseconds::zero()) {
+        total = Microseconds::max();
+    }
+
+    if (total == Microseconds::max()) {
+        _deadline = Date_t::max();
+    } else {
+        auto& clock = fastClockSource();
+        _deadline = clock.now() + clock.getPrecision() + total - getElapsedTime();
+    }
+    // '_maxTime' holds the total budget (not the remaining time) so that
+    // 'getRemainingMaxTimeMicros()' does not double-count elapsed time.
+    _maxTime = total;
+    _timeoutError = timeoutError;
+}
+
 void OperationContext::setDeadlineAfterNowBy(Microseconds maxTime, ErrorCodes::Error timeoutError) {
     Date_t when;
     if (maxTime < Microseconds::zero()) {
@@ -190,18 +208,7 @@ void OperationContext::restoreMaxTimeMS() {
 
     auto maxTime = *_storedMaxTime;
     _storedMaxTime = boost::none;
-
-    if (maxTime <= Microseconds::zero()) {
-        maxTime = Microseconds::max();
-    }
-
-    if (maxTime == Microseconds::max()) {
-        _deadline = Date_t::max();
-    } else {
-        auto& clock = fastClockSource();
-        _deadline = clock.now() + clock.getPrecision() + maxTime - _elapsedTime.elapsed();
-    }
-    _maxTime = maxTime;
+    setMaxTimeFromTotalBudget(maxTime, _timeoutError);
 }
 
 namespace {

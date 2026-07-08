@@ -212,6 +212,13 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotHaveDefaultValues)
     ASSERT_THROWS_CODE(service().validateQuerySettings(querySettings), DBException, 7746604);
 }
 
+TEST_F(QuerySettingsValidationTestFixture, QuerySettingsMaxTimeMSZeroIsNormalizedToUnset) {
+    QuerySettings querySettings;
+    querySettings.setMaxTimeMS(0);
+    service().simplifyQuerySettings(querySettings);
+    ASSERT_EQUALS(querySettings.getMaxTimeMS(), boost::none);
+}
+
 TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithNoDbSpecified) {
     QuerySettings querySettings;
     NamespaceSpec ns;

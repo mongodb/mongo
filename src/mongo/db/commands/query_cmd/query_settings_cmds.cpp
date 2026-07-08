@@ -318,6 +318,7 @@ public:
             const query_shape::QueryShapeHash& queryShapeHash) {
             auto& querySettingsService = QuerySettingsService::get(opCtx);
             querySettingsService.validateQueryKnobs(opCtx, request().getSettings());
+            querySettingsService.validateMaxTimeMS(opCtx, request().getSettings());
 
             // Validate that both 'representativeQuery' and 'representativeQueryInfo' are either
             // empty or not empty.

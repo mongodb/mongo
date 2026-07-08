@@ -70,5 +70,15 @@ TEST_F(QuerySettingsCmdsCommandTestFixture,
                12324800 /*errorCode*/);
 }
 
+TEST_F(QuerySettingsCmdsCommandTestFixture,
+       SetQuerySettingsRejectsMaxTimeMSWhenFeatureFlagDisabled) {
+    unittest::ServerParameterGuard featureFlagCtrl("featureFlagPqsMaxTimeMS", false);
+    runCommand(BSON("setQuerySettings"
+                    << BSON("find" << "testColl" << "$db" << "testDb" << "filter" << BSONObj())
+                    << "settings" << BSON("maxTimeMS" << 5000)),
+               DatabaseName::kAdmin,
+               12998200 /*errorCode*/);
+}
+
 }  // namespace
 }  // namespace mongo::query_settings

@@ -445,6 +445,7 @@ public:
         kMoveQueriesToCollection = 1 << 2,
         kMoveQueriesToParameter = 1 << 3,
         kDropCollection = 1 << 4,
+        kRemoveMaxTimeMS = 1 << 5,
     };
 
     friend constexpr Op operator|(Op a, Op b) {
@@ -479,6 +480,9 @@ public:
             if (contains(plan, Op::kRemoveUnsupportedQueryKnobs)) {
                 removeUnsupportedQueryKnobs(targetFCV);
             }
+            if (contains(plan, Op::kRemoveMaxTimeMS)) {
+                removeMaxTimeMS();
+            }
             if (contains(plan, Op::kMoveQueriesToCollection)) {
                 moveQueriesToCollection(opCtx);
             }
@@ -503,37 +507,62 @@ public:
     }
 
 private:
-    void removeUnsupportedQueryKnobs(multiversion::FeatureCompatibilityVersion targetFCV) {
+    enum class ModifyResult { kModified, kNotModified };
+
+    // Applies 'modify' to each query shape configuration in place, dropping any configuration
+    // whose settings became fully default as a result.
+    void modifySettingsArray(std::function<ModifyResult(QueryShapeConfiguration&)> modify) {
         auto& configs = _config.queryShapeConfigurations;
         configs.erase(std::remove_if(configs.begin(),
                                      configs.end(),
                                      [&](auto&& entry) -> bool {
-                                         auto&& settings = entry.getSettings();
-                                         auto knobs = settings.getQueryKnobs();
-                                         if (!knobs ||
-                                             !knobs->removeKnobsRequiringHigherFcv(targetFCV)) {
-                                             return false;
+                                         switch (modify(entry)) {
+                                             case ModifyResult::kNotModified:
+                                                 return false;
+                                             case ModifyResult::kModified:
+                                                 _dirty = true;
+                                                 return isDefault(entry.getSettings());
                                          }
-                                         _dirty = true;
-                                         if (knobs->empty()) {
-                                             knobs = boost::none;
-                                         }
-                                         settings.setQueryKnobs(knobs);
-                                         const bool becameDefault = isDefault(settings);
-                                         LOGV2_DEBUG(12826802,
-                                                     3,
-                                                     "Stripping query knobs not supported on the "
-                                                     "target FCV from query settings",
-                                                     "queryShapeHash"_attr =
-                                                         entry.getQueryShapeHash().toHexString(),
-                                                     "removedEntry"_attr = becameDefault);
-                                         if (becameDefault) {
-                                             return true;
-                                         }
-                                         entry.setSettings(settings);
-                                         return false;
+                                         MONGO_UNREACHABLE;
                                      }),
                       configs.end());
+    }
+
+    void removeUnsupportedQueryKnobs(multiversion::FeatureCompatibilityVersion targetFCV) {
+        modifySettingsArray([&](QueryShapeConfiguration& configuration) {
+            auto&& settings = configuration.getSettings();
+            auto knobs = settings.getQueryKnobs();
+            if (!knobs || !knobs->removeKnobsRequiringHigherFcv(targetFCV)) {
+                return ModifyResult::kNotModified;
+            }
+            if (knobs->empty()) {
+                knobs = boost::none;
+            }
+            settings.setQueryKnobs(knobs);
+            LOGV2_DEBUG(12826802,
+                        3,
+                        "Stripping query knobs not supported on the target FCV from query "
+                        "settings",
+                        "queryShapeHash"_attr = configuration.getQueryShapeHash().toHexString());
+            configuration.setSettings(settings);
+            return ModifyResult::kModified;
+        });
+    }
+
+    void removeMaxTimeMS() {
+        modifySettingsArray([](QueryShapeConfiguration& configuration) {
+            auto&& settings = configuration.getSettings();
+            if (!settings.getMaxTimeMS()) {
+                return ModifyResult::kNotModified;
+            }
+            LOGV2_DEBUG(12998201,
+                        3,
+                        "Stripping maxTimeMS from query settings",
+                        "queryShapeHash"_attr = configuration.getQueryShapeHash().toHexString());
+            settings.setMaxTimeMS(boost::none);
+            configuration.setSettings(settings);
+            return ModifyResult::kModified;
+        });
     }
 
     void moveQueriesToCollection(OperationContext* opCtx) {
@@ -691,6 +720,7 @@ public:
             // error.
             auto userSettings = *querySettingsFromOriginalCommand;
             validateQueryKnobs(expCtx->getOperationContext(), userSettings);
+            validateMaxTimeMS(expCtx->getOperationContext(), userSettings);
 
             settings = mergeQuerySettings(userSettings, settings);
             simplifyQuerySettings(settings);
@@ -701,6 +731,7 @@ public:
 
         // Fail the current command, if 'reject: true' flag is present.
         failIfRejectedBySettings(expCtx, settings);
+        applyMaxTimeMSFromSettings(expCtx, settings);
 
         return settings;
     }
@@ -794,8 +825,15 @@ public:
         const boost::optional<QuerySettings>& querySettingsFromOriginalCommand) const override {
         auto* opCtx = expCtx->getOperationContext();
         if (isInternalOrDirectClient(opCtx->getClient())) {
-            // Mongos already looked up and merged - return forwarded settings as-is.
-            return querySettingsFromOriginalCommand.get_value_or(QuerySettings());
+            // Mongos already looked up and merged - use the forwarded settings as-is. The
+            // shard's initial command deadline, however, was computed from the forwarded
+            // (pre-merge) 'maxTimeMS' field before query settings were considered, so
+            // 'maxTimeMS' must be (re-)applied here: otherwise a query settings override that
+            // loosens the deadline is silently lost, since the transport layer's
+            // 'maxTimeMS'/'maxTimeMSOpOnly' precedence always favors whichever is shorter.
+            auto settings = querySettingsFromOriginalCommand.get_value_or(QuerySettings());
+            applyMaxTimeMSFromSettings(expCtx, settings);
+            return settings;
         }
 
         // Replica set: perform cluster lookup (includes rejection check) and merge with user
@@ -806,6 +844,7 @@ public:
             // error.
             auto& userSettings = *querySettingsFromOriginalCommand;
             validateQueryKnobs(opCtx, userSettings);
+            validateMaxTimeMS(opCtx, userSettings);
 
             settings = mergeQuerySettings(userSettings, settings);
             simplifyQuerySettings(settings);
@@ -816,6 +855,7 @@ public:
 
         // Fail the current command, if 'reject: true' flag is present.
         failIfRejectedBySettings(expCtx, settings);
+        applyMaxTimeMSFromSettings(expCtx, settings);
 
         return settings;
     }
@@ -891,10 +931,17 @@ public:
         if (!feature_flags::gFeatureFlagPQSBackfill.isEnabledOnVersion(targetFCV)) {
             plan |= Op::kMoveQueriesToParameter | Op::kDropCollection;
         }
+        // Strip the maxTimeMS query setting once the target FCV no longer supports it.
+        if (!feature_flags::gFeatureFlagPqsMaxTimeMS.isEnabledOnVersion(targetFCV)) {
+            plan |= Op::kRemoveMaxTimeMS;
+        }
+
         LOGV2_DEBUG(12826804,
                     2,
                     "Planning query settings FCV downgrade",
                     "targetFCV"_attr = multiversion::toString(targetFCV),
+                    "removeMaxTimeMS"_attr =
+                        QuerySettingsMigration::contains(plan, Op::kRemoveMaxTimeMS),
                     "migrateRepresentativeQueriesToClusterParameter"_attr =
                         QuerySettingsMigration::contains(plan, Op::kMoveQueriesToParameter));
 
@@ -958,6 +1005,25 @@ QuerySettingsService& QuerySettingsService::get(OperationContext* opCtx) {
 
 std::string QuerySettingsService::getQuerySettingsClusterParameterName() {
     return std::string{kQuerySettingsClusterParameterName};
+}
+
+void QuerySettingsService::applyMaxTimeMSFromSettings(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, const QuerySettings& settings) {
+    // Like 'reject', query settings reflect what would apply to a query (the setting still appears
+    // in the 'querySettings' section of explain output) but do not enforce behavioral settings
+    // during an explain itself. This also matches 'defaultMaxTimeMS', which is not applied to
+    // explain. So do not bound the explain operation by the query settings 'maxTimeMS'.
+    if (expCtx->getExplain()) {
+        return;
+    }
+
+    auto maxTimeMS = settings.getMaxTimeMS();
+    if (!maxTimeMS) {
+        return;
+    }
+
+    expCtx->getOperationContext()->setMaxTimeFromTotalBudget(
+        duration_cast<Microseconds>(Milliseconds(*maxTimeMS)), ErrorCodes::MaxTimeMSExpired);
 }
 
 bool QuerySettingsService::isEligbleForQuerySettings(
@@ -1034,19 +1100,19 @@ bool allowQuerySettingsFromClient(Client* client) {
 
 bool isDefault(const QuerySettings& settings) {
     // The 'serialization_context' and 'comment' fields are not significant.
-    static_assert(QuerySettings::fieldNames.size() == 6,
+    static_assert(QuerySettings::fieldNames.size() == 7,
                   "A new field has been added to the QuerySettings structure, isDefault should be "
                   "updated appropriately.");
 
     // For the 'reject' field of type OptionalBool, consider both 'false' and missing value as
     // default.
     return !(settings.getQueryFramework() || settings.getIndexHints() || settings.getReject() ||
-             settings.getQueryKnobs());
+             settings.getQueryKnobs() || settings.getMaxTimeMS());
 }
 
 QuerySettings mergeQuerySettings(const QuerySettings& lhs, const QuerySettings& rhs) {
     static_assert(
-        QuerySettings::fieldNames.size() == 6,
+        QuerySettings::fieldNames.size() == 7,
         "A new field has been added to the QuerySettings structure, mergeQuerySettings() should be "
         "updated appropriately.");
 
@@ -1074,6 +1140,10 @@ QuerySettings mergeQuerySettings(const QuerySettings& lhs, const QuerySettings& 
             querySettings.getQueryKnobs().value_or(QuerySettingsKnobOverrides{}),
             *rhs.getQueryKnobs());
         querySettings.setQueryKnobs(std::move(merged));
+    }
+
+    if (rhs.getMaxTimeMS()) {
+        querySettings.setMaxTimeMS(rhs.getMaxTimeMS());
     }
 
     return querySettings;
@@ -1109,6 +1179,16 @@ void QuerySettingsService::validateQueryKnobs(OperationContext* opCtx,
                               << knobEntry.wireName,
                 fcvSnapshot.isGreaterThanOrEqualTo(*knobEntry.minFcv));
     }
+}
+
+void QuerySettingsService::validateMaxTimeMS(OperationContext* opCtx,
+                                             const QuerySettings& querySettings) const {
+    uassert(12998200,
+            "Unknown field 'maxTimeMS' in querySettings",
+            !querySettings.getMaxTimeMS() ||
+                feature_flags::gFeatureFlagPqsMaxTimeMS.isEnabled(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 }
 
 void QuerySettingsService::validateQuerySettings(const QuerySettings& querySettings) const {
@@ -1180,6 +1260,12 @@ void QuerySettingsService::simplifyQuerySettings(QuerySettings& settings) const 
     // If reject is present, but is false, set to an empty optional.
     if (settings.getReject().has_value() && !settings.getReject()) {
         settings.setReject({});
+    }
+    // A 'maxTimeMS' of 0 is equivalent to leaving it unset.
+    // Normalizing here keeps 0 available as a way to clear the setting without dropping the entire
+    // configuration.
+    if (settings.getMaxTimeMS() && *settings.getMaxTimeMS() == 0) {
+        settings.setMaxTimeMS(boost::none);
     }
     if (auto knobs = settings.getQueryKnobs()) {
         knobs->simplify();

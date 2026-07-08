@@ -117,8 +117,9 @@ size_t hash_value(const IndexHintSpec& v) {
 }
 
 size_t hash_value(const QuerySettings& querySettings) {
-    // The 'serialization_context' and 'comment' fields are not significant.
-    static_assert(QuerySettings::fieldNames.size() == 6,
+    // The 'serialization_context', 'comment', and 'maxTimeMS' fields are not significant.
+    // 'maxTimeMS' affects operation deadline, not plan selection.
+    static_assert(QuerySettings::fieldNames.size() == 7,
                   "A new field has been added to the QuerySettings structure, adjust the hash "
                   "function accordingly");
 

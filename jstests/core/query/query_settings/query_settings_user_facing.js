@@ -193,6 +193,22 @@ describe("User-facing querySettings when flag is on", function () {
             );
         });
     }
+
+    // The 'maxTimeMS' field is itself gated behind featureFlagPqsMaxTimeMS. When that flag is
+    // disabled, passing it inline must be rejected by the shared validation.
+    const maxTimeMSFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "PqsMaxTimeMS");
+    if (!maxTimeMSFlagEnabled) {
+        it("rejects maxTimeMS when featureFlagPqsMaxTimeMS is disabled", function () {
+            assert.commandFailedWithCode(
+                db.runCommand({
+                    find: coll.getName(),
+                    filter: {a: 1},
+                    querySettings: {maxTimeMS: NumberLong(5000)},
+                }),
+                [12998200],
+            );
+        });
+    }
 });
 
 // Queries that are ineligible for query settings (IDHACK/Express, FLE, internal/system

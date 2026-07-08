@@ -115,6 +115,11 @@ structs:
                 type: QuerySettingsKnobOverrides
                 optional: true
                 stability: internal
+            maxTimeMS:
+                type: safeInt64
+                optional: true
+                stability: internal
+                validator: {gte: 0}
         mod_visibility: public
 
     QueryShapeConfiguration:

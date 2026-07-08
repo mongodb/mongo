@@ -531,6 +531,22 @@ public:
     void setDeadlineByDate(Date_t when, ErrorCodes::Error timeoutError);
 
     /**
+     * Sets the deadline and maxTime from a total time budget for the operation, anchored to the
+     * operation's start (via the elapsed timer) rather than to "now", so that repeated calls for a
+     * single operation are idempotent. A total of zero (or greater than the maximum representable
+     * duration) is treated as "no timeout".
+     *
+     * Unlike 'setDeadlineAndMaxTime', this does not check '_hasArtificialDeadline'/'hasDeadline()'
+     * and so is permitted to change an already-set deadline. Only call this when the caller is a
+     * legitimate secondary source of the operation's total time budget (e.g. restoring a
+     * previously stored maxTime, or a query-settings-derived override discovered during query
+     * planning) rather than an arbitrary external mutation. The recomputed deadline is written
+     * eagerly to the canonical deadline state so that the interrupt hot path (which reads the
+     * deadline field directly) observes it immediately.
+     */
+    void setMaxTimeFromTotalBudget(Microseconds total, ErrorCodes::Error timeoutError);
+
+    /**
      * Sets the deadline for this operation to the maxTime plus the current time reported
      * by the ServiceContext's fast clock source.
      */

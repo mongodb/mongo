@@ -122,6 +122,15 @@ public:
                                           const NamespaceString& nss);
 
     /**
+     * Applies 'settings.maxTimeMS' (if set) to the current operation's deadline. A no-op during
+     * explain, and if 'settings' has no 'maxTimeMS'. Exposed so that every code path resolving
+     * query settings (including the QueryShapeHash-less fallback) can (re-)apply 'maxTimeMS' to
+     * this node's own operation, since each node enforces its own deadline independently.
+     */
+    static void applyMaxTimeMSFromSettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                           const QuerySettings& settings);
+
+    /**
      * Returns a set of system and administrative aggregation pipeline stages that, if used as the
      * initial stage, prevent the query from being rejected via query settings.
      *
@@ -187,7 +196,16 @@ public:
         }
 
         if (!queryShapeHash) {
-            return querySettingsFromOriginalCommand.value_or(QuerySettings());
+            // No shape hash means no cluster-configured settings can be looked up (e.g. internal
+            // clients such as a shard receiving a command forwarded by mongos deliberately skip
+            // recomputing it, since mongos already did). 'reject' does not need to be re-checked
+            // here, since mongos would already have rejected the command before ever dispatching
+            // it; 'maxTimeMS', however, governs this node's own operation deadline and must still
+            // be (re-)applied here, or a query settings override that loosens the deadline would
+            // be silently lost on this node.
+            auto settings = querySettingsFromOriginalCommand.value_or(QuerySettings());
+            applyMaxTimeMSFromSettings(expCtx, settings);
+            return settings;
         }
 
         return lookupQuerySettingsWithRejectionCheck(
@@ -314,6 +332,13 @@ public:
      * (SPM-4364).
      */
     void validateQueryKnobs(OperationContext* opCtx, const QuerySettings& querySettings) const;
+
+    /**
+     * Validates that 'maxTimeMS' in 'querySettings' is only used when featureFlagPqsMaxTimeMS is
+     * enabled. Must be called at every entry point accepting external query settings, mirroring
+     * validateQueryKnobs().
+     */
+    void validateMaxTimeMS(OperationContext* opCtx, const QuerySettings& querySettings) const;
 
     /**
      * Validates that QuerySettings can be applied to the query represented by 'queryInfo'.

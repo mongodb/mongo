@@ -730,5 +730,152 @@ TEST_F(QuerySettingsServiceTest, LookupValidatesUserSuppliedQuerySettings) {
         DBException,
         7746608);
 }
+
+// ---- maxTimeMS query setting tests ----
+
+TEST_F(QuerySettingsServiceTest, IsDefaultReturnsFalseWhenOnlyMaxTimeMSIsSet) {
+    QuerySettings settings;
+    ASSERT(isDefault(settings));
+    settings.setMaxTimeMS(5000);
+    ASSERT_FALSE(isDefault(settings));
+}
+
+TEST_F(QuerySettingsServiceTest, MergeQuerySettingsMaxTimeMS) {
+    // rhs maxTimeMS overrides lhs when present.
+    QuerySettings lhs;
+    lhs.setMaxTimeMS(1000);
+    QuerySettings rhs;
+    rhs.setMaxTimeMS(2000);
+    auto merged = mergeQuerySettings(lhs, rhs);
+    ASSERT_EQ(*merged.getMaxTimeMS(), 2000);
+
+    // maxTimeMS is preserved from lhs when rhs has no maxTimeMS.
+    QuerySettings rhsNoMax;
+    rhsNoMax.setQueryFramework(QueryFrameworkControlEnum::kForceClassicEngine);
+    auto merged2 = mergeQuerySettings(lhs, rhsNoMax);
+    ASSERT_EQ(*merged2.getMaxTimeMS(), 1000);
+
+    // maxTimeMS from rhs is applied even when lhs has no maxTimeMS.
+    QuerySettings lhsNoMax;
+    lhsNoMax.setQueryFramework(QueryFrameworkControlEnum::kForceClassicEngine);
+    auto merged3 = mergeQuerySettings(lhsNoMax, rhs);
+    ASSERT_EQ(*merged3.getMaxTimeMS(), 2000);
+}
+
+TEST_F(QuerySettingsServiceTest, MaxTimeMSFromSettingsIsAppliedOnLookup) {
+    QuerySettingsService::initializeForShard(getServiceContext(),
+                                             nullptr /* setClusterParameterImplFn */);
+
+    auto findCmdBSON = fromjson("{find: 'exampleColl', '$db': 'foo'}");
+    auto findCmd = query_request_helper::makeFromFindCommandForTests(findCmdBSON, nss());
+    auto parsedRequest =
+        uassertStatusOK(parsed_find_command::parse(expCtx(), {.findCommand = std::move(findCmd)}));
+    query_shape::DeferredQueryShape deferredShape{[&]() {
+        return shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedRequest, expCtx());
+    }};
+
+    // Confirm there is no deadline before the lookup.
+    ASSERT_EQ(opCtx()->getDeadline(), Date_t::max());
+
+    QuerySettings settingsWithMaxTimeMS;
+    settingsWithMaxTimeMS.setMaxTimeMS(60000);
+    QuerySettingsScope scope(opCtx(),
+                             {makeQueryShapeConfiguration(findCmdBSON, settingsWithMaxTimeMS)});
+
+    service().lookupQuerySettingsWithRejectionCheck(
+        expCtx(), hashForShape(deferredShape), nss(), boost::none);
+
+    // A finite deadline must have been set by the lookup.
+    ASSERT_LT(opCtx()->getDeadline(), Date_t::max());
+}
+
+TEST_F(QuerySettingsServiceTest, MaxTimeMSFromSettingsLoosensExistingDeadline) {
+    QuerySettingsService::initializeForShard(getServiceContext(),
+                                             nullptr /* setClusterParameterImplFn */);
+
+    auto findCmdBSON = fromjson("{find: 'exampleColl', '$db': 'foo'}");
+    auto findCmd = query_request_helper::makeFromFindCommandForTests(findCmdBSON, nss());
+    auto parsedRequest =
+        uassertStatusOK(parsed_find_command::parse(expCtx(), {.findCommand = std::move(findCmd)}));
+    query_shape::DeferredQueryShape deferredShape{[&]() {
+        return shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedRequest, expCtx());
+    }};
+
+    // Set a tight 100ms deadline to simulate a command-level maxTimeMS.
+    auto tightDeadline =
+        opCtx()->getServiceContext()->getFastClockSource()->now() + Milliseconds(100);
+    opCtx()->setDeadlineByDate(tightDeadline, ErrorCodes::MaxTimeMSExpired);
+    ASSERT_EQ(opCtx()->getDeadline(), tightDeadline);
+
+    // QS maxTimeMS of 60s should loosen the 100ms deadline.
+    QuerySettings settingsWithMaxTimeMS;
+    settingsWithMaxTimeMS.setMaxTimeMS(60000);
+    QuerySettingsScope scope(opCtx(),
+                             {makeQueryShapeConfiguration(findCmdBSON, settingsWithMaxTimeMS)});
+
+    service().lookupQuerySettingsWithRejectionCheck(
+        expCtx(), hashForShape(deferredShape), nss(), boost::none);
+
+    // The deadline should now be ~60s from now, i.e. well beyond the original 100ms.
+    ASSERT_GT(opCtx()->getDeadline(), tightDeadline);
+}
+
+TEST_F(QuerySettingsServiceTest, MaxTimeMSZeroRemovesDeadline) {
+    QuerySettingsService::initializeForShard(getServiceContext(),
+                                             nullptr /* setClusterParameterImplFn */);
+
+    auto findCmdBSON = fromjson("{find: 'exampleColl', '$db': 'foo'}");
+    auto findCmd = query_request_helper::makeFromFindCommandForTests(findCmdBSON, nss());
+    auto parsedRequest =
+        uassertStatusOK(parsed_find_command::parse(expCtx(), {.findCommand = std::move(findCmd)}));
+    query_shape::DeferredQueryShape deferredShape{[&]() {
+        return shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedRequest, expCtx());
+    }};
+
+    // Set an existing deadline.
+    opCtx()->setDeadlineByDate(opCtx()->getServiceContext()->getFastClockSource()->now() +
+                                   Milliseconds(1000),
+                               ErrorCodes::MaxTimeMSExpired);
+    ASSERT_LT(opCtx()->getDeadline(), Date_t::max());
+
+    // QS maxTimeMS of 0 should remove the deadline (no timeout).
+    QuerySettings settingsWithMaxTimeMSZero;
+    settingsWithMaxTimeMSZero.setMaxTimeMS(0);
+    QuerySettingsScope scope(opCtx(),
+                             {makeQueryShapeConfiguration(findCmdBSON, settingsWithMaxTimeMSZero)});
+
+    service().lookupQuerySettingsWithRejectionCheck(
+        expCtx(), hashForShape(deferredShape), nss(), boost::none);
+
+    ASSERT_EQ(opCtx()->getDeadline(), Date_t::max());
+}
+
+TEST_F(QuerySettingsServiceTest, MaxTimeMSFromSettingsIsNotAppliedForExplain) {
+    QuerySettingsService::initializeForShard(getServiceContext(),
+                                             nullptr /* setClusterParameterImplFn */);
+
+    auto findCmdBSON = fromjson("{find: 'exampleColl', '$db': 'foo'}");
+    auto findCmd = query_request_helper::makeFromFindCommandForTests(findCmdBSON, nss());
+    auto parsedRequest =
+        uassertStatusOK(parsed_find_command::parse(expCtx(), {.findCommand = std::move(findCmd)}));
+    query_shape::DeferredQueryShape deferredShape{[&]() {
+        return shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedRequest, expCtx());
+    }};
+
+    QuerySettings settingsWithMaxTimeMS;
+    settingsWithMaxTimeMS.setMaxTimeMS(60000);
+    QuerySettingsScope scope(opCtx(),
+                             {makeQueryShapeConfiguration(findCmdBSON, settingsWithMaxTimeMS)});
+
+    // Under explain, query settings 'maxTimeMS' must not bound the explain operation itself, so the
+    // deadline is left untouched (mirrors how 'reject' exempts explain).
+    ExplainScope explainScope(expCtx(), findCmdBSON);
+    ASSERT_EQ(opCtx()->getDeadline(), Date_t::max());
+
+    service().lookupQuerySettingsWithRejectionCheck(
+        expCtx(), hashForShape(deferredShape), nss(), boost::none);
+
+    ASSERT_EQ(opCtx()->getDeadline(), Date_t::max());
+}
 }  // namespace
 }  // namespace mongo::query_settings
