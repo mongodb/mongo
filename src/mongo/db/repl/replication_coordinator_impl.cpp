@@ -5471,8 +5471,7 @@ void ReplicationCoordinatorImpl::setOldestTimestamp(const Timestamp& timestamp) 
 }
 
 bool ReplicationCoordinatorImpl::getWriteConcernMajorityShouldJournal() {
-    std::unique_lock lock(_mutex);
-    return getWriteConcernMajorityShouldJournal(lock);
+    return _getReplSetConfig().getWriteConcernMajorityShouldJournal();
 }
 
 bool ReplicationCoordinatorImpl::getWriteConcernMajorityShouldJournal(WithLock lk) const {
