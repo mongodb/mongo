@@ -292,7 +292,7 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Not authorized to compact structured encryption data",
                     as->isAuthorizedForActionsOnResource(
-                        ResourcePattern::forExactNamespace(request().getNamespace()),
+                        ResourcePattern::forDatabaseName(request().getDbName()),
                         ActionType::compactStructuredEncryptionData));
         }
 
