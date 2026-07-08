@@ -33,7 +33,12 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/authenticate.h"
+#include "mongo/client/internal_auth.h"
 #include "mongo/config.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/sasl_command_constants.h"
+#include "mongo/db/auth/user.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/base64.h"
@@ -201,5 +206,30 @@ TEST_F(AuthClientTest, asyncX509) {
             .getNoThrow());
 }
 #endif
+
+class InternalAuthParamsTest : public AuthClientTest {
+public:
+    void setUp() override {
+        // getInternalAuthParams() reads the __system user's name to build SASL parameters.
+        UserRequest systemLocal(UserName("__system"_sd, "local"_sd), boost::none);
+        internalSecurity.setUser(std::make_shared<UserHandle>(User(std::move(systemLocal))));
+    }
+};
+
+TEST_F(InternalAuthParamsTest, GetInternalAuthParamsRejectsPlain) {
+    auth::setInternalAuthKeys({"hunter2"});
+
+    // PLAIN would leak the raw keyfile as a cleartext credential; it must never be used for
+    // internal authentication.
+    ASSERT_TRUE(auth::getInternalAuthParams(0, auth::kMechanismSaslPlain).isEmpty());
+}
+
+TEST_F(InternalAuthParamsTest, GetInternalAuthParamsAllowsScram) {
+    auth::setInternalAuthKeys({"hunter2"});
+
+    auto params = auth::getInternalAuthParams(0, auth::kMechanismScramSha256);
+    ASSERT_FALSE(params.isEmpty());
+    ASSERT_EQ(params[saslCommandMechanismFieldName].str(), auth::kMechanismScramSha256) << params;
+}
 
 }  // namespace
