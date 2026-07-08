@@ -274,6 +274,69 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldReportEOFWithNoCursors) {
     ASSERT_TRUE(stage->getNext().isEOF());
 }
 
+// Returns the shards registered by the fixture's setUp(), for answering the config.shards find that
+// getShard()'s forced reload issues.
+std::vector<ShardType> makeConfigShards() {
+    std::vector<ShardType> shards;
+    for (size_t i = 0; i < kTestShardIds.size(); i++) {
+        ShardType shardType;
+        shardType.setHandle(ShardHandle{ShardId(kTestShardIds[i].toString()), boost::none});
+        shardType.setHost(kTestShardHosts[i].toString());
+        shards.push_back(shardType);
+    }
+    return shards;
+}
+
+// Building the executable stage validates every remote's shardId against the ShardRegistry. A
+// remote on a shard the registry does not know about (even after a reload) must fail with
+// 'ShardNotFound'.
+TEST_F(DocumentSourceMergeCursorsTest, ShouldFailToBuildStageIfShardIsUnknown) {
+    auto expCtx = getExpCtx();
+    AsyncResultsMergerParams armParams;
+    armParams.setNss(getTenantIdNss());
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(ShardId("NonExistentShard"),
+                         HostAndPort("NonExistentShardHost", 12345),
+                         CursorResponse(expCtx->getNamespaceString(), kExhaustedCursorID, {})));
+    armParams.setRemotes(std::move(cursors));
+    auto source = DocumentSourceMergeCursors::create(expCtx, std::move(armParams));
+
+    auto future = launchAsync([&] {
+        ASSERT_THROWS_CODE(
+            exec::agg::buildStage(source), AssertionException, ErrorCodes::ShardNotFound);
+    });
+    // Answer getShard()'s forced reload; the response omits the bogus shard, so it stays
+    // unresolved.
+    expectGetShards(makeConfigShards());
+    future.default_timed_get();
+}
+
+// The validation must fire even when only one of several remotes references an unknown shard.
+TEST_F(DocumentSourceMergeCursorsTest, ShouldFailToBuildStageIfAnyShardIsUnknown) {
+    auto expCtx = getExpCtx();
+    AsyncResultsMergerParams armParams;
+    armParams.setNss(getTenantIdNss());
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0],
+                         kTestShardHosts[0],
+                         CursorResponse(expCtx->getNamespaceString(), kExhaustedCursorID, {})));
+    cursors.emplace_back(
+        makeRemoteCursor(ShardId("NonExistentShard"),
+                         HostAndPort("NonExistentShardHost", 12345),
+                         CursorResponse(expCtx->getNamespaceString(), kExhaustedCursorID, {})));
+    armParams.setRemotes(std::move(cursors));
+    auto source = DocumentSourceMergeCursors::create(expCtx, std::move(armParams));
+
+    auto future = launchAsync([&] {
+        ASSERT_THROWS_CODE(
+            exec::agg::buildStage(source), AssertionException, ErrorCodes::ShardNotFound);
+    });
+    expectGetShards(makeConfigShards());
+    future.default_timed_get();
+}
+
 BSONObj cursorResponseObj(const NamespaceString& nss,
                           CursorId cursorId,
                           std::vector<BSONObj> batch) {

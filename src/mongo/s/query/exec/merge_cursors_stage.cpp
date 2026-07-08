@@ -30,10 +30,41 @@
 #include "mongo/s/query/exec/merge_cursors_stage.h"
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/topology/shard_registry.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
 
+#include <utility>
+
 namespace mongo::exec::agg {
+
+namespace {
+// Ensure the ShardRegistry knows every shard we hold a cursor on before the merger opens its first
+// getMore egress connection.
+void validateShardIds(OperationContext* opCtx, const std::vector<RemoteCursor>& remotes) {
+    auto* grid = opCtx ? Grid::get(opCtx) : nullptr;
+    if (!grid || !grid->isInitialized()) {
+        // No ShardRegistry wired up (e.g. a non-sharded context or some unit tests); nothing to do.
+        return;
+    }
+    auto* shardRegistry = grid->shardRegistry();
+
+    // Deduplicate shardIds: the registry cache is a single whole-registry entry, so the first
+    // resolve warms every shard; the rest are cache hits.
+    stdx::unordered_set<ShardId> seen;
+    seen.reserve(remotes.size());
+    for (const auto& remote : remotes) {
+        ShardId shardId{std::string{remote.getShardId()}};
+        if (!seen.insert(shardId).second) {
+            continue;
+        }
+        // 'getShard()' also resolves the config shard (which 'getAllShardIds()' omits) and retries
+        // via a forced reload on a miss, making this resilient to add/remove-shard churn.
+        uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
+    }
+}
+}  // namespace
 
 boost::intrusive_ptr<MergeCursorsStage> documentSourceMergeCursorsToStageFn(
     const boost::intrusive_ptr<DocumentSource>& documentSource) {
@@ -42,8 +73,13 @@ boost::intrusive_ptr<MergeCursorsStage> documentSourceMergeCursorsToStageFn(
 
     tassert(10561401, "expected 'DocumentSourceMergeCursors' type", mergeCursorsDocumentSource);
 
+    auto blockingResultsMerger = mergeCursorsDocumentSource->populateMerger();
+
+    validateShardIds(mergeCursorsDocumentSource->getExpCtx()->getOperationContext(),
+                     blockingResultsMerger->asyncResultsMergerParams().getRemotes());
+
     return make_intrusive<MergeCursorsStage>(mergeCursorsDocumentSource->getExpCtx(),
-                                             mergeCursorsDocumentSource->populateMerger());
+                                             std::move(blockingResultsMerger));
 }
 
 REGISTER_AGG_STAGE_MAPPING(mergeCursors,
