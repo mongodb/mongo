@@ -49,8 +49,6 @@ executor:
     launch_mongot: true
     num_shards: 2
     num_mongos: 3
-    load_extensions:
-      - "add_fields_match"
     mongod_options:
       keyFile: *keyFile
       set_parameters:

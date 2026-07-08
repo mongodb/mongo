@@ -48,8 +48,6 @@ executor:
     # TODO SERVER-118983 Change back to 2 and re-generate matrix suites.
     num_rs_nodes_per_shard: 1
     num_mongos: 3
-    load_extensions:
-      - "add_fields_match"
     mongod_options:
       keyFile: *keyFile
       set_parameters:

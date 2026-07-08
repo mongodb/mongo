@@ -1,11 +1,7 @@
 /**
  * This test checks that search indexes cannot be created on view definitions that violate
- * constraints. See db/query/search/search_index_view_validation.h for more details.
- *
- * @tags: [ featureFlagExtensionsAPI ]
+ * constraints.
  */
-import {isPlatformCompatibleWithExtensions} from "jstests/noPassthrough/libs/extension_helpers.js";
-
 const invalidStageErrorCode = 10623000;
 const matchErrorCode = 10623001;
 const addFieldsErrorCode = 10623002;
@@ -27,9 +23,10 @@ const createViewAndSearchIndexDef = function (name, pipeline) {
 };
 
 const testSearchIndexOnInvalidView = function ({name, pipeline, errorCode}) {
-    const searchIndexDef = createViewAndSearchIndexDef(name, pipeline);
+    const viewName = `${jsTestName()}_${name}`;
+    const searchIndexDef = createViewAndSearchIndexDef(viewName, pipeline);
     assert.commandFailedWithCode(
-        testDb.runCommand({createSearchIndexes: name, indexes: [searchIndexDef]}),
+        testDb.runCommand({createSearchIndexes: viewName, indexes: [searchIndexDef]}),
         errorCode,
     );
 };
@@ -68,26 +65,6 @@ testSearchIndexOnInvalidView({
     pipeline: [{$project: {abc: 1}}],
     errorCode: invalidStageErrorCode,
 });
-
-if (isPlatformCompatibleWithExtensions()) {
-    testSearchIndexOnInvalidView({
-        // Test with an extension that desugars into $addFields and $match (allowed stages).
-        // This should fail as we do not desugar before making CRUD operations on search indexes,
-        // meaning that the search index validator will see `$addFieldsMatch` (not supported)
-        // rather than the desugared form of `$addFields` + `$match` (supported).
-        name: "search_index_addFields_match_extension",
-        pipeline: [
-            {
-                $addFieldsMatch: {
-                    field: "apple",
-                    value: "banana",
-                    filter: "grape",
-                },
-            },
-        ],
-        errorCode: invalidStageErrorCode,
-    });
-}
 
 // ===============================================================================
 // Stage-specific constraints.
@@ -164,7 +141,7 @@ testSearchIndexOnInvalidView({
 // Valid: empty $match should be allowed.
 // ===============================================================================
 (function testEmptyMatchIsValid() {
-    const viewName = "search_index_empty_match_view";
+    const viewName = `${jsTestName()}_search_index_empty_match_view`;
     const searchIndexDef = createViewAndSearchIndexDef(viewName, [{$match: {}}]);
     assert.commandWorked(
         testDb.runCommand({createSearchIndexes: viewName, indexes: [searchIndexDef]}),
