@@ -34,7 +34,12 @@ def generate_extension_configs(
     extensions = {}
     parsed_manual_options = None
 
-    if manual_options:
+    if not so_files:
+        # Nothing to generate; the caller only wants the output directory created (see
+        # ensureExtensionConfDir() in extension_helpers.js). Skip reading options entirely so this
+        # path doesn't depend on CONF_IN_PATH resolving from the current working directory.
+        pass
+    elif manual_options:
         if len(so_files) > 1:
             raise RuntimeError(
                 "When using --manual-options, only one .so file can be specified via --so-files"
@@ -117,8 +122,10 @@ def main():
     parser.add_argument(
         "--so-files",
         type=str,
-        required=True,
-        help="A comma-separated list of .so file paths for the extensions.",
+        default="",
+        help="A comma-separated list of .so file paths for the extensions. May be empty, in which "
+        "case no .conf files are generated but the output directory is still created with "
+        "restricted permissions.",
     )
     parser.add_argument(
         "--with-suffix",
@@ -137,7 +144,7 @@ def main():
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
     logger = logging.getLogger(__name__)
 
-    so_files_list = [item.strip() for item in args.so_files.split(",")]
+    so_files_list = [item.strip() for item in args.so_files.split(",") if item.strip()]
 
     try:
         extension_names = generate_extension_configs(

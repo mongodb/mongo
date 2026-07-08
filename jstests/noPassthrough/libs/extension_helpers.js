@@ -76,6 +76,27 @@ function _generateExtensionConfigsInternal(soFileNames, manualOptions = "") {
 }
 
 /**
+ * Ensures the extension config directory exists with restricted (non group/other-writable)
+ * permissions. Delegates creation to generate_extension_configs.py (invoked with no .so files) so
+ * the directory is always created with mode 0o700, matching the server's requirement that the
+ * extensionsConfigPath not be writable by group or other users. This is needed even when no
+ * extensions are loaded, since withExtensions() always passes extensionsConfigPath and the server
+ * rejects a non-existent path at startup.
+ */
+export function ensureExtensionConfDir() {
+    const ret = runNonMongoProgram(
+        getPython3Binary(),
+        "-m",
+        "buildscripts.resmokelib.extensions.generate_extension_configs",
+        "--so-files",
+        "",
+        "--with-suffix",
+        "unused",
+    );
+    assert.eq(ret, 0, "Failed to create extension config directory");
+}
+
+/**
  * @param {string} path A path string to a .so file for which to generate a .conf file.
  * @param {string} manualOptions A YAML or JSON string containing extensionOptions to include in
  * each extension. This is used for noPassthrough tests where extension options are not already set
@@ -124,10 +145,12 @@ export function withExtensions(
 
     // Ensure the config directory exists up front so it can be populated with .conf files below and
     // so extensionsConfigPath can always be passed, even when no extensions are loaded (in which
-    // case generate_extension_configs.py never runs to create it, and the server rejects a
-    // non-existent extensionsConfigPath at startup). mkdir() is idempotent.
+    // case generateExtensionConfigWithOptions() never runs to create it, and the server rejects a
+    // non-existent extensionsConfigPath at startup). ensureExtensionConfDir() creates it with
+    // restricted permissions (mode 0o700) via Python; a plain mkdir() would inherit the shell's
+    // umask and can leave the directory group/other-writable, which the server rejects.
     const extensionConfDir = getExtensionConfDir();
-    mkdir(extensionConfDir);
+    ensureExtensionConfDir();
 
     for (const [extLib, extensionOptions] of Object.entries(extToOptionsMap)) {
         const cfgStr =

@@ -67,6 +67,24 @@ class TestGenerateExtensionConfigs(unittest.TestCase):
         mode = stat.S_IMODE(os.stat(conf_out_dir).st_mode)
         self.assertEqual(mode, 0o700)
 
+    def test_empty_so_files_creates_dir_without_generating_configs(self):
+        # withExtensions() invokes the generator with no .so files purely to create the conf
+        # directory with restricted permissions (e.g. when no extensions are loaded). It should
+        # create the directory at 0o700 and generate no .conf files.
+        extension_names = generate_extension_configs(
+            so_files=[],
+            with_suffix="suffix",
+            logger=self.logger,
+            manual_options=None,
+        )
+
+        self.assertEqual(extension_names, [])
+
+        conf_out_dir = get_conf_out_dir()
+        mode = stat.S_IMODE(os.stat(conf_out_dir).st_mode)
+        self.assertEqual(mode, 0o700)
+        self.assertEqual(os.listdir(conf_out_dir), [])
+
     def test_conf_file_is_created_with_restricted_permissions(self):
         extension_names = generate_extension_configs(
             so_files=["/path/to/libfoo_mongo_extension.so"],
