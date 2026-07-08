@@ -111,7 +111,8 @@ public:
                 request().getCommonFields().getCheckRangeDeletionIndexes();
             const auto checkIndexes = request().getCommonFields().getCheckIndexes();
 
-            _invokeCommandOnSecondaries(opCtx, primaryShardId);
+            // TODO SERVER-129223: Re-enable metadata checks on secondaries once it correctly solves
+            // PIT _invokeCommandOnSecondaries(opCtx, primaryShardId);
 
             auto inconsistencies =
                 metadata_consistency_util::runCheckMetadataConsistencyOnParticipant(
@@ -122,10 +123,13 @@ public:
                     checkIndexes,
                     true /* asRSPrimaryNode */);
 
+            // TODO SERVER-129223: Re-enable metadata checks on secondaries once it correctly solves
+            // PIT
+            //
             // Build a streaming executor that merges the secondaries' cursors (or null if there are
             // none). The locally-computed inconsistencies are prepended by
             // 'createInitialCursorReplyMongod' so they are emitted before the streamed results.
-            auto secondaryCursorsExec = _mergeSecondaryCursors(opCtx);
+            // auto secondaryCursorsExec = _mergeSecondaryCursors(opCtx);
 
             return metadata_consistency_util::createInitialCursorReplyMongod(
                 opCtx,
@@ -133,7 +137,7 @@ public:
                 std::move(inconsistencies),
                 request().getCursor(),
                 request().toBSON(),
-                std::move(secondaryCursorsExec));
+                {});
         }
 
     private:
