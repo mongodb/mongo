@@ -121,7 +121,7 @@ TEST_F(LocalReshardingOperationsRegistryResyncFromDiskTest, EmptyCollectionsRegi
         opCtx(), NamespaceString::kRecipientReshardingOperationsNamespace, {});
 
     LocalReshardingOperationsRegistry registry;
-    registry.resyncFromDisk(opCtx());
+    registry.resyncFromDisk(opCtx(), "test resync");
 
     ASSERT_FALSE(registry.getOperation(kNs1));
     ASSERT_FALSE(registry.getOperation(kNs2));
@@ -139,7 +139,7 @@ TEST_F(LocalReshardingOperationsRegistryResyncFromDiskTest,
         opCtx(), NamespaceString::kRecipientReshardingOperationsNamespace, {});
 
     LocalReshardingOperationsRegistry registry;
-    registry.resyncFromDisk(opCtx());
+    registry.resyncFromDisk(opCtx(), "test resync");
 
     auto op = registry.getOperation(kNs1);
     ASSERT_TRUE(op);
@@ -160,7 +160,7 @@ TEST_F(LocalReshardingOperationsRegistryResyncFromDiskTest, DonorDocOnlyRegistry
         opCtx(), NamespaceString::kRecipientReshardingOperationsNamespace, {});
 
     LocalReshardingOperationsRegistry registry;
-    registry.resyncFromDisk(opCtx());
+    registry.resyncFromDisk(opCtx(), "test resync");
 
     auto op = registry.getOperation(kNs1);
     ASSERT_TRUE(op);
@@ -180,7 +180,7 @@ TEST_F(LocalReshardingOperationsRegistryResyncFromDiskTest,
                               {makeRecipientStateDoc(kNs1, reshardingUUID, sourceUUID)});
 
     LocalReshardingOperationsRegistry registry;
-    registry.resyncFromDisk(opCtx());
+    registry.resyncFromDisk(opCtx(), "test resync");
 
     auto op = registry.getOperation(kNs1);
     ASSERT_TRUE(op);
@@ -204,7 +204,7 @@ TEST_F(LocalReshardingOperationsRegistryResyncFromDiskTest,
                               {makeRecipientStateDoc(kNs1, reshardingUUID, sourceUUID)});
 
     LocalReshardingOperationsRegistry registry;
-    registry.resyncFromDisk(opCtx());
+    registry.resyncFromDisk(opCtx(), "test resync");
 
     auto op = registry.getOperation(kNs1);
     ASSERT_TRUE(op);
@@ -228,7 +228,7 @@ TEST_F(LocalReshardingOperationsRegistryResyncFromDiskTest,
         opCtx(), NamespaceString::kRecipientReshardingOperationsNamespace, {});
 
     LocalReshardingOperationsRegistry registry;
-    registry.resyncFromDisk(opCtx());
+    registry.resyncFromDisk(opCtx(), "test resync");
 
     ASSERT_FALSE(registry.getOperation(kNs1));
 }
@@ -244,7 +244,7 @@ TEST_F(LocalReshardingOperationsRegistryResyncFromDiskTest, MultipleOperationsRe
                               {makeDonorStateDoc(kNs2, uuid2, UUID::gen())});
 
     LocalReshardingOperationsRegistry registry;
-    registry.resyncFromDisk(opCtx());
+    registry.resyncFromDisk(opCtx(), "test resync");
 
     auto op1 = registry.getOperation(kNs1);
     auto op2 = registry.getOperation(kNs2);
@@ -270,10 +270,80 @@ TEST_F(LocalReshardingOperationsRegistryResyncFromDiskTest, ClearsExistingStateB
     registry.registerOperation(Role::kDonor, makeMetadata(kNs2));
     ASSERT_TRUE(registry.getOperation(kNs2));
 
-    registry.resyncFromDisk(opCtx());
+    registry.resyncFromDisk(opCtx(), "test resync");
 
     ASSERT_TRUE(registry.getOperation(kNs1));
     ASSERT_FALSE(registry.getOperation(kNs2));
+}
+
+TEST_F(LocalReshardingOperationsRegistryResyncFromDiskTest, ReportForServerStatusCountsResyncs) {
+    createCollectionAndInsert(opCtx(), NamespaceString::kConfigReshardingOperationsNamespace, {});
+    createCollectionAndInsert(opCtx(), NamespaceString::kDonorReshardingOperationsNamespace, {});
+    createCollectionAndInsert(
+        opCtx(), NamespaceString::kRecipientReshardingOperationsNamespace, {});
+
+    LocalReshardingOperationsRegistry registry;
+    registry.resyncFromDisk(opCtx(), "test resync");
+    registry.resyncFromDisk(opCtx(), "test resync");
+
+    BSONObjBuilder bob;
+    registry.reportForServerStatus(&bob);
+    auto bobObj = bob.obj();
+    auto section = bobObj.getObjectField("reshardingOperationsRegistry");
+    ASSERT_EQ(section.getField("resyncs").numberLong(), 2);
+    ASSERT_EQ(section.getField("currentOperations").numberLong(), 0);
+}
+
+TEST_F(LocalReshardingOperationsRegistryResyncFromDiskTest,
+       CurrentOperationsReflectsOnDiskStateWhileRegistrationCountersDriftAcrossRollbackAndRetry) {
+    auto reshardingUUID = UUID::gen();
+    auto sourceUUID = UUID::gen();
+    createCollectionAndInsert(opCtx(), NamespaceString::kConfigReshardingOperationsNamespace, {});
+    createCollectionAndInsert(opCtx(), NamespaceString::kDonorReshardingOperationsNamespace, {});
+    createCollectionAndInsert(
+        opCtx(), NamespaceString::kRecipientReshardingOperationsNamespace, {});
+
+    LocalReshardingOperationsRegistry registry;
+    auto meta = makeMetadata(kNs1, reshardingUUID, sourceUUID);
+
+    auto section = [&] {
+        BSONObjBuilder bob;
+        registry.reportForServerStatus(&bob);
+        return bob.obj().getObjectField("reshardingOperationsRegistry").getOwned();
+    };
+
+    // On startup the registry resyncs from an empty disk, so nothing is tracked.
+    registry.resyncFromDisk(opCtx(), "startup");
+    ASSERT_EQ(section().getField("resyncs").numberLong(), 1);
+    ASSERT_EQ(section().getField("currentOperations").numberLong(), 0);
+
+    // On stepup the operation is registered in memory and its state document is persisted to disk.
+    registry.registerOperation(Role::kDonor, meta);
+    DBDirectClient(opCtx()).insert(NamespaceString::kDonorReshardingOperationsNamespace,
+                                   makeDonorStateDoc(kNs1, reshardingUUID, sourceUUID));
+    ASSERT_EQ(section().getField("registrations").numberLong(), 1);
+    ASSERT_EQ(section().getField("currentOperations").numberLong(), 1);
+
+    // A rollback triggers another resync. The operation is still on disk, so the gauge is correctly
+    // repopulated to 1 even though the resync does not touch the monotonic registration counter.
+    registry.resyncFromDisk(opCtx(), "rollback");
+    ASSERT_EQ(section().getField("resyncs").numberLong(), 2);
+    ASSERT_EQ(section().getField("registrations").numberLong(), 1);
+    ASSERT_EQ(section().getField("currentOperations").numberLong(), 1);
+
+    // The operation is retried and re-registers, which double-counts the monotonic registrations
+    // counter but is idempotent for the gauge.
+    registry.registerOperation(Role::kDonor, meta);
+    ASSERT_EQ(section().getField("registrations").numberLong(), 2);
+    ASSERT_EQ(section().getField("currentOperations").numberLong(), 1);
+
+    // When the operation finally completes it unregisters once.
+    registry.unregisterOperation(Role::kDonor, meta);
+    auto finalSection = section();
+    ASSERT_EQ(finalSection.getField("registrations").numberLong(), 2);
+    ASSERT_EQ(finalSection.getField("unregistrations").numberLong(), 1);
+    ASSERT_EQ(finalSection.getField("resyncs").numberLong(), 2);
+    ASSERT_EQ(finalSection.getField("currentOperations").numberLong(), 0);
 }
 
 class ReshardingReplicaSetAwareServiceTest : public MockReplCoordServerFixture {};
@@ -434,6 +504,111 @@ TEST(LocalReshardingOperationsRegistryTest, RegisterDuplicateRoleNamespaceSameMe
     ASSERT_EQ(op->roles.size(), 1u);
     ASSERT_TRUE(op->roles.count(Role::kCoordinator));
     ASSERT_EQ(op->metadata.getSourceNss(), kNs1);
+}
+
+TEST(LocalReshardingOperationsRegistryTest,
+     ReportForServerStatusCountsRegistrationsAndUnregistrations) {
+    LocalReshardingOperationsRegistry registry;
+    auto meta = makeMetadata(kNs1);
+
+    {
+        BSONObjBuilder bob;
+        registry.reportForServerStatus(&bob);
+        auto bobObj = bob.obj();
+        auto section = bobObj.getObjectField("reshardingOperationsRegistry");
+        ASSERT_EQ(section.getField("registrations").numberLong(), 0);
+        ASSERT_EQ(section.getField("unregistrations").numberLong(), 0);
+        ASSERT_EQ(section.getField("currentOperations").numberLong(), 0);
+    }
+
+    registry.registerOperation(Role::kCoordinator, meta);
+    registry.registerOperation(Role::kDonor, meta);
+    registry.unregisterOperation(Role::kCoordinator, meta);
+
+    {
+        BSONObjBuilder bob;
+        registry.reportForServerStatus(&bob);
+        auto bobObj = bob.obj();
+        auto section = bobObj.getObjectField("reshardingOperationsRegistry");
+        ASSERT_EQ(section.getField("registrations").numberLong(), 2);
+        ASSERT_EQ(section.getField("unregistrations").numberLong(), 1);
+        // The coordinator role was unregistered but the donor role remains, so the operation is
+        // still tracked and the gauge reflects one live operation.
+        ASSERT_EQ(section.getField("currentOperations").numberLong(), 1);
+    }
+}
+
+TEST(LocalReshardingOperationsRegistryTest, ReportForServerStatusCountsCurrentOperations) {
+    LocalReshardingOperationsRegistry registry;
+    auto meta1 = makeMetadata(kNs1);
+    auto meta2 = makeMetadata(kNs2);
+
+    registry.registerOperation(Role::kCoordinator, meta1);
+    registry.registerOperation(Role::kDonor, meta1);
+    registry.registerOperation(Role::kDonor, meta2);
+
+    auto currentOperations = [&] {
+        BSONObjBuilder bob;
+        registry.reportForServerStatus(&bob);
+        return bob.obj()
+            .getObjectField("reshardingOperationsRegistry")
+            .getField("currentOperations")
+            .numberLong();
+    };
+
+    // Two distinct namespaces are tracked; multiple roles on the same operation count once.
+    ASSERT_EQ(currentOperations(), 2);
+
+    // Removing one of meta1's two roles leaves the operation tracked, so the gauge is unchanged.
+    registry.unregisterOperation(Role::kCoordinator, meta1);
+    ASSERT_EQ(currentOperations(), 2);
+    // Removing meta1's last role drops the operation.
+    registry.unregisterOperation(Role::kDonor, meta1);
+    ASSERT_EQ(currentOperations(), 1);
+
+    registry.unregisterOperation(Role::kDonor, meta2);
+    ASSERT_EQ(currentOperations(), 0);
+}
+
+TEST(LocalReshardingOperationsRegistryTest, ClearOperationsForRoleUpdatesCurrentOperations) {
+    LocalReshardingOperationsRegistry registry;
+    auto meta1 = makeMetadata(kNs1);
+    auto meta2 = makeMetadata(kNs2);
+
+    // kNs1 holds two roles; kNs2 holds only the donor role.
+    registry.registerOperation(Role::kCoordinator, meta1);
+    registry.registerOperation(Role::kDonor, meta1);
+    registry.registerOperation(Role::kDonor, meta2);
+
+    auto currentOperations = [&] {
+        BSONObjBuilder bob;
+        registry.reportForServerStatus(&bob);
+        return bob.obj()
+            .getObjectField("reshardingOperationsRegistry")
+            .getField("currentOperations")
+            .numberLong();
+    };
+
+    ASSERT_EQ(currentOperations(), 2);
+
+    // Clearing the donor role drops kNs2 entirely (its only role) but leaves kNs1 tracked because
+    // it still holds the coordinator role, so the gauge only decreases by one.
+    registry.clearOperationsForRole(Role::kDonor);
+    ASSERT_EQ(currentOperations(), 1);
+    auto op = registry.getOperation(kNs1);
+    ASSERT_TRUE(op);
+    ASSERT_EQ(op->roles.size(), 1u);
+    ASSERT_TRUE(op->roles.count(Role::kCoordinator));
+    ASSERT_FALSE(registry.getOperation(kNs2));
+
+    // Clearing the coordinator role removes kNs1's last role, so the gauge reaches zero.
+    registry.clearOperationsForRole(Role::kCoordinator);
+    ASSERT_EQ(currentOperations(), 0);
+    ASSERT_FALSE(registry.getOperation(kNs1));
+
+    // Clearing a role with nothing left to remove is a no-op.
+    registry.clearOperationsForRole(Role::kRecipient);
+    ASSERT_EQ(currentOperations(), 0);
 }
 
 TEST(LocalReshardingOperationsRegistryTest,

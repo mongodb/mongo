@@ -52,7 +52,10 @@ void ReshardingReplicaSetAwareService::onConsistentDataAvailable(OperationContex
                                                                  bool isMajority,
                                                                  bool isRollback) {
     if (resharding::gFeatureFlagReshardingRegistry.isEnabled()) {
-        LocalReshardingOperationsRegistry::get().resyncFromDisk(opCtx);
+        LocalReshardingOperationsRegistry::get().resyncFromDisk(
+            opCtx,
+            isRollback ? "replica set data became consistent after rollback"
+                       : "replica set data became consistent");
     }
 }
 

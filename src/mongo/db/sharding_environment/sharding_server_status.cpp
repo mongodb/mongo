@@ -43,6 +43,7 @@
 #include "mongo/db/router_role/routing_cache/routing_information_cache.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/range_deleter_service.h"
+#include "mongo/db/s/resharding/local_resharding_operations_registry.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -181,6 +182,7 @@ public:
         }
 
         reportDataTransformMetrics(opCtx, &result);
+        LocalReshardingOperationsRegistry::get().reportForServerStatus(&result);
 
         return result.obj();
     }
