@@ -30,6 +30,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -507,6 +508,22 @@ TEST_F(WiredTigerUtilTest, RemoveEncryptionFromConfigString) {
         WiredTigerUtil::removeEncryptionFromConfigString(&input);
         ASSERT_EQUALS(input, expectedOutput);
     }
+}
+
+TEST_F(WiredTigerUtilTest, CheckTableCreationOptionsRejectsTopLevelImport) {
+    auto obj = BSON(WiredTigerUtil::kConfigStringField
+                    << "import=(enabled=true,metadata_file=WiredTiger)");
+    auto status = WiredTigerUtil::checkTableCreationOptions(obj.firstElement());
+    ASSERT_EQUALS(status.code(), ErrorCodes::IllegalOperation);
+}
+
+TEST_F(WiredTigerUtilTest, CheckTableCreationOptionsAllowsImportSubstringInNestedValue) {
+    // "import=" appearing inside a nested value (e.g. app_metadata) is not a top-level 'import'
+    // option and must not be rejected.
+    auto obj =
+        BSON(WiredTigerUtil::kConfigStringField << "app_metadata=(note=\"import=(enabled=true)\")");
+    auto status = WiredTigerUtil::checkTableCreationOptions(obj.firstElement());
+    ASSERT_OK(status);
 }
 
 TEST_F(WiredTigerUtilTest, GetSanitizedStorageOptionsForSecondaryReplication) {

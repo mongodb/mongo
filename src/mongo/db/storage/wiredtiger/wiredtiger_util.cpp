@@ -71,6 +71,19 @@ const std::string kTableExtension = ".wt";
 const std::string kWiredTigerBackupFile = "WiredTiger.backup";
 const static StaticImmortal<pcre::Regex> encryptionOptsRegex(R"re(encryption=\([^\)]*\),?)re");
 
+bool configHasImportOption(const std::string& config) {
+    WT_CONFIG_PARSER* parser = nullptr;
+    if (wiredtiger_config_parser_open(nullptr, config.data(), config.size(), &parser) != 0) {
+        // Falls back to a conservative substring scan if the config string cannot be parsed at all
+        return config.find("import=") != std::string::npos;
+    }
+    WT_CONFIG_ITEM value;
+    // doing it through parser->get() we ensure import is a exact top-level key and not a substring
+    int ret = parser->get(parser, "import", &value);
+    parser->close(parser);
+    return ret == 0;
+}
+
 StatusWith<std::string> _getMetadata(WT_CURSOR* cursor, std::string_view uri) {
     std::string strUri = std::string{uri};
     cursor->set_key(cursor, strUri.c_str());
@@ -328,6 +341,12 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
 
     if (config.find("type=lsm") != std::string::npos) {
         return {ErrorCodes::Error(6627201), "Configuration 'type=lsm' is not supported."};
+    }
+
+    if (configHasImportOption(config)) {
+        return {ErrorCodes::IllegalOperation,
+                "Manual configuration of the 'import' option as part of 'configString' is not "
+                "supported."};
     }
 
     if (gFeatureFlagBanEncryptionOptionsInCollectionCreation
