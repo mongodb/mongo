@@ -232,6 +232,30 @@ private:
     UUID _UUIDForKey(RecordId key) const;
 
     /**
+     * Decides how to start the fast count system when there is no persisted checkpoint timestamp
+     * ('cold start'). Returns `{skipScan, startFrom}`:
+     *
+     * When the lag between the oldest entry in the oplog and the stable recovery timestamp is
+     * within `replicatedFastCountMaxOplogScanLagSecs`, returns `{false, Timestamp::min()}` to
+     * signal that we should catch up by scanning from the beginning of the oplog.
+     *
+     * Otherwise, returns `{true, ...}` to signal that we should skip the catch-up scan.
+     *
+     * 'returnTimestampToSeekFromIfSkippingScan' controls whether this function should return a
+     * timestamp to seek from when we have too much oplog to scan. If true, it will return the
+     * timestamp returned by seeking the stable recovery timestamp. If there is no
+     * last applied optime, returns Timestamp::min() - indicating that we are assuming there is no
+     * oplog to scan and it should be fine to scan from the beginning.
+     *
+     * If 'returnTimestampToSeekFromIfSkippingScan' is false and `skipScan` is true, returns
+     * boost::none for the timestamp.
+     *
+     * TODO SERVER-130675: Remove this function and its usages once we never skip the oplog scan.
+     */
+    std::pair<bool, boost::optional<Timestamp>> _computeColdStartTimestamp(
+        OperationContext* opCtx, bool returnTimestampToSeekFromIfSkippingScan);
+
+    /**
      * Used to force synchronous writes in tests.
      */
     bool _isUnderTest = false;

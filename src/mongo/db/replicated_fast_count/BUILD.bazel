@@ -60,10 +60,16 @@ mongo_cc_library(
     ],
 )
 
+idl_generator(
+    name = "replicated_fast_count_max_oplog_scan_lag_secs_gen",
+    src = "replicated_fast_count_max_oplog_scan_lag_secs.idl",
+)
+
 mongo_cc_library(
     name = "replicated_fast_count_manager",
     srcs = [
         "replicated_fast_count_manager.cpp",
+        ":replicated_fast_count_max_oplog_scan_lag_secs_gen",
     ],
     deps = [
         "replicated_fast_count_advance_checkpoint",
@@ -75,6 +81,7 @@ mongo_cc_library(
         "size_count_store",
         "size_count_timestamp_store",
         "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/shard_role",
