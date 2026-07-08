@@ -3360,10 +3360,18 @@ config_setting(
 # ==========
 
 selects.config_setting_group(
+    name = "al2023_any",
+    match_any = [
+        "//bazel/platforms:amazon_linux_2023",
+        "//bazel/platforms:amazon_linux_2023_3",
+    ],
+)
+
+selects.config_setting_group(
     name = "al2023_x86_64",
     match_all = [
         "@platforms//os:linux",
-        "//bazel/platforms:amazon_linux_2023",
+        ":al2023_any",
         "@platforms//cpu:x86_64",
     ],
 )
@@ -3372,7 +3380,7 @@ selects.config_setting_group(
     name = "al2023_aarch64",
     match_all = [
         "@platforms//os:linux",
-        "//bazel/platforms:amazon_linux_2023",
+        ":al2023_any",
         "@platforms//cpu:aarch64",
     ],
 )
