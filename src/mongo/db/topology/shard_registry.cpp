@@ -456,6 +456,19 @@ std::shared_ptr<Shard> ShardRegistry::getConfigShard() const {
 StatusWith<std::shared_ptr<Shard>> ShardRegistry::getShard(OperationContext* opCtx,
                                                            const ShardRef& shardRef,
                                                            bool allowNonShardIdIdentifiers) {
+    // In config-only mode the catalog refresh that backs '_getData' is intentionally blocked
+    // (ShardingCatalogClient::getAllShards). The config server is tracked separately in
+    // '_configShardData', so resolve it directly without triggering a refresh. This allows reads on
+    // the fixed 'admin.*'/'config.*' namespaces to be forwarded to the config server. Lookups for
+    // any other (data) shard still fall through below and fail, since data shards are not
+    // reachable.
+    if (MONGO_unlikely(serverGlobalParams.configOnly)) {
+        std::lock_guard lk(_mutex);
+        if (auto shard = _configShardData.findShard(shardRef, allowNonShardIdIdentifiers)) {
+            return shard;
+        }
+    }
+
     // First check if this is a non config shard lookup.
     // This call may be blocking if there is an ongoing or a needed cache rebuild.
     if (auto shard = _getData(opCtx)->findShard(shardRef, allowNonShardIdIdentifiers)) {
@@ -481,6 +494,16 @@ StatusWith<std::shared_ptr<Shard>> ShardRegistry::getShard(OperationContext* opC
 
 SemiFuture<std::shared_ptr<Shard>> ShardRegistry::getShard(
     ExecutorPtr executor, const ShardRef& shardRef, bool allowNonShardIdIdentifiers) noexcept {
+    // See the comment in the synchronous getShard() overload: in config-only mode the config server
+    // is resolved directly from '_configShardData' to avoid the (blocked) catalog refresh, so that
+    // reads on the fixed 'admin.*'/'config.*' namespaces can be forwarded to the config server.
+    if (MONGO_unlikely(serverGlobalParams.configOnly)) {
+        std::lock_guard lk(_mutex);
+        if (auto shard = _configShardData.findShard(shardRef, allowNonShardIdIdentifiers)) {
+            return SemiFuture<std::shared_ptr<Shard>>::makeReady(std::move(shard));
+        }
+    }
+
     // Fetch the shard registry data associated to the latest known topology time
     return _getDataAsync()
         .thenRunOn(executor)
