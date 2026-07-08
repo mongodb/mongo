@@ -105,7 +105,7 @@ MONGO_FAIL_POINT_DEFINE(commitMovePrimaryFailsAfterDurableChange);
 DatabaseType ShardingCatalogManager::createDatabase(
     OperationContext* opCtx,
     const DatabaseName& dbName,
-    const boost::optional<ShardRef>& optResolvedPrimaryShard,
+    const boost::optional<ShardId>& optResolvedPrimaryShard,
     const SerializationContext& serializationContext) {
     // Make sure to force update of any stale metadata
     ON_BLOCK_EXIT([&] { RoutingInformationCache::get(opCtx)->purgeDatabase(dbName); });

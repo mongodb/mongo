@@ -73,27 +73,24 @@ boost::optional<DatabaseType> checkDbNameConstraints(const DatabaseName& dbName)
     return boost::none;
 }
 
-boost::optional<ShardRef> resolvePrimaryShard(OperationContext* opCtx,
-                                              const boost::optional<ShardId>& optPrimaryShard) {
+boost::optional<ShardId> resolvePrimaryShard(OperationContext* opCtx,
+                                             const boost::optional<ShardId>& optPrimaryShard) {
     if (optPrimaryShard) {
         uassert(ErrorCodes::BadValue,
                 str::stream() << "invalid shard name: " << *optPrimaryShard,
                 optPrimaryShard->isValid());
-        return ShardRef{uassertStatusOK(Grid::get(opCtx)->shardRegistry()->resolveShardId(
-            opCtx, *optPrimaryShard, true /* allowNonShardIdIdentifiers */))};
+        return uassertStatusOK(Grid::get(opCtx)->shardRegistry()->resolveShardId(
+            opCtx, *optPrimaryShard, true /* allowNonShardIdIdentifiers */));
     }
     return boost::none;
 }
 
 BSONObj constructDbMatchFilterExact(std::string_view dbNameStr,
-                                    const boost::optional<ShardRef>& optResolvedPrimaryShard) {
+                                    const boost::optional<ShardId>& optResolvedPrimaryShard) {
     BSONObjBuilder filterBuilder;
     filterBuilder.append(DatabaseType::kDbNameFieldName, dbNameStr);
     if (optResolvedPrimaryShard) {
-        // TODO SERVER-128701: Apply an OR between UUID and ShardID and make sure to return only
-        // one.
-        filterBuilder.append(DatabaseType::kPrimaryFieldName,
-                             optResolvedPrimaryShard->getShardId());
+        filterBuilder.append(DatabaseType::kPrimaryFieldName, *optResolvedPrimaryShard);
     }
     return filterBuilder.obj();
 }
@@ -101,7 +98,7 @@ BSONObj constructDbMatchFilterExact(std::string_view dbNameStr,
 boost::optional<DatabaseType> findDatabaseExactMatch(
     OperationContext* opCtx,
     std::string_view dbNameStr,
-    const boost::optional<ShardRef>& optResolvedPrimaryShard) {
+    const boost::optional<ShardId>& optResolvedPrimaryShard) {
     const auto dbMatchFilterExact = constructDbMatchFilterExact(dbNameStr, optResolvedPrimaryShard);
 
     DBDirectClient client(opCtx);
@@ -123,7 +120,7 @@ BSONObj constructDbMatchFilterCaseInsensitive(std::string_view dbNameStr) {
 
 void checkAgainstExistingDbDoc(const DatabaseType& existingDb,
                                const DatabaseName& dbName,
-                               const boost::optional<ShardRef>& optResolvedPrimaryShard) {
+                               const boost::optional<ShardId>& optResolvedPrimaryShard) {
     uassert(ErrorCodes::DatabaseDifferCase,
             str::stream() << "can't have 2 databases that just differ on case "
                           << " have: " << existingDb.getDbName().toStringForErrorMsg()
@@ -133,14 +130,13 @@ void checkAgainstExistingDbDoc(const DatabaseType& existingDb,
     uassert(ErrorCodes::NamespaceExists,
             str::stream() << "database already created on a primary which is different from "
                           << optResolvedPrimaryShard,
-            !optResolvedPrimaryShard ||
-                optResolvedPrimaryShard->getShardId() == existingDb.getPrimary());
+            !optResolvedPrimaryShard || *optResolvedPrimaryShard == existingDb.getPrimary());
 }
 
 boost::optional<DatabaseType> checkForExistingDatabaseWithDifferentOptions(
     OperationContext* opCtx,
     const DatabaseName& dbName,
-    const boost::optional<ShardRef>& optResolvedPrimaryShard) {
+    const boost::optional<ShardId>& optResolvedPrimaryShard) {
     DBDirectClient client(opCtx);
     auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
     const auto dbNameStr =
@@ -178,10 +174,9 @@ bool checkIfDropPendingDB(OperationContext* opCtx, const DatabaseName& dbName) {
         .isEmpty();
 }
 
-// TODO SERVER-128701: Return ShardRef when ready
 ShardId getCandidatePrimaryShard(OperationContext* opCtx,
-                                 const boost::optional<ShardRef>& optResolvedPrimaryShard) {
-    return optResolvedPrimaryShard ? optResolvedPrimaryShard->getShardId()
+                                 const boost::optional<ShardId>& optResolvedPrimaryShard) {
+    return optResolvedPrimaryShard ? *optResolvedPrimaryShard
                                    : sharding_util::selectLeastLoadedNonDrainingShard(opCtx);
 }
 

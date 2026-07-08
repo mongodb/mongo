@@ -533,7 +533,7 @@ public:
      */
     DatabaseType createDatabase(OperationContext* opCtx,
                                 const DatabaseName& dbName,
-                                const boost::optional<ShardRef>& optResolvedPrimaryShard,
+                                const boost::optional<ShardId>& optResolvedPrimaryShard,
                                 const SerializationContext& serializationContext);
 
     /*

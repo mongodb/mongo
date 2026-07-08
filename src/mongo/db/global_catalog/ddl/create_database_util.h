@@ -55,11 +55,11 @@ boost::optional<DatabaseType> checkDbNameConstraints(const DatabaseName& dbName)
  * Resolves the shard against the received parameter which may encode either a shard ID or a
  * connection string.
  */
-boost::optional<ShardRef> resolvePrimaryShard(OperationContext* opCtx,
-                                              const boost::optional<ShardId>& optPrimaryShard);
+boost::optional<ShardId> resolvePrimaryShard(OperationContext* opCtx,
+                                             const boost::optional<ShardId>& optPrimaryShard);
 
 BSONObj constructDbMatchFilterExact(std::string_view dbNameStr,
-                                    const boost::optional<ShardRef>& optResolvedPrimaryShard);
+                                    const boost::optional<ShardId>& optResolvedPrimaryShard);
 
 /**
  * Returns the database with the requested name and primary shard fields if existed.
@@ -67,14 +67,14 @@ BSONObj constructDbMatchFilterExact(std::string_view dbNameStr,
 boost::optional<DatabaseType> findDatabaseExactMatch(
     OperationContext* opCtx,
     std::string_view dbNameStr,
-    const boost::optional<ShardRef>& optResolvedPrimaryShard);
+    const boost::optional<ShardId>& optResolvedPrimaryShard);
 
 
 BSONObj constructDbMatchFilterCaseInsensitive(std::string_view dbNameStr);
 
 void checkAgainstExistingDbDoc(const DatabaseType& existingDb,
                                const DatabaseName& dbName,
-                               const boost::optional<ShardRef>& optResolvedPrimaryShard);
+                               const boost::optional<ShardId>& optResolvedPrimaryShard);
 
 /**
  * Checks for existing database that only differs in case or has a conflicting primary shard
@@ -84,7 +84,7 @@ void checkAgainstExistingDbDoc(const DatabaseType& existingDb,
 boost::optional<DatabaseType> checkForExistingDatabaseWithDifferentOptions(
     OperationContext* opCtx,
     const DatabaseName& dbName,
-    const boost::optional<ShardRef>& optResolvedPrimaryShard);
+    const boost::optional<ShardId>& optResolvedPrimaryShard);
 
 /**
  * Checks if there is a document with {_id: dbName} in 'config.dropPendingDBs' collection, which is
@@ -97,7 +97,7 @@ bool checkIfDropPendingDB(OperationContext* opCtx, const DatabaseName& dbName);
  * non-draining shard.
  */
 ShardId getCandidatePrimaryShard(OperationContext* opCtx,
-                                 const boost::optional<ShardRef>& optResolvedPrimaryShard);
+                                 const boost::optional<ShardId>& optResolvedPrimaryShard);
 
 void refreshDbVersionOnPrimaryShard(OperationContext* opCtx,
                                     const std::string& dbNameStr,
