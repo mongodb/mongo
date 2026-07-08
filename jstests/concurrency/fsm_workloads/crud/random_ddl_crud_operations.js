@@ -74,6 +74,32 @@ export const $config = (function () {
             this.collName = threadCollectionName(collName, this.tid);
         },
 
+        createUnsplittable: function (db, collName, connCache) {
+            let tid = this.tid;
+            // Pick a tid at random until we pick one that doesn't target this thread's collection.
+            while (tid === this.tid) tid = Random.randInt(this.threadCount);
+
+            const targetThreadColl = threadCollectionName(collName, tid);
+            jsTest.log.info("createUnsplittable state", {
+                tid,
+                currentTid: this.tid,
+                collection: targetThreadColl,
+            });
+            assert.commandWorkedOrFailedWithCode(
+                db.runCommand({
+                    createUnsplittableCollection: targetThreadColl,
+                }),
+                [
+                    ErrorCodes.ConflictingOperationInProgress,
+                    ErrorCodes.AlreadyInitialized,
+                    ErrorCodes.InvalidOptions,
+                    ErrorCodes.NamespaceExists,
+                    ErrorCodes.CannotCreateCollection,
+                ],
+            );
+
+            jsTest.log.info("createUnsplittable finished");
+        },
         create: function (db, collName, connCache) {
             let tid = this.tid;
             // Pick a tid at random until we pick one that doesn't target this thread's collection.
@@ -89,17 +115,6 @@ export const $config = (function () {
                     this.tid +
                     " collection:" +
                     targetThreadColl,
-            );
-            // Add necessary indexes for resharding.
-            assert.commandWorked(
-                db.adminCommand({
-                    createIndexes: targetThreadColl,
-                    indexes: [
-                        {key: {[`tid_${tid}_0`]: 1}, name: `tid_${tid}_0_1`, unique: false},
-                        {key: {[`tid_${tid}_1`]: 1}, name: `tid_${tid}_1_1`, unique: false},
-                    ],
-                    writeConcern: {w: "majority"},
-                }),
             );
             try {
                 assert.commandWorked(
@@ -280,6 +295,24 @@ export const $config = (function () {
             );
             const inconsistencies = db[targetThreadColl].checkMetadataConsistency().toArray();
             assert.eq(0, inconsistencies.length, tojson(inconsistencies));
+        },
+        unshardCollection: function unshardCollection(db, collName, connCache) {
+            let tid = this.tid;
+            while (tid === this.tid) tid = Random.randInt(this.threadCount);
+
+            const targetThreadColl = threadCollectionName(collName, tid);
+            const namespace = `${db}.${targetThreadColl}`;
+            jsTest.log.info(`Started to unshard collection ${namespace}`);
+            assert.commandWorkedOrFailedWithCode(db.adminCommand({unshardCollection: namespace}), [
+                // Handles the case where the collection/db does not exist
+                ErrorCodes.NamespaceNotFound,
+                // Handles the case where another resharding operation is in progress
+                ErrorCodes.ConflictingOperationInProgress,
+                ErrorCodes.ReshardCollectionInProgress,
+                // Handles the case where the collection is already unsharded
+                ErrorCodes.NamespaceNotSharded,
+            ]);
+            jsTest.log.info(`Unsharding completed ${namespace}`);
         },
         untrackUnshardedCollection: function untrackUnshardedCollection(db, collName, connCache) {
             let tid = this.tid;

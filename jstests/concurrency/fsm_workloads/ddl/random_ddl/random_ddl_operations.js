@@ -6,6 +6,7 @@
  *  ]
  */
 
+import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {ShardingTopologyHelpers} from "jstests/concurrency/fsm_workload_helpers/catalog_and_routing/sharding_topology_helpers.js";
 import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
 
@@ -49,6 +50,32 @@ export const $config = (function () {
             assert.commandWorked(
                 db.adminCommand({shardCollection: fullNs, key: {_id: 1}, unique: false}),
             );
+        },
+        createUnsplittable: function (db, collName, connCache) {
+            db = this.getRandomDb(db);
+            const coll = this.getRandomCollection(db);
+            const fullNs = coll.getFullName();
+            jsTest.log.info("Executing createUnsplittable state: " + fullNs);
+
+            const res = assert.commandWorkedOrFailedWithCode(
+                db.runCommand({
+                    createUnsplittableCollection: coll.getName(),
+                }),
+                [
+                    ErrorCodes.MovePrimaryInProgress,
+                    ErrorCodes.ConflictingOperationInProgress,
+                    ErrorCodes.AlreadyInitialized,
+                    ErrorCodes.InvalidOptions,
+                    ErrorCodes.NamespaceExists,
+                ],
+            );
+            if (!res.ok) {
+                // If we're running with transactions and an acceptable error occurred then the transaction will
+                // fail due to an implicit abort. If the returned error is sticky then that would cause the
+                // operation to be retried indefinitely. To prevent this we force this command to be executed
+                // again outside of the transaction where it will see the acceptable error and succeed.
+                fsm.forceRunningOutsideTransaction(this);
+            }
         },
         drop: function (db, collName, connCache) {
             db = this.getRandomDb(db);
@@ -107,6 +134,27 @@ export const $config = (function () {
             );
             const inconsistencies = coll.checkMetadataConsistency().toArray();
             assert.eq(0, inconsistencies.length, tojson(inconsistencies));
+        },
+        unshardCollection: function (db, collName, connCache) {
+            db = this.getRandomDb(db);
+            const coll = this.getRandomCollection(db);
+            const namespace = coll.getFullName();
+            jsTest.log.info(`Started to unshard collection ${namespace}`);
+            assert.commandWorkedOrFailedWithCode(db.adminCommand({unshardCollection: namespace}), [
+                // Handles the case where the collection/db does not exist
+                ErrorCodes.NamespaceNotFound,
+                // Handles the case where another resharding operation is in progress
+                ErrorCodes.ConflictingOperationInProgress,
+                ErrorCodes.ReshardCollectionInProgress,
+                // The command is sent while a FCV transition is in progress
+                ErrorCodes.CommandNotSupported,
+                ErrorCodes.ReshardCollectionAborted,
+                // The command is sent while a node is undergoing initial sync
+                ErrorCodes.SnapshotTooOld,
+                // Handles the case where the collection is already unsharded
+                ErrorCodes.NamespaceNotSharded,
+            ]);
+            jsTest.log.info(`Unsharding completed ${namespace}`);
         },
         untrackUnshardedCollection: function untrackUnshardedCollection(db, collName, connCache) {
             // SERVER-111231 Remove early exit when untrackUnshardedCollection is re-enabled.
