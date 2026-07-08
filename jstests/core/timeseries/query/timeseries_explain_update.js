@@ -222,7 +222,7 @@ function testUpdateExplain({
 })();
 
 // Skip upsert tests in sharding as the query has to be on the shard key field.
-if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
+if (!db.getMongo().isMongos()) {
     (function testUpsert() {
         testUpdateExplain({
             singleUpdateOp: {

@@ -32,7 +32,7 @@ assert.commandWorked(db.runCommand({drop: longCollName}));
 assert.commandWorked(db.createCollection(longCollName));
 
 // The collection name for internal db collections is longer then 255 but still capped to 512.
-if (!FixtureHelpers.isMongos(db) && !TestData.testingReplicaSetEndpoint) {
+if (!FixtureHelpers.isMongos(db)) {
     const internalLongCollName = "a".repeat(500);
     assert.commandWorked(db.runCommand({drop: internalLongCollName}));
     assert.commandWorked(db.getSiblingDB("config").runCommand({drop: internalLongCollName}));

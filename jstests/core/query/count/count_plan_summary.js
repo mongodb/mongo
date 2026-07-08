@@ -53,14 +53,7 @@ try {
                 {$currentOp: {}},
                 {
                     $match: {
-                        $and: [
-                            {"command.count": t.getName()},
-                            // On the replica set endpoint, currentOp reports both router and
-                            // shard operations. So filter out one of them.
-                            TestData.testingReplicaSetEndpoint
-                                ? {role: "ClusterRole{shard}"}
-                                : {role: {$exists: false}},
-                        ],
+                        $and: [{"command.count": t.getName()}, {role: {$exists: false}}],
                     },
                 },
                 {$limit: 1},

@@ -131,10 +131,7 @@ export const workerThread = (function () {
                 let connectionDesc = "";
                 // In sharded environments, mongos is acting as a proxy for the mongo shell and
                 // therefore has a different outbound port than the 'whatsmyuri' command returns.
-                if (
-                    !Cluster.isSharded(args.clusterOptions) &&
-                    !TestData.testingReplicaSetEndpoint
-                ) {
+                if (!Cluster.isSharded(args.clusterOptions)) {
                     let res = assert.commandWorked(myDB.runCommand({whatsmyuri: 1}));
                     const myUri = res.you;
 

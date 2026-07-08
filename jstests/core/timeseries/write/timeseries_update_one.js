@@ -256,7 +256,7 @@ if (
 
     // Update timeField, metaField and add a new field.
     // Skip tests changing the shard key value in sharding.
-    if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
+    if (!db.getMongo().isMongos()) {
         (function testPipelineUpdateSetMultipleFields() {
             testUpdateOne({
                 initialDocList: [doc_2023_m1_a1],
@@ -306,7 +306,7 @@ if (
     const doc_t2022_m2_noId_a2 = {[timeFieldName]: timestamp2022, [metaFieldName]: 2, a: 2};
 
     // Skip tests changing the shard key value in sharding.
-    if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
+    if (!db.getMongo().isMongos()) {
         // Full measurement replacement: update every field in the document, including the _id.
         (function testReplacementUpdateChangeId() {
             testUpdateOne({

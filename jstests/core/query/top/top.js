@@ -35,13 +35,7 @@ let testColl = testDB[collName];
 testColl.drop();
 
 // Perform an operation on the collection so that it is present in the "top" command's output.
-// TODO (SERVER-84307): find command against non-existent collection on sharded cluster doesn't show
-// up in response to top command but the same command on replica set does.
-if (TestData.testingReplicaSetEndpoint) {
-    assert.commandWorked(testDB.createCollection(collName));
-} else {
-    assert.eq(testColl.find({}).itcount(), 0);
-}
+assert.eq(testColl.find({}).itcount(), 0);
 
 //  This variable is used to get differential output
 let lastTop = getTop(testColl);

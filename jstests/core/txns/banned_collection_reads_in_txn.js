@@ -37,9 +37,8 @@ if (PersistenceProviderUtil.allNodesHavePropertyWithValue(db, "supportsLocalColl
         ErrorCodes.NoSuchTransaction,
     );
 }
-// The following tests a {find: uuid} command which is not supported on mongos or with replica set
-// endpoints.
-if (FixtureHelpers.isMongos(testDB) || TestData.testingReplicaSetEndpoint) {
+// The following tests a {find: uuid} command which is not supported on mongos.
+if (FixtureHelpers.isMongos(testDB)) {
     quit();
 }
 

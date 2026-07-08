@@ -41,7 +41,7 @@ testColl.drop();
 
 // Running a $collStats aggregation on a non-existent database will error on mongos but return
 // bassic information on monogod.
-if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
+if (FixtureHelpers.isMongos(db)) {
     assert.commandWorked(testDB.createCollection(collName));
 }
 

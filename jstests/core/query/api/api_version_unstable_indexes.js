@@ -33,7 +33,7 @@ assert.commandWorked(coll.createIndex({subject: "text"}));
 assert.commandWorked(coll.createIndex({"views": 1}, {sparse: true}));
 
 // The "text" index, "subject_text", can be used normally.
-if (!FixtureHelpers.isMongos(testDb) && !TestData.testingReplicaSetEndpoint) {
+if (!FixtureHelpers.isMongos(testDb)) {
     const explainRes = assert.commandWorked(
         testDb.runCommand({explain: {"find": collName, "filter": {$text: {$search: "coffee"}}}}),
     );
@@ -62,7 +62,7 @@ assert.commandFailedWithCode(
     ErrorCodes.BadValue,
 );
 
-if (!FixtureHelpers.isMongos(testDb) && !TestData.testingReplicaSetEndpoint) {
+if (!FixtureHelpers.isMongos(testDb)) {
     const explainRes = assert.commandWorked(
         testDb.runCommand({explain: {"find": collName, "filter": {views: 50}, "hint": {views: 1}}}),
     );

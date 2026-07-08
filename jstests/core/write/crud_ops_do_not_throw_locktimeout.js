@@ -108,20 +108,6 @@ assert.commandFailedWithCode(
     ErrorCodes.MaxTimeMSExpired,
 );
 
-if (TestData.testingReplicaSetEndpoint) {
-    // When using the replica set endpoint, each CRUD command above would fail MaxTimeMSExpired when
-    // the router command has timed out, but it is possible that the shard command has not. If it
-    // has not timed out, disabling the failpoint (below) would allow the command to execute and
-    // cause the test to fail the assertion that none of the writes happened.
-    assert.soon(() => {
-        const docs = db
-            .getSiblingDB("admin")
-            .aggregate([{$currentOp: {}}, {$match: {"command.comment": comment}}])
-            .toArray();
-        return docs.length == 0;
-    });
-}
-
 jsTestLog("Waiting for threads to join");
 assert.commandWorked(db.adminCommand({configureFailPoint: failpoint, mode: "off"}));
 awaitBlockingDDL();

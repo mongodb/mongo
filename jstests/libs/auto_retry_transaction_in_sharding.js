@@ -34,7 +34,7 @@ export var {
      * unnecessary
      */
     function withTxnAndAutoRetryOnMongos(session, func, txnOptions) {
-        if (session.getClient().isMongos() || TestData.testingReplicaSetEndpoint) {
+        if (session.getClient().isMongos()) {
             withTxnAndAutoRetry(session, func, {txnOptions});
         } else {
             session.startTransaction(txnOptions);
@@ -130,7 +130,7 @@ export var {
      * transient error doesn't continually occur.
      */
     function retryOnceOnTransientOnMongos(session, func) {
-        if (session.getClient().isMongos() || TestData.testingReplicaSetEndpoint) {
+        if (session.getClient().isMongos()) {
             try {
                 func();
             } catch (e) {

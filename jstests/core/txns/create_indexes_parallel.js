@@ -121,7 +121,7 @@ let doParallelCreateIndexesTest = function (explicitCollectionCreate, multikeyIn
         assert.eq(secondSessionColl.find({}).itcount(), 1);
         assert.eq(secondSessionColl.getIndexes().length, 2);
 
-        if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
+        if (FixtureHelpers.isMongos(db)) {
             // createIndexes takes minimum visible snapshots of new collections into consideration
             // when checking for existing indexes.
             assert.commandFailedWithCode(

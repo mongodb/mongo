@@ -32,7 +32,7 @@ assert.eq(
         .cursor.id,
 );
 
-if (FixtureHelpers.isMongos(testDB) || TestData.testingReplicaSetEndpoint) {
+if (FixtureHelpers.isMongos(testDB)) {
     // In sharded cluster, if the database exists, the mongos will let you establish a cursor with
     // batch size 0 and return to you before it realizes the shard's cursor is exhausted. The next
     // getMore should return a 0 cursor id though.

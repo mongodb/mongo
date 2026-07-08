@@ -25,7 +25,7 @@ const sessionOptions = {
 const session = db.getMongo().startSession(sessionOptions);
 const sessionDb = session.getDatabase(dbName);
 
-const runningOnMongos = session.getClient().isMongos() || TestData.testingReplicaSetEndpoint;
+const runningOnMongos = session.getClient().isMongos();
 
 assert.commandWorked(testDB.createCollection(testColl.getName(), {writeConcern: {w: "majority"}}));
 assert.commandWorked(

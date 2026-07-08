@@ -31,13 +31,6 @@ export const $config = (function () {
                 ErrorCodes.IndexBuildAborted,
                 ErrorCodes.NoMatchingDocument,
             ];
-            if (TestData.testingReplicaSetEndpoint) {
-                expectedErrorCodes.push(ErrorCodes.NamespaceNotFound);
-                // These sharding error codes can bubble up if we exhaust all retries.
-                expectedErrorCodes.push(ErrorCodes.CannotImplicitlyCreateCollection);
-                expectedErrorCodes.push(ErrorCodes.StaleDbVersion);
-                expectedErrorCodes.push(ErrorCodes.StaleConfig);
-            }
             assert.commandWorkedOrFailedWithCode(coll.createIndex({a: 1}), expectedErrorCodes);
             assert.commandWorkedOrFailedWithCode(coll.createIndex({b: 1}), expectedErrorCodes);
         } catch (ex) {

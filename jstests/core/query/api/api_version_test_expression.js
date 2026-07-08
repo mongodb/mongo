@@ -29,10 +29,7 @@ collForeign.drop();
 // TODO SERVER-92954 remove this helper function after validation of validator during creation of
 // tracked collection is fixed
 function useShardingCoordinatorForCreate() {
-    return (
-        (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) &&
-        TestData.implicitlyTrackUnshardedCollectionOnCreation
-    );
+    return FixtureHelpers.isMongos(db) && TestData.implicitlyTrackUnshardedCollectionOnCreation;
 }
 
 for (let i = 0; i < 5; i++) {

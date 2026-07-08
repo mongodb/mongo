@@ -144,7 +144,7 @@ testSuccessOnTxnCommit(dbName, dropDatabaseCmd, {
         // once the conflicting transaction gets committed.
         // This behavior can cause unexpected failures when running subsequent commands: to remove
         // them, we restore the initial state through a specular request.
-        if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
+        if (FixtureHelpers.isMongos(db)) {
             assert.commandWorkedOrFailedWithCode(
                 testDB.adminCommand({
                     renameCollection: originalTo,

@@ -19,7 +19,7 @@ mydb.createCollection("foo", {writeConcern: {w: "majority"}});
 let session = db.getMongo().startSession();
 let sessionDb = session.getDatabase(dbName);
 
-if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
+if (FixtureHelpers.isMongos(db)) {
     // Before starting the transaction below, access the collection so it can be implicitly
     // sharded and force all shards to refresh their database versions because the refresh
     // requires an exclusive lock and would block behind the transaction.

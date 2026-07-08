@@ -291,7 +291,7 @@ function modifyObjectAtPath(orig, path) {
 
 // TODO(SERVER-18047): Remove database creation once explain behavior is unified between replica
 // sets and sharded clusters for non-existent dbs.
-if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
+if (FixtureHelpers.isMongos(db)) {
     // Create database
     assert.commandWorked(db.adminCommand({"enableSharding": db.getName()}));
 }

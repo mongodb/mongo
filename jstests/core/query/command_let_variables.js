@@ -142,7 +142,7 @@ if (!isMongos) {
     }
 }
 
-if (!isMongos && !TestData.testingReplicaSetEndpoint) {
+if (!isMongos) {
     // Test that if runtimeConstants and let are both specified, both will coexist.
     // Runtime constants are not allowed on mongos passthroughs.
     // Must set 'fromRouter: true' as otherwise 'runtimeConstants' is disallowed on mongod.

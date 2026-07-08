@@ -203,7 +203,7 @@ assert.commandFailedWithCode(
 
 // The command above was run with autocommit: true, and commit recovery on a router requires
 // "recoveryToken".
-if (!FixtureHelpers.isMongos(sessionDb) && !TestData.testingReplicaSetEndpoint) {
+if (!FixtureHelpers.isMongos(sessionDb)) {
     // Committing the transaction should fail.
     assert.commandFailedWithCode(
         sessionDb.adminCommand({

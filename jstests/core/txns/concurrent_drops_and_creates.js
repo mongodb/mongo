@@ -54,7 +54,7 @@ withAbortAndRetryOnTransientTxnError(session, () => {
     sessionOutsideTxn.advanceClusterTime(session.getClusterTime());
     assert.commandWorked(testDB2.runCommand({drop: collNameB, writeConcern: {w: "majority"}}));
 
-    if (!session.getClient().isMongos() && !TestData.testingReplicaSetEndpoint) {
+    if (!session.getClient().isMongos()) {
         // We can perform reads on the dropped collection as it existed when we started the
         // transaction.
         assert.commandWorked(sessionDB2.runCommand({find: sessionCollB.getName()}));

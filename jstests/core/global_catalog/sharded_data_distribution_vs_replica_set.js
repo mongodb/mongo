@@ -3,7 +3,7 @@
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
+if (FixtureHelpers.isMongos(db)) {
     // The functionalities of $shardedDataDistribution against router ports are covered in other
     // test files.
     quit();

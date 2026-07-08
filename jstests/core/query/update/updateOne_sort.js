@@ -22,7 +22,7 @@ const coll = db[jsTestName()];
 
 function verifyExplainContainsNoSort(explain, nWouldModify) {
     let stages = explain.executionStats.executionStages;
-    if (isMongos(db) || TestData.testingReplicaSetEndpoint) {
+    if (isMongos(db)) {
         stages = stages.shards[0].executionStages;
     }
     assert.eq("UPDATE", stages.stage);

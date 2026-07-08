@@ -22,11 +22,6 @@ export const $config = (function () {
         if (err.code) {
             return err.code;
         }
-        if (TestData.testingReplicaSetEndpoint && err.hasOwnProperty("writeErrors")) {
-            // The replica set endpoint uses embedded router, which can return transaction error
-            // as a write error.
-            return err.writeErrors[0].code;
-        }
         return null;
     }
 
@@ -50,15 +45,6 @@ export const $config = (function () {
                     ErrorCodes.NoSuchTransaction,
                     ErrorCodes.TransactionCommitted,
                 ];
-                if (TestData.testingReplicaSetEndpoint) {
-                    // The replica set endpoint uses embedded router, which yields sessions before
-                    // sending requests to shards. This allows for interleaving such that a
-                    // participant shard can end up claiming to be read-only for a transaction after
-                    // previously claiming to have done a write in that transaction. This causes the
-                    // transaction to be implicitly aborted.
-                    txnCompletedErrorCodes.push(51113);
-                }
-
                 if (
                     txnCompletedErrorCodes.includes(errorCode) ||
                     kSnapshotErrors.includes(errorCode)

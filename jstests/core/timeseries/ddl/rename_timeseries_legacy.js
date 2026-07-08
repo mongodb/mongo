@@ -36,7 +36,7 @@ function setupEnv() {
     db.getSiblingDB(otherDbName).dropDatabase();
 
     // TODO SERVER-89086 remove the following workaround once the underlying problem is fixed.
-    if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
+    if (FixtureHelpers.isMongos(db)) {
         // On sharded cluster rename throw NamespaceNotFound if the target database does not exists
         // yet. Thus we need to manually pre-create it.
         // Additionally rename only works across database with the same primary shard. Thus create

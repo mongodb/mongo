@@ -507,15 +507,7 @@ let viewsCommandTests = {
     getParameter: {skip: isUnrelated},
     getQueryableEncryptionCountInfo: {skip: isAnInternalCommand},
     getShardMap: {skip: isUnrelated},
-    getShardVersion: {
-        command: {getShardVersion: "test.view"},
-        // This command is only expected to fail with the errors below when it is run against
-        // a standalone replica set mongod.
-        expectFailure: !TestData.testingReplicaSetEndpoint,
-        expectedErrorCode: ErrorCodes.ShardingStateNotInitialized,
-        isAdminCommand: true,
-        skipSharded: true, // mongos is tested in views/views_sharded.js
-    },
+    getShardVersion: {skip: isUnrelated},
     getTrafficRecordingStatus: {skip: isUnrelated},
     getTransitionToDedicatedConfigServerStatus: {skip: isUnrelated},
     godinsert: {skip: isAnInternalCommand},
