@@ -45,7 +45,6 @@
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution_helpers.h"
 #include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 
 #include <algorithm>
@@ -1522,7 +1521,7 @@ std::unique_ptr<QuerySolutionNode> SortKeyGeneratorNode::clone() const {
 // SortNode
 //
 
-SortNode::SortNode(const SortNode& other) {
+SortNode::SortNode(const SortNode& other) : maxMemoryUsageBytes(other.maxMemoryUsageBytes) {
     other.cloneSortData(this);
 }
 
@@ -1555,10 +1554,6 @@ std::unique_ptr<QuerySolutionNode> SortNodeDefault::clone() const {
 
 std::unique_ptr<QuerySolutionNode> SortNodeSimple::clone() const {
     return std::make_unique<SortNodeSimple>(*this);
-}
-
-uint64_t SortNode::_loadMaxMemoryUsageBytes() {
-    return loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes);
 }
 
 //

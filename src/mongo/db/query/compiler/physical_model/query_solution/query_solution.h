@@ -1221,11 +1221,13 @@ struct SortNode : public QuerySolutionNodeWithSortSet {
     SortNode(std::unique_ptr<QuerySolutionNode> child,
              BSONObj pattern,
              size_t limit,
-             LimitSkipParameterization canBeParameterized)
+             LimitSkipParameterization canBeParameterized,
+             uint64_t maxMemoryUsageBytes)
         : QuerySolutionNodeWithSortSet(std::move(child)),
           pattern(std::move(pattern)),
           limit(limit),
-          canBeParameterized(canBeParameterized) {}
+          canBeParameterized(canBeParameterized),
+          maxMemoryUsageBytes(maxMemoryUsageBytes) {}
     SortNode(const SortNode& other);
 
     ~SortNode() override {}
@@ -1261,16 +1263,15 @@ struct SortNode : public QuerySolutionNodeWithSortSet {
 
     // The maximum number of bytes of memory we're willing to use during execution of the sort. If
     // this limit is exceeded and we're not allowed to spill to disk, the query will fail at
-    // execution time. Otherwise, the data will be spilled to disk.
-    const uint64_t maxMemoryUsageBytes = _loadMaxMemoryUsageBytes();
+    // execution time. Otherwise, the data will be spilled to disk. Sourced from the per-operation
+    // QueryKnobConfiguration at construction time.
+    const uint64_t maxMemoryUsageBytes;
 
 protected:
     void cloneSortData(SortNode* copy) const;
 
 private:
     virtual std::string_view sortImplementationTypeToString() const = 0;
-
-    static uint64_t _loadMaxMemoryUsageBytes();
 };
 
 /**

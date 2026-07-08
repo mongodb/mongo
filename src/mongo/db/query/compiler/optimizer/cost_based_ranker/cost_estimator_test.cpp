@@ -228,19 +228,28 @@ std::unique_ptr<CollectionScanNode> collScanNode(EstimateMap& estimates, QSNEsti
     return node;
 }
 
+// Default sort memory limit used when constructing SortNodes in these tests.
+constexpr uint64_t kSortMaxMemoryUsageBytes = 100 * 1024 * 1024;
+
 template <typename SortNode>
 void testSortCostDependsOnChildren() {
     EstimateMap estimates;
     auto cheapCollScan = collScanNode(estimates, QSNEstimate{makeCard(10), makeCard(10)});
-    auto cheapSort = std::make_unique<SortNode>(
-        std::move(cheapCollScan), BSON("a" << 1), 0, LimitSkipParameterization::Disabled);
+    auto cheapSort = std::make_unique<SortNode>(std::move(cheapCollScan),
+                                                BSON("a" << 1),
+                                                0,
+                                                LimitSkipParameterization::Disabled,
+                                                kSortMaxMemoryUsageBytes);
     estimates[cheapSort.get()] = std::make_unique<QSNEstimate>(makeCard(10));
     auto cheapPlan = std::make_unique<QuerySolution>();
     cheapPlan->setRoot(std::move(cheapSort));
 
     auto expsensiveCollScan = collScanNode(estimates, QSNEstimate{makeCard(100), makeCard(100)});
-    auto expensiveSort = std::make_unique<SortNode>(
-        std::move(expsensiveCollScan), BSON("a" << 1), 0, LimitSkipParameterization::Disabled);
+    auto expensiveSort = std::make_unique<SortNode>(std::move(expsensiveCollScan),
+                                                    BSON("a" << 1),
+                                                    0,
+                                                    LimitSkipParameterization::Disabled,
+                                                    kSortMaxMemoryUsageBytes);
     estimates[expensiveSort.get()] = std::make_unique<QSNEstimate>(makeCard(100));
     auto expensivePlan = std::make_unique<QuerySolution>();
     expensivePlan->setRoot(std::move(expensiveSort));

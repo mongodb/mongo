@@ -1447,12 +1447,20 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
     size_t sortLimit = findCommand.getLimit() ? static_cast<size_t>(*findCommand.getLimit()) +
             static_cast<size_t>(findCommand.getSkip().value_or(0))
                                               : 0;
+    const uint64_t maxMemoryUsageBytes =
+        query.getExpCtx()->getQueryKnobConfiguration().getQueryMaxBlockingSortMemoryUsageBytes();
     if (canUseSimpleSort(*solnRoot, query)) {
-        sortNode = std::make_unique<SortNodeSimple>(
-            std::move(solnRoot), sortObj, sortLimit, LimitSkipParameterization::Disabled);
+        sortNode = std::make_unique<SortNodeSimple>(std::move(solnRoot),
+                                                    sortObj,
+                                                    sortLimit,
+                                                    LimitSkipParameterization::Disabled,
+                                                    maxMemoryUsageBytes);
     } else {
-        sortNode = std::make_unique<SortNodeDefault>(
-            std::move(solnRoot), sortObj, sortLimit, LimitSkipParameterization::Disabled);
+        sortNode = std::make_unique<SortNodeDefault>(std::move(solnRoot),
+                                                     sortObj,
+                                                     sortLimit,
+                                                     LimitSkipParameterization::Disabled,
+                                                     maxMemoryUsageBytes);
     }
     sortNode->addSortKeyMetadata = query.metadataDeps()[DocumentMetadataFields::kSortKey];
     solnRoot = std::move(sortNode);

@@ -37,12 +37,16 @@
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
+#include <cstdint>
 #include <memory>
 #include <utility>
 #include <vector>
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+
+// Default sort memory limit used when constructing SortNodes in these tests.
+constexpr uint64_t kSortMaxMemoryUsageBytes = 100 * 1024 * 1024;
 
 class SbeTimeseriesTest : public GoldenSbeStageBuilderTestFixture {
 public:
@@ -316,7 +320,8 @@ TEST_F(SbeTimeseriesTest, TestGroupMax) {
     auto sortNode = std::make_unique<SortNodeDefault>(std::move(projectNode),
                                                       BSON("max" << 1) /* pattern */,
                                                       -1 /* limit */,
-                                                      LimitSkipParameterization::Disabled);
+                                                      LimitSkipParameterization::Disabled,
+                                                      kSortMaxMemoryUsageBytes);
 
     runTest(std::move(sortNode), BSONArray(fromjson("[{max: 0}, {max: 101}]")));
 }
@@ -355,7 +360,8 @@ TEST_F(SbeTimeseriesTest, TestGroupSum) {
     auto sortNode = std::make_unique<SortNodeDefault>(std::move(groupNode),
                                                       BSON("sum" << 1) /* pattern */,
                                                       -1 /* limit */,
-                                                      LimitSkipParameterization::Disabled);
+                                                      LimitSkipParameterization::Disabled,
+                                                      kSortMaxMemoryUsageBytes);
 
     runTest(std::move(sortNode),
             BSONArray(fromjson("[{_id: 2, sum: 2}, {_id: null, sum: 25}, {_id: 1, sum: 34}]")));

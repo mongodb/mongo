@@ -42,7 +42,12 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+#include <cstdint>
+
 namespace mongo {
+
+// Default sort memory limit used when constructing SortNodes in these tests.
+constexpr uint64_t kSortMaxMemoryUsageBytes = 100 * 1024 * 1024;
 
 class EngineSelectionPlanFixture : public mongo::unittest::Test {
 public:
@@ -106,8 +111,11 @@ public:
                                                                BSONObj sortPattern,
                                                                size_t limit = 0) {
         auto indexScan = std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(indexKeys));
-        auto sort = std::make_unique<SortNodeDefault>(
-            std::move(indexScan), sortPattern, limit, LimitSkipParameterization::Disabled);
+        auto sort = std::make_unique<SortNodeDefault>(std::move(indexScan),
+                                                      sortPattern,
+                                                      limit,
+                                                      LimitSkipParameterization::Disabled,
+                                                      kSortMaxMemoryUsageBytes);
         return std::make_unique<FetchNode>(std::move(sort), nss);
     }
 
@@ -523,8 +531,11 @@ TEST_F(EngineSelectionPlanFixture, LuRuleMatchesListedPatternsAndRejectsOthers) 
     {
         auto innerIxscan =
             std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(fromjson("{a: 1}")));
-        auto sort = std::make_unique<SortNodeDefault>(
-            std::move(innerIxscan), fromjson("{a: 1}"), 5, LimitSkipParameterization::Disabled);
+        auto sort = std::make_unique<SortNodeDefault>(std::move(innerIxscan),
+                                                      fromjson("{a: 1}"),
+                                                      5,
+                                                      LimitSkipParameterization::Disabled,
+                                                      kSortMaxMemoryUsageBytes);
         ASSERT_EQ(runRule(std::make_unique<FetchNode>(std::move(sort), nss)),
                   EngineChoice::kClassic);
     }

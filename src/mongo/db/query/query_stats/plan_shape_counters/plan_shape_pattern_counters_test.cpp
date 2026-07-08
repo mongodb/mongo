@@ -39,6 +39,7 @@
 #include "mongo/util/string_map.h"
 
 #include <bitset>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
@@ -50,6 +51,9 @@
 namespace mongo::plan_shape_counters {
 namespace {
 using namespace std::literals::string_view_literals;
+
+// Default sort memory limit used when constructing SortNodes in these tests.
+constexpr uint64_t kSortMaxMemoryUsageBytes = 100 * 1024 * 1024;
 
 using NodeWrapper =
     std::function<std::unique_ptr<QuerySolutionNode>(std::unique_ptr<QuerySolutionNode>)>;
@@ -161,8 +165,11 @@ public:
 
     std::unique_ptr<SortNodeDefault> makeSort(std::unique_ptr<QuerySolutionNode> child,
                                               size_t limit = 0) {
-        return std::make_unique<SortNodeDefault>(
-            std::move(child), BSON("a" << 1), limit, LimitSkipParameterization::Disabled);
+        return std::make_unique<SortNodeDefault>(std::move(child),
+                                                 BSON("a" << 1),
+                                                 limit,
+                                                 LimitSkipParameterization::Disabled,
+                                                 kSortMaxMemoryUsageBytes);
     }
 
     std::unique_ptr<LimitNode> makeLimit(std::unique_ptr<QuerySolutionNode> child,
@@ -312,8 +319,11 @@ public:
         add(std::make_unique<ProjectionNodeCovered>(
                 makeIxScan(), nullptr, parseProjection(), BSON("a" << 1)),
             PlanShapeCounter::kIxscanProject);
-        add(std::make_unique<SortNodeSimple>(
-                makeCollScan(), BSON("a" << 1), 0, LimitSkipParameterization::Disabled),
+        add(std::make_unique<SortNodeSimple>(makeCollScan(),
+                                             BSON("a" << 1),
+                                             0,
+                                             LimitSkipParameterization::Disabled,
+                                             kSortMaxMemoryUsageBytes),
             PlanShapeCounter::kCollscanSort);
         // A sort with an absorbed limit (top-N sort) is still a "SORT".
         add(makeSort(makeCollScan(), 5 /* limit */), PlanShapeCounter::kCollscanSort);

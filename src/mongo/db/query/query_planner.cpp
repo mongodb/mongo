@@ -2056,10 +2056,14 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
                     .serialize(SortPattern::SortKeySerialization::kForPipelineSerialization)
                     .toBson();
             auto limit = sortStage->getLimit().get_value_or(0);
-            solnForAgg = std::make_unique<SortNodeDefault>(std::move(solnForAgg),
-                                                           std::move(pattern),
-                                                           limit,
-                                                           LimitSkipParameterization::Disabled);
+            solnForAgg =
+                std::make_unique<SortNodeDefault>(std::move(solnForAgg),
+                                                  std::move(pattern),
+                                                  limit,
+                                                  LimitSkipParameterization::Disabled,
+                                                  query.getExpCtx()
+                                                      ->getQueryKnobConfiguration()
+                                                      .getQueryMaxBlockingSortMemoryUsageBytes());
             continue;
         }
 

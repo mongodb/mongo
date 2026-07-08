@@ -60,6 +60,9 @@
 namespace mongo {
 using namespace std::literals::string_view_literals;
 
+// Default sort memory limit used when constructing SortNodes in these tests.
+constexpr uint64_t kSortMaxMemoryUsageBytes = 100 * 1024 * 1024;
+
 class SbeStageBuilderTest : public SbeStageBuilderTestFixture {
 protected:
     std::unique_ptr<ShardFiltererFactoryInterface> makeAlwaysPassShardFiltererInterface() {
@@ -365,7 +368,8 @@ TEST_F(GoldenSbeStageBuilderTest, TestSort) {
         std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false),
         BSON("a" << -1) /* pattern */,
         -1 /* limit */,
-        LimitSkipParameterization::Disabled);
+        LimitSkipParameterization::Disabled,
+        kSortMaxMemoryUsageBytes);
     runTest(std::move(sortNode), expected);
 }
 
@@ -380,7 +384,8 @@ TEST_F(GoldenSbeStageBuilderTest, TestSortLimit) {
         std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false),
         BSON("a" << -1) /* pattern */,
         1 /* limit */,
-        LimitSkipParameterization::Enabled);
+        LimitSkipParameterization::Enabled,
+        kSortMaxMemoryUsageBytes);
     runTest(std::move(sortNode), expected, {.limit = 1});
 }
 
@@ -395,7 +400,8 @@ TEST_F(GoldenSbeStageBuilderTest, TestSortLimitSkip) {
         std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false),
         BSON("a" << -1) /* pattern */,
         2 /* limit */,
-        LimitSkipParameterization::Enabled);
+        LimitSkipParameterization::Enabled,
+        kSortMaxMemoryUsageBytes);
 
     auto limitSkipNode = std::make_unique<LimitNode>(
         std::make_unique<SkipNode>(
@@ -447,7 +453,8 @@ TEST_F(GoldenSbeStageBuilderTest, TestSortCovered) {
         makeIdxScanNode(_nss, makeIndexEntry(indexKeyPattern), "a", 1, 3),
         BSON("a" << -1) /* pattern */,
         -1 /* limit */,
-        LimitSkipParameterization::Disabled);
+        LimitSkipParameterization::Disabled,
+        kSortMaxMemoryUsageBytes);
 
     // Build covered projection so that sort stage doesn't need to return whole document and becomes
     // covered sort.
