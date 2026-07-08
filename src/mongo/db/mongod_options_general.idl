@@ -106,7 +106,9 @@ configs:
         condition:
             preprocessor: "defined(__linux__)"
     "net.proxyPort":
-        description: "The port that accepts connections with a proxy protocol header."
+        description: >-
+            The port that accepts connections with a proxy protocol header. Access to this port
+            MUST be restricted to trusted hosts (the load balancer or reverse proxy).
         short_name: proxyPort
         arg_vartype: Int
         source: [cli, yaml]

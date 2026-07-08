@@ -271,6 +271,9 @@ public:
      *  2. If the connection was NOT accepted via the load balancer port:
      *      a. The source remote endpoint is always remote(). The proxy protocol
      *         header is only parsed if presented by a load balancer connection.
+     *
+     * NOTE: This value is trusted as-is with no authentication of the connecting peer. Access to
+     * the load balancer port MUST be restricted to trusted hosts (the load balancer/reverse proxy).
      */
     virtual const HostAndPort& getSourceRemoteEndpoint() const {
         return remote();

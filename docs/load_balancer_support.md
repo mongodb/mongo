@@ -4,6 +4,13 @@
 [proxy protocol][proxy-protocol-url] header. Placing `mongos` or `mongod` behind load balancers
 requires proper configuration of the load balancers, `mongos`, and `mongod`.
 
+# Security considerations
+
+The `proxyPort`/`loadBalancerPort` header's claimed source address is trusted without authentication
+and is used verbatim for audit log attribution. Access to this port **MUST be restricted to trusted
+hosts only** (the load balancer or reverse proxy) via firewall/security-group rules, since any other
+host reaching it can forge its recorded source address.
+
 # Configuring mongod
 
 To use `mongod` with a L4 load balancer (or reverse proxy) it _must_ be configured with the
