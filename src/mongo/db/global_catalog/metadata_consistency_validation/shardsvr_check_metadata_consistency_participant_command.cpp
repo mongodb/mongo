@@ -120,7 +120,7 @@ public:
                     primaryShardId,
                     checkRangeDeletionIndexes,
                     checkIndexes,
-                    true /* asPrimaryNode */);
+                    true /* asRSPrimaryNode */);
 
             // Build a streaming executor that merges the secondaries' cursors (or null if there are
             // none). The locally-computed inconsistencies are prepended by

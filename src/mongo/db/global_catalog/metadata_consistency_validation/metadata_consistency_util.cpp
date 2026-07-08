@@ -681,14 +681,25 @@ boost::optional<BSONObj> validateChunksStrictEquality(
  * Domain-only coverage applies when the CSR is non-authoritative. Strict per-chunk
  * validation applies when the CSR is authoritative.
  */
-void validateShardCatalogEntries(const ShardCatalogCollectionTypeBase& shardCatalogCollection,
+void validateShardCatalogEntries(ShardCatalogCollectionTypeBase shardCatalogCollection,
                                  const std::vector<ChunkType>& shardCatalogChunks,
                                  const CollectionType& globalCatalogCollection,
                                  const std::vector<ChunkType>& globalCatalogChunks,
                                  const ShardId& shardId,
                                  std::string_view sourceName,
                                  bool useStrictChunkValidation,
+                                 bool asRSPrimaryNode,
                                  std::vector<MetadataInconsistencyItem>& inconsistencies) {
+    if (!asRSPrimaryNode) {
+        // The allowMigrations flag is not persisted locally, only in memory, so `atClusterTime` is
+        // not enough to guarantee that secondaries see an updated value. Since this flag is not
+        // used with authoritative shards and CMC on secondaries only runs with the auth shards flag
+        // enabled, this mismatch can only happen on very rare occasions during setFCV, so just
+        // ignore it on secondaries.
+        shardCatalogCollection.setAllowMigrations(globalCatalogCollection.getAllowMigrations()
+                                                      ? boost::none
+                                                      : boost::make_optional(false));
+    }
 
     if (shardCatalogCollection.getComparableFields() !=
         globalCatalogCollection.getComparableFields()) {
@@ -810,6 +821,7 @@ void validateInMemoryShardCatalogEntries(const CollectionMetadata& inMemoryShard
                                          const std::vector<ChunkType>& chunksInGlobalCatalog,
                                          const ShardId& shardId,
                                          bool useStrictChunkValidation,
+                                         bool asRSPrimaryNode,
                                          std::vector<MetadataInconsistencyItem>& inconsistencies) {
     auto chunksInMemoryShardCatalog =
         getChunksFromInMemoryShardCatalog(inMemoryShardCatalogMetadata, shardId);
@@ -824,6 +836,7 @@ void validateInMemoryShardCatalogEntries(const CollectionMetadata& inMemoryShard
                                 shardId,
                                 kInMemoryShardCatalogSourceScope,
                                 useStrictChunkValidation,
+                                asRSPrimaryNode,
                                 inconsistencies);
 }
 
@@ -852,6 +865,7 @@ void validateDurableShardCatalogEntries(const NamespaceString& nss,
                                         const CollectionType& collectionInDurableShardCatalog,
                                         const std::vector<ChunkType>& chunksInDurableShardCatalog,
                                         bool useStrictChunkValidation,
+                                        bool asRSPrimaryNode,
                                         std::vector<MetadataInconsistencyItem>& inconsistencies) {
 
     if (chunksInDurableShardCatalog.empty() && !chunksInGlobalCatalog.empty()) {
@@ -872,6 +886,7 @@ void validateDurableShardCatalogEntries(const NamespaceString& nss,
                                 shardId,
                                 kDurableShardCatalogSourceScope,
                                 useStrictChunkValidation,
+                                asRSPrimaryNode,
                                 inconsistencies);
 }
 
@@ -880,6 +895,7 @@ void checkCollectionMetadataInShardCatalog(
     const NamespaceString& nss,
     const ShardId& shardId,
     bool isPrimary,
+    bool asRSPrimaryNode,
     const CollectionPtr& localCollectionPtr,
     const boost::optional<CollectionType> collectionInGlobalCatalog,
     std::vector<MetadataInconsistencyItem>& inconsistencies) {
@@ -1048,6 +1064,7 @@ void checkCollectionMetadataInShardCatalog(
                                            *collectionInDurableShardCatalog,
                                            *chunksInDurableShardCatalog,
                                            authoritativeShardsCRUDEnabled,
+                                           asRSPrimaryNode,
                                            inconsistencies);
         return;
     }
@@ -1079,6 +1096,7 @@ void checkCollectionMetadataInShardCatalog(
                                             chunksInGlobalCatalog,
                                             shardId,
                                             authoritativeShardsCRUDEnabled,
+                                            asRSPrimaryNode,
                                             inconsistencies);
     }
 
@@ -1119,6 +1137,7 @@ void checkCollectionMetadataInShardCatalog(
                                        *collectionInDurableShardCatalog,
                                        *chunksInDurableShardCatalog,
                                        authoritativeShardsCRUDEnabled,
+                                       asRSPrimaryNode,
                                        inconsistencies);
 }
 
@@ -1226,7 +1245,8 @@ std::vector<MetadataInconsistencyItem> _checkInconsistenciesBetweenBothCatalogs(
     const ShardId& primaryShardId,
     const CollectionType& catalogColl,
     const CollectionPtr& localColl,
-    const bool checkRangeDeletionIndexes) {
+    const bool checkRangeDeletionIndexes,
+    const bool asRSPrimaryNode) {
     std::vector<MetadataInconsistencyItem> inconsistencies;
 
     const auto& catalogUUID = catalogColl.getUuid();
@@ -1313,6 +1333,7 @@ std::vector<MetadataInconsistencyItem> _checkInconsistenciesBetweenBothCatalogs(
                                               nss,
                                               shardId,
                                               shardId == primaryShardId,
+                                              asRSPrimaryNode,
                                               localColl,
                                               catalogColl,
                                               inconsistencies);
@@ -1341,7 +1362,8 @@ std::vector<MetadataInconsistencyItem> _checkLocalInconsistencies(
     const ShardId& currentShard,
     const ShardId& primaryShard,
     const std::shared_ptr<const CollectionCatalog> localCatalogSnapshot,
-    const CollectionPtr& localColl) {
+    const CollectionPtr& localColl,
+    const bool asRSPrimaryNode) {
     std::vector<MetadataInconsistencyItem> inconsistencies;
 
     if (currentShard != primaryShard) {
@@ -1354,6 +1376,7 @@ std::vector<MetadataInconsistencyItem> _checkLocalInconsistencies(
                                               nss,
                                               currentShard,
                                               currentShard == primaryShard,
+                                              asRSPrimaryNode,
                                               localColl,
                                               boost::none,
                                               inconsistencies);
@@ -1850,7 +1873,8 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
     const std::shared_ptr<const CollectionCatalog> localCatalogSnapshot,
     const std::vector<CollectionPtr>& localCatalogCollections,
     const bool checkRangeDeletionIndexes,
-    const bool optionalCheckIndexes) {
+    const bool optionalCheckIndexes,
+    const bool asRSPrimaryNode) {
 
     std::vector<MetadataInconsistencyItem> inconsistencies;
     auto itLocalCollections = localCatalogCollections.begin();
@@ -1884,7 +1908,8 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
                                                          primaryShardId,
                                                          catalogColl,
                                                          localColl,
-                                                         checkRangeDeletionIndexes);
+                                                         checkRangeDeletionIndexes,
+                                                         asRSPrimaryNode);
             inconsistencies.insert(
                 inconsistencies.end(),
                 std::make_move_iterator(inconsistenciesBetweenBothCatalogs.begin()),
@@ -1912,8 +1937,13 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
             const auto& nss = localNss;
 
             if (!localNss.isShardLocalNamespace()) {
-                auto localInconsistencies = _checkLocalInconsistencies(
-                    opCtx, nss, shardId, primaryShardId, localCatalogSnapshot, localColl);
+                auto localInconsistencies = _checkLocalInconsistencies(opCtx,
+                                                                       nss,
+                                                                       shardId,
+                                                                       primaryShardId,
+                                                                       localCatalogSnapshot,
+                                                                       localColl,
+                                                                       asRSPrimaryNode);
                 inconsistencies.insert(inconsistencies.end(),
                                        std::make_move_iterator(localInconsistencies.begin()),
                                        std::make_move_iterator(localInconsistencies.end()));
@@ -1927,8 +1957,13 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
         const auto& localNss = localColl->ns();
 
         if (!localNss.isShardLocalNamespace()) {
-            auto localInconsistencies = _checkLocalInconsistencies(
-                opCtx, localNss, shardId, primaryShardId, localCatalogSnapshot, localColl);
+            auto localInconsistencies = _checkLocalInconsistencies(opCtx,
+                                                                   localNss,
+                                                                   shardId,
+                                                                   primaryShardId,
+                                                                   localCatalogSnapshot,
+                                                                   localColl,
+                                                                   asRSPrimaryNode);
             inconsistencies.insert(inconsistencies.end(),
                                    std::make_move_iterator(localInconsistencies.begin()),
                                    std::make_move_iterator(localInconsistencies.end()));
@@ -2628,7 +2663,7 @@ std::vector<MetadataInconsistencyItem> runCheckMetadataConsistencyOnParticipant(
     const ShardId& primaryShardId,
     bool checkRangeDeletionIndexes,
     bool checkIndexes,
-    bool asPrimaryNode) {
+    bool asRSPrimaryNode) {
     const auto shardId = ShardingState::get(opCtx)->shardId();
     const auto commandLevel = getCommandLevel(nss);
 
@@ -2734,7 +2769,7 @@ std::vector<MetadataInconsistencyItem> runCheckMetadataConsistencyOnParticipant(
 
     // If this is the primary shard of the db coordinate index check across shards
     if (shardId == primaryShardId) {
-        if (asPrimaryNode) {
+        if (asRSPrimaryNode) {
             if (checkIndexes) {
                 auto indexInconsistencies =
                     metadata_consistency_util::checkIndexesConsistencyAcrossShards(

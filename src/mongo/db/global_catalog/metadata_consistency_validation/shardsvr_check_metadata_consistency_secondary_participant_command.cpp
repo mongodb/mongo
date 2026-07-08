@@ -110,7 +110,7 @@ public:
                     primaryShardId,
                     checkRangeDeletionIndexes,
                     checkIndexes,
-                    false /* asPrimaryNode */);
+                    false /* asRSPrimaryNode */);
 
             const auto& shardId = ShardingState::get(opCtx)->shardId();
             for (auto& inconsistency : inconsistencies) {

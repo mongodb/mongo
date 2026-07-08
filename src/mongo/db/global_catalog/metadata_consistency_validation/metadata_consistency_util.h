@@ -102,7 +102,8 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
     std::shared_ptr<const CollectionCatalog> localCatalogSnapshot,
     const std::vector<CollectionPtr>& localCatalogCollections,
     bool checkRangeDeletionIndexes,
-    bool optionalCheckIndexes);
+    bool optionalCheckIndexes,
+    bool asRSPrimaryNode = true);
 
 /**
  * For every collection, check that all the shards currently owning chunks for that collection have
@@ -178,8 +179,8 @@ std::vector<MetadataInconsistencyItem> checkShardCatalogCollectionsConsistentWit
  * Main check consistency metadata logic ran by the participant commands (i.e.
  * _shardsvrCheckMetadataConsistencyParticipant and
  * _shardsvrCheckMetadataConsistencySecondaryParticipant).
- * `asPrimaryNode` is set to true if this command is called by the shard *RS* primary (not the shard
- * DB primary). Setting it to false skips some cluster-wide checks.
+ * `asRSPrimaryNode` is set to true if this command is called by the shard *RS* primary (not the
+ * shard DB primary). Setting it to false skips some cluster-wide checks.
  */
 std::vector<MetadataInconsistencyItem> runCheckMetadataConsistencyOnParticipant(
     OperationContext* opCtx,
@@ -187,7 +188,7 @@ std::vector<MetadataInconsistencyItem> runCheckMetadataConsistencyOnParticipant(
     const ShardId& primaryShardId,
     bool checkRangeDeletionIndexes,
     bool checkIndexes,
-    bool asPrimaryNode);
+    bool asRSPrimaryNode);
 
 }  // namespace metadata_consistency_util
 }  // namespace mongo
