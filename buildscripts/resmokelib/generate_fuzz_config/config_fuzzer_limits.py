@@ -482,6 +482,15 @@ config_fuzzer_params = {
             "choices": [{"mode": "off"}, {"mode": "alwaysOn"}],
             "fuzz_at": ["startup"],
         },
+        # Similar "fail after durable commit" failpoints for non-chunk DDL operations.
+        "failpoint.commitMovePrimaryFailsAfterDurableChange": {
+            "choices": [{"mode": "off"}, {"mode": "alwaysOn"}],
+            "fuzz_at": ["startup"],
+        },
+        "failpoint.commitRefineCollectionShardKeyFailsAfterDurableChange": {
+            "choices": [{"mode": "off"}, {"mode": "alwaysOn"}],
+            "fuzz_at": ["startup"],
+        },
         # TODO(SERVER-98867): re-enable config fuzzer signal testing.
         "failpoint.enableSignalTesting": {
             "choices": [{"mode": "off"}],

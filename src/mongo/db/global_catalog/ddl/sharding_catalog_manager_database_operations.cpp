@@ -76,6 +76,7 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/out_of_line_executor.h"
@@ -97,6 +98,9 @@
 
 
 namespace mongo {
+namespace {
+MONGO_FAIL_POINT_DEFINE(commitMovePrimaryFailsAfterDurableChange);
+}
 
 DatabaseType ShardingCatalogManager::createDatabase(
     OperationContext* opCtx,
@@ -241,8 +245,10 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     const auto validAfter = currentTime.clusterTime().asTimestamp();
 
+    int updatesDone = 0;
+
     const auto transactionChain =
-        [dbName, expectedDbVersion, toShardId, validAfter, serializationContext](
+        [dbName, expectedDbVersion, toShardId, validAfter, serializationContext, &updatesDone](
             const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             int currStmtId = 0;
             // Find database entry to get current dbPrimary
@@ -317,6 +323,8 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
                 txnClient.runCRUDOpSync(updateDatabaseEntryOp, {currStmtId++});
             uassertStatusOK(updateDatabaseEntryResponse.toStatus());
 
+            updatesDone++;
+
             NamespacePlacementType placementInfo(
                 NamespaceString(dbName), validAfter, std::vector<mongo::ShardRef>{toShardId});
 
@@ -327,6 +335,8 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
             auto insertDatabasePlacementHistoryResponse =
                 txnClient.runCRUDOpSync(insertPlacementHistoryOp, {currStmtId++});
             uassertStatusOK(insertDatabasePlacementHistoryResponse.toStatus());
+
+            updatesDone++;
 
             return SemiFuture<void>::makeReady();
         };
@@ -339,6 +349,11 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
                                             nullptr, /*resourceYielder*/
                                             inlineExecutor);
     txn.run(opCtx, transactionChain);
+
+    if (updatesDone > 0 && MONGO_unlikely(commitMovePrimaryFailsAfterDurableChange.shouldFail())) {
+        uasserted(ErrorCodes::LockBusy,
+                  "Failing because of commitMovePrimaryFailsAfterDurableChange");
+    }
 }
 
 DatabaseType ShardingCatalogManager::commitCreateDatabase(OperationContext* opCtx,

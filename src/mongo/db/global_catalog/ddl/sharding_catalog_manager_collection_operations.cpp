@@ -112,6 +112,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangRefineCollectionShardKeyBeforeUpdatingChunks);
 MONGO_FAIL_POINT_DEFINE(hangRefineCollectionShardKeyBeforeCommit);
+MONGO_FAIL_POINT_DEFINE(commitRefineCollectionShardKeyFailsAfterDurableChange);
 
 void triggerFireAndForgetShardRefreshes(OperationContext* opCtx,
                                         Shard* configShard,
@@ -419,6 +420,11 @@ void ShardingCatalogManager::commitRefineCollectionShardKey(
 
     refineCollectionShardKeyInTxn(
         opCtx, nss, newShardKeyPattern, newTimestamp, newEpoch, oldTimestamp);
+
+    if (MONGO_unlikely(commitRefineCollectionShardKeyFailsAfterDurableChange.shouldFail())) {
+        uasserted(ErrorCodes::LockBusy,
+                  "Failing because of commitRefineCollectionShardKeyFailsAfterDurableChange");
+    }
 }
 
 void ShardingCatalogManager::configureCollectionBalancing(
