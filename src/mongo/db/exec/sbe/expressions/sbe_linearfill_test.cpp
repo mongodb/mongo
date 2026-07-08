@@ -108,9 +108,9 @@ public:
 
             sortByAccessor.reset(sortByValues[i].tag(), sortByValues[i].value());
             auto out = runCompiledExpression(compiledLinearFillFinalize.get());
-            value::ValueGuard outGuard{out.first, out.second};
+            value::TagValueOwned outOwned = value::TagValueOwned::fromRaw(out);
 
-            ASSERT_EQ(out.first, expValues[i].tag());
+            ASSERT_EQ(outOwned.tag(), expValues[i].tag());
             ASSERT_THAT(out, ValueEq(expValues[i].view()));
         }
     }

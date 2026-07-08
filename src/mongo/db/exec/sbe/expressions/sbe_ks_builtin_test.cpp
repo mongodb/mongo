@@ -71,11 +71,11 @@ protected:
                                               std::move(discriminatorExpr)));
 
         auto compiledExpr = compileExpression(*ksExpr);
-        auto [actualTag, actualVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(actualTag, actualVal);
+        value::TagValueOwned actual =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         auto [compareTag, compareVal] =
-            value::compareValue(actualTag, actualVal, expectedTag, expectedVal);
+            value::compareValue(actual.tag(), actual.value(), expectedTag, expectedVal);
         ASSERT_EQUALS(compareTag, value::TypeTags::NumberInt32);
         ASSERT_EQUALS(value::bitcastTo<int32_t>(compareVal), 0);
     }
@@ -93,10 +93,10 @@ TEST_F(SBEBuiltinKsTest, NumericTests) {
 
         key_string::Builder kb(key_string::Version::V1, key_string::ALL_ASCENDING);
         kb.appendNumberInt(int32Value);
-        auto [expectedTag, expectedVal] = value::makeKeyString(kb.getValueCopy());
-        value::ValueGuard expectedGuard(expectedTag, expectedVal);
+        value::TagValueOwned expected =
+            value::TagValueOwned::fromRaw(value::makeKeyString(kb.getValueCopy()));
 
-        runAndAssertExpression(argTag, argVal, expectedTag, expectedVal);
+        runAndAssertExpression(argTag, argVal, expected.tag(), expected.value());
     }
 
     for (int64_t int64Value :
@@ -106,10 +106,10 @@ TEST_F(SBEBuiltinKsTest, NumericTests) {
 
         key_string::Builder kb(key_string::Version::V1, key_string::ALL_ASCENDING);
         kb.appendNumberLong(int64Value);
-        auto [expectedTag, expectedVal] = value::makeKeyString(kb.getValueCopy());
-        value::ValueGuard expectedGuard(expectedTag, expectedVal);
+        value::TagValueOwned expected =
+            value::TagValueOwned::fromRaw(value::makeKeyString(kb.getValueCopy()));
 
-        runAndAssertExpression(argTag, argVal, expectedTag, expectedVal);
+        runAndAssertExpression(argTag, argVal, expected.tag(), expected.value());
     }
 
     for (double doubleValue : {-73.0, 3.14159, std::numeric_limits<double>::quiet_NaN()}) {
@@ -118,22 +118,22 @@ TEST_F(SBEBuiltinKsTest, NumericTests) {
 
         key_string::Builder kb(key_string::Version::V1, key_string::ALL_ASCENDING);
         kb.appendNumberDouble(doubleValue);
-        auto [expectedTag, expectedVal] = value::makeKeyString(kb.getValueCopy());
-        value::ValueGuard expectedGuard(expectedTag, expectedVal);
+        value::TagValueOwned expected =
+            value::TagValueOwned::fromRaw(value::makeKeyString(kb.getValueCopy()));
 
-        runAndAssertExpression(argTag, argVal, expectedTag, expectedVal);
+        runAndAssertExpression(argTag, argVal, expected.tag(), expected.value());
     }
 
     for (Decimal128 dec128Value : {Decimal128("-73"), Decimal128("3.14159"), Decimal128("NaN")}) {
-        auto [argTag, argVal] = value::makeCopyDecimal(dec128Value);
-        value::ValueGuard argGuard(argTag, argVal);
+        value::TagValueOwned arg =
+            value::TagValueOwned::fromRaw(value::makeCopyDecimal(dec128Value));
 
         key_string::Builder kb(key_string::Version::V1, key_string::ALL_ASCENDING);
         kb.appendNumberDecimal(dec128Value);
-        auto [expectedTag, expectedVal] = value::makeKeyString(kb.getValueCopy());
-        value::ValueGuard expectedGuard(expectedTag, expectedVal);
+        value::TagValueOwned expected =
+            value::TagValueOwned::fromRaw(value::makeKeyString(kb.getValueCopy()));
 
-        runAndAssertExpression(argTag, argVal, expectedTag, expectedVal);
+        runAndAssertExpression(arg.tag(), arg.value(), expected.tag(), expected.value());
     }
 }
 
@@ -144,24 +144,23 @@ TEST_F(SBEBuiltinKsTest, BooleanTests) {
 
         key_string::Builder kb(key_string::Version::V1, key_string::ALL_ASCENDING);
         kb.appendBool(boolValue);
-        auto [expectedTag, expectedVal] = value::makeKeyString(kb.getValueCopy());
-        value::ValueGuard expectedGuard(expectedTag, expectedVal);
+        value::TagValueOwned expected =
+            value::TagValueOwned::fromRaw(value::makeKeyString(kb.getValueCopy()));
 
-        runAndAssertExpression(argTag, argVal, expectedTag, expectedVal);
+        runAndAssertExpression(argTag, argVal, expected.tag(), expected.value());
     }
 }
 
 TEST_F(SBEBuiltinKsTest, StringTests) {
     for (std::string str : {"", "hello", "world"}) {
-        auto [argTag, argVal] = value::makeNewString(str);
-        value::ValueGuard argGuard(argTag, argVal);
+        value::TagValueOwned arg = value::TagValueOwned::fromRaw(value::makeNewString(str));
 
         key_string::Builder kb(key_string::Version::V1, key_string::ALL_ASCENDING);
         kb.appendString(str);
-        auto [expectedTag, expectedVal] = value::makeKeyString(kb.getValueCopy());
-        value::ValueGuard expectedGuard(expectedTag, expectedVal);
+        value::TagValueOwned expected =
+            value::TagValueOwned::fromRaw(value::makeKeyString(kb.getValueCopy()));
 
-        runAndAssertExpression(argTag, argVal, expectedTag, expectedVal);
+        runAndAssertExpression(arg.tag(), arg.value(), expected.tag(), expected.value());
     }
 }
 
@@ -171,10 +170,10 @@ TEST_F(SBEBuiltinKsTest, NullTests) {
 
     key_string::Builder kb(key_string::Version::V1, key_string::ALL_ASCENDING);
     kb.appendNull();
-    auto [expectedTag, expectedVal] = value::makeKeyString(kb.getValueCopy());
-    value::ValueGuard expectedGuard(expectedTag, expectedVal);
+    value::TagValueOwned expected =
+        value::TagValueOwned::fromRaw(value::makeKeyString(kb.getValueCopy()));
 
-    runAndAssertExpression(argTag, argVal, expectedTag, expectedVal);
+    runAndAssertExpression(argTag, argVal, expected.tag(), expected.value());
 }
 
 }  // namespace mongo::sbe

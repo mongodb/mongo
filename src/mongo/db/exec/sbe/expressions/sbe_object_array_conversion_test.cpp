@@ -65,23 +65,23 @@ const BSONArray bsonArr2 =
 class SBEObjectArrayConversionTest : public EExpressionTestFixture {
 public:
     void runAndAssertNothing(const vm::CodeFragment* compiledExpr) {
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(runTag, runVal);
-        ASSERT_EQUALS(runTag, sbe::value::TypeTags::Nothing);
-        ASSERT_EQUALS(runVal, 0);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
+        ASSERT_EQUALS(result.tag(), sbe::value::TypeTags::Nothing);
+        ASSERT_EQUALS(result.value(), 0);
     }
 
     void runAndAssertExpression(const vm::CodeFragment* compiledExpr,
                                 value::TypeTags expTag,
                                 value::TypeTags equivalentExpTag,
                                 value::Value equivalentExpVal) {
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
 
-        ASSERT_EQ(expTag, runTag);
+        ASSERT_EQ(expTag, result.tag());
 
         auto [compareTag, compareVal] =
-            value::compareValue(equivalentExpTag, equivalentExpVal, runTag, runVal);
+            value::compareValue(equivalentExpTag, equivalentExpVal, result.tag(), result.value());
         ASSERT_EQ(compareTag, value::TypeTags::NumberInt32);
         ASSERT_EQ(value::bitcastTo<int32_t>(compareVal), 0);
     }
@@ -89,8 +89,8 @@ public:
     void runAndAssertErrorCode(const vm::CodeFragment* compiledExpr, int expErrCode) {
         Status status = [&]() {
             try {
-                auto [runTag, runVal] = runCompiledExpression(compiledExpr);
-                value::ValueGuard guard(runTag, runVal);
+                value::TagValueOwned result =
+                    value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
                 return Status::OK();
             } catch (AssertionException& ex) {
                 return ex.toStatus();
@@ -150,10 +150,9 @@ TEST_F(SBEObjectArrayConversionTest, ObjectToArrayExpression) {
     // Test with empty object
     auto emptyObj = value::TagValueOwned::fromRaw(value::makeNewObject());
     inputAccessor.reset(std::move(emptyObj));
-    auto [emptyArrTag, emptyArrVal] = value::makeNewArray();
-    value::ValueGuard guard(emptyArrTag, emptyArrVal);
+    value::TagValueOwned emptyArr = value::TagValueOwned::fromRaw(value::makeNewArray());
     runAndAssertExpression(
-        compiledObjectToArray.get(), value::TypeTags::Array, emptyArrTag, emptyArrVal);
+        compiledObjectToArray.get(), value::TypeTags::Array, emptyArr.tag(), emptyArr.value());
 
     // Test when input is not object Type
     inputAccessor.reset(value::TagValueView::numberInt64(42));
@@ -203,10 +202,9 @@ TEST_F(SBEObjectArrayConversionTest, ArrayToObjectExpression) {
     // Test with empty array
     auto emptyArr = value::TagValueOwned::fromRaw(value::makeNewArray());
     inputAccessor.reset(std::move(emptyArr));
-    auto [emptyObjTag, emptyObjVal] = value::makeNewObject();
-    value::ValueGuard guard(emptyObjTag, emptyObjVal);
+    value::TagValueOwned emptyObj = value::TagValueOwned::fromRaw(value::makeNewObject());
     runAndAssertExpression(
-        compiledArrayToObject.get(), value::TypeTags::Object, emptyObjTag, emptyObjVal);
+        compiledArrayToObject.get(), value::TypeTags::Object, emptyObj.tag(), emptyObj.value());
 
     // Test when input is not array Type
     inputAccessor.reset(value::TagValueView::numberInt64(42));

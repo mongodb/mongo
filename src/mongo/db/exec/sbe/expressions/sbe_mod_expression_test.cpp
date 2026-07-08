@@ -46,41 +46,41 @@ namespace mongo::sbe {
 class SBEModExprTest : public EExpressionTestFixture {
 protected:
     void runAndAssertExpression(const vm::CodeFragment* compiledExpr, double expectedVal) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
-        ASSERT_EQUALS(value::TypeTags::NumberDouble, tag);
-        ASSERT_APPROX_EQUAL(value::bitcastTo<double>(val), expectedVal, 0.000001);
+        value::TagValueOwned resultVal =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
+        ASSERT_EQUALS(value::TypeTags::NumberDouble, resultVal.tag());
+        ASSERT_APPROX_EQUAL(value::bitcastTo<double>(resultVal.value()), expectedVal, 0.000001);
     }
 
     void runAndAssertExpression(const vm::CodeFragment* compiledExpr, Decimal128 expectedVal) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned resultVal =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
 
-        ASSERT_EQUALS(value::TypeTags::NumberDecimal, tag);
-        ASSERT(value::bitcastTo<Decimal128>(val)
+        ASSERT_EQUALS(value::TypeTags::NumberDecimal, resultVal.tag());
+        ASSERT(value::bitcastTo<Decimal128>(resultVal.value())
                    .subtract(expectedVal)
                    .toAbs()
                    .isLessEqual(Decimal128(".000001")));
     }
 
     void runAndAssertExpression(const vm::CodeFragment* compiledExpr, int32_t expectedVal) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
-        ASSERT_EQUALS(value::TypeTags::NumberInt32, tag);
-        ASSERT_EQUALS(value::bitcastTo<int32_t>(val), expectedVal);
+        value::TagValueOwned resultVal =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
+        ASSERT_EQUALS(value::TypeTags::NumberInt32, resultVal.tag());
+        ASSERT_EQUALS(value::bitcastTo<int32_t>(resultVal.value()), expectedVal);
     }
 
     void runAndAssertExpression(const vm::CodeFragment* compiledExpr, int64_t expectedVal) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
-        ASSERT_EQUALS(value::TypeTags::NumberInt64, tag);
-        ASSERT_EQUALS(value::bitcastTo<int64_t>(val), expectedVal);
+        value::TagValueOwned resultVal =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
+        ASSERT_EQUALS(value::TypeTags::NumberInt64, resultVal.tag());
+        ASSERT_EQUALS(value::bitcastTo<int64_t>(resultVal.value()), expectedVal);
     }
 
     void runAndAssertNothing(const vm::CodeFragment* compiledExpr) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
-        ASSERT_EQUALS(value::TypeTags::Nothing, tag);
+        value::TagValueOwned resultVal =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
+        ASSERT_EQUALS(value::TypeTags::Nothing, resultVal.tag());
     }
 
     void runAndAssertThrows(const vm::CodeFragment* compiledExpr) {

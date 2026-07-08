@@ -116,22 +116,22 @@ TEST_F(SBEPrimNaryTest, BalancedAnd) {
 
     // All values are true.
     {
-        auto [tag, val] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         TypedValue expected = makeBool(true);
-        ASSERT_THAT(std::make_pair(tag, val), ValueEq(expected));
+        ASSERT_THAT(std::make_pair(result.tag(), result.value()), ValueEq(expected));
     }
 
     // One of the values is false.
     for (int falsePosition = 0; falsePosition < numSlots; falsePosition++) {
         accessors[falsePosition]->reset(value::TypeTags::Boolean, value::bitcastFrom<bool>(false));
 
-        auto [tag, val] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         TypedValue expected = makeBool(false);
-        ASSERT_THAT(std::make_pair(tag, val), ValueEq(expected));
+        ASSERT_THAT(std::make_pair(result.tag(), result.value()), ValueEq(expected));
 
         accessors[falsePosition]->reset(value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
     }
@@ -147,11 +147,11 @@ TEST_F(SBEPrimNaryTest, BalancedAnd) {
                                             value::bitcastFrom<bool>(false));
 
 
-            auto [tag, val] = runCompiledExpression(compiledExpr.get());
-            value::ValueGuard guard(tag, val);
+            value::TagValueOwned result =
+                value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
             TypedValue expected = nothingPosition < falsePosition ? makeNothing() : makeBool(false);
-            ASSERT_THAT(std::make_pair(tag, val), ValueEq(expected));
+            ASSERT_THAT(std::make_pair(result.tag(), result.value()), ValueEq(expected));
 
             accessors[falsePosition]->reset(value::TypeTags::Boolean,
                                             value::bitcastFrom<bool>(true));
@@ -184,22 +184,22 @@ TEST_F(SBEPrimNaryTest, BalancedOr) {
 
     // All values are false.
     {
-        auto [tag, val] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         TypedValue expected = makeBool(false);
-        ASSERT_THAT(std::make_pair(tag, val), ValueEq(expected));
+        ASSERT_THAT(std::make_pair(result.tag(), result.value()), ValueEq(expected));
     }
 
     // One of the values is true.
     for (int truePosition = 0; truePosition < numSlots; truePosition++) {
         accessors[truePosition]->reset(value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
 
-        auto [tag, val] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         TypedValue expected = makeBool(true);
-        ASSERT_THAT(std::make_pair(tag, val), ValueEq(expected));
+        ASSERT_THAT(std::make_pair(result.tag(), result.value()), ValueEq(expected));
 
         accessors[truePosition]->reset(value::TypeTags::Boolean, value::bitcastFrom<bool>(false));
     }
@@ -215,11 +215,11 @@ TEST_F(SBEPrimNaryTest, BalancedOr) {
                                            value::bitcastFrom<bool>(true));
 
 
-            auto [tag, val] = runCompiledExpression(compiledExpr.get());
-            value::ValueGuard guard(tag, val);
+            value::TagValueOwned result =
+                value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
             TypedValue expected = nothingPosition < truePosition ? makeNothing() : makeBool(true);
-            ASSERT_THAT(std::make_pair(tag, val), ValueEq(expected));
+            ASSERT_THAT(std::make_pair(result.tag(), result.value()), ValueEq(expected));
 
             accessors[truePosition]->reset(value::TypeTags::Boolean,
                                            value::bitcastFrom<bool>(false));
@@ -250,21 +250,21 @@ TEST_F(SBEPrimNaryTest, NaryAdd) {
     printCompiledExpression(os, *compiledExpr);
 
     {
-        auto [tag, val] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         TypedValue expected = makeInt64(28);
-        ASSERT_THAT(std::make_pair(tag, val), ValueEq(expected));
+        ASSERT_THAT(std::make_pair(result.tag(), result.value()), ValueEq(expected));
     }
 
     for (int idx = 0; idx < numSlots; ++idx) {
         accessors[idx]->reset(value::TypeTags::Nothing, 0);
 
-        auto [tag, val] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         TypedValue expected = makeNothing();
-        ASSERT_THAT(std::make_pair(tag, val), ValueEq(expected));
+        ASSERT_THAT(std::make_pair(result.tag(), result.value()), ValueEq(expected));
         accessors[idx]->reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(idx));
     }
 
@@ -272,11 +272,11 @@ TEST_F(SBEPrimNaryTest, NaryAdd) {
         accessors[idx]->reset(value::TypeTags::NumberDouble,
                               value::bitcastFrom<double>(static_cast<double>(idx)));
 
-        auto [tag, val] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         TypedValue expected = makeDouble(28.0);
-        ASSERT_THAT(std::make_pair(tag, val), ValueEq(expected));
+        ASSERT_THAT(std::make_pair(result.tag(), result.value()), ValueEq(expected));
         accessors[idx]->reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(idx));
     }
 }
@@ -302,21 +302,21 @@ TEST_F(SBEPrimNaryTest, NaryMult) {
     printCompiledExpression(os, *compiledExpr);
 
     {
-        auto [tag, val] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         TypedValue expected = makeInt64(40320);
-        ASSERT_THAT(std::make_pair(tag, val), ValueEq(expected));
+        ASSERT_THAT(std::make_pair(result.tag(), result.value()), ValueEq(expected));
     }
 
     for (int idx = 0; idx < numSlots; ++idx) {
         accessors[idx]->reset(value::TypeTags::Nothing, 0);
 
-        auto [tag, val] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         TypedValue expected = makeNothing();
-        ASSERT_THAT(std::make_pair(tag, val), ValueEq(expected));
+        ASSERT_THAT(std::make_pair(result.tag(), result.value()), ValueEq(expected));
         accessors[idx]->reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(idx + 1));
     }
 
@@ -324,11 +324,11 @@ TEST_F(SBEPrimNaryTest, NaryMult) {
         accessors[idx]->reset(value::TypeTags::NumberDouble,
                               value::bitcastFrom<double>(static_cast<double>(idx + 1)));
 
-        auto [tag, val] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         TypedValue expected = makeDouble(40320.0);
-        ASSERT_THAT(std::make_pair(tag, val), ValueEq(expected));
+        ASSERT_THAT(std::make_pair(result.tag(), result.value()), ValueEq(expected));
         accessors[idx]->reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(idx + 1));
     }
 }

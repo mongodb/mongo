@@ -188,22 +188,22 @@ TEST_F(SBEPrimBinaryTest, BalancedAnd) {
 
     // All values are true.
     {
-        auto [tag, val] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         TypedValue expected = makeBool(true);
-        ASSERT_THAT(std::make_pair(tag, val), ValueEq(expected));
+        ASSERT_THAT(std::make_pair(result.tag(), result.value()), ValueEq(expected));
     }
 
     // One of the values is false.
     for (int falsePosition = 0; falsePosition < numSlots; falsePosition++) {
         accessors[falsePosition]->reset(value::TypeTags::Boolean, value::bitcastFrom<bool>(false));
 
-        auto [tag, val] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         TypedValue expected = makeBool(false);
-        ASSERT_THAT(std::make_pair(tag, val), ValueEq(expected));
+        ASSERT_THAT(std::make_pair(result.tag(), result.value()), ValueEq(expected));
 
         accessors[falsePosition]->reset(value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
     }
@@ -219,11 +219,11 @@ TEST_F(SBEPrimBinaryTest, BalancedAnd) {
                                             value::bitcastFrom<bool>(false));
 
 
-            auto [tag, val] = runCompiledExpression(compiledExpr.get());
-            value::ValueGuard guard(tag, val);
+            value::TagValueOwned result =
+                value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
             TypedValue expected = nothingPosition < falsePosition ? makeNothing() : makeBool(false);
-            ASSERT_THAT(std::make_pair(tag, val), ValueEq(expected));
+            ASSERT_THAT(std::make_pair(result.tag(), result.value()), ValueEq(expected));
 
             accessors[falsePosition]->reset(value::TypeTags::Boolean,
                                             value::bitcastFrom<bool>(true));
@@ -256,22 +256,22 @@ TEST_F(SBEPrimBinaryTest, BalancedOr) {
 
     // All values are false.
     {
-        auto [tag, val] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         TypedValue expected = makeBool(false);
-        ASSERT_THAT(std::make_pair(tag, val), ValueEq(expected));
+        ASSERT_THAT(std::make_pair(result.tag(), result.value()), ValueEq(expected));
     }
 
     // One of the values is true.
     for (int truePosition = 0; truePosition < numSlots; truePosition++) {
         accessors[truePosition]->reset(value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
 
-        auto [tag, val] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         TypedValue expected = makeBool(true);
-        ASSERT_THAT(std::make_pair(tag, val), ValueEq(expected));
+        ASSERT_THAT(std::make_pair(result.tag(), result.value()), ValueEq(expected));
 
         accessors[truePosition]->reset(value::TypeTags::Boolean, value::bitcastFrom<bool>(false));
     }
@@ -287,11 +287,11 @@ TEST_F(SBEPrimBinaryTest, BalancedOr) {
                                            value::bitcastFrom<bool>(true));
 
 
-            auto [tag, val] = runCompiledExpression(compiledExpr.get());
-            value::ValueGuard guard(tag, val);
+            value::TagValueOwned result =
+                value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
             TypedValue expected = nothingPosition < truePosition ? makeNothing() : makeBool(true);
-            ASSERT_THAT(std::make_pair(tag, val), ValueEq(expected));
+            ASSERT_THAT(std::make_pair(result.tag(), result.value()), ValueEq(expected));
 
             accessors[truePosition]->reset(value::TypeTags::Boolean,
                                            value::bitcastFrom<bool>(false));

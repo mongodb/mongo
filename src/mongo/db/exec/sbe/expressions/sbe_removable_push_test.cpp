@@ -85,7 +85,7 @@ public:
 
             aggAccessor.reset(runTag, runVal);
             auto out = runCompiledExpression(compiledRemovablePushFinalize.get());
-            value::ValueGuard outGuard{out.first, out.second};
+            value::TagValueOwned outOwned = value::TagValueOwned::fromRaw(out);
 
             ASSERT_EQ(out.first, expValues[i].tag());
             ASSERT_THAT(out, ValueEq(expValues[i].view()));

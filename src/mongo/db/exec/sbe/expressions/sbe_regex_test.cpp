@@ -51,66 +51,62 @@ class SBERegexTest : public EExpressionTestFixture {
 protected:
     void runAndAssertRegexCompile(const vm::CodeFragment* compiledExpr,
                                   std::string_view regexString) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
 
-        ASSERT_EQUALS(value::TypeTags::pcreRegex, tag);
+        ASSERT_EQUALS(value::TypeTags::pcreRegex, result.tag());
 
-        auto regex = value::getPcreRegexView(val);
+        auto regex = value::getPcreRegexView(result.value());
         std::string res = str::stream()
             << "/" << regex->pattern() << "/" << pcre_util::optionsToFlags(regex->options());
         ASSERT_EQUALS(res, regexString);
     }
 
     void runAndAssertMatchExpression(const vm::CodeFragment* compiledExpr, bool expected) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
 
-        ASSERT(tag == value::TypeTags::Boolean);
-        ASSERT_EQUALS(value::bitcastTo<bool>(val), expected);
+        ASSERT(result.tag() == value::TypeTags::Boolean);
+        ASSERT_EQUALS(value::bitcastTo<bool>(result.value()), expected);
     }
 
     void runAndAssertFindExpression(const vm::CodeFragment* compiledExpr,
                                     std::string_view expectedMatch,
                                     int idx) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
 
-        ASSERT(tag == value::TypeTags::Object);
-        auto obj = value::getObjectView(val);
+        ASSERT(result.tag() == value::TypeTags::Object);
+        auto obj = value::getObjectView(result.value());
 
-        auto [matchTag, matchVal] = obj->getField("match");
-        value::ValueGuard matchGuard(matchTag, matchVal);
-        ASSERT(value::isString(matchTag));
-        ASSERT_EQUALS(value::getStringView(matchTag, matchVal), expectedMatch);
+        auto match = obj->getField("match");
+        ASSERT(value::isString(match.tag));
+        ASSERT_EQUALS(value::getStringView(match.tag, match.value), expectedMatch);
 
-        auto [idxTag, idxVal] = obj->getField("idx");
-        value::ValueGuard idxGuard(idxTag, idxVal);
-        ASSERT_EQUALS(idxTag, value::TypeTags::NumberInt32);
-        ASSERT_EQUALS(value::numericCast<int32_t>(idxTag, idxVal), idx);
+        auto fieldIdx = obj->getField("idx");
+        ASSERT_EQUALS(fieldIdx.tag, value::TypeTags::NumberInt32);
+        ASSERT_EQUALS(value::numericCast<int32_t>(fieldIdx.tag, fieldIdx.value), idx);
     }
 
     void addMatchResult(value::Array* arrayPtr, std::string_view matchStr, int32_t idx) {
-        auto [objTag, objVal] = value::makeNewObject();
-        value::ValueGuard objGuard{objTag, objVal};
-        auto obj = value::getObjectView(objVal);
+        value::TagValueOwned ownedObj = value::TagValueOwned::fromRaw(value::makeNewObject());
+        auto obj = value::getObjectView(ownedObj.value());
 
         auto [matchStrTag, matchStrVal] = value::makeNewString(matchStr);
         auto [capturesTag, capturesVal] = value::makeNewArray();
         obj->push_back_raw("match", matchStrTag, matchStrVal);
         obj->push_back_raw("idx", value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(idx));
         obj->push_back_raw("captures", capturesTag, capturesVal);
-        objGuard.reset();
-        arrayPtr->push_back_raw(objTag, objVal);
+        arrayPtr->push_back(std::move(ownedObj));
     }
 
     void runAndAssertFindAllExpression(const vm::CodeFragment* compiledExpr,
                                        value::Array* expected) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
 
-        ASSERT(tag == value::TypeTags::Array);
-        auto arr = value::getArrayView(val);
+        ASSERT(result.tag() == value::TypeTags::Array);
+        auto arr = value::getArrayView(result.value());
 
         ASSERT_EQUALS(arr->size(), expected->size());
 
@@ -205,9 +201,8 @@ TEST_F(SBERegexTest, ComputesRegexFindAll) {
         EFn::kRegexFindAll, sbe::makeEs(makeE<EVariable>(regexSlot), makeE<EVariable>(inputSlot)));
     auto compiledExpr = compileExpression(*regexExpr);
 
-    auto [arrTag, arrVal] = value::makeNewArray();
-    value::ValueGuard arrGuard{arrTag, arrVal};
-    auto arrayView = value::getArrayView(arrVal);
+    auto expectedArr = value::TagValueOwned::fromRaw(value::makeNewArray());
+    auto arrayView = value::getArrayView(expectedArr.value());
 
     addMatchResult(arrayView, "line", 4);
     addMatchResult(arrayView, "line", 16);
