@@ -48,9 +48,15 @@ namespace mongo {
 namespace {
 
 /**
- * Returns the grouping type to be used, converting kDontGroup to
- * kGroupForPossiblyRetryableOperations for a top-level WriteUnitOfWork if the operation is not a
- * multi-document transaction and primary-driven index builds are enabled.
+ * Returns the grouping type to be used, converting kDontGroup to a batched mode for a top-level
+ * WriteUnitOfWork if the operation is not a multi-document transaction and primary-driven index
+ * builds are enabled. The chosen mode depends on whether the write is retryable:
+ *   - retryable write -> kGroupForAtomicWrite (single retryable statement, applied atomically).
+ *   - otherwise       -> kGroupForTransaction (atomic batched write without session info).
+ *
+ * A caller that requests an explicit (non-kDontGroup) grouping mode bypasses this conversion:
+ * 'groupType' is already set, so it is returned unchanged. This is how a write that intentionally
+ * batches multiple statements opts out of the single-statement atomic mode.
  */
 WriteUnitOfWork::OplogEntryGroupType getGroupType(OperationContext* opCtx,
                                                   WriteUnitOfWork::OplogEntryGroupType groupType,
@@ -61,11 +67,18 @@ WriteUnitOfWork::OplogEntryGroupType getGroupType(OperationContext* opCtx,
     }
 
     auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    return fcvSnapshot.isVersionInitialized() &&
-            feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
-                VersionContext::getDecoration(opCtx), fcvSnapshot)
-        ? WriteUnitOfWork::OplogEntryGroupType::kGroupForPossiblyRetryableOperations
-        : groupType;
+    const bool pdibEnabled = fcvSnapshot.isVersionInitialized() &&
+        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+            VersionContext::getDecoration(opCtx), fcvSnapshot);
+
+    if (!pdibEnabled) {
+        return groupType;
+    }
+
+    // Multi-document transactions already returned above, so a present txnNumber here means a
+    // retryable write.
+    return opCtx->getTxnNumber() ? WriteUnitOfWork::OplogEntryGroupType::kGroupForAtomicWrite
+                                 : WriteUnitOfWork::OplogEntryGroupType::kGroupForTransaction;
 }
 
 }  // namespace

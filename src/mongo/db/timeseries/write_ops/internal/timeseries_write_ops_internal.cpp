@@ -973,9 +973,15 @@ Status performAtomicTimeseriesWrites(
     curOp->raiseDbProfileLevel(DatabaseProfileSettings::get(opCtx->getServiceContext())
                                    .getDatabaseProfileLevel(ns.dbName()));
 
+    const bool pdibEnabled =
+        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
     WriteUnitOfWork::OplogEntryGroupType oplogEntryGroupType = WriteUnitOfWork::kDontGroup;
-    if (insertOps.size() > 1 && updateOps.empty() &&
-        !repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns)) {
+    const bool shouldGroup = pdibEnabled ? (insertOps.size() + updateOps.size() > 1)
+                                         : (insertOps.size() > 1 && updateOps.empty());
+    if (shouldGroup && !repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns)) {
         oplogEntryGroupType = WriteUnitOfWork::kGroupForPossiblyRetryableOperations;
     }
     WriteUnitOfWork wuow{opCtx, oplogEntryGroupType};
@@ -985,10 +991,7 @@ Status performAtomicTimeseriesWrites(
     if (!updateOps.empty() &&
         // When primary-driven index builds are enabled, we should avoid allocating op times
         // ourselves because the WriteUnitOfWork will do it for us.
-        !feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
-             .isEnabledUseLastLTSFCVWhenUninitialized(
-                 VersionContext::getDecoration(opCtx),
-                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        !pdibEnabled) {
         if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns)) {
             oplogSlots = repl::getNextOpTimes(opCtx, insertOps.size() + updateOps.size());
             slot = oplogSlots.begin();

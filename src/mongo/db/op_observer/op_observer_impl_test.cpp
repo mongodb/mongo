@@ -3724,6 +3724,125 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsGrouping) {
     }
 }
 
+// getGroupType() converts a top-level WUOW created with kDontGroup to a batched mode when
+// primary-driven index builds are enabled: kGroupForAtomicWrite for a retryable write, otherwise
+// kGroupForTransaction. The following tests verify the conversion through the resulting oplog
+// output.
+
+// A retryable write is grouped atomically: the batch replicates as an applyOps tagged
+// kApplyOpsAppliedAtomically and stamped with the session id and txnNumber, exactly as an explicit
+// kGroupForAtomicWrite would (see AtomicWriteEmitsAppliedAtomicallyTag).
+TEST_F(BatchedWriteOutputsTest, RetryableWriteWithPdibGroupsAtomically) {
+    // (Generic FCV reference): test requires an initialized FCV to enable the feature flag.
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
+    unittest::ServerParameterGuard pdib("featureFlagPrimaryDrivenIndexBuilds", true);
+
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    // Create the collection before resetting the oplog so its 'create' entry isn't counted below.
+    reset(opCtx, _nss);
+    resetOplogAndTransactions(opCtx);
+
+    std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
+    beginRetryableWriteWithTxnNumber(opCtx, 0 /*txnNumber*/, contextSession);
+
+    // Two ops so the batch produces an applyOps rather than the single-op fast path.
+    std::vector<InsertStatement> toInsert;
+    toInsert.emplace_back(StmtId(0), BSON("_id" << 0));
+    toInsert.emplace_back(kUninitializedStmtId, BSON("_id" << 1));
+
+    {
+        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+        // Default grouping (kDontGroup); getGroupType performs the conversion.
+        WriteUnitOfWork wuow(opCtx);
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx,
+            *autoColl,
+            toInsert.begin(),
+            toInsert.end(),
+            /*recordIds=*/{},
+            /*fromMigrate=*/std::vector<bool>(toInsert.size(), false),
+            /*defaultFromMigrate=*/false);
+        wuow.commit();
+    }
+
+    auto entry = assertGet(OplogEntry::parse(getNOplogEntries(opCtx, 1).back()));
+    EXPECT_EQ(entry.getCommandType(), OplogEntry::CommandType::kApplyOps);
+    EXPECT_EQ(entry.getMultiOpType(), repl::MultiOplogEntryType::kApplyOpsAppliedAtomically);
+    EXPECT_EQ(opCtx->getLogicalSessionId(), entry.getSessionId());
+    EXPECT_EQ(opCtx->getTxnNumber(), entry.getTxnNumber());
+}
+
+// A non-retryable write is grouped as a one-shot transaction: it batches into an applyOps that is
+// not tagged applied-atomically and carries no txnNumber.
+TEST_F(BatchedWriteOutputsTest, NonRetryableWriteWithPdibGroupsAsTransaction) {
+    // (Generic FCV reference): test requires an initialized FCV to enable the feature flag.
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
+    unittest::ServerParameterGuard pdib("featureFlagPrimaryDrivenIndexBuilds", true);
+
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    reset(opCtx, _nss);
+    reset(opCtx, NamespaceString::kRsOplogNamespace);
+
+    std::vector<InsertStatement> toInsert;
+    toInsert.emplace_back(kUninitializedStmtId, BSON("_id" << 0));
+    toInsert.emplace_back(kUninitializedStmtId, BSON("_id" << 1));
+
+    {
+        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+        WriteUnitOfWork wuow(opCtx);
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx,
+            *autoColl,
+            toInsert.begin(),
+            toInsert.end(),
+            /*recordIds=*/{},
+            /*fromMigrate=*/std::vector<bool>(toInsert.size(), false),
+            /*defaultFromMigrate=*/false);
+        wuow.commit();
+    }
+
+    auto entry = assertGet(OplogEntry::parse(getNOplogEntries(opCtx, 1).back()));
+    EXPECT_EQ(entry.getCommandType(), OplogEntry::CommandType::kApplyOps);
+    EXPECT_NE(entry.getMultiOpType(), repl::MultiOplogEntryType::kApplyOpsAppliedAtomically);
+    EXPECT_FALSE(entry.getTxnNumber());
+}
+
+// Without primary-driven index builds, kDontGroup is left as-is: writes are not batched, so each
+// insert replicates as its own (non-applyOps) oplog entry.
+TEST_F(BatchedWriteOutputsTest, WriteWithoutPdibIsNotGrouped) {
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    reset(opCtx, _nss);
+    reset(opCtx, NamespaceString::kRsOplogNamespace);
+
+    std::vector<InsertStatement> toInsert;
+    toInsert.emplace_back(kUninitializedStmtId, BSON("_id" << 0));
+    toInsert.emplace_back(kUninitializedStmtId, BSON("_id" << 1));
+
+    {
+        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+        WriteUnitOfWork wuow(opCtx);
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx,
+            *autoColl,
+            toInsert.begin(),
+            toInsert.end(),
+            /*recordIds=*/{},
+            /*fromMigrate=*/std::vector<bool>(toInsert.size(), false),
+            /*defaultFromMigrate=*/false);
+        wuow.commit();
+    }
+
+    // Two individual insert entries, neither wrapped in an applyOps.
+    for (const auto& obj : getNOplogEntries(opCtx, 2)) {
+        auto entry = assertGet(OplogEntry::parse(obj));
+        EXPECT_EQ(entry.getOpType(), repl::OpTypeEnum::kInsert);
+        EXPECT_NE(entry.getCommandType(), OplogEntry::CommandType::kApplyOps);
+    }
+}
+
 // The "tearable side write" redo state decorates the OperationContext: onBatchedWriteCommit arms it
 // (with the affected collection) when it throws a write conflict to redo a write. The armed UUID
 // must survive the WUOW rollback so the redo can read it, but must be consumed once a batched write
