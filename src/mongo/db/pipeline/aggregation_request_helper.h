@@ -99,8 +99,8 @@ MONGO_MOD_PUBLIC StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     boost::optional<ExplainOptions::Verbosity> explainVerbosity = boost::none);
 
 /**
- * Retrieves the query settings from 'expCtx' and if they are not empty, attaches them to the
- * request object.
+ * Retrieves the resolved query settings for the operation and, if non-default, attaches them to the
+ * request object. Thin wrapper over 'query_settings::addQuerySettingsToRequest'.
  */
 void addQuerySettingsToRequest(AggregateCommandRequest& request,
                                const boost::intrusive_ptr<ExpressionContext>& expCtx);

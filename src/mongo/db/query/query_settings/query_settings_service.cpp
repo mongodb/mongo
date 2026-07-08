@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/query_settings/query_settings_service.h"
 
+#include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/generic_argument_util.h"

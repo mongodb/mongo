@@ -216,12 +216,11 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
     auto queryShapeHash = CurOp::get(opCtx)->debug().ensureQueryShapeHash(
         opCtx, [&]() { return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, nss); });
 
-    // Perform the query settings lookup and attach it to 'expCtx'.
+    // Resolve the query settings for this operation.
     auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx);
     auto& findReq = *parsedRequest->findCommandRequest;
-    auto querySettings = querySettingsService.lookupQuerySettingsWithRejectionCheck(
+    querySettingsService.initializeSettingsForQuery(
         expCtx, queryShapeHash, nss, findReq.getQuerySettings());
-    expCtx->setQuerySettingsIfNotPresent(std::move(querySettings));
 
     // Register query stats collection. Exclude queries with encrypted fields as indicated by the
     // inclusion of encryptionInformation in the request.
@@ -299,6 +298,10 @@ public:
 
     ReadWriteType getReadWriteType() const override {
         return ReadWriteType::kRead;
+    }
+
+    bool supportsQuerySettings() const override {
+        return true;
     }
 
     std::size_t reserveBytesForReply() const override {
@@ -525,11 +528,10 @@ public:
                 return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, ns);
             });
 
-            // Perform the query settings lookup and attach it to 'expCtx'.
+            // Resolve the query settings for this operation.
             auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx);
-            auto querySettings = querySettingsService.lookupQuerySettingsWithRejectionCheck(
+            querySettingsService.initializeSettingsForQuery(
                 expCtx, queryShapeHash, ns, parsedRequest->findCommandRequest->getQuerySettings());
-            expCtx->setQuerySettingsIfNotPresent(std::move(querySettings));
 
             auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
                 .expCtx = std::move(expCtx), .parsedFind = std::move(parsedRequest)});

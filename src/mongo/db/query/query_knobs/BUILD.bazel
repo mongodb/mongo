@@ -45,6 +45,20 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "query_knob_configuration_test_util",
+    srcs = [
+        "query_knob_configuration_test_util.cpp",
+    ],
+    hdrs = [
+        "query_knob_configuration_test_util.h",
+    ],
+    deps = [
+        ":query_knob_configuration",
+        "//src/mongo/unittest:server_parameter_guard",
+    ],
+)
+
 mongo_cc_benchmark(
     name = "query_knob_configuration_bm",
     srcs = ["query_knob_configuration_bm.cpp"],

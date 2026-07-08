@@ -408,31 +408,6 @@ TEST_F(DocumentSourceUnionWithTest, ReturnEOFAfterBeingDisposed) {
     unionWith->dispose();
 }
 
-TEST_F(DocumentSourceUnionWithTest, OptimizePropagatesQuerySettingsToSubPipeline) {
-    auto parentExpCtx = getExpCtx();
-
-    // Build a subpipeline whose ExpressionContext is distinct from the parent's, so we can
-    // distinguish whether query settings are propagated by optimize().
-    auto subExpCtx =
-        makeCopyFromExpressionContext(parentExpCtx, parentExpCtx->getNamespaceString());
-    subExpCtx->setQuerySettings(boost::none);
-    ASSERT_FALSE(subExpCtx->getOptionalQuerySettings().has_value());
-
-    auto unionWith = make_intrusive<DocumentSourceUnionWith>(
-        parentExpCtx,
-        Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, subExpCtx));
-
-    // Attach a non-default QuerySettings to the parent ExpressionContext after construction.
-    query_settings::QuerySettings parentSettings;
-    parentSettings.setReject(true);
-    parentExpCtx->setQuerySettings(parentSettings);
-
-    unionWith->optimize();
-
-    ASSERT_TRUE(subExpCtx->getOptionalQuerySettings().has_value());
-    ASSERT_TRUE(subExpCtx->getQuerySettings().getReject().value_or(false));
-}
-
 TEST_F(DocumentSourceUnionWithTest, DependencyAnalysisReportsFullDoc) {
     auto expCtx = getExpCtx();
     const auto replaceRoot = DocumentSourceReplaceRoot::createFromBson(

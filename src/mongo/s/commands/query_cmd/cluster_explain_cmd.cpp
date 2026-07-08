@@ -136,6 +136,10 @@ public:
             return false;
         }
 
+        const CommandInvocation* inner() const override {
+            return _innerInvocation.get();
+        }
+
         /**
          * You are authorized to run an explain if you are authorized to run
          * the command that you are explaining. The auth check is performed recursively

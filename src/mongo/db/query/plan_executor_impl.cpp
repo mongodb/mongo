@@ -128,14 +128,14 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
       _planExplainer(plan_explainer_factory::make(
           _root.get(), cachedPlanHash, std::move(replanReason), std::move(maybeExplainData))),
       _mustReturnOwnedBson(returnOwnedBson),
+      // Read value of 'operationResponseMaxMS' query knob once, here at construction, where the
+      // knob configuration is resolved and available. The knob is fixed for the query's lifetime,
+      // so the value is cached and reused rather than re-read on every reattach (see header).
+      _operationResponseMaxMS(QueryKnobConfiguration::get(opCtx).getOperationResponseMaxMS()),
       _responseDeadlineType([&]() -> ResponseDeadlineType {
           // Determine response deadline type for change stream queries.
           if (_expCtx && _expCtx->getChangeStreamSpec().has_value()) {
-              // Read value of 'operationResponseMaxMS' query knob to determine whether we
-              // should set a response deadline for gracefully interrupting long-running operations
-              // or logging a warning about long-running oplog scans.
-              if (auto value = _expCtx->getQueryKnobConfiguration().getOperationResponseMaxMS();
-                  value > 0) {
+              if (_operationResponseMaxMS > 0) {
                   // Use the response deadline to periodically interrupt the executor after a
                   // user-configurable time period of performing work. This allows us to return
                   // an updated PBRT to the consumer and check for interrupts more frequently during
@@ -565,24 +565,24 @@ std::unique_ptr<insert_listener::Notifier> PlanExecutorImpl::makeNotifier() {
 }
 
 boost::optional<Date_t> PlanExecutorImpl::_calculateResponseDeadlineValue() const {
-    if (_responseDeadlineType == ResponseDeadlineType::kNone) {
-        // No response deadline configured.
+    if (_responseDeadlineType == ResponseDeadlineType::kNone || !_opCtx) {
+        // No response deadline configured, or no operation to compute one against (e.g. recomputed
+        // during disposal, which reattaches the executor to a foreign or null opCtx).
         return boost::none;
     }
 
     auto now = _opCtx->getServiceContext()->getPreciseClockSource()->now();
     if (_responseDeadlineType == ResponseDeadlineType::kInterruptWork) {
-        auto value = _expCtx->getQueryKnobConfiguration().getOperationResponseMaxMS();
         tassert(
             10290002,
             "Expected 'operationResponseMaxMS' to be set to a value > 0 if response deadline type "
             "is 'kInterruptWork'",
-            value > 0);
+            _operationResponseMaxMS > 0);
 
         // Use configured operation response timeout as the response deadline. If the
         // response deadline is reached, the executor will return whatever results it has
         // accumulated plus an updated PBRT to the consumer.
-        return now + Milliseconds(value);
+        return now + Milliseconds(_operationResponseMaxMS);
     }
 
     // Use hard-coded response deadline to inform the user about a long-running oplog scan at

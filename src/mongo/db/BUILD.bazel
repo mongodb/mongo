@@ -2843,6 +2843,7 @@ mongo_cc_library(
         "periodic_runner_job_abort_expired_transactions",
         "//src/mongo/db/pipeline:change_stream_expired_pre_image_remover",
         "//src/mongo/db/pipeline/process_interface:mongod_process_interface_factory",
+        "//src/mongo/db/query/query_settings:query_settings_command_hooks",
         "//src/mongo/db/query/query_settings:query_settings_service",
         "//src/mongo/db/query/compiler/stats",
         "//src/mongo/db/repl/initial_sync:initial_syncer",

@@ -31,8 +31,11 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_knobs/query_knob_snapshot.h"
+#include "mongo/db/query/query_settings/query_settings_context.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/util/modules.h"
+
+#include <variant>
 
 namespace mongo::query_settings {
 
@@ -68,5 +71,18 @@ enum class KnobOverrideResult { kApplied, kNotStarted, kPending };
  */
 MONGO_MOD_PUBLIC KnobOverrideResult tryOverrideQueryKnobValues(OperationContext* opCtx,
                                                                QueryKnobSnapshot& snapshot);
+
+/**
+ * Attaches the operation's resolved query settings to 'request' via 'request.setQuerySettings'. A
+ * no-op unless resolution produced non-default settings: only the 'QuerySettings' alternative
+ * carries them (default resolutions collapse to 'Empty', and pending ones have not resolved yet).
+ */
+template <typename Request>
+void addQuerySettingsToRequest(OperationContext* opCtx, Request& request) {
+    auto& state = query_settings_details::getQuerySettingsStateForOp(opCtx);
+    if (auto* settings = std::get_if<QuerySettings>(&state)) {
+        request.setQuerySettings(*settings);
+    }
+}
 
 }  // namespace mongo::query_settings

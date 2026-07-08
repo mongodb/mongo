@@ -650,8 +650,6 @@ boost::intrusive_ptr<ExpressionContext> makeCopyFromExpressionContext(
     expCtx->variablesParseState =
         other->variablesParseState.copyWith(expCtx->variables.useIdGenerator());
 
-    expCtx->setQuerySettings(other->getOptionalQuerySettings());
-
     if (other->isHybridSearch()) {
         expCtx->setIsHybridSearch();
     }

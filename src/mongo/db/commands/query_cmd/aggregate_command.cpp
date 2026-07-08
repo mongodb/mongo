@@ -114,6 +114,10 @@ public:
         return true;
     }
 
+    bool supportsQuerySettings() const override {
+        return true;
+    }
+
     class Invocation final : public MinimalInvocationBase {
     public:
         Invocation(OperationContext* opCtx, Command* cmd, const OpMsgRequest& opMsgRequest)

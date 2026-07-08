@@ -144,5 +144,6 @@ mongo_cc_unit_test(
         "//src/mongo/db:query_exec",
         "//src/mongo/db/index_builds:index_builds_coordinator",
         "//src/mongo/db/query/compiler/optimizer/join:unit_test_helpers",
+        "//src/mongo/db/query/query_knobs:query_knob_configuration_test_util",
     ],
 )

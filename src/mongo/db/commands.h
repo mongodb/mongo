@@ -762,6 +762,14 @@ public:
     }
 
     /**
+     * Returns whether this command supports query settings (PQS). Commands that resolve query
+     * settings for their query (e.g. find, aggregate, distinct) override this to return true.
+     */
+    virtual bool supportsQuerySettings() const {
+        return false;
+    }
+
+    /**
      * Override to true if this command should be allowed on a direct shard connection regardless
      * of the directShardOperations ActionType.
      */
@@ -899,6 +907,14 @@ public:
      */
     virtual bool supportsRawData() const {
         return false;
+    }
+
+    /**
+     * Returns the invocation this invocation wraps, or nullptr if it does not wrap one. Wrapping
+     * invocations (e.g. explain) override this so callers can inspect the wrapped invocation.
+     */
+    virtual const CommandInvocation* inner() const {
+        return nullptr;
     }
 
     /**

@@ -50,6 +50,20 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "query_settings_command_hooks",
+    srcs = [
+        "query_settings_command_hooks.cpp",
+    ],
+    hdrs = [
+        "query_settings_command_hooks.h",
+    ],
+    deps = [
+        ":query_settings",
+        "//src/mongo/db:commands",
+    ],
+)
+
 idl_generator(
     name = "query_settings_cluster_parameter_gen",
     src = "query_settings_cluster_parameter.idl",
@@ -87,6 +101,7 @@ mongo_cc_library(
         "//src/mongo/client:remote_command_targeter",
         "//src/mongo/crypto:fle_fields",
         "//src/mongo/crypto:sha256_block",
+        "//src/mongo/db:commands",
         "//src/mongo/db:index_key_validate",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
@@ -100,6 +115,18 @@ mongo_cc_library(
         "//src/mongo/db/shard_role/lock_manager:exception_util",
         "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter",
         "//src/mongo/executor:async_rpc",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_settings_context_test_util",
+    srcs = [
+        "query_settings_context_test_util.cpp",
+    ],
+    hdrs = ["query_settings_context_test_util.h"],
+    deps = [
+        ":query_settings",
+        "//src/mongo/unittest",
     ],
 )
 

@@ -37,6 +37,7 @@
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/optimizer/join/logical_defs.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -454,7 +455,8 @@ TEST_F(JoinPlanCacheKeyAggModelTest, InferredSingleTablePredicateAppearsInKey) {
 
     // Disable inference: the predicate is no longer propagated to the main
     // collection's access path, so the key reflects only the raw graph shape.
-    unittest::ServerParameterGuard noInference{"internalInferSingleTablePredicates", false};
+    QueryKnobGuardForTest noInference{
+        operationContext(), "internalInferSingleTablePredicates", false};
     auto keyWithoutInference = buildKey();
 
     ASSERT_NE(keyWithInference, keyWithoutInference);

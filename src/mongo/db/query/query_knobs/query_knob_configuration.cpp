@@ -102,6 +102,10 @@ const QueryKnobConfiguration& QueryKnobConfiguration::get(OperationContext* opCt
     return *instance;
 }
 
+void QueryKnobConfiguration::reset_forTest(OperationContext* opCtx) {
+    decoration(opCtx).reset();
+}
+
 bool QueryKnobConfiguration::_isKnobReadAllowed(QueryKnobId id) const {
     // Any read is allowed once the overrides are applied, or before the query starts (eligibility
     // not yet known). Only the pending window, where settings may still override a knob, restricts

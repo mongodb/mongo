@@ -577,18 +577,7 @@ Value DocumentSourceUnionWith::serialize(const query_shape::SerializationOptions
         tassert(11282958, "Missing pipeline copy", pipeCopy);
 
         auto preparePipelineAndExplain = [&](std::unique_ptr<Pipeline> pipeline) {
-            // Query settings are looked up after parsing and therefore are not populated in the
-            // context of the unionWith '_pipeline' as part of DocumentSourceUnionWith
-            // constructor. Attach query settings to the '_pipeline->getContext()' by copying
-            // them from the parent query ExpressionContext.
-            //
-            // NOTE: this is done here, as opposed to at the beginning of the serialize() method
-            // because serialize() is called when generating query shape, however, at that
-            // moment no query settings are present in the parent context.
             _sharedState->_pipeline->getContext()->initializeReferencedSystemVariables();
-            _sharedState->_pipeline->getContext()->setQuerySettingsIfNotPresent(
-                getExpCtx()->getQuerySettings());
-
             return getExpCtx()->getMongoProcessInterface()->finalizePipelineAndExplain(
                 std::move(pipeline),
                 *opts.verbosity,

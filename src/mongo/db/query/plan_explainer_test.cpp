@@ -43,6 +43,7 @@
 #include "mongo/db/query/plan_explainer_sbe.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_settings/query_knob_overrides.h"
+#include "mongo/db/query/query_settings/query_settings_context_test_util.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
@@ -739,13 +740,12 @@ TEST_F(PlanExplainerTest, GenerateQueryKnobsEmitsNothingWhenFeatureFlagOff) {
 }
 
 TEST_F(PlanExplainerTest, GenerateQueryKnobsEmitsQuerySettingsKnobsWhenFeatureFlagOn) {
+    auto* opCtx = operationContext();
     unittest::ServerParameterGuard flagGuard("featureFlagPqsQueryKnobs", true);
+    query_settings::QuerySettingsGuardForTest settingsGuard(
+        opCtx, fromjson(R"({queryKnobs: {samplingMarginOfError: 2.5}})"));
 
-    query_settings::QuerySettings qs;
-    qs.setQueryKnobs(
-        query_settings::QuerySettingsKnobOverrides::fromBSON(BSON("samplingMarginOfError" << 2.5)));
-    auto testExpCtx = make_intrusive<ExpressionContextForTest>(operationContext(), kNss);
-    testExpCtx->setQuerySettings(qs);
+    auto testExpCtx = make_intrusive<ExpressionContextForTest>(opCtx, kNss);
 
     BSONObjBuilder bob;
     explain_common::generateQueryKnobs(testExpCtx, &bob);
@@ -758,14 +758,12 @@ TEST_F(PlanExplainerTest, GenerateQueryKnobsEmitsQuerySettingsKnobsWhenFeatureFl
 }
 
 TEST_F(PlanExplainerTest, GenerateQueryKnobsOmitsKnobsWhenOutputNearlyFull) {
+    auto* opCtx = operationContext();
     unittest::ServerParameterGuard flagGuard("featureFlagPqsQueryKnobs", true);
-
-    query_settings::QuerySettings qs;
-    qs.setQueryKnobs(query_settings::QuerySettingsKnobOverrides::fromBSON(
-        BSON("samplingMarginOfError" << 2.5 << "planRankerMode"
-                                     << "samplingCE")));
-    auto testExpCtx = make_intrusive<ExpressionContextForTest>(operationContext(), kNss);
-    testExpCtx->setQuerySettings(qs);
+    query_settings::QuerySettingsGuardForTest settingsGuard(
+        opCtx,
+        fromjson(R"({queryKnobs: {samplingMarginOfError: 2.5, planRankerMode: "samplingCE"}})"));
+    auto testExpCtx = make_intrusive<ExpressionContextForTest>(opCtx, kNss);
 
     int knobsSize = 0;
     {

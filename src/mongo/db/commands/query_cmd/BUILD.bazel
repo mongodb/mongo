@@ -97,6 +97,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:commands",
+        "//src/mongo/db/query/query_settings",
     ],
 )
 

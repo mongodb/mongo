@@ -130,6 +130,10 @@ public:
         return true;
     }
 
+    bool supportsQuerySettings() const override {
+        return true;
+    }
+
     class Invocation final : public TC::MinimalInvocationBase {
         using TC::MinimalInvocationBase::request;
         using TC::MinimalInvocationBase::unparsedRequest;

@@ -981,11 +981,10 @@ void computeShapeAndRegisterQueryStats(const AggExState& aggExState,
             expCtx, deferredShape, aggExState.getOriginalNss());
     });
 
-    // Perform the query settings lookup and attach it to 'expCtx'.
+    // Resolve the query settings for this operation.
     auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx);
-    auto querySettings = querySettingsService.lookupQuerySettingsWithRejectionCheck(
+    querySettingsService.initializeSettingsForQuery(
         expCtx, queryShapeHash, aggExState.getOriginalNss(), userRequest.getQuerySettings());
-    expCtx->setQuerySettingsIfNotPresent(std::move(querySettings));
 
     // If this is a query over a resolved view, we want to register query stats with the
     // original user-given request and pipeline, rather than the new request generated when

@@ -214,14 +214,6 @@ StatusWith<Predicates> extractPredicatesFromLookup(const DocumentSourceLookUp& l
 
     // Recreate the pipeline with just our STPs & any CBR + SBE eligible subpipeline.
     auto cqExpCtx = lookup.getSubpipelineExpCtx();
-
-    // Propagate query settings onto the sub-pipeline ExpressionContext before we build a
-    // CanonicalQuery from it. Constructing the CQ (and the sampling/cost estimation that follows)
-    // reads the query knob configuration off 'cqExpCtx', which initializes it. Since query settings
-    // must be assigned before the knobs are initialized, we mirror what LookUpStage does at runtime
-    // (see LookUpStage::prepareStateToBuildPipeline) and set them here first. Otherwise, executing
-    // the resulting plan would trip the tassert in setQuerySettingsIfNotPresent().
-    cqExpCtx->setQuerySettingsIfNotPresent(lookup.getExpCtx()->getQuerySettings());
     auto pipelineForCQ =
         Pipeline::create(DocumentSourceContainer(start, lookup.getSubPipeline()->end()), cqExpCtx);
     if (singleTablePredicates) {

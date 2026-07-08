@@ -585,11 +585,6 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
                                                                 bool allowForeignSharded) {
     _variables.copyToExpCtx(_variablesParseState, _fromExpCtx.get());
 
-    // Query settings are looked up after parsing and therefore are not populated in the
-    // '_fromExpCtx' as part of DocumentSourceGraphLookUp constructor. Assign query settings
-    // to the '_fromExpCtx' by copying them from the parent query ExpressionContext.
-    _fromExpCtx->setQuerySettingsIfNotPresent(pExpCtx->getQuerySettings());
-
     const ShardTargetingPolicy shardTargetingPolicy =
         allowForeignSharded ? ShardTargetingPolicy::kAllowed : ShardTargetingPolicy::kNotAllowed;
 

@@ -58,6 +58,8 @@
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/query/query_settings/query_settings.h"
+#include "mongo/db/query/query_settings/query_settings_context.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/query/util/deferred.h"
@@ -925,13 +927,7 @@ public:
 
     // TODO SERVER-108400: reconsider API for accessing QuerySettings instance.
     const query_settings::QuerySettings& getQuerySettings() const {
-        static const auto kEmptySettings = query_settings::QuerySettings();
-        return _querySettings.get_value_or(kEmptySettings);
-    }
-
-    // TODO SERVER-108400: reconsider API for accessing QuerySettings instance.
-    const boost::optional<query_settings::QuerySettings>& getOptionalQuerySettings() const {
-        return _querySettings;
+        return query_settings::forOp(getOperationContext());
     }
 
     // Resolves the VersionContext for a feature-flag check on this ExpressionContext.
@@ -946,34 +942,9 @@ public:
         return kNoVersionContext;
     }
 
-    /**
-     * Attaches 'querySettings' to context if they were not previously set.
-     *
-     * TODO SERVER-108400: reconsider API for accessing QuerySettings instance.
-     */
-    void setQuerySettingsIfNotPresent(query_settings::QuerySettings querySettings) {
-        if (_querySettings.has_value()) {
-            return;
-        }
-
-        tassert(8827100,
-                "Query knobs shouldn't be initialized before query settings are set",
-                !_queryKnobConfiguration.isInitialized());
-
-        _querySettings = std::move(querySettings);
-    }
-
-    // TODO SERVER-108400: reconsider API for accessing QuerySettings instance.
-    void setQuerySettings(const boost::optional<query_settings::QuerySettings>& querySettings) {
-        _querySettings = querySettings;
-    }
-
+    // TODO SERVER-108400: clean this up; the knob configuration now lives on the operation.
     const QueryKnobConfiguration& getQueryKnobConfiguration() const {
-        return _queryKnobConfiguration.get(getQuerySettings());
-    }
-
-    bool queryKnobIsInitialized() const {
-        return _queryKnobConfiguration.isInitialized();
+        return QueryKnobConfiguration::get(getOperationContext());
     }
 
     void setIgnoreCollator() {
@@ -1398,13 +1369,6 @@ private:
     // We use this set to indicate whether or not a system variable was referenced in the query that
     // is being executed (if the variable was referenced, it is an element of this set).
     stdx::unordered_set<Variables::Id> _systemVarsReferencedInQuery;
-
-    boost::optional<query_settings::QuerySettings> _querySettings = boost::none;
-
-    DeferredFn<QueryKnobConfiguration, const query_settings::QuerySettings&>
-        _queryKnobConfiguration{[](const auto& querySettings) {
-            return QueryKnobConfiguration(querySettings);
-        }};
 
     Deferred<bool (*)(const VersionContext&)> _featureFlagShardFilteringDistinctScan{
         [](const VersionContext& vCtx) {

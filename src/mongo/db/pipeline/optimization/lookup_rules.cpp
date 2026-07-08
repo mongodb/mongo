@@ -48,7 +48,7 @@ namespace {
 bool canOptimizeSubPipeForJoinOpt(PipelineRewriteContext& ctx) {
     auto& lookup = ctx.currentAs<DocumentSourceLookUp>();
 
-    if (lookup.hasPipeline() && ctx.getExpCtx().queryKnobIsInitialized()) {
+    if (lookup.hasPipeline()) {
         // Join optimization currently only supports lookup subpipelines with a depth of 1 eg there
         // cannot be further nested subpipelines.
         auto depth = lookup.getSubpipelineExpCtx()->getSubPipelineDepth();

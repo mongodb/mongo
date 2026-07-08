@@ -455,11 +455,6 @@ void LookUpStage::prepareStateToBuildPipeline(
     _variables.copyToExpCtx(_variablesParseState, fromExpCtx.get());
     fromExpCtx->setPlanCache(ExpressionContext::PlanCacheOptions::kForcePlanCache);
 
-    // Query settings are looked up after parsing and therefore are not populated in the
-    // 'fromExpCtx' as part of DocumentSourceLookUp constructor. Assign query settings to the
-    // 'fromExpCtx' by copying them from the parent query ExpressionContext.
-    fromExpCtx->setQuerySettingsIfNotPresent(getContext()->getQuerySettings());
-
     // Resolve the 'let' variables to values per the given input document.
     resolveLetVariables(inputDoc, &fromExpCtx->variables);
 

@@ -374,6 +374,12 @@ private:
     // deadline is reached. Cleared upon every 'reattachToOperationContext()' call.
     bool _interrupted = false;
 
+    // The 'operationResponseMaxMS' knob value captured at construction. The knob is fixed for the
+    // query's lifetime, so it is cached here rather than re-read on every
+    // 'reattachToOperationContext' call, where the current opCtx may be foreign or absent (e.g.
+    // during cursor disposal).
+    long long _operationResponseMaxMS = 0;
+
     // The currently used response deadline type.
     ResponseDeadlineType _responseDeadlineType = ResponseDeadlineType::kNone;
 

@@ -155,11 +155,10 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
     auto queryShapeHash = CurOp::get(opCtx)->debug().ensureQueryShapeHash(
         opCtx, [&]() { return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, nss); });
 
-    // Perform the query settings lookup and attach it to 'expCtx'.
+    // Resolve the query settings for this operation.
     auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx);
-    auto querySettings = querySettingsService.lookupQuerySettingsWithRejectionCheck(
+    querySettingsService.initializeSettingsForQuery(
         expCtx, queryShapeHash, nss, distinctCommandRequest.getQuerySettings());
-    expCtx->setQuerySettingsIfNotPresent(std::move(querySettings));
 
     // We do not collect queryStats on explain for distinct.
     if (feature_flags::gFeatureFlagQueryStatsCountDistinct.isEnabledUseLastLTSFCVWhenUninitialized(
@@ -341,6 +340,10 @@ public:
     }
 
     bool allowedInTransactions() const final {
+        return true;
+    }
+
+    bool supportsQuerySettings() const override {
         return true;
     }
 

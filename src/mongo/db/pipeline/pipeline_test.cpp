@@ -204,9 +204,6 @@ protected:
         ctx->setResolvedNamespace(lookupCollNs, {lookupCollNs, std::vector<BSONObj>{}});
         ctx->setResolvedNamespace(unionCollNs, {unionCollNs, std::vector<BSONObj>{}});
 
-        // Query settings needed for some tests.
-        ctx->setQuerySettingsIfNotPresent(query_settings::QuerySettings());
-
         auto outputPipe = pipeline_factory::makePipeline(
             request.getPipeline(), ctx, pipeline_factory::kOptionsMinimal);
         pipeline_optimization::optimizePipeline(*outputPipe);

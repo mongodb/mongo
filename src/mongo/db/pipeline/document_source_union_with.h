@@ -268,9 +268,6 @@ public:
                                                  DocumentSourceContainer* container);
 
     boost::intrusive_ptr<DocumentSource> optimize() {
-        // Propagate query settings from the parent before optimizing.
-        _sharedState->_pipeline->getContext()->setQuerySettingsIfNotPresent(
-            getExpCtx()->getQuerySettings());
         pipeline_optimization::optimizePipeline(*_sharedState->_pipeline);
         return this;
     }

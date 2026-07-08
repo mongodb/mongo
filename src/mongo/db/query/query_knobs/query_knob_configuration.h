@@ -65,6 +65,13 @@ public:
     static const QueryKnobConfiguration& get(OperationContext* opCtx);
 
     /**
+     * Clears the cached configuration for 'opCtx' so the next 'get()' rebuilds it from the current
+     * global knob snapshot. Test-only: production keeps one configuration for an operation's whole
+     * lifetime, but a test may need to observe a knob value toggled mid-operation.
+     */
+    static void reset_forTest(OperationContext* opCtx);
+
+    /**
      * Read a knob value from the snapshot. T is deduced from the descriptor.
      */
     template <typename T>

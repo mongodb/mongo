@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/optimization/graph_validation_rules.h"
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 
 namespace mongo::pipeline_optimization {
@@ -74,9 +75,7 @@ void optimizePipeline(Pipeline& pipeline) {
         removeArraynessValidationStages(pipeline);
     }
 
-    if (pipeline.getContext()->getOptionalQuerySettings() &&
-        pipeline.getContext()
-            ->getQueryKnobConfiguration()
+    if (QueryKnobConfiguration::get(pipeline.getContext()->getOperationContext())
             .getEnablePipelineOptimizationAdditionalTestingRules()) {
         applyRuleBasedRewrites(rbr::PipelineRewriteContext(pipeline), Tags::Testing);
     }

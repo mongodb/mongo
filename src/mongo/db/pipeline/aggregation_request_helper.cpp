@@ -45,6 +45,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_settings/query_settings.h"
 #include "mongo/db/query/query_utils.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/tenant_id.h"
@@ -100,10 +101,7 @@ AggregateCommandRequest parseFromBSON(const BSONObj& cmdObj,
 
 void addQuerySettingsToRequest(AggregateCommandRequest& request,
                                const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    const auto& querySettings = expCtx->getQuerySettings();
-    if (!querySettings.toBSON().isEmpty()) {
-        request.setQuerySettings(querySettings);
-    }
+    query_settings::addQuerySettingsToRequest(expCtx->getOperationContext(), request);
 }
 
 void addIfrFlagsToRequest(AggregateCommandRequest& request,

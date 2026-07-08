@@ -50,6 +50,13 @@ const QuerySettings& forOp(OperationContext* opCtx) {
             [&](const NotStarted&) -> const QuerySettings& { return kEmpty; },
             // Eligible but not yet resolved: reading now would observe stale values.
             [&](const Pending&) -> const QuerySettings& {
+                // A nested DBDirectClient command may run before the user command resolves its
+                // settings (e.g. loading 'system.js' while parsing a $where filter). From the
+                // nested command's perspective the settings were never initiated, so it observes
+                // none.
+                if (opCtx->getClient()->isInDirectClient()) {
+                    return kEmpty;
+                }
                 tasserted(13020703, "query settings read while resolution is still pending");
             },
             // Resolution matched nothing: no settings apply.
@@ -66,7 +73,16 @@ KnobOverrideResult tryOverrideQueryKnobValues(OperationContext* opCtx,
                           // No eligible command has begun yet; the caller must retry later.
                           [&](const NotStarted&) { return KnobOverrideResult::kNotStarted; },
                           // Settings are still pending resolution; the caller must retry later.
-                          [&](const Pending&) { return KnobOverrideResult::kPending; },
+                          [&](const Pending&) {
+                              // A nested DBDirectClient command running inside the user command's
+                              // pending window observes no settings (see 'forOp'): report
+                              // 'kNotStarted' so its knob reads are unrestricted and the outer
+                              // command still installs its overrides on a later retry.
+                              if (opCtx->getClient()->isInDirectClient()) {
+                                  return KnobOverrideResult::kNotStarted;
+                              }
+                              return KnobOverrideResult::kPending;
+                          },
                           // Not eligible, or resolution matched nothing: no overrides to apply.
                           [&](const Empty&) { return KnobOverrideResult::kApplied; },
                           [&](const QuerySettings& settings) {

@@ -75,6 +75,10 @@ public:
         return Impl::getApiVersions();
     }
 
+    bool supportsQuerySettings() const override {
+        return true;
+    }
+
     class Invocation final : public TC::MinimalInvocationBase {
         using TC::MinimalInvocationBase::MinimalInvocationBase;
         using TC::MinimalInvocationBase::request;

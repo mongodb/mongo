@@ -585,12 +585,11 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
         return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, nsStruct.executionNss);
     });
 
-    // Perform the query settings lookup and attach it to 'expCtx'.
+    // Resolve the query settings for this operation.
     {
         auto& service = query_settings::QuerySettingsService::get(opCtx);
-        auto querySettings = service.lookupQuerySettingsWithRejectionCheck(
+        service.initializeSettingsForQuery(
             expCtx, queryShapeHash, nsStruct.executionNss, request.getQuerySettings());
-        expCtx->setQuerySettingsIfNotPresent(std::move(querySettings));
     }
 
     // Skip query stats recording for queryable encryption queries.
@@ -1174,9 +1173,15 @@ void makeEOFExplainResult(OperationContext* opCtx,
             *pipeline,
             expCtx);
     }};
-    CurOp::get(opCtx)->debug().ensureQueryShapeHash(opCtx, [&]() {
+    auto queryShapeHash = CurOp::get(opCtx)->debug().ensureQueryShapeHash(opCtx, [&]() {
         return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, namespaces.executionNss);
     });
+
+    // Resolve the query settings for this operation. The regular resolution point in
+    // 'runAggregateImpl' is never reached on this path, and serializing the explain output below
+    // reads knobs that query settings may override.
+    query_settings::QuerySettingsService::get(opCtx).initializeSettingsForQuery(
+        expCtx, queryShapeHash, namespaces.executionNss, request.getQuerySettings());
 
     explain_common::generateQueryShapeHash(opCtx, result);
     explain_common::generateServerInfo(result);

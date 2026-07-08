@@ -701,11 +701,10 @@ std::unique_ptr<CanonicalQuery> ClusterFind::generateAndValidateCanonicalQuery(
         return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, origNss);
     });
 
-    // Perform the query settings lookup and attach it to 'expCtx'.
+    // Resolve the query settings for this operation.
     auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx);
-    auto querySettings = querySettingsService.lookupQuerySettingsWithRejectionCheck(
+    querySettingsService.initializeSettingsForQuery(
         expCtx, queryShapeHash, origNss, parsedFind->findCommandRequest->getQuerySettings());
-    expCtx->setQuerySettingsIfNotPresent(std::move(querySettings));
 
     if (mustRegisterRequestToQueryStats) {
         query_stats::registerRequest(

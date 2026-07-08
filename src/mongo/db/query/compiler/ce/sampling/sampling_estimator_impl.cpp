@@ -334,9 +334,6 @@ std::unique_ptr<CanonicalQuery> SamplingEstimatorImpl::makeEmptyCanonicalQuery(
             .nonArrayPathsForNssFrom(*customerQueryExpCtx);
     }
     auto samplingQueryExpCtx = builder.build();
-    if (customerQueryExpCtx) {
-        samplingQueryExpCtx->setQuerySettings(customerQueryExpCtx->getOptionalQuerySettings());
-    }
     auto statusWithCQ = CanonicalQuery::make(
         {.expCtx = samplingQueryExpCtx,
          .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand)}});

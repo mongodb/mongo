@@ -607,6 +607,7 @@ mongo_cc_library(
         "//src/mongo/db/extension/host:extension_loader",
         "//src/mongo/db/ftdc:ftdc_mongos",
         "//src/mongo/db/process_health:fault_manager",
+        "//src/mongo/db/query/query_settings:query_settings_command_hooks",
         "//src/mongo/db/query/query_settings:query_settings_service",
         "//src/mongo/db/query/search:search_task_executors",
         "//src/mongo/db:read_write_concern_defaults",
