@@ -112,7 +112,7 @@ void ReplicationCoordinatorImpl::CatchupState::start(WithLock lk) {
 
 void ReplicationCoordinatorImpl::CatchupState::abort(WithLock lk,
                                                      PrimaryCatchUpConclusionReason reason) {
-    invariant(_repl->_getMemberState(lk).primary());
+    invariant(_repl->_getMemberState().primary());
 
     ReplicationMetrics::get(getGlobalServiceContext())
         .incrementNumCatchUpsConcludedForReason(reason);
@@ -244,18 +244,18 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
 
     const MemberState newState = _topCoord->getMemberState();
 
-    if (newState == _memberState) {
+    if (newState == _getMemberState()) {
         return kActionNone;
     }
 
     PostMemberStateUpdateAction result;
-    if (_memberState.primary() || newState.removed() || newState.rollback()) {
+    if (_getMemberState().primary() || newState.removed() || newState.rollback()) {
         // Wake up any threads blocked in awaitReplication, close connections, etc.
         _replicationWaiterList.setErrorAll(
             lk,
             {ErrorCodes::PrimarySteppedDown, "Primary stepped down while waiting for replication"});
 
-        if (_memberState.primary()) {
+        if (_getMemberState().primary()) {
             // We may have already disallowed primary majority reads via failing a replication
             // waiter in the previous line. However, it's possible we are stepping down here before
             // we managed to create a waiter, so in that case we should explicitly indicate that we
@@ -291,7 +291,7 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
     }
 
     // Exit catchup mode if we're in it and enable replication producer and applier on stepdown.
-    if (_memberState.primary()) {
+    if (_getMemberState().primary()) {
         if (_catchupState) {
             // _pendingTermUpdateDuringStepDown is set before stepping down due to hearing about a
             // higher term, so that we can remember the term we heard and update our term as part of
@@ -308,11 +308,11 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
         _externalState->startProducerIfStopped();
     }
 
-    if (_memberState.secondary() && !newState.primary() && !newState.rollback()) {
+    if (_getMemberState().secondary() && !newState.primary() && !newState.rollback()) {
         // Switching out of SECONDARY, but not to PRIMARY or ROLLBACK. Note that ROLLBACK case is
         // handled separately and requires RSTL lock held, see setFollowerModeRollback.
         _readWriteAbility->setCanServeNonLocalReads_UNSAFE(0U);
-    } else if (!_memberState.primary() && newState.secondary()) {
+    } else if (!_getMemberState().primary() && newState.secondary()) {
         // Switching into SECONDARY, but not from PRIMARY.
         _readWriteAbility->setCanServeNonLocalReads_UNSAFE(1U);
     }
@@ -325,13 +325,13 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
     }
 
     // If we are transitioning from secondary, cancel any scheduled takeovers.
-    if (_memberState.secondary()) {
+    if (_getMemberState().secondary()) {
         _cancelCatchupTakeover(lk);
         _cancelPriorityTakeover(lk);
     }
 
     // Ensure replication is running if we are no longer REMOVED.
-    if (_memberState.removed() && !newState.arbiter()) {
+    if (_getMemberState().removed() && !newState.arbiter()) {
         LOGV2(5268000, "Scheduling a task to begin or continue replication");
         _scheduleWorkAt(_replExecutor->now(),
                         [=, this](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
@@ -351,7 +351,7 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
     LOGV2(21358,
           "Replica set state transition",
           "newState"_attr = newState,
-          "oldState"_attr = _memberState);
+          "oldState"_attr = _getMemberState());
 
     // Initializes the featureCompatibilityVersion to the latest value, because arbiters do not
     // receive the replicated version. This is to avoid bugs like SERVER-32639.
@@ -361,7 +361,7 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot().logFCVWithContext("arbiter"sv);
     }
 
-    _memberState = newState;
+    _memberState.store(newState);
 
     _cancelAndRescheduleElectionTimeout(lk);
 
@@ -389,7 +389,7 @@ void ReplicationCoordinatorImpl::_postWonElectionUpdateMemberState(WithLock lk) 
 
     invariant(nextAction == kActionFollowerModeStateChange,
               str::stream() << "nextAction == " << static_cast<int>(nextAction));
-    invariant(_getMemberState(lk).primary());
+    invariant(_getMemberState().primary());
     // Clear the sync source.
     _onFollowerModeStateChange();
 

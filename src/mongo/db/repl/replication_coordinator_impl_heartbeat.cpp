@@ -323,9 +323,9 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
             // It is safe to update our commit point via heartbeat propagation as long as the
             // the new commit point we learned of is on the same branch of history as our own
             // oplog.
-            if (_getMemberState(lk).arbiter() ||
-                (!_getMemberState(lk).startup() && !_getMemberState(lk).startup2() &&
-                 !_getMemberState(lk).rollback())) {
+            if (_getMemberState().arbiter() ||
+                (!_getMemberState().startup() && !_getMemberState().startup2() &&
+                 !_getMemberState().rollback())) {
                 // The node that sent the heartbeat is not guaranteed to be our sync source.
                 const bool fromSyncSource = false;
                 _advanceCommitPoint(
@@ -410,7 +410,7 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
     // STARTUP_2, the primary will initiate a reconfig to remove the 'newlyAdded' field for that
     // node (if present). This field is normally set when we add new members with votes:1 to the
     // set.
-    if (_getMemberState(lk).primary() && hbStatusResponse.isOK() &&
+    if (_getMemberState().primary() && hbStatusResponse.isOK() &&
         hbStatusResponse.getValue().hasState()) {
         auto remoteState = hbStatusResponse.getValue().getState();
         if (remoteState == MemberState::RS_SECONDARY || remoteState == MemberState::RS_RECOVERING ||
@@ -477,7 +477,7 @@ ReplicationCoordinatorImpl::_handleHeartbeatResponseAction(
     switch (action.getAction()) {
         case HeartbeatResponseAction::NoAction:
             // Update the cached member state if different than the current topology member state
-            if (_memberState != _topCoord->getMemberState()) {
+            if (_getMemberState() != _topCoord->getMemberState()) {
                 const PostMemberStateUpdateAction postUpdateAction =
                     _updateMemberStateFromTopologyCoordinator(lock);
                 lock.unlock();
@@ -669,7 +669,7 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
 bool ReplicationCoordinatorImpl::_shouldStepDownOnReconfig(WithLock,
                                                            const ReplSetConfig& newConfig,
                                                            StatusWith<int> myIndex) {
-    return _memberState.primary() &&
+    return _getMemberState().primary() &&
         !(myIndex.isOK() && newConfig.getMemberAt(myIndex.getValue()).isElectable());
 }
 
@@ -707,7 +707,7 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(WithLock lk,
     }
 
     // Allow force reconfigs to proceed even if we are not a writable primary yet.
-    if (_memberState.primary() && !_readWriteAbility->canAcceptNonLocalWrites(lk) &&
+    if (_getMemberState().primary() && !_readWriteAbility->canAcceptNonLocalWrites(lk) &&
         newConfig.getConfigTerm() != OpTime::kUninitializedTerm) {
         LOGV2_FOR_HEARTBEATS(
             4794900,
@@ -1254,7 +1254,7 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout(WithLock lk
     auto oldWhen = _handleElectionTimeoutCallback.getNextCall();
     const bool wasActive = oldWhen != Date_t();
     auto now = _replExecutor->now();
-    const bool doNotReschedule = _inShutdown || !_memberState.secondary() || _selfIndex < 0 ||
+    const bool doNotReschedule = _inShutdown || !_getMemberState().secondary() || _selfIndex < 0 ||
         !_rsConfig.unsafePeek().getMemberAt(_selfIndex).isElectable();
 
     if (doNotReschedule || !wasActive || (now - logThrottleTime) >= Seconds(1)) {

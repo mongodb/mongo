@@ -377,7 +377,7 @@ Status ReplicationCoordinatorImpl::stepUpIfEligible(OperationContext* opCtx, boo
         // process of stepping down. If we know we are going to step down, we should fail the
         // replSetStepUp command so caller can retry if necessary.
         std::lock_guard lk(_mutex);
-        if (!_getMemberState(lk).primary())
+        if (!_getMemberState().primary())
             return Status(ErrorCodes::CommandFailed, "Election failed.");
         else if (_topCoord->isSteppingDown())
             return Status(ErrorCodes::CommandFailed, "Election failed due to concurrent stepdown.");

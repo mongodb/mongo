@@ -1199,7 +1199,7 @@ bool ReplicationCoordinatorImpl::enterQuiesceModeIfSecondary(Milliseconds quiesc
 
     std::lock_guard lk(_mutex);
 
-    if (!_memberState.secondary()) {
+    if (!_getMemberState().secondary()) {
         return false;
     }
 
@@ -1320,8 +1320,7 @@ const ReplSettings& ReplicationCoordinatorImpl::getSettings() const {
 }
 
 MemberState ReplicationCoordinatorImpl::getMemberState() const {
-    std::lock_guard lk(_mutex);
-    return _getMemberState(lk);
+    return _getMemberState();
 }
 
 std::vector<MemberData> ReplicationCoordinatorImpl::getMemberData() const {
@@ -1329,8 +1328,8 @@ std::vector<MemberData> ReplicationCoordinatorImpl::getMemberData() const {
     return _topCoord->getMemberData();
 }
 
-MemberState ReplicationCoordinatorImpl::_getMemberState(WithLock) const {
-    return _memberState;
+MemberState ReplicationCoordinatorImpl::_getMemberState() const {
+    return _memberState.load();
 }
 
 Status ReplicationCoordinatorImpl::waitForMemberState(Interruptible* interruptible,
@@ -1342,13 +1341,13 @@ Status ReplicationCoordinatorImpl::waitForMemberState(Interruptible* interruptib
 
     std::unique_lock lk(_mutex);
     auto pred = [this, expectedState]() {
-        return _memberState == expectedState;
+        return _getMemberState() == expectedState;
     };
     if (!interruptible->waitForConditionOrInterruptFor(_memberStateChange, lk, timeout, pred)) {
         return Status(ErrorCodes::ExceededTimeLimit,
                       str::stream()
                           << "Timed out waiting for state to become " << expectedState.toString()
-                          << ". Current state is " << _memberState.toString());
+                          << ". Current state is " << _getMemberState().toString());
     }
     return Status::OK();
 }
@@ -1406,7 +1405,7 @@ Status ReplicationCoordinatorImpl::_setFollowerMode(OperationContext* opCtx,
 
     _topCoord->setFollowerMode(newState.s);
 
-    if (_memberState.secondary() && newState == MemberState::RS_ROLLBACK) {
+    if (_getMemberState().secondary() && newState == MemberState::RS_ROLLBACK) {
         // If we are switching out of SECONDARY and to ROLLBACK, we must make sure that we hold the
         // RSTL in mode X to prevent readers that have the RSTL in intent mode from reading.
         _readWriteAbility->setCanServeNonLocalReads(opCtx, 0U);
@@ -1504,7 +1503,7 @@ void ReplicationCoordinatorImpl::signalApplierDrainComplete(OperationContext* op
     // ensure we haven't encountered a new term during catchup.
     if (_oplogSyncState != OplogSyncState::ApplierDraining ||
         !_topCoord->canCompleteTransitionToPrimary(termWhenExhausted) ||
-        (_memberState.primary() && _catchupState && _pendingTermUpdateDuringStepDown)) {
+        (_getMemberState().primary() && _catchupState && _pendingTermUpdateDuringStepDown)) {
         LOGV2(6015308,
               "Applier left draining state or not allowed to become writeable primary, exiting");
         return;
@@ -1512,7 +1511,7 @@ void ReplicationCoordinatorImpl::signalApplierDrainComplete(OperationContext* op
     _oplogSyncState = OplogSyncState::Stopped;
     _externalState->onApplierDrainComplete(opCtx);
 
-    invariant(_getMemberState(lk).primary());
+    invariant(_getMemberState().primary());
     invariant(!_readWriteAbility->canAcceptNonLocalWrites(opCtx));
 
     {
@@ -1711,7 +1710,7 @@ void ReplicationCoordinatorImpl::_reportUpstream(std::unique_lock<ObservableMute
         return;
     }
 
-    if (_getMemberState(lock).primary()) {
+    if (_getMemberState().primary()) {
         return;
     }
 
@@ -1808,7 +1807,7 @@ OpTimeAndWallTime ReplicationCoordinatorImpl::getMyLastWrittenOpTimeAndWallTime(
     // A node rolling back may be removed from the cluster, in which case it is still not safe to
     // return the opTime from the oplog here. So, in the rollbackSafe case we do not return the time
     // if we are in rollback OR removed state.
-    if (rollbackSafe && (_getMemberState(lock).rollback() || _getMemberState(lock).removed())) {
+    if (rollbackSafe && (_getMemberState().rollback() || _getMemberState().removed())) {
         return {};
     }
     return _getMyLastWrittenOpTimeAndWallTime(lock);
@@ -1936,7 +1935,7 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
         // oplog collection is racey with it being set. We do not want to acquire a lock here since
         // this is a blocking call, so we opt to fail the wait if we are in rollback since we cannot
         // guarantee the oplog contents.
-        if (_memberState.rollback()) {
+        if (_getMemberState().rollback()) {
             return {ErrorCodes::InterruptedDueToReplStateChange,
                     "Unable to wait for wait for op time while node is in rollback."};
         }
@@ -2474,7 +2473,7 @@ ReplicationCoordinatorImpl::_startWaitingForReplication(WithLock wl,
     }
 
     auto checkForStepDown = [&]() -> Status {
-        if (isReplSet && !_memberState.primary()) {
+        if (isReplSet && !_getMemberState().primary()) {
             return {ErrorCodes::PrimarySteppedDown,
                     "Primary stepped down before starting to wait for replication"};
         }
@@ -2916,7 +2915,7 @@ bool ReplicationCoordinatorImpl::isWritablePrimaryForReportingPurposes() {
     }
 
     std::lock_guard lock(_mutex);
-    return _getMemberState(lock).primary();
+    return _getMemberState().primary();
 }
 
 bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase(OperationContext* opCtx,
@@ -3054,8 +3053,8 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor_UNSAFE(OperationContext
     // reads. Internal reads are required for cleaning up unfinished apply batches.
     if (!isPrimaryOrSecondary && _settings.isReplSet() && ns.isOplog()) {
         std::lock_guard lock(_mutex);
-        if ((_memberState.startup() && client->isFromUserConnection()) || _memberState.startup2() ||
-            _memberState.rollback()) {
+        if ((_getMemberState().startup() && client->isFromUserConnection()) ||
+            _getMemberState().startup2() || _getMemberState().rollback()) {
             return Status{ErrorCodes::NotPrimaryOrSecondary,
                           "Oplog collection reads are not allowed while in the rollback or "
                           "startup state."};
@@ -3069,7 +3068,7 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor_UNSAFE(OperationContext
         client->isFromUserConnection()) {
         std::lock_guard lock(_mutex);
         auto isInternalThreadOrClient = !client->session() || client->isInternalClient();
-        if (!isInternalThreadOrClient && _memberState.startup2() && _initialSyncer &&
+        if (!isInternalThreadOrClient && _getMemberState().startup2() && _initialSyncer &&
             !_initialSyncer->allowLocalDbAccess()) {
             return Status{ErrorCodes::NotPrimaryOrSecondary,
                           str::stream() << "Local reads are not allowed during initial sync with "
@@ -3377,7 +3376,7 @@ Status ReplicationCoordinatorImpl::setMaintenanceMode(OperationContext* opCtx, b
         return Status(ErrorCodes::NotSecondary, "currently running for election");
     }
 
-    if (_getMemberState(lk).primary()) {
+    if (_getMemberState().primary()) {
         return Status(ErrorCodes::NotSecondary, "primaries can't modify maintenance mode");
     }
 
@@ -3607,7 +3606,7 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
             ErrorCodes::NotWritablePrimary,
             str::stream()
                 << "Safe reconfig is only allowed on a writable PRIMARY. Current state is "
-                << _getMemberState(lk).toString());
+                << _getMemberState().toString());
     }
     auto topCoordTerm = _topCoord->getTerm();
 
@@ -4087,7 +4086,7 @@ Status ReplicationCoordinatorImpl::awaitConfigCommitment(OperationContext* opCtx
         return {ErrorCodes::PrimarySteppedDown,
                 fmt::format(
                     "replSetReconfig should only be run on a writable PRIMARY. Current state {};",
-                    _memberState.toString())};
+                    _getMemberState().toString())};
     }
     auto configOplogCommitmentOpTime = _topCoord->getConfigOplogCommitmentOpTime();
     auto oplogWriteConcern = _getOplogCommitmentWriteConcern(lk);
@@ -4479,7 +4478,7 @@ void ReplicationCoordinatorImpl::_errorOnPromisesIfHorizonChanged(WithLock lk,
     }
 
     // We were previously removed but are now rejoining the replica set.
-    if (_memberState.removed()) {
+    if (_getMemberState().removed()) {
         // Reply with an error to hello requests received while the node had an invalid config.
         invariant(_horizonToTopologyChangePromiseMap.empty());
 
@@ -4829,7 +4828,7 @@ Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(const UpdatePosi
         // (slightly expensively).  If we become secondary after the unlock below, BackgroundSync
         // will take care of forwarding our progress by calling signalUpstreamUpdater() once we
         // select a new sync source.  So it's OK to depend on the stale value of wasPrimary here.
-        bool wasPrimary = _getMemberState(lock).primary();
+        bool wasPrimary = _getMemberState().primary();
         lock.unlock();
         // maxRemoteOpTime is null here if we got valid updates but no downstream node had
         // actually advanced any optime.
@@ -4918,7 +4917,7 @@ Status ReplicationCoordinatorImpl::checkReplEnabledForCommand(BSONObjBuilder* re
 
 ReadPreference ReplicationCoordinatorImpl::_getSyncSourceReadPreference(WithLock lk) const {
     // Always allow chaining while in catchup and drain mode.
-    auto memberState = _getMemberState(lk);
+    auto memberState = _getMemberState();
     ReadPreference readPreference = ReadPreference::Nearest;
     const auto& config = _rsConfig.unsafePeek();
 
@@ -4991,7 +4990,7 @@ HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource(const OpTime& lastOp
     // If we lost our sync source, schedule new heartbeats immediately to update our knowledge
     // of other members's state, allowing us to make informed sync source decisions.
     if (newSyncSource.empty() && !oldSyncSource.empty() && _selfIndex >= 0 &&
-        !_getMemberState(lk).primary()) {
+        !_getMemberState().primary()) {
         _restartScheduledHeartbeats(lk, std::string{_rsConfig.unsafePeek().getReplSetName()});
     }
 
@@ -5057,7 +5056,7 @@ ChangeSyncSourceAction ReplicationCoordinatorImpl::shouldChangeSyncSource(
 
     const auto readPreference = _getSyncSourceReadPreference(lock);
     if (_topCoord->shouldChangeSyncSourceDueToPingTime(
-            currentSource, _getMemberState(lock), previousOpTimeFetched, now, readPreference)) {
+            currentSource, _getMemberState(), previousOpTimeFetched, now, readPreference)) {
         // We should drop the last batch if we find a significantly closer node. This is to
         // avoid advancing our 'lastFetched', which makes it more likely that we will be able to
         // choose the closer node as our sync source.
@@ -5078,7 +5077,7 @@ ChangeSyncSourceAction ReplicationCoordinatorImpl::shouldChangeSyncSourceOnError
 
     const auto readPreference = _getSyncSourceReadPreference(lock);
     if (_topCoord->shouldChangeSyncSourceDueToPingTime(
-            currentSource, _getMemberState(lock), lastOpTimeFetched, now, readPreference)) {
+            currentSource, _getMemberState(), lastOpTimeFetched, now, readPreference)) {
         return ChangeSyncSourceAction::kStopSyncingAndDropLastBatchIfPresent;
     }
 
@@ -5175,7 +5174,7 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
     // behind the oldest timestamp, which is prohibited in the storage engine. Note that we don't
     // take stable checkpoints during initial sync, so the stable timestamp during this period
     // doesn't play a functionally important role anyway.
-    auto memberState = _getMemberState(lk);
+    auto memberState = _getMemberState();
     if (memberState.startup2()) {
         LOGV2_DEBUG(
             2139501, 2, "Not updating stable timestamp", "state"_attr = memberState.toString());
@@ -5216,7 +5215,7 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
 
     // As arbiters aren't data bearing nodes, the all durable timestamp does not get advanced. To
     // advance the all durable timestamp when setting the stable timestamp we use 'force=true'.
-    const bool force = _getMemberState(lk).arbiter();
+    const bool force = _getMemberState().arbiter();
 
     // Update committed snapshot and wake up any threads waiting on read concern or write concern.
     // Set the committed snapshot to the new stable optime. The wall time of the committed snapshot
@@ -5317,7 +5316,7 @@ void ReplicationCoordinatorImpl::_advanceCommitPoint(
     bool forInitiate) {
     if (_topCoord->advanceLastCommittedOpTimeAndWallTime(
             committedOpTimeAndWallTime, fromSyncSource, forInitiate)) {
-        if (_getMemberState(lk).arbiter()) {
+        if (_getMemberState().arbiter()) {
             // Arbiters do not store replicated data, so we consider their data trivially
             // consistent.
             _setMyLastWrittenOpTimeAndWallTime(lk, committedOpTimeAndWallTime, false);
@@ -5535,7 +5534,7 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
         // If we are currently in drain mode, we won't allow installing newer configs, so we don't
         // schedule a heartbeat to fetch one. We do allow force reconfigs to proceed even if we are
         // in drain mode.
-        if (_memberState.primary() && !_readWriteAbility->canAcceptNonLocalWrites(lk) &&
+        if (_getMemberState().primary() && !_readWriteAbility->canAcceptNonLocalWrites(lk) &&
             args.getConfigTerm() != OpTime::kUninitializedTerm) {
             LOGV2(4794901,
                   "Not scheduling a heartbeat to fetch a newer config since we are in PRIMARY "
@@ -5730,7 +5729,7 @@ bool ReplicationCoordinatorImpl::_updateCommittedSnapshot(WithLock lk,
 
     // If we are in ROLLBACK state, do not set any new _currentCommittedSnapshot, as it will be
     // cleared at the end of rollback anyway.
-    if (_memberState.rollback()) {
+    if (_getMemberState().rollback()) {
         LOGV2(21404, "Not updating committed snapshot because we are in rollback");
         return false;
     }

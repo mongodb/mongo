@@ -78,6 +78,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
@@ -1303,7 +1304,10 @@ private:
                             const std::string& replSetName);
 
 
-    MemberState _getMemberState(WithLock) const;
+    // This is the single place _memberState is read. It is the responsibility of the caller to
+    // acquire _mutex if this read must be serialized with other events. The value is only updated
+    // while holding _mutex.
+    MemberState _getMemberState() const;
 
     /**
      * Helper method for setting this node to a specific follower mode.
@@ -1906,8 +1910,8 @@ private:
     // Used to signal threads waiting for changes to _memberState.
     stdx::condition_variable _memberStateChange;  // (M)
 
-    // Current ReplicaSet state.
-    MemberState _memberState;  // (M)
+    // Current ReplicaSet state. Stored as an Atomic and is only modified under _mutex.
+    Atomic<MemberState> _memberState;  // (S, written under M)
 
     ReplicationCoordinator::OplogSyncState _oplogSyncState = OplogSyncState::Running;  // (M)
 
