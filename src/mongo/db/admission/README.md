@@ -213,38 +213,25 @@ circumstances:
 
 - The remote IP address is included in one of the ranges specified in
   `ingressRequestRateLimiterExemptions`.
+- The client-provided appName or driverName associated with that connection prefix-matches one of
+  the names specified in `ingressRequestRateLimiterApplicationExemptions`.
 - Auth is enabled and the ingress session has not been authenticated yet.
   - This exemption is to prevent unauthenticated clients from consuming all of the rate limiter
     tokens, causing unavailability.
 
-Because token acquisition currently only takes place in the `SessionWorkflow`, all internal requests
-are not subject to rate limiting.
+Because token acquisition currently only takes place in the `SessionWorkflow`, all process-internal
+requests are not subject to rate limiting.
 
 If the thread is not considered exempt, it attempts to acquire a token from the rate limiter. If a
 token is immediately available, the request proceeds as normal. If not, behavior depends on
 `ingressRequestAdmissionMaxQueueDepth`:
 
 - If queueing is disabled (`0`) or the queue is full, the request is rejected with an error labeled
-  `SystemOverloaded`. Clients will observe this label and interpret the server as being overloaded,
-  modifying their routing and retry logic accordingly.
+  `SystemOverloaded` and `RetryableError` (depending on the value of the
+  `ingressRequestRateLimiterAllowRetries` server parameter). Clients will observe this label and
+  interpret the server as being overloaded, modifying their routing and retry logic accordingly.
 - If queueing is enabled and capacity exists, the request reserves a queue position and later blocks
   in service entry point until that reserved position becomes valid (or until interruption).
-
-### Admission Token Exemption
-
-Token acquisition happens in two stages. `SessionWorkflow` calls `admitRequest` immediately after
-reading the message, before an `OperationContext` exists. The service entry point later calls
-`waitForAdmission` once the command has been parsed and the exemption signal is known
-(`isExemptFromAdmissionControl`). Because that signal is unavailable at the first stage, the
-rate-limiter-level exemption can only rescue requests that successfully reserved a queue slot:
-
-- Rate exceeded, queueing disabled: rejected at `admitRequest`.
-- Rate exceeded, queue full: rejected at `admitRequest`.
-- Rate exceeded, queue has room: queued at `admitRequest`, then exempted at `waitForAdmission`.
-
-This asymmetry is intentional. Determining exemption status from `admitRequest` would require
-constructing or partially evaluating the command before deciding to reject, which would make
-rejections more expensive.
 
 ## Metrics
 

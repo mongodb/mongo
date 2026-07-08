@@ -1882,10 +1882,7 @@ void ExecCommandDatabase::_initiateCommand() {
         IngressAdmissionContext::get(opCtx).isHoldingTicket();
 
     if (gFeatureFlagIngressRateLimiting.isEnabled()) {
-        const bool exemptFromIngressRateLimit =
-            isExemptFromAdmissionControl || !admission::gIngressRequestRateLimiterEnabled.load();
-        uassertStatusOK(admission::IngressRequestRateLimiter::waitForAdmission(
-            opCtx, exemptFromIngressRateLimit));
+        uassertStatusOK(admission::IngressRequestRateLimiter::waitForAdmission(opCtx));
     }
 
     if (gIngressAdmissionControlEnabled.load()) {

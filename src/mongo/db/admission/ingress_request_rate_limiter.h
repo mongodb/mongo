@@ -69,18 +69,8 @@ public:
     /**
      * Waits for admission to be granted. If there is no deferred token then this is a no-op,
      * otherwise it resolves the deferred token.
-     *
-     * If isExemptFromAdmissionControl is true, the deferred token is marked exempt instead of
-     * waited on, returning the borrowed token to the bucket and releasing its queue slot.
-     *
-     * Exemption is determined here (rather than in admitRequest) because it
-     * depends on command-level state that is not available at the point of message read. As a
-     * consequence, the exemption can only take effect for requests that successfully reserved a
-     * queue slot in admitRequest. A rate-exceeded request that was rejected up front because
-     * queueing was disabled or the queue was full will not reach this function. See README.md for
-     * the rationale.
      */
-    static Status waitForAdmission(OperationContext* opCtx, bool isExemptFromAdmissionControl);
+    static Status waitForAdmission(OperationContext* opCtx);
 
     /**
      * Adjusts the refresh rate and burst capacity of the rate limiter.

@@ -622,12 +622,7 @@ void ParseAndRunCommand::RunInvocation::_maybeWaitForAdmission() {
 
     // Deferred admission must run after maxTimeMS is applied to the opCtx so that queued requests
     // respect the deadline.
-    // NOTE: All cluster commands are subject to admission control at this time.
-    const auto isProcessInternalCommand = isProcessInternalClient(*opCtx->getClient());
-    const bool exemptFromIngressRateLimit =
-        isProcessInternalCommand || !admission::gIngressRequestRateLimiterEnabled.load();
-    uassertStatusOK(
-        admission::IngressRequestRateLimiter::waitForAdmission(opCtx, exemptFromIngressRateLimit));
+    uassertStatusOK(admission::IngressRequestRateLimiter::waitForAdmission(opCtx));
 }
 
 bool isInternalClient(OperationContext* opCtx) {

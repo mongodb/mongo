@@ -258,14 +258,13 @@ bool IngressRequestRateLimiter::admitRequest(Client* client) {
     return false;
 }
 
-Status IngressRequestRateLimiter::waitForAdmission(OperationContext* opCtx,
-                                                   bool isExemptFromAdmissionControl) {
+Status IngressRequestRateLimiter::waitForAdmission(OperationContext* opCtx) {
     auto deferredToken = std::exchange(getDeferredAdmissionToken(opCtx->getClient()), boost::none);
     if (!deferredToken) {
         return Status::OK();
     }
 
-    if (isExemptFromAdmissionControl) {
+    if (!gIngressRequestRateLimiterEnabled.load()) {
         std::move(*deferredToken).recordExemption();
         return Status::OK();
     }

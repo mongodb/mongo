@@ -320,33 +320,6 @@ TEST_F(ServiceEntryPointShardServerTest, TestWriteConcernClientUnspecifiedWithDe
     testWriteConcernClientUnspecifiedWithDefault();
 }
 
-TEST_F(ServiceEntryPointShardServerTest, WaitForAdmissionResolvesDeferredTokenBeforeInvocation) {
-    unittest::ServerParameterGuard rateLimiterEnabled{"ingressRequestRateLimiterEnabled", true};
-
-    RateLimiter limiterForDeferredToken(
-        /*refreshRatePerSec=*/1.0,
-        /*burstCapacitySecs=*/1.0,
-        /*maxQueueDepth=*/2,
-        "WaitForAdmissionResolvesDeferredTokenBeforeInvocation");
-
-    auto opCtx = makeOperationContext();
-    ASSERT_OK(limiterForDeferredToken.acquireToken(opCtx.get()));
-    auto queuedTokenResult = limiterForDeferredToken.acquireToken();
-    ASSERT_TRUE(queuedTokenResult);
-    ASSERT_FALSE(queuedTokenResult->isReady());
-    IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(opCtx->getClient(),
-                                                                 std::move(*queuedTokenResult));
-
-    // Mark this client as a direct client so that waitForAdmission exempts it rather than sleeping
-    // on the mock clock. We are just testing that waitForAdmission resolves the deferred token and
-    // allows the command to proceed, not that it waits for the token to be available.
-    opCtx->getClient()->setInDirectClient(true);
-
-    runCommandTestWithResponse(BSON("ping" << 1), opCtx.get(), Status::OK());
-    ASSERT_EQ(limiterForDeferredToken.queued(), 0);
-    ASSERT_EQ(limiterForDeferredToken.stats().exemptedAdmissions(), 1);
-}
-
 TEST_F(ServiceEntryPointShardServerTest,
        PendingIngressDeferredTokenIsConsumedWhenRateLimitingDisabled) {
     unittest::ServerParameterGuard rateLimiterEnabled{"ingressRequestRateLimiterEnabled", false};
