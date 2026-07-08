@@ -56,13 +56,14 @@ protected:
             makeE<EFunction>(EFn::kUnwindArray, makeEs(std::move(arrayExpr)));
         std::unique_ptr<vm::CodeFragment> compiledExpr = compileExpression(*unwoundExpr);
 
-        TypedValue actualValue = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard actualValueGuard{actualValue};
+        value::TagValueOwned actualValue =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         auto [compareTag, compareValue] = value::compareValue(
-            actualValue.first, actualValue.second, expectedRes.first, expectedRes.second);
+            actualValue.tag(), actualValue.value(), expectedRes.first, expectedRes.second);
         ASSERT_EQ(compareTag, value::TypeTags::NumberInt32);
-        ASSERT_EQ(compareValue, 0) << actualValue << " != " << expectedRes;
+        ASSERT_EQ(compareValue, 0)
+            << TypedValue{actualValue.tag(), actualValue.value()} << " != " << expectedRes;
     }
 };
 
@@ -73,16 +74,15 @@ protected:
 TEST_F(SBEBuiltinUnwindArrayTest, Array) {
     BSONArray source = BSON_ARRAY(1 << BSON_ARRAY("long long string" << 900) << 3 << BSONArray()
                                     << BSON_ARRAY(34.3 << BSON_ARRAY(12)));
-    TypedValue expected =
-        makeArray(BSON_ARRAY(1 << "long long string" << 900 << 3 << 34.3 << BSON_ARRAY(12)));
-    value::ValueGuard guardExpected{expected};
+    value::TagValueOwned expected = value::TagValueOwned::fromRaw(
+        makeArray(BSON_ARRAY(1 << "long long string" << 900 << 3 << 34.3 << BSON_ARRAY(12))));
     // Testing ArraySet gives unpredictable ordering of the result, so we only test for stable
     // arrays.
     for (auto makeArrayFn : {makeBsonArray, makeArray}) {
-        TypedValue someArray = makeArrayFn(source);
-        value::ValueGuard guard{someArray};
+        value::TagValueOwned someArray = value::TagValueOwned::fromRaw(makeArrayFn(source));
 
-        runAndAssertExpression(someArray, expected);
+        runAndAssertExpression({someArray.tag(), someArray.value()},
+                               {expected.tag(), expected.value()});
     }
 }
 
@@ -91,10 +91,9 @@ TEST_F(SBEBuiltinUnwindArrayTest, Array) {
  */
 TEST_F(SBEBuiltinUnwindArrayTest, EmptyArray) {
     for (auto makeArrayFn : {makeBsonArray, makeArray, makeArraySet}) {
-        TypedValue emptyArray = makeArrayFn(BSONArray());
-        value::ValueGuard emptyArrayGuard{emptyArray};
+        value::TagValueOwned emptyArray = value::TagValueOwned::fromRaw(makeArrayFn(BSONArray()));
 
-        runAndAssertExpression(emptyArray, makeNothing());
+        runAndAssertExpression({emptyArray.tag(), emptyArray.value()}, makeNothing());
     }
 }
 

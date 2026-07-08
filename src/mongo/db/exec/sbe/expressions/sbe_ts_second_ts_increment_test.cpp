@@ -77,46 +77,43 @@ using SBEBuiltinTsIncrementTest = SBEBuiltinTsExpressionBase;
 
 TEST_F(SBEBuiltinTsSecondTest, HandlesTimestamp) {
     auto timestamp = Timestamp(1622731060, 10);
-    auto sbeTimestamp = makeTimestamp(timestamp);
-    auto expectedSecs = makeInt64(timestamp.getSecs());
+    value::TagValueOwned sbeTimestamp = value::TagValueOwned::fromRaw(makeTimestamp(timestamp));
+    value::TagValueOwned expectedSecs =
+        value::TagValueOwned::fromRaw(makeInt64(timestamp.getSecs()));
 
-    value::ValueGuard guardSbeTimestamp{sbeTimestamp};
-    value::ValueGuard guardExpectedSecs{expectedSecs};
-
-    validateExpression(EFn::kTsSecond, sbeTimestamp, expectedSecs);
+    validateExpression(EFn::kTsSecond,
+                       {sbeTimestamp.tag(), sbeTimestamp.value()},
+                       {expectedSecs.tag(), expectedSecs.value()});
 }
 
 TEST_F(SBEBuiltinTsSecondTest, HandlesInvalidTimestamp) {
     auto timestamp = 1622731060;
-    auto sbeInvalidTimestamp = makeInt64(timestamp);
-    auto expectedNothing = makeNothing();
+    value::TagValueOwned sbeInvalidTimestamp = value::TagValueOwned::fromRaw(makeInt64(timestamp));
+    value::TagValueOwned expectedNothing = value::TagValueOwned::fromRaw(makeNothing());
 
-    value::ValueGuard guardSbeInvalidTimestamp{sbeInvalidTimestamp};
-    value::ValueGuard guardExpectedNothing{expectedNothing};
-
-    validateExpression(EFn::kTsSecond, sbeInvalidTimestamp, expectedNothing);
+    validateExpression(EFn::kTsSecond,
+                       {sbeInvalidTimestamp.tag(), sbeInvalidTimestamp.value()},
+                       {expectedNothing.tag(), expectedNothing.value()});
 }
 
 TEST_F(SBEBuiltinTsIncrementTest, HandlesTimestamp) {
     auto timestamp = Timestamp(1622731060, 10);
-    auto sbeTimestamp = makeTimestamp(timestamp);
-    auto expectedInc = makeInt64(timestamp.getInc());
+    value::TagValueOwned sbeTimestamp = value::TagValueOwned::fromRaw(makeTimestamp(timestamp));
+    value::TagValueOwned expectedInc = value::TagValueOwned::fromRaw(makeInt64(timestamp.getInc()));
 
-    value::ValueGuard guardSbeTimestamp{sbeTimestamp};
-    value::ValueGuard guardExpectedInc{expectedInc};
-
-    validateExpression(EFn::kTsIncrement, sbeTimestamp, expectedInc);
+    validateExpression(EFn::kTsIncrement,
+                       {sbeTimestamp.tag(), sbeTimestamp.value()},
+                       {expectedInc.tag(), expectedInc.value()});
 }
 
 TEST_F(SBEBuiltinTsIncrementTest, HandlesInvalidTimestamp) {
     auto timestamp = 10;
-    auto sbeInvalidTimestamp = makeInt64(timestamp);
-    auto expectedNothing = makeNothing();
+    value::TagValueOwned sbeInvalidTimestamp = value::TagValueOwned::fromRaw(makeInt64(timestamp));
+    value::TagValueOwned expectedNothing = value::TagValueOwned::fromRaw(makeNothing());
 
-    value::ValueGuard guardSbeInvalidTimestamp{sbeInvalidTimestamp};
-    value::ValueGuard guardExpectedNothing{expectedNothing};
-
-    validateExpression(EFn::kTsIncrement, sbeInvalidTimestamp, expectedNothing);
+    validateExpression(EFn::kTsIncrement,
+                       {sbeInvalidTimestamp.tag(), sbeInvalidTimestamp.value()},
+                       {expectedNothing.tag(), expectedNothing.value()});
 }
 
 }  // namespace mongo::sbe

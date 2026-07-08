@@ -45,28 +45,28 @@ namespace mongo::sbe {
 class SBETrigonometricExprTest : public EExpressionTestFixture {
 protected:
     void runAndAssertExpression(const vm::CodeFragment* compiledExpr, double expectedVal) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
 
-        ASSERT_EQUALS(value::TypeTags::NumberDouble, tag);
-        ASSERT_APPROX_EQUAL(value::bitcastTo<double>(val), expectedVal, 0.000001);
+        ASSERT_EQUALS(value::TypeTags::NumberDouble, result.tag());
+        ASSERT_APPROX_EQUAL(value::bitcastTo<double>(result.value()), expectedVal, 0.000001);
     }
 
     void runAndAssertExpression(const vm::CodeFragment* compiledExpr, Decimal128 expectedVal) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
 
-        ASSERT_EQUALS(value::TypeTags::NumberDecimal, tag);
-        ASSERT(value::bitcastTo<Decimal128>(val)
+        ASSERT_EQUALS(value::TypeTags::NumberDecimal, result.tag());
+        ASSERT(value::bitcastTo<Decimal128>(result.value())
                    .subtract(expectedVal)
                    .toAbs()
                    .isLessEqual(Decimal128(".000001")));
     }
 
     void runAndAssertNothing(const vm::CodeFragment* compiledExpr) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
-        ASSERT_EQUALS(value::TypeTags::Nothing, tag);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
+        ASSERT_EQUALS(value::TypeTags::Nothing, result.tag());
     }
 };
 

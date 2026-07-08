@@ -71,11 +71,11 @@ protected:
             EFn::kTopN, makeEs(std::move(nExpr), std::move(arrayExpr), std::move(sortByExpr)));
         auto compiledExpr = compileExpression(*topNExpr);
 
-        auto actual = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard actualGuard{actual};
+        value::TagValueOwned actualOwned =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        auto [compareTag, compareValue] =
-            value::compareValue(actual.first, actual.second, expected.first, expected.second);
+        auto [compareTag, compareValue] = value::compareValue(
+            actualOwned.tag(), actualOwned.value(), expected.first, expected.second);
         ASSERT_EQ(compareTag, value::TypeTags::NumberInt32);
         ASSERT_EQ(compareValue, 0);
     }
@@ -103,105 +103,90 @@ TEST_F(SBEBuiltinTopNTest, Array) {
     // Testing ArraySet gives unpredictable ordering of the result, so we only test for stable
     // arrays.
     for (auto makeArrayFn : {makeBsonArray, makeArray}) {
-        auto testArray = makeArrayFn(BSON_ARRAY(1 << 2 << 3));
-        value::ValueGuard testArrayGuard{testArray};
+        value::TagValueOwned testArrayOwned =
+            value::TagValueOwned::fromRaw(makeArrayFn(BSON_ARRAY(1 << 2 << 3)));
+        value::TagValueOwned expectedResultOwned =
+            value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(3 << 2 << 1)));
+        value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-        auto expectedResult = makeArray(BSON_ARRAY(3 << 2 << 1));
-        value::ValueGuard expectedResultGuard{expectedResult};
-
-        auto sortSpec = makeSortSpec();
-        value::ValueGuard sortSpecGuard{sortSpec};
-
-        runAndAssertExpression(makeInt64(3), testArray, sortSpec, expectedResult);
+        runAndAssertExpression(
+            makeInt64(3), testArrayOwned.raw(), sortSpecOwned.raw(), expectedResultOwned.raw());
     }
 }
 
 TEST_F(SBEBuiltinTopNTest, NotArray) {
-    auto sortSpec = makeSortSpec();
-    value::ValueGuard sortSpecGuard{sortSpec};
+    value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-    runAndAssertExpression(makeInt64(3), makeNothing(), sortSpec, makeNothing());
-    runAndAssertExpression(makeInt64(3), makeInt32(123), sortSpec, makeNothing());
+    runAndAssertExpression(makeInt64(3), makeNothing(), sortSpecOwned.raw(), makeNothing());
+    runAndAssertExpression(makeInt64(3), makeInt32(123), sortSpecOwned.raw(), makeNothing());
 }
 
 TEST_F(SBEBuiltinTopNTest, NIsZero) {
-    auto testArray = makeArray(BSON_ARRAY(1 << 2 << 3));
-    value::ValueGuard testArrayGuard{testArray};
-    auto expectedResult = value::makeNewArray();
-    value::ValueGuard expectedResultGuard{expectedResult};
+    value::TagValueOwned testArrayOwned =
+        value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(1 << 2 << 3)));
+    value::TagValueOwned expectedResultOwned = value::TagValueOwned::fromRaw(value::makeNewArray());
+    value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-    auto sortSpec = makeSortSpec();
-    value::ValueGuard sortSpecGuard{sortSpec};
-
-    runAndAssertExpression(makeInt64(0), testArray, sortSpec, expectedResult);
+    runAndAssertExpression(
+        makeInt64(0), testArrayOwned.raw(), sortSpecOwned.raw(), expectedResultOwned.raw());
 }
 
 
 TEST_F(SBEBuiltinTopNTest, NegativeN) {
-    auto testArray = makeArray(BSON_ARRAY(1 << 2 << 3));
-    value::ValueGuard testArrayGuard{testArray};
+    value::TagValueOwned testArrayOwned =
+        value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(1 << 2 << 3)));
+    value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-    auto sortSpec = makeSortSpec();
-    value::ValueGuard sortSpecGuard{sortSpec};
-
-    runAndAssertExpression(makeInt64(-1), testArray, sortSpec, makeNothing());
+    runAndAssertExpression(makeInt64(-1), testArrayOwned.raw(), sortSpecOwned.raw(), makeNothing());
 }
 
 TEST_F(SBEBuiltinTopNTest, NLargerThanArraySize) {
     // Test with n larger than array size
-    auto testArray = makeArray(BSON_ARRAY(1 << 2 << 3));
-    value::ValueGuard testArrayGuard{testArray};
-    auto expectedResult = makeArray(BSON_ARRAY(3 << 2 << 1));
-    value::ValueGuard expectedResultGuard{expectedResult};
+    value::TagValueOwned testArrayOwned =
+        value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(1 << 2 << 3)));
+    value::TagValueOwned expectedResultOwned =
+        value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(3 << 2 << 1)));
+    value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-    auto sortSpec = makeSortSpec();
-    value::ValueGuard sortSpecGuard{sortSpec};
-
-    runAndAssertExpression(makeInt64(10), testArray, sortSpec, expectedResult);
+    runAndAssertExpression(
+        makeInt64(10), testArrayOwned.raw(), sortSpecOwned.raw(), expectedResultOwned.raw());
 }
 
 TEST_F(SBEBuiltinTopNTest, Int32N) {
     // Test with n as NumberInt32 instead of NumberInt64
-    auto testArray = makeArray(BSON_ARRAY(1 << 2 << 3));
-    value::ValueGuard testArrayGuard{testArray};
-    auto expectedResult = makeArray(BSON_ARRAY(3 << 2));
-    value::ValueGuard expectedResultGuard{expectedResult};
+    value::TagValueOwned testArrayOwned =
+        value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(1 << 2 << 3)));
+    value::TagValueOwned expectedResultOwned =
+        value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(3 << 2)));
+    value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-    auto sortSpec = makeSortSpec();
-    value::ValueGuard sortSpecGuard{sortSpec};
-
-    runAndAssertExpression(makeInt32(2), testArray, sortSpec, expectedResult);
+    runAndAssertExpression(
+        makeInt32(2), testArrayOwned.raw(), sortSpecOwned.raw(), expectedResultOwned.raw());
 }
 
 TEST_F(SBEBuiltinTopNTest, MixedTypes) {
     // BSON type ordering: null < numbers < strings < objects < arrays
-    auto testArray = makeArray(
-        BSON_ARRAY(5 << "hello" << BSON("a" << 1) << BSON_ARRAY(1 << 2) << BSONNULL << 2));
-    value::ValueGuard testArrayGuard{testArray};
+    value::TagValueOwned testArrayOwned = value::TagValueOwned::fromRaw(makeArray(
+        BSON_ARRAY(5 << "hello" << BSON("a" << 1) << BSON_ARRAY(1 << 2) << BSONNULL << 2)));
+    value::TagValueOwned expectedResultOwned = value::TagValueOwned::fromRaw(
+        makeArray(BSON_ARRAY(BSON_ARRAY(1 << 2) << BSON("a" << 1) << "hello" << 5 << 2)));
+    value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-    auto expectedResult =
-        makeArray(BSON_ARRAY(BSON_ARRAY(1 << 2) << BSON("a" << 1) << "hello" << 5 << 2));
-    value::ValueGuard expectedResultGuard{expectedResult};
-
-    auto sortSpec = makeSortSpec();
-    value::ValueGuard sortSpecGuard{sortSpec};
-
-    runAndAssertExpression(makeInt64(5), testArray, sortSpec, expectedResult);
+    runAndAssertExpression(
+        makeInt64(5), testArrayOwned.raw(), sortSpecOwned.raw(), expectedResultOwned.raw());
 }
 
 TEST_F(SBEBuiltinTopNTest, ArraySet) {
     // ArraySet has unpredictable internal ordering due to its hash function, but topN should
     // still sort the elements correctly regardless of the input order.
-    auto testArray = makeArraySet(BSON_ARRAY(1 << 2 << 3));
-    value::ValueGuard testArrayGuard{testArray};
+    value::TagValueOwned testArrayOwned =
+        value::TagValueOwned::fromRaw(makeArraySet(BSON_ARRAY(1 << 2 << 3)));
+    value::TagValueOwned expectedResultOwned =
+        value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(3 << 2)));
+    value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-    auto expectedResult = makeArray(BSON_ARRAY(3 << 2));
-    value::ValueGuard expectedResultGuard{expectedResult};
-
-    auto sortSpec = makeSortSpec();
-    value::ValueGuard sortSpecGuard{sortSpec};
-
-    runAndAssertExpression(makeInt64(2), testArray, sortSpec, expectedResult);
+    runAndAssertExpression(
+        makeInt64(2), testArrayOwned.raw(), sortSpecOwned.raw(), expectedResultOwned.raw());
 }
 
 class SBEBuiltinBottomNTest : public EExpressionTestFixture {
@@ -233,11 +218,11 @@ protected:
             EFn::kBottomN, makeEs(std::move(nExpr), std::move(arrayExpr), std::move(sortByExpr)));
         auto compiledExpr = compileExpression(*bottomNExpr);
 
-        auto actual = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard actualGuard{actual};
+        value::TagValueOwned actualOwned =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        auto [compareTag, compareValue] =
-            value::compareValue(actual.first, actual.second, expected.first, expected.second);
+        auto [compareTag, compareValue] = value::compareValue(
+            actualOwned.tag(), actualOwned.value(), expected.first, expected.second);
         ASSERT_EQ(compareTag, value::TypeTags::NumberInt32);
         ASSERT_EQ(compareValue, 0);
     }
@@ -265,99 +250,85 @@ TEST_F(SBEBuiltinBottomNTest, Array) {
     // bottomN returns the bottom N elements (opposite of topN)
     // With descending sort (-1), bottom N means the smallest elements
     for (auto makeArrayFn : {makeBsonArray, makeArray}) {
-        auto testArray = makeArrayFn(BSON_ARRAY(1 << 2 << 3));
-        value::ValueGuard testArrayGuard{testArray};
+        value::TagValueOwned testArrayOwned =
+            value::TagValueOwned::fromRaw(makeArrayFn(BSON_ARRAY(1 << 2 << 3)));
+        value::TagValueOwned expectedResultOwned =
+            value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(3 << 2 << 1)));
+        value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-        auto expectedResult = makeArray(BSON_ARRAY(3 << 2 << 1));
-        value::ValueGuard expectedResultGuard{expectedResult};
-
-        auto sortSpec = makeSortSpec();
-        value::ValueGuard sortSpecGuard{sortSpec};
-
-        runAndAssertExpression(makeInt64(3), testArray, sortSpec, expectedResult);
+        runAndAssertExpression(
+            makeInt64(3), testArrayOwned.raw(), sortSpecOwned.raw(), expectedResultOwned.raw());
     }
 }
 
 TEST_F(SBEBuiltinBottomNTest, NotArray) {
-    auto sortSpec = makeSortSpec();
-    value::ValueGuard sortSpecGuard{sortSpec};
+    value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-    runAndAssertExpression(makeInt64(3), makeNothing(), sortSpec, makeNothing());
-    runAndAssertExpression(makeInt64(3), makeInt32(123), sortSpec, makeNothing());
+    runAndAssertExpression(makeInt64(3), makeNothing(), sortSpecOwned.raw(), makeNothing());
+    runAndAssertExpression(makeInt64(3), makeInt32(123), sortSpecOwned.raw(), makeNothing());
 }
 
 TEST_F(SBEBuiltinBottomNTest, NIsZero) {
-    auto testArray = makeArray(BSON_ARRAY(1 << 2 << 3));
-    value::ValueGuard testArrayGuard{testArray};
-    auto expectedResult = value::makeNewArray();
-    value::ValueGuard expectedResultGuard{expectedResult};
+    value::TagValueOwned testArrayOwned =
+        value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(1 << 2 << 3)));
+    value::TagValueOwned expectedResultOwned = value::TagValueOwned::fromRaw(value::makeNewArray());
+    value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-    auto sortSpec = makeSortSpec();
-    value::ValueGuard sortSpecGuard{sortSpec};
-
-    runAndAssertExpression(makeInt64(0), testArray, sortSpec, expectedResult);
+    runAndAssertExpression(
+        makeInt64(0), testArrayOwned.raw(), sortSpecOwned.raw(), expectedResultOwned.raw());
 }
 
 TEST_F(SBEBuiltinBottomNTest, NegativeN) {
-    auto testArray = makeArray(BSON_ARRAY(1 << 2 << 3));
-    value::ValueGuard testArrayGuard{testArray};
+    value::TagValueOwned testArrayOwned =
+        value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(1 << 2 << 3)));
+    value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-    auto sortSpec = makeSortSpec();
-    value::ValueGuard sortSpecGuard{sortSpec};
-
-    runAndAssertExpression(makeInt64(-1), testArray, sortSpec, makeNothing());
+    runAndAssertExpression(makeInt64(-1), testArrayOwned.raw(), sortSpecOwned.raw(), makeNothing());
 }
 
 TEST_F(SBEBuiltinBottomNTest, NLargerThanArraySize) {
-    auto testArray = makeArray(BSON_ARRAY(1 << 2 << 3));
-    value::ValueGuard testArrayGuard{testArray};
-    auto expectedResult = makeArray(BSON_ARRAY(3 << 2 << 1));
-    value::ValueGuard expectedResultGuard{expectedResult};
+    value::TagValueOwned testArrayOwned =
+        value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(1 << 2 << 3)));
+    value::TagValueOwned expectedResultOwned =
+        value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(3 << 2 << 1)));
+    value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-    auto sortSpec = makeSortSpec();
-    value::ValueGuard sortSpecGuard{sortSpec};
-
-    runAndAssertExpression(makeInt64(10), testArray, sortSpec, expectedResult);
+    runAndAssertExpression(
+        makeInt64(10), testArrayOwned.raw(), sortSpecOwned.raw(), expectedResultOwned.raw());
 }
 
 TEST_F(SBEBuiltinBottomNTest, Int32N) {
-    auto testArray = makeArray(BSON_ARRAY(1 << 2 << 3));
-    value::ValueGuard testArrayGuard{testArray};
-    auto expectedResult = makeArray(BSON_ARRAY(2 << 1));
-    value::ValueGuard expectedResultGuard{expectedResult};
+    value::TagValueOwned testArrayOwned =
+        value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(1 << 2 << 3)));
+    value::TagValueOwned expectedResultOwned =
+        value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(2 << 1)));
+    value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-    auto sortSpec = makeSortSpec();
-    value::ValueGuard sortSpecGuard{sortSpec};
-
-    runAndAssertExpression(makeInt32(2), testArray, sortSpec, expectedResult);
+    runAndAssertExpression(
+        makeInt32(2), testArrayOwned.raw(), sortSpecOwned.raw(), expectedResultOwned.raw());
 }
 
 TEST_F(SBEBuiltinBottomNTest, MixedTypes) {
     // bottomN with mixed types - returns bottom 5 elements
-    auto testArray = makeArray(
-        BSON_ARRAY(5 << "hello" << BSON("a" << 1) << BSON_ARRAY(1 << 2) << BSONNULL << 2));
-    value::ValueGuard testArrayGuard{testArray};
+    value::TagValueOwned testArrayOwned = value::TagValueOwned::fromRaw(makeArray(
+        BSON_ARRAY(5 << "hello" << BSON("a" << 1) << BSON_ARRAY(1 << 2) << BSONNULL << 2)));
+    value::TagValueOwned expectedResultOwned = value::TagValueOwned::fromRaw(
+        makeArray(BSON_ARRAY(BSON("a" << 1) << "hello" << 5 << 2 << BSONNULL)));
+    value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-    auto expectedResult = makeArray(BSON_ARRAY(BSON("a" << 1) << "hello" << 5 << 2 << BSONNULL));
-    value::ValueGuard expectedResultGuard{expectedResult};
-
-    auto sortSpec = makeSortSpec();
-    value::ValueGuard sortSpecGuard{sortSpec};
-
-    runAndAssertExpression(makeInt64(5), testArray, sortSpec, expectedResult);
+    runAndAssertExpression(
+        makeInt64(5), testArrayOwned.raw(), sortSpecOwned.raw(), expectedResultOwned.raw());
 }
 
 TEST_F(SBEBuiltinBottomNTest, ArraySet) {
-    auto testArray = makeArraySet(BSON_ARRAY(1 << 2 << 3));
-    value::ValueGuard testArrayGuard{testArray};
+    value::TagValueOwned testArrayOwned =
+        value::TagValueOwned::fromRaw(makeArraySet(BSON_ARRAY(1 << 2 << 3)));
+    value::TagValueOwned expectedResultOwned =
+        value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(2 << 1)));
+    value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-    auto expectedResult = makeArray(BSON_ARRAY(2 << 1));
-    value::ValueGuard expectedResultGuard{expectedResult};
-
-    auto sortSpec = makeSortSpec();
-    value::ValueGuard sortSpecGuard{sortSpec};
-
-    runAndAssertExpression(makeInt64(2), testArray, sortSpec, expectedResult);
+    runAndAssertExpression(
+        makeInt64(2), testArrayOwned.raw(), sortSpecOwned.raw(), expectedResultOwned.raw());
 }
 
 class SBEBuiltinTopTest : public EExpressionTestFixture {
@@ -382,11 +353,11 @@ protected:
             makeE<EFunction>(EFn::kTop, makeEs(std::move(arrayExpr), std::move(sortByExpr)));
         auto compiledExpr = compileExpression(*topExpr);
 
-        auto actual = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard actualGuard{actual};
+        value::TagValueOwned actualOwned =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        auto [compareTag, compareValue] =
-            value::compareValue(actual.first, actual.second, expected.first, expected.second);
+        auto [compareTag, compareValue] = value::compareValue(
+            actualOwned.tag(), actualOwned.value(), expected.first, expected.second);
         ASSERT_EQ(compareTag, value::TypeTags::NumberInt32);
         ASSERT_EQ(compareValue, 0);
     }
@@ -407,61 +378,51 @@ protected:
 TEST_F(SBEBuiltinTopTest, Array) {
     // top returns the first element under the sort order
     for (auto makeArrayFn : {makeBsonArray, makeArray}) {
-        auto testArray = makeArrayFn(BSON_ARRAY(1 << 2 << 3));
-        value::ValueGuard testArrayGuard{testArray};
+        value::TagValueOwned testArrayOwned =
+            value::TagValueOwned::fromRaw(makeArrayFn(BSON_ARRAY(1 << 2 << 3)));
 
         auto expectedResult = makeInt64(3);
 
-        auto sortSpec = makeSortSpec();
-        value::ValueGuard sortSpecGuard{sortSpec};
+        value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-        runAndAssertExpression(testArray, sortSpec, expectedResult);
+        runAndAssertExpression(testArrayOwned.raw(), sortSpecOwned.raw(), expectedResult);
     }
 }
 
 TEST_F(SBEBuiltinTopTest, NotArray) {
-    auto sortSpec = makeSortSpec();
-    value::ValueGuard sortSpecGuard{sortSpec};
+    value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-    runAndAssertExpression(makeNothing(), sortSpec, makeNothing());
-    runAndAssertExpression(makeInt32(123), sortSpec, makeNothing());
+    runAndAssertExpression(makeNothing(), sortSpecOwned.raw(), makeNothing());
+    runAndAssertExpression(makeInt32(123), sortSpecOwned.raw(), makeNothing());
 }
 
 TEST_F(SBEBuiltinTopTest, EmptyArray) {
-    auto testArray = value::makeNewArray();
-    value::ValueGuard testArrayGuard{testArray};
+    value::TagValueOwned testArrayOwned = value::TagValueOwned::fromRaw(value::makeNewArray());
+    value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-    auto sortSpec = makeSortSpec();
-    value::ValueGuard sortSpecGuard{sortSpec};
-
-    runAndAssertExpression(testArray, sortSpec, makeNull());
+    runAndAssertExpression(testArrayOwned.raw(), sortSpecOwned.raw(), makeNull());
 }
 
 TEST_F(SBEBuiltinTopTest, MixedTypes) {
     // top with mixed types - returns the first element (largest in descending order)
-    auto testArray = makeArray(
-        BSON_ARRAY(5 << "hello" << BSON("a" << 1) << BSON_ARRAY(1 << 2) << BSONNULL << 2));
-    value::ValueGuard testArrayGuard{testArray};
+    value::TagValueOwned testArrayOwned = value::TagValueOwned::fromRaw(makeArray(
+        BSON_ARRAY(5 << "hello" << BSON("a" << 1) << BSON_ARRAY(1 << 2) << BSONNULL << 2)));
+    value::TagValueOwned expectedResultOwned =
+        value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(1 << 2)));
+    value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-    auto expectedResult = makeArray(BSON_ARRAY(1 << 2));
-    value::ValueGuard expectedResultGuard{expectedResult};
-
-    auto sortSpec = makeSortSpec();
-    value::ValueGuard sortSpecGuard{sortSpec};
-
-    runAndAssertExpression(testArray, sortSpec, expectedResult);
+    runAndAssertExpression(testArrayOwned.raw(), sortSpecOwned.raw(), expectedResultOwned.raw());
 }
 
 TEST_F(SBEBuiltinTopTest, ArraySet) {
-    auto testArray = makeArraySet(BSON_ARRAY(1 << 2 << 3));
-    value::ValueGuard testArrayGuard{testArray};
+    value::TagValueOwned testArrayOwned =
+        value::TagValueOwned::fromRaw(makeArraySet(BSON_ARRAY(1 << 2 << 3)));
 
     auto expectedResult = makeInt64(3);
 
-    auto sortSpec = makeSortSpec();
-    value::ValueGuard sortSpecGuard{sortSpec};
+    value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-    runAndAssertExpression(testArray, sortSpec, expectedResult);
+    runAndAssertExpression(testArrayOwned.raw(), sortSpecOwned.raw(), expectedResult);
 }
 
 class SBEBuiltinBottomTest : public EExpressionTestFixture {
@@ -486,11 +447,11 @@ protected:
             makeE<EFunction>(EFn::kBottom, makeEs(std::move(arrayExpr), std::move(sortByExpr)));
         auto compiledExpr = compileExpression(*bottomExpr);
 
-        auto actual = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard actualGuard{actual};
+        value::TagValueOwned actualOwned =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        auto [compareTag, compareValue] =
-            value::compareValue(actual.first, actual.second, expected.first, expected.second);
+        auto [compareTag, compareValue] = value::compareValue(
+            actualOwned.tag(), actualOwned.value(), expected.first, expected.second);
         ASSERT_EQ(compareTag, value::TypeTags::NumberInt32);
         ASSERT_EQ(compareValue, 0);
     }
@@ -511,60 +472,52 @@ protected:
 TEST_F(SBEBuiltinBottomTest, Array) {
     // bottom returns the last element under the sort order
     for (auto makeArrayFn : {makeBsonArray, makeArray}) {
-        auto testArray = makeArrayFn(BSON_ARRAY(1 << 2 << 3));
-        value::ValueGuard testArrayGuard{testArray};
+        value::TagValueOwned testArrayOwned =
+            value::TagValueOwned::fromRaw(makeArrayFn(BSON_ARRAY(1 << 2 << 3)));
 
         auto expectedResult = makeInt64(1);
 
-        auto sortSpec = makeSortSpec();
-        value::ValueGuard sortSpecGuard{sortSpec};
+        value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-        runAndAssertExpression(testArray, sortSpec, expectedResult);
+        runAndAssertExpression(testArrayOwned.raw(), sortSpecOwned.raw(), expectedResult);
     }
 }
 
 TEST_F(SBEBuiltinBottomTest, NotArray) {
-    auto sortSpec = makeSortSpec();
-    value::ValueGuard sortSpecGuard{sortSpec};
+    value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-    runAndAssertExpression(makeNothing(), sortSpec, makeNothing());
-    runAndAssertExpression(makeInt32(123), sortSpec, makeNothing());
+    runAndAssertExpression(makeNothing(), sortSpecOwned.raw(), makeNothing());
+    runAndAssertExpression(makeInt32(123), sortSpecOwned.raw(), makeNothing());
 }
 
 TEST_F(SBEBuiltinBottomTest, EmptyArray) {
-    auto testArray = value::makeNewArray();
-    value::ValueGuard testArrayGuard{testArray};
+    value::TagValueOwned testArrayOwned = value::TagValueOwned::fromRaw(value::makeNewArray());
+    value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-    auto sortSpec = makeSortSpec();
-    value::ValueGuard sortSpecGuard{sortSpec};
-
-    runAndAssertExpression(testArray, sortSpec, makeNull());
+    runAndAssertExpression(testArrayOwned.raw(), sortSpecOwned.raw(), makeNull());
 }
 
 TEST_F(SBEBuiltinBottomTest, MixedTypes) {
     // bottom with mixed types - returns the last element (smallest in descending order)
-    auto testArray =
-        makeArray(BSON_ARRAY(5 << "hello" << BSON("a" << 1) << BSON_ARRAY(1 << 2) << 2));
-    value::ValueGuard testArrayGuard{testArray};
+    value::TagValueOwned testArrayOwned = value::TagValueOwned::fromRaw(
+        makeArray(BSON_ARRAY(5 << "hello" << BSON("a" << 1) << BSON_ARRAY(1 << 2) << 2)));
 
     auto expectedResult = makeInt64(2);
 
-    auto sortSpec = makeSortSpec();
-    value::ValueGuard sortSpecGuard{sortSpec};
+    value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-    runAndAssertExpression(testArray, sortSpec, expectedResult);
+    runAndAssertExpression(testArrayOwned.raw(), sortSpecOwned.raw(), expectedResult);
 }
 
 TEST_F(SBEBuiltinBottomTest, ArraySet) {
-    auto testArray = makeArraySet(BSON_ARRAY(1 << 2 << 3));
-    value::ValueGuard testArrayGuard{testArray};
+    value::TagValueOwned testArrayOwned =
+        value::TagValueOwned::fromRaw(makeArraySet(BSON_ARRAY(1 << 2 << 3)));
 
     auto expectedResult = makeInt64(1);
 
-    auto sortSpec = makeSortSpec();
-    value::ValueGuard sortSpecGuard{sortSpec};
+    value::TagValueOwned sortSpecOwned = value::TagValueOwned::fromRaw(makeSortSpec());
 
-    runAndAssertExpression(testArray, sortSpec, expectedResult);
+    runAndAssertExpression(testArrayOwned.raw(), sortSpecOwned.raw(), expectedResult);
 }
 
 }  // namespace mongo::sbe

@@ -55,14 +55,14 @@ protected:
             EFn::kTrunc, sbe::makeEs(makeE<EConstant>(copyTag, copyValue)));
         auto compiledExpr = compileExpression(*truncExpr);
 
-        auto [actualTag, actualValue] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(actualTag, actualValue);
+        value::TagValueOwned actual =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
         // This workaround is needed because double NaN values are not equal to themselves.
         if (expectedTag == value::TypeTags::NumberDouble) {
             auto expectedDouble = value::bitcastTo<double>(expectedValue);
             if (std::isnan(expectedDouble)) {
-                auto actualDouble = value::bitcastTo<double>(actualValue);
+                auto actualDouble = value::bitcastTo<double>(actual.value());
                 ASSERT(std::isnan(actualDouble));
                 return;
             }
@@ -72,14 +72,14 @@ protected:
         if (expectedTag == value::TypeTags::NumberDecimal) {
             auto expectedDecimal = value::bitcastTo<Decimal128>(expectedValue);
             if (expectedDecimal.isNaN()) {
-                auto actualDecimal = value::bitcastTo<Decimal128>(actualValue);
+                auto actualDecimal = value::bitcastTo<Decimal128>(actual.value());
                 ASSERT(actualDecimal.isNaN());
                 return;
             }
         }
 
         auto [compareTag, compareValue] =
-            value::compareValue(actualTag, actualValue, expectedTag, expectedValue);
+            value::compareValue(actual.tag(), actual.value(), expectedTag, expectedValue);
         ASSERT_EQUALS(compareTag, value::TypeTags::NumberInt32);
         ASSERT_EQUALS(value::bitcastTo<int32_t>(compareValue), 0);
     }
@@ -141,13 +141,14 @@ TEST_F(SBETruncBuiltinTest, TestDecimal) {
     };
 
     for (const auto& [argument, result] : testCases) {
-        auto [argumentTag, argumentValue] = value::makeCopyDecimal(argument);
-        value::ValueGuard argumentGuard(argumentTag, argumentValue);
+        value::TagValueOwned argumentCopy =
+            value::TagValueOwned::fromRaw(value::makeCopyDecimal(argument));
 
-        auto [resultTag, resultValue] = value::makeCopyDecimal(result);
-        value::ValueGuard resultGuard(resultTag, resultValue);
+        value::TagValueOwned resultCopy =
+            value::TagValueOwned::fromRaw(value::makeCopyDecimal(result));
 
-        runAndAssertExpression(argumentTag, argumentValue, resultTag, resultValue);
+        runAndAssertExpression(
+            argumentCopy.tag(), argumentCopy.value(), resultCopy.tag(), resultCopy.value());
     }
 }
 

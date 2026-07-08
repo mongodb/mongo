@@ -128,8 +128,8 @@ public:
 
         Status status = [&]() {
             try {
-                auto [stateTag, stateVal] = runCompiledExpression(compiledInit.get());
-                value::ValueGuard guard{stateTag, stateVal};
+                value::TagValueOwned state =
+                    value::TagValueOwned::fromRaw(runCompiledExpression(compiledInit.get()));
                 return Status::OK();
             } catch (AssertionException& ex) {
                 return ex.toStatus();
