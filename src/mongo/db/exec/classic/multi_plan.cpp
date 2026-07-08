@@ -362,7 +362,7 @@ Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy,
             multiPlannerHitWorksLimitTotal.incrementRelaxed();
         }
 
-        int numDocsFound = 0;
+        size_t numDocsFound = 0;
         for (const auto& candidate : _candidates) {
             numDocsFound += candidate.results.size();
         }

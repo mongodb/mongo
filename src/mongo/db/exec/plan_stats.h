@@ -768,9 +768,9 @@ struct MultiPlanStats : public SpecificStats {
     boost::optional<std::string> replanReason;
 
     // Total number of works across all candidate plans.
-    int totalWorks = 0;
+    int64_t totalWorks = 0;
     // Total number of documents returned across all candidate plans.
-    int numResultsFound = 0;
+    int64_t numResultsFound = 0;
     // Number of candidate plans considered.
     int numCandidatePlans = 0;
     // True if we exited the multi-planner early due to one plan hitting EOF or filling a batch
