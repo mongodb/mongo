@@ -115,6 +115,9 @@ protected:
         return *(_ptr->vtable);
     }
 
+    // Called from the constructor, copy, and move paths (not just construction), so a
+    // misconfigured vtable is caught as soon as any wrapper referencing it is created, rather than
+    // at the point of first use.
     void _assertValidVTable() const {
         if (_ptr) {
             API::assertVTableConstraints(_vtable());
