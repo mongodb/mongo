@@ -120,6 +120,35 @@ TEST_F(TelemetryContextSerializationTest,
     ASSERT_TRUE(resultBson.hasField(GenericArguments::kTraceCtxFieldName));
 }
 
+TEST_F(TelemetryContextSerializationTest, ToWireTypeNullInputReturnsNull) {
+    EXPECT_FALSE(toWireType(nullptr).has_value());
+}
+
+TEST_F(TelemetryContextSerializationTest, ToWireTypeNoActiveSpanReturnsNull) {
+    auto context = traces::Span::createTelemetryContext();
+    EXPECT_FALSE(toWireType(context.get()).has_value());
+}
+
+TEST_F(TelemetryContextSerializationTest, ToWireTypeActiveSpanReturnsWireType) {
+    auto context = traces::Span::createTelemetryContext();
+    auto span = traces::Span::start(context, traces::span_names::kTest1);
+    auto wireType = toWireType(context.get());
+    ASSERT_TRUE(wireType.has_value());
+    EXPECT_FALSE(wireType->getOtel().getTraceparent().empty());
+}
+
+TEST_F(TelemetryContextSerializationTest, ToWireTypeTraceparentMatchesBSONSerialization) {
+    auto context = traces::Span::createTelemetryContext();
+    auto span = traces::Span::start(context, traces::span_names::kTest1);
+
+    auto wireType = toWireType(context.get());
+    ASSERT_TRUE(wireType.has_value());
+
+    BSONObj bson = TelemetryContextSerializer::toBSON(context);
+    auto traceparentFromBson = bson.getStringField("traceparent");
+    ASSERT_EQ(wireType->getOtel().getTraceparent(), traceparentFromBson);
+}
+
 }  // namespace
 }  // namespace traces
 }  // namespace otel

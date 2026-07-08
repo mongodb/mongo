@@ -228,6 +228,9 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:aggregation_request_helper",
         "//src/mongo/db/query:command_request_response",
         "//src/mongo/db/query:query_request",
+        "//src/mongo/otel:otel_base",
+        "//src/mongo/otel/traces:telemetry_context_serialization",
+        "//src/mongo/otel/traces:tracing_enablement",
         "//src/mongo/rpc",
         "//src/mongo/rpc:command_status",
         "//src/mongo/util/net:ssl_manager",
@@ -614,6 +617,30 @@ mongo_cc_unit_test(
         ":clientdriver_network",
         "//src/mongo/util:version_impl",
     ],
+)
+
+mongo_cc_unit_test(
+    name = "dbclient_base_test",
+    srcs = [
+        "dbclient_base_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_first_group",
+        "tracing_test",
+    ],
+    deps = [
+        ":clientdriver_minimal",
+        "//src/mongo/otel/traces:tracing",
+        "//src/mongo/otel/traces:tracing_initialization",
+        "//src/mongo/otel/traces/sampler",
+        "//src/mongo/unittest:server_parameter_guard",
+    ] + select({
+        "@//bazel/config:build_otel_enabled": [
+            "//src/mongo/otel/traces:tracer_provider_service",
+            "//src/mongo/otel/traces:tracing_test_util",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 # TODO(SERVER-96852): Remove cycle created by moving //src/mongo/client:connection_string.h to //src/mongo/client:connection_string

@@ -108,6 +108,9 @@ enum WireVersion {
     // Supports features available from 5.1 and onwards.
     WIRE_VERSION_51 = 14,
 
+    // Supports features available from 9.0 and onwards.
+    WIRE_VERSION_90 = 29,
+
     // Calculate the latest wire version using the number of releases since 4.0.
     LATEST_WIRE_VERSION = REPLICA_SET_TRANSACTIONS + multiversion::kSince_4_0,
 

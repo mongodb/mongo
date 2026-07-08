@@ -32,7 +32,10 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/otel/telemetry_context.h"
+#include "mongo/rpc/telemetry_context_section_gen.h"
 #include "mongo/util/modules.h"
+
+#include <boost/optional.hpp>
 
 #ifdef MONGO_CONFIG_OTEL
 #include <opentelemetry/context/propagation/text_map_propagator.h>
@@ -53,6 +56,12 @@ public:
     static BSONObj toBSON(const std::shared_ptr<TelemetryContext>& context);
     static BSONObj appendTelemetryContext(OperationContext* opCtx, BSONObj bson);
 };
+
+/**
+ * Converts a TelemetryContext to the wire-format type for use in OpMsg's telemetry section.
+ * Returns boost::none if ctx is null or if no active span is present in ctx.
+ */
+boost::optional<TelemetryContextSection> toWireType(const TelemetryContext* ctx);
 
 namespace detail {
 using TextMapPropagator = opentelemetry::context::propagation::TextMapPropagator;
@@ -78,6 +87,10 @@ public:
         return bson;
     }
 };
+
+inline boost::optional<::mongo::TelemetryContextSection> toWireType(const TelemetryContext*) {
+    return boost::none;
+}
 
 #endif
 

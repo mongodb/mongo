@@ -57,6 +57,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_shard_role.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/base64.h"
@@ -218,6 +219,10 @@ protected:
         setGlobalServiceContext(std::move(serviceContextHolder));
         client = serviceContext->getService()->makeClient("test");
         opCtx = serviceContext->makeOperationContext(client.get());
+
+        // Required so DBDirectClient (used by the cluster-auth user lookup path) can determine
+        // the max wire version.
+        WireSpec::getWireSpec(serviceContext).initialize(WireSpec::Specification{});
 
         // Initialize the serviceEntryPoint so that DBDirectClient can function.
         serviceContext->getService()->setServiceEntryPoint(
