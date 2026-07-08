@@ -52,3 +52,4 @@ release:
   featureFlagMultiPlanLimiter: {}
   featureFlagSbeAccumulators: {}
   featureFlagSbeUpgradeBinaryTrees: {}
+  featureFlagSearchExtension: {}

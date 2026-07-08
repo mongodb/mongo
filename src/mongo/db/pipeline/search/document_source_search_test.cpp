@@ -206,8 +206,9 @@ TEST_F(SearchTest, IsExtensionMongotPipelineReturnsTrueForSearch) {
 }
 
 TEST_F(SearchTest, IsExtensionMongotPipelineReturnsFalseForSearchFlagDisabled) {
-    // No flag values, so featureFlagSearchExtension is false.
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(std::vector<BSONObj>{});
+    auto& flag = feature_flags::gFeatureFlagSearchExtension;
+    std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << false)};
+    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
 
     auto origExtensions = serverGlobalParams.extensions;
     ScopeGuard restoreExtensions([&] { serverGlobalParams.extensions = origExtensions; });
@@ -237,8 +238,9 @@ TEST_F(SearchTest, IsExtensionMongotPipelineReturnsTrueForSearchMeta) {
 }
 
 TEST_F(SearchTest, IsExtensionMongotPipelineReturnsFalseForSearchMetaFlagDisabled) {
-    // No flag values, so featureFlagSearchExtension is false.
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(std::vector<BSONObj>{});
+    auto& flag = feature_flags::gFeatureFlagSearchExtension;
+    std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << false)};
+    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
 
     auto origExtensions = serverGlobalParams.extensions;
     ScopeGuard restoreExtensions([&] { serverGlobalParams.extensions = origExtensions; });
