@@ -5,36 +5,36 @@ load("@bazel_rules_mongo//utils:platforms_normalize.bzl", "ARCH_NORMALIZE_MAP", 
 
 URLS_MAP = {
     "linux_aarch64": {
-        "sha": "75b9816f262e828e45fd336f067c0721e38d75c7d6d40f817648822c80ff3b1e",
-        "url": "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.2.11/db-contrib-tool_v2.2.11_linux_arm64.gz",
+        "sha": "c083405331439d76e1dcae8bbb3e90c6039fc7333e0160f46dff251dd506a637",
+        "url": "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.4.0/db-contrib-tool_v2.4.0_linux_arm64.gz",
     },
     "linux_x86_64": {
-        "sha": "3de6cce6ef60998dbb09ff30a0670d1ac5499067269aa5c2f403ea44ea4ca4db",
-        "url": "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.2.11/db-contrib-tool_v2.2.11_linux_x64.gz",
+        "sha": "937985fbf56a3312787e15ade4cafc208f2b81ee483b096aead34c0a1816b627",
+        "url": "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.4.0/db-contrib-tool_v2.4.0_linux_x64.gz",
     },
     "linux_s390x": {
-        "sha": "49ca8380859d03be63457d031f8db7054f3f88f6e2b47da66748ded4333ed756",
-        "url": "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.2.11/db-contrib-tool_v2.2.11_linux_s390x.gz",
+        "sha": "8e06a8386ace14875d70d0f5e8de13d982902f76c1eff70250dbb49e0c56703f",
+        "url": "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.4.0/db-contrib-tool_v2.4.0_linux_s390x.gz",
     },
     "rhel8_ppc64le": {
-        "sha": "bb11d8cef10d89975a1cc31b9e07c1ec9a1d1b4c98367362f458568ea25b2995",
-        "url": "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.2.11/db-contrib-tool_v2.2.11_rhel8_ppc64le.gz",
+        "sha": "c0a6616aa07c9fdb2e3b867833718b7c973bfee345d0e781b943430af10784d3",
+        "url": "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.4.0/db-contrib-tool_v2.4.0_rhel8_ppc64le.gz",
     },
     "rhel9_ppc64le": {
-        "sha": "8ee1febb2a22034b66fc3acebdd3eee3fc1e51b58ac532852283a6b719a1b9ec",
-        "url": "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.2.11/db-contrib-tool_v2.2.11_rhel9_ppc64le.gz",
+        "sha": "f541856ecc0698b7dc1a96b84d8af326f69c6b72997d6d6dd98ee713e88343c0",
+        "url": "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.4.0/db-contrib-tool_v2.4.0_rhel9_ppc64le.gz",
     },
     "macos_x86_64": {
-        "sha": "53aea9e93ecc8865b0dbb95432d56879737b58187b56e22835403c3c883c438c",
-        "url": "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.2.11/db-contrib-tool_v2.2.11_darwin_x64.gz",
+        "sha": "4e1e8d0c3969668037fd2a2fd550ed6e42b85a1fbbed5cc8f891900c664cb138",
+        "url": "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.4.0/db-contrib-tool_v2.4.0_darwin_x64.gz",
     },
     "macos_aarch64": {
-        "sha": "81495a8f1be9d60fa20d005e0f4e349f51a610e1c750c532db8640eeab4a3c48",
-        "url": "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.2.11/db-contrib-tool_v2.2.11_darwin_arm64.gz",
+        "sha": "045e1b041a4ab1fc7d0cd45ef50f6d5e3403e6597412b1509491a6865dd5296e",
+        "url": "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.4.0/db-contrib-tool_v2.4.0_darwin_arm64.gz",
     },
     "windows_x86_64": {
-        "sha": "47e0946c0703043968ef758f3b1cccfa4d5ef690763ededb89645b0765a3a4b8",
-        "url": "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.2.11/db-contrib-tool_v2.2.11_windows_x64.exe.gz",
+        "sha": "61a53f57845d5af7a95e50144154c04c116c96b118cb19fcc3c02f474b96204c",
+        "url": "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.4.0/db-contrib-tool_v2.4.0_windows_x64.exe.gz",
     },
 }
 
