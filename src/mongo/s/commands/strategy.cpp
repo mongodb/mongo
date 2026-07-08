@@ -624,8 +624,6 @@ void ParseAndRunCommand::RunInvocation::_maybeWaitForAdmission() {
     // respect the deadline.
     // NOTE: All cluster commands are subject to admission control at this time.
     const auto isProcessInternalCommand = isProcessInternalClient(*opCtx->getClient());
-    // TODO(SERVER-125863): Integrate whether the cluster command is subject to admission control
-    // here once we audit the list.
     const bool exemptFromIngressRateLimit =
         isProcessInternalCommand || !admission::gIngressRequestRateLimiterEnabled.load();
     uassertStatusOK(
