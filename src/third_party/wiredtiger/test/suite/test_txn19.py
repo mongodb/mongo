@@ -376,11 +376,10 @@ class test_txn19_meta(wttest.WiredTigerTestCase, suite_subprocess):
         ('garbage-end', dict(kind='garbage-end', f=lambda fname:
             corrupt(fname, False, -1, 'Bad!' * 1024))),
     ]
-    # File to be corrupted. WiredTiger.basecfg is deliberately excluded as it is not metadata that
-    # salvage ever operates on. Its own corruption/recovery behavior is covered directly by
-    # test_baseconfig.py.
+    # File to be corrupted
     filename_scenarios = [
         ('WiredTiger', dict(filename='WiredTiger')),
+        ('WiredTiger.basecfg', dict(filename='WiredTiger.basecfg')),
         ('WiredTiger.turtle', dict(filename='WiredTiger.turtle')),
         ('WiredTiger.wt', dict(filename='WiredTiger.wt')),
         ('WiredTigerHS.wt', dict(filename='WiredTigerHS.wt')),
@@ -394,19 +393,25 @@ class test_txn19_meta(wttest.WiredTigerTestCase, suite_subprocess):
     # In many cases, wiredtiger_open without any salvage options will
     # just work.  We list those cases here.
     openable = [
+        "removal:WiredTiger.basecfg",
         "removal:WiredTiger.turtle",
         "truncate:WiredTiger",
+        "truncate:WiredTiger.basecfg",
         "truncate-middle:WiredTiger",
+        "truncate-middle:WiredTiger.basecfg",
         "truncate-middle:WiredTiger.turtle",
         "truncate-middle:WiredTiger.wt",
         "truncate-middle:WiredTigerHS.wt",
         "zero:WiredTiger",
+        "zero:WiredTiger.basecfg",
         "zero-end:WiredTiger",
+        "zero-end:WiredTiger.basecfg",
         "zero-end:WiredTiger.turtle",
         "zero-end:WiredTiger.wt",
         "zero-end:WiredTigerHS.wt",
         "garbage-begin:WiredTiger",
         "garbage-middle:WiredTiger",
+        "garbage-middle:WiredTiger.basecfg",
         "garbage-middle:WiredTiger.turtle",
         "garbage-middle:WiredTiger.wt",
         "garbage-middle:WiredTigerHS.wt",
@@ -425,8 +430,10 @@ class test_txn19_meta(wttest.WiredTigerTestCase, suite_subprocess):
         "truncate:WiredTigerHS.wt",
         "zero:WiredTiger.wt",
         "zero:WiredTigerHS.wt",
+        "garbage-begin:WiredTiger.basecfg",
         "garbage-begin:WiredTiger.wt",
         "garbage-begin:WiredTigerHS.wt",
+        "garbage-end:WiredTiger.basecfg",
     ]
 
     scenarios = make_scenarios(key_format_values, corruption_scenarios, filename_scenarios)
@@ -478,6 +485,9 @@ class test_txn19_meta(wttest.WiredTigerTestCase, suite_subprocess):
                     errmsg = '/hs_exists/'
                 elif self.kind == 'truncate':
                     errmsg = '/file size=0, alloc size=4096/'
+            if self.filename == 'WiredTiger.basecfg':
+                if self.kind == 'garbage-begin' or self.kind == 'garbage-end':
+                    errmsg = '/Bad!Bad!Bad!/'
             if self.filename == 'WiredTiger.wt':
                 if self.kind == 'truncate':
                     errmsg = '/is smaller than allocation size; file size=0, alloc size=4096/'

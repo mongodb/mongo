@@ -12,7 +12,6 @@
 #define WT_SINGLETHREAD "WiredTiger.lock" /* Locking file */
 
 #define WT_BASECONFIG "WiredTiger.basecfg"         /* Base configuration */
-#define WT_BASECONFIG_BAD "WiredTiger.basecfg.bad" /* Base config, renamed if corrupted */
 #define WT_BASECONFIG_SET "WiredTiger.basecfg.set" /* Base config temp */
 
 #define WT_USERCONFIG "WiredTiger.config" /* User configuration */

@@ -200,6 +200,7 @@ of the documentation.
 
 - @subpage arch-toc-disaggregated-storage
     - @ref arch-page-delta
+    - @ref arch-disagg-cross-checkpoint-caching
     - @ref arch-disagg-layered
     - @ref arch-disagg-layered-cursor
     - @ref arch-disagg-key-provider
@@ -382,6 +383,7 @@ operation.
 /*! @page arch-toc-disaggregated-storage Disaggregated Storage
 
 @subpage arch-page-delta
+@subpage arch-disagg-cross-checkpoint-caching
 @subpage arch-disagg-layered
 @subpage arch-disagg-layered-cursor
 @subpage arch-disagg-key-provider

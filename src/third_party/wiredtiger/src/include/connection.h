@@ -341,7 +341,7 @@ struct __wt_disaggregated_storage {
      * e.g. if the config parsing does anything even slightly off the beaten track.
      */
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_DISAGG_NO_SYNC 0x1u
+#define WT_DISAGG_NO_LOCAL_DURABILITY 0x1u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
 };
@@ -763,7 +763,8 @@ struct __wt_conn_tiered {
 #define WT_CONN_HOTBACKUP_START(conn)                                                          \
     do {                                                                                       \
         WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_HOTBACKUP_WRITE)); \
-        (conn)->backup.timestamp = (conn)->txn_global.last_ckpt_timestamp;                     \
+        (conn)->backup.timestamp =                                                             \
+          __wt_atomic_load_uint64_acquire(&(conn)->txn_global.last_ckpt_timestamp);            \
         __wt_atomic_store_uint64_relaxed(&(conn)->backup.start, (conn)->ckpt.most_recent);     \
         (conn)->backup.list = NULL;                                                            \
     } while (0)

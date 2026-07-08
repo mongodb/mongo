@@ -446,11 +446,17 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
          *
          * Do not mark the tree dirty if there is no change to stable timestamp compared to the last
          * checkpoint.
+         *
+         * The load is relaxed rather than acquire: this runs on the checkpoint thread, under the
+         * checkpoint lock, which is the same thread that publishes the timestamp, and the value is
+         * only compared to decide whether to mark the tree dirty. No state published alongside the
+         * timestamp is consumed here.
          */
         if (!btree->modified && !F_ISSET(conn, WT_CONN_RECOVERING) &&
           !F_ISSET_ATOMIC_32(conn, WT_CONN_CLOSING_CHECKPOINT) &&
           (btree->rec_max_txn >= txn->snapshot_data.snap_min ||
-            (conn->txn_global.checkpoint_timestamp != conn->txn_global.last_ckpt_timestamp &&
+            (conn->txn_global.checkpoint_timestamp !=
+                __wt_atomic_load_uint64_relaxed(&conn->txn_global.last_ckpt_timestamp) &&
               btree->rec_max_timestamp > conn->txn_global.checkpoint_timestamp)))
             __wt_tree_modify_set(session);
         break;

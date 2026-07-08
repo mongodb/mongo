@@ -1360,7 +1360,7 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
 
         WT_ERR(__wt_config_gets(session, cfg, "disaggregated.lose_all_my_data", &cval));
         if (cval.val != 0)
-            F_SET(&conn->disaggregated_storage, WT_DISAGG_NO_SYNC);
+            F_SET(&conn->disaggregated_storage, WT_DISAGG_NO_LOCAL_DURABILITY);
 
         /*
          * Get the percentage of a page size that a delta must be less than in order to write that

@@ -14,7 +14,7 @@
  */
 static int
 __layered_create_missing_ingest_table(
-  WT_SESSION_IMPL *session, const char *uri, const char *layered_cfg)
+  WT_SESSION_IMPL *session, const char *uri, const char *layered_cfg, bool is_startup)
 {
     WT_CONFIG_ITEM key_format, value_format;
     WT_DECL_ITEM(ingest_config);
@@ -31,7 +31,15 @@ __layered_create_missing_ingest_table(
       "disaggregated=(page_log=none,storage_source=none)",
       (int)key_format.len, key_format.str, (int)value_format.len, value_format.str));
 
-    WT_WITH_SCHEMA_LOCK(session, ret = __wt_schema_create(session, uri, ingest_config->data));
+    /*
+     * On the first checkpoint pickup, skip opening a dhandle for each newly created ingest table:
+     * the cost scales with the number of tables and dominates startup time and the dhandle will be
+     * opened on first access instead. This is safe because ingest tables are in-memory only and
+     * skipped by checkpoints. Steady-state pickups create few tables, so keep the eager open there
+     * to avoid acquiring the schema lock again on first access.
+     */
+    WT_WITH_SCHEMA_LOCK(
+      session, ret = __wt_schema_create_internal(session, uri, ingest_config->data, !is_startup));
 
     __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
       "Created missing ingest table \"%s\" from \"%s\"", uri, layered_cfg);
@@ -446,7 +454,8 @@ err:
  *     Process the metadata entries stored in the shared metadata table for a new checkpoint.
  */
 static int
-__disagg_apply_checkpoint_meta(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT_META *ckpt_meta)
+__disagg_apply_checkpoint_meta(
+  WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT_META *ckpt_meta, bool is_startup)
 {
     WT_CONFIG_ITEM cval;
     WT_CURSOR *md_cursors[WT_DISAGG_CURSOR_COUNT], *md_write_cursor,
@@ -667,7 +676,7 @@ __disagg_apply_checkpoint_meta(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPO
                 if (ret == WT_NOTFOUND) {
                     WT_ERR_MSG_CHK(session,
                       __layered_create_missing_ingest_table(
-                        session, layered_ingest_uri, metadata_value),
+                        session, layered_ingest_uri, metadata_value, is_startup),
                       "Failed to create missing ingest table \"%s\" from \"%s\"",
                       layered_ingest_uri, metadata_value);
                     ++new_ingest;
@@ -847,7 +856,9 @@ __disagg_finalize_checkpoint_meta(WT_SESSION_IMPL *session,
     __wt_atomic_store_uint64_release(
       &conn->disaggregated_storage.last_checkpoint_oldest_timestamp, metadata->oldest_timestamp);
     conn->txn_global.last_ckpt_disaggregated_schema_epoch = metadata->schema_epoch;
-    conn->txn_global.last_ckpt_timestamp = metadata->checkpoint_timestamp;
+    /* Release store to pair with the acquire load in sweep. */
+    __wt_atomic_store_uint64_release(
+      &conn->txn_global.last_ckpt_timestamp, metadata->checkpoint_timestamp);
 
     /* Set the database size. */
     __wt_disagg_set_database_size(session, ckpt_meta->database_size);
@@ -882,6 +893,7 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT
     WT_TIMER pickup_timer;
     uint64_t current_meta_lsn, pickup_elapsed_ms;
     char ts_string[3][WT_TS_INT_STRING_SIZE];
+    bool is_startup;
 
     conn = S2C(session);
 
@@ -905,6 +917,7 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT
           "Attempting to pick up an older checkpoint: current metadata LSN = %" PRIu64
           ", new metadata LSN = %" PRIu64,
           current_meta_lsn, ckpt_meta->metadata_lsn);
+    is_startup = current_meta_lsn == WT_DISAGG_LSN_NONE;
 
     /*
      * Warn if we are picking up the same checkpoint again. There's nothing else to do here, goto
@@ -967,7 +980,8 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT
      */
 
     /* Apply the metadata from the checkpoint. */
-    WT_WITH_SCHEMA_LOCK(session, ret = __disagg_apply_checkpoint_meta(session, ckpt_meta));
+    WT_WITH_SCHEMA_LOCK(
+      session, ret = __disagg_apply_checkpoint_meta(session, ckpt_meta, is_startup));
     WT_ERR(ret);
 
     /*

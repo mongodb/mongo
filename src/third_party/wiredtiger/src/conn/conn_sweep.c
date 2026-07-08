@@ -169,7 +169,7 @@ __sweep_close_dhandle_locked(WT_SESSION_IMPL *session)
         wt_timestamp_t max_write_ts = __wt_atomic_load_uint64_relaxed(&btree->max_ingest_write_ts);
         if (max_write_ts == WT_TS_NONE ||
           max_write_ts >
-            __wt_atomic_load_uint64_relaxed(&S2C(session)->txn_global.last_ckpt_timestamp))
+            __wt_atomic_load_uint64_acquire(&S2C(session)->txn_global.last_ckpt_timestamp))
             return (0);
     }
 

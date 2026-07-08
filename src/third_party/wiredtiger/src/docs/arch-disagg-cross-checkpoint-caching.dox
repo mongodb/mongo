@@ -1,0 +1,121 @@
+/*! @arch_page arch-disagg-cross-checkpoint-caching Cross-Checkpoint Caching
+
+WiredTiger's cross-checkpoint caching feature reduces redundant network reads
+and unnecessary memory usage on disaggregated standbys by sharing disk images
+in memory across checkpoints. When a standby picks up a new checkpoint
+(see @ref arch-checkpoint), pages that are unchanged from the previous
+checkpoint can be served directly from memory instead of being re-fetched from
+remote storage. This feature is only active on disaggregated standby nodes;
+see @ref ccc_states for when it is enabled and disabled.
+
+The shared disk cache is implemented as a connection-level hash table keyed on
+the address cookie. Because different files can hash to the same bucket, lookup
+finds the correct disk image by walking the bucket's linked list and matching on
+file ID, address size, and address cookie. Each entry holds a single disk image
+buffer shared across all in-memory pages that reference the same block.
+Normally each page owns its disk image buffer privately, but with the
+cross-checkpoint cache, the disk image is owned by the cache entry and pages
+share it instead. When a page is read, WiredTiger first checks the shared disk
+cache for an existing entry. On a miss, it reads the block from remote storage
+and adds the disk image to the shared disk cache. When the last page
+referencing an entry is discarded, the entry is removed and the buffer freed.
+
+Pages sharing a disk image do not count those bytes toward connection-level
+cache totals (\c bytes_inmem). The shared disk cache counts them once when
+the entry is first inserted and drains them when the last reference is
+released. Each page's \c memory_footprint still includes the disk image size
+for per-page eviction decisions.
+
+@section ccc_key_files Key files
+
+| File | Role |
+|------|------|
+| \c src/include/cache.h | \c WT_SHARED_DSK_CACHE struct and state definitions |
+| \c src/include/btmem.h | \c shared_dsk_item pointer in the page's \c WT_PAGE_DISAGG_INFO |
+| \c src/btree/bt_read.c | call site: get on page fault-in, put after storage read |
+| \c src/btree/bt_discard.c | call site: release when a page is discarded |
+| \c src/cache/shared_dsk.c | get, put, release, init, and destroy |
+| \c src/cache/cache.c | cache creation and destruction wiring |
+| \c src/conn/conn_layered.c | step-up transition (ACTIVE to READONLY) and step-down transition (back to ACTIVE) |
+| \c src/conn/conn_sweep.c | sweep server flipping READONLY to DEAD after the grace period |
+
+@section ccc_lifecycle Lifecycle of the cache
+
+The cache is created in \c __wt_cache_create when a disaggregated connection
+opens on a standby, and it starts in \c WT_DSK_CACHE_ACTIVE. On connection
+close, it is destroyed in \c __wt_cache_destroy. State transitions on step-up
+and beyond are described in @ref ccc_states.
+
+@section ccc_ops Cache Operation Implementations
+
+- <b>get</b> (\c __wt_shared_dsk_cache_get): looks up an entry by file ID and
+  address cookie. On a hit the reference count is incremented and the caller
+  receives a pointer to the cached disk image. On a miss the caller reads from
+  storage as usual.
+
+- <b>put</b> (\c __wt_shared_dsk_cache_put): inserts a newly read disk image.
+  If an entry for that address already exists its reference count is
+  incremented and \c inserted is set to false; the caller must free the
+  redundant buffer. On a fresh insert \c inserted is set to true and the cache
+  takes ownership of the data.
+
+- <b>release</b> (\c __wt_shared_dsk_cache_release): decrements the reference
+  count. When the count reaches zero the entry is removed from the hash table
+  and its buffer freed.
+
+@section ccc_data_structures Data structures
+
+Two structs in \c src/include/cache.h implement the cache.
+
+\c WT_SHARED_DSK_CACHE is the top-level object, embedded in \c WT_CACHE:
+
+- \c state: atomic \c uint8_t holding the current \c WT_DSK_CACHE_STATE
+  (see @ref ccc_states).
+- \c readonly_since: atomic wall-clock timestamp (seconds) recording when the
+  cache transitioned to \c READONLY on step-up (see @ref ccc_lifecycle).
+- \c hash / \c hash_size: bucket array sized at roughly 0.2% of configured
+  cache, with a floor of 1000 buckets.
+- \c hash_locks / \c hash_lock_size: spinlock array, striped across buckets
+  so that each lock guards a group of buckets.
+
+\c WT_SHARED_DSK_ITEM is a single cache entry:
+
+- \c fid + \c addr[]: composite lookup key: file ID and address cookie.
+- \c data / \c data_size: cached disk image buffer and its length.
+- \c ref_count: number of in-memory pages sharing this entry; incremented on
+  get or put collision, decremented on release. Drops to zero causes the entry
+  to be immediately removed and the buffer freed. Protected by the bucket
+  spinlock.
+- \c block_meta: \c WT_PAGE_BLOCK_META copied into the page's \c disagg_info
+  on a cache hit, avoiding a storage round-trip.
+
+Each in-memory page that holds a reference stores a pointer to its
+\c WT_SHARED_DSK_ITEM in \c page->disagg_info->shared_dsk_item
+(see \c src/include/btmem.h).
+
+@section ccc_states State machine
+
+Cross-checkpoint caching is only enabled on disaggregated standbys, because
+leader reads come from the live btree rather than older checkpoint images.
+The cache moves through the following states over the lifetime of a connection:
+
+| State | Who enters it | Reads allowed | Writes (puts) allowed |
+|-------|--------------|---------------|-----------------------|
+| \c WT_DSK_CACHE_OFF | Leader that has never been a standby; non-disagg connections | No | No |
+| \c WT_DSK_CACHE_ACTIVE | Standby | Yes | Yes |
+| \c WT_DSK_CACHE_READONLY | Immediately after step-up to leader | Yes | No |
+| \c WT_DSK_CACHE_DEAD | After the sweep server's grace period elapses on a leader | No | No |
+
+On step-up, the cache moves from \c ACTIVE to \c READONLY so that warm pages
+already in the cache continue to be served. A grace period
+(\c WT_DISAGG_OUTDATED_GRACE_SECS) controls how long the cache remains in
+\c READONLY: once the reuse window expires, the sweep server flips it to
+\c DEAD. The sweep server preserves outdated stable-checkpoint dhandles for
+that grace period instead of discarding them immediately, allowing the next
+checkpoint generation to reuse the shared disk image.
+
+On step-down, the cache transitions back to \c ACTIVE. If the hash table was
+never initialized (i.e. the node started as a leader and was not previously a standby),
+it is created at this point, otherwise the existing table is reused.
+
+*/

@@ -933,6 +933,11 @@ __wti_cursors_can_be_cached(WT_SESSION_IMPL *session, const char *cfg[], bool *c
     if (cval.val)
         goto return_false;
 
+    /* Statistics cursors are never cached, don't search the cache for a match. */
+    WT_RET(__wt_config_gets_def(session, cfg, "statistics", 0, &cval));
+    if (cval.len != 0)
+        goto return_false;
+
     /* Checkpoints are readonly, we won't cache them. */
     WT_RET(__wt_config_gets_def(session, cfg, "checkpoint", 0, &cval));
     if (cval.len != 0 && !WT_CONFIG_MATCHES_DEFAULT(session, WT_SESSION_open_cursor, cval))

@@ -45,6 +45,7 @@ DISAGG
 DNON
 DONTNEED
 DSC
+DSK
 DSPINLOCK
 DWT
 Datastore
@@ -251,6 +252,7 @@ callbk
 callgraph
 cas
 ccache
+ccc
 cd
 cdb
 cds
@@ -347,6 +349,7 @@ dontlock
 doxtable
 dp
 ds
+dsk
 dsrc
 dsync
 dt
@@ -386,6 +389,7 @@ fd's
 fdatasync
 fextend
 fh
+fid
 fieldname
 fileBackgroundColor
 fileBorderColor

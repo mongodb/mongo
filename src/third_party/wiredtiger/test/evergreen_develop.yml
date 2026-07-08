@@ -31,6 +31,7 @@ variables:
     - name: many-dhandle-stress
     - name: prefetch-off-verify
     - name: prefetch-on-verify
+    - name: perf-disagg-many-tables-follower-startup
 
 # Build variants that need to be run only on the develop branch.
 buildvariants:
