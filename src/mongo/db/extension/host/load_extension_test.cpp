@@ -47,6 +47,7 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/scopeguard.h"
 
 #include <filesystem>
 
@@ -751,6 +752,14 @@ TEST(SelectCompatibleVersionTest, MultipleHostMajorsPicksHighestCompatible) {
     auto chosen = selectCompatibleVersion(hostVec, extVec);
     ASSERT_EQ(chosen.major, 2u);
     ASSERT_EQ(chosen.minor, 1u);
+}
+
+TEST_F(LoadExtensionsTest, LoadExtensionConfigFailsWhenConfigPathEmpty) {
+    const auto previousExtensionsConfigPath = serverGlobalParams.extensionsConfigPath;
+    ON_BLOCK_EXIT([&] { serverGlobalParams.extensionsConfigPath = previousExtensionsConfigPath; });
+
+    serverGlobalParams.extensionsConfigPath = "";
+    ASSERT_THROWS_CODE(ExtensionLoader::loadExtensionConfig("foo"), AssertionException, 12773200);
 }
 
 }  // namespace mongo::extension::host

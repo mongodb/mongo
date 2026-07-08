@@ -34,6 +34,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/extension/host/load_extension.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 
 #include <fstream>
@@ -45,13 +46,14 @@
 namespace mongo::extension::host {
 namespace {
 using namespace std::literals::string_view_literals;
-std::filesystem::path getExtensionStubParserFile() {
-    constexpr auto kFileName = "aggregation_stage_fallback_parsers.json";
+std::filesystem::path getExtensionStubParserDirectory() {
     if (getTestCommandsEnabled()) {
         return std::filesystem::current_path() /
-            std::filesystem::path{"src/mongo/db/extension/test_examples"} / kFileName;
+            std::filesystem::path{"src/mongo/db/extension/test_examples"};
     }
-    return ExtensionLoader::getExtensionConfDir() / kFileName;
+    // In production, the stub parsers are expected to be found in the same directory as the
+    // extension configuration files.
+    return std::filesystem::path(serverGlobalParams.extensionsConfigPath);
 }
 
 /**
@@ -97,7 +99,14 @@ void registerStubParser(std::string stageName, std::string message, FeatureFlag*
 }
 
 void registerUnloadedExtensionStubParsers() {
-    const auto extensionStubParserFile = getExtensionStubParserFile();
+    const auto extensionStubParserDirectory = getExtensionStubParserDirectory();
+    if (extensionStubParserDirectory.empty()) {
+        LOGV2_DEBUG(
+            12773201, 2, "No stub parser file for unloaded extension - no directory provided");
+        return;
+    }
+    constexpr auto kFileName = "aggregation_stage_fallback_parsers.json";
+    const auto extensionStubParserFile = extensionStubParserDirectory / kFileName;
     if (!std::filesystem::exists(extensionStubParserFile)) {
         LOGV2_DEBUG(10918501,
                     2,

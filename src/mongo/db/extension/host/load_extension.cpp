@@ -149,23 +149,6 @@ host_connector::ExtensionHandle getMongoExtension(SharedLibrary& extensionLib,
 }
 }  // namespace
 
-std::filesystem::path ExtensionLoader::getExtensionConfDir() {
-    // In the server, serverGlobalParams.extensionsConfigPath is expected to remain consistent after
-    // start-up. However, we avoid caching its value into a static variable to accommodate any
-    // potential future unit testing which may rely on mutating the extensionsConfigPath across
-    // sequential unit tests.
-    if (!serverGlobalParams.extensionsConfigPath.empty()) {
-        return std::filesystem::path(serverGlobalParams.extensionsConfigPath);
-    }
-    // TODO SERVER-127732: Once Atlas has made the changes to provide the extensions config path
-    // value to the server, remove this fallback and assert that we received a config value.
-    static constexpr std::string_view kExtensionConfigPath = "/etc/mongo/extensions";
-    LOGV2(12758900,
-          "No extensionsConfigPath was provided; using the default extension config directory",
-          "defaultPath"_attr = kExtensionConfigPath);
-    return {kExtensionConfigPath};
-}
-
 ::MongoExtensionAPIVersion selectCompatibleVersion(
     const ::MongoExtensionAPIVersionVector& hostVersions,
     const ::MongoExtensionAPIVersionVector& extensionVersions) {
@@ -258,7 +241,12 @@ ExtensionConfig ExtensionLoader::loadExtensionConfig(const std::string& extensio
             !extensionName.empty() && extensionName.find('/') == std::string::npos &&
                 extensionName.find('\\') == std::string::npos);
 
-    const auto& confDir = getExtensionConfDir();
+    uassert(12773200,
+            "No extensionsConfigPath was provided",
+            !serverGlobalParams.extensionsConfigPath.empty());
+    const auto confDir = std::filesystem::path(serverGlobalParams.extensionsConfigPath);
+    verifyConfigPathPermissions(extensionName, confDir.string());
+
     const auto confPath = confDir / std::string(extensionName + ".conf");
 
     uassert(11042900,
@@ -267,7 +255,6 @@ ExtensionConfig ExtensionLoader::loadExtensionConfig(const std::string& extensio
                           << confPath.string() << "'",
             std::filesystem::exists(confPath));
 
-    verifyConfigPathPermissions(extensionName, confDir.string());
     verifyConfigPathPermissions(extensionName, confPath.string());
 
     const auto root = [&] {

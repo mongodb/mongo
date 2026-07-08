@@ -122,12 +122,6 @@ public:
      */
     static void unload_forTest(const std::string& name);
 
-    /**
-     * Returns the extension configuration path where extension configuration files (.conf) and
-     * fallback parsers (i.e aggregation_stage_fallback_parsers.json) are read from.
-     */
-    static std::filesystem::path getExtensionConfDir();
-
 private:
     // Used to keep loaded extension 'SharedLibrary' objects alive for the lifetime of the server
     // and track what extensions have been loaded. Initialized during process initialization and
