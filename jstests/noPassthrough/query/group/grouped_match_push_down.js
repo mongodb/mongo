@@ -136,8 +136,11 @@ assertPipelineOptimizationAndResult({
     expectedResult: [{"_id": {"c": 2}, "m2": 2}],
 });
 
-// Asserts that the optimization over group, project, match over a renamed dotted path will not
-// push down the predicate when the rename stage renames a dotted path with depth more than 3.
+// Asserts that the optimization over group, project, match over a renamed dotted path pushes down
+// the predicate even when the renamed path has 3 components (e.g. '_id.c.d'). In a $group compound
+// key, prefixes such as '_id' and '_id.c' are freshly constructed objects and therefore cannot be
+// arrays, so the rename is array-traversal-free at any depth and the $match can be pushed before the
+// $group.
 assertPipelineOptimizationAndResult({
     pipeline: [
         {$group: {_id: {c: {d: "$d"}}, c: {$sum: {$const: 1}}}},
@@ -145,9 +148,9 @@ assertPipelineOptimizationAndResult({
         {$match: {m: {$eq: 2}}},
     ],
     expectedStageSequence: {
-        [MultiStageSBE]: ["$cursor", "$project", "$match"],
-        [MultiStageClassic]: ["$cursor", "$group", "$project", "$match"],
-        [SingleStage]: ["MATCH", "PROJECTION_DEFAULT", "GROUP", "COLLSCAN"],
+        [MultiStageSBE]: ["$cursor", "$project"],
+        [MultiStageClassic]: ["$cursor", "$group", "$project"],
+        [SingleStage]: ["PROJECTION_DEFAULT", "GROUP", "COLLSCAN"],
     },
     expectedResult: [{"_id": {"c": {"d": 2}}, "m": 2}],
 });
