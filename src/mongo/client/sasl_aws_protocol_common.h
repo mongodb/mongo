@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/data_range_cursor.h"
-#include "mongo/base/data_type_validated.h"
 #include "mongo/base/status_with.h"
 #include "mongo/client/sasl_aws_protocol_common_gen.h"
 #include "mongo/rpc/object_check.h"
@@ -80,7 +79,7 @@ template <typename T>
 T convertFromByteString(std::string_view rawString) {
     ConstDataRange cdr(rawString.data(), rawString.size());
 
-    auto clientFirstBson = cdr.read<Validated<BSONObj>>();
+    BSONObj clientFirstBson{cdr.read<rpc::ValidatedBSONObj>()};
 
     return T::parse(clientFirstBson, IDLParserContext("sasl"));
 }

@@ -62,7 +62,7 @@ std::string unpackName(std::string_view inputData) {
     }
 
     ConstDataRange cdr(inputData.data(), inputData.size());
-    auto payload = cdr.read<Validated<BSONObj>>().val;
+    BSONObj payload{cdr.read<rpc::ValidatedBSONObj>()};
 
     auto request =
         X509MechanismClientStep1::parse(payload, IDLParserContext{"x509-authentication"});

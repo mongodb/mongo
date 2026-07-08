@@ -31,7 +31,6 @@
 
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/data_range.h"
-#include "mongo/base/data_type_validated.h"
 #include "mongo/base/secure_allocator.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonobj.h"
@@ -57,7 +56,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/rpc/message.h"
-#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/rpc/unique_message.h"

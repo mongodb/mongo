@@ -30,7 +30,6 @@
 #include "mongo/shell/encrypted_dbclient_base.h"
 
 #include "mongo/base/data_range_cursor.h"
-#include "mongo/base/data_type_validated.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
@@ -56,7 +55,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
+#include "mongo/rpc/object_check.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/rpc/reply_interface.h"
@@ -322,9 +321,7 @@ EncryptedDBClientBase::runCommandWithTarget(OpMsgRequest request,
 BSONObj EncryptedDBClientBase::validateBSONElement(ConstDataRange out, uint8_t bsonType) {
     if (bsonType == stdx::to_underlying(BSONType::object)) {
         ConstDataRangeCursor cdc = ConstDataRangeCursor(out);
-        BSONObj valueObj;
-
-        valueObj = cdc.readAndAdvance<Validated<BSONObj>>();
+        BSONObj valueObj{cdc.readAndAdvance<rpc::ValidatedBSONObj>()};
         return valueObj.getOwned();
     } else {
         auto valueString = "value"sv;
@@ -351,7 +348,7 @@ BSONObj EncryptedDBClientBase::validateBSONElement(ConstDataRange out, uint8_t b
 
         ConstDataRangeCursor cdc =
             ConstDataRangeCursor(ConstDataRange(builder.buf(), builder.len()));
-        BSONObj elemWrapped = cdc.readAndAdvance<Validated<BSONObj>>();
+        BSONObj elemWrapped{cdc.readAndAdvance<rpc::ValidatedBSONObj>()};
         return elemWrapped.getOwned();
     }
 }
