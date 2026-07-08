@@ -102,7 +102,7 @@ selector:
   - jstests/aggregation/sources/setWindowFields/integral.js
   - jstests/aggregation/bugs/server6238.js
   - jstests/aggregation/expressions/expression_cond.js
-  - jstests/aggregation/expressions/const_literal_bsoncolumn.js
+  - jstests/aggregation/expressions/const_literal_bindata_restricted_subtypes.js
   exclude_with_any_tags:
   # The following tests start their own ShardingTest or ReplSetTest, respectively.
   - requires_sharding

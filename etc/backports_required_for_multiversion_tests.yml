@@ -25,11 +25,11 @@ last-continuous:
     ticket: SERVER-130139
   - test_file: jstests/aggregation/accumulators/percentiles_syntax.js
     ticket: SERVER-129617
+  - test_file: jstests/aggregation/expressions/const_literal_bindata_restricted_subtypes.js
+    ticket: SERVER-130168
   - test_file: jstests/aggregation/expressions/percentile_expression_syntax.js
     ticket: SERVER-129617
   - test_file: jstests/aggregation/expressions/subtype.js
-    ticket: SERVER-129103
-  - test_file: jstests/aggregation/expressions/const_literal_bsoncolumn.js
     ticket: SERVER-129103
   - test_file: jstests/noPassthrough/timeseries_initial_sync_mixed_bucket_geo_index.js
     ticket: SERVER-121132
@@ -702,11 +702,11 @@ last-lts:
     ticket: SERVER-130139
   - test_file: jstests/aggregation/accumulators/percentiles_syntax.js
     ticket: SERVER-129617
+  - test_file: jstests/aggregation/expressions/const_literal_bindata_restricted_subtypes.js
+    ticket: SERVER-130168
   - test_file: jstests/aggregation/expressions/percentile_expression_syntax.js
     ticket: SERVER-129617
   - test_file: jstests/aggregation/expressions/subtype.js
-    ticket: SERVER-129103
-  - test_file: jstests/aggregation/expressions/const_literal_bsoncolumn.js
     ticket: SERVER-129103
   - test_file: jstests/noPassthrough/timeseries_initial_sync_mixed_bucket_geo_index.js
     ticket: SERVER-121132

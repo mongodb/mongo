@@ -38,6 +38,7 @@
 #include <utility>
 #include <vector>
 
+#include "mongo/base/data_view.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/fle_crypto.h"
@@ -1230,19 +1231,38 @@ const char* ExpressionCond::getOpName() const {
 /* ---------------------- ExpressionConstant --------------------------- */
 
 namespace {
-// The Column (7) BinData subtype is not allowed in $const or $literal.
-void assertNoBSONColumn(const BSONElement& elem) {
+// Subtype 7 (Column) is banned; subtypes 2, 3, and 5 are structurally validated.
+void assertNoRestrictedBinDataSubtype(const BSONElement& elem) {
     if (elem.type() == BSONType::BinData) {
+        const auto subtype = elem.binDataType();
+        if (subtype == BinDataType::ByteArrayDeprecated) {
+            int len;
+            const char* data = elem.binData(len);
+            uassert(ErrorCodes::FailedToParse,
+                    "BinData subtype ByteArrayDeprecated (2) requires a valid inner length prefix",
+                    len >= 4 &&
+                        ConstDataView(data).read<LittleEndian<int32_t>>() ==
+                            static_cast<int32_t>(len - 4));
+        }
+        if (subtype == BinDataType::bdtUUID || subtype == BinDataType::MD5Type) {
+            int len;
+            elem.binData(len);
+            uassert(ErrorCodes::FailedToParse,
+                    str::stream() << "BinData subtype " << static_cast<int>(subtype)
+                                  << " requires exactly " << UUID::kNumBytes
+                                  << " bytes as an expression literal",
+                    len == UUID::kNumBytes);
+        }
         uassert(ErrorCodes::FailedToParse,
                 "BSONColumn (BinData subtype 7) is not allowed as an expression literal",
-                elem.binDataType() != BinDataType::Column);
+                subtype != BinDataType::Column);
     } else if (elem.type() == BSONType::Object || elem.type() == BSONType::Array) {
         for (const auto& child : elem.embeddedObject()) {
-            assertNoBSONColumn(child);
+            assertNoRestrictedBinDataSubtype(child);
         }
     } else if (elem.type() == BSONType::CodeWScope) {
         for (const auto& child : elem.codeWScopeObject()) {
-            assertNoBSONColumn(child);
+            assertNoRestrictedBinDataSubtype(child);
         }
     }
 }
@@ -1251,7 +1271,7 @@ void assertNoBSONColumn(const BSONElement& elem) {
 intrusive_ptr<Expression> ExpressionConstant::parse(ExpressionContext* const expCtx,
                                                     BSONElement exprElement,
                                                     const VariablesParseState& vps) {
-    assertNoBSONColumn(exprElement);
+    assertNoRestrictedBinDataSubtype(exprElement);
     return new ExpressionConstant(expCtx, Value(exprElement));
 }
 
