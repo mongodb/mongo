@@ -252,6 +252,7 @@ public:
     void onPreCommitVerificationTimedOut();
     void onPreCommitDonorVerificationRetry();
     void onPreCommitRecipientVerificationRetry();
+    void onCoordinatorRetry(std::string_view label);
 
     ReshardingCumulativeMetrics::AnyState getState() const {
         return _state.load();

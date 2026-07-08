@@ -302,6 +302,15 @@ void ReshardingCumulativeMetrics::reportForServerStatus(BSONObjBuilder* bob) con
         BSONObjBuilder steps(bob->subobjStart(kCurrentInSteps));
         reportCurrentInSteps(&steps);
     }
+    {
+        std::lock_guard lock(_coordinatorRetriesMutex);
+        if (!_coordinatorRetryCounts.empty()) {
+            BSONObjBuilder retries(bob->subobjStart("coordinatorRetries"));
+            for (auto& [label, count] : _coordinatorRetryCounts) {
+                retries.append(label, count);
+            }
+        }
+    }
 }
 
 void ReshardingCumulativeMetrics::reportOldestActive(BSONObjBuilder* bob) const {
@@ -536,6 +545,11 @@ void ReshardingCumulativeMetrics::onPreCommitDonorVerificationRetry() {
 
 void ReshardingCumulativeMetrics::onPreCommitRecipientVerificationRetry() {
     _countPreCommitRecipientVerificationRetried.fetchAndAdd(1);
+}
+
+void ReshardingCumulativeMetrics::onCoordinatorRetry(std::string_view label) {
+    std::lock_guard lock(_coordinatorRetriesMutex);
+    ++_coordinatorRetryCounts[std::string{label}];
 }
 
 void ReshardingCumulativeMetrics::onCloningRemoteBatchRetrieval(Milliseconds elapsed) {

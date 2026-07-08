@@ -35,6 +35,7 @@
 #include "mongo/db/s/resharding/resharding_metrics_observer.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/modules.h"
 
@@ -141,6 +142,8 @@ public:
     void onPreCommitVerificationTimedOut();
     void onPreCommitDonorVerificationRetry();
     void onPreCommitRecipientVerificationRetry();
+
+    void onCoordinatorRetry(std::string_view label);
 
     template <typename T>
     void onStateTransition(boost::optional<T> before, boost::optional<T> after) {
@@ -259,6 +262,9 @@ private:
 
     std::set<UUID> _activeReshardingOperations;
     std::mutex _activeReshardingOperationsMutex;
+
+    mutable std::mutex _coordinatorRetriesMutex;
+    stdx::unordered_map<std::string, int64_t> _coordinatorRetryCounts;
 };
 
 }  // namespace mongo

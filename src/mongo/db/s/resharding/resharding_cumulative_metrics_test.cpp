@@ -222,6 +222,27 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsInsertsDuringFetching) {
     ASSERT_EQ(latencies.getIntField("oplogFetchingTotalLocalInsertTimeMillis"), 17);
 }
 
+TEST_F(ReshardingCumulativeMetricsTest, ReportContainsCoordinatorRetriesByLabel) {
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kCoordinator};
+    auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
+
+    BSONObjBuilder bob;
+    _reshardingCumulativeMetrics->reportForServerStatus(&bob);
+    auto report = bob.done();
+    ASSERT_FALSE(report.getObjectField(kResharding).hasField("coordinatorRetries"));
+
+    _reshardingCumulativeMetrics->onCoordinatorRetry("_initializeCoordinator");
+    _reshardingCumulativeMetrics->onCoordinatorRetry("_initializeCoordinator");
+    _reshardingCumulativeMetrics->onCoordinatorRetry("_runUntilReadyToCommit");
+
+    BSONObjBuilder bob2;
+    _reshardingCumulativeMetrics->reportForServerStatus(&bob2);
+    auto retries =
+        bob2.done().getObjectField(kResharding).getObjectField("coordinatorRetries").getOwned();
+    ASSERT_EQ(retries.getIntField("_initializeCoordinator"), 2);
+    ASSERT_EQ(retries.getIntField("_runUntilReadyToCommit"), 1);
+}
+
 TEST_F(ReshardingCumulativeMetricsTest, ReportContainsBatchRetrievedDuringApplying) {
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&recipient);

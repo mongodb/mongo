@@ -91,7 +91,9 @@ public:
 
                 LOGV2(9746401,
                       "Resharding recipient received clone command.",
-                      "reshardingUUID"_attr = uuid());
+                      "reshardingUUID"_attr = uuid(),
+                      "lsid"_attr = opCtx->getLogicalSessionId(),
+                      "txnNum"_attr = opCtx->getTxnNumber());
 
                 pauseAfterRecipientReceiveCloneCmd.pauseWhileSet();
 
@@ -103,6 +105,12 @@ public:
                         request().getApproxCopySize().getApproxBytesToCopy().get_value_or(0),
                         request().getDonorShards()});
                 (*machine)->awaitInCreatingCollection().get(opCtx);
+
+                LOGV2(12992412,
+                      "Finished executing _shardsvrReshardRecipientClone command",
+                      "reshardingUUID"_attr = uuid(),
+                      "lsid"_attr = opCtx->getLogicalSessionId(),
+                      "txnNum"_attr = opCtx->getTxnNumber());
             } else {
                 // If state machine does not exist, either this message was delayed and the
                 // resharding operation is done, or this node is no longer a primary.

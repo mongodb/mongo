@@ -352,7 +352,8 @@ ExecutorFuture<void> ReshardingCoordinator::_tellAllParticipantsReshardingStarte
                        return status;
                    });
            })
-        .onTransientError([](const Status& status) {
+        .onTransientError([this](const Status& status) {
+            _metrics->onCoordinatorRetry("_tellAllParticipantsReshardingStarted");
             LOGV2(5093702,
                   "Resharding coordinator encountered transient error while telling participants "
                   "to refresh",
@@ -441,7 +442,8 @@ ExecutorFuture<void> ReshardingCoordinator::_initializeCoordinator(
                        }
                    });
            })
-        .onTransientError([](const Status& status) {
+        .onTransientError([this](const Status& status) {
+            _metrics->onCoordinatorRetry("_initializeCoordinator");
             LOGV2(5093703,
                   "Resharding coordinator encountered transient error while initializing",
                   "error"_attr = status);
@@ -606,7 +608,8 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                                                          std::move(coordinatorDocChangedOnDisk));
                        });
            })
-        .onTransientError([](const Status& status) {
+        .onTransientError([this](const Status& status) {
+            _metrics->onCoordinatorRetry("_runUntilReadyToCommit");
             LOGV2(5093704,
                   "Resharding coordinator encountered transient error",
                   "error"_attr = status);
@@ -674,7 +677,8 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
                    .then(
                        [this, executor, updatedCoordinatorDoc] { _commit(updatedCoordinatorDoc); });
            })
-        .onTransientError([](const Status& status) {
+        .onTransientError([this](const Status& status) {
+            _metrics->onCoordinatorRetry("_commitAndFinishReshardOperation");
             LOGV2(7698801,
                   "Resharding coordinator encountered transient error while committing",
                   "error"_attr = status);
@@ -768,7 +772,8 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
                                _tellAllRecipientsToRefresh(executor);
                            });
                    })
-                .onTransientError([](const Status& status) {
+                .onTransientError([this](const Status& status) {
+                    _metrics->onCoordinatorRetry("_commitAndFinishReshardOperation");
                     LOGV2(5093705,
                           "Resharding coordinator encountered transient error while committing",
                           "error"_attr = status);
@@ -1013,7 +1018,8 @@ ExecutorFuture<void> ReshardingCoordinator::_onAbortCoordinatorOnly(
                _removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(opCtx.get(), status);
                return status;
            })
-        .onTransientError([](const Status& retryStatus) {
+        .onTransientError([this](const Status& retryStatus) {
+            _metrics->onCoordinatorRetry("_onAbortCoordinatorOnly");
             LOGV2(5093706,
                   "Resharding coordinator encountered transient error while aborting",
                   "error"_attr = retryStatus);
@@ -1066,7 +1072,8 @@ ExecutorFuture<void> ReshardingCoordinator::_onAbortCoordinatorAndParticipants(
                        return _awaitAllParticipantShardsDone(executor);
                    });
            })
-        .onTransientError([](const Status& retryStatus) {
+        .onTransientError([this](const Status& retryStatus) {
+            _metrics->onCoordinatorRetry("_onAbortCoordinatorAndParticipants");
             LOGV2(5093707,
                   "Resharding coordinator encountered transient error while aborting all "
                   "participants",
@@ -1202,7 +1209,8 @@ ExecutorFuture<bool> ReshardingCoordinator::_isReshardingOpRedundant(
                _coordinatorDoc.setForceRedistribution(false);
                return isOpRedundant;
            })
-        .onTransientError([](const StatusWith<bool>& status) {
+        .onTransientError([this](const StatusWith<bool>& status) {
+            _metrics->onCoordinatorRetry("_isReshardingOpRedundant");
             LOGV2(7074600,
                   "Resharding coordinator encountered transient error refreshing routing info",
                   "error"_attr = status.getStatus());

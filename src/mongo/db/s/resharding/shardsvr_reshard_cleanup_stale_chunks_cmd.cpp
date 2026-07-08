@@ -78,6 +78,13 @@ public:
                     "expected to be called within a retryable write",
                     TransactionParticipant::get(opCtx));
 
+            LOGV2(12992408,
+                  "Received _shardsvrReshardCleanupStaleChunks command",
+                  "sourceUUID"_attr = uuid(),
+                  "sourceNss"_attr = ns(),
+                  "lsid"_attr = opCtx->getLogicalSessionId(),
+                  "txnNum"_attr = opCtx->getTxnNumber());
+
             {
                 auto newClient = getGlobalServiceContext()->getService()->makeClient(
                     "ShardsvrReshardCleanupStaleChunks");
@@ -93,7 +100,9 @@ public:
                 LOGV2(12779000,
                       "Cleanup of stale chunks finished for resharding",
                       "sourceUUID"_attr = uuid(),
-                      "sourceNss"_attr = ns());
+                      "sourceNss"_attr = ns(),
+                      "lsid"_attr = opCtx->getLogicalSessionId(),
+                      "txnNum"_attr = opCtx->getTxnNumber());
             }
 
             // Since no write happened on this txnNumber, we need to make a dummy write so that

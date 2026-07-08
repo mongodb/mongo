@@ -78,10 +78,18 @@ public:
 
             LOGV2(12425400,
                   "Resharding donor received criticalSectionStarted command",
-                  "reshardingUUID"_attr = uuid());
+                  "reshardingUUID"_attr = uuid(),
+                  "lsid"_attr = opCtx->getLogicalSessionId(),
+                  "txnNum"_attr = opCtx->getTxnNumber());
 
             (*machine)->onCoordinatorStateAdvanced(CoordinatorStateEnum::kBlockingWrites);
             (*machine)->awaitInBlockingWritesOrError().get(opCtx);
+
+            LOGV2(12992414,
+                  "Finished executing _shardsvrReshardDonorCriticalSectionStarted command",
+                  "reshardingUUID"_attr = uuid(),
+                  "lsid"_attr = opCtx->getLogicalSessionId(),
+                  "txnNum"_attr = opCtx->getTxnNumber());
         }
 
     private:

@@ -90,7 +90,9 @@ public:
                 LOGV2(11400401,
                       "Resharding recipient start executing "
                       "_shardsvrRecipientCriticalSectionStarted command.",
-                      "reshardingUUID"_attr = uuid());
+                      "reshardingUUID"_attr = uuid(),
+                      "lsid"_attr = opCtx->getLogicalSessionId(),
+                      "txnNum"_attr = opCtx->getTxnNumber());
 
                 (*machine)->onCoordinatorStateAdvanced(CoordinatorStateEnum::kBlockingWrites);
                 (*machine)->awaitInStrictConsistencyOrError().get(opCtx);
@@ -98,7 +100,9 @@ public:
                 LOGV2(11400402,
                       "Resharding recipient finished executing "
                       "_shardsvrRecipientCriticalSectionStarted command.",
-                      "reshardingUUID"_attr = uuid());
+                      "reshardingUUID"_attr = uuid(),
+                      "lsid"_attr = opCtx->getLogicalSessionId(),
+                      "txnNum"_attr = opCtx->getTxnNumber());
             } else {
                 // If state machine does not exist, either this message was delayed and the
                 // resharding operation is done, or this node is no longer a primary.

@@ -38,6 +38,7 @@
 #include "mongo/db/s/resharding/resharding_donor_service.h"
 #include "mongo/db/s/resharding/shardsvr_resharding_commands_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/util/assert_util.h"
 
@@ -87,6 +88,12 @@ public:
                     "shardsvr mongod",
                     serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
+            LOGV2(12992420,
+                  "Received _shardsvrReshardingDonorStartChangeStreamsMonitor command",
+                  "reshardingUUID"_attr = request().getReshardingUUID(),
+                  "lsid"_attr = opCtx->getLogicalSessionId(),
+                  "txnNum"_attr = opCtx->getTxnNumber());
+
             auto donorMachine = resharding::tryGetReshardingStateMachineAndThrowIfShuttingDown<
                 ReshardingDonorService,
                 ReshardingDonorService::DonorStateMachine,
@@ -100,6 +107,12 @@ public:
             (*donorMachine)
                 ->createAndStartChangeStreamsMonitor(request().getCloneTimestamp())
                 .get(opCtx);
+
+            LOGV2(12992421,
+                  "Finished executing _shardsvrReshardingDonorStartChangeStreamsMonitor command",
+                  "reshardingUUID"_attr = request().getReshardingUUID(),
+                  "lsid"_attr = opCtx->getLogicalSessionId(),
+                  "txnNum"_attr = opCtx->getTxnNumber());
         }
 
     private:

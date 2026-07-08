@@ -79,10 +79,18 @@ public:
 
             LOGV2(10758401,
                   "Resharding donor received recipientsFinishedCloning command",
-                  "reshardingUUID"_attr = uuid());
+                  "reshardingUUID"_attr = uuid(),
+                  "lsid"_attr = opCtx->getLogicalSessionId(),
+                  "txnNum"_attr = opCtx->getTxnNumber());
 
             (*machine)->onCoordinatorStateAdvanced(CoordinatorStateEnum::kApplying);
             (*machine)->awaitInDonatingOplogEntries().get(opCtx);
+
+            LOGV2(12992418,
+                  "Finished executing _shardsvrReshardDonorRecipientsFinishedCloning command",
+                  "reshardingUUID"_attr = uuid(),
+                  "lsid"_attr = opCtx->getLogicalSessionId(),
+                  "txnNum"_attr = opCtx->getTxnNumber());
         }
 
     private:

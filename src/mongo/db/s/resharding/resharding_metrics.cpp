@@ -418,6 +418,10 @@ void ReshardingMetrics::onPreCommitDonorVerificationRetry() {
     getCumulativeMetrics()->onPreCommitDonorVerificationRetry();
 }
 
+void ReshardingMetrics::onCoordinatorRetry(std::string_view label) {
+    getCumulativeMetrics()->onCoordinatorRetry(label);
+}
+
 void ReshardingMetrics::onPreCommitRecipientVerificationRetry() {
     getCumulativeMetrics()->onPreCommitRecipientVerificationRetry();
 }

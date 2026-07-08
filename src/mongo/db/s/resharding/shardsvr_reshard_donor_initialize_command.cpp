@@ -70,6 +70,12 @@ public:
         void typedRun(OperationContext* opCtx) {
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
+            LOGV2(12992402,
+                  "Received _shardsvrReshardDonorInitialize command",
+                  "reshardingUUID"_attr = uuid(),
+                  "lsid"_attr = opCtx->getLogicalSessionId(),
+                  "txnNum"_attr = opCtx->getTxnNumber());
+
             uassert(ErrorCodes::IllegalOperation,
                     "_shardsvrReshardDonorInitialize can only be run on shard servers",
                     serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
@@ -104,11 +110,15 @@ public:
                 LOGV2(12092601,
                       "Initialized resharding donor state machine via "
                       "_shardsvrReshardDonorInitialize command",
-                      "reshardingUUID"_attr = uuid());
+                      "reshardingUUID"_attr = uuid(),
+                      "lsid"_attr = opCtx->getLogicalSessionId(),
+                      "txnNum"_attr = opCtx->getTxnNumber());
             } else {
                 LOGV2(12092600,
                       "Donor state machine already exists for resharding operation",
-                      "reshardingUUID"_attr = uuid());
+                      "reshardingUUID"_attr = uuid(),
+                      "lsid"_attr = opCtx->getLogicalSessionId(),
+                      "txnNum"_attr = opCtx->getTxnNumber());
             }
 
             resharding::waitForStateDocumentMajorityCommitted(opCtx);

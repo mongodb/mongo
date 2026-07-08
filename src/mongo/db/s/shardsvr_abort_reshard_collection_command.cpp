@@ -87,6 +87,12 @@ public:
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
 
+            LOGV2(12992410,
+                  "Received _shardsvrAbortReshardCollection command",
+                  "reshardingUUID"_attr = uuid(),
+                  "lsid"_attr = opCtx->getLogicalSessionId(),
+                  "txnNum"_attr = opCtx->getTxnNumber());
+
             // Persist the config time to ensure that in case of stepdown next filtering metadata
             // refresh on the new primary will always fetch the latest information.
             VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
@@ -141,6 +147,12 @@ public:
                 recipientReshardingOpStore.count(
                     opCtx, BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << uuid())) ==
                     0);
+
+            LOGV2(12992411,
+                  "Finished executing _shardsvrAbortReshardCollection command",
+                  "reshardingUUID"_attr = uuid(),
+                  "lsid"_attr = opCtx->getLogicalSessionId(),
+                  "txnNum"_attr = opCtx->getTxnNumber());
         }
 
     private:
