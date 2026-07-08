@@ -760,6 +760,8 @@ mongo_cc_library(
         "//src/mongo/db/query/client_cursor:cursor_response_idl",
         "//src/mongo/db/query/client_cursor:generic_cursor",
         "//src/mongo/db/query/plan_ranking:plan_ranker_method",
+        "//src/mongo/db/query/query_knobs:query_knob_configuration",
+        "//src/mongo/db/query/query_settings",
         "//src/mongo/db/repl:local_oplog_info",
         "//src/mongo/db/repl:read_concern_args",
         "//src/mongo/db/shard_role:shard_role_api_stor_ex",

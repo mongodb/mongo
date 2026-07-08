@@ -33,6 +33,7 @@
 #include "mongo/db/query/query_knobs/query_knob_snapshot.h"
 #include "mongo/db/query/query_settings/query_settings_context.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/util/modules.h"
 
 #include <variant>
@@ -84,5 +85,17 @@ void addQuerySettingsToRequest(OperationContext* opCtx, Request& request) {
         request.setQuerySettings(*settings);
     }
 }
+
+/**
+ * Adds the operation's resolved query settings to the slow query log 'attrs' under "querySettings".
+ * A no-op unless resolution installed non-default settings (only the 'QuerySettings' alternative
+ * carries them, as in 'addQuerySettingsToRequest').
+ *
+ * Unlike 'forOp', this reads the lifecycle state directly and never asserts on 'Pending', so it is
+ * safe to call from log formatting for operations that began dispatch (hooks set 'Pending') but
+ * never completed settings resolution.
+ */
+MONGO_MOD_PUBLIC void addQuerySettingsToSlowLog(OperationContext* opCtx,
+                                                logv2::DynamicAttributes& attrs);
 
 }  // namespace mongo::query_settings

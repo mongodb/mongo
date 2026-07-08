@@ -30,6 +30,7 @@
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/db/query/query_knob_descriptors_optimization.h"
 #include "mongo/db/query/query_knobs/query_knob.h"
@@ -38,6 +39,8 @@
 #include "mongo/db/query/query_lifespan.h"
 #include "mongo/db/query/query_settings/query_settings.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/version_context.h"
 
 namespace mongo {
 using namespace std::literals::string_view_literals;
@@ -143,6 +146,18 @@ BSONObj QueryKnobConfiguration::serializeForExplain() const {
         }
     }
     return bob.obj();
+}
+
+void QueryKnobConfiguration::addToSlowLog(OperationContext* opCtx,
+                                          logv2::DynamicAttributes& attrs) const {
+    if (!feature_flags::gFeatureFlagPqsQueryKnobs.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return;
+    }
+    if (auto serializedKnobs = serializeForExplain(); !serializedKnobs.isEmpty()) {
+        attrs.add("queryKnobs", serializedKnobs);
+    }
 }
 
 // The remaining typed knob accessors are generated from the knob tables by the AccessorMixin base

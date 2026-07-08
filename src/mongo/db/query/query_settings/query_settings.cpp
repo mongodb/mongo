@@ -112,4 +112,11 @@ KnobOverrideResult tryOverrideQueryKnobValues(OperationContext* opCtx,
                       getQuerySettingsStateForOp(opCtx));
 }
 
+void addQuerySettingsToSlowLog(OperationContext* opCtx, logv2::DynamicAttributes& attrs) {
+    auto& state = query_settings_details::getQuerySettingsStateForOp(opCtx);
+    if (auto* settings = std::get_if<QuerySettings>(&state)) {
+        attrs.add("querySettings", settings->toBSON());
+    }
+}
+
 }  // namespace mongo::query_settings

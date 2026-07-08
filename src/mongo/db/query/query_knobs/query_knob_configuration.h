@@ -89,6 +89,13 @@ public:
      */
     BSONObj serializeForExplain() const;
 
+    /**
+     * Adds the effective knob values to the slow query log 'attrs' under "queryKnobs", using the
+     * same serialization as 'serializeForExplain()'. A no-op unless 'featureFlagPqsQueryKnobs' is
+     * enabled and at least one knob has a non-default source.
+     */
+    void addToSlowLog(OperationContext* opCtx, logv2::DynamicAttributes& attrs) const;
+
     // Most typed knob accessors (getPlanRankerMode(), getMaxNodesInJoinGraph(),
     // getSbeDisableGroupPushdownForOp(), ...) are generated from the knob tables by the
     // AccessorMixin base classes. Only accessors that compute over a knob rather than returning it

@@ -38,6 +38,8 @@
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
+#include "mongo/db/query/query_settings/query_settings.h"
 #include "mongo/db/query/query_stats/aggregated_metric.h"
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -270,6 +272,9 @@ void OpDebug::report(OperationContext* opCtx,
         }
     }
     pAttrs->add("opid", opCtx->getOpID());
+
+    query_settings::addQuerySettingsToSlowLog(opCtx, *pAttrs);
+    QueryKnobConfiguration::get(opCtx).addToSlowLog(opCtx, *pAttrs);
 
     auto originatingCommand = curop.originatingCommand();
     if (!originatingCommand.isEmpty()) {
