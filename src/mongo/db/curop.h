@@ -710,6 +710,18 @@ public:
      */
     SingleThreadedStorageMetrics getOperationStorageMetrics() const;
 
+    /**
+     * Ensures the current operation's storage statistics have been fetched from the storage engine
+     * and returns them (or nullptr if unavailable, e.g. no storage engine work has occurred yet).
+     * Unlike the storage stats gathered lazily for slow-op logging and query stats (which only
+     * happens when profiling or query stats tracking is enabled), this may be called
+     * unconditionally. It cooperates with the internal storage-stats accumulator so that any later
+     * slow-op logging or query stats collection still observes the full totals. Swallows (and logs)
+     * any exception from the storage engine, returning nullptr in that case. The returned pointer
+     * is owned by this CurOp and remains valid for the lifetime of the operation.
+     */
+    const StorageStats* getOperationStorageStats();
+
     long long getPrepareReadConflicts() const;
 
     void updateSpillStorageStats(std::unique_ptr<StorageStats> operationStorageStats);

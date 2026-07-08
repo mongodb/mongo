@@ -93,6 +93,17 @@ export class ServerStatusMetrics {
         const after = this.getSsMetricsAcrossCluster(db);
         return _combineMetrics(before, after, (beforeVal, afterVal) => afterVal - beforeVal);
     }
+
+    static getCsThroughputMetrics(db) {
+        const cursor = this.getCsMetrics(db).cursor;
+        return {
+            docsReturned: cursor.docsReturned.sum,
+            bytesReturned: cursor.bytesReturned.sum,
+            batchesReturned: cursor.batchesReturned.sum,
+            docsExamined: cursor.docsExamined.sum,
+            bytesRead: cursor.bytesRead.sum,
+        };
+    }
 }
 
 // Temporarily overrides a nested TestData field at a dot-notation path with 'newValue',

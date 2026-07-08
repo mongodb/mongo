@@ -1267,6 +1267,21 @@ SingleThreadedStorageMetrics CurOp::getOperationStorageMetrics() const {
     return StorageExecutionContext::get(opCtx())->getStorageMetrics();
 }
 
+const StorageStats* CurOp::getOperationStorageStats() {
+    try {
+        // Fetch with isFinal=false so that later slow-op logging / query stats collection can still
+        // accumulate any remaining deltas into '_debug.storageStats'.
+        _fetchStorageStatsIfNecessary(Date_t::max(), false);
+    } catch (const DBException& ex) {
+        LOGV2(12236300,
+              "Failed to gather storage statistics for change stream throughput metrics",
+              "opId"_attr = opCtx()->getOpID(),
+              "error"_attr = redact(ex));
+        return nullptr;
+    }
+    return _debug.storageStats.get();
+}
+
 long long CurOp::getPrepareReadConflicts() const {
     return StorageExecutionContext::get(opCtx())
         ->getPrepareConflictTracker()

@@ -523,6 +523,17 @@ boost::optional<ClientCursorPin> executeSingleExecUntilFirstBatch(
 
     collectQueryStats(aggExState, expCtx, execs[0].get(), maybePinnedCursor.get_ptr());
 
+    if (aggExState.hasChangeStream()) {
+        auto curOp = CurOp::get(opCtx);
+        const auto& additiveMetrics = curOp->debug().getAdditiveMetrics();
+        change_stream::cursorDocsReturned().add(additiveMetrics.nreturned.value_or(0));
+        change_stream::cursorDocsExamined().add(additiveMetrics.docsExamined.value_or(0));
+        const auto* storageStats = curOp->getOperationStorageStats();
+        change_stream::cursorBytesRead().add(storageStats ? storageStats->bytesRead() : 0);
+        change_stream::cursorBytesReturned().add(responseBuilder.bytesUsed());
+        change_stream::cursorBatchesReturned().add(1);
+    }
+
     const auto& aggReq = aggExState.getRequest();
     const auto& includeMetricsOption = aggReq.getIncludeMetrics();
     const bool includeQueryStatsMetrics = aggReq.getIncludeQueryStatsMetrics().value_or(false) ||

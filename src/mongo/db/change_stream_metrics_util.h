@@ -178,6 +178,8 @@ inline otel::metrics::Histogram<int64_t>& createUpdateLookupLatency(otel::metric
         opts);
 }
 
+// TODO SERVER-130815: deduplicate metric initializers
+
 inline otel::metrics::Counter<int64_t>& errorNonRetriableHistoryLost() {
     static auto& counter = []() -> otel::metrics::Counter<int64_t>& {
         otel::metrics::CounterOptions opts{};
@@ -321,6 +323,86 @@ inline void incrementChangeStreamErrorCounters(ErrorCodes::Error code) {
 // Overload for DBException — delegates to the code-based overload above.
 inline void incrementChangeStreamErrorCounters(const DBException& ex) {
     incrementChangeStreamErrorCounters(ex.code());
+}
+
+inline otel::metrics::Counter<int64_t>& cursorDocsReturned() {
+    static auto& counter = []() -> otel::metrics::Counter<int64_t>& {
+        otel::metrics::CounterOptions opts{};
+        opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "changeStreams.cursor.docsReturned",
+            .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
+        };
+        return otel::metrics::MetricsService::instance().createInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamCursorDocsReturned,
+            "Total number of documents returned by change stream cursors.",
+            otel::metrics::MetricUnit::kEvents,
+            opts);
+    }();
+    return counter;
+}
+
+inline otel::metrics::Counter<int64_t>& cursorBytesReturned() {
+    static auto& counter = []() -> otel::metrics::Counter<int64_t>& {
+        otel::metrics::CounterOptions opts{};
+        opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "changeStreams.cursor.bytesReturned",
+            .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
+        };
+        return otel::metrics::MetricsService::instance().createInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamCursorBytesReturned,
+            "Total number of bytes returned by change stream cursors.",
+            otel::metrics::MetricUnit::kBytes,
+            opts);
+    }();
+    return counter;
+}
+
+inline otel::metrics::Counter<int64_t>& cursorBatchesReturned() {
+    static auto& counter = []() -> otel::metrics::Counter<int64_t>& {
+        otel::metrics::CounterOptions opts{};
+        opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "changeStreams.cursor.batchesReturned",
+            .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
+        };
+        return otel::metrics::MetricsService::instance().createInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamCursorBatchesReturned,
+            "Total number of batches returned by change stream cursors.",
+            otel::metrics::MetricUnit::kEvents,
+            opts);
+    }();
+    return counter;
+}
+
+inline otel::metrics::Counter<int64_t>& cursorDocsExamined() {
+    static auto& counter = []() -> otel::metrics::Counter<int64_t>& {
+        otel::metrics::CounterOptions opts{};
+        opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "changeStreams.cursor.docsExamined",
+            .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
+        };
+        return otel::metrics::MetricsService::instance().createInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamCursorDocsExamined,
+            "Total number of documents examined by change stream cursors.",
+            otel::metrics::MetricUnit::kEvents,
+            opts);
+    }();
+    return counter;
+}
+
+inline otel::metrics::Counter<int64_t>& cursorBytesRead() {
+    static auto& counter = []() -> otel::metrics::Counter<int64_t>& {
+        otel::metrics::CounterOptions opts{};
+        opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "changeStreams.cursor.bytesRead",
+            .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
+        };
+        return otel::metrics::MetricsService::instance().createInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamCursorBytesRead,
+            "Total number of bytes read by change stream cursors.",
+            otel::metrics::MetricUnit::kBytes,
+            opts);
+    }();
+    return counter;
 }
 
 }  // namespace mongo::change_stream

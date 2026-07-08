@@ -89,6 +89,13 @@ auto& gErrorRetriableInterruptedDueToReplStateChange =
     change_stream::errorRetriableInterruptedDueToReplStateChange();
 auto& gErrorRetriableOther = change_stream::errorRetriableOther();
 
+// Throughput metrics
+auto& gCursorDocsReturned = change_stream::cursorDocsReturned();
+auto& gCursorBytesReturned = change_stream::cursorBytesReturned();
+auto& gCursorBatchesReturned = change_stream::cursorBatchesReturned();
+auto& gCursorDocsExamined = change_stream::cursorDocsExamined();
+auto& gCursorBytesRead = change_stream::cursorBytesRead();
+
 }  // namespace change_stream_metrics
 }  // namespace
 

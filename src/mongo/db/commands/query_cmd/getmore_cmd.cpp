@@ -733,7 +733,9 @@ public:
                                                         &nextBatch,
                                                         &numResults);
 
-            if (cursorPin->isChangeStreamQuery()) {
+            const bool isChangeStream = cursorPin->isChangeStreamQuery();
+
+            if (isChangeStream) {
                 // Update optime after every getMore: reflects the last event's timestamp when
                 // events were returned, or the current high-watermark when the batch was empty.
                 auto ts = exec->getLatestOplogTimestamp();
@@ -795,6 +797,18 @@ public:
             curOp->debug().getAdditiveMetrics().nBatches = 1;
             curOp->setEndOfOpMetrics(numResults);
             collectQueryStatsMongod(opCtx, cursorPin);
+
+            if (isChangeStream) {
+                change_stream::cursorDocsReturned().add(numResults);
+                change_stream::cursorBytesReturned().add(nextBatch.bytesUsed());
+                change_stream::cursorDocsExamined().add(
+                    curOp->debug().getAdditiveMetrics().docsExamined.value_or(0));
+                const auto* storageStats = curOp->getOperationStorageStats();
+                change_stream::cursorBytesRead().add(storageStats ? storageStats->bytesRead() : 0);
+                if (numResults > 0) {
+                    change_stream::cursorBatchesReturned().add(1);
+                }
+            }
 
             const auto& includeMetricsOption = cmd.getIncludeMetrics();
             const bool includeQueryStatsMetrics =

@@ -285,6 +285,16 @@ public:
         MetricNameMaker::make("serverStatus.metrics.changeStreams.option.cursor.batchSize");
     static constexpr MetricName kChangeStreamOptionCursorMaxTimeMS =
         MetricNameMaker::make("serverStatus.metrics.changeStreams.option.cursor.maxTimeMS");
+    static constexpr MetricName kChangeStreamCursorDocsReturned =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.cursor.docsReturned");
+    static constexpr MetricName kChangeStreamCursorBytesReturned =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.cursor.bytesReturned");
+    static constexpr MetricName kChangeStreamCursorBatchesReturned =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.cursor.batchesReturned");
+    static constexpr MetricName kChangeStreamCursorDocsExamined =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.cursor.docsExamined");
+    static constexpr MetricName kChangeStreamCursorBytesRead =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.cursor.bytesRead");
 
     // Storage Execution Team Metrics
     static constexpr MetricName kIndexBuildsActive = MetricNameMaker::make("index_builds.active");
