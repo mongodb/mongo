@@ -2602,6 +2602,44 @@ TEST_F(WasmMozJSBridgeTest, StoreLimiterTrapSetsFlag) {
     // The store is in a broken state after the trap; discard without calling shutdown.
     _bridge.reset();
 }
+
+// Verifies that a store-limiter trap is classified as ExceededMemoryLimit (146) rather
+// than the generic kWasmtimeTrapErrorCode. When memory.grow is denied by the store
+// limiter, SpiderMonkey MOZ_CRASHes via `unreachable`, which _throwAfterTrap() detects.
+//
+// Also disabled under TSan for the same SIGABRT-signal-handler-malloc reason as above.
+TEST_F(WasmMozJSBridgeTest, StoreLimiterTrapClassifiedAsExceededMemoryLimit) {
+    _bridge->shutdown();
+    _bridge.reset();
+
+    MozJSWasmBridge::Options opts{};
+    opts.jsHeapLimitMB = 50;
+    opts.linearMemoryLimitMB = 114;
+    _bridge = std::make_unique<MozJSWasmBridge>(_s_engineCtx, opts);
+    ASSERT_TRUE(initEngine());
+
+    auto handle = createFunction(
+        "function() {"
+        "  var big = [];"
+        "  for (var i = 0; i < 2000000; i++) {"
+        "    big.push({x: i, y: i * 2, z: 'padding_string_to_consume_memory'});"
+        "  }"
+        "  return big.length;"
+        "}");
+
+    bool threw = false;
+    try {
+        (void)_bridge->invokeFunction(handle, wasm_helpers::convertBsonToWcVal(BSONObj()));
+    } catch (DBException& ex) {
+        threw = true;
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit)
+            << "Store-limiter OOM should throw ExceededMemoryLimit; got: " << ex.toString();
+    }
+    ASSERT_TRUE(threw) << "invokeFunction should have thrown on store-limiter OOM";
+    ASSERT_TRUE(_bridge->hasTrapped());
+    _bridge.reset();
+}
+
 #endif  // !__has_feature(thread_sanitizer)
 
 TEST_F(WasmMozJSBridgeTest, StoreLimiterAllowsWithinLimit) {
@@ -3358,6 +3396,62 @@ TEST_F(WasmMozJSBridgeTest, AssertTest) {
     BSONObj emptyArgs;
     auto result = invokeFunction(handle, emptyArgs);
 }
+
+// ---------------------------------------------------------------------------
+// OOM trap classification tests
+//
+// These tests exercise the full _throwAfterTrap() → classify → uassert pipeline
+// end-to-end by running a real JS allocation workload against a tight Wasmtime
+// store limit, verifying that ExceededMemoryLimit is thrown (not a generic
+// kWasmtimeTrapErrorCode).  The store limit is set just above the minimum valid
+// value (jsHeapLimitMB + max(64, jsHeapLimitMB/10)) so the test is fast: OOM
+// occurs during the first large allocation, not after a long warmup.
+//
+// TODO SERVER-128404: Wasmtime's OOM trap signal handler allocates memory, causing
+// TSan to abort.  Skip these tests under TSan until that is resolved.
+// ---------------------------------------------------------------------------
+
+#if !__has_feature(thread_sanitizer)
+TEST_F(WasmMozJSBridgeTest, OomTrapThrowsExceededMemoryLimit) {
+    // Use jsHeapLimitMB=50 → minOverhead=max(64,5)=64 → minStore=114 MB.
+    // A 117 MB store is tight: it satisfies the constraint but OOMs when the
+    // JS function below allocates ~2 M objects (matching the sharding JS test).
+    constexpr uint32_t kJsHeapMB = 50;
+    constexpr uint32_t kStoreMB = 117;
+    // kAllocCount = ceil((kStoreMB * 1024 * 1024 / 64) * 1.05) ≈ 2012775.
+    // Each object occupies one 64-byte GC arena slot; 5% margin ensures we cross
+    // the store ceiling on ARM64 and x86_64.
+    constexpr int kAllocCount = 2012775;
+
+    auto savedHeap = gJSHeapLimitMB.load();
+    gJSHeapLimitMB.store(kJsHeapMB);
+    ON_BLOCK_EXIT([&] { gJSHeapLimitMB.store(savedHeap); });
+
+    MozJSWasmBridge::Options opts{};
+    opts.linearMemoryLimitMB = kStoreMB;
+    opts.jsHeapLimitMB = kJsHeapMB;
+    auto tightBridge = std::make_unique<MozJSWasmBridge>(_s_engineCtx, opts);
+    ASSERT_TRUE(tightBridge->initialize());
+
+    // Build the allocating function with the count as a literal so it is
+    // self-contained when the source is compiled inside the WASM store.
+    const std::string src = fmt::format(
+        "function() {{"
+        "  var arr = [];"
+        "  for (var i = 0; i < {}; i++) {{"
+        "    arr.push({{x: i, y: i * 2, z: 'padding_string_to_consume_memory'}});"
+        "  }}"
+        "  return true;"
+        "}}",
+        kAllocCount);
+
+    auto handle = tightBridge->createFunction(src);
+    ASSERT_THROWS_CODE(
+        tightBridge->invokeFunction(handle, wasm_helpers::convertBsonToWcVal(BSONObj())),
+        AssertionException,
+        ErrorCodes::ExceededMemoryLimit);
+}
+#endif  // !__has_feature(thread_sanitizer)
 
 }  // namespace
 }  // namespace wasm

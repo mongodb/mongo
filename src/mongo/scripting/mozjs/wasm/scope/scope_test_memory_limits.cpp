@@ -239,3 +239,43 @@ TEST(WasmtimeScope, EmitBufferExceedsStoreLimitFails) {
                        DBException,
                        ErrorCodes::BadValue);
 }
+
+// ---------------------------------------------------------------------------
+// OOM trap classification
+// ---------------------------------------------------------------------------
+
+// When the WASM store limiter is triggered (SpiderMonkey MOZ_CRASHes inside
+// WASM linear memory), scope->invoke() must surface ExceededMemoryLimit rather
+// than the opaque generic trap error code.
+//
+// Disabled under TSan: the MOZ_CRASH signal handler performs allocations that
+// TSan intercepts before Wasmtime can convert the SIGABRT into a trap.
+#if !__has_feature(thread_sanitizer)
+TEST(WasmtimeScope, MemoryLimit_StoreLimiterTrapClassifiedAsExceededMemoryLimit) {
+    auto savedHeap = gJSHeapLimitMB.load();
+    auto savedStore = gWasmtimeStoreMemoryLimitMB.load();
+    ON_BLOCK_EXIT([&] {
+        gJSHeapLimitMB.store(savedHeap);
+        gWasmtimeStoreMemoryLimitMB.store(savedStore);
+    });
+
+    // heap=50 MB, overhead=max(64,5)=64 MB → minStore=114 MB exactly.
+    gJSHeapLimitMB.store(50);
+    gWasmtimeStoreMemoryLimitMB.store(114);
+
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    ASSERT(scope);
+
+    ScriptingFunction fn = scope->createFunction(
+        "function() {"
+        "  var big = [];"
+        "  for (var i = 0; i < 2000000; i++) {"
+        "    big.push({x: i, y: i * 2, z: 'padding_string_to_consume_memory'});"
+        "  }"
+        "  return big.length;"
+        "}");
+    ASSERT_THROWS_CODE(
+        scope->invoke(fn, nullptr, nullptr, 0), DBException, ErrorCodes::ExceededMemoryLimit);
+}
+#endif  // !__has_feature(thread_sanitizer)

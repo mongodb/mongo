@@ -1,9 +1,11 @@
 /**
  * Returns true if the running mongod uses the MozJS-WASM JavaScript engine.
- * @param {DB} targetDb - the database connection to query (e.g. st.s0.getDB("admin")).
+ * @param {DB} [targetDb] - the database connection to query; falls back to the global `db` if
+ *     omitted.
  */
 export function isMozjsWasm(targetDb) {
-    return targetDb.adminCommand({buildInfo: 1}).javascriptEngine === "mozjs-wasm";
+    const db_ = targetDb !== undefined ? targetDb : db;
+    return db_.adminCommand({buildInfo: 1}).javascriptEngine === "mozjs-wasm";
 }
 
 /**

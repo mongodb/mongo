@@ -6,3 +6,6 @@ filters:
   - "out_max_time_ms.js":
     approvers:
       - 10gen/query-execution-classic
+  - "memory.js":
+    approvers:
+      - 10gen/query-integration-features

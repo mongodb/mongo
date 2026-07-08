@@ -152,10 +152,25 @@ public:
 private:
     // A small pool of lazily-warmed contexts reduces the cost of cold-start scope creation and
     // post-kill recovery by amortising Engine+Component+Linker initialisation over time.
+    //
+    // Pool size is intentionally small (2) to limit the virtual memory reserved at pool
+    // warm-up time. Each WasmEngineContext holds a Wasmtime Engine + deserialized Component +
+    // Linker, and each bridge created from one reserves ~1.2 GB of virtual address space for
+    // WASM linear memory (wasmtimeStoreMemoryLimitMB). In environments where multiple mongod
+    // processes run concurrently (e.g. ShardingTest with 3–5 nodes), the eager reservation of
+    // 4 × 1.2 GB = 4.8 GB per mongod at first JS use can exhaust available virtual/physical
+    // memory before any query runs.
+    //
+    // With size 2, the pool covers the common case of rapid sequential scope reuse (cold-start
+    // on a fresh thread + one post-kill rebuild) while deferring further deserialization until
+    // actually needed. Scopes beyond the pool limit are created on-demand under the pool mutex
+    // (serialised to avoid a Wasmtime ASAN double-free on concurrent deserialisation of the
+    // same pre-compiled bytes — see wasmtime_engine.cpp for details). The pool does NOT bound
+    // the maximum number of concurrent scopes; it is purely a warm-up performance cache.
     mutable std::mutex _contextPoolMutex;
     mutable std::once_flag _poolOnce;
     mutable std::vector<std::shared_ptr<wasm::WasmEngineContext>> _contextPool;
-    static constexpr size_t kContextPoolSize = 4;
+    static constexpr size_t kContextPoolSize = 2;
 };
 
 }  // namespace mozjs

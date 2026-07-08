@@ -1,19 +1,36 @@
 /**
  * @tags: [
  *   requires_scripting,
- *   mozjs_wasm_unsupported
+ *   resource_intensive,
+ *   # jsUseLegacyMemoryTracking was added in SERVER-117317 and is not present in older binaries.
+ *   multiversion_incompatible,
+ *   # TODO SERVER-128404: Wasmtime's rayon thread pool bypasses TSAN's pthread_create interception,
+ *   # triggering a TSAN internal assertion during ShardingTest startup on WASM TSAN builds.
+ *   tsan_incompatible,
  * ]
  */
 
 // Confirms that JavaScript heap limits are respected in aggregation. Includes testing for mapReduce
 // and $where which use aggregation for execution.
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {isMozjsWasm} from "jstests/libs/js_engine_util.js";
 
 const st = new ShardingTest({shards: 2});
 const mongos = st.s;
 
 let mongosDB = mongos.getDB("test");
 let mongosColl = mongosDB.coll;
+
+// On WASM, jsHeapLimitMB maps to JSGC_MAX_BYTES which is a GC-frequency hint only — it does
+// not enforce a hard allocation barrier. The WASM equivalent is javascript_heap_limit_wasm.js,
+// which sets wasmtimeStoreMemoryLimitMB to create a hard constraint.
+if (isMozjsWasm(mongosDB)) {
+    jsTestLog(
+        "Skipping: test requires legacy mozjs engine, not mozjs-wasm (see javascript_heap_limit_wasm.js)",
+    );
+    st.stop();
+    quit();
+}
 
 // Shard the collection with one chunk per shard. Insert a single document into each shard.
 st.shardColl(mongosColl.getName(), {x: 1}, {x: 2}, {x: 2});

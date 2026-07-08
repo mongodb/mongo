@@ -277,6 +277,39 @@ void MozJSWasmBridge::_throwAfterTrap(const std::string& trapMessage) {
         uasserted(reason, trapMessage);
     }
 
+    // Snapshot once; stale is fine — we only need to know memory was near the limit.
+    const uint64_t lastKnown = _lastKnownLinearMemoryBytes.load();
+
+    // Classify the trap into ExceededMemoryLimit or kWasmtimeTrapErrorCode.
+    // Heuristics, in priority order:
+    //  1. Explicit Wasmtime/Canonical-ABI messages that name a memory limit.
+    //  2. "unreachable" with a non-zero store limit: SpiderMonkey MOZ_CRASHes via `unreachable`
+    //     when memory.grow is denied by the Wasmtime store limiter. In the SpiderMonkey-WASM
+    //     binary as shipped, `unreachable executed` without a pending kill is ONLY produced by
+    //     this store-limiter OOM path — SpiderMonkey emits no other unreachable instructions
+    //     during normal JS execution.
+    //  3. Watermark-only fallback: covers Wasmtime builds where the message doesn't match above.
+    // TODO SERVER-130779: replace these heuristics with a Wasmtime ResourceLimiter callback that
+    // sets a flag when memory.grow is denied, so only actual limiter denials become
+    // ExceededMemoryLimit and MOZ_ASSERT-derived unreachable traps surface as real errors.
+    ErrorCodes::Error trapCode = [&]() -> ErrorCodes::Error {
+        const std::string_view msg = trapMessage;
+        if (msg.find("cannot leave component instance") != std::string::npos ||
+            msg.find("store bytes limit exceeded") != std::string::npos ||
+            msg.find("memory limit exceeded") != std::string::npos) {
+            return ErrorCodes::ExceededMemoryLimit;
+        }
+        if (_storeLimitMB > 0 && msg.find("unreachable") != std::string::npos) {
+            return ErrorCodes::ExceededMemoryLimit;
+        }
+        constexpr uint64_t kWasmPageBytes = 64 * 1024;
+        const uint64_t storeLimitBytes = static_cast<uint64_t>(_storeLimitMB) * 1024 * 1024;
+        const bool nearStoreLimit =
+            lastKnown > 0 && storeLimitBytes > 0 && lastKnown + kWasmPageBytes >= storeLimitBytes;
+        return nearStoreLimit ? ErrorCodes::ExceededMemoryLimit
+                              : ErrorCodes::Error{kWasmtimeTrapErrorCode};
+    }();
+
     // Full state dump on any trap for diagnostics.
     int64_t ageNanos = std::chrono::duration_cast<std::chrono::nanoseconds>(
                            std::chrono::steady_clock::now().time_since_epoch())
@@ -285,12 +318,14 @@ void MozJSWasmBridge::_throwAfterTrap(const std::string& trapMessage) {
     LOGV2_WARNING(11542382,
                   "WASM bridge trapped (no kill pending)",
                   "trap"_attr = trapMessage,
+                  "trapCode"_attr = static_cast<int>(trapCode),
+                  "lastKnownLinearMemoryMB"_attr = lastKnown / (1024 * 1024),
                   "state"_attr = static_cast<int>(_state.load()),
                   "heapLimitMB"_attr = _jsHeapLimitMB,
                   "storeLimitMB"_attr = _storeLimitMB,
                   "ageMillis"_attr = ageNanos / 1'000'000,
                   "stats"_attr = _stats.toBSON());
-    uasserted(kWasmtimeTrapErrorCode, trapMessage);
+    uasserted(trapCode, trapMessage);
 }
 
 namespace {
@@ -702,7 +737,12 @@ BSONObj MozJSWasmBridge::getMemoryStats() {
             "Failed to call get-memory-stats",
             _callFuncNoArgs(*_getMemoryStatsFunc, &result, 1));
     _assertWitResult(result, "Failed to get memory stats", ErrorCodes::Error{11542384});
-    return _extractBSON(result);
+    auto stats = _extractBSON(result);
+    // Cache the linear memory watermark so _throwAfterTrap() can diagnose store-limiter OOM.
+    if (auto elem = stats["linearMemoryBytes"]; !elem.eoo()) {
+        _lastKnownLinearMemoryBytes.store(static_cast<uint64_t>(elem.numberLong()));
+    }
+    return stats;
 }
 
 BSONObj MozJSWasmBridge::getReturnValueWrapped() {

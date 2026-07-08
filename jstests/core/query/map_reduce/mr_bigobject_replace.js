@@ -11,12 +11,7 @@
 //   uses_map_reduce_with_temp_collections,
 //   requires_scripting,
 //   multiversion_incompatible,
-//   # TODO SERVER-127318 (PR #54257): re-enable on WASM once per-request JS context cost is
-//   # eliminated. The ~200 MB per-mongod WASM module load combined with the test's large-document
-//   # workload OOM-kills the primary on memory-constrained hosts.
-//   mozjs_wasm_unsupported,
 // ]
-
 /**
  * Test that the server returns an error response for map-reduce operations that attempt to insert a
  * document larger than 16MB as a result of the reduce() or finalize() functions and using the
@@ -35,12 +30,18 @@ function createBigDocument() {
         let doc = {_id: new ObjectId(), value: ""};
 
         let size = Object.bsonsize(doc);
-        assert.gte(targetSize, size);
+        // Use native JS checks instead of assert.gte/assert.eq — assert helpers are not available
+        // in all server-side JS execution contexts (e.g. mozjs-wasm).
+        if (targetSize < size) {
+            throw new Error("targetSize (" + targetSize + ") < base doc size (" + size + ")");
+        }
 
         // Set 'value' as a string with enough characters to make the whole document 'size'
         // bytes long.
         doc.value = "x".repeat(targetSize - size);
-        assert.eq(targetSize, Object.bsonsize(doc));
+        if (Object.bsonsize(doc) !== targetSize) {
+            throw new Error("bsonsize mismatch: " + Object.bsonsize(doc) + " !== " + targetSize);
+        }
 
         return doc;
     }

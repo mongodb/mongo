@@ -5,14 +5,20 @@
  *
  * @tags: [
  *      requires_scripting,
- *      mozjs_wasm_unsupported,
  * ]
  */
 import {Thread} from "jstests/libs/parallelTester.js";
+import {isMozjsWasm} from "jstests/libs/js_engine_util.js";
 
 const JS_HEAP_LIMIT_MB = 50;
 const conn = MongoRunner.runMongod({setParameter: {jsHeapLimitMB: JS_HEAP_LIMIT_MB}});
 const testDB = conn.getDB("js_mozjs_heap_limit");
+
+if (isMozjsWasm(testDB)) {
+    jsTestLog("Skipping: test requires legacy mozjs engine, not mozjs-wasm");
+    MongoRunner.stopMongod(conn);
+    quit();
+}
 const coll = testDB.coll;
 
 assert.commandWorked(coll.insertMany(Array.from({length: 100}, (_, i) => ({_id: i, n: 0}))));

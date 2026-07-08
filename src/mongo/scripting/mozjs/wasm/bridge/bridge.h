@@ -302,6 +302,9 @@ private:
     // until kill() is first called; never reset afterward -- a killed bridge is excluded from
     // the idle-bridge reuse pool via isHealthy(), so it is never reused and never needs clearing.
     Atomic<ErrorCodes::Error> _killReason{ErrorCodes::OK};
+    // Watermark updated by getMemoryStats(); read by _throwAfterTrap() to identify store-limiter
+    // OOM traps even when Wasmtime's trap message doesn't explicitly mention the store limit.
+    Atomic<uint64_t> _lastKnownLinearMemoryBytes{0};
     uint32_t _jsHeapLimitMB{0};
     uint32_t _storeLimitMB{0};
     bool _javascriptProtection{false};
