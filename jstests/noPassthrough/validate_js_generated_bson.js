@@ -38,6 +38,19 @@
     // --------------------------------------------------------------------------
     // Cases that must be rejected.
     // --------------------------------------------------------------------------
+
+    // Encodes a JS number as a little-endian int32 hex string for splicing into a HexData() literal.
+    // `n >>> 0` normalizes negative/out-of-int32-range inputs to their unsigned 32-bit bit pattern
+    // before writing, so callers can pass values like -1 or -(2 ** 31) directly.
+    function int32ToLEHexStr(n) {
+        const buf = new ArrayBuffer(4);
+        new DataView(buf).setUint32(0, n >>> 0, /* littleEndian */ true);
+        return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    }
+
+    // Mirrors BSONObjMaxUserSize (src/mongo/bson/util/builder.h)
+    const kBSONObjMaxUserSize = 16 * 1024 * 1024;
+
     const rejectCases = [
         {
             expr: "new BinData(7, 'Ag==')",
@@ -45,6 +58,57 @@
             desc: "malformed BSONColumn (subtype 7) with single 0x02 byte",
         },
     ];
+
+    // A BSONColumn (BinData subtype 7) can hold literal BSONElements. Several element types carry an
+    // embedded int32 length prefix that the column decompressor trusts. We synthesize such columns via
+    // $function and require the server to reject the malformed BSON.
+    //
+    // oobLength values, and why each is here:
+    //  - kBSONObjMaxUserSize: the largest size BSON allowed for non-system collections.
+    //  - a value well inside that cap (1 MiB): proves the size cap doesn't bound the read against the
+    //    column's actual remaining bytes anywhere in the gap, not just at the edge.
+    //  - INT32_MIN: a negative length that casts to a huge size_t and should already be handled.
+    //  - -10..0: a dense sweep of non-positive lengths.
+    //  - INT32_MAX-10..INT32_MAX+10: a dense sweep around maximum values, including overflow.
+    for (const oobLength of [
+        kBSONObjMaxUserSize,
+        1024 * 1024,
+        -(2 ** 31),
+        ...Array.from({length: 11}, (_, i) => i - 10),
+        ...Array.from({length: 21}, (_, i) => 2 ** 31 - 11 + i),
+    ]) {
+        const lenHex = int32ToLEHexStr(oobLength);
+
+        // String (0x02), Code (0x0D) and Symbol (0x0E) share the same wire format: an int32 length
+        // prefix followed by the NUL-terminated string content. DBPointer (0x0C) prepends the same
+        // string descriptor and appends a 12-byte OID pointer. CodeWScope (0x0F) wraps an int32
+        // total-size prefix around the string descriptor and a trailing scope document. The inner
+        // string length in invalid while keeping the scope object otherwise well-formed (empty).
+        //
+        // Layout per literal (fieldname is a single empty NUL):
+        //   <type> | 0x00 fieldname | <type-specific body> | 0x00 EOO
+        const literalCases = [
+            {typeHexStr: "02", desc: "String", bodyHex: `${lenHex}7800`},
+            {typeHexStr: "0D", desc: "Code", bodyHex: `${lenHex}7800`},
+            {typeHexStr: "0E", desc: "Symbol", bodyHex: `${lenHex}7800`},
+            {typeHexStr: "0C", desc: "DBPointer", bodyHex: `${lenHex}7800${"12".repeat(12)}`},
+            {
+                typeHexStr: "0F",
+                desc: "CodeWScope",
+                // <int32 total size> <int32 string len=oob> "x\0" <empty scope obj: 05 00 00 00 00>
+                bodyHex: `${int32ToLEHexStr(4 + 4 + 2 + 5)}${lenHex}78000500000000`,
+            },
+        ];
+
+        for (const {typeHexStr, desc, bodyHex} of literalCases) {
+            const b64 = HexData(7, `${typeHexStr}00${bodyHex}00`).base64();
+            rejectCases.push({
+                expr: `new BinData(7, '${b64}')`,
+                code: ErrorCodes.InvalidBSONFromJavaScript,
+                desc: `malformed BSONColumn (subtype 7) with ${desc} literal (type 0x${typeHexStr}) length ${oobLength}`,
+            });
+        }
+    }
 
     rejectCases.forEach(function (tc) {
         assert.commandFailedWithCode(runFunction(tc.expr), tc.code, tc.desc);
