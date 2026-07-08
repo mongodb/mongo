@@ -35,23 +35,12 @@
 #include "mongo/db/version_context.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/otel/telemetry_context_holder.h"
-#include "mongo/otel/traces/sampler/sampler.h"
 #include "mongo/otel/traces/span/span.h"
 #include "mongo/otel/traces/span/span_names.h"
+#include "mongo/otel/traces/traces_test_util.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
-
-#ifdef MONGO_CONFIG_OTEL
-#include "mongo/otel/traces/mock_exporter.h"
-#include "mongo/otel/traces/tracer_provider_service.h"
-
-#include <opentelemetry/sdk/trace/simple_processor_factory.h>
-#include <opentelemetry/sdk/trace/tracer_provider_factory.h>
-
-using mongo::otel::traces::MockExporter;
-using mongo::otel::traces::TracerProviderService;
-#endif
 
 #include <limits>
 
@@ -61,14 +50,16 @@ namespace mongo {
 namespace {
 
 using otel::TelemetryContextHolder;
-using otel::traces::ScopedSamplerOverride;
-using otel::traces::setTraceSamplingFnForTest;
+using otel::traces::OtelTracesCapturer;
 using otel::traces::Span;
 namespace span_names = otel::traces::span_names;
 
 class FakeDBClient : public DBClientBase {
 public:
-    explicit FakeDBClient(int maxWireVersion) : _maxWireVersion(maxWireVersion) {}
+    explicit FakeDBClient(int maxWireVersion,
+                          ConnectionString::ConnectionType connectionType =
+                              ConnectionString::ConnectionType::kStandalone)
+        : _maxWireVersion(maxWireVersion), _connectionType(connectionType) {}
 
     std::string toString() const override {
         return "FakeDBClient";
@@ -86,7 +77,7 @@ public:
         return false;
     }
     ConnectionString::ConnectionType type() const override {
-        return ConnectionString::ConnectionType::kStandalone;
+        return _connectionType;
     }
     double getSoTimeout() const override {
         return 0.0;
@@ -124,6 +115,7 @@ public:
 
 private:
     int _maxWireVersion;
+    ConnectionString::ConnectionType _connectionType;
     boost::optional<Message> _lastSent;
 };
 
@@ -138,35 +130,13 @@ class AppendMetadataTest : public DBClientBaseTest {
 public:
     void setUp() override {
         DBClientBaseTest::setUp();
-#ifdef MONGO_CONFIG_OTEL
-        auto exporter = std::make_unique<MockExporter>();
-        auto processor =
-            opentelemetry::sdk::trace::SimpleSpanProcessorFactory::Create(std::move(exporter));
-        auto resource = opentelemetry::sdk::resource::Resource::Create(
-            {{"service.name", "test"}, {"service.instance.id", 1}});
-        std::shared_ptr<opentelemetry::trace::TracerProvider> provider =
-            opentelemetry::sdk::trace::TracerProviderFactory::Create(std::move(processor),
-                                                                     resource);
-        auto svc = TracerProviderService::create();
-        svc->setTracerProvider_ForTest(std::move(provider));
-        otel::traces::setGlobalTracerProviderService(std::move(svc));
-#else
-        GTEST_SKIP() << "Requires OTel build";
-#endif
-    }
-
-    void tearDown() override {
-#ifdef MONGO_CONFIG_OTEL
-        otel::traces::setGlobalTracerProviderService(nullptr);
-#endif
-        DBClientBaseTest::tearDown();
+        if (!OtelTracesCapturer::canReadSpans())
+            GTEST_SKIP() << "Requires OTel build";
     }
 
 protected:
     unittest::ServerParameterGuard _featureFlagTracing{"featureFlagTracing", true};
-    unittest::ServerParameterGuard _featureFlagSampling{"featureFlagOtelTraceSampling", true};
-    ScopedSamplerOverride _samplerGuard =
-        setTraceSamplingFnForTest([](std::string_view, double) { return true; });
+    OtelTracesCapturer _capturer;
 };
 
 OpMsgRequest makeRequest() {
@@ -176,10 +146,13 @@ OpMsgRequest makeRequest() {
     return req;
 }
 
-// Sends a fire-and-forget command on a FakeDBClient with the given wire version and returns the
-// telemetry context attached to the serialized request.
-boost::optional<TelemetryContextSection> sendAndGetTelemetryContext(int maxWireVersion) {
-    FakeDBClient client(maxWireVersion);
+// Sends a fire-and-forget command on a FakeDBClient with the given wire version and connection
+// type, and returns the telemetry context attached to the serialized request.
+boost::optional<TelemetryContextSection> sendAndGetTelemetryContext(
+    int maxWireVersion,
+    ConnectionString::ConnectionType connectionType =
+        ConnectionString::ConnectionType::kStandalone) {
+    FakeDBClient client(maxWireVersion, connectionType);
     client.runFireAndForgetCommand(makeRequest());
     invariant(client.lastSent().has_value());
     return OpMsgRequest::parse(*client.lastSent()).telemetryContext;
@@ -221,6 +194,17 @@ TEST_F(AppendMetadataTest, UnknownWireVersionSentinelDoesNotSetTelemetryContext)
     auto span = Span::start(opCtx.get(), span_names::kTest1);
 
     EXPECT_FALSE(sendAndGetTelemetryContext(std::numeric_limits<int>::max()).has_value());
+}
+
+TEST_F(AppendMetadataTest, LocalConnectionTypeDoesNotSetTelemetryContext) {
+    // A kLocal connection (e.g. DBDirectClient) talks to the server in-process, so there is no
+    // network hop to trace and the telemetry context should not be propagated.
+    auto opCtx = makeOperationContext();
+    auto span = Span::start(opCtx.get(), span_names::kTest1);
+
+    EXPECT_FALSE(sendAndGetTelemetryContext(WireVersion::WIRE_VERSION_90,
+                                            ConnectionString::ConnectionType::kLocal)
+                     .has_value());
 }
 
 TEST_F(AppendMetadataTest, SamplingFlagChecksTargetFCVNotLocalFCV) {
