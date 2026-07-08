@@ -449,6 +449,7 @@ mongo_cc_unit_test(
         "async_rpc_util_test.cpp",
         "connection_pool_test.cpp",
         "connection_pool_test_fixture.cpp",
+        "connection_pool_tl_test.cpp",
         "mock_async_rpc_test.cpp",
         "mock_network_fixture_test.cpp",
         "network_interface_mock_test.cpp",
