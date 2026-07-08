@@ -439,11 +439,11 @@ TEST_F(RouterRoleTest, DBPrimaryRouterDoesntImplicitlyCreateDbByDefault) {
 
     // 3. Expect a NamespaceNotFound error since the database doesn't exist and the implicit db
     // creation is disabled.
-    ASSERT_THROWS_CODE_AND_WHAT(future.default_timed_get(),
-                                DBException,
-                                ErrorCodes::NamespaceNotFound,
-                                str::stream() << "database " << _nss.dbName().toStringForErrorMsg()
-                                              << " not found");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        future.default_timed_get(),
+        DBException,
+        ErrorCodes::NamespaceNotFound,
+        fmt::format("database {} not found", _nss.dbName().toStringForErrorMsg()));
     ASSERT_EQ(tries, 1);
 }
 
@@ -1374,11 +1374,11 @@ TEST_F(RouterRoleTest, CollectionRouterDoesntImplicitlyCreateDbByDefault) {
 
     // 3. Expect a NamespaceNotFound error since the database doesn't exist and the implicit db
     // creation is disabled.
-    ASSERT_THROWS_CODE_AND_WHAT(future.default_timed_get(),
-                                DBException,
-                                ErrorCodes::NamespaceNotFound,
-                                str::stream() << "database " << _nss.dbName().toStringForErrorMsg()
-                                              << " not found");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        future.default_timed_get(),
+        DBException,
+        ErrorCodes::NamespaceNotFound,
+        fmt::format("database {} not found", _nss.dbName().toStringForErrorMsg()));
     ASSERT_EQ(tries, 1);
 }
 

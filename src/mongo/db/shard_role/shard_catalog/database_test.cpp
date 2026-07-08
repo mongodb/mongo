@@ -34,8 +34,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/index_builds/index_build_block.h"
@@ -319,9 +317,9 @@ TEST_F(DatabaseTest, CreateCollectionThrowsExceptionWhenDatabaseIsInADropPending
                 db->createCollection(_opCtx.get(), _nss),
                 AssertionException,
                 ErrorCodes::DatabaseDropPending,
-                (StringBuilder() << "Cannot create collection " << _nss.toStringForErrorMsg()
-                                 << " - database is in the process of being dropped.")
-                    .stringData());
+                fmt::format("Cannot create collection {} - database is in the process of being "
+                            "dropped.",
+                            _nss.toStringForErrorMsg()));
         });
 }
 
@@ -543,10 +541,10 @@ TEST_F(DatabaseTest, MakeUniqueCollectionNamespaceReplacesPercentSignsWithRandom
 
         auto nss1 = unittest::assertGet(makeUniqueCollectionName(_opCtx.get(), db->name(), model));
         if (!re.matchView(nss1.ns_forTest())) {
-            FAIL((StringBuilder() << "First generated namespace \"" << nss1.ns_forTest()
-                                  << "\" does not match regular expression \"" << re.pattern()
-                                  << "\"")
-                     .str());
+            FAIL(fmt::format(
+                "First generated namespace \"{}\" does not match regular expression \"{}\"",
+                nss1.ns_forTest(),
+                re.pattern()));
         }
 
         // Create collection using generated namespace so that makeUniqueCollectionNamespace()
@@ -560,10 +558,10 @@ TEST_F(DatabaseTest, MakeUniqueCollectionNamespaceReplacesPercentSignsWithRandom
 
         auto nss2 = unittest::assertGet(makeUniqueCollectionName(_opCtx.get(), db->name(), model));
         if (!re.matchView(nss2.ns_forTest())) {
-            FAIL((StringBuilder() << "Second generated namespace \"" << nss2.ns_forTest()
-                                  << "\" does not match regular expression \"" << re.pattern()
-                                  << "\"")
-                     .str());
+            FAIL(fmt::format(
+                "Second generated namespace \"{}\" does not match regular expression \"{}\"",
+                nss2.ns_forTest(),
+                re.pattern()));
         }
 
         // Second generated namespace should not collide with the first because a collection
@@ -646,12 +644,12 @@ TEST_F(DatabaseTest, CreateCollectionProhibitsReplicatedCollectionsWithoutIdInde
             CollectionOptions options;
             options.setNoIdIndex();
 
-            ASSERT_THROWS_CODE_AND_WHAT(
-                db->createCollection(_opCtx.get(), _nss, options),
-                AssertionException,
-                50001,
-                (str::stream() << "autoIndexId:false is not allowed for collection "
-                               << _nss.toStringForErrorMsg() << " because it can be replicated"));
+            ASSERT_THROWS_CODE_AND_WHAT(db->createCollection(_opCtx.get(), _nss, options),
+                                        AssertionException,
+                                        50001,
+                                        fmt::format("autoIndexId:false is not allowed for "
+                                                    "collection {} because it can be replicated",
+                                                    _nss.toStringForErrorMsg()));
         });
 }
 

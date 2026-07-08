@@ -39,6 +39,8 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/pcre.h"
 
+#include <string_view>
+
 #include <fmt/format.h>
 
 MONGO_MOD_PUBLIC;
@@ -184,6 +186,55 @@ MATCHER_P(
     return ExplainMatchResult(value, arg.getValue(), result_listener);
 }
 
+/**
+ * `AsStringView(value)` matches a string view constructed from value against `matcher`.
+ *
+ * Useful when an api or a property is of type `char const*` and a string-like object is required
+ * for the matcher.
+ *
+ * Example:
+ *  std::string s = "string";
+ *  ASSERT_THAT("string literal", AsStringView(StartsWith(s)));
+ */
+MATCHER_P(AsStringView,
+          matcher,
+          fmt::format("as string view {}",
+                      testing::DescribeMatcher<std::string_view>(matcher, negation))) {
+    return ExplainMatchResult(matcher, std::string_view(arg), result_listener);
+}
+
+/**
+ * `CodeIs(matcher)` matches the result of code() against `matcher`.
+ *
+ * Example:
+ *  AssertionException& ex = ...;
+ *  ASSERT_THAT(ex, CodeIs(ErrorCodes::InternalError));
+ */
+MATCHER_P(
+    CodeIs,
+    matcher,
+    fmt::format("{} an object whose code() result {}",
+                negation ? "isn't" : "is",
+                testing::DescribeMatcher<decltype(std::declval<arg_type>().code())>(matcher))) {
+    return ExplainMatchResult(matcher, arg.code(), result_listener);
+}
+
+
+/**
+ * `WhatIs(matcher)` matches the result of what() against `matcher`.
+ *
+ * Example:
+ *  AssertionException& ex = ...;
+ *  ASSERT_THAT(ex, WhatIs(StrEq("exception message")));
+ */
+MATCHER_P(
+    WhatIs,
+    matcher,
+    fmt::format("{} an object whose what() result {}",
+                negation ? "isn't" : "is",
+                testing::DescribeMatcher<decltype(std::declval<arg_type>().what())>(matcher))) {
+    return ExplainMatchResult(matcher, arg.what(), result_listener);
+}
 
 /**
  * `StatusWithHasStatus(status)` matches a `StatusWith` whose status matches

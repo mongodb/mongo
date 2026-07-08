@@ -100,6 +100,7 @@ public:
 
 TEST(UnitTestSelfTest, TestAssertThrowsWhatSuccess) {
     ASSERT_THROWS_WHAT(throw MyException(), MyException, "whatever");
+    ASSERT_THROWS_WHAT(throw MyException(), MyException, mongo::unittest::match::Eq("whatever"));
 }
 
 TEST(UnitTestSelfTest, TestSuccessfulNumericComparisons) {
@@ -168,6 +169,64 @@ TEST(UnitTestSelfTest, BSONElementComparisons) {
     ASSERT_BSONELT_GT(b, a);
     ASSERT_BSONELT_GTE(b, a);
     ASSERT_BSONELT_GTE(a, a);
+}
+
+TEST(UnitTestMatcherTest, AsStringViewMatcher) {
+    namespace match = mongo::unittest::match;
+    const char* str1 = "str";
+    const char* str2 = "str";
+    ASSERT_THAT(str1, match::AsStringView(str2));
+    ASSERT_THAT("different", match::AsStringView(match::Not(str2)));
+}
+
+TEST(UnitTestMatcherTest, AsStringViewMatcherDescription) {
+    namespace match = mongo::unittest::match;
+    const char* str = "str";
+    ASSERT_EQ(match::DescribeMatcher<std::string_view>(match::AsStringView(match::StartsWith(str))),
+              "as string view starts with \"str\"");
+    ASSERT_EQ(match::DescribeMatcher<std::string_view>(
+                  match::Not(match::AsStringView(match::StartsWith(str)))),
+              "as string view doesn't start with \"str\"");
+    ASSERT_EQ(
+        match::DescribeMatcher<mongo::AssertionException>(match::Property(
+            "what", &mongo::AssertionException::what, match::AsStringView(match::StartsWith(str)))),
+        "is an object whose property `what` as string view starts with \"str\"");
+}
+
+TEST(UnitTestMatcherTest, WhatIsMatcher) {
+    namespace match = mongo::unittest::match;
+    auto ex = mongo::ExceptionFor<mongo::ErrorCodes::APIMismatchError>{
+        mongo::Status{mongo::ErrorCodes::APIMismatchError, "what"}};
+    ASSERT_THAT(ex, match::WhatIs(match::StrEq("what")));
+    ASSERT_THAT(ex, match::Not(match::WhatIs(match::StrEq("unrelated"))));
+}
+
+TEST(UnitTestMatcherTest, WhatIsMatcherDescription) {
+    namespace match = mongo::unittest::match;
+    ASSERT_THAT(
+        match::DescribeMatcher<mongo::AssertionException>(match::WhatIs(match::StrEq("what"))),
+        "is an object whose what() result is equal to \"what\"");
+    ASSERT_THAT(match::DescribeMatcher<mongo::AssertionException>(
+                    match::Not(match::WhatIs(match::StrEq("unrelated")))),
+                "isn't an object whose what() result is equal to \"unrelated\"");
+}
+
+TEST(UnitTestMatcherTest, CodeIsMatcher) {
+    namespace match = mongo::unittest::match;
+    auto ex = mongo::ExceptionFor<mongo::ErrorCodes::APIMismatchError>{
+        mongo::Status{mongo::ErrorCodes::APIMismatchError, "what"}};
+    ASSERT_THAT(ex, match::CodeIs(mongo::ErrorCodes::APIMismatchError));
+    ASSERT_THAT(ex, match::Not(match::CodeIs(mongo::ErrorCodes::InternalError)));
+}
+
+TEST(UnitTestMatcherTest, CodeIsMatcherDescription) {
+    namespace match = mongo::unittest::match;
+    ASSERT_THAT(match::DescribeMatcher<mongo::AssertionException>(
+                    match::CodeIs(mongo::ErrorCodes::APIMismatchError)),
+                "is an object whose code() result is equal to APIMismatchError");
+    ASSERT_THAT(match::DescribeMatcher<mongo::AssertionException>(
+                    match::Not(match::CodeIs(mongo::ErrorCodes::InternalError))),
+                "isn't an object whose code() result is equal to InternalError");
 }
 
 TEST(UnitTestMatcherTest, StatusIsOKMatcherStatusWithOK) {
@@ -483,8 +542,13 @@ TEST_F(ExceptionMatcherTest, TestAssertThrowsNotCalledTwice) {
 }
 
 TEST_F(ExceptionMatcherTest, TestAssertThrowsCodeAndWhatSuccess) {
+    namespace match = mongo::unittest::match;
     ASSERT_THROWS_CODE_AND_WHAT(
         doThrow(), mongo::DBException, mongo::ErrorCodes::CommandFailed, "failure message");
+    ASSERT_THROWS_CODE_AND_WHAT(doThrow(),
+                                mongo::DBException,
+                                match::Eq(mongo::ErrorCodes::CommandFailed),
+                                match::StartsWith("failure"));
 }
 
 TEST_F(ExceptionMatcherTest, DBExceptionMatcherDescription) {

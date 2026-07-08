@@ -142,7 +142,7 @@ MONGO_MOD_PUBLIC;
     ASSERT_THROWS_EXCEPTION_MATCHING(                               \
         expression,                                                 \
         exceptionType,                                              \
-        ::testing::Property("what", &exceptionType::what, ::testing::StrEq(expectedWhat)))
+        ::mongo::unittest::match::WhatIs(::mongo::unittest::match::AsStringView(expectedWhat)))
 
 /**
  * Behaves like ASSERT_THROWS, above, but also fails if calling getCode() on the thrown exception
@@ -150,9 +150,7 @@ MONGO_MOD_PUBLIC;
  */
 #define ASSERT_THROWS_CODE(expression, exceptionType, expectedCode) \
     ASSERT_THROWS_EXCEPTION_MATCHING(                               \
-        expression,                                                 \
-        exceptionType,                                              \
-        ::testing::Property("code", &exceptionType::code, expectedCode))
+        expression, exceptionType, ::mongo::unittest::match::CodeIs(expectedCode))
 
 /**
  * Behaves like ASSERT_THROWS, above, but also fails if calling getCode() on the thrown exception
@@ -163,9 +161,9 @@ MONGO_MOD_PUBLIC;
     ASSERT_THROWS_EXCEPTION_MATCHING(                                                      \
         expression,                                                                        \
         exceptionType,                                                                     \
-        ::testing::AllOf(                                                                  \
-            ::testing::Property("code", &exceptionType::code, expectedCode),               \
-            ::testing::Property("what", &exceptionType::what, ::testing::StrEq(expectedWhat))))
+        ::testing::AllOf(::mongo::unittest::match::CodeIs(expectedCode),                   \
+                         ::mongo::unittest::match::WhatIs(                                 \
+                             ::mongo::unittest::match::AsStringView(expectedWhat))))
 
 /**
  * Compiles if expr doesn't compile.
