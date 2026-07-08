@@ -368,6 +368,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: disablePlanCache
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryCacheMaxEntriesPerCollection:
         description: >-
@@ -612,6 +615,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: maxScansToExplode
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryPlannerGenerateCoveredWholeIndexScans:
         description: >-
@@ -641,6 +647,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: plannerUseMultiplannerForSingleSolutions
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryIgnoreUnknownJSONSchemaKeywords:
         description: "Ignore unknown JSON Schema keywords."
@@ -1301,6 +1310,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: plannerPushdownFilterToIxscanForSort
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryTransformHoistPolicy:
         description: >-

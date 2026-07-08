@@ -413,7 +413,9 @@ std::unique_ptr<PlannerInterface> PlannerGeneratorFromSbeCacheEntry::makePlanner
                     collectionInfo != secondaryCollectionsInfo.end());
             tassert(8832901, "Foreign collection must exist", collectionInfo->second.exists);
 
-            if (!QueryPlannerAnalysis::isEligibleForHashJoin(collectionInfo->second)) {
+            if (!QueryPlannerAnalysis::isEligibleForHashJoin(
+                    _plannerData.cq->getExpCtx()->getQueryKnobConfiguration(),
+                    collectionInfo->second)) {
                 return replan(
                     std::move(_plannerData),
                     indexExistenceChecker,

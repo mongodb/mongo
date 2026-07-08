@@ -229,7 +229,7 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
     _isSearchQuery = isSearchQuery;
     _aggWithNonEmptyPipeline = aggWithNonEmptyPipeline;
 
-    _disablePlanCache = internalQueryDisablePlanCache.load() ||
+    _disablePlanCache = _expCtx->getQueryKnobConfiguration().getDisablePlanCache() ||
         _expCtx->getPlanCache() == ExpressionContext::PlanCacheOptions::kDisablePlanCache;
     _maxMatchExpressionParams = loadMaxMatchExpressionParams();
     // The tree must always be valid after normalization.

@@ -36,6 +36,7 @@
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/index_hint.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/util/modules.h"
 
@@ -176,6 +177,7 @@ public:
      * - A nested loop join is chosen in all other cases.
      */
     static Strategy determineLookupStrategy(
+        const QueryKnobConfiguration& knobs,
         const NamespaceString& foreignCollName,
         const std::string& foreignField,
         const std::map<NamespaceString, CollectionInfo>& collectionsInfo,
@@ -192,7 +194,8 @@ public:
      * Checks if the foreign collection is eligible for the hash join algorithm. We conservatively
      * choose the hash join algorithm for cases when the hash table is unlikely to spill to disk.
      */
-    static bool isEligibleForHashJoin(const CollectionInfo& foreignCollInfo);
+    static bool isEligibleForHashJoin(const QueryKnobConfiguration& knobs,
+                                      const CollectionInfo& foreignCollInfo);
 
     /**
      * Returns 'true' if the provided solution uses a fast counting stage.

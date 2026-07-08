@@ -257,7 +257,8 @@ bool shouldMultiPlanForSingleSolution(const PlanRankingResult& rankerResult,
     // cache. If 'internalQueryDisablePlanCache' disables the plan cache, we will ignore
     // 'needsWorksMeasuredForPlanCache' and instead only check whether we should force running the
     // single solution plan through the multiplanner.
-    return (!internalQueryDisablePlanCache.load() && rankerResult.needsWorksMeasuredForPlanCache) ||
+    return (!expCtx->getQueryKnobConfiguration().getDisablePlanCache() &&
+            rankerResult.needsWorksMeasuredForPlanCache) ||
         forceMultiPlanForSingleSolution;
 }
 

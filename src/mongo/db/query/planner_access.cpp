@@ -2434,7 +2434,9 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::scanWholeIndex(
     if (MatchExpression::AND == filter->matchType() && (0 == filter->numChildren())) {
         solnRoot = std::move(isn);
     } else {
-        if (internalQueryPlannerPushdownFilterToIxscanForSort.load()) {
+        if (query.getExpCtx()
+                ->getQueryKnobConfiguration()
+                .getPlannerPushdownFilterToIxscanForSort()) {
             solnRoot = pushdownFilterToFullIxscan(
                 std::move(filter), std::move(isn), index, queryContext, params, query.nss());
         } else {

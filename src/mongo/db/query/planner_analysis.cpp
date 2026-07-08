@@ -889,14 +889,15 @@ bool shouldReverseScanForSort(QuerySolutionNode* solnRoot,
 }
 }  // namespace
 
-bool QueryPlannerAnalysis::isEligibleForHashJoin(const CollectionInfo& foreignCollInfo) {
-    return !internalQueryDisableLookupExecutionUsingHashJoin.load() && foreignCollInfo.exists &&
+bool QueryPlannerAnalysis::isEligibleForHashJoin(const QueryKnobConfiguration& knobs,
+                                                 const CollectionInfo& foreignCollInfo) {
+    return !knobs.getDisableLookupExecutionUsingHashJoin() && foreignCollInfo.exists &&
         foreignCollInfo.stats.noOfRecords <=
-        internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin.load() &&
+        knobs.getCollectionMaxNoOfDocumentsToChooseHashJoin() &&
         foreignCollInfo.stats.approximateDataSizeBytes <=
-        internalQueryCollectionMaxDataSizeBytesToChooseHashJoin.load() &&
+        knobs.getCollectionMaxDataSizeBytesToChooseHashJoin() &&
         foreignCollInfo.stats.storageSizeBytes <=
-        internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin.load();
+        knobs.getCollectionMaxStorageSizeBytesToChooseHashJoin();
 }
 
 // static
@@ -1008,6 +1009,7 @@ bool QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
 
 // static
 QueryPlannerAnalysis::Strategy QueryPlannerAnalysis::determineLookupStrategy(
+    const QueryKnobConfiguration& knobs,
     const NamespaceString& foreignCollName,
     const std::string& foreignField,
     const std::map<NamespaceString, CollectionInfo>& collectionsInfo,
@@ -1039,7 +1041,7 @@ QueryPlannerAnalysis::Strategy QueryPlannerAnalysis::determineLookupStrategy(
                 "No foreign index and table scan disallowed",
                 !tableScanForbidden);
 
-        if (allowDiskUse && isEligibleForHashJoin(foreignCollItr->second)) {
+        if (allowDiskUse && isEligibleForHashJoin(knobs, foreignCollItr->second)) {
             // No index with compatible collation. Use HashJoin.
             return EqLookupNode::LookupStrategy::kHashJoin;
         }

@@ -82,6 +82,26 @@
          kInternalChangeStreamRespectsReadPreferenceName,                                 \
          internalChangeStreamRespectsReadPreference,                                      \
          getChangeStreamRespectsReadPreference)                                           \
+    KNOB(kDisableLookupExecutionUsingHashJoin,                                            \
+         kInternalQueryDisableLookupExecutionUsingHashJoinName,                           \
+         internalQueryDisableLookupExecutionUsingHashJoin,                                \
+         getDisableLookupExecutionUsingHashJoin)                                          \
+    KNOB(kCollectionMaxDataSizeBytesToChooseHashJoin,                                     \
+         kInternalQueryCollectionMaxDataSizeBytesToChooseHashJoinName,                    \
+         internalQueryCollectionMaxDataSizeBytesToChooseHashJoin,                         \
+         getCollectionMaxDataSizeBytesToChooseHashJoin)                                   \
+    KNOB(kCollectionMaxNoOfDocumentsToChooseHashJoin,                                     \
+         kInternalQueryCollectionMaxNoOfDocumentsToChooseHashJoinName,                    \
+         internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin,                         \
+         getCollectionMaxNoOfDocumentsToChooseHashJoin)                                   \
+    KNOB(kCollectionMaxStorageSizeBytesToChooseHashJoin,                                  \
+         kInternalQueryCollectionMaxStorageSizeBytesToChooseHashJoinName,                 \
+         internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin,                      \
+         getCollectionMaxStorageSizeBytesToChooseHashJoin)                                \
+    KNOB(kDisableSingleFieldExpressExecutor,                                              \
+         kInternalQueryDisableSingleFieldExpressExecutorName,                             \
+         internalQueryDisableSingleFieldExpressExecutor,                                  \
+         getDisableSingleFieldExpressExecutor)                                            \
     /* End MONGO_EXPAND_QUERY_KNOBS_EXECUTION */
 // clang-format on
 

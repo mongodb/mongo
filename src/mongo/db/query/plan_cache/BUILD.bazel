@@ -126,6 +126,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:canonical_query_test_util",
         "//src/mongo/db/query:query_planner_test_lib",
+        "//src/mongo/db/query/query_knobs:query_knob_configuration_test_util",
         "//src/mongo/db/shard_role/shard_catalog:collection_mock",
         "//src/mongo/db/shard_role/shard_catalog:index_catalog_mock",
         "//src/mongo/unittest:server_parameter_guard",

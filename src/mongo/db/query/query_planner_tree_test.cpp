@@ -3132,7 +3132,7 @@ TEST_F(QueryPlannerTest, PrunedAnyIndexesIsReportedOnAllSolutions) {
 }
 
 TEST_F(QueryPlannerTest, HitScanLimitIsReportedOnAllSolutions) {
-    unittest::ServerParameterGuard maxScansController("internalQueryMaxScansToExplode", 2);
+    QueryKnobGuardForTest maxScansController{opCtx.get(), "internalQueryMaxScansToExplode", 2};
     // explodeForSort handles "filter on the leading key, sort on a trailing key" query shape (eg
     // {a: {$in: [1, 2, 3]}}, {b: 1} where `a` is the filter and `b` is the sort). More
     // specifically, explodeForSort() rewrites an index scan over point intervals on one field into

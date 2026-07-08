@@ -74,6 +74,7 @@
 #include "mongo/db/query/plan_yield_policy_impl.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration_test_util.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
@@ -460,10 +461,10 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, collection);
 
     // Force index intersection and enable AND_SORTED intersection.
-    unittest::ServerParameterGuard forceIntersectionPlans{"internalQueryForceIntersectionPlans",
-                                                          true};
-    unittest::ServerParameterGuard enableSortIntersection{
-        "internalQueryPlannerEnableSortIndexIntersection", true};
+    QueryKnobGuardForTest forceIntersectionPlans{
+        opCtx.get(), "internalQueryForceIntersectionPlans", true};
+    QueryKnobGuardForTest enableSortIntersection{
+        opCtx.get(), "internalQueryPlannerEnableSortIndexIntersection", true};
 
     // Plan.
     auto plannerParams = makePlannerParams(collection, *cq);

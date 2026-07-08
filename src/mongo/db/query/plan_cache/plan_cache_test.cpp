@@ -61,6 +61,7 @@
 #include "mongo/db/query/plan_cache/sbe_plan_cache.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration_test_util.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
@@ -323,10 +324,7 @@ TEST_F(PlanCacheTest, ShouldNotCacheQueryTriviallyFalse) {
 }
 
 TEST_F(PlanCacheTest, ShouldNotCacheIfCachingDisabled) {
-    bool oldDisablePlanCache = internalQueryDisablePlanCache.load();
-    ON_BLOCK_EXIT(
-        [oldDisablePlanCache] { internalQueryDisablePlanCache.store(oldDisablePlanCache); });
-    internalQueryDisablePlanCache.store(true);
+    QueryKnobGuardForTest disablePlanCache(opCtx(), "internalQueryDisablePlanCache", true);
     std::unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     assertShouldNotCacheQuery(*cq);
 }

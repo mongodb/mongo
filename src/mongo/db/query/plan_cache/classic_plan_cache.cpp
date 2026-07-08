@@ -141,7 +141,7 @@ std::string SolutionCacheData::toString() const {
 }
 
 bool shouldCacheQuery(const CanonicalQuery& query) {
-    if (internalQueryDisablePlanCache.load()) {
+    if (query.getExpCtx()->getQueryKnobConfiguration().getDisablePlanCache()) {
         return false;
     }
 

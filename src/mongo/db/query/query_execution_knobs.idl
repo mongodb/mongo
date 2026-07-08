@@ -614,6 +614,12 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: disableSingleFieldExpressExecutor
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryEnablePlanShapeAnalysis:
         description: "Knob to control whether we collect plan shape counters for query stats."
@@ -635,6 +641,12 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: collectionMaxNoOfDocumentsToChooseHashJoin
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryCollectionMaxDataSizeBytesToChooseHashJoin:
         description: >-
@@ -648,6 +660,12 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: collectionMaxDataSizeBytesToChooseHashJoin
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin:
         description: >-
@@ -661,6 +679,12 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: collectionMaxStorageSizeBytesToChooseHashJoin
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryDisableLookupExecutionUsingHashJoin:
         description: >-
@@ -671,6 +695,12 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: disableLookupExecutionUsingHashJoin
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalMeasureQueryExecutionTimeInNanoseconds:
         description: >-

@@ -99,7 +99,7 @@ inline bool isEqualityExpressEligibleQuery(const CollectionPtr& collection,
     const auto& findCommand = cq.getFindCommandRequest();
     auto me = cq.getPrimaryMatchExpression();
 
-    if (internalQueryDisableSingleFieldExpressExecutor.load()) {
+    if (cq.getExpCtx()->getQueryKnobConfiguration().getDisableSingleFieldExpressExecutor()) {
         return false;
     }
 
