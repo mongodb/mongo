@@ -119,7 +119,8 @@ constexpr size_t Exchange::kMaxNumberConsumers;
 
 Exchange::Exchange(OperationContext* opCtx,
                    ExchangeSpec spec,
-                   std::unique_ptr<mongo::Pipeline> pipeline)
+                   std::unique_ptr<mongo::Pipeline> pipeline,
+                   InputMemoryPolicy inputMemoryPolicy)
     : _spec(std::move(spec)),
       _pipeline(std::move(pipeline)),
       _execPipeline{buildPipeline(_pipeline->freeze())},
@@ -131,7 +132,10 @@ Exchange::Exchange(OperationContext* opCtx,
       _policy(_spec.getPolicy()),
       _orderPreserving(_spec.getOrderPreserving()),
       _maxBufferSize(_spec.getBufferSize()),
-      _memoryTracker(OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx)) {
+      _inputMemoryPolicy(inputMemoryPolicy),
+      _memoryTracker(ownsOperationMemoryTracker()
+                         ? OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx)
+                         : nullptr) {
     uassert(50901, "Exchange must have at least one consumer", _spec.getConsumers() > 0);
 
     uassert(50951,
@@ -281,13 +285,17 @@ void Exchange::unblockLoading(size_t consumerId) {
 void Exchange::attachContext(OperationContext* opCtx, size_t consumerId) {
     _pipeline->reattachToOperationContext(opCtx);
     _execPipeline->reattachToOperationContext(opCtx);
-    if (consumerId == 0) {
+    if (reportsInputMemoryToCurOp() && consumerId == 0) {
+        tassert(12920100,
+                "Cannot publish the exchange producer's memory tracker: consumer 0's opCtx already "
+                "has an operation memory tracker",
+                !OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx));
         OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx, std::move(_memoryTracker));
     }
 }
 
 void Exchange::detachContext(OperationContext* opCtx, size_t consumerId) {
-    if (consumerId == 0) {
+    if (reportsInputMemoryToCurOp() && consumerId == 0) {
         _memoryTracker = OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx);
     }
     _execPipeline->detachFromOperationContext();
@@ -477,7 +485,11 @@ size_t Exchange::getTargetConsumer(const Document& input) {
 void Exchange::updateMemoryTrackingForDispose(OperationContext* opCtx) {
     // opCtx might be null here if we are disposing outside of an operation. E.g., when the server
     // shuts down and we are deleting the CursorManager.
-    if (_memoryTracker && opCtx) {
+    if (reportsInputMemoryToCurOp() && _memoryTracker && opCtx) {
+        tassert(12920101,
+                "Cannot flush the exchange producer's memory tracker: consumer 0's opCtx already "
+                "has an operation memory tracker",
+                !OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx));
         OperationMemoryUsageTracker* tracker = _memoryTracker.get();
         OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx, std::move(_memoryTracker));
         tracker->propagateStatsToCurOp();

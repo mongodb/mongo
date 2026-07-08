@@ -100,10 +100,40 @@ class Exchange : public RefCountable {
 
 public:
     /**
+     * How the operation memory tracker of the input subpipeline (the producer) is owned and
+     * reported.
+     */
+    enum class InputMemoryPolicy {
+        // The Exchange takes the tracker off the opCtx and owns it for its lifetime, and publishes
+        // it to consumer 0's opCtx while consumer 0 executes so the producer's memory reaches
+        // CurOp. Requires the consumer pipelines to be bare exchange readers with no operation
+        // memory tracker of their own: publishing overwrites the opCtx's tracker slot, and two
+        // trackers reporting to one CurOp would overwrite each other's stats.
+        kOwnAndReportToCurOp,
+
+        // The Exchange owns the tracker as above but never puts it on an opCtx: the producer's
+        // memory is still tracked and limit-enforced, just not reported to CurOp. For exchanges
+        // whose consumers have memory-tracking stages of their own.
+        //
+        // TODO SERVER-110499: a tracking strategy that supports memory-tracking stages after the
+        // exchange alongside the producer would let the producer's memory be reported to CurOp in
+        // all cases, removing this policy.
+        kOwnWithoutReporting,
+
+        // The tracker stays on the opCtx; the producer and all consumer stages built on that opCtx
+        // share it, so the producer's memory is accounted and reported as part of the whole query.
+        // Only valid when the whole exchange runs on a single opCtx with no concurrent consumers.
+        kShareOperationTracker,
+    };
+
+    /**
      * Create an exchange. 'pipeline' represents the input to the exchange operator and must not be
      * nullptr.
      **/
-    Exchange(OperationContext* opCtx, ExchangeSpec spec, std::unique_ptr<mongo::Pipeline> pipeline);
+    Exchange(OperationContext* opCtx,
+             ExchangeSpec spec,
+             std::unique_ptr<mongo::Pipeline> pipeline,
+             InputMemoryPolicy inputMemoryPolicy = InputMemoryPolicy::kOwnAndReportToCurOp);
 
     /**
      * Interface for retrieving the next document. 'resourceYielder' is optional, and if provided,
@@ -243,11 +273,23 @@ private:
 
     std::vector<std::unique_ptr<ExchangeBuffer>> _consumers;
 
+    bool ownsOperationMemoryTracker() const {
+        return _inputMemoryPolicy != InputMemoryPolicy::kShareOperationTracker;
+    }
+
+    bool reportsInputMemoryToCurOp() const {
+        return _inputMemoryPolicy == InputMemoryPolicy::kOwnAndReportToCurOp;
+    }
+
+    const InputMemoryPolicy _inputMemoryPolicy;
+
     // The OperationMemoryTracker for the exchange pipeline. Stages in the subpipeline that track
-    // memory will report to this memory tracker. Except when consumer 0 is executing the
-    // subpipeline, the operation memory tracker is stored here and not attached to any particular
-    // OperationContext. We do this to avoid data races that would occur if we were to move the
-    // memory tracker between the OperationContext and ClientCursor while a pipeline is executing.
+    // memory will report to this memory tracker. Only set when this Exchange owns the tracker
+    // (otherwise the tracker stays on the opCtx and this is null); the operation memory tracker is
+    // stored here and not attached to any particular OperationContext, except while consumer 0 is
+    // executing the subpipeline under InputMemoryPolicy::kOwnAndReportToCurOp. We do this to avoid
+    // data races that would occur if we were to move the memory tracker between the
+    // OperationContext and ClientCursor while a pipeline is executing.
     std::unique_ptr<OperationMemoryUsageTracker> _memoryTracker;
 };
 

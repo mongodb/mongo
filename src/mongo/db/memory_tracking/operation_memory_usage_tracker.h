@@ -60,7 +60,7 @@ namespace mongo {
  * - RunAggregateTest: TransferOperationMemoryUsageTracker
  * - ClusterAggregateMemoryTrackingTest: MemoryTrackingWorksOnRouter
  */
-class OperationMemoryUsageTracker : public SimpleMemoryUsageTracker {
+class MONGO_MOD_NEEDS_REPLACEMENT OperationMemoryUsageTracker : public SimpleMemoryUsageTracker {
     OperationMemoryUsageTracker() = delete;
 
 public:
@@ -124,6 +124,12 @@ public:
      */
     static void moveToOpCtxIfAvailable(OperationContext* opCtx,
                                        std::unique_ptr<OperationMemoryUsageTracker> tracker);
+
+    /**
+     * Returns true if the given operation context currently holds a memory tracker. Unlike
+     * getOperationMemoryUsageTracker(), never creates one.
+     */
+    static bool hasTrackerOnOpCtx(OperationContext* opCtx);
 
     explicit OperationMemoryUsageTracker(OperationContext* opCtx);
 

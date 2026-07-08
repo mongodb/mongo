@@ -95,6 +95,10 @@ DeduplicatorReporter::DeduplicatorReporter(std::function<void(int64_t, int64_t)>
 }
 
 void SimpleMemoryUsageTracker::add(int64_t diff) {
+    addInternal(diff, true /* report */);
+}
+
+void SimpleMemoryUsageTracker::addInternal(int64_t diff, bool report) {
     _inUseTrackedMemoryBytes += diff;
     tassert(6128100,
             str::stream() << "Underflow in memory tracking, attempting to add " << diff
@@ -104,31 +108,25 @@ void SimpleMemoryUsageTracker::add(int64_t diff) {
         _peakTrackedMemoryBytes = _inUseTrackedMemoryBytes;
     }
 
-    // When chunking is enabled, we report memory usage in discrete chunks (0, chunkSize,
-    // 2*chunkSize, ...) rather than exact values. This reduces update frequency and
-    // provides predictable lower-bound semantics where CurOp's reported value <= actual
-    // usage < reported value + chunkSize.
-    //
-    // This is to avoid performance regressions, but will also result having slightly less
-    // accurate statistics in CurOp.
-    int64_t inUseTrackedMemoryBytes = _inUseTrackedMemoryBytes;
+    // When chunking is enabled we report to CurOp only when usage crosses a chunk boundary (0,
+    // chunkSize, 2*chunkSize, ...), and also whenever it returns to zero so CurOp does not keep a
+    // stale value once all memory is released. This avoids the lock contention of touching CurOp's
+    // atomics on every update. The chunk size may live on an intermediate tracker rather than the
+    // root, so the decision is computed here and carried in 'report' to the root, which performs
+    // the CurOp write.
+    if (_chunkSize) {
+        int64_t newLowerBound = (_inUseTrackedMemoryBytes / _chunkSize) * _chunkSize;
+        report = newLowerBound != _lastReportedLowerBound ||
+            (_inUseTrackedMemoryBytes == 0 && diff != 0);
+        if (report) {
+            _lastReportedLowerBound = newLowerBound;
+        }
+    }
 
     if (_base) {
-        if (_chunkSize) {
-            int64_t newLowerBound = (_inUseTrackedMemoryBytes / _chunkSize) * _chunkSize;
-
-            if (newLowerBound != _lastReportedLowerBound) {
-                int64_t chunkedDelta = newLowerBound - _lastReportedLowerBound;
-
-                _base->add(chunkedDelta);
-                _lastReportedLowerBound = newLowerBound;
-                inUseTrackedMemoryBytes = newLowerBound;
-            }
-        } else {
-            _base->add(diff);
-        }
-    } else if (_writeToCurOp) {
-        _writeToCurOp(inUseTrackedMemoryBytes, _peakTrackedMemoryBytes);
+        _base->addInternal(diff, report);
+    } else if (_writeToCurOp && report) {
+        _writeToCurOp(_inUseTrackedMemoryBytes, _peakTrackedMemoryBytes);
     }
 }
 

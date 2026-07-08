@@ -111,11 +111,20 @@ exec::agg::StageExpansion documentSourceInternalDocumentResultsAndMetadataToStag
         ? makeCopyFromExpressionContext(expCtx, expCtx->getNamespaceString(), expCtx->getUUID())
         : boost::intrusive_ptr<ExpressionContext>{};
 
+    // Sharded path (returnCursor): the metadata stream is a separate secondary cursor, so the
+    // Exchange must own the tracker (it can't depend on any one cursor's lifetime); it stays
+    // unreported since the consumer stages report their own memory. Non-sharded: the whole router
+    // runs on one opCtx, so the tracker stays there and the producer and all consumers share it.
+    const auto inputMemoryPolicy = docResultsAndMeta.getReturnCursor()
+        ? exec::agg::Exchange::InputMemoryPolicy::kOwnWithoutReporting
+        : exec::agg::Exchange::InputMemoryPolicy::kShareOperationTracker;
+
     auto exchange = make_intrusive<exec::agg::Exchange>(
         opCtx,
         buildStreamRoutingSpec(hasMeta),
         // Clone the source onto docExpCtx so the stage's expCtx matches the inner pipeline's.
-        Pipeline::create({docResultsAndMeta.getSourceStage()->clone(docExpCtx)}, docExpCtx));
+        Pipeline::create({docResultsAndMeta.getSourceStage()->clone(docExpCtx)}, docExpCtx),
+        inputMemoryPolicy);
 
     exec::agg::StageExpansion stages;
     stages.push_back(exec::agg::buildStage(

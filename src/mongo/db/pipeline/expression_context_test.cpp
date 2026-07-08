@@ -523,10 +523,6 @@ TEST_F(ExpressionContextTest,
                                                10 * 1024 * 1024};
         unittest::ServerParameterGuard perQueryLimit{"internalQueryMaxMemoryUsageBytesPerOperation",
                                                      4};
-        // Disable chunking so the small increment below propagates to the operation tracker
-        // immediately (a chunked tracker only forwards to its base at chunk-size boundaries).
-        // TODO SERVER-129201: Remove this explicit knob set.
-        unittest::ServerParameterGuard chunkSize{"internalQueryMaxWriteToCurOpMemoryUsageBytes", 0};
 
         auto opCtx = makeOperationContext();
         auto expCtx = ExpressionContextBuilder{}
@@ -553,9 +549,6 @@ TEST_F(ExpressionContextTest, ExpressionFallbackTrackerIgnoresPerExpressionCapWh
     unittest::ServerParameterGuard exprCap{"internalQueryMaxSingleExpressionMemoryUsageBytes", 4};
     unittest::ServerParameterGuard perQueryLimit{"internalQueryMaxMemoryUsageBytesPerOperation",
                                                  10 * 1024 * 1024};
-    // Disable chunking so the increment below propagates to the operation tracker immediately.
-    // TODO SERVER-129201: Remove this explicit knob set.
-    unittest::ServerParameterGuard chunkSize{"internalQueryMaxWriteToCurOpMemoryUsageBytes", 0};
 
     auto opCtx = makeOperationContext();
     auto expCtx = ExpressionContextBuilder{}
@@ -577,8 +570,6 @@ TEST_F(ExpressionContextTest, ExpressionFallbackTrackerRebuiltWhenOperationConte
     unittest::ServerParameterGuard exprCap{"internalQueryMaxSingleExpressionMemoryUsageBytes", 4};
     unittest::ServerParameterGuard perQueryLimit{"internalQueryMaxMemoryUsageBytesPerOperation",
                                                  10 * 1024 * 1024};
-    // Disable chunking so the increment below propagates to the operation tracker immediately.
-    unittest::ServerParameterGuard chunkSize{"internalQueryMaxWriteToCurOpMemoryUsageBytes", 0};
 
     auto opCtx = makeOperationContext();
     auto expCtx = ExpressionContextBuilder{}

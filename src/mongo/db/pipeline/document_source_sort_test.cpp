@@ -339,14 +339,14 @@ public:
             }
             ASSERT_GT(_sortStage->getMemoryTracker_forTest().peakTrackedMemoryBytes(), 0);
 
-            // To avoid perf regressions, sort chunks its writes to CurOp. CurOp's reported value <=
-            // actual usage < reported value + chunksize.
+            // To avoid perf regressions, sort rate-limits its writes to CurOp to chunk-boundary
+            // crossings, but reports the exact in-use total at each crossing. Between crossings
+            // CurOp holds a recent exact sample, so it stays within the same chunk as the actual
+            // usage.
             int64_t curopUsage = curop->getInUseTrackedMemoryBytes();
-            ASSERT_EQ(curopUsage % chunkSize, 0);
-            ASSERT_LTE(curopUsage, actualUsage);
-            ASSERT_LT(actualUsage, curopUsage + chunkSize)
-                << "Actual usage (" << actualUsage << ") should be < reported (" << curopUsage
-                << ") + chunk size (" << chunkSize << ")";
+            ASSERT_EQ(curopUsage / chunkSize, actualUsage / chunkSize)
+                << "CurOp usage (" << curopUsage << ") and actual usage (" << actualUsage
+                << ") should be in the same chunk (size " << chunkSize << ")";
         }
         assertEOF();
 

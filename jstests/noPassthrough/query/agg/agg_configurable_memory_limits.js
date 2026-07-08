@@ -197,7 +197,6 @@ assert.commandWorked(bulk.execute());
         return;
     }
     const knob = "internalQueryMaxMemoryUsageBytesPerOperation";
-    const chunkSizeKnob = "internalQueryMaxWriteToCurOpMemoryUsageBytes";
 
     const pipeline = [
         {$limit: 1},
@@ -218,8 +217,6 @@ assert.commandWorked(bulk.execute());
 
     // Lower the operation-wide limit so the $concatArrays result exceeds it.
     const originalVal = setParam(knob, 1024);
-    // TODO SERVER-129201: Remove this explicit knob set.
-    const chunkOriginalVal = setParam(chunkSizeKnob, 256);
 
     const err = assert.throwsWithCode(
         () => coll.aggregate(pipeline).toArray(),
@@ -232,7 +229,6 @@ assert.commandWorked(bulk.execute());
     );
 
     setParam(knob, originalVal);
-    setParam(chunkSizeKnob, chunkOriginalVal);
 })();
 
 (function testSetUnionExpressionMemoryLimit() {
@@ -249,7 +245,6 @@ assert.commandWorked(bulk.execute());
         return;
     }
     const knob = "internalQueryMaxMemoryUsageBytesPerOperation";
-    const chunkSizeKnob = "internalQueryMaxWriteToCurOpMemoryUsageBytes";
 
     const pipeline = [
         {$limit: 1},
@@ -270,8 +265,6 @@ assert.commandWorked(bulk.execute());
 
     // Lower the operation-wide limit so the $setUnion result exceeds it.
     const originalVal = setParam(knob, 1024);
-    // TODO SERVER-129201: Remove this explicit knob set.
-    const chunkOriginalVal = setParam(chunkSizeKnob, 256);
 
     const err = assert.throwsWithCode(
         () => coll.aggregate(pipeline).toArray(),
@@ -284,7 +277,6 @@ assert.commandWorked(bulk.execute());
     );
 
     setParam(knob, originalVal);
-    setParam(chunkSizeKnob, chunkOriginalVal);
 })();
 
 (function testConvertExpressionMemoryLimit() {
@@ -294,7 +286,6 @@ assert.commandWorked(bulk.execute());
     }
 
     const knob = "internalQueryMaxMemoryUsageBytesPerOperation";
-    const chunkSizeKnob = "internalQueryMaxWriteToCurOpMemoryUsageBytes";
 
     // BinData -> array has by far the largest blow-up of any $convert conversion (one array element
     // per vector entry, so the output can be many times the input size), so it is the only tracked
@@ -332,8 +323,6 @@ assert.commandWorked(bulk.execute());
     assert.doesNotThrow(() => memColl.aggregate(pipeline).toArray());
 
     const originalVal = setParam(knob, 1024);
-    // TODO SERVER-129201: Remove this explicit knob set.
-    const chunkOriginalVal = setParam(chunkSizeKnob, 256);
 
     const err = assert.throwsWithCode(
         () => memColl.aggregate(pipeline).toArray(),
@@ -346,7 +335,6 @@ assert.commandWorked(bulk.execute());
     );
 
     setParam(knob, originalVal);
-    setParam(chunkSizeKnob, chunkOriginalVal);
 })();
 
 (function testConcatExpressionMemoryLimit() {
@@ -364,7 +352,6 @@ assert.commandWorked(bulk.execute());
         return;
     }
     const knob = "internalQueryMaxMemoryUsageBytesPerOperation";
-    const chunkSizeKnob = "internalQueryMaxWriteToCurOpMemoryUsageBytes";
 
     const big = "x".repeat(2000);
     const pipeline = [{$limit: 1}, {$project: {a: {$concat: ["$y", big]}}}];
@@ -372,8 +359,6 @@ assert.commandWorked(bulk.execute());
     assert.doesNotThrow(() => coll.aggregate(pipeline).toArray());
 
     const originalVal = setParam(knob, 1024);
-    // TODO SERVER-129201: Remove this explicit knob set.
-    const chunkOriginalVal = setParam(chunkSizeKnob, 256);
 
     const err = assert.throwsWithCode(
         () => coll.aggregate(pipeline).toArray(),
@@ -386,7 +371,6 @@ assert.commandWorked(bulk.execute());
     );
 
     setParam(knob, originalVal);
-    setParam(chunkSizeKnob, chunkOriginalVal);
 })();
 
 (function testArrayExpressionMemoryLimit() {
@@ -404,7 +388,6 @@ assert.commandWorked(bulk.execute());
         return;
     }
     const knob = "internalQueryMaxMemoryUsageBytesPerOperation";
-    const chunkSizeKnob = "internalQueryMaxWriteToCurOpMemoryUsageBytes";
 
     const pipeline = [
         {$limit: 1},
@@ -422,8 +405,6 @@ assert.commandWorked(bulk.execute());
 
     // Lower the operation-wide limit so the $array result exceeds it.
     const originalVal = setParam(knob, 1024);
-    // TODO SERVER-129201: Remove this explicit knob set.
-    const chunkOriginalVal = setParam(chunkSizeKnob, 256);
 
     const err = assert.throwsWithCode(
         () => coll.aggregate(pipeline).toArray(),
@@ -436,7 +417,6 @@ assert.commandWorked(bulk.execute());
     );
 
     setParam(knob, originalVal);
-    setParam(chunkSizeKnob, chunkOriginalVal);
 })();
 
 (function testReplaceAllExpressionMemoryLimit() {
@@ -453,7 +433,6 @@ assert.commandWorked(bulk.execute());
         return;
     }
     const knob = "internalQueryMaxMemoryUsageBytesPerOperation";
-    const chunkSizeKnob = "internalQueryMaxWriteToCurOpMemoryUsageBytes";
 
     const big = "x".repeat(2000);
     const pipeline = [
@@ -464,8 +443,6 @@ assert.commandWorked(bulk.execute());
     assert.doesNotThrow(() => coll.aggregate(pipeline).toArray());
 
     const originalVal = setParam(knob, 1024);
-    // TODO SERVER-129201: Remove this explicit knob set.
-    const chunkOriginalVal = setParam(chunkSizeKnob, 256);
 
     const err = assert.throwsWithCode(
         () => coll.aggregate(pipeline).toArray(),
@@ -478,7 +455,6 @@ assert.commandWorked(bulk.execute());
     );
 
     setParam(knob, originalVal);
-    setParam(chunkSizeKnob, chunkOriginalVal);
 })();
 
 (function testZipExpressionMemoryLimit() {
@@ -493,7 +469,6 @@ assert.commandWorked(bulk.execute());
         return;
     }
     const knob = "internalQueryMaxMemoryUsageBytesPerOperation";
-    const chunkSizeKnob = "internalQueryMaxWriteToCurOpMemoryUsageBytes";
 
     const pipeline = [
         {$limit: 1},
@@ -516,8 +491,6 @@ assert.commandWorked(bulk.execute());
 
     // Lower the operation-wide limit so the $zip result exceeds it.
     const originalVal = setParam(knob, 1024);
-    // TODO SERVER-129201: Remove this explicit knob set.
-    const chunkOriginalVal = setParam(chunkSizeKnob, 256);
 
     const err = assert.throwsWithCode(
         () => coll.aggregate(pipeline).toArray(),
@@ -530,7 +503,6 @@ assert.commandWorked(bulk.execute());
     );
 
     setParam(knob, originalVal);
-    setParam(chunkSizeKnob, chunkOriginalVal);
 })();
 
 (function testObjectExpressionMemoryLimit() {
@@ -548,7 +520,6 @@ assert.commandWorked(bulk.execute());
         return;
     }
     const knob = "internalQueryMaxMemoryUsageBytesPerOperation";
-    const chunkSizeKnob = "internalQueryMaxWriteToCurOpMemoryUsageBytes";
 
     const pipeline = [
         {$limit: 1},
@@ -564,8 +535,6 @@ assert.commandWorked(bulk.execute());
 
     // Lower the operation-wide limit so the $object result exceeds it.
     const originalVal = setParam(knob, 1024);
-    // TODO SERVER-129201: Remove this explicit knob set.
-    const chunkOriginalVal = setParam(chunkSizeKnob, 256);
 
     const err = assert.throwsWithCode(
         () => coll.aggregate(pipeline).toArray(),
@@ -578,7 +547,6 @@ assert.commandWorked(bulk.execute());
     );
 
     setParam(knob, originalVal);
-    setParam(chunkSizeKnob, chunkOriginalVal);
 })();
 
 MongoRunner.stopMongod(conn);

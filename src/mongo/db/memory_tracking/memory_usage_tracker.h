@@ -109,6 +109,15 @@ protected:
     void setWriteToCurOp(std::function<void(int64_t, int64_t)> writeToCurOp);
 
 private:
+    /**
+     * Accumulates 'diff' into this tracker and propagates the exact diff up the base chain.
+     * 'report' indicates whether the originating add() should be reported to CurOp; it is
+     * overridden by any tracker in the chain that has chunking enabled, based on whether a chunk
+     * boundary was crossed. The root tracker performs the actual CurOp write (reporting the exact
+     * in-use total) when 'report' is true.
+     */
+    void addInternal(int64_t diff, bool report);
+
     SimpleMemoryUsageTracker* _base = nullptr;
 
     // Maximum memory consumption thus far observed for this function.

@@ -89,6 +89,10 @@ ReshardingDonorOplogPipeline::ScopedPipeline ReshardingDonorOplogPipeline::initW
                 _execPipeline);
         _execPipeline->reattachToOperationContext(opCtx);
         _pipeline->reattachToOperationContext(opCtx);
+        if (_memoryUsageTracker) {
+            OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx,
+                                                                std::move(_memoryUsageTracker));
+        }
     } else {
         auto pipeline =
             _makePipeline(opCtx, _mongoProcessInterfaceFactory->create(opCtx), resumeToken);
@@ -104,8 +108,10 @@ ReshardingDonorOplogPipeline::ScopedPipeline ReshardingDonorOplogPipeline::initW
 void ReshardingDonorOplogPipeline::_detachFromOperationContext() {
     invariant(_execPipeline);
     invariant(_pipeline);
+    auto* opCtx = _pipeline->getContext()->getOperationContext();
     _execPipeline->detachFromOperationContext();
     _pipeline->detachFromOperationContext();
+    _memoryUsageTracker = OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx);
 }
 
 std::unique_ptr<Pipeline> ReshardingDonorOplogPipeline::_makePipeline(
@@ -174,6 +180,10 @@ std::vector<repl::OplogEntry> ReshardingDonorOplogPipeline::_getNextBatch(size_t
 void ReshardingDonorOplogPipeline::dispose(OperationContext* opCtx) {
     if (_pipeline) {
         _execPipeline->reattachToOperationContext(opCtx);
+        if (_memoryUsageTracker) {
+            OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx,
+                                                                std::move(_memoryUsageTracker));
+        }
         _execPipeline->dispose();
         _pipeline.reset();
         _execPipeline.reset();

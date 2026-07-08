@@ -161,4 +161,8 @@ void OperationMemoryUsageTracker::moveToOpCtxIfAvailable(
     _getFromOpCtx(opCtx) = std::move(tracker);
 }
 
+bool OperationMemoryUsageTracker::hasTrackerOnOpCtx(OperationContext* opCtx) {
+    return _getFromOpCtx(opCtx) != nullptr;
+}
+
 }  // namespace mongo
