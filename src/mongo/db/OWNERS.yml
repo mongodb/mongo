@@ -363,7 +363,9 @@ filters:
       - 10gen/server-workload-resilience
   - "feature_flag.*":
     approvers:
-      - 10gen/server-programmability
+      - 10gen/server-catalog-and-routing
+      - 10gen/query-execution
   - "feature_flag_test.idl.tpl":
     approvers:
-      - 10gen/server-programmability
+      - 10gen/server-catalog-and-routing
+      - 10gen/query-execution

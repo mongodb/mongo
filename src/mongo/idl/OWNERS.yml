@@ -3,6 +3,10 @@ filters:
   - "*":
     approvers:
       - 10gen/server-programmability
+  - "feature_flag_test.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+      - 10gen/query-execution
   - "ifr_sender_version*":
     approvers:
       - 10gen/query-execution
