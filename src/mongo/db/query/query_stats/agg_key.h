@@ -102,19 +102,6 @@ public:
         return _components;
     }
 
-    // The default implementation of hashing for smart pointers is not a good one for our purposes.
-    // Here we overload them to actually take the hash of the object, rather than hashing the
-    // pointer itself.
-    template <typename H>
-    friend H AbslHashValue(H h, const std::unique_ptr<const AggKey>& key) {
-        return H::combine(std::move(h), *key);
-    }
-    template <typename H>
-    friend H AbslHashValue(H h, const std::shared_ptr<const AggKey>& key) {
-        return H::combine(std::move(h), *key);
-    }
-
-
 protected:
     void appendCommandSpecificComponents(BSONObjBuilder& bob,
                                          const query_shape::SerializationOptions& opts) const final;

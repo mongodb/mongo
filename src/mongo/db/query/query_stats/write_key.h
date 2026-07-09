@@ -87,18 +87,6 @@ public:
              std::unique_ptr<query_shape::Shape> shape,
              query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown);
 
-    // The default implementation of hashing for smart pointers is not a good one for our purposes.
-    // Here we overload them to actually take the hash of the object, rather than hashing the
-    // pointer itself.
-    template <typename H>
-    friend H AbslHashValue(H h, const std::unique_ptr<const WriteKey<Request>>& key) {
-        return H::combine(std::move(h), *key);
-    }
-    template <typename H>
-    friend H AbslHashValue(H h, const std::shared_ptr<const WriteKey<Request>>& key) {
-        return H::combine(std::move(h), *key);
-    }
-
     const SpecificKeyComponents& specificComponents() const final {
         return _components;
     }

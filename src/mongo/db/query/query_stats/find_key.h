@@ -115,18 +115,6 @@ public:
               request.getOriginalQueryShapeHash()),
           _components(request) {}
 
-    // The default implementation of hashing for smart pointers is not a good one for our purposes.
-    // Here we overload them to actually take the hash of the object, rather than hashing the
-    // pointer itself.
-    template <typename H>
-    friend H AbslHashValue(H h, const std::unique_ptr<const FindKey>& key) {
-        return H::combine(std::move(h), *key);
-    }
-    template <typename H>
-    friend H AbslHashValue(H h, const std::shared_ptr<const FindKey>& key) {
-        return H::combine(std::move(h), *key);
-    }
-
     const SpecificKeyComponents& specificComponents() const override {
         return _components;
     }

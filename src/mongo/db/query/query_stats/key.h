@@ -301,18 +301,6 @@ public:
         return H::combine(std::move(h), key._universalComponents, key.specificComponents());
     }
 
-    // The default implementation of hashing for smart pointers is not a good one for our purposes.
-    // Here we overload them to actually take the hash of the object, rather than hashing the
-    // pointer itself.
-    template <typename H>
-    friend H AbslHashValue(H h, const std::unique_ptr<const Key>& key) {
-        return H::combine(std::move(h), *key);
-    }
-    template <typename H>
-    friend H AbslHashValue(H h, const std::shared_ptr<const Key>& key) {
-        return H::combine(std::move(h), *key);
-    }
-
 protected:
     /**
      * Sub-classes can use this to instantiate a 'real' Key. 'queryShape' must not be null,
@@ -344,4 +332,25 @@ private:
 static_assert(
     sizeof(Key) == sizeof(void*) /*vtable ptr*/ + sizeof(UniversalKeyComponents),
     "If the class' members have changed, this assert may need to be updated with a new value.");
+
+/**
+ * The default implementation of hashing for smart pointers is not a good one for our purposes. Here
+ * we overload them to actually take the hash of the object, rather than hashing the pointer itself.
+ *
+ * These overloads are found via ADL for all Key subclasses in namespace mongo::query_stats. A
+ * subclass in a different namespace would not pick these up and would silently fall back to hashing
+ * the pointer.
+ */
+template <typename H, typename K>
+requires std::derived_from<K, Key>
+H AbslHashValue(H h, const std::unique_ptr<const K>& key) {
+    return H::combine(std::move(h), *key);
+}
+
+template <typename H, typename K>
+requires std::derived_from<K, Key>
+H AbslHashValue(H h, const std::shared_ptr<const K>& key) {
+    return H::combine(std::move(h), *key);
+}
+
 }  // namespace mongo::query_stats
