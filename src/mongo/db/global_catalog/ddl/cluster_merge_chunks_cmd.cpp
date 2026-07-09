@@ -39,6 +39,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
+#include "mongo/db/router_role/router_role.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/util/assert_util.h"
@@ -85,44 +86,51 @@ public:
             BSONObj minKey = bounds[0];
             BSONObj maxKey = bounds[1];
 
-            const auto cri = getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(opCtx, ns());
+            sharding::router::CollectionRouter router(opCtx, ns());
+            router.route(
+                definition()->getName(),
+                [&](OperationContext* opCtx, const CollectionRoutingInfo& _) {
+                    const auto cri =
+                        getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(opCtx, ns());
 
-            const auto& cm = cri.getChunkManager();
+                    const auto& cm = cri.getChunkManager();
 
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "shard key bounds "
-                                  << "[" << minKey << "," << maxKey << ")"
-                                  << " are not valid for shard key pattern "
-                                  << cm.getShardKeyPattern().toBSON(),
-                    (cm.getShardKeyPattern().isShardKey(minKey) &&
-                     cm.getShardKeyPattern().isShardKey(maxKey)));
+                    uassert(ErrorCodes::InvalidOptions,
+                            str::stream() << "shard key bounds "
+                                          << "[" << minKey << "," << maxKey << ")"
+                                          << " are not valid for shard key pattern "
+                                          << cm.getShardKeyPattern().toBSON(),
+                            (cm.getShardKeyPattern().isShardKey(minKey) &&
+                             cm.getShardKeyPattern().isShardKey(maxKey)));
 
-            minKey = cm.getShardKeyPattern().normalizeShardKey(minKey);
-            maxKey = cm.getShardKeyPattern().normalizeShardKey(maxKey);
+                    BSONObj normalizedMinKey = cm.getShardKeyPattern().normalizeShardKey(minKey);
+                    BSONObj normalizedMaxKey = cm.getShardKeyPattern().normalizeShardKey(maxKey);
 
-            const auto firstChunk = cm.findIntersectingChunkWithSimpleCollation(minKey);
-            ChunkVersion placementVersion = cm.getVersion(firstChunk.getShardId());
+                    const auto firstChunk =
+                        cm.findIntersectingChunkWithSimpleCollation(normalizedMinKey);
+                    ChunkVersion placementVersion = cm.getVersion(firstChunk.getShardId());
 
-            ShardsvrMergeChunks req(ns());
-            req.setDbName(DatabaseName::kAdmin);
-            req.setBounds(bounds);
-            req.setEpoch(placementVersion.epoch());
-            req.setTimestamp(placementVersion.getTimestamp());
+                    ShardsvrMergeChunks req(ns());
+                    req.setDbName(DatabaseName::kAdmin);
+                    req.setBounds(bounds);
+                    req.setEpoch(placementVersion.epoch());
+                    req.setTimestamp(placementVersion.getTimestamp());
 
-            // Throws, but handled at level above.  Don't want to rewrap to preserve exception
-            // formatting.
-            auto shard = uassertStatusOK(
-                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, firstChunk.getShardId()));
+                    // Throws, but handled at level above.  Don't want to rewrap to preserve
+                    // exception formatting.
+                    auto shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(
+                        opCtx, firstChunk.getShardId()));
 
-            auto response = uassertStatusOK(
-                shard->runCommand(opCtx,
-                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                  DatabaseName::kAdmin,
-                                  req.toBSON(),
-                                  Shard::RetryPolicy::kNotIdempotent));
-            uassertStatusOK(response.commandStatus);
+                    auto response = uassertStatusOK(
+                        shard->runCommand(opCtx,
+                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                          DatabaseName::kAdmin,
+                                          req.toBSON(),
+                                          Shard::RetryPolicy::kNotIdempotent));
+                    uassertStatusOK(response.commandStatus);
 
-            Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(ns(), boost::none);
+                    Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(ns(), boost::none);
+                });
         }
 
     private:
