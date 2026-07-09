@@ -108,12 +108,13 @@ public:
         UUID uuid = colls.getMainCollection()->uuid();
         DatabaseName dbName = dummyTest._nss.dbName();
         auto [inputTag, inputVal] = stage_builder::makeValue(BSONArray());
-        value::ValueGuard inputGuard{inputTag, inputVal};
+        value::TagValueOwned inputOwned = value::TagValueOwned::fromRaw(inputTag, inputVal);
         BSONArrayBuilder outputBab;
         outputBab << 10 << 20;
         auto [expectedTag, expectedVal] = stage_builder::makeValue(outputBab.arr());
 
-        value::ValueGuard expectedGuard{expectedTag, expectedVal};
+        value::TagValueOwned expectedOwned =
+            value::TagValueOwned::fromRaw(expectedTag, expectedVal);
         auto makeStageFn = [uuid, dbName](value::SlotId scanSlot,
                                           std::unique_ptr<PlanStage> stage) {
             // Create a slot for the index key and record ID

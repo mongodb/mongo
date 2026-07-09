@@ -55,18 +55,15 @@ protected:
     std::pair<std::unique_ptr<PlanStage>, value::SlotId> buildLimitSkipTree(
         std::unique_ptr<EExpression> limitExpr, std::unique_ptr<EExpression> skipExpr) {
         // Make an input array containing 64-integers 0 thru 999, inclusive.
-        auto [inputTag, inputVal] = value::makeNewArray();
-        value::ValueGuard inputGuard{inputTag, inputVal};
-        auto inputView = value::getArrayView(inputVal);
+        value::TagValueOwned inputArray = value::TagValueOwned::fromRaw(value::makeNewArray());
+        auto inputView = value::getArrayView(inputArray.value());
         for (long long i = 0; i < kValueCount; ++i) {
             inputView->push_back_raw(value::TypeTags::NumberInt64,
                                      value::bitcastFrom<long long>(i));
         }
 
         // Make a "limit <limitValue> skip <skipValue>" stage.
-        inputGuard.reset();
-        auto [scanSlot, scanStage] =
-            generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
+        auto [scanSlot, scanStage] = generateVirtualScan(std::move(inputArray));
         auto limit = makeS<LimitSkipStage>(
             std::move(scanStage), std::move(limitExpr), std::move(skipExpr), kEmptyPlanNodeId);
         return {std::move(limit), scanSlot};

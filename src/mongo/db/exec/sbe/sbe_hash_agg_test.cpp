@@ -133,10 +133,10 @@ void HashAggStageTest::performHashAggWithSpillChecking(
     using namespace std::literals;
 
     auto [inputTag, inputVal] = stage_builder::makeValue(inputArr);
-    value::ValueGuard inputGuard{inputTag, inputVal};
+    value::TagValueOwned inputOwned = value::TagValueOwned::fromRaw(inputTag, inputVal);
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(expectedOutputArray);
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expectedOwned =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(expectedOutputArray));
 
     auto collatorSlot = generateSlotId();
     auto shouldUseCollator = optionalCollator != nullptr;
@@ -175,20 +175,18 @@ void HashAggStageTest::performHashAggWithSpillChecking(
     }
 
     // Generate a mock scan from 'input' with a single output slot.
-    inputGuard.reset();
-    auto [scanSlot, scanStage] =
-        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
+    auto [scanSlot, scanStage] = generateVirtualScan(std::move(inputOwned));
 
     auto [outputSlot, stage] = makeStageFn(scanSlot, std::move(scanStage));
     auto resultAccessor = prepareTree(ctx.get(), stage.get(), outputSlot);
 
     // Get all the results produced.
-    auto [resultsTag, resultsVal] = getAllResults(stage.get(), resultAccessor);
-    value::ValueGuard resultsGuard{resultsTag, resultsVal};
+    value::TagValueOwned resultsOwned =
+        value::TagValueOwned::fromRaw(getAllResults(stage.get(), resultAccessor));
 
     // Sort results for stable compare, since the counts could come out in any order.
     std::vector<value::TagValueView> resultsContents;
-    auto resultsView = value::getArrayView(resultsVal);
+    auto resultsView = value::getArrayView(resultsOwned.value());
     for (size_t i = 0; i < resultsView->size(); i++) {
         resultsContents.push_back(resultsView->getAt(i));
     }
@@ -205,15 +203,17 @@ void HashAggStageTest::performHashAggWithSpillChecking(
                   return value::bitcastTo<int32_t>(compareVal) > 0;
               });
 
-    auto [sortedResultsTag, sortedResultsVal] = value::makeNewArray();
-    value::ValueGuard sortedResultsGuard{sortedResultsTag, sortedResultsVal};
-    auto sortedResultsView = value::getArrayView(sortedResultsVal);
+    value::TagValueOwned sortedResultsOwned = value::TagValueOwned::fromRaw(value::makeNewArray());
+    auto sortedResultsView = value::getArrayView(sortedResultsOwned.value());
     for (auto [tag, val] : resultsContents) {
         auto [tagCopy, valCopy] = copyValue(tag, val);
         sortedResultsView->push_back_raw(tagCopy, valCopy);
     }
 
-    ASSERT_SBE_VALUE_EQ(sortedResultsTag, sortedResultsVal, expectedTag, expectedVal);
+    ASSERT_SBE_VALUE_EQ(sortedResultsOwned.tag(),
+                        sortedResultsOwned.value(),
+                        expectedOwned.tag(),
+                        expectedOwned.value());
     ASSERT_GT(stage->getMemoryTracker()->peakTrackedMemoryBytes(), 0);
     if (shouldSpill) {
         ASSERT_EQ(stage->getMemoryTracker()->inUseTrackedMemoryBytes(), 0);
@@ -228,12 +228,12 @@ TEST_F(HashAggStageTest, HashAggMinMaxTest) {
     BSONArrayBuilder bab1;
     bab1.append("D").append("a").append("F").append("e").append("B").append("c");
     auto [inputTag, inputVal] = stage_builder::makeValue(bab1.arr());
-    value::ValueGuard inputGuard{inputTag, inputVal};
+    value::TagValueOwned inputOwned = value::TagValueOwned::fromRaw(inputTag, inputVal);
 
     BSONArrayBuilder bab2;
     bab2.append("B").append("e").append("a").append("F");
     auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY(bab2.arr()));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expectedOwned = value::TagValueOwned::fromRaw(expectedTag, expectedVal);
 
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString);
@@ -299,8 +299,8 @@ TEST_F(HashAggStageTest, HashAggMinMaxTest) {
         return std::make_pair(outSlot, std::move(projectStage));
     };
 
-    inputGuard.reset();
-    expectedGuard.reset();
+    inputOwned.reset();
+    expectedOwned.reset();
     runTest(inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
 }
 
@@ -311,13 +311,12 @@ TEST_F(HashAggStageTest, HashAggAddToSetTest) {
     bab.append("cc").append("BB").append("Aa").append("Bb").append("dD").append("aA");
     bab.append("CC").append("AA").append("Dd").append("cC").append("bb").append("DD");
     auto [inputTag, inputVal] = stage_builder::makeValue(bab.arr());
-    value::ValueGuard inputGuard{inputTag, inputVal};
+    value::TagValueOwned inputOwned = value::TagValueOwned::fromRaw(inputTag, inputVal);
 
-    auto [expectedTag, expectedVal] = value::makeNewArray();
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expectedOwned = value::TagValueOwned::fromRaw(value::makeNewArray());
     for (auto&& sv : std::array<std::string_view, 4>{"Aa", "BB", "cc", "dD"}) {
         auto [tag, val] = value::makeNewString(sv);
-        value::getArrayView(expectedVal)->push_back_raw(tag, val);
+        value::getArrayView(expectedOwned.value())->push_back_raw(tag, val);
     }
 
     auto collator =
@@ -350,9 +349,7 @@ TEST_F(HashAggStageTest, HashAggAddToSetTest) {
     };
 
     // Generate a mock scan from 'input' with a single output slot.
-    inputGuard.reset();
-    auto [scanSlot, scanStage] =
-        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
+    auto [scanSlot, scanStage] = generateVirtualScan(std::move(inputOwned));
 
     // Call the 'makeStage' callback to create the PlanStage that we want to test, passing in
     // the mock scan subtree and its output slot.
@@ -363,23 +360,23 @@ TEST_F(HashAggStageTest, HashAggAddToSetTest) {
     auto resultAccessor = prepareTree(ctx.get(), stage.get(), outputSlot);
 
     // Get all the results produced by the PlanStage we want to test.
-    auto [resultsTag, resultsVal] = getAllResults(stage.get(), resultAccessor);
-    value::ValueGuard resultGuard{resultsTag, resultsVal};
+    value::TagValueOwned resultsOwned =
+        value::TagValueOwned::fromRaw(getAllResults(stage.get(), resultAccessor));
 
     // Retrieve the first element from the results array.
-    value::ArrayEnumerator resultsEnumerator{resultsTag, resultsVal};
+    value::ArrayEnumerator resultsEnumerator{resultsOwned.tag(), resultsOwned.value()};
     ASSERT_TRUE(!resultsEnumerator.atEnd());
     auto [elemTag, elemVal] = resultsEnumerator.getViewOfValue();
 
     // Convert the element into an ArraySet 'as' (with no collation).
-    auto [asTag, asVal] = value::arrayToSet(elemTag, elemVal);
-    value::ValueGuard asGuard{asTag, asVal};
-    ASSERT_TRUE(asTag == value::TypeTags::ArraySet);
+    value::TagValueOwned asOwned =
+        value::TagValueOwned::fromRaw(value::arrayToSet(elemTag, elemVal));
+    ASSERT_TRUE(asOwned.tag() == value::TypeTags::ArraySet);
 
     // Assert that 'as' and 'expected' are the same size and contain the same values.
-    auto as = value::getArraySetView(asVal);
+    auto as = value::getArraySetView(asOwned.value());
     size_t expectedSize = 0;
-    value::ArrayEnumerator expectedEnumerator{expectedTag, expectedVal};
+    value::ArrayEnumerator expectedEnumerator{expectedOwned.tag(), expectedOwned.value()};
 
     for (; !expectedEnumerator.atEnd(); expectedEnumerator.advance()) {
         ASSERT_TRUE(as->values().count(expectedEnumerator.getViewOfValue()));
