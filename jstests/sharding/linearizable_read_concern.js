@@ -24,20 +24,24 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {shardCollectionWithChunks} from "jstests/libs/write_concern_util.js";
 import {reconfig} from "jstests/replsets/rslib.js";
-import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 let testName = "linearizable_read_concern";
 
 let st = new ShardingTest({
     name: testName,
-    other: {rs0: {nodes: 3}, rs1: {nodes: 3}, useBridge: true},
+    // Enabling periodic write noops to resolve the infinite hang which may occur, when
+    // shard is trying to establish majority on read for disk recovering collection
+    // metadata and can't proceed with it unless the snapshot time advances, due to
+    // it being reset to null by reconfig with force option enabled.
+    other: {
+        rs0: {nodes: 3, setParameter: {writePeriodicNoops: true}},
+        rs1: {nodes: 3, setParameter: {writePeriodicNoops: true}},
+        useBridge: true,
+    },
     mongos: 1,
     config: TestData.configShard ? undefined : 1,
     enableBalancer: false,
 });
-
-// TODO SERVER-130072: re-enable this test.
-skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
 
 jsTestLog("Setting up sharded cluster.");
 
