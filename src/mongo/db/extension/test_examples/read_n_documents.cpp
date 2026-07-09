@@ -309,7 +309,14 @@ public:
         properties.setPosition(extension::MongoExtensionPositionRequirementEnum::kFirst);
         properties.setRequiresInputDocSource(false);
         properties.setAllowedInFacet(false);
-        properties.setProvidedMetadataFields(std::vector<std::string>{"score"});
+
+        // When sorting by _id, this stage produces a merge sort pattern in its distributed plan
+        // logic and attaches $sortKey metadata to every document.
+        std::vector<std::string> providedMetadataFields{"score"};
+        if (_arguments["sortById"].booleanSafe()) {
+            providedMetadataFields.push_back("sortKey");
+        }
+        properties.setProvidedMetadataFields(std::move(providedMetadataFields));
 
         BSONObjBuilder builder;
         properties.serialize(&builder);

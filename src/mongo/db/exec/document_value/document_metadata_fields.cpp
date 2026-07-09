@@ -155,6 +155,10 @@ MetaType DocumentMetadataFields::parseMetaType(std::string_view name) {
     return iter->second;
 }
 
+bool DocumentMetadataFields::isValidMetaType(std::string_view name) {
+    return kMetaNameToMetaType.find(name) != kMetaNameToMetaType.end();
+}
+
 std::string_view DocumentMetadataFields::serializeMetaType(MetaType type) {
     const auto nameIter = kMetaTypeToMetaName.find(type);
     tassert(9733900,

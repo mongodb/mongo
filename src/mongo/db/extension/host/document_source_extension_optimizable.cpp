@@ -382,17 +382,22 @@ DocumentSource::Id DocumentSourceExtensionOptimizable::getId() const {
 }
 
 DepsTracker::State DocumentSourceExtensionOptimizable::getDependencies(DepsTracker* deps) const {
-    auto processFields = [](const auto& fields, auto&& apply) {
+    auto processFields = [&](const auto& fields, auto propertyName, auto&& apply) {
         if (fields.has_value()) {
             for (const auto& fieldName : *fields) {
-                auto metaType = DocumentMetadataFields::parseMetaType(fieldName);
-                apply(metaType);
+                uassert(12489100,
+                        str::stream() << "Extension stage '" << getSourceName() << "' declared '"
+                                      << fieldName << "' in " << propertyName
+                                      << ", which is not a recognized metadata field",
+                        DocumentMetadataFields::isValidMetaType(fieldName));
+                apply(DocumentMetadataFields::parseMetaType(fieldName));
             }
         }
     };
 
     // Report required metadata fields for this stage.
     processFields(_properties.getRequiredMetadataFields(),
+                  "requiredMetadataFields",
                   [&](auto metaType) { deps->setNeedsMetadata(metaType); });
 
     // Drop upstream metadata fields if this stage does not preserve them.
@@ -403,6 +408,7 @@ DepsTracker::State DocumentSourceExtensionOptimizable::getDependencies(DepsTrack
 
     // Report provided metadata fields for this stage.
     processFields(_properties.getProvidedMetadataFields(),
+                  "providedMetadataFields",
                   [&](auto metaType) { deps->setMetadataAvailable(metaType); });
 
     // Return SEE_NEXT to ensure metadata dependencies are propagated to the pipeline.
@@ -489,6 +495,13 @@ DocumentSourceExtensionOptimizable::distributedPlanLogic(const DistributedPlanCo
     const auto sortPattern = dplHandle->getSortPattern();
     if (!sortPattern.isEmpty()) {
         logic.mergeSortPattern = sortPattern.getOwned();
+        uassert(12489101,
+                str::stream() << "Extension stage '" << getSourceName()
+                              << "' returned a distributedPlanLogic with a merge sort pattern but "
+                                 "does not declare sortKey in its providedMetadataFields; a stage "
+                                 "that produces a merge sort pattern must also provide sortKey "
+                                 "metadata on every document",
+                providesSortKeyMetadata());
     }
 
     // For source stages (no input required), the DPL sort pattern is the only sort order the

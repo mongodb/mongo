@@ -2317,7 +2317,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
     DepsTracker deps(QueryMetadataBitSet{});
     deps.setMetadataAvailable(DocumentMetadataFields::kSearchScore);
 
-    ASSERT_THROWS_CODE(optimizable->getDependencies(&deps), AssertionException, 17308);
+    ASSERT_THROWS_CODE(optimizable->getDependencies(&deps), AssertionException, 12489100);
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest,
@@ -2332,7 +2332,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
     DepsTracker deps(QueryMetadataBitSet{});
     deps.setMetadataAvailable(DocumentMetadataFields::kSearchScore);
 
-    ASSERT_THROWS_CODE(optimizable->getDependencies(&deps), AssertionException, 17308);
+    ASSERT_THROWS_CODE(optimizable->getDependencies(&deps), AssertionException, 12489100);
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest, StageWithNonDefaultSubPipelineStaticProperties) {
@@ -3423,6 +3423,20 @@ public:
     static const BSONObj kSortPattern;
 };
 const BSONObj LogicalStageWithSortPattern::kSortPattern = BSON("score" << -1);
+
+/**
+ * A transform logical stage whose distributed plan logic returns a non-empty merge sort pattern,
+ * but does not declare sortKey in providedMetadataFields.
+ */
+class LogicalStageWithMergeSortPatternDPL
+    : public sdk::shared_test_stages::TransformLogicalAggStage {
+public:
+    boost::optional<sdk::DistributedPlanLogic> getDistributedPlanLogic() const override {
+        sdk::DistributedPlanLogic dpl;
+        dpl.sortPattern = BSON("a" << 1);
+        return dpl;
+    }
+};
 }  // namespace
 
 TEST_F(DocumentSourceExtensionOptimizableTest, GetSortPattern_ExtensionSortPatternPropagated) {
@@ -3444,6 +3458,19 @@ TEST_F(DocumentSourceExtensionOptimizableTest, GetSortPattern_EmptyWhenNotOverri
         getExpCtx(), std::move(logicalStageHandle), MongoExtensionStaticProperties{});
 
     ASSERT_TRUE(optimizable->getSortPattern().empty());
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       DistributedPlanLogicWithMergeSortPatternButNoSortKeyMetadataThrows) {
+    // A stage whose DPL returns a non-empty merge sort pattern must declare that it provides
+    // sortKey metadata. This stage does not, so distributedPlanLogic() should throw.
+    auto logicalStage = new sdk::ExtensionLogicalAggStageAdapter(
+        std::make_unique<LogicalStageWithMergeSortPatternDPL>());
+    auto logicalStageHandle = LogicalAggStageHandle(logicalStage);
+    auto optimizable = host::DocumentSourceExtensionOptimizable::create(
+        getExpCtx(), std::move(logicalStageHandle), MongoExtensionStaticProperties{});
+
+    ASSERT_THROWS_CODE(optimizable->distributedPlanLogic(nullptr), AssertionException, 12489101);
 }
 
 // ============================================================================

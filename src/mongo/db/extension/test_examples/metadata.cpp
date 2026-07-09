@@ -129,7 +129,7 @@ public:
         mongo::BSONObjBuilder builder;
         // Report that this stage will provide metadata.
         std::vector<std::string> providedMetadata{
-            "textScore", "searchScore", "score", "searchScoreDetails"};
+            "textScore", "searchScore", "score", "searchScoreDetails", "sortKey"};
         properties.setProvidedMetadataFields(providedMetadata);
         properties.serialize(&builder);
         return builder.obj();

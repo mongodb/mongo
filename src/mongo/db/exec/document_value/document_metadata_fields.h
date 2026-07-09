@@ -102,6 +102,11 @@ public:
     static std::string_view serializeMetaType(DocumentMetadataFields::MetaType type);
 
     /**
+     * Returns true if 'name' is a recognized metadata name that can be parsed by parseMetaType().
+     */
+    static bool isValidMetaType(std::string_view name);
+
+    /**
      * Returns true if this metadata value produces score metadata.
      */
     static bool isScoreProducingMetaType(std::string_view name);
