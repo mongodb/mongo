@@ -32,7 +32,6 @@
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/pipeline/change_stream_invalidation_info.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -84,32 +83,6 @@ protected:
         ++enrichCalls;
         return enrichFn(std::move(event));
     }
-};
-
-// A source stage that yields a fixed sequence of data events and then throws (instead of ever
-// reaching EOF), simulating ChangeStreamCheckInvalidateStage's queue-an-event-then-throw protocol.
-class ThrowingSourceStage : public Stage {
-public:
-    ThrowingSourceStage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                        std::vector<Document> docs,
-                        std::function<void()> throwFn)
-        : Stage("$mockThrowingSource", expCtx),
-          _docs(std::move(docs)),
-          _throwFn(std::move(throwFn)) {}
-
-protected:
-    GetNextResult doGetNext() override {
-        if (_index < _docs.size()) {
-            return GetNextResult(Document(_docs[_index++]));
-        }
-        _throwFn();
-        MONGO_UNREACHABLE;
-    }
-
-private:
-    std::vector<Document> _docs;
-    size_t _index = 0;
-    std::function<void()> _throwFn;
 };
 
 class BatchedEnrichmentStageTest : public unittest::Test {
@@ -475,87 +448,6 @@ TEST_F(BatchedEnrichmentStageTest, BufferedMemoryIsTrackedAndReturnsToZeroWhenDr
     ASSERT_EQ(stage->beginCalls, 1);
     ASSERT_EQ(stage->closeCalls, 1);
     ASSERT_EQ(stage->enrichCalls, 3);
-}
-
-TEST_F(BatchedEnrichmentStageTest,
-       PendingChangeStreamInvalidatedDrainsBufferedEventsBeforeRethrow) {
-    // Mirrors ChangeStreamCheckInvalidateStage's real protocol: it returns an "invalidate" event
-    // (here, just another data event as far as this stage cares) on one call, then throws
-    // ChangeStreamInvalidated on the next. fillBatch() must not lose the two already-buffered
-    // events underneath that throw; they must still reach the caller, enriched, before the
-    // exception surfaces.
-    auto invalidateToken = BSON("_data" << "some-invalidate-token");
-    auto source = make_intrusive<ThrowingSourceStage>(
-        _expCtx, std::vector<Document>{dataEvent(1), dataEvent(2)}, [invalidateToken] {
-            uasserted(ChangeStreamInvalidationInfo(invalidateToken),
-                      "simulated change stream invalidate");
-        });
-    auto stage = make_intrusive<EnrichmentStageMock>(_expCtx, looseLimits());
-    MockStage::setSource_forTest(stage, source.get());
-
-    auto e1 = stage->getNext();
-    ASSERT_TRUE(e1.isAdvanced());
-    ASSERT_EQ(e1.getDocument()["_id"].getInt(), 1);
-    ASSERT_TRUE(e1.getDocument()["enriched"].getBool());
-
-    auto e2 = stage->getNext();
-    ASSERT_TRUE(e2.isAdvanced());
-    ASSERT_EQ(e2.getDocument()["_id"].getInt(), 2);
-    ASSERT_TRUE(e2.getDocument()["enriched"].getBool());
-
-    // Only once both buffered events have drained does the exception surface, with its extra info
-    // (the resume token getmore_cmd.cpp needs) intact.
-    try {
-        stage->getNext();
-        FAIL("expected ChangeStreamInvalidated to be thrown");
-    } catch (const ExceptionFor<ErrorCodes::ChangeStreamInvalidated>& ex) {
-        auto extraInfo = ex.extraInfo<ChangeStreamInvalidationInfo>();
-        ASSERT_TRUE(extraInfo);
-        ASSERT_BSONOBJ_EQ(extraInfo->getInvalidateResumeToken(), invalidateToken);
-    }
-
-    ASSERT_FALSE(stage->scopeOpen);
-    ASSERT_EQ(stage->beginCalls, 1);
-    ASSERT_EQ(stage->closeCalls, 1);
-    ASSERT_EQ(stage->enrichCalls, 2);
-}
-
-TEST_F(BatchedEnrichmentStageTest, PendingCloseChangeStreamDrainsBufferedEventsBeforeRethrow) {
-    // Same hazard, different code: CloseChangeStream carries no extra info, but must still let
-    // already-buffered events drain first.
-    auto source =
-        make_intrusive<ThrowingSourceStage>(_expCtx, std::vector<Document>{dataEvent(1)}, [] {
-            uasserted(ErrorCodes::CloseChangeStream, "simulated close change stream");
-        });
-    auto stage = make_intrusive<EnrichmentStageMock>(_expCtx, looseLimits());
-    MockStage::setSource_forTest(stage, source.get());
-
-    auto e1 = stage->getNext();
-    ASSERT_TRUE(e1.isAdvanced());
-    ASSERT_EQ(e1.getDocument()["_id"].getInt(), 1);
-    ASSERT_TRUE(e1.getDocument()["enriched"].getBool());
-
-    ASSERT_THROWS_CODE(stage->getNext(), DBException, ErrorCodes::CloseChangeStream);
-    ASSERT_FALSE(stage->scopeOpen);
-    ASSERT_EQ(stage->beginCalls, 1);
-    ASSERT_EQ(stage->closeCalls, 1);
-    ASSERT_EQ(stage->enrichCalls, 1);
-}
-
-TEST_F(BatchedEnrichmentStageTest, PendingExceptionWithNothingBufferedRethrowsImmediately) {
-    // Edge case: the exception fires on the very first upstream pull, with nothing buffered ahead
-    // of it. No scope should ever be opened.
-    auto source = make_intrusive<ThrowingSourceStage>(_expCtx, std::vector<Document>{}, [] {
-        uasserted(ErrorCodes::CloseChangeStream, "simulated close change stream");
-    });
-    auto stage = make_intrusive<EnrichmentStageMock>(_expCtx, looseLimits());
-    MockStage::setSource_forTest(stage, source.get());
-
-    ASSERT_THROWS_CODE(stage->getNext(), DBException, ErrorCodes::CloseChangeStream);
-    ASSERT_FALSE(stage->scopeOpen);
-    ASSERT_EQ(stage->beginCalls, 0);
-    ASSERT_EQ(stage->closeCalls, 0);
-    ASSERT_EQ(stage->enrichCalls, 0);
 }
 
 TEST_F(BatchedEnrichmentStageTest, InterruptIsCheckedAndPropagates) {

@@ -102,18 +102,6 @@
          kInternalQueryDisableSingleFieldExpressExecutorName,                             \
          internalQueryDisableSingleFieldExpressExecutor,                                  \
          getDisableSingleFieldExpressExecutor)                                            \
-    KNOB(kChangeStreamUpdateLookupMaxBatchSize,                                           \
-         kInternalChangeStreamUpdateLookupMaxBatchSizeName,                               \
-         internalChangeStreamUpdateLookupMaxBatchSize,                                    \
-         getChangeStreamUpdateLookupMaxBatchSize)                                         \
-    KNOB(kChangeStreamUpdateLookupMaxInputBytes,                                          \
-         kInternalChangeStreamUpdateLookupMaxInputBytesName,                              \
-         internalChangeStreamUpdateLookupMaxInputBytes,                                   \
-         getChangeStreamUpdateLookupMaxInputBytes)                                        \
-    KNOB(kChangeStreamUpdateLookupMaxOutputBytes,                                         \
-         kInternalChangeStreamUpdateLookupMaxOutputBytesName,                             \
-         internalChangeStreamUpdateLookupMaxOutputBytes,                                  \
-         getChangeStreamUpdateLookupMaxOutputBytes)                                       \
     /* End MONGO_EXPAND_QUERY_KNOBS_EXECUTION */
 // clang-format on
 

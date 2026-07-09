@@ -29,9 +29,8 @@
 
 #pragma once
 
-#include "mongo/db/exec/agg/batched_enrichment_stage.h"
+#include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/single_doc_lookup/scoped_batched_lookup.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
 #include "mongo/db/pipeline/change_stream.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -50,18 +49,12 @@ namespace mongo::exec::agg {
  * event's clusterTime) and attaches it as the 'fullDocument' field. Its construction is based on
  * DocumentSourceChangeStreamAddPostImage (in updateLookup mode), which handles the optimization
  * part.
- *
- * Built on BatchedEnrichmentStage: events are buffered and enriched in batches inside a single
- * resource scope, so the lookup executor never holds catalog state across upstream getNext() calls.
- * The production batch size is governed by the factory (batch-of-1 unless a caching executor makes
- * batching pay), so behaviour is byte-for-byte the per-event path; batching only changes when.
  */
-class ChangeStreamUpdateLookupStage final : public BatchedEnrichmentStage {
+class ChangeStreamUpdateLookupStage final : public Stage {
 public:
     ChangeStreamUpdateLookupStage(std::string_view stageName,
                                   const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                                  std::unique_ptr<SingleDocumentLookupExecutor> lookupExecutor,
-                                  Limits limits);
+                                  std::unique_ptr<SingleDocumentLookupExecutor> lookupExecutor);
 
     /**
      * Test-only: returns the injected SingleDocumentLookupExecutor so wiring tests can assert the
@@ -73,17 +66,9 @@ public:
 
 private:
     /**
-     * Opens / closes the per-batch resource scope over the lookup executor chain. closeBatch()
-     * releases any attached catalog state (idempotent; a no-op for Express, which caches nothing).
+     * Performs the lookup to retrieve the full document.
      */
-    void beginBatch() override;
-    void closeBatch() noexcept override;
-
-    /**
-     * Enriches one buffered event: for an update event, attaches the looked-up post-image as
-     * 'fullDocument'; any other event passes through unchanged.
-     */
-    Document enrich(Document event) override;
+    GetNextResult doGetNext() final;
 
     /**
      * Extracts the lookup parameters from the update event and invokes the injected executor.
@@ -101,10 +86,5 @@ private:
      * collection-level streams (fixed namespace, no per-event parse).
      */
     ChangeStream _changeStream;
-
-    /**
-     * The active per-batch resource scope, present only while a batch is being enriched.
-     */
-    boost::optional<ScopedBatchedLookup> _batch;
 };
 }  // namespace mongo::exec::agg

@@ -68,7 +68,6 @@
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/optime.h"
@@ -142,7 +141,7 @@ static const ReadConcernSupportResult kSupportsReadConcernResult{
  */
 void ensureChangeStreamReadPreferenceCanBeSatisfied(OperationContext* opCtx,
                                                     ClientCursorPin& cursorPin) {
-    if (QueryKnobConfiguration::get(opCtx).getChangeStreamRespectsReadPreference()) {
+    if (!internalChangeStreamRespectsReadPreference.loadRelaxed()) {
         return;
     }
 

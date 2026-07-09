@@ -1165,67 +1165,6 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: changeStreamRespectsReadPreference
-                pqs_settable: true
-                fcv:
-                    min: "9.0"
-
-    internalChangeStreamUpdateLookupMaxBatchSize:
-        description: >-
-            Maximum number of change events the updateLookup stage buffers before enriching them as
-            one batch. Effective only when featureFlagChangeStreamOptimizedUpdateLookup is enabled;
-            with the flag off the stage always runs batch-of-one (master-equivalent). Batching only
-            amortizes cost behind a caching executor, so production keeps this at 100.
-        set_at: [startup, runtime]
-        cpp_varname: "internalChangeStreamUpdateLookupMaxBatchSize"
-        cpp_vartype: AtomicWord<int>
-        default: 100
-        validator:
-            gte: 1
-        redact: false
-        annotations:
-            query_knob:
-                wire_name: changeStreamUpdateLookupMaxBatchSize
-                pqs_settable: true
-                fcv:
-                    min: "9.0"
-
-    internalChangeStreamUpdateLookupMaxInputBytes:
-        description: >-
-            Byte budget for buffered (pre-enrichment) change events in the updateLookup batch stage.
-            Fill stops once buffered input crosses this bound, so a few large events cannot grow the
-            buffer without limit; at least one event is always admitted.
-        set_at: [startup, runtime]
-        cpp_varname: "internalChangeStreamUpdateLookupMaxInputBytes"
-        cpp_vartype: AtomicWord<long long>
-        default: 16777216
-        validator:
-            gte: 1
-        redact: false
-        annotations:
-            query_knob:
-                wire_name: changeStreamUpdateLookupMaxInputBytes
-                pqs_settable: true
-                fcv:
-                    min: "9.0"
-
-    internalChangeStreamUpdateLookupMaxOutputBytes:
-        description: >-
-            Byte budget for enriched (post-image) change events in the updateLookup batch stage. The
-            enrich scope suspends after the event that crosses this bound; a single oversized
-            post-image is enriched as a batch-of-one and never split.
-        set_at: [startup, runtime]
-        cpp_varname: "internalChangeStreamUpdateLookupMaxOutputBytes"
-        cpp_vartype: AtomicWord<long long>
-        default: 16777216
-        validator:
-            gte: 1
-        redact: false
-        annotations:
-            query_knob:
-                wire_name: changeStreamUpdateLookupMaxOutputBytes
-                pqs_settable: true
-                fcv:
-                    min: "9.0"
 
     internalOperationResponseMaxMS:
         description: >-
