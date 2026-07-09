@@ -1143,6 +1143,7 @@ mongo_cc_unit_test(
     deps = [
         ":db_s_shard_server_test_deps",
         ":sharding_test_helpers",
+        "//src/mongo/db/op_observer:replica_set_write_block_op_observer",
     ],
 )
 

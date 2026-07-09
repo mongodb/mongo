@@ -92,6 +92,10 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
             this.shard0PrimaryAdminDB,
             "InsufficientDiskSpace" /* reason */,
         );
+        disableReplicaSetWriteBlock(
+            this.st.rs1.getPrimary().getDB("admin"),
+            "InsufficientDiskSpace" /* reason */,
+        );
         assert.commandWorked(
             this.st.s.adminCommand({
                 setUserWriteBlockMode: 1,
@@ -1525,6 +1529,587 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
                 [this.shardedCollName].find({x: {$gte: 0}})
                 .itcount(),
             "Both migrated documents should be on shard0 after the migration completes under the block",
+        );
+    });
+
+    it("Test that in-progress resharding is held (coordinator and recipient remain non-terminal and the on-hold warning is logged) and resumes when blockReplicaSetWrites is enabled then disabled on a recipient shard", function () {
+        // Shard the collection on {x: 1}. All data initially lives on shard0 (primary shard).
+        assert.commandWorked(this.testDB.createCollection(this.shardedCollName));
+        assert.commandWorked(this.st.s.adminCommand({shardCollection: this.nns, key: {x: 1}}));
+        assert.commandWorked(this.testShardedColl.insert({x: 1, y: 1}));
+        assert.commandWorked(this.testShardedColl.insert({x: 2, y: 2}));
+
+        // Pause the resharding recipient on shard0 before cloning begins, so we can enable the
+        // per-shard write block while a resharding operation is in progress.
+        const hangFp = configureFailPoint(
+            this.shard0Primary,
+            "reshardingPauseRecipientBeforeCloning",
+        );
+
+        // Start a resharding in a parallel shell. ReplicaSetWritesBlocked is now a retryable error,
+        // so the recipient pauses on its blocked clone writes: the operation is
+        // held and is expected to eventually succeed once the block is lifted.
+        const awaitResharding = startParallelShell(
+            funWithArgs((ns) => {
+                assert.commandWorked(
+                    db.adminCommand({reshardCollection: ns, key: {y: 1}, numInitialChunks: 2}),
+                );
+            }, this.nns),
+            this.st.s.port,
+        );
+
+        // Wait until shard0's resharding recipient has reached the pre-cloning pause.
+        hangFp.wait();
+
+        // Enable per-shard write blocking on shard0, then let the recipient proceed into cloning.
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+
+        hangFp.off();
+
+        // The recipient's clone writes to the temporary resharding collection are now blocked. It
+        // should retry/hold and log the "on hold" warning.
+        checkLog.containsJson(this.shard0Primary, 12818901);
+
+        // The coordinator is paused indirectly: it is waiting on the held recipient, so its state
+        // doc stays in a pre-commit state (it has not persisted a commit decision).
+        const coordinatorDoc = this.st.s
+            .getCollection("config.reshardingOperations")
+            .findOne({ns: this.nns});
+        assert.neq(null, coordinatorDoc, "expected an in-progress resharding coordinator document");
+        assert(
+            coordinatorDoc.state !== "decision-persisted" && coordinatorDoc.state !== "done",
+            "expected resharding to be held in a pre-commit state while writes are blocked",
+            {state: coordinatorDoc.state},
+        );
+
+        // The recipient is held, not aborted: its local state document still exists and is in a
+        // non-terminal state (not kError/kDone).
+        const recipientDoc = this.shard0Primary
+            .getDB("config")
+            .getCollection("localReshardingOperations.recipient")
+            .findOne({});
+        assert.neq(
+            null,
+            recipientDoc,
+            "expected the recipient state document to still exist while held (not aborted)",
+        );
+        assert(
+            recipientDoc.mutableState.state !== "error" &&
+                recipientDoc.mutableState.state !== "done",
+            "expected the held recipient to remain in a non-terminal state",
+            {state: recipientDoc.mutableState.state},
+        );
+
+        // Disable write blocking and verify that the held resharding now resumes and completes.
+        disableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            "InsufficientDiskSpace" /* reason */,
+        );
+        awaitResharding();
+        assert.eq(
+            2,
+            this.testShardedColl.find().itcount(),
+            "Expected two documents after the held resharding resumed and completed",
+        );
+    });
+
+    it("Test that an in-progress resharding held by blockReplicaSetWrites can be manually aborted", function () {
+        // Shard the collection on {x: 1}. All data initially lives on shard0 (primary shard).
+        assert.commandWorked(this.testDB.createCollection(this.shardedCollName));
+        assert.commandWorked(this.st.s.adminCommand({shardCollection: this.nns, key: {x: 1}}));
+        assert.commandWorked(this.testShardedColl.insert({x: 1, y: 1}));
+        assert.commandWorked(this.testShardedColl.insert({x: 2, y: 2}));
+
+        // Pause the resharding recipient on shard0 before cloning begins, so we can enable the
+        // per-shard write block while a resharding operation is in progress.
+        const hangFp = configureFailPoint(
+            this.shard0Primary,
+            "reshardingPauseRecipientBeforeCloning",
+        );
+
+        // Start a resharding in a parallel shell. Once the recipient is held on its blocked clone
+        // writes, we manually abort the operation, so the original command is expected to fail with
+        // ReshardCollectionAborted.
+        const awaitResharding = startParallelShell(
+            funWithArgs((ns) => {
+                assert.commandFailedWithCode(
+                    db.adminCommand({reshardCollection: ns, key: {y: 1}, numInitialChunks: 2}),
+                    ErrorCodes.ReshardCollectionAborted,
+                );
+            }, this.nns),
+            this.st.s.port,
+        );
+
+        // Wait until shard0's resharding recipient has reached the pre-cloning pause.
+        hangFp.wait();
+
+        // Enable per-shard write blocking on shard0, then let the recipient proceed into cloning.
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+
+        hangFp.off();
+
+        // The recipient's clone writes to the temporary resharding collection are now blocked, so
+        // it holds and logs the "on hold" warning.
+        checkLog.containsJson(this.shard0Primary, 12818901);
+
+        // Manually abort the held resharding operation while the write block is still enabled. The
+        // abort cancels the recipient's retry loop, so the operation winds down without needing the
+        // block to be lifted first.
+        assert.commandWorked(this.st.s.adminCommand({abortReshardCollection: this.nns}));
+
+        // The original reshardCollection command should observe the abort.
+        awaitResharding();
+
+        // The coordinator document should be cleaned up, and the source collection left unchanged.
+        assert.eq(
+            null,
+            this.st.s.getCollection("config.reshardingOperations").findOne({ns: this.nns}),
+            "Expected no in-progress resharding coordinator document after manual abort",
+        );
+        assert.eq(
+            2,
+            this.testShardedColl.find().itcount(),
+            "Expected the source collection to be unchanged after the held resharding was aborted",
+        );
+    });
+
+    it("Test that a new resharding fails when started while blockReplicaSetWrites is enabled on a recipient shard", function () {
+        // Shard the collection on {x: 1}. All data initially lives on shard0 (primary shard).
+        assert.commandWorked(this.testDB.createCollection(this.shardedCollName));
+        assert.commandWorked(this.st.s.adminCommand({shardCollection: this.nns, key: {x: 1}}));
+        assert.commandWorked(this.testShardedColl.insert({x: 1, y: 1}));
+        assert.commandWorked(this.testShardedColl.insert({x: 2, y: 2}));
+
+        // Enable per-shard write blocking on shard0 before starting resharding.
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+
+        // The recipient start gate rejects incoming resharding while writes are blocked, which
+        // causes the coordinator to abort the operation.
+        const awaitResharding = startParallelShell(
+            funWithArgs((ns) => {
+                assert.commandFailedWithCode(
+                    db.adminCommand({reshardCollection: ns, key: {y: 1}, numInitialChunks: 2}),
+                    ErrorCodes.ReplicaSetWritesBlocked,
+                );
+            }, this.nns),
+            this.st.s.port,
+        );
+        awaitResharding();
+
+        assert.eq(
+            2,
+            this.testShardedColl.find().itcount(),
+            "Expected collection to be unchanged after aborted resharding",
+        );
+        assert.eq(
+            null,
+            this.st.s.getCollection("config.reshardingOperations").findOne({ns: this.nns}),
+            "Expected no in-progress resharding coordinator document after abort",
+        );
+    });
+
+    it("Test that a dbPrimary-only recipient (receiving only metadata and not data) does not cause resharding to abort when blockReplicaSetWrites is already enabled", function () {
+        // shard0 is the db primary for this.testDBName. Moving an unsharded collection to shard1
+        // makes shard0 a dbPrimary-only resharding recipient. blockReplicaSetWrites
+        // should therefore skip aborting it, allowing the moveCollection to complete.
+        const unshardedCollName = "dbPrimaryOnlyRecipientColl";
+        const ns = `${this.testDBName}.${unshardedCollName}`;
+        const testColl = this.testDB[unshardedCollName];
+
+        assert.commandWorked(testColl.insert({x: 1}));
+        assert.commandWorked(testColl.insert({x: 2}));
+
+        // Pause shard1's resharding recipient before it begins cloning so write blocking can be
+        // enabled while the operation is in progress.
+        const shard1Primary = this.st.rs1.getPrimary();
+        const hangFp = configureFailPoint(shard1Primary, "reshardingPauseRecipientBeforeCloning");
+
+        // Move the collection from shard0 to shard1.
+        const shard1ShardName = this.st.shard1.shardName;
+        const awaitMoveCollection = startParallelShell(
+            funWithArgs(
+                (ns, toShard) => {
+                    assert.commandWorked(db.adminCommand({moveCollection: ns, toShard}));
+                },
+                ns,
+                shard1ShardName,
+            ),
+            this.st.s.port,
+        );
+
+        hangFp.wait();
+
+        // Enable per-shard write blocking.
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+
+        hangFp.off();
+
+        // Check that moveCollection succeeds.
+        awaitMoveCollection();
+
+        assert.eq(2, testColl.find().itcount(), "Expected two documents after moveCollection", {
+            ns,
+        });
+    });
+
+    it("Test that a dbPrimary-only recipient (receiving only metadata and not data) can start while blockReplicaSetWrites is already enabled", function () {
+        const unshardedCollName = "dbPrimaryOnlyRecipientBlockFirstColl";
+        const ns = `${this.testDBName}.${unshardedCollName}`;
+        const testColl = this.testDB[unshardedCollName];
+        assert.commandWorked(testColl.insert({x: 1}));
+        assert.commandWorked(testColl.insert({x: 2}));
+
+        // Enable per-shard write blocking on shard0 and check that the resharding operation succeeds.
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+        assert.commandWorked(
+            this.st.s.adminCommand({moveCollection: ns, toShard: this.st.shard1.shardName}),
+        );
+
+        assert.eq(2, testColl.find().itcount(), "Expected two documents after moveCollection", {
+            ns,
+        });
+    });
+
+    it("Test that an in-progress resharding is held during the index building phase when blockReplicaSetWrites is enabled, and resumes when the block is lifted", function () {
+        // Shard the collection on {x: 1}. All data initially lives on shard0 (primary shard).
+        assert.commandWorked(this.testDB.createCollection(this.shardedCollName));
+        assert.commandWorked(this.st.s.adminCommand({shardCollection: this.nns, key: {x: 1}}));
+        assert.commandWorked(this.testShardedColl.insert({x: 1, y: 1}));
+        assert.commandWorked(this.testShardedColl.insert({x: 2, y: 2}));
+
+        // Hold the resharding index build in-flight.
+        const hangFp = configureFailPoint(this.shard0Primary, "hangAfterInitializingIndexBuild");
+
+        // Start resharding in a parallel shell.
+        const awaitResharding = startParallelShell(
+            funWithArgs((ns) => {
+                assert.commandWorked(
+                    db.adminCommand({reshardCollection: ns, key: {y: 1}, numInitialChunks: 2}),
+                );
+            }, this.nns),
+            this.st.s.port,
+        );
+
+        // Wait until the resharding index build is paused mid-build.
+        hangFp.wait();
+
+        // Enable per-shard write blocking on shard0 which aborts the in-flight index build.
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+        hangFp.off();
+
+        // The recipient retries the index-build phase, but the block is still active, so the
+        // restarted build is now rejected up front with ReplicaSetWritesBlocked and the recipient
+        // holds, logging the warning.
+        checkLog.containsJson(this.shard0Primary, 12818900);
+
+        // The coordinator must be in a non-terminal, pre-commit state while the recipient is held.
+        const coordinatorDoc = this.st.s
+            .getCollection("config.reshardingOperations")
+            .findOne({ns: this.nns});
+        assert.neq(null, coordinatorDoc, "expected an in-progress resharding coordinator document");
+        assert(
+            coordinatorDoc.state !== "decision-persisted" && coordinatorDoc.state !== "done",
+            "expected resharding to be held in a pre-commit state while writes are blocked",
+            {state: coordinatorDoc.state},
+        );
+
+        // The recipient must still exist in a non-terminal state.
+        const recipientDoc = this.shard0Primary
+            .getDB("config")
+            .getCollection("localReshardingOperations.recipient")
+            .findOne({});
+        assert.neq(null, recipientDoc, "expected recipient state document to exist while held");
+        assert(
+            recipientDoc.mutableState.state !== "error" &&
+                recipientDoc.mutableState.state !== "done",
+            "expected the held recipient to remain in a non-terminal state",
+            {state: recipientDoc.mutableState.state},
+        );
+
+        // Lift the write block. The recipient resumes building indexes and the operation completes.
+        disableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            "InsufficientDiskSpace" /* reason */,
+        );
+        awaitResharding();
+        assert.eq(
+            2,
+            this.testShardedColl.find().itcount(),
+            "Expected two documents after the held resharding resumed and completed",
+        );
+    });
+
+    it("Test that in-progress resharding is held during the kApplying oplog application phase when blockReplicaSetWrites is enabled, and resumes when the block is lifted", function () {
+        // Shard the collection on {x: 1}. All data initially lives on shard0 (primary shard),
+        // which will remain the sole donor. shard1 owns none of the pre-resharding data.
+        assert.commandWorked(this.testDB.createCollection(this.shardedCollName));
+        assert.commandWorked(this.st.s.adminCommand({shardCollection: this.nns, key: {x: 1}}));
+        assert.commandWorked(this.testShardedColl.insert({x: 1, y: 1}));
+        assert.commandWorked(this.testShardedColl.insert({x: 2, y: 2}));
+
+        // Pin the entire new {y: 1} range to shard1 so it is a pure recipient (never a donor).
+        // This matters because once the coordinator reaches kBlockingWrites, resharding
+        // permanently bypasses the write block on the recipient's oplog applier so the final
+        // catch-up cannot be blocked.
+        const shard1Primary = this.st.rs1.getPrimary();
+        const shard1PrimaryAdminDB = shard1Primary.getDB("admin");
+        const shard1Name = this.st.shard1.shardName;
+
+        // Hold the coordinator's commit monitor so it can't reach "blocking-writes", which is what
+        // grants the applier's write-block bypass.
+        const configPrimary = this.st.configRS.getPrimary();
+        const coordFp = configureFailPoint(configPrimary, "hangBeforeQueryingRecipients");
+
+        // Pause shard1's recipient just before it starts oplog application (kApplying phase),
+        // so we can enable the write block before the appliers begin writing.
+        const hangFp = configureFailPoint(
+            shard1Primary,
+            "reshardingPauseRecipientBeforeOplogApplication",
+        );
+
+        // Start resharding in a parallel shell.
+        const awaitResharding = startParallelShell(
+            funWithArgs(
+                (ns, shard1Name) => {
+                    assert.commandWorked(
+                        db.adminCommand({
+                            reshardCollection: ns,
+                            key: {y: 1},
+                            shardDistribution: [
+                                {shard: shard1Name, min: {y: MinKey}, max: {y: MaxKey}},
+                            ],
+                        }),
+                    );
+                },
+                this.nns,
+                shard1Name,
+            ),
+            this.st.s.port,
+        );
+
+        // Wait until shard1's recipient has reached the pre-oplog-application pause. While the
+        // recipient is held here it has not yet reported the "applying" state to the coordinator
+        // (that update is sent only after this failpoint is released), so the coordinator stays in
+        // the "cloning" phase.
+        hangFp.wait();
+
+        // Write during the resharding window, after the recipient has cloned, so that the donor
+        // produces an oplog entry for the recipient to apply once oplog application begins. This write must happen before the block is enabled.
+        assert.commandWorked(this.testShardedColl.insert({x: 3, y: 3}));
+
+        // Enable per-shard write blocking on shard1, then release the failpoint
+        // so the recipient starts oplog application with the block already active.
+        enableReplicaSetWriteBlock(
+            shard1PrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+        hangFp.off();
+
+        // The oplog applier hits ReplicaSetWritesBlocked and holds, logging the on-hold warning.
+        checkLog.containsJson(shard1Primary, 12818902);
+
+        // The coordinator must remain in a non-terminal, pre-commit state while the recipient
+        // applier is held.
+        const coordinatorDoc = this.st.s
+            .getCollection("config.reshardingOperations")
+            .findOne({ns: this.nns});
+        assert.neq(null, coordinatorDoc, "expected an in-progress resharding coordinator document");
+        assert(
+            coordinatorDoc.state !== "decision-persisted" && coordinatorDoc.state !== "done",
+            "expected resharding to be held in a pre-commit state while oplog application is blocked",
+            {state: coordinatorDoc.state},
+        );
+
+        // The recipient must still be alive in a non-terminal state.
+        const recipientDoc = shard1Primary
+            .getDB("config")
+            .getCollection("localReshardingOperations.recipient")
+            .findOne({});
+        assert.neq(null, recipientDoc, "expected recipient state document to exist while held");
+        assert(
+            recipientDoc.mutableState.state !== "error" &&
+                recipientDoc.mutableState.state !== "done",
+            "expected the held recipient to remain in a non-terminal state",
+            {state: recipientDoc.mutableState.state},
+        );
+
+        // Let the coordinator resume: it queries the recipients, advances to "blocking-writes",
+        // and enables the write-block bypass on the appliers. Then lift the write block. The
+        // oplog applier retries, drains the remaining entries, and the resharding operation
+        // completes.
+        coordFp.off();
+        disableReplicaSetWriteBlock(shard1PrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
+        awaitResharding();
+        assert.eq(
+            3,
+            this.testShardedColl.find().itcount(),
+            "Expected three documents after the held resharding resumed and completed",
+        );
+    });
+
+    it("Test that resharding completes through the kStrictConsistency catch-up phase even when blockReplicaSetWrites is enabled after donors have blocked writes", function () {
+        // Shard the collection and place both documents on shard0 (the primary shard).
+        assert.commandWorked(this.testDB.createCollection(this.shardedCollName));
+        assert.commandWorked(this.st.s.adminCommand({shardCollection: this.nns, key: {x: 1}}));
+        assert.commandWorked(this.testShardedColl.insert({x: 1, y: 1}));
+        assert.commandWorked(this.testShardedColl.insert({x: 2, y: 2}));
+
+        // Pause shard0's recipient just before it calls awaitStrictlyConsistent(). The oplog
+        // appliers continue running on separate threads, so the coordinator can still observe
+        // low oplog lag and advance to kBlockingWrites while the state-machine thread is paused.
+        const hangFp = configureFailPoint(
+            this.shard0Primary,
+            "reshardingPauseRecipientDuringOplogApplication",
+        );
+
+        // Start resharding in a parallel shell, expecting it to complete despite the write block
+        // that will be enabled mid-operation.
+        const awaitResharding = startParallelShell(
+            funWithArgs((ns) => {
+                assert.commandWorked(
+                    db.adminCommand({reshardCollection: ns, key: {y: 1}, numInitialChunks: 2}),
+                );
+            }, this.nns),
+            this.st.s.port,
+        );
+
+        // Wait until shard0's recipient has reached the pre-strict-consistency pause.
+        hangFp.wait();
+
+        // Poll until the coordinator has advanced to "blocking-writes". At that point the
+        // coordinator has sent kBlockingWrites to all donors, which has triggered
+        // prepareForCriticalSection() on the recipient and enabled the write-block bypass on
+        // all oplog appliers.
+        assert.soon(
+            () => {
+                const doc = this.st.s
+                    .getCollection("config.reshardingOperations")
+                    .findOne({ns: this.nns});
+                return doc && doc.state === "blocking-writes";
+            },
+            "Coordinator did not reach blocking-writes state while recipient was paused",
+            2 * 60 * 1000,
+            200,
+        );
+
+        // Enable the per-shard write block.
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+
+        // Release the recipient. The oplog drain completes via the write-block bypass, and the
+        // resharding operation terminates successfully without ever disabling the write block.
+        hangFp.off();
+
+        awaitResharding();
+        assert.eq(
+            2,
+            this.testShardedColl.find().itcount(),
+            "Expected two documents after resharding completed through kStrictConsistency with write block active",
+        );
+    });
+
+    it("Test that blockReplicaSetWrites does not abort a resharding recipient that has already received a coordinator commit decision", function () {
+        // Shard on {x: 1} and place the two documents on different shards, so that the subsequent
+        // resharding forces shard0 to clone {y: 2} from shard1. That makes shard0 a genuine,
+        // non-dbPrimary-only recipient, so the only reason blockReplicaSetWrites can have to skip
+        // aborting it is that it has already received the coordinator's commit decision.
+        assert.commandWorked(this.testDB.createCollection(this.shardedCollName));
+        assert.commandWorked(this.st.s.adminCommand({shardCollection: this.nns, key: {x: 1}}));
+        assert.commandWorked(this.testShardedColl.insert({x: 1, y: 1}));
+        assert.commandWorked(this.testShardedColl.insert({x: 2, y: 2}));
+        assert.commandWorked(this.st.s.adminCommand({split: this.nns, middle: {x: 2}}));
+        assert.commandWorked(
+            this.st.s.adminCommand({
+                moveChunk: this.nns,
+                find: {x: 2},
+                to: this.st.shard1.shardName,
+            }),
+        );
+
+        // Pause shard0's recipient just before collection cleanup. At this point the coordinator
+        // has already persisted its commit decision.
+        const hangFp = configureFailPoint(
+            this.shard0Primary,
+            "reshardingPauseRecipientBeforeCleanup",
+        );
+
+        // Reshard onto {y: 1} with all output owned by shard0, forcing it to clone {y: 2} from
+        // shard1.
+        const shard0Name = this.st.shard0.shardName;
+        const awaitResharding = startParallelShell(
+            funWithArgs(
+                (ns, shard0Name) => {
+                    assert.commandWorked(
+                        db.adminCommand({
+                            reshardCollection: ns,
+                            key: {y: 1},
+                            shardDistribution: [
+                                {shard: shard0Name, min: {y: MinKey}, max: {y: MaxKey}},
+                            ],
+                        }),
+                    );
+                },
+                this.nns,
+                shard0Name,
+            ),
+            this.st.s.port,
+        );
+
+        // Wait until shard0's recipient has reached the post-commit cleanup pause, confirming the
+        // coordinator commit decision has been persisted and the collection rename is done.
+        hangFp.wait();
+
+        // Enable per-shard write blocking on shard0 from a parallel shell so the command can run
+        // concurrently with the paused recipient.
+        const awaitWriteBlock = startParallelShell(() => {
+            assert.commandWorked(
+                db.adminCommand({
+                    blockReplicaSetWrites: 1,
+                    enabled: true,
+                    allowDeletions: false,
+                    reason: "InsufficientDiskSpace",
+                }),
+            );
+        }, this.shard0Primary.port);
+
+        // Release the recipient so it can finish its cleanup.
+        hangFp.off();
+
+        // Check that the resharding succeeds and the write block is established.
+        awaitResharding();
+        awaitWriteBlock();
+        assert.eq(
+            2,
+            this.testShardedColl.find().itcount(),
+            "Expected two documents after resharding",
         );
     });
 });

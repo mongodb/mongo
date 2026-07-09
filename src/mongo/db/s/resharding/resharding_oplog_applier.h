@@ -126,6 +126,8 @@ public:
     static boost::optional<ReshardingOplogApplierProgress> checkStoredProgress(
         OperationContext* opCtx, const ReshardingSourceId& id);
 
+    void setReplicaSetWriteBlockBypass();
+
     static NamespaceString ensureStashCollectionExists(OperationContext* opCtx,
                                                        const UUID& existingUUID,
                                                        const ShardId& donorShardId,

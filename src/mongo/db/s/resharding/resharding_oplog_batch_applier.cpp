@@ -43,10 +43,12 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_role_loop.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_bypass.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future_util.h"
@@ -70,6 +72,10 @@ ReshardingOplogBatchApplier::ReshardingOplogBatchApplier(
     const ReshardingOplogSessionApplication& sessionApplication)
     : _crudApplication(crudApplication), _sessionApplication(sessionApplication) {}
 
+void ReshardingOplogBatchApplier::setReplicaSetWriteBlockBypass() const {
+    _bypassWriteBlock.store(true);
+}
+
 template <bool IsForSessionApplication>
 SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
     OplogBatch batch,
@@ -91,6 +97,10 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                    for (auto& i = chainCtx->nextToApply; i < chainCtx->batch.size(); ++i) {
                        const auto& oplogEntry = *chainCtx->batch[i];
                        auto opCtx = _makeOperationContext(factory);
+
+                       if (_bypassWriteBlock.load()) {
+                           ReplicaSetWriteBlockBypass::get(opCtx.get()).set(true);
+                       }
 
                        boost::optional<rss::consensus::WriteIntentGuard> writeGuard;
                        if (gFeatureFlagIntentRegistration.isEnabled()) {
@@ -128,8 +138,22 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                        }
                    }
                    return makeReadyFutureWith([] {}).semi();
-               })
-        .onTransientError([](const Status& status) {
+               },
+               // Treat ReplicaSetWritesBlocked as transient so the cloner holds and resumes (via
+               // its persisted resume token) until the replica set write block is lifted, rather
+               // than failing the operation.
+               resharding::kRetryabilityPredicateIncludeReplicaSetWritesBlockedAndWriteConcern)
+        .onTransientError([this](const Status& status) {
+            if (status == ErrorCodes::ReplicaSetWritesBlocked) {
+                if (resharding::shouldLogWriteBlockWarning(_lastWriteBlockWarningAt)) {
+                    LOGV2_WARNING(12818902,
+                                  "Resharding oplog application is paused because writes to this "
+                                  "replica set are currently blocked; it will keep retrying until "
+                                  "the write block is disabled or the operation is aborted",
+                                  "error"_attr = redact(status));
+                }
+                return;
+            }
             LOGV2(5615800,
                   "Transient error while applying oplog entry from donor shard",
                   "error"_attr = redact(status));

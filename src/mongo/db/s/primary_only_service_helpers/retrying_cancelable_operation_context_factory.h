@@ -62,6 +62,22 @@ public:
             _isRetryable);
     }
 
+    /**
+     * Overload that extends the factory's default retryability predicate for a single retry scope,
+     * rather than replacing it. Errors matching either the base predicate or additionalPredicate
+     * are treated as retryable.
+     */
+    template <typename BodyCallable>
+    decltype(auto) withAutomaticRetryExtending(BodyCallable&& body,
+                                               RetryabilityPredicate additionalPredicate) const {
+        auto child = _factory->createSharedChild();
+        return WithAutomaticRetry(
+            [child, body = std::forward<BodyCallable>(body)]() { return body(child); },
+            [base = _isRetryable, extra = std::move(additionalPredicate)](const Status& s) {
+                return base(s) || extra(s);
+            });
+    }
+
 private:
     RetryabilityPredicate _isRetryable;
     std::unique_ptr<HierarchicalCancelableOperationContextFactory> _factory;

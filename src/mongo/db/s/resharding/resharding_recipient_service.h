@@ -54,6 +54,7 @@
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/otel/telemetry_context.h"
 #include "mongo/otel/traces/span/span.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/util/assert_util.h"
@@ -67,6 +68,7 @@
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <string_view>
@@ -520,6 +522,8 @@ private:
 
     // It states whether or not the user has aborted the resharding operation.
     boost::optional<bool> _userCanceled;
+
+    AtomicWord<long long> _lastWriteBlockWarningAt{std::numeric_limits<long long>::min()};
 
     ReshardingRecipientPromises _promises;
 

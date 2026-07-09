@@ -52,6 +52,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -123,6 +124,14 @@ template <class Service, class StateMachine, class ReshardingDocument>
 void createReshardingStateMachine(OperationContext* opCtx,
                                   const ReshardingDocument& doc,
                                   bool throwOnNotPrimaryError) {
+    if constexpr (std::is_same_v<Service, ReshardingRecipientService>) {
+        if (!doc.getSkipCloningAndApplying().value_or(false)) {
+            uassertStatusOK(
+                ReplicaSetWriteBlockState::get(opCtx)->checkIfIncomingReshardingAllowedToStart(
+                    opCtx));
+        }
+    }
+
     try {
         // Inserting the resharding state document must happen synchronously with the shard version
         // refresh for the w:majority wait from the resharding coordinator to mean that this replica

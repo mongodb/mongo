@@ -610,5 +610,46 @@ TEST_F(ReplicaSetWriteBlockStateTest, IndexBuildAllowedWhenBypassEnabled) {
     ASSERT_OK(state->checkIfIndexBuildAllowedToStart(opCtx.get(), nss));
 }
 
+TEST_F(ReplicaSetWriteBlockStateTest, IncomingReshardingAllowedWhenWriteBlockingDisabled) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    state->disableReplicaSetWriteBlocking();
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
+
+    ASSERT_OK(state->checkIfIncomingReshardingAllowedToStart(opCtx.get()));
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, IncomingReshardingBlockedWhenWriteBlockingEnabled) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
+
+    state->enableReplicaSetWriteBlocking(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+    ASSERT_EQ(state->checkIfIncomingReshardingAllowedToStart(opCtx.get()),
+              ErrorCodes::ReplicaSetWritesBlocked);
+
+    state->disableReplicaSetWriteBlocking();
+    ASSERT_OK(state->checkIfIncomingReshardingAllowedToStart(opCtx.get()));
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, IncomingReshardingAllowedWhenBypassEnabled) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    state->enableReplicaSetWriteBlocking(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+
+    auto authSession = AuthorizationSession::get(opCtx->getClient());
+    authSession->grantInternalAuthorization();
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).setFromMetadata(opCtx.get(), {});
+    ASSERT(ReplicaSetWriteBlockBypass::get(opCtx.get()).isEnabled());
+
+    ASSERT_OK(state->checkIfIncomingReshardingAllowedToStart(opCtx.get()));
+}
+
 }  // namespace
 }  // namespace mongo

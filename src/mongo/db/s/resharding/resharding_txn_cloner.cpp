@@ -310,13 +310,31 @@ SemiFuture<void> ReshardingTxnCloner::run(
 
                    chainCtx->donorRecord = boost::none;
                    return makeReadyFutureWith([] {}).semi();
-               })
+               },
+               // Treat ReplicaSetWritesBlocked as transient so config.transactions cloning holds
+               // and resumes until the replica set write block is lifted, rather than failing the
+               // operation, matching ReshardingCollectionCloner's handling. LockTimeout is left out
+               // (retried by the recipient state machine that drives the cloner) so this only
+               // extends the default retryability with the write block.
+               resharding::kRetryabilityPredicateIncludeReplicaSetWritesBlockedAndWriteConcern)
         .onTransientError([this, chainCtx, factory](const Status& status) {
-            LOGV2(5461600,
-                  "Transient error while cloning config.transactions collection",
-                  "sourceId"_attr = _sourceId,
-                  "readTimestamp"_attr = _fetchTimestamp,
-                  "error"_attr = redact(status));
+            if (status == ErrorCodes::ReplicaSetWritesBlocked) {
+                if (resharding::shouldLogWriteBlockWarning(_lastWriteBlockWarningAt)) {
+                    LOGV2_WARNING(10627300,
+                                  "Resharding recipient is paused because writes to this replica "
+                                  "set are currently blocked; config.transactions cloning will "
+                                  "keep retrying until the write block is disabled or the "
+                                  "operation is aborted",
+                                  "sourceId"_attr = _sourceId,
+                                  "error"_attr = redact(status));
+                }
+            } else {
+                LOGV2(5461600,
+                      "Transient error while cloning config.transactions collection",
+                      "sourceId"_attr = _sourceId,
+                      "readTimestamp"_attr = _fetchTimestamp,
+                      "error"_attr = redact(status));
+            }
             if (chainCtx->pipeline) {
                 auto opCtx = factory->makeOperationContext(&cc());
                 chainCtx->execPipeline->reattachToOperationContext(opCtx.get());

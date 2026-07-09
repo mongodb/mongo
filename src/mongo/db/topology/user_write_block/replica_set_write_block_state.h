@@ -154,6 +154,13 @@ public:
     Status checkIfIndexBuildAllowedToStart(OperationContext* opCtx,
                                            const NamespaceString& nss) const;
 
+    /**
+     * Checks that an incoming resharding operation is allowed to start on this replica set as a
+     * recipient. Returns ReplicaSetWritesBlocked if incoming resharding is disallowed, OK
+     * otherwise.
+     */
+    Status checkIfIncomingReshardingAllowedToStart(OperationContext* opCtx) const;
+
 private:
     struct WriteBlockInfo {
         bool blocked{false};

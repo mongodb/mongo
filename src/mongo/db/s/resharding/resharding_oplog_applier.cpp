@@ -274,6 +274,10 @@ boost::optional<ReshardingOplogApplierProgress> ReshardingOplogApplier::checkSto
     return ReshardingOplogApplierProgress::parse(doc, ctx);
 }
 
+void ReshardingOplogApplier::setReplicaSetWriteBlockBypass() {
+    _batchApplier.setReplicaSetWriteBlockBypass();
+}
+
 void ReshardingOplogApplier::_clearAppliedOpsAndStoreProgress(OperationContext* opCtx) {
     const auto& lastOplog = _currentBatchToApply.back();
 

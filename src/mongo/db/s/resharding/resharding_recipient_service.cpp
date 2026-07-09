@@ -380,51 +380,73 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     std::shared_ptr<otel::TelemetryContext> telemetryCtx) {
     return _retryingCancelableOpCtxFactory
-        ->withAutomaticRetry([this, executor, telemetryCtx = telemetryCtx->clone()](auto factory) {
-            return ExecutorFuture(**executor)
-                .then([this, executor, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
-                    auto span = _startSpan(
-                        telemetryCtx,
-                        span_names::
-                            kReshardingRecipientAwaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection);
-                    return _awaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection(
-                        executor, factory);
-                })
-                .then([this, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
-                    auto span = _startSpan(
-                        telemetryCtx,
-                        span_names::
-                            kReshardingRecipientCreateTemporaryReshardingCollectionThenTransitionToCloning);
-                    _createTemporaryReshardingCollectionThenTransitionToCloning(factory);
-                })
-                .then([this, executor, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
-                    auto span = _startSpan(
-                        telemetryCtx,
-                        span_names::kReshardingRecipientCloneThenTransitionToBuildingIndex);
-                    return _cloneThenTransitionToBuildingIndex(executor, factory);
-                })
-                .then([this, executor, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
-                    auto span = _startSpan(
-                        telemetryCtx,
-                        span_names::kReshardingRecipientBuildIndexThenTransitionToApplying);
-                    return _buildIndexThenTransitionToApplying(executor, factory);
-                })
-                .then([this, executor, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
-                    auto span = _startSpan(
-                        telemetryCtx,
-                        span_names::kReshardingRecipientCreateAndStartChangeStreamsMonitor);
-                    return _createAndStartChangeStreamsMonitor(executor, factory);
-                })
-                .then([this, executor, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
-                    auto span = _startSpan(
-                        telemetryCtx,
-                        span_names::
-                            kReshardingRecipientAwaitAllDonorsBlockingWritesThenTransitionToStrictConsistency);
-                    return _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(executor,
-                                                                                          factory);
-                });
-        })
-        .onTransientError([](const Status& status) {
+        ->withAutomaticRetryExtending(
+            [this, executor, telemetryCtx = telemetryCtx->clone()](auto factory) {
+                return ExecutorFuture(**executor)
+                    .then([this,
+                           executor,
+                           factory,
+                           telemetryCtx = telemetryCtx->clone()]() mutable {
+                        auto span = _startSpan(
+                            telemetryCtx,
+                            span_names::
+                                kReshardingRecipientAwaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection);
+                        return _awaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection(
+                            executor, factory);
+                    })
+                    .then([this, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
+                        auto span = _startSpan(
+                            telemetryCtx,
+                            span_names::
+                                kReshardingRecipientCreateTemporaryReshardingCollectionThenTransitionToCloning);
+                        _createTemporaryReshardingCollectionThenTransitionToCloning(factory);
+                    })
+                    .then(
+                        [this, executor, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
+                            auto span = _startSpan(
+                                telemetryCtx,
+                                span_names::kReshardingRecipientCloneThenTransitionToBuildingIndex);
+                            return _cloneThenTransitionToBuildingIndex(executor, factory);
+                        })
+                    .then(
+                        [this, executor, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
+                            auto span = _startSpan(
+                                telemetryCtx,
+                                span_names::kReshardingRecipientBuildIndexThenTransitionToApplying);
+                            return _buildIndexThenTransitionToApplying(executor, factory);
+                        })
+                    .then(
+                        [this, executor, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
+                            auto span = _startSpan(
+                                telemetryCtx,
+                                span_names::kReshardingRecipientCreateAndStartChangeStreamsMonitor);
+                            return _createAndStartChangeStreamsMonitor(executor, factory);
+                        })
+                    .then([this,
+                           executor,
+                           factory,
+                           telemetryCtx = telemetryCtx->clone()]() mutable {
+                        auto span = _startSpan(
+                            telemetryCtx,
+                            span_names::
+                                kReshardingRecipientAwaitAllDonorsBlockingWritesThenTransitionToStrictConsistency);
+                        return _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(
+                            executor, factory);
+                    });
+            },
+            resharding::kRetryabilityPredicateReplicaSetWritesBlocked)
+        .onTransientError([this](const Status& status) {
+            if (status == ErrorCodes::ReplicaSetWritesBlocked) {
+                if (resharding::shouldLogWriteBlockWarning(_lastWriteBlockWarningAt)) {
+                    LOGV2_WARNING(12818900,
+                                  "Resharding recipient is paused because writes to this replica "
+                                  "set are currently blocked; it will keep retrying until the "
+                                  "write block is disabled or the operation is aborted",
+                                  "reshardingUUID"_attr = _metadata.getReshardingUUID(),
+                                  "error"_attr = redact(status));
+                }
+                return;
+            }
             LOGV2(5551100,
                   "Recipient _runUntilStrictConsistencyOrErrored encountered transient error",
                   "error"_attr = redact(status));

@@ -350,6 +350,12 @@ void ReshardingDataReplication::prepareForCriticalSection() {
     for (auto& fetcher : _oplogFetchers) {
         fetcher->prepareForCriticalSection();
     }
+    // The donor has blocked writes to the source collection, so the remaining oplog delta is
+    // bounded and must be drained to reach strict consistency. Bypass blockReplicaSetWrites on
+    // the recipient so a per-shard write block cannot prevent the final catch-up from completing.
+    for (auto& applier : _oplogAppliers) {
+        applier->setReplicaSetWriteBlockBypass();
+    }
 }
 
 SharedSemiFuture<void> ReshardingDataReplication::awaitCloningDone() {

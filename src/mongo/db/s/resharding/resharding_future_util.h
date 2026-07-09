@@ -34,6 +34,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/s/primary_only_service_helpers/retrying_cancelable_operation_context_factory.h"
 #include "mongo/db/s/primary_only_service_helpers/with_automatic_retry.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/functional.h"
@@ -41,6 +42,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
 
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -56,11 +58,49 @@ const auto kRetryabilityPredicateIncludeLockTimeoutAndWriteConcern = [](const St
         status == ErrorCodes::LockTimeout;
 };
 
+// Treats errors caused by an active replica set write block as retryable. Used on its own to extend
+// a base retryability so that a held resharding operation keeps retrying instead of failing while a
+// replica set write block is active.
+const auto kRetryabilityPredicateReplicaSetWritesBlocked = [](const Status& status) {
+    return status == ErrorCodes::ReplicaSetWritesBlocked ||
+        (status == ErrorCodes::IndexBuildAborted &&
+         status.reason().find("Write blocking") != std::string::npos);
+};
+
+const auto kRetryabilityPredicateIncludeReplicaSetWritesBlockedAndLockTimeoutAndWriteConcern =
+    [](const Status& status) {
+        return kRetryabilityPredicateIncludeLockTimeoutAndWriteConcern(status) ||
+            kRetryabilityPredicateReplicaSetWritesBlocked(status);
+    };
+
+// Extends the default write-concern-timeout retryability with only an active replica set write
+// block, without also making LockTimeout retryable. Used by the resharding cloners so they hold and
+// resume through a write block while otherwise preserving their default retryability; LockTimeout
+// is left to be retried by the recipient state machine that drives them.
+const auto kRetryabilityPredicateIncludeReplicaSetWritesBlockedAndWriteConcern =
+    [](const Status& status) {
+        return kRetryabilityPredicateIncludeWriteConcernTimeout(status) ||
+            kRetryabilityPredicateReplicaSetWritesBlocked(status);
+    };
+
+/**
+ * Rate-limits the "writes to this replica set are blocked" warning that the resharding cloner,
+ * oplog applier, and recipient state machine each emit while held on a replica set write block.
+ */
+bool shouldLogWriteBlockWarning(AtomicWord<long long>& lastWarningAt);
+
 template <typename BodyCallable>
 primary_only_service_helpers::WithAutomaticRetry<BodyCallable> WithAutomaticRetry(
     BodyCallable&& body) {
     return primary_only_service_helpers::WithAutomaticRetry<BodyCallable>(
         std::move(body), kRetryabilityPredicateIncludeWriteConcernTimeout);
+}
+
+template <typename BodyCallable>
+primary_only_service_helpers::WithAutomaticRetry<BodyCallable> WithAutomaticRetry(
+    BodyCallable&& body, RetryabilityPredicate isRetryable) {
+    return primary_only_service_helpers::WithAutomaticRetry<BodyCallable>(std::move(body),
+                                                                          std::move(isRetryable));
 }
 
 /**

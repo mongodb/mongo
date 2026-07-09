@@ -148,5 +148,13 @@ TEST_F(WithAutomaticRetryTest, DefaultRetryWithWriteConcernError) {
     }
 }
 
+TEST_F(WithAutomaticRetryTest, DefaultRetryabilityPredicateDoesNotRetryOnReplicaSetWritesBlocked) {
+    // ReplicaSetWritesBlocked is only retryable for specific operations that opt in via a custom
+    // predicate; the default predicates must not treat it as retryable.
+    auto error = Status(ErrorCodes::ReplicaSetWritesBlocked, "foo");
+    ASSERT_FALSE(kDefaultRetryabilityPredicate(error));
+    ASSERT_FALSE(kRetryabilityPredicateIncludeWriteConcernTimeout(error));
+}
+
 }  // namespace primary_only_service_helpers
 }  // namespace mongo

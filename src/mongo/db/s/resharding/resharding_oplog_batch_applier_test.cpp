@@ -93,6 +93,8 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/topology/cluster_role.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_op_observer.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock_metadata_hook.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/db/transaction/transaction_participant.h"
@@ -652,6 +654,37 @@ TEST_F(ReshardingOplogBatchApplierTest,
     auto future = applier()->applyBatch<false>(
         {&oplogEntry}, executor, CancellationToken::uncancelable(), factory);
     future.get();
+}
+
+TEST_F(ReshardingOplogBatchApplierTest, RetriesWhileReplicaSetWritesAreBlocked) {
+    // Register the op observer that enforces the replica set write block so that the applier's
+    // writes to the (non-internal) temporary resharding collection are rejected with
+    // ReplicaSetWritesBlocked while the block is enabled.
+    auto opObserverRegistry =
+        dynamic_cast<OpObserverRegistry*>(getServiceContext()->getOpObserver());
+    invariant(opObserverRegistry);
+    opObserverRegistry->addObserver(std::make_unique<ReplicaSetWriteBlockOpObserver>());
+
+    auto* writeBlockState = ReplicaSetWriteBlockState::get(getServiceContext());
+    writeBlockState->enableReplicaSetWriteBlocking(
+        ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+
+    auto oplogEntry = makeInsertOplogEntry();
+
+    auto executor = makeTaskExecutorForApplier();
+    auto factory = makeCancelableOpCtxForApplier(CancellationToken::uncancelable());
+    auto future = applier()->applyBatch<false>(
+        {&oplogEntry}, executor, CancellationToken::uncancelable(), factory);
+
+    // While the block is active the batch is repeatedly rejected, so the applier holds and retries
+    // in place rather than completing or failing the operation.
+    ASSERT_OK(
+        executor->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
+    ASSERT_FALSE(future.isReady());
+
+    // Once the block is lifted, the batch is applied successfully.
+    writeBlockState->disableReplicaSetWriteBlocking();
+    ASSERT_OK(future.getNoThrow());
 }
 
 using ReshardingOplogBatchApplierTestDeathTest = ReshardingOplogBatchApplierTest;

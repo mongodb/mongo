@@ -41,11 +41,13 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
 
+#include <limits>
 #include <memory>
 #include <utility>
 
@@ -127,6 +129,7 @@ private:
 
     const ReshardingSourceId _sourceId;
     const Timestamp _fetchTimestamp;
+    AtomicWord<long long> _lastWriteBlockWarningAt{std::numeric_limits<long long>::min()};
 };
 
 /**

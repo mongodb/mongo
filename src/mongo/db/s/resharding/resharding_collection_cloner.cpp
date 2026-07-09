@@ -451,8 +451,24 @@ SemiFuture<void> ReshardingCollectionCloner::run(
                    // If we got here, we succeeded and there is no more to come.  Otherwise
                    // _runOnceWithNaturalOrder would uassert.
                    chainCtx->moreToCome = false;
-               })
+               },
+               // Treat ReplicaSetWritesBlocked as transient so the cloner holds and resumes (via
+               // its persisted resume token) until the replica set write block is lifted, rather
+               // than failing the operation.
+               resharding::kRetryabilityPredicateIncludeReplicaSetWritesBlockedAndWriteConcern)
         .onTransientError([this](const Status& status) {
+            if (status == ErrorCodes::ReplicaSetWritesBlocked) {
+                if (resharding::shouldLogWriteBlockWarning(_lastWriteBlockWarningAt)) {
+                    LOGV2_WARNING(12818901,
+                                  "Resharding recipient is paused because writes to this replica "
+                                  "set are currently blocked; cloning will keep retrying until the "
+                                  "write block is disabled or the operation is aborted",
+                                  "sourceNamespace"_attr = _sourceNss,
+                                  "outputNamespace"_attr = _outputNss,
+                                  "error"_attr = redact(status));
+                }
+                return;
+            }
             LOGV2(5269300,
                   "Transient error while cloning sharded collection",
                   "sourceNamespace"_attr = _sourceNss,

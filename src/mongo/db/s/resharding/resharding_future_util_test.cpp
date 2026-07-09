@@ -106,5 +106,24 @@ TEST_F(ReshardingFutureUtilTest, CancelWhenAnyErrorThenQuiesceDuringExecutorShut
     ASSERT_EQ(status.code(), 6791600);
     ASSERT_TRUE(taskWasCancelled.load());
 }
+
+TEST_F(ReshardingFutureUtilTest, IncludeReplicaSetWritesBlockedPredicateRetriesOnWriteBlock) {
+    auto writeBlockError = Status(ErrorCodes::ReplicaSetWritesBlocked, "foo");
+    // The dedicated predicate treats ReplicaSetWritesBlocked as retryable, while the predicate it
+    // builds upon does not.
+    ASSERT_TRUE(
+        resharding::
+            kRetryabilityPredicateIncludeReplicaSetWritesBlockedAndLockTimeoutAndWriteConcern(
+                writeBlockError));
+    ASSERT_FALSE(
+        resharding::kRetryabilityPredicateIncludeLockTimeoutAndWriteConcern(writeBlockError));
+
+    // It still retries on everything the base predicate considers retryable.
+    auto lockTimeoutError = Status(ErrorCodes::LockTimeout, "bar");
+    ASSERT_TRUE(
+        resharding::
+            kRetryabilityPredicateIncludeReplicaSetWritesBlockedAndLockTimeoutAndWriteConcern(
+                lockTimeoutError));
+}
 }  // namespace
 }  // namespace mongo

@@ -33,10 +33,12 @@
 #include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 #include "mongo/db/s/resharding/resharding_oplog_batch_preparer.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
 
+#include <limits>
 #include <memory>
 
 namespace mongo {
@@ -64,6 +66,14 @@ public:
         CancellationToken cancelToken,
         std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) const;
 
+    /**
+     * When set, each opCtx created by applyBatch() will have ReplicaSetWriteBlockBypass enabled,
+     * allowing catch-up writes to bypass blockReplicaSetWrites. Called when the recipient enters
+     * the critical section (kBlockingWrites), after which the oplog delta is bounded and must be
+     * drained even if a replica set write block is active.
+     */
+    void setReplicaSetWriteBlockBypass() const;
+
 private:
     /**
      * Helper to construct an opCtx and set non-deprioritizable state. Since this class exists
@@ -75,6 +85,9 @@ private:
 
     const ReshardingOplogApplicationRules& _crudApplication;
     const ReshardingOplogSessionApplication& _sessionApplication;
+
+    mutable AtomicWord<bool> _bypassWriteBlock{false};
+    mutable AtomicWord<long long> _lastWriteBlockWarningAt{std::numeric_limits<long long>::min()};
 };
 
 }  // namespace mongo

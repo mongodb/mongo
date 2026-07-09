@@ -45,11 +45,13 @@
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
+#include <limits>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -142,6 +144,8 @@ private:
     const bool _storeProgress;
     const bool _relaxed;
     const boost::optional<ForwardableOperationMetadata> _forwardableOpMetadata;
+
+    AtomicWord<long long> _lastWriteBlockWarningAt{std::numeric_limits<long long>::min()};
 };
 
 }  // namespace mongo

@@ -83,7 +83,7 @@ void ReplicaSetWriteBlockState::checkReplicaSetWritesAllowed(
     const auto info = _writeBlockInfo.load();
     const bool writesAllowed = !info.blocked ||
         ReplicaSetWriteBlockBypass::get(opCtx).isEnabled() || nss.isOnInternalDb() ||
-        nss.isTemporaryReshardingCollection() || nss.isSystemDotProfile();
+        nss.isSystemDotProfile();
     if (!writesAllowed) {
         switch (opType) {
             case ReplicaSetWriteBlockRejectedWriteOp::kInsert:
@@ -199,6 +199,18 @@ Status ReplicaSetWriteBlockState::checkIfIndexBuildAllowedToStart(
     if (_userIndexBuildsBlocked.load() && !ReplicaSetWriteBlockBypass::get(opCtx).isEnabled() &&
         !nss.isOnInternalDb()) {
         return Status(ErrorCodes::ReplicaSetWritesBlocked, "Replica set writes blocked");
+    }
+    return Status::OK();
+}
+
+Status ReplicaSetWriteBlockState::checkIfIncomingReshardingAllowedToStart(
+    OperationContext* opCtx) const {
+    const auto info = _writeBlockInfo.load();
+    if ((info.blocked) && !ReplicaSetWriteBlockBypass::get(opCtx).isEnabled()) {
+        return Status(
+            ErrorCodes::ReplicaSetWritesBlocked,
+            fmt::format("Resharding blocked because replica set writes are blocked, reason: {}",
+                        idl::serialize(info.reason)));
     }
     return Status::OK();
 }

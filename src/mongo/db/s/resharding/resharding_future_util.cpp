@@ -30,12 +30,25 @@
 #include "mongo/db/s/resharding/resharding_future_util.h"
 
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/time_support.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/smart_ptr.hpp>
 
 namespace mongo::resharding {
+
+bool shouldLogWriteBlockWarning(AtomicWord<long long>& lastWarningAt) {
+    const auto now = Date_t::now();
+    auto last = lastWarningAt.load();
+    if (now <= Date_t::fromMillisSinceEpoch(last) + Minutes(1)) {
+        return false;
+    }
+    // Under concurrent callers (e.g. multiple oplog appliers), let exactly one win the right to log
+    // for this interval; the loser sees the updated timestamp and returns false.
+    return lastWarningAt.compareAndSwap(&last, now.toMillisSinceEpoch());
+}
 
 std::vector<ExecutorFuture<void>> thenRunAllOn(const std::vector<SharedSemiFuture<void>>& futures,
                                                ExecutorPtr executor) {
