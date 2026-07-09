@@ -723,9 +723,9 @@ BSONObj readDumpFile(const BSONObj& a, void*) {
         // Record the amount of valid data ahead of us before
         // advancing the cursor so we can use it as an argument to
         // validate below. It would be nice and proper to use
-        // Validated<BSONObj> for all of this instead, but
-        // unfortunately the BSONObj specialization of Validated
-        // depends on a server parameter, so we do it manually.
+        // rpc::checkBSONObj for all of this instead, but
+        // unfortunately that depends on a server parameter, so we
+        // do it manually.
         const auto expectedValidBytes = cursor.length();
 
         const auto swObj = cursor.readAndAdvanceNoThrow<BSONObj>();
@@ -829,9 +829,9 @@ BSONObj getObjInDumpFile(const BSONObj& a, void*) {
     // Record the amount of valid data ahead of us before
     // advancing the cursor so we can use it as an argument to
     // validate below. It would be nice and proper to use
-    // Validated<BSONObj> for all of this instead, but
-    // unfortunately the BSONObj specialization of Validated
-    // depends on a server parameter, so we do it manually.
+    // rpc::checkBSONObj for all of this instead, but
+    // unfortunately that depends on a server parameter, so
+    // we do it manually.
     const auto expectedValidBytes = cursor.length();
     BSONObj obj;
     cursor.readAndAdvance<BSONObj>(&obj);

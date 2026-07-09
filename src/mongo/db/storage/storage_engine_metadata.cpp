@@ -46,7 +46,6 @@
 #endif
 
 #include "mongo/base/data_range.h"
-#include "mongo/base/data_type_validated.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
@@ -57,7 +56,7 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
+#include "mongo/rpc/object_check.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/file.h"
@@ -185,12 +184,12 @@ Status StorageEngineMetadata::read() {
     }
 
     ConstDataRange cdr(&buffer[0], buffer.size());
-    auto swObj = cdr.readNoThrow<Validated<BSONObj>>();
+    auto swObj = cdr.readNoThrow<rpc::ValidatedBSONObj>();
     if (!swObj.isOK()) {
         return swObj.getStatus();
     }
 
-    BSONObj obj = swObj.getValue();
+    BSONObj obj{swObj.getValue()};
 
     // Validate 'storage.engine' field.
     BSONElement storageEngineElement =

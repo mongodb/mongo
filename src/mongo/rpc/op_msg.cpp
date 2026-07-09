@@ -31,7 +31,6 @@
 #include "mongo/rpc/op_msg.h"
 
 #include "mongo/base/data_type_endian.h"
-#include "mongo/base/data_type_validated.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/dotted_path/dotted_path_support.h"
@@ -45,7 +44,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_severity_suppressor.h"
-#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
+#include "mongo/rpc/object_check.h"
 #include "mongo/rpc/telemetry_context_section_gen.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/debug_util.h"
@@ -196,7 +195,7 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
                         "Multiple body sections in message",
                         !haveBody);
                 haveBody = true;
-                msg.body = sectionsBuf.read<Validated<BSONObj>>();
+                msg.body = BSONObj{sectionsBuf.read<rpc::ValidatedBSONObj>()};
                 uassertStatusOK(msg.body.validateBSONObjSize(kOpMsgReplyBSONBufferMaxSize));
                 break;
             }
@@ -221,14 +220,14 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
 
                 msg.sequences.push_back({std::string{name}});
                 while (!seqBuf.atEof()) {
-                    auto obj = seqBuf.read<Validated<BSONObj>>();
+                    BSONObj obj{seqBuf.read<rpc::ValidatedBSONObj>()};
                     // For document sequences, each document must be within the 16MB document
                     // limit. See the OP_MSG documentation for further details on the size
                     // limits:
                     // https://github.com/mongodb/specifications/blob/master/source/message/OP_MSG.md#sections.
-                    uassertStatusOK(obj.val.validateBSONObjSize().addContext(
-                        "Parsing opMsg DocSequence failed"));
-                    msg.sequences.back().objs.push_back(obj);
+                    uassertStatusOK(
+                        obj.validateBSONObjSize().addContext("Parsing opMsg DocSequence failed"));
+                    msg.sequences.back().objs.push_back(std::move(obj));
                 }
                 break;
             }
@@ -247,8 +246,8 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
                 uassert(ErrorCodes::BadValue,
                         "Multiple telemetry context sections in message",
                         !msg.telemetryContext);
-                auto bsonContext = sectionsBuf.read<Validated<BSONObj>>();
-                uassertStatusOK(bsonContext.val.validateBSONObjSize(kMaxTelemetrySectionSize));
+                BSONObj bsonContext{sectionsBuf.read<rpc::ValidatedBSONObj>()};
+                uassertStatusOK(bsonContext.validateBSONObjSize(kMaxTelemetrySectionSize));
                 msg.telemetryContext = TelemetryContextSection::parse(bsonContext);
                 break;
             }

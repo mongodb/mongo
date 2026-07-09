@@ -29,55 +29,80 @@
 
 #pragma once
 
-#include "mongo/base/data_type_validated.h"
-#include "mongo/base/error_codes.h"
+#include "mongo/base/data_type.h"
 #include "mongo/base/status.h"
-#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/db/server_options.h"
-#include "mongo/logv2/redaction.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/hex.h"
+#include "mongo/util/modules.h"
 
-#include <algorithm>
 #include <cstddef>
 #include <string>
+#include <utility>
 
-// We do not use the rpc namespace here so we can specialize Validator.
+MONGO_MOD_PUBLIC;
+
 namespace mongo {
-class BSONObj;
-class Status;
+namespace rpc {
 
 /**
- * A validator for BSON objects. The implementation will validate the input object
+ * Calls validateBSON, but controllable by server parameters.
+ *
+ *  - `objcheck`:
+ *     controls whether the check is actually performed.
+ *
+ *  - `crashOnInvalidBSONError`:
+ *     controls whether a verbose fassert is triggered on failure.
+ */
+Status checkBSONObj(const char* ptr, size_t length);
+
+/**
+ * You can use ValidatedBSONObj in a DataRange (and associated types)
+ *
+ * Example:
+ *
+ *     DataRangeCursor drc(buf, buf_end);
+ *     ValidatedBSONObj vobj;
+ *     auto status = drc.readAndAdvance(&vobj);
+ *     if (status.isOK()) {
+ *         BSONObj obj{vobj};
+ *         // use obj
+ *         // ....
+ *     }
+ *
+ * The implementation will validate the input object
  * if validation is enabled, or return Status::OK() otherwise.
  */
+class ValidatedBSONObj {
+public:
+    ValidatedBSONObj() = default;
+    explicit ValidatedBSONObj(BSONObj value) : _val{std::move(value)} {}
+
+    explicit operator const BSONObj&() const& {
+        return _val;
+    }
+
+    explicit operator BSONObj() && {
+        return std::move(_val);
+    }
+
+private:
+    BSONObj _val;
+};
+}  // namespace rpc
+
 template <>
-struct Validator<BSONObj> {
-    static Status validateLoad(const char* ptr, size_t length) {
-        if (!serverGlobalParams.objcheck) {
-            return Status::OK();
-        }
+struct DataType::Handler<rpc::ValidatedBSONObj> {
+    static Status load(rpc::ValidatedBSONObj* vt,
+                       const char* ptr,
+                       size_t length,
+                       size_t* advanced,
+                       std::ptrdiff_t debugOffset);
 
-        auto status = validateBSON(ptr, length);
-        if (serverGlobalParams.crashOnInvalidBSONError && !status.isOK()) {
-            std::string msg = "Invalid BSON was received: " + status.toString() +
-                // Using std::min with length so we do not max anything out in case the corruption
-                // is in the size of the object. The hex dump will be longer if needed.
-                ", beginning 5000 characters: " + std::string(ptr, std::min(length, (size_t)5000)) +
-                ", length: " + std::to_string(length) +
-                // Using std::min with hex dump length, too, to ensure we do not throw in hexdump()
-                // because of exceeded length and miss out on the core dump of the fassert below.
-                ", hex dump: " + hexdump(ptr, std::min(length, kHexDumpMaxSize - 1));
-            Status builtStatus(ErrorCodes::InvalidBSON, redact(msg));
-            fassertFailedWithStatus(50761, builtStatus);
-        }
-        return status;
-    }
+    static Status store(const rpc::ValidatedBSONObj& vt,
+                        char* ptr,
+                        size_t length,
+                        size_t* advanced,
+                        std::ptrdiff_t debugOffset);
 
-    static Status validateStore(const BSONObj& toStore) {
-        return Status::OK();
-    }
+    static rpc::ValidatedBSONObj defaultConstruct();
 };
 }  // namespace mongo

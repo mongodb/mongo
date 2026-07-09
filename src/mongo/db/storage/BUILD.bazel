@@ -192,6 +192,7 @@ mongo_cc_library(
         "//src/mongo/bson:bson_validate",
         "//src/mongo/bson/dotted_path:dotted_path_support",
         "//src/mongo/db:server_base",
+        "//src/mongo/rpc:object_check",
     ],
 )
 

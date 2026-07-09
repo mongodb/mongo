@@ -31,7 +31,6 @@
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
-#include "mongo/base/data_type_validated.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
@@ -53,7 +52,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
+#include "mongo/rpc/object_check.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
@@ -1384,7 +1383,7 @@ ConstDataRange binDataToCDR(BSONElement element);
 template <typename T>
 T parseFromCDR(ConstDataRange cdr) {
     ConstDataRangeCursor cdc(cdr);
-    auto obj = cdc.readAndAdvance<Validated<BSONObj>>();
+    BSONObj obj{cdc.readAndAdvance<rpc::ValidatedBSONObj>()};
 
     IDLParserContext ctx("root");
     return T::parse(obj, ctx);
