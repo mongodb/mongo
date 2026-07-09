@@ -39,10 +39,10 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
+#include <limits>
 #include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -138,17 +138,15 @@ TEST_F(MatchStageTest, DoesNotThreadMemoryTrackerWhenExpressionMemoryTrackingDis
     ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluationsWithTracker, 0);
 }
 
-TEST_F(MatchStageTest, MemoryTrackerLimitReflectsKnob) {
+TEST_F(MatchStageTest, MemoryTrackerHasNoPerStageLimit) {
     unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
     unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", true);
-    const long long customLimit = 1024;
-    unittest::ServerParameterGuard knobGuard("internalMatchStageMaxExpressionEvaluationBytes",
-                                             customLimit);
 
     runMatchWithObservingExpression(getExpCtx());
 
     ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluationsWithTracker, 1);
-    ASSERT_EQ(MemoryTrackerObservingExpression::gLastTrackerMaxBytes, customLimit);
+    ASSERT_EQ(MemoryTrackerObservingExpression::gLastTrackerMaxBytes,
+              std::numeric_limits<int64_t>::max());
 }
 
 TEST_F(MatchStageTest, StageNameIsSetInEvaluationContext) {

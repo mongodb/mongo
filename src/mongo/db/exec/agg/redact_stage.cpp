@@ -33,7 +33,6 @@
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/document_source_redact.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/util/assert_util.h"
 
 #include <string_view>
@@ -59,8 +58,8 @@ RedactStage::RedactStage(std::string_view stageName,
                          const std::shared_ptr<RedactProcessor>& redactProcessor)
     : Stage(stageName, expCtx),
       _redactProcessor{redactProcessor},
-      _memoryTracker(OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(
-          *expCtx, loadMemoryLimit(StageMemoryLimit::RedactStageMaxExpressionEvaluationBytes))) {
+      _memoryTracker(
+          OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*expCtx)) {
     if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
         feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
         _expressionEvalCtx.tracker = &_memoryTracker;

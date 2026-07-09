@@ -48,6 +48,7 @@
 #include "mongo/util/str.h"
 
 #include <deque>
+#include <limits>
 #include <list>
 #include <string_view>
 #include <vector>
@@ -474,17 +475,15 @@ TEST_F(LookupStageTest, DoesNotThreadMemoryTrackerWhenExpressionMemoryTrackingDi
     ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluationsWithTracker, 0);
 }
 
-TEST_F(LookupStageTest, MemoryTrackerLimitReflectsKnob) {
+TEST_F(LookupStageTest, MemoryTrackerHasNoPerStageLimit) {
     unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
     unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", true);
-    const long long customLimit = 1024;
-    unittest::ServerParameterGuard knobGuard("internalLookupStageMaxExpressionEvaluationBytes",
-                                             customLimit);
 
     runLookupWithObservingLetVariable(getExpCtx());
 
     ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluationsWithTracker, 1);
-    ASSERT_EQ(MemoryTrackerObservingExpression::gLastTrackerMaxBytes, customLimit);
+    ASSERT_EQ(MemoryTrackerObservingExpression::gLastTrackerMaxBytes,
+              std::numeric_limits<int64_t>::max());
 }
 
 TEST_F(LookupStageTest, StageNameIsSetInEvaluationContext) {

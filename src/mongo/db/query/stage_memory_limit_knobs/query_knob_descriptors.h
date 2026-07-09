@@ -127,22 +127,6 @@
          kInternalCountScanStageMaxMemoryBytesName,                                       \
          internalCountScanStageMaxMemoryBytes,                                            \
          getCountScanStageMaxMemoryBytes)                                                 \
-    KNOB(kSingleDocumentTransformationStageMaxExpressionEvaluationBytes,                  \
-         kInternalSingleDocumentTransformationStageMaxExpressionEvaluationBytesName,      \
-         internalSingleDocumentTransformationStageMaxExpressionEvaluationBytes,           \
-         getSingleDocumentTransformationStageMaxExpressionEvaluationBytes)                \
-    KNOB(kMatchStageMaxExpressionEvaluationBytes,                                         \
-         kInternalMatchStageMaxExpressionEvaluationBytesName,                             \
-         internalMatchStageMaxExpressionEvaluationBytes,                                  \
-         getMatchStageMaxExpressionEvaluationBytes)                                       \
-    KNOB(kLookupStageMaxExpressionEvaluationBytes,                                        \
-         kInternalLookupStageMaxExpressionEvaluationBytesName,                            \
-         internalLookupStageMaxExpressionEvaluationBytes,                                 \
-         getLookupStageMaxExpressionEvaluationBytes)                                      \
-    KNOB(kRedactStageMaxExpressionEvaluationBytes,                                        \
-         kInternalRedactStageMaxExpressionEvaluationBytesName,                            \
-         internalRedactStageMaxExpressionEvaluationBytes,                                 \
-         getRedactStageMaxExpressionEvaluationBytes)                                      \
     /* End MONGO_EXPAND_QUERY_KNOBS_STAGE_MEMORY_LIMIT */
 // clang-format on
 

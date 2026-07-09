@@ -44,6 +44,7 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
+#include <limits>
 #include <memory>
 
 
@@ -182,17 +183,15 @@ TEST_F(DocumentSourceRedactTest, DoesNotThreadMemoryTrackerWhenQueryMemoryTracki
     ASSERT_EQ(RedactMemoryTrackerObservingExpression::gEvaluationsWithTracker, 0);
 }
 
-TEST_F(DocumentSourceRedactTest, MemoryTrackerLimitReflectsKnob) {
+TEST_F(DocumentSourceRedactTest, MemoryTrackerHasNoPerStageLimit) {
     unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
     unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", true);
-    const long long customLimit = 1024;
-    unittest::ServerParameterGuard knobGuard("internalRedactStageMaxExpressionEvaluationBytes",
-                                             customLimit);
 
     runRedactWithObservingExpression(getExpCtx());
 
     ASSERT_EQ(RedactMemoryTrackerObservingExpression::gEvaluationsWithTracker, 1);
-    ASSERT_EQ(RedactMemoryTrackerObservingExpression::gLastTrackerMaxBytes, customLimit);
+    ASSERT_EQ(RedactMemoryTrackerObservingExpression::gLastTrackerMaxBytes,
+              std::numeric_limits<int64_t>::max());
 }
 }  // namespace
 }  // namespace mongo

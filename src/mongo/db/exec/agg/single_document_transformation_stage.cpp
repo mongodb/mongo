@@ -34,7 +34,6 @@
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 
 #include <string_view>
 
@@ -76,10 +75,8 @@ SingleDocumentTransformationStage::SingleDocumentTransformationStage(
     : Stage(stageName, pExpCtx),
       _ownedStageName(stageName),
       _transformationProcessor(transformationProcessor),
-      _memoryTracker(OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(
-          *pExpCtx,
-          loadMemoryLimit(
-              StageMemoryLimit::SingleDocumentTransformationStageMaxExpressionEvaluationBytes))) {
+      _memoryTracker(
+          OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*pExpCtx)) {
     _commonStats.stageTypeStr = _ownedStageName;
     if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
         feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {

@@ -71,11 +71,6 @@ const excludeKnobs = [
     "internalSlotBasedExecutionAndHashStageMaxMemoryBytes",
     "internalUpdateStageMaxMemoryBytes",
     "internalCountScanStageMaxMemoryBytes",
-    // Expression-evaluation byte limits: uassert (no spill) and apply to internal pipelines.
-    "internalSingleDocumentTransformationStageMaxExpressionEvaluationBytes",
-    "internalMatchStageMaxExpressionEvaluationBytes",
-    "internalLookupStageMaxExpressionEvaluationBytes",
-    "internalRedactStageMaxExpressionEvaluationBytes",
 ];
 
 const knobSchema = db
