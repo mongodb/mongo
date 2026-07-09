@@ -104,6 +104,36 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "ifr_sender_version",
+    srcs = [
+        "ifr_sender_version.cpp",
+    ],
+    hdrs = [
+        "ifr_sender_version.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "ifr_sender_version_test",
+    srcs = [
+        "ifr_sender_version_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_sixth_group",
+        "server-programmability",
+    ],
+    deps = [
+        ":idl_parser",
+        ":ifr_sender_version",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
     name = "idl_test_base",
     srcs = [
         "server_parameter_specialized_test_defs.cpp",

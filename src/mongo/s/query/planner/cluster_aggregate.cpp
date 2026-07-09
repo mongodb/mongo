@@ -166,11 +166,15 @@ Document serializeForPassthrough(const boost::intrusive_ptr<ExpressionContext>& 
     auto readConcern = req.getReadConcern();
     auto writeConcern = req.getWriteConcern();
     auto rawData = req.getRawData();
+    auto ifrSenderVersion = req.getIfrSenderVersion();
     req.setGenericArguments({});
     req.setMaxTimeMS(maxTimeMS);
     req.setReadConcern(std::move(readConcern));
     req.setWriteConcern(std::move(writeConcern));
     req.setRawData(rawData);
+    if (ifrSenderVersion) {
+        req.setIfrSenderVersion(std::move(*ifrSenderVersion));
+    }
 
     // If the wire RC has no level, fall back to opCtx so the dispatcher's CWRC-merged RC
     // reaches the shard. Otherwise keep the wire RC untouched (master semantics).

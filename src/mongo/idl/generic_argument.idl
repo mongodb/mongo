@@ -50,6 +50,33 @@ imports:
     - "mongo/db/transaction/transaction_runtime_context.idl"
 
 structs:
+    IFRSenderVersion:
+        description: >-
+            The full binary version of the sender of a request, decomposed into its numeric
+            components so that receivers can compare it against another version. The components
+            mirror 'VersionInfoInterface' (major.minor.patch plus an 'extra' component that encodes
+            pre-release ordering: e.g. a release-candidate build sorts *before* the corresponding
+            final release). Comparing two 'IFRSenderVersion's lexicographically in
+            (major, minor, patch, extra) order therefore yields correct version ordering, including
+            at patch-release granularity. This is intentionally finer-grained than an FCV string
+            (e.g. "9.0") so IFR flags shipped in patch releases can be resolved correctly.
+        strict: true
+        generate_comparison_operators: true
+        fields:
+            major:
+                type: int
+                comparison_order: 0
+            minor:
+                type: int
+                comparison_order: 1
+            patch:
+                type: int
+                comparison_order: 2
+            extra:
+                type: int
+                comparison_order: 3
+                validator: {lte: 0}
+
     GenericArguments:
         description: "Arguments accepted by all commands."
         strict: false
@@ -435,7 +462,22 @@ structs:
             # throughout the query's execution. Currently, used only in Agg command pipeline.
             ifrFlags:
                 type: array<object_owned>
+                # TODO SERVER-130136: update to false once we start conditionally propagating
+                # both senderVersion and flags.
                 forward_to_shards: true
+                optional: true
+                stability: "internal"
+            # The sender's full binary version, decomposed into numeric components (see
+            # IFRSenderVersion). Used by the receiver to resolve IFR flags that were active on the
+            # receiver but absent from the payload: if ifrSenderVersion < flag.introductionVersion
+            # the flag defaults to false (sender predates the flag); otherwise the receiver uses its
+            # local default (sender is newer and has likely removed/promoted the flag). Carrying the
+            # full binary version rather than an FCV string lets this comparison stay correct when
+            # IFR flags ship in patch releases (a 9.0.1 router and a 9.0.5 shard report distinct
+            # versions instead of both reporting "9.0").
+            ifrSenderVersion:
+                type: IFRSenderVersion
+                forward_to_shards: false
                 optional: true
                 stability: "internal"
             # Requests a specific priority or task type for execution control for the command.

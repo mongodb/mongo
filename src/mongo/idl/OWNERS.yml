@@ -3,3 +3,6 @@ filters:
   - "*":
     approvers:
       - 10gen/server-programmability
+  - "ifr_sender_version*":
+    approvers:
+      - 10gen/query-execution

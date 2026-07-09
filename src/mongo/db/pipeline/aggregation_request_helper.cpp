@@ -111,6 +111,7 @@ void addIfrFlagsToRequest(AggregateCommandRequest& request,
     if (!flagsToSerialize.empty()) {
         request.setIfrFlags(ifrContext->serializeFlagValues(flagsToSerialize));
     }
+    // TODO SERVER-130136: stamp ifrSenderVersion on outgoing requests.
 }
 
 void validate(const AggregateCommandRequest& aggregate,
