@@ -27,11 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/rpc/object_check.h"
+#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 
 #include "mongo/base/data_range_cursor.h"
-#include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/server_options.h"
@@ -43,10 +41,9 @@
 #include <iterator>
 #include <variant>
 
-
-namespace mongo::rpc {
 namespace {
 
+using namespace mongo;
 using std::begin;
 using std::end;
 
@@ -62,7 +59,7 @@ TEST(DataTypeValidated, BSONValidationEnabled) {
     char buf[1024] = {0};
     std::copy(valid.objdata(), valid.objdata() + valid.objsize(), begin(buf));
     {
-        ValidatedBSONObj v;
+        Validated<BSONObj> v;
         ConstDataRangeCursor cdrc(begin(buf), end(buf));
         ASSERT_OK(cdrc.readAndAdvanceNoThrow(&v));
     }
@@ -77,7 +74,7 @@ TEST(DataTypeValidated, BSONValidationEnabled) {
     }
 
     {
-        ValidatedBSONObj v;
+        Validated<BSONObj> v;
         ConstDataRangeCursor cdrc(begin(buf), end(buf));
         ASSERT_NOT_OK(cdrc.readAndAdvanceNoThrow(&v));
     }
@@ -85,7 +82,7 @@ TEST(DataTypeValidated, BSONValidationEnabled) {
     {
         // disable validation
         setValidation(false);
-        ValidatedBSONObj v;
+        Validated<BSONObj> v;
         ConstDataRangeCursor cdrc(begin(buf), end(buf));
         ASSERT_OK(cdrc.readAndAdvanceNoThrow(&v));
     }
@@ -115,7 +112,7 @@ DEATH_TEST(ObjectCheckDeathTest, BSONValidationEnabledWithCrashOnError, "50761")
     }
 
     {
-        ValidatedBSONObj v;
+        Validated<BSONObj> v;
         ConstDataRangeCursor cdrc(begin(buf), end(buf));
         // Crashes because of invalid BSON
         cdrc.readAndAdvanceNoThrow(&v).ignore();
@@ -123,4 +120,3 @@ DEATH_TEST(ObjectCheckDeathTest, BSONValidationEnabledWithCrashOnError, "50761")
 }
 
 }  // namespace
-}  // namespace mongo::rpc

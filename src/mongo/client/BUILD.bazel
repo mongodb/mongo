@@ -121,7 +121,6 @@ mongo_cc_library(
         "//src/mongo/executor:remote_command",
         "//src/mongo/rpc:command_status",
         "//src/mongo/rpc:metadata",
-        "//src/mongo/rpc:object_check",
         "//src/mongo/shell:program_runner",
         "//src/mongo/util:icu",
         "//src/mongo/util:md5",
@@ -374,7 +373,6 @@ mongo_cc_library(
         "sasl_aws_common",
         "//src/mongo/bson:bson_validate",
         "//src/mongo/db:server_base",
-        "//src/mongo/rpc:object_check",
         "//src/third_party/libmongocrypt:mongocrypt",
     ],
 )

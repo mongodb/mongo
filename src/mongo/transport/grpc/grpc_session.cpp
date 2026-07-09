@@ -30,6 +30,7 @@
 #include "mongo/transport/grpc/grpc_session.h"
 
 #include "mongo/base/data_type.h"
+#include "mongo/base/data_type_validated.h"
 #include "mongo/config.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
@@ -226,7 +227,7 @@ boost::optional<const ClientMetadata&> IngressSession::getClientMetadata() const
     fmt::memory_buffer buffer{};
     base64::decode(buffer, *_encodedClientMetadata);
     BufReader reader(buffer.data(), buffer.size());
-    BSONObj obj{reader.read<rpc::ValidatedBSONObj>()};
+    BSONObj obj = reader.read<Validated<BSONObj>>();
     uassert(11525500, "More data than just a valid bson object provided", reader.atEof());
     decoded->emplace(std::move(obj));
     return **decoded;

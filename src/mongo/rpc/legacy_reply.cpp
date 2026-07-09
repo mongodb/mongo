@@ -35,7 +35,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/rpc/object_check.h"
+#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -69,7 +69,7 @@ LegacyReply::LegacyReply(const Message* message) {
                           << " expected a value of 0 but got " << qr.getStartingFrom(),
             qr.getStartingFrom() == 0);
 
-    auto status = rpc::checkBSONObj(qr.data(), qr.dataLen());
+    auto status = Validator<BSONObj>::validateLoad(qr.data(), qr.dataLen());
     uassert(ErrorCodes::InvalidBSON,
             str::stream() << "Got legacy command reply with invalid BSON in the metadata field"
                           << causedBy(status),

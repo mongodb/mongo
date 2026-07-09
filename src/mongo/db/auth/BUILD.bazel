@@ -671,7 +671,6 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
         "//src/mongo/db/commands:test_commands_enabled",
-        "//src/mongo/rpc:object_check",
         "//src/mongo/util:icu",
         "//src/mongo/util:md5",
         "//src/mongo/util/net:network",

@@ -85,7 +85,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/bson:bson_validate",
+        "//src/mongo/bson:bson_validate",  # Validated<BSONObj>
         "//src/mongo/db:service_context",
         "//src/third_party/libmongocrypt:mongocrypt",
     ],
@@ -122,7 +122,6 @@ mongo_cc_library(
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/query:query_knobs",
         "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter",
-        "//src/mongo/rpc:object_check",
         "//src/mongo/shell:kms_idl",
         "//src/mongo/util:testing_options",
         "//src/third_party/libmongocrypt:mongocrypt",

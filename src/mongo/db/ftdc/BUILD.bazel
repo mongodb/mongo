@@ -72,7 +72,6 @@ mongo_cc_library(
         "//src/mongo/db:shard_role_api",
         "//src/mongo/db/admission/execution_control:execution_admission_context",
         "//src/mongo/db/commands/server_status:server_status_metric",
-        "//src/mongo/rpc:object_check",
         "//src/mongo/util:varint",
         "//src/mongo/util/concurrency:spin_lock",
         "@zlib",

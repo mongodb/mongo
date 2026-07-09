@@ -27,57 +27,72 @@
  *    it in the license file.
  */
 
-#pragma once
-
 #include "mongo/base/data_type_validated.h"
+
+#include "mongo/base/data_range_cursor.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/bson/bson_validate.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/db/server_options.h"
-#include "mongo/logv2/redaction.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/hex.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/unittest.h"
 
-#include <algorithm>
-#include <cstddef>
-#include <string>
+#include <iterator>
 
-// We do not use the rpc namespace here so we can specialize Validator.
 namespace mongo {
-class BSONObj;
-class Status;
-
-/**
- * A validator for BSON objects. The implementation will validate the input object
- * if validation is enabled, or return Status::OK() otherwise.
- */
 template <>
-struct Validator<BSONObj> {
+struct Validator<char> {
     static Status validateLoad(const char* ptr, size_t length) {
-        if (!serverGlobalParams.objcheck) {
+        if ((length >= sizeof(char)) && (ptr[0] == 0xFU)) {
             return Status::OK();
         }
-
-        auto status = validateBSON(ptr, length);
-        if (serverGlobalParams.crashOnInvalidBSONError && !status.isOK()) {
-            std::string msg = "Invalid BSON was received: " + status.toString() +
-                // Using std::min with length so we do not max anything out in case the corruption
-                // is in the size of the object. The hex dump will be longer if needed.
-                ", beginning 5000 characters: " + std::string(ptr, std::min(length, (size_t)5000)) +
-                ", length: " + std::to_string(length) +
-                // Using std::min with hex dump length, too, to ensure we do not throw in hexdump()
-                // because of exceeded length and miss out on the core dump of the fassert below.
-                ", hex dump: " + hexdump(ptr, std::min(length, kHexDumpMaxSize - 1));
-            Status builtStatus(ErrorCodes::InvalidBSON, redact(msg));
-            fassertFailedWithStatus(50761, builtStatus);
-        }
-        return status;
+        return Status(ErrorCodes::BadValue, "bad");
     }
 
-    static Status validateStore(const BSONObj& toStore) {
-        return Status::OK();
+    static Status validateStore(const char& toStore) {
+        if (toStore == 0xFU) {
+            return Status::OK();
+        }
+        return Status(ErrorCodes::BadValue, "bad");
     }
 };
 }  // namespace mongo
+
+namespace {
+
+using namespace mongo;
+using std::begin;
+using std::end;
+
+TEST(DataTypeValidated, SuccessfulValidation) {
+    char buf[1];
+
+    {
+        DataRangeCursor drc(begin(buf), end(buf));
+        ASSERT_OK(drc.writeAndAdvanceNoThrow(Validated<char>(0xFU)));
+    }
+
+    {
+        Validated<char> valid;
+        ConstDataRangeCursor cdrc(begin(buf), end(buf));
+        ASSERT_OK(cdrc.readAndAdvanceNoThrow(&valid));
+        ASSERT_EQUALS(valid.val, char{0xFU});
+    }
+}
+
+TEST(DataTypeValidated, FailedValidation) {
+    char buf[1];
+
+    {
+        DataRangeCursor drc(begin(buf), end(buf));
+        ASSERT_NOT_OK(drc.writeAndAdvanceNoThrow(Validated<char>(0x01)));
+    }
+
+    buf[0] = char{0x01};
+
+    {
+        Validated<char> valid;
+        ConstDataRangeCursor cdrc(begin(buf), end(buf));
+        ASSERT_NOT_OK(cdrc.readAndAdvanceNoThrow(&valid));
+    }
+}
+
+}  // namespace

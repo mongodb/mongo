@@ -16,7 +16,6 @@ mongo_cc_library(
         "op_msg.cpp",
     ],
     deps = [
-        ":object_check",
         ":telemetry_context_section",
         "//src/mongo/bson:bson_validate",
         "//src/mongo/bson/dotted_path:dotted_path_support",
@@ -126,18 +125,6 @@ idl_generator(
 )
 
 mongo_cc_library(
-    name = "object_check",
-    srcs = [
-        "object_check.cpp",
-        ":object_check_gen",
-    ],
-    deps = [
-        "//src/mongo/bson:bson_validate",
-        "//src/mongo/db:server_base",
-    ],
-)
-
-mongo_cc_library(
     name = "rpc",
     srcs = [
         "check_allowed_op_query_cmd.cpp",
@@ -146,11 +133,11 @@ mongo_cc_library(
         "legacy_reply_builder.cpp",
         "legacy_request.cpp",
         "reply_builder_interface.cpp",
+        ":object_check_gen",
     ],
     deps = [
         ":message",
         ":metadata",
-        ":object_check",
         ":rewrite_state_change_errors",
         "//src/mongo/db:dbmessage",
         "//src/mongo/db:server_base",

@@ -32,6 +32,7 @@
 #include "mongo/base/data_builder.h"
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
+#include "mongo/base/data_type_validated.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -47,7 +48,7 @@
 #include "mongo/db/auth/oidc_protocol_gen.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/rpc/object_check.h"
+#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/http_client.h"
 #include "mongo/util/str.h"
@@ -301,7 +302,7 @@ StatusWith<bool> SaslOIDCClientConversation::_secondStep(std::string_view input,
         // Currently, only device authorization flow is supported for token acquisition.
         // Parse device authorization endpoint from input.
         ConstDataRange inputCdr(input.data(), input.size());
-        BSONObj payload{inputCdr.read<rpc::ValidatedBSONObj>()};
+        auto payload = inputCdr.read<Validated<BSONObj>>().val;
         auto serverReply = auth::OIDCMechanismServerStep1::parse(
             payload, IDLParserContext{"oidcServerStep1Reply"});
 

@@ -31,11 +31,12 @@
 
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_type_validated.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/db/ftdc/compressor.h"
 #include "mongo/db/ftdc/util.h"
-#include "mongo/rpc/object_check.h"
+#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 #include "mongo/util/varint.h"
 
 #include <cstdint>
@@ -71,12 +72,12 @@ StatusWith<std::vector<BSONObj>> FTDCDecompressor::uncompress(ConstDataRange buf
     ConstDataRangeCursor cdc = statusUncompress.getValue();
 
     // The document is not part of any checksum so we must validate it is correct
-    auto swRef = cdc.readAndAdvanceNoThrow<rpc::ValidatedBSONObj>();
+    auto swRef = cdc.readAndAdvanceNoThrow<Validated<BSONObj>>();
     if (!swRef.isOK()) {
         return {swRef.getStatus()};
     }
 
-    BSONObj ref{swRef.getValue()};
+    BSONObj ref = swRef.getValue();
 
     // Read count of metrics
     auto swMetricsCount = cdc.readAndAdvanceNoThrow<LittleEndian<std::uint32_t>>();

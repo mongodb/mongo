@@ -40,11 +40,12 @@
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_type_validated.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/db/ftdc/file_reader.h"
 #include "mongo/db/ftdc/util.h"
-#include "mongo/rpc/object_check.h"
+#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/str.h"
@@ -217,12 +218,12 @@ StatusWith<BSONObj> FTDCFileReader::readDocument() {
     ConstDataRange cdr(_buffer.data(), _buffer.data() + bsonLength);
 
     // TODO: Validated only validates objects based on a flag which is the default at the moment
-    auto swl = cdr.readNoThrow<rpc::ValidatedBSONObj>();
+    auto swl = cdr.readNoThrow<Validated<BSONObj>>();
     if (!swl.isOK()) {
         return swl.getStatus();
     }
 
-    return BSONObj{swl.getValue()};
+    return {swl.getValue().val};
 }
 
 Status FTDCFileReader::open(const boost::filesystem::path& file) {
