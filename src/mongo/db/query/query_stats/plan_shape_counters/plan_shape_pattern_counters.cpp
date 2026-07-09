@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/query_stats/plan_shape_counters/plan_shape_pattern_counters.h"
 
-#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/query_solution_analyzer.h"
 #include "mongo/util/assert_util.h"
@@ -45,8 +44,6 @@ namespace {
 
 using query_solution_analyzer::Range;
 using query_solution_analyzer::StateMachine;
-using query_solution_analyzer::StateMachineMatcher;
-using query_solution_analyzer::treeSearch;
 
 // Node families collapsed by the specific plan shapes: any projection/sort variant matches the
 // "PROJECT"/"SORT" step of a shape.
@@ -209,42 +206,17 @@ StateMachine makePlanShapeRule() {
     return sm;
 }
 
-// Returns the root of the find portion of the QuerySolution.
-const QuerySolutionNode* getFindRoot(const QuerySolution& solution) {
-    const QuerySolutionNode* node = solution.root();
-    if (!solution.hasExtension()) {
-        return node;
-    }
-    // The unextended root can be removed by some optimizations, so we can't
-    // search for the exact node ID.
-    while (node->nodeId() > solution.unextendedRootId()) {
-        tassert(11907602,
-                "Extension chain ended before reaching the unextended root",
-                !node->children.empty());
-        const QuerySolutionNode* child = node->children[0].get();
-        tassert(11907603,
-                "Node ids do not strictly decrease down the extension branch",
-                child->nodeId() < node->nodeId());
-        node = child;
-    }
-    return node;
+const StateMachine& planShapeMachine() {
+    static const StateMachine machine = makePlanShapeRule();
+    return machine;
 }
-
 }  // namespace
 
-boost::optional<PlanShapeCounter> identifyPlanShapeForCounters(const QuerySolution& qs) {
-    static const StateMachine machine = makePlanShapeRule();
-
-    auto findRoot = getFindRoot(qs);
-    tassert(11907601, "Expected to have a non-null find-layer QSN node", findRoot);
-
+query_solution_analyzer::StateMachineMatcher makePlanShapeMatcher() {
     // Pass ignoreNonEssentialNodes=true to have the state machine only consider
     // nodes that are involved in defining the plan shape.
-    StateMachineMatcher matcher(machine, true /* ignoreNonEssentialNodes */);
-    if (!treeSearch(findRoot, matcher)) {
-        return boost::none;
-    }
-    return static_cast<PlanShapeCounter>(*matcher.getMatchedTag());
+    return query_solution_analyzer::StateMachineMatcher(planShapeMachine(),
+                                                        true /* ignoreNonEssentialNodes */);
 }
 
 }  // namespace mongo::plan_shape_counters

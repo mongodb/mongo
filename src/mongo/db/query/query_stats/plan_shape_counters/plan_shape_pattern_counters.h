@@ -29,22 +29,19 @@
 
 #pragma once
 
+#include "mongo/db/query/query_solution_analyzer.h"
 #include "mongo/db/query/query_stats/plan_shape_counters/plan_shape_counts.h"
+#include "mongo/db/query/util/named_enum.h"
 
-#include <boost/optional.hpp>
+#include <cstddef>
 
 namespace mongo {
-class QuerySolution;
 namespace plan_shape_counters {
 
 /**
- * Matches the winning 'solution' against the specific plan shapes tracked by query stats and
- * returns the matched shape's counter, or boost::none if the plan matches no tracked shape.
- * Shapes are matched against the find-layer QuerySolutionNode root. Stages that don't
- * contribute to a plan's shape (skip, limit, sharding filter, sort key generator, return key)
- * are ignored wherever they appear.
+ * Returns a state machine that matches a plan shape pattern against a given QSN.
  */
-boost::optional<PlanShapeCounter> identifyPlanShapeForCounters(const QuerySolution& solution);
+query_solution_analyzer::StateMachineMatcher makePlanShapeMatcher();
 
 }  // namespace plan_shape_counters
 }  // namespace mongo

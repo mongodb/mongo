@@ -71,27 +71,28 @@ template <class Rule>
 concept HasFinish = requires(Rule& rule, RuleEngine& engine) { rule.finish(engine); };
 
 template <class Rule, class N>
-void callPreVisit(Rule& rule, RuleEngine& engine, const N& node, size_t index) {
+void callPreVisit(
+    Rule& rule, RuleEngine& engine, const N& node, size_t index, bool allowEarlyExit) {
     if constexpr (HasPreVisit<Rule, N>) {
-        if (engine.hasMatch())
+        if (allowEarlyExit && engine.hasMatch())
             return;
         rule.preVisit(engine, node, index);
     }
 }
 
 template <class Rule, class N>
-void callPostVisit(Rule& rule, RuleEngine& engine, const N& node) {
+void callPostVisit(Rule& rule, RuleEngine& engine, const N& node, bool allowEarlyExit) {
     if constexpr (HasPostVisit<Rule, N>) {
-        if (engine.hasMatch())
+        if (allowEarlyExit && engine.hasMatch())
             return;
         rule.postVisit(engine, node);
     }
 }
 
 template <class Rule>
-void callFinish(Rule& rule, RuleEngine& engine) {
+void callFinish(Rule& rule, RuleEngine& engine, bool allowEarlyExit) {
     if constexpr (HasFinish<Rule>) {
-        if (engine.hasMatch())
+        if (allowEarlyExit && engine.hasMatch())
             return;
         rule.finish(engine);
     }
@@ -107,6 +108,9 @@ void visit(F&& f, const QuerySolutionNode& node) {
             break;
         case STAGE_GROUP:
             f(static_cast<const GroupNode&>(node));
+            break;
+        case STAGE_COLLSCAN:
+            f(static_cast<const CollectionScanNode&>(node));
             break;
         case STAGE_IXSCAN:
             f(static_cast<const IndexScanNode&>(node));
@@ -157,35 +161,47 @@ void visit(F&& f, const QuerySolutionNode& node) {
  * };
  */
 template <class... Rules>
-const QuerySolutionNode* treeSearch(const QuerySolutionNode* root, Rules&&... rules) {
+const QuerySolutionNode* _treeSearch(const QuerySolutionNode* root,
+                                     bool allowEarlyExit,
+                                     Rules&&... rules) {
     RuleEngine engine;
     std::function<void(const QuerySolutionNode*, size_t)> walk = [&](const QuerySolutionNode* node,
                                                                      size_t index) {
-        visit([&](const auto& node) { (callPreVisit(rules, engine, node, index), ...); }, *node);
-        if (engine.hasMatch())
+        visit(
+            [&](const auto& node) {
+                (callPreVisit(rules, engine, node, index, allowEarlyExit), ...);
+            },
+            *node);
+        if (allowEarlyExit && engine.hasMatch())
             return;
 
         for (size_t i = 0; i < node->children.size(); ++i) {
             walk(node->children[i].get(), i);
-            if (engine.hasMatch())
+            if (allowEarlyExit && engine.hasMatch())
                 return;
         }
 
-        visit([&](const auto& node) { (callPostVisit(rules, engine, node), ...); }, *node);
+        visit([&](const auto& node) { (callPostVisit(rules, engine, node, allowEarlyExit), ...); },
+              *node);
     };
 
     walk(root, 0);
-    (callFinish(rules, engine), ...);
+    (callFinish(rules, engine, allowEarlyExit), ...);
 
     return engine.getMatchedNode();
+}
+
+template <class... Rules>
+const QuerySolutionNode* treeSearch(const QuerySolutionNode* root, Rules&&... rules) {
+    return _treeSearch(root, true /* allowEarlyExit */, rules...);
 }
 
 /**
  * Returns 'true' if the query solution tree at 'root' matches any of the rules defined by 'rules'.
  */
 template <class... Rules>
-bool treeMatchesAny(const QuerySolutionNode* root, Rules&&... rules) {
-    return treeSearch(root, std::forward<Rules>(rules)...) != nullptr;
+bool treeMatchesAny(const QuerySolutionNode* root, bool allowEarlyExit, Rules&&... rules) {
+    return _treeSearch(root, allowEarlyExit, std::forward<Rules>(rules)...) != nullptr;
 }
 
 struct Range {

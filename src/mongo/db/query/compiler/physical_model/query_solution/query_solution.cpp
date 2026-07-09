@@ -75,17 +75,6 @@ namespace {
 
 namespace wcp = ::mongo::wildcard_planning;
 
-void assertSupportsLeftMostBranchTraversal(const QuerySolutionNode* node) {
-    // At the moment, we only extend a solution plan with a tree for $group stage(s), which have
-    // exactly one child. The only node with more than one child that we accept is $lookup,
-    // where we descend down the first child, representing the main collection. We'll replace
-    // the left-most branch descent with a full tree traversal, if/when it becomes necessary.
-    tassert(5842800,
-            "Only chain extension trees are supported",
-            node->children.size() == 1 || node->getType() == StageType::STAGE_EQ_LOOKUP ||
-                node->getType() == StageType::STAGE_EQ_LOOKUP_UNWIND);
-}
-
 // Create an ordred interval list which represents the bounds for all BSON elements of type String,
 // Object, or Array.
 OrderedIntervalList buildStringBoundsOil(const std::string& keyName) {
@@ -364,7 +353,7 @@ int QuerySolution::extendWith(std::unique_ptr<QuerySolutionNode> extensionRoot) 
                 "Cannot find the sentinel node in the extension tree",
                 !parentOfSentinel->children.empty());
 
-        assertSupportsLeftMostBranchTraversal(parentOfSentinel);
+        QuerySolutionNode::assertSupportsLeftMostBranchTraversal(parentOfSentinel);
 
         current = parentOfSentinel->children[0].get();
         ++extensionDepth;
@@ -390,7 +379,7 @@ int QuerySolution::removePathFromExtension(PlanNodeId targetNode) {
     while ((*current)->nodeId() != targetNode) {
         QuerySolutionNode* currentPtr = current->get();
 
-        assertSupportsLeftMostBranchTraversal(currentPtr);
+        QuerySolutionNode::assertSupportsLeftMostBranchTraversal(currentPtr);
 
         tassert(12152002,
                 "Cannot remove a path that extends beyond the unextended root node",

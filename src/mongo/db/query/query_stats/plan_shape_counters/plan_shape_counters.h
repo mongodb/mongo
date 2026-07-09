@@ -45,7 +45,7 @@ struct PlanShapeAnalysisResult {
 
 /*
  * Entry point for computing plan shape counters for query stats.
- * Takes a QuerySolution and computes three kinds of counters:
+ * Takes a QuerySolution and computes three kinds of counters in a single traversal of the tree:
  *  - An enum to identify what pattern of query solution this is (see plan_shape_pattern_counters.h)
  *  - Counts of the access paths used in the qsn.
  *  - Counts of the types of nodes that appear in the QSN.

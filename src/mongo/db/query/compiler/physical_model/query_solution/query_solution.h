@@ -341,6 +341,17 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QuerySolutionNode {
      */
     std::pair<const QuerySolutionNode*, size_t> getFirstNodeByType(StageType type) const;
 
+    static void assertSupportsLeftMostBranchTraversal(const QuerySolutionNode* node) {
+        // At the moment, we only extend a solution plan with a tree for $group stage(s), which have
+        // exactly one child. The only node with more than one child that we accept is $lookup,
+        // where we descend down the first child, representing the main collection. We'll replace
+        // the left-most branch descent with a full tree traversal, if/when it becomes necessary.
+        tassert(5842800,
+                "Only chain extension trees are supported",
+                node->children.size() == 1 || node->getType() == StageType::STAGE_EQ_LOOKUP ||
+                    node->getType() == StageType::STAGE_EQ_LOOKUP_UNWIND);
+    }
+
 protected:
     /**
      * Formatting helper used by toString().

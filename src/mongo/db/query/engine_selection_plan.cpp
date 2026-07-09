@@ -338,17 +338,20 @@ EngineSelectionResult engineSelectionForPlan(const QuerySolution* solution,
     // "classic" forces classic. This takes precedence over all other rules.
     if (auto scoped = engineSelectionOverrideByIndexName.scoped();
         MONGO_unlikely(scoped.isActive())) {
-        if (treeMatchesAny(solution->root(), IndexNameRule_ForTest("sbe"))) {
+        if (treeMatchesAny(
+                solution->root(), true /* allowEarlyExit*/, IndexNameRule_ForTest("sbe"))) {
             return {EngineChoice::kSbe, solution->root()};
         }
-        if (treeMatchesAny(solution->root(), IndexNameRule_ForTest("classic"))) {
+        if (treeMatchesAny(
+                solution->root(), true /* allowEarlyExit*/, IndexNameRule_ForTest("classic"))) {
             return {EngineChoice::kClassic, nullptr};
         }
     }
 
     // TODO SERVER-129910 statically generate LU rule.
     const auto luRule = makeLookupUnwindRule(ifrContext);
-    const bool containsLuPattern = treeMatchesAny(dataAccessNode, StateMachineMatcher(luRule));
+    const bool containsLuPattern =
+        treeMatchesAny(dataAccessNode, true /* allowEarlyExit*/, StateMachineMatcher(luRule));
     LOGV2_DEBUG(13022705,
                 5,
                 "Engine selection analyzed plan for LU pattern",
