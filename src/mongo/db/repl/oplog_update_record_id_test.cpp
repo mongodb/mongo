@@ -30,6 +30,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
@@ -852,6 +853,48 @@ public:
     }
 };
 
+// Builds a document whose 'data' field is a BSONColumn BinData with corrupt column content. The
+// document is structurally valid BSON, so mutablebson and _id extraction handle it fine, but
+// validateBSON rejects the column with NonConformantBSON (column validation is gated on the
+// validation version, not the mode, so this fails even in default mode). This is the corruption
+// shape from SERVER-130080: a time-series bucket whose compressed column was corrupted by a
+// re-applied $v:2 diff. See BSONValidateColumn.BSONColumnInBSON in bson_validate_test.cpp.
+BSONObj makeDocWithCorruptColumn() {
+    BSONColumnBuilder cb;
+    cb.append(BSON("f" << "deadbeef").getField("f"));
+    cb.append(BSON("f" << 1).getField("f"));
+    BSONBinData columnData = cb.finalize();
+
+    std::vector<char> badColumn(columnData.length);
+    std::memcpy(badColumn.data(), columnData.data, columnData.length);
+    badColumn[0] = '0';  // Corrupt a control byte so column validation fails.
+    columnData.data = badColumn.data();
+
+    // BSON() copies the BinData bytes, so the returned object is self-contained.
+    return BSON("_id" << 1 << "data" << columnData);
+}
+
+// Overwrites the raw bytes of the record at 'rid' with those of 'corruptDoc', bypassing the BSON
+// validation that the normal insert/update paths run. This lets a test write arbitrary bytes
+// (including invalid BSON) directly into a real collection.
+void corruptRecordAtRecordId(OperationContext* opCtx,
+                             const NamespaceString& nss,
+                             const RecordId& rid,
+                             const BSONObj& corruptDoc) {
+    auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    WriteUnitOfWork wuow(opCtx);
+    ASSERT_OK(coll.getCollectionPtr()->getRecordStore()->updateRecord(
+        opCtx,
+        *shard_role_details::getRecoveryUnit(opCtx),
+        rid,
+        corruptDoc.objdata(),
+        corruptDoc.objsize()));
+    wuow.commit();
+}
+
 TEST_F(UpdateWithRecordIdTestEnableSteadyStateConstraints,
        UpdateObjectByRidRejectsMalformedBSONFromSeekExact) {
     // Wrap our corrupt-cursor-returning Collection in a CollectionAcquisition via
@@ -887,6 +930,114 @@ TEST_F(UpdateWithRecordIdTestEnableSteadyStateConstraints,
                                          preImage),
                        DBException,
                        ErrorCodes::InvalidBSON);
+}
+
+TEST_F(UpdateWithRecordIdTestEnableSteadyStateConstraints,
+       UpdateByRidRejectsCorruptColumnInSecondaryMode) {
+    // Baseline for the skip tests below: a structurally-valid document with a corrupt BSONColumn
+    // (the SERVER-130080 shape) is rejected by the by-RecordId path's BSON validation during
+    // steady-state replication on a non-resharding collection. We place the corrupt document at a
+    // known recordId (bypassing the insert-time validation) and then apply an update by recordId.
+    const RecordId rid(1);
+    insertDocumentAtRecordId(_opCtx.get(), _nss, BSON("_id" << 1), rid);
+    corruptRecordAtRecordId(_opCtx.get(), _nss, rid, makeDocWithCorruptColumn());
+
+    auto op = makeUpdateOplogEntryWithRecordId(
+        nextOpTime(), _nss, BSON("_id" << 1), BSON("_id" << 1 << "a" << 1), rid);
+    ASSERT_EQ(runOpSteadyState(op).code(), ErrorCodes::NonConformantBSON);
+}
+
+TEST_F(UpdateWithRecordIdTest, UpdateByRidSkipsBSONValidationInInitialSync) {
+    // Initial sync replays the oplog at-least-once and can transiently produce invalid BSON (for
+    // example by re-applying a non-idempotent $v:2 diff against an already-advanced bucket), so the
+    // by-RecordId path must not run BSON validation in this mode, even for a non-resharding
+    // collection. The same corrupt document that is rejected in steady state
+    // (UpdateByRidRejectsCorruptColumnInSecondaryMode) must be tolerated here: applying a
+    // replacement update by recordId succeeds. The corrupt column stays opaque to the update since
+    // the replacement rewrites the document.
+    const RecordId rid(1);
+    insertDocumentAtRecordId(_opCtx.get(), _nss, BSON("_id" << 1), rid);
+    corruptRecordAtRecordId(_opCtx.get(), _nss, rid, makeDocWithCorruptColumn());
+
+    auto op = makeUpdateOplogEntryWithRecordId(
+        nextOpTime(), _nss, BSON("_id" << 1), BSON("_id" << 1 << "a" << 1), rid);
+    ASSERT_OK(runOpInitialSync(op));
+
+    auto updatedDoc = documentAtRecordId(_opCtx.get(), _nss, rid);
+    ASSERT_TRUE(updatedDoc.has_value());
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "a" << 1), updatedDoc.value());
+}
+
+// =============================================================================
+// Tests for resharding internal collections (SERVER-130723)
+//
+// Resharding materializes its internal collections through at-least-once oplog application on the
+// recipient, so those collections can transiently hold invalid BSON (for example time-series
+// buckets carrying stale $v:2 diffs) that self-heals before the collection is finalized. The
+// recipient commits this without running the by-rid path's BSON validation, so a secondary
+// replaying the temporary collection's oplog must skip that validation to avoid crashing on the
+// transiently invalid document. All the other steady-state checks (recordId/_id/size) are left
+// active because a secondary applies exactly-once and in-order, so they can only fire on genuine
+// divergence. See SERVER-130080.
+// =============================================================================
+
+/**
+ * Test fixture for update oplog entries with recordId on a temporary resharding collection.
+ */
+class ReshardingUpdateWithRecordIdTest : public OplogApplierImplTest {
+protected:
+    void setUp() override {
+        OplogApplierImplTest::setUp();
+        _nss = NamespaceString::createNamespaceString_forTest("test.system.resharding." +
+                                                              UUID::gen().toString());
+        ASSERT_TRUE(_nss.isTemporaryReshardingCollection());
+        createCollection(_opCtx.get(), _nss, {});
+        _uuid = getCollectionUUID(_opCtx.get(), _nss);
+    }
+
+    NamespaceString _nss;
+    UUID _uuid = UUID::gen();
+    unittest::ServerParameterGuard featureFlagController =
+        unittest::ServerParameterGuard("featureFlagRecordIdsReplicated", true);
+};
+
+typedef SetSteadyStateConstraints<ReshardingUpdateWithRecordIdTest, true>
+    ReshardingUpdateWithRecordIdTestEnableSteadyStateConstraints;
+
+TEST_F(ReshardingUpdateWithRecordIdTestEnableSteadyStateConstraints, SuccessInSecondaryMode) {
+    // A normal update to a resharding internal collection still applies as expected.
+    const RecordId rid(1);
+    insertDocumentAtRecordId(_opCtx.get(), _nss, BSON("_id" << 1 << "x" << 100), rid);
+
+    auto op = makeUpdateOplogEntryWithRecordId(
+        nextOpTime(), _nss, BSON("_id" << 1), BSON("$set" << BSON("x" << 200)), rid);
+    ASSERT_OK(runOpSteadyState(op));
+
+    auto updatedDoc = documentAtRecordId(_opCtx.get(), _nss, rid);
+    ASSERT_TRUE(updatedDoc.has_value());
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "x" << 200), updatedDoc.value());
+}
+
+TEST_F(ReshardingUpdateWithRecordIdTestEnableSteadyStateConstraints,
+       SkipsBSONValidationInSecondaryMode) {
+    // Resharding internal collections are materialized at-least-once: the recipient can commit a
+    // transiently-invalid document (for example a time-series bucket with a stale $v:2 diff) and
+    // replicate it. A secondary applying that document by recordId must not run BSON validation, or
+    // it would crash on bytes the recipient already accepted. The same corrupt document that fails
+    // in steady state on a non-resharding collection
+    // (UpdateByRidRejectsCorruptColumnInSecondaryMode) is tolerated here: applying a replacement
+    // update by recordId succeeds.
+    const RecordId rid(1);
+    insertDocumentAtRecordId(_opCtx.get(), _nss, BSON("_id" << 1), rid);
+    corruptRecordAtRecordId(_opCtx.get(), _nss, rid, makeDocWithCorruptColumn());
+
+    auto op = makeUpdateOplogEntryWithRecordId(
+        nextOpTime(), _nss, BSON("_id" << 1), BSON("_id" << 1 << "a" << 1), rid);
+    ASSERT_OK(runOpSteadyState(op));
+
+    auto updatedDoc = documentAtRecordId(_opCtx.get(), _nss, rid);
+    ASSERT_TRUE(updatedDoc.has_value());
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "a" << 1), updatedDoc.value());
 }
 
 }  // namespace

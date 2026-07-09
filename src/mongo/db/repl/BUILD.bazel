@@ -2113,6 +2113,7 @@ mongo_cc_unit_test(
         ":oplog_entry",
         ":oplog_entry_test_helpers",
         ":storage_interface_impl",
+        "//src/mongo/bson/column",
         "//src/mongo/db:change_stream_pre_images_collection_manager",
         "//src/mongo/db:server_base",
         "//src/mongo/db/shard_role/shard_catalog:collection_mock",

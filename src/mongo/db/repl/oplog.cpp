@@ -1625,6 +1625,17 @@ void assertOnInconsistentDocuments(OperationContext* opCtx,
                           !docById.isEmpty() ? redact(docById).toString() : "Not found",
                           rid.toString()));
 }
+
+/**
+ * Returns true if 'nss' is one of the internal collections that resharding materializes through
+ * at-least-once oplog application: the temporary output collection or a per-donor conflict stash
+ * collection. While being built these collections can transiently hold invalid BSON that the
+ * recipient commits without validating (for example time-series buckets carrying stale $v:2 diffs)
+ * and that self-heals before the collection is finalized. See SERVER-130723 / SERVER-130080.
+ */
+bool isReshardingInternalCollection(const NamespaceString& nss) {
+    return nss.isTemporaryReshardingCollection() || nss.isReshardingConflictStashCollection();
+}
 }  // namespace
 
 constexpr std::string_view OplogApplication::kInitialSyncOplogApplicationMode;
@@ -1813,8 +1824,22 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
                 BSONObj::kEmptyObject /* upsertedObject */};
     }
 
-    auto validBSON = validateBSON(record->data.data(), record->data.size());
-    uassertStatusOKWithContext(validBSON, "Received an invalid BSON object from cursor");
+    // BSON validation of the fetched record is a steady-state consistency check, so it is only
+    // enforced when oplog application is exactly-once and in-order (kSecondary), matching the
+    // gating of the other by-RecordId checks in this function. It is skipped when:
+    //   - the mode is not kSecondary: initial sync and recovery replay the oplog at-least-once and
+    //     can transiently produce invalid BSON (for example by re-applying a non-idempotent $v:2
+    //     time-series diff against an already-advanced bucket), which self-heals once application
+    //     reaches a consistent point, or
+    //   - the target is a resharding internal collection: these are materialized at-least-once, so
+    //     the recipient commits transiently-invalid BSON without running this validation and
+    //     replicates it, meaning even an exactly-once secondary must skip it.
+    // See SERVER-130723 / SERVER-130080.
+    if (mode == OplogApplication::Mode::kSecondary &&
+        !isReshardingInternalCollection(op.getNss())) {
+        auto validBSON = validateBSON(record->data.data(), record->data.size());
+        uassertStatusOKWithContext(validBSON, "Received an invalid BSON object from cursor");
+    }
 
     record->data.makeOwned();
     auto obj = Snapshotted<BSONObj>(shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId(),
