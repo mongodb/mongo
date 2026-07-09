@@ -375,7 +375,7 @@ feature_flags:
         default: true
         version: 9.0
         fcv_gated: true
-    # TODO (SERVER-76345): Remove this feature flag once parallel validation is the permanent default.
+    # TODO (SERVER-76346): Remove this feature flag once parallel validation is the permanent default.
     featureFlagParallelCollectionValidation:
         description: "When enabled, collection validation will use a parallel execution model to validate records."
         cpp_varname: gFeatureFlagParallelCollectionValidation

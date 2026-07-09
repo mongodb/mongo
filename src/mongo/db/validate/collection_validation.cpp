@@ -1058,7 +1058,7 @@ Status validate(OperationContext* opCtx,
         // record key (RecordId) matches the cluster key field in the record value (document's
         // cluster key).
 
-        // TODO (SERVER-76345): Remove feature flag branch.
+        // TODO (SERVER-76346): Remove feature flag branch.
         // TODO (SERVER-127596): Hook feature flag into parallel execution.
         if (gFeatureFlagParallelCollectionValidation.isEnabled()) {
             LOGV2_DEBUG(
