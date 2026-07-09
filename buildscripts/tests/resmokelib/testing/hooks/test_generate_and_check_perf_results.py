@@ -1237,6 +1237,51 @@ class TestRetrieveBaseCommitValue(GenerateAndCheckPerfResultsFixture):
     @mock.patch(
         "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.requests.get"
     )
+    def test_retrieve_base_commit_value_project_id_mismatch(self, mock_get):
+        """The project filter must not compare info.project to the hook's project parameter.
+
+        SPS stores info.project as the Evergreen project_id (an ObjectId for newer projects, e.g.
+        'mongodb-mongo-v8.3-staging' maps to '69b8579ce7a4080007a30200'), while the hook receives
+        the human-readable project identifier. The /raw_perf_results/versions/{version_id}
+        endpoint is already scoped to a single project, so the remaining filters on variant,
+        task_name, test_name, and args are sufficient. A mismatch on info.project must not cause
+        _retrieve_base_commit_value to return None and silently skip the threshold check.
+        """
+        mock_response = mock.MagicMock()
+        mock_response.json.return_value = [
+            {
+                "info": {
+                    "project": "69b8579ce7a4080007a30200",
+                    "variant": "my-variant",
+                    "task_name": "benchmarks_sep",
+                    "test_name": "BM_Test",
+                    "args": {"thread_level": 1},
+                },
+                "rollups": {
+                    "stats": [
+                        {"name": "latency", "val": 42},
+                    ]
+                },
+            }
+        ]
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+
+        value = self.cbr_hook._retrieve_base_commit_value(
+            test_name="BM_Test",
+            task_name="benchmarks_sep",
+            variant="my-variant",
+            measurement="latency",
+            args={"thread_level": 1},
+            project="mongodb-mongo-v8.3-staging",
+            version_id="some_version_id",
+        )
+
+        self.assertEqual(value, 42)
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.requests.get"
+    )
     def test_retrieve_base_commit_value_uses_latest_execution(self, mock_get):
         """Test that the value from the latest execution is used when there are retries."""
         info = {

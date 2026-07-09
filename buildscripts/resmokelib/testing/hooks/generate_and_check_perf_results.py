@@ -524,8 +524,7 @@ class GenerateAndCheckPerfResults(interface.Hook):
         for result in data:
             info = result.get("info") or {}
             if (
-                info.get("project") == project
-                and info.get("variant") == variant
+                info.get("variant") == variant
                 and info.get("task_name") == task_name
                 and info.get("test_name") == test_name
                 and info.get("args") == args
