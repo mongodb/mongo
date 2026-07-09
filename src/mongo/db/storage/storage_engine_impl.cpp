@@ -38,10 +38,14 @@
 #include "mongo/db/client.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/rss/persistence_provider.h"
 #include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
+#include "mongo/db/storage/compact_options.h"
 #include "mongo/db/storage/disk_space_monitor.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_drop_pending_ident_reaper.h"
@@ -62,11 +66,15 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log_and_backoff.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 #include <algorithm>
+#include <functional>
 #include <memory>
 #include <string_view>
+#include <vector>
 
 #ifdef _WIN32
 #define NVALGRIND
@@ -1187,6 +1195,83 @@ void StorageEngineImpl::dump() const {
 
 Status StorageEngineImpl::autoCompact(RecoveryUnit& ru, const AutoCompactOptions& options) {
     return _engine->autoCompact(ru, options);
+}
+
+namespace {
+// Background auto-compaction reconfigures are applied asynchronously by the storage engine;
+// while a previous reconfigure is still being consumed, a new one is transiently rejected with
+// ObjectIsBusy.
+const Milliseconds kAutoCompactReconfigureRetryInterval{50};
+constexpr int kMaxAutoCompactReconfigureAttempts = 600;  // ~30s of retrying before giving up.
+
+/**
+ * Runs an auto-compaction reconfigure for a write block transition under the global lock, retrying
+ * the transient ObjectIsBusy (a previous reconfigure not yet applied by the background server) up
+ * to kMaxAutoCompactReconfigureAttempts so the change isn't dropped. A non-OK status is logged, not
+ * thrown, to avoid failing the replica set write block.
+ */
+void retryPauseOrResumeAutoCompactForWriteBlock(
+    OperationContext* opCtx,
+    std::string_view operation,
+    const std::function<Status(RecoveryUnit&)>& reconfigure) {
+    Status status = Status::OK();
+    for (int attempt = 0; attempt < kMaxAutoCompactReconfigureAttempts; ++attempt) {
+        status = [&] {
+            Lock::GlobalLock lk{
+                opCtx,
+                MODE_IS,
+                Date_t::max(),
+                Lock::InterruptBehavior::kThrow,
+                Lock::GlobalLockOptions{.skipFlowControlTicket = true, .skipRSTLLock = true}};
+            return reconfigure(*shard_role_details::getRecoveryUnit(opCtx));
+        }();
+
+        if (status != ErrorCodes::ObjectIsBusy) {
+            break;
+        }
+        // A previous auto-compact reconfigure has not been consumed by the background server
+        // yet. Wait (interruptibly) and retry so this reconfigure is not dropped.
+        opCtx->sleepFor(kAutoCompactReconfigureRetryInterval);
+    }
+
+    // IllegalOperation means auto-compaction is simply not applicable, so there is nothing to
+    // stop or restore. Warn only on unexpected errors.
+    if (!status.isOK() && status != ErrorCodes::IllegalOperation) {
+        LOGV2_WARNING(12966500,
+                      "Failed to reconfigure auto-compaction for replica set write block",
+                      "operation"_attr = operation,
+                      "error"_attr = status);
+    }
+}
+}  // namespace
+
+void StorageEngineImpl::pauseOrResumeAutoCompactForWriteBlock(OperationContext* opCtx,
+                                                              bool pause,
+                                                              std::string_view oplogIdent) {
+    if (!rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider().supportsCompaction()) {
+        return;
+    }
+
+    if (pause) {
+        // The engine saves the currently-active configuration before stopping compaction so it can
+        // be restored on resume; stopping when nothing is running is a no-op.
+        retryPauseOrResumeAutoCompactForWriteBlock(opCtx, "pause", [&](RecoveryUnit& ru) {
+            return _engine->pauseOrResumeAutoCompactForWriteBlock(
+                ru, pause, {} /* excludedIdents */);
+        });
+        return;
+    }
+
+    // On resume the engine restores the saved configuration, excluding the current oplog ident
+    // supplied by the caller (the saved options intentionally omit the non-owning excludedIdents,
+    // so the exclusion is recomputed by the caller on each resume rather than restored).
+    std::vector<std::string_view> excludedIdents;
+    if (!oplogIdent.empty()) {
+        excludedIdents.push_back(oplogIdent);
+    }
+    retryPauseOrResumeAutoCompactForWriteBlock(opCtx, "resume", [&](RecoveryUnit& ru) {
+        return _engine->pauseOrResumeAutoCompactForWriteBlock(ru, pause, excludedIdents);
+    });
 }
 
 bool StorageEngineImpl::underCachePressure(int concurrentOpOuts) {

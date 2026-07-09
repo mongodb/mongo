@@ -119,6 +119,7 @@ Status autoCompact(OperationContext* opCtx,
         storageEngine->autoCompact(*shard_role_details::getRecoveryUnit(opCtx), options);
     if (!status.isOK())
         return status;
+
     LOGV2(8012100, "AutoCompact", "enabled"_attr = enable);
     return status;
 }

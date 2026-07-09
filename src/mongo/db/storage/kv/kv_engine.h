@@ -714,7 +714,8 @@ public:
     }
 
     /**
-     * See StorageEngine::autoCompact for details
+     * See StorageEngine::autoCompact for details. An explicit disable (options.enable == false)
+     * additionally discards any configuration saved by pauseOrResumeAutoCompactForWriteBlock().
      */
     virtual Status autoCompact(RecoveryUnit&, const AutoCompactOptions& options) {
         return Status(ErrorCodes::CommandNotSupported,
@@ -727,6 +728,19 @@ public:
     virtual StatusWith<int64_t> getIndexStorageSize(
         OperationContext*, const std::vector<std::string>& indexIdents) const {
         return 0;
+    }
+
+    /**
+     * Pauses (pause=true) or resumes (pause=false) background auto-compaction for a replica set
+     * write block transition. Pausing saves the active configuration and stops compaction; resuming
+     * restarts it with the saved configuration, excluding 'excludedIdents' (ignored when pausing).
+     * Kept separate from autoCompact() so that a write-block stop (which saves for restore) is not
+     * confused with a user disable (which is permanent and discards the saved configuration).
+     */
+    virtual Status pauseOrResumeAutoCompactForWriteBlock(RecoveryUnit&,
+                                                         bool pause,
+                                                         const std::vector<std::string_view>&) {
+        return Status::OK();
     }
 
     /**

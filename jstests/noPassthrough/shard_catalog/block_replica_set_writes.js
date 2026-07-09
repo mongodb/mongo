@@ -26,6 +26,42 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {checkLog} from "src/mongo/shell/check_log.js";
 import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 
+// Runs an autoCompact command, retrying while it reports the transient ObjectIsBusy (the previous
+// command's signal has not been consumed yet) and asserting it ultimately succeeds.
+function runAutoCompactRetryingBusy(adminDB, cmdObj, timeoutMsg, workedMsg) {
+    assert.soon(() => {
+        const res = adminDB.runCommand(cmdObj);
+        if (res.code === ErrorCodes.ObjectIsBusy) return false;
+        assert.commandWorked(res, workedMsg);
+        return true;
+    }, timeoutMsg);
+}
+
+// Confirms background auto-compact is running with the expected options.
+// Re-requesting the same options is a silent no-op. We therefore probe with a deliberately different
+// freeSpaceTargetMB: while auto-compact is running, the probe is rejected and the active
+// options are reported in the error message. A transient ObjectIsBusy
+// (the previous command's signal not yet consumed) is retried.
+function assertAutoCompactRunningWith(adminDB, expectedMB) {
+    const probeMB = expectedMB + 1;
+    assert.soon(() => {
+        const res = adminDB.runCommand({autoCompact: true, freeSpaceTargetMB: probeMB});
+        if (res.code === ErrorCodes.ObjectIsBusy) return false;
+        assert.eq(
+            res.code,
+            ErrorCodes.AlreadyInitialized,
+            "auto-compact reconfigure should be rejected because it is already running",
+            {res},
+        );
+        assert(
+            res.errmsg.includes(`freeSpaceTargetMB: ${expectedMB}`),
+            "autoCompact error should report the active options",
+            {res},
+        );
+        return true;
+    }, `Timed out confirming auto-compact is running with expected options`);
+}
+
 describe("Test blockReplicaSetWrites command on shard replica sets in a sharded cluster", function () {
     before(function () {
         this.st = new ShardingTest({shards: 2, rs: {nodes: 2}});
@@ -63,6 +99,11 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
                 reason: "DiskUseThresholdExceeded",
             }),
         );
+
+        assert.soon(() => {
+            const res = this.shard0PrimaryAdminDB.runCommand({autoCompact: false});
+            return res.code !== ErrorCodes.ObjectIsBusy;
+        }, "Timed out disabling autoCompact in afterEach");
 
         for (const dbName of this.extraDatabasesToDrop) {
             assert.commandWorked(this.st.s.getDB(dbName).dropDatabase());
@@ -488,20 +529,139 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
             true /* allowDeletions */,
             "InsufficientDiskSpace" /* reason */,
         );
-        assert.soon(() => {
-            const res = shard0AdminDB.runCommand({autoCompact: true});
-            if (res.code === ErrorCodes.ObjectIsBusy) return false;
-            assert.commandWorked(res);
-            return true;
-        }, "Timed out waiting to enable autoCompact");
+        runAutoCompactRetryingBusy(
+            shard0AdminDB,
+            {autoCompact: true},
+            "Timed out waiting to enable autoCompact",
+        );
 
         // Leave background compaction off.
+        runAutoCompactRetryingBusy(
+            shard0AdminDB,
+            {autoCompact: false},
+            "Timed out waiting to disable autoCompact",
+        );
+    });
+
+    it("Test that auto-compact running before write block is enabled is stopped when the write block is enabled and restored when the write block is released", function () {
+        if (
+            PersistenceProviderUtil.allNodesHavePropertyWithValue(
+                this.shard0Primary,
+                "supportsLocalCollections",
+                false,
+            )
+        ) {
+            jsTest.log.info("Skipping auto-compact restore test: local collections not supported");
+            return;
+        }
+
+        const adminDB = this.shard0PrimaryAdminDB;
+        const freeSpaceTargetMB = 750;
+
+        // Enable auto-compact with a custom freeSpaceTargetMB so we can verify the exact
+        // options are preserved after restore.
+        runAutoCompactRetryingBusy(
+            adminDB,
+            {autoCompact: true, freeSpaceTargetMB},
+            "Timed out enabling autoCompact before write block",
+        );
+
+        // Confirm auto-compact is running with the expected options before engaging the write
+        // block.
+        assertAutoCompactRunningWith(adminDB, freeSpaceTargetMB);
+
+        // Engage write block with allowDeletions:false, auto-compact should be stopped.
+        enableReplicaSetWriteBlock(adminDB, false /* allowDeletions */, "InsufficientDiskSpace");
+
+        // Enabling auto-compact is rejected while the write block is active.
+        assert.commandFailedWithCode(
+            adminDB.runCommand({autoCompact: true}),
+            ErrorCodes.ReplicaSetWritesBlocked,
+            "autoCompact enable must be blocked while write block is active",
+        );
+
+        // Release the write block, auto-compact should be restored with the original options.
+        disableReplicaSetWriteBlock(adminDB, "InsufficientDiskSpace");
+
+        // After releasing the write block, auto-compact must be restored with the original options.
+        assertAutoCompactRunningWith(adminDB, freeSpaceTargetMB);
+
+        // Disable auto-compact.
+        runAutoCompactRetryingBusy(
+            adminDB,
+            {autoCompact: false},
+            "Timed out disabling autoCompact after write block release",
+        );
+    });
+
+    it("Test that explicitly disabling auto-compact during a write block prevents restore on write block release", function () {
+        if (
+            PersistenceProviderUtil.allNodesHavePropertyWithValue(
+                this.shard0Primary,
+                "supportsLocalCollections",
+                false,
+            )
+        ) {
+            jsTest.log.info(
+                "Skipping auto-compact explicit-disable test: local collections not supported",
+            );
+            return;
+        }
+
+        const adminDB = this.shard0PrimaryAdminDB;
+        const freeSpaceTargetMB = 600;
+
+        // Enable auto-compact with a custom freeSpaceTargetMB.
+        runAutoCompactRetryingBusy(
+            adminDB,
+            {autoCompact: true, freeSpaceTargetMB},
+            "Timed out enabling autoCompact",
+        );
+
+        // Engage write block with allowDeletions:false — auto-compact is stopped, options saved.
+        enableReplicaSetWriteBlock(adminDB, false /* allowDeletions */, "InsufficientDiskSpace");
+
+        // Explicitly disable auto-compact while the write block is active.
+        // Disabling is always permitted and signals user intent to stop permanently,
+        // which must override the automatic restore on write block release.
+        runAutoCompactRetryingBusy(
+            adminDB,
+            {autoCompact: false},
+            "Timed out disabling autoCompact during write block",
+            "Disabling autoCompact must always be permitted",
+        );
+
+        // Release the write block. Because we explicitly disabled auto-compact, the saved options
+        // must be discarded — auto-compact must NOT be automatically restored.
+        disableReplicaSetWriteBlock(adminDB, "InsufficientDiskSpace");
+
+        // Confirm auto-compact was not restored. Probe by enabling with a *different*
+        // freeSpaceTargetMB: had it been wrongly restored (and were running), this reconfigure
+        // would be rejected with AlreadyInitialized. Because it is stopped, enabling succeeds.
         assert.soon(() => {
-            const res = shard0AdminDB.runCommand({autoCompact: false});
+            const res = adminDB.runCommand({
+                autoCompact: true,
+                freeSpaceTargetMB: freeSpaceTargetMB + 1,
+            });
             if (res.code === ErrorCodes.ObjectIsBusy) return false;
-            assert.commandWorked(res);
+            assert.neq(
+                res.code,
+                ErrorCodes.AlreadyInitialized,
+                "autoCompact must not be running after explicit disable during write block",
+            );
+            assert.commandWorked(
+                res,
+                "autoCompact enable must succeed after explicit disable during write block",
+            );
             return true;
-        }, "Timed out waiting to disable autoCompact");
+        }, "Timed out confirming autoCompact was not restored after explicit disable");
+
+        // Disable auto-compact.
+        runAutoCompactRetryingBusy(
+            adminDB,
+            {autoCompact: false},
+            "Timed out disabling autoCompact at end of test",
+        );
     });
 
     it("Test that index builds on empty collections bypass the replica set write block", function () {

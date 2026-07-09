@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/find_command.h"
@@ -46,7 +47,10 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
 #include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
@@ -601,6 +605,11 @@ void UserWritesRecoverableCriticalSectionService::
                 "enabled"_attr = "true",
                 "allowDeletions"_attr = allowDeletions,
                 "reason"_attr = reasonText(reason));
+
+    if (!allowDeletions) {
+        opCtx->getServiceContext()->getStorageEngine()->pauseOrResumeAutoCompactForWriteBlock(
+            opCtx, true /* pause */);
+    }
 }
 
 void UserWritesRecoverableCriticalSectionService::
@@ -627,5 +636,24 @@ void UserWritesRecoverableCriticalSectionService::
 
     LOGV2_DEBUG(
         12096407, 2, "Released replica set writes recoverable critical section", logAttrs(nss));
+
+    // Resume auto-compaction if it was paused when the replica set write block was acquired,
+    // recomputing the current oplog ident.
+    std::string oplogIdent;
+    {
+        Lock::GlobalLock lk{
+            opCtx,
+            MODE_IS,
+            Date_t::max(),
+            Lock::InterruptBehavior::kThrow,
+            Lock::GlobalLockOptions{.skipFlowControlTicket = true, .skipRSTLLock = true}};
+        if (auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
+                opCtx, NamespaceString::kRsOplogNamespace)) {
+            oplogIdent = collection->getSharedIdent()->getIdent();
+        }
+    }
+
+    opCtx->getServiceContext()->getStorageEngine()->pauseOrResumeAutoCompactForWriteBlock(
+        opCtx, false /* pause */, oplogIdent);
 }
 }  // namespace mongo

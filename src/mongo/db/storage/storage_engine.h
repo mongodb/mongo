@@ -1027,6 +1027,24 @@ public:
     virtual Status autoCompact(RecoveryUnit&, const AutoCompactOptions& options) = 0;
 
     /**
+     * Pauses (pause=true) or resumes (pause=false) background auto-compaction for a replica set
+     * write block critical section transition. Pausing saves the currently-active configuration so
+     * the storage engine can restore it on resume; a run-once compaction is never treated as
+     * active, so it is stopped but not saved/restored. Pausing aborts any in-progress compaction
+     * rather than waiting for it to finish. On resume the caller passes the current oplog ident to
+     * exclude (empty if there is none); the exclusion is recomputed rather than restored from the
+     * saved options, since those intentionally omit excludedIdents (they are non-owning views). An
+     * explicit user-initiated disable (via autoCompact) discards the saved configuration, so a
+     * write block released afterwards does not resurrect compaction the user turned off.
+     *
+     * A no-op on storage engines that don't support compaction. Failures are logged, not thrown,
+     * so a write block transition is never failed by auto-compaction reconfiguration.
+     */
+    virtual void pauseOrResumeAutoCompactForWriteBlock(OperationContext* opCtx,
+                                                       bool pause,
+                                                       std::string_view oplogIdent = {}) {}
+
+    /**
      * Return true if the storage engine indicates that it is under cache pressure.
      */
     virtual bool underCachePressure(int concurrentOpOuts) {

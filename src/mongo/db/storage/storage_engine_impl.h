@@ -321,6 +321,10 @@ public:
 
     Status autoCompact(RecoveryUnit&, const AutoCompactOptions& options) override;
 
+    void pauseOrResumeAutoCompactForWriteBlock(OperationContext* opCtx,
+                                               bool pause,
+                                               std::string_view oplogIdent = {}) override;
+
     bool underCachePressure(int concurrentOpOuts) override;
 
     size_t getCacheSizeMB() override;

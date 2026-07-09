@@ -438,6 +438,7 @@ mongo_cc_library(
         ":storage_repair_observer",
         ":storage_tier",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/rss:persistence_provider",
         "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/shard_role",
         "//src/mongo/db/storage/kv:kv_drop_pending_ident_reaper",
