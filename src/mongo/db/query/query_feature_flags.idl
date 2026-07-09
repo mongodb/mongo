@@ -402,9 +402,9 @@ feature_flags:
     featureFlagVectorSearchExtension:
         description: "Feature flag to enable vector search extension functionality."
         cpp_varname: gFeatureFlagVectorSearchExtension
-        default: false
+        default: true
         fcv_gated: false
-        incremental_rollout_phase: in_development
+        incremental_rollout_phase: release
         serialize_on_outgoing_requests: true
         version: 8.3
 
