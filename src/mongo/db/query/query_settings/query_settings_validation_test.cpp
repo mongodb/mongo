@@ -392,6 +392,7 @@ TEST_F(QuerySettingsValidationTestFixture, ValidateQueryKnobsRejectsKnobsWhenFla
     QueryFCVEnvironmentForTest::setUp();
     // (Generic FCV reference): FCV-gated query knob validation test.
     unittest::EnsureFCV fcv(multiversion::GenericFCV::kLatest);
+    unittest::ServerParameterGuard featureFlagGuard("featureFlagPqsQueryKnobs", false);
 
     QuerySettings settings;
     settings.setQueryKnobs(QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 5)));
