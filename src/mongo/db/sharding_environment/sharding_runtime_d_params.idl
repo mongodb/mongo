@@ -267,3 +267,13 @@ server_parameters:
             gte: 0
         default: 10
         redact: false
+
+    forceUnconditionalInvalidateCollectionMetadata:
+        description: >-
+            When enabled, every invalidateCollectionMetadata oplog entry unconditionally clears the
+            in-memory collection metadata on the applying node, regardless of local state.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: forceUnconditionalInvalidateCollectionMetadata
+        default: false
+        redact: false

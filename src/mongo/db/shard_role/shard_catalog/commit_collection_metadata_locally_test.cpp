@@ -36,12 +36,15 @@
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/collection_cache_recoverer.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
+#include "mongo/db/shard_role/shard_catalog/type_oplog_catalog_metadata_gen.h"
 #include "mongo/db/sharding_environment/shard_server_op_observer.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
+#include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
@@ -341,6 +344,18 @@ protected:
         return findLocalDocs(NamespaceString::kRsOplogNamespace,
                              BSON("op" << "c" << objField << nss.coll()))
             .size();
+    }
+
+    repl::OplogEntry makeInvalidateOplogEntry(const UUID& uuid,
+                                              const InvalidateCollectionMetadataOplogEntry& entry) {
+        repl::MutableOplogEntry oplogEntry;
+        oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+        oplogEntry.setNss(kTestNss.getCommandNS());
+        oplogEntry.setUuid(uuid);
+        oplogEntry.setObject(entry.toBSON());
+        oplogEntry.setOpTime(OplogSlot());
+        oplogEntry.setWallClockTime(Date_t::now());
+        return repl::OplogEntry(oplogEntry.toBSON());
     }
 
     BSONObj getRecoveryStats() {
@@ -1282,6 +1297,279 @@ TEST_F(CommitCollectionMetadataLocallyTest, CommitChunklessPreservesCSRWithOwned
     ASSERT_EQ(metadata->getChunkManager()->getVersion().getTimestamp(), collType1.getTimestamp());
 }
 
+// The chunkless commit emits a 'c' entry carrying the kIfUnowned precondition, delegating the
+// decision to clear to each node. A locally tracked node does not satisfy the precondition, so its
+// filtering metadata is preserved.
+TEST_F(CommitCollectionMetadataLocallyTest,
+       CommitChunklessAlwaysEmitsInvalidateWithIfUnownedConditionAndPreservesTrackedCsr) {
+    auto [collType, _] = makeCollectionMetadata(0);
+    mockCatalogClient()->setCollectionMetadata(collType, {});
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss, true);
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+        ASSERT_TRUE(scopedCsr->getCurrentMetadataIfKnown());
+        ASSERT_FALSE(scopedCsr->isUnowned());
+    }
+
+    shard_catalog_commit::commitChunklessCollectionMetadataLocally(operationContext(), kTestNss);
+
+    // The invalidate is always emitted and only clears UNOWNED nodes.
+    auto oplogEntry = findLastOplogEntry();
+    auto object = oplogEntry.getObjectField("o");
+    ASSERT_EQ(object.firstElementFieldNameStringData(), "invalidateCollectionMetadata");
+    ASSERT_TRUE(object.getBoolField("onlyClearIfUnowned"));
+
+    // This node is tracked, so it does not satisfy the precondition and keeps its metadata.
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    ASSERT_TRUE(scopedCsr->getCurrentMetadataIfKnown());
+}
+
+// When this node's CSS is UNOWNED, applying the chunkless commit's invalidate locally clears the
+// filtering metadata so the next access recovers it as tracked.
+TEST_F(CommitCollectionMetadataLocallyTest, CommitChunklessClearsCsrWhenLocallyUnowned) {
+    auto [collType, _] = makeCollectionMetadata(0);
+    mockCatalogClient()->setCollectionMetadata(collType, {});
+
+    CollectionShardingRuntime::acquireExclusive(operationContext(), kTestNss)
+        ->setCollectionMetadata(operationContext(),
+                                CollectionMetadata::UNTRACKED(),
+                                CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+        ASSERT_TRUE(scopedCsr->isUnowned());
+    }
+
+    shard_catalog_commit::commitChunklessCollectionMetadataLocally(operationContext(), kTestNss);
+
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown());
+}
+
+// Directly exercises the op observer to prove the kIfUnowned precondition is evaluated per-node:
+// the same invalidate 'c' entry clears an UNOWNED node's metadata but leaves a tracked node's
+// metadata untouched.
+TEST_F(CommitCollectionMetadataLocallyTest, OnInvalidateIfUnownedClearsOnlyLocallyUnownedNodes) {
+    // Produce a real kIfUnowned invalidate 'c' entry and capture it to replay as a secondary would.
+    auto [chunkless, _] = makeCollectionMetadata(0);
+    mockCatalogClient()->setCollectionMetadata(chunkless, {});
+    shard_catalog_commit::commitChunklessCollectionMetadataLocally(operationContext(), kTestNss);
+
+    const auto invalidateEntry = repl::OplogEntry(findLastOplogEntry());
+    ASSERT_EQ(invalidateEntry.getObject().firstElementFieldNameStringData(),
+              "invalidateCollectionMetadata");
+    ASSERT_TRUE(invalidateEntry.getObject().getBoolField("onlyClearIfUnowned"));
+
+    ShardServerOpObserver observer;
+
+    // A node whose CSS is tracked does not satisfy the precondition: replaying the entry leaves its
+    // filtering metadata untouched.
+    {
+        auto [trackedColl, chunks] = makeCollectionMetadata(2);
+        for (auto& chunk : chunks) {
+            chunk.setShard(kMyShardName);
+        }
+        mockCatalogClient()->setCollectionMetadata(trackedColl, chunks);
+        shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss, false);
+        {
+            auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+            ASSERT_TRUE(scopedCsr->getCurrentMetadataIfKnown());
+        }
+
+        observer.onInvalidateCollectionMetadata(operationContext(), invalidateEntry);
+
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+        ASSERT_TRUE(scopedCsr->getCurrentMetadataIfKnown());
+    }
+
+    // A node whose CSS is unknown does not satisfy the precondition: replaying the entry leaves
+    // its filtering metadata untouched.
+    {
+        CollectionShardingRuntime::acquireExclusive(operationContext(), kTestNss)
+            ->clearCollectionMetadata(operationContext());
+
+        observer.onInvalidateCollectionMetadata(operationContext(), invalidateEntry);
+
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+        ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown());
+    }
+
+    // A node whose CSS is UNTRACKED (unsharded) does not satisfy the precondition: replaying the
+    // entry leaves its filtering metadata untouched.
+    {
+        CollectionShardingRuntime::acquireExclusive(operationContext(), kTestNss)
+            ->setCollectionMetadata(operationContext(),
+                                    CollectionMetadata::UNTRACKED(),
+                                    CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
+
+        observer.onInvalidateCollectionMetadata(operationContext(), invalidateEntry);
+
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+        auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+        ASSERT_TRUE(metadata);
+        ASSERT_FALSE(metadata->isSharded());
+        ASSERT_EQ(metadata->getShardPlacementVersion(), ChunkVersion::UNTRACKED());
+    }
+
+    // A node whose CSS is UNOWNED satisfies the precondition: replaying the entry clears it.
+    {
+        CollectionShardingRuntime::acquireExclusive(operationContext(), kTestNss)
+            ->setCollectionMetadata(operationContext(),
+                                    CollectionMetadata::UNTRACKED(),
+                                    CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
+
+        observer.onInvalidateCollectionMetadata(operationContext(), invalidateEntry);
+
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+        ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown());
+    }
+}
+
+// A versioned invalidate leaves an unknown CSR untouched: there is no in-memory metadata to
+// reconcile against the disk shard version carried by the entry.
+TEST_F(CommitCollectionMetadataLocallyTest, OnInvalidateWithShardVersionKeepsUnknownCsr) {
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    chunks[0].setShard(kMyShardName);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    shard_catalog_commit::cloneCollectionMetadataLocally(
+        operationContext(), kTestNss, false /* isDbPrimaryShard */);
+    const auto invalidateEntry = repl::OplogEntry(findLastOplogEntry());
+
+    CollectionShardingRuntime::acquireExclusive(operationContext(), kTestNss)
+        ->clearCollectionMetadata(operationContext());
+
+    ShardServerOpObserver observer;
+    observer.onInvalidateCollectionMetadata(operationContext(), invalidateEntry);
+
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown());
+}
+
+// A versioned invalidate leaves a tracked CSR untouched when its shard version already matches
+// the disk shard version carried by the entry.
+TEST_F(CommitCollectionMetadataLocallyTest, OnInvalidateWithShardVersionKeepsUpToDateTrackedCsr) {
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    chunks[0].setShard(kMyShardName);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss, false);
+
+    const auto invalidateEntry = makeInvalidateOplogEntry(collType.getUuid(), [&] {
+        InvalidateCollectionMetadataOplogEntry entry{std::string(kTestNss.coll())};
+        entry.setShardVersion(chunks[0].getVersion());
+        return entry;
+    }());
+
+    ShardServerOpObserver observer;
+    observer.onInvalidateCollectionMetadata(operationContext(), invalidateEntry);
+
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadata);
+    ASSERT_EQ(metadata->getShardPlacementVersion(), chunks[0].getVersion());
+}
+
+// A versioned invalidate clears a tracked CSR whose in-memory shard version is older than the disk
+// shard version carried by the entry.
+TEST_F(CommitCollectionMetadataLocallyTest, OnInvalidateWithShardVersionClearsStaleTrackedCsr) {
+    auto [collType, chunksV1] = makeCollectionMetadata(1);
+    chunksV1[0].setShard(kMyShardName);
+    mockCatalogClient()->setCollectionMetadata(collType, chunksV1);
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss, false);
+
+    auto chunksV2 = makeCoveringChunks(collType, 2 /* nChunks */, chunksV1[0].getVersion());
+    for (auto& chunk : chunksV2) {
+        chunk.setShard(kMyShardName);
+    }
+    const auto invalidateEntry = makeInvalidateOplogEntry(collType.getUuid(), [&] {
+        InvalidateCollectionMetadataOplogEntry entry{std::string(kTestNss.coll())};
+        entry.setShardVersion(chunksV2.back().getVersion());
+        return entry;
+    }());
+
+    ShardServerOpObserver observer;
+    observer.onInvalidateCollectionMetadata(operationContext(), invalidateEntry);
+
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown());
+}
+
+// A versioned invalidate still clears an UNOWNED CSR: unowned nodes have no durable metadata and
+// must always be eligible to recover from disk.
+TEST_F(CommitCollectionMetadataLocallyTest, OnInvalidateWithShardVersionClearsUnownedCsr) {
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    chunks[0].setShard(kMyShardName);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    CollectionShardingRuntime::acquireExclusive(operationContext(), kTestNss)
+        ->setCollectionMetadata(operationContext(),
+                                CollectionMetadata::UNTRACKED(),
+                                CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+        ASSERT_TRUE(scopedCsr->isUnowned());
+    }
+
+    const auto invalidateEntry = makeInvalidateOplogEntry(collType.getUuid(), [&] {
+        InvalidateCollectionMetadataOplogEntry entry{std::string(kTestNss.coll())};
+        entry.setShardVersion(chunks[0].getVersion());
+        return entry;
+    }());
+
+    ShardServerOpObserver observer;
+    observer.onInvalidateCollectionMetadata(operationContext(), invalidateEntry);
+
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown());
+}
+
+// A versioned invalidate leaves UNTRACKED filtering metadata untouched when the entry's disk
+// shard version is also UNTRACKED: both sides agree the collection is unsharded, so there is
+// nothing to reconcile.
+TEST_F(CommitCollectionMetadataLocallyTest, OnInvalidateWithShardVersionKeepsUntrackedCsr) {
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    CollectionShardingRuntime::acquireExclusive(operationContext(), kTestNss)
+        ->setCollectionMetadata(operationContext(),
+                                CollectionMetadata::UNTRACKED(),
+                                CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
+
+    const auto invalidateEntry = makeInvalidateOplogEntry(collType.getUuid(), [&] {
+        InvalidateCollectionMetadataOplogEntry entry{std::string(kTestNss.coll())};
+        entry.setShardVersion(ChunkVersion::UNTRACKED());
+        return entry;
+    }());
+
+    ShardServerOpObserver observer;
+    observer.onInvalidateCollectionMetadata(operationContext(), invalidateEntry);
+
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadata);
+    ASSERT_FALSE(metadata->isSharded());
+    ASSERT_EQ(metadata->getShardPlacementVersion(), ChunkVersion::UNTRACKED());
+}
+
+// An unconditional invalidate (no shardVersion) clears even an unknown CSR.
+TEST_F(CommitCollectionMetadataLocallyTest, OnInvalidateUnconditionalClearsUnknownCsr) {
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    const auto invalidateEntry = makeInvalidateOplogEntry(
+        collType.getUuid(), InvalidateCollectionMetadataOplogEntry{std::string(kTestNss.coll())});
+
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+        ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown());
+    }
+
+    ShardServerOpObserver observer;
+    observer.onInvalidateCollectionMetadata(operationContext(), invalidateEntry);
+
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown());
+}
+
 TEST_F(CommitCollectionMetadataLocallyTest, RefineShardKeyRemovesStaleChunks) {
     auto [collType, chunks] = makeCollectionMetadata(2);
 
@@ -1475,10 +1763,10 @@ TEST_F(CommitCollectionMetadataLocallyTest, SetAllowChunkOperationsOplogEntryUse
 // Clone (setFCV) tests
 // ---------------------------------------------------------------------------
 
-// The clone persists the durable shard catalog but performs no in-memory or oplog side effects:
-// no 'c' oplog entries (neither the invalidate nor the setAllowChunkOperations) and no in-memory
-// CSR install.
-TEST_F(CommitCollectionMetadataLocallyTest, CloneOnlyWritesDurableCatalogAndEmitsNoOplog) {
+// The clone persists the durable shard catalog and emits a single kIfStale invalidate 'c' entry
+// (carrying the freshly persisted shard version) but does not emit setAllowChunkOperations and does
+// not install metadata in-memory: with no prior in-memory state there is nothing stale to clear.
+TEST_F(CommitCollectionMetadataLocallyTest, CloneEmitsIfStaleInvalidateWithoutInstalling) {
     auto [collType, chunks] = makeCollectionMetadata(2);
     mockCatalogClient()->setCollectionMetadata(collType, chunks);
 
@@ -1489,19 +1777,98 @@ TEST_F(CommitCollectionMetadataLocallyTest, CloneOnlyWritesDurableCatalogAndEmit
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 1);
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 2);
 
-    // The clone is counted (it emits no 'c' entry, so this counter is the only signal for it) and
-    // is not double-counted as a commit.
+    // The clone is counted and is not double-counted as a commit.
     ASSERT_EQ(getRecoveryStats().getIntField("countLocalCollectionMetadataClones"), 1);
     ASSERT_EQ(getRecoveryStats().getIntField("countLocalCollectionMetadataCommits"), 0);
 
-    // No 'c' oplog entries are written during the clone.
-    ASSERT_EQ(countCommandOplogEntries("invalidateCollectionMetadata", kTestNss), 0);
+    // The clone emits exactly one invalidate carrying the disk shard version, and never a
+    // setAllowChunkOperations (the metadata is not reinstalled in-memory).
+    ASSERT_EQ(countCommandOplogEntries("invalidateCollectionMetadata", kTestNss), 1);
     ASSERT_EQ(countCommandOplogEntries("setAllowChunkOperations", kTestNss), 0);
+    auto oplogEntry = findLastOplogEntry();
+    auto object = oplogEntry.getObjectField("o");
+    ASSERT_EQ(object.firstElementFieldNameStringData(), "invalidateCollectionMetadata");
+    ASSERT_TRUE(object.hasField("shardVersion"));
+    ASSERT_FALSE(object.getBoolField("onlyClearIfUnowned"));
 
-    // The clone does not touch the in-memory CSR: with no prior state it stays unknown, to be
-    // recovered lazily from the durable catalog when next needed.
+    // With no prior in-memory state, the kIfStale precondition does not hold, so the CSR stays
+    // unknown, to be recovered lazily from the durable catalog when next needed.
     auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
     ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown());
+}
+
+// The clone clears an in-memory CSR whose shard version is older than the one it persists, so the
+// stale legacy state gets re-recovered from the authoritative catalog.
+TEST_F(CommitCollectionMetadataLocallyTest, CloneClearsKnownButStaleCsr) {
+    // Install a CSR at an older shard version owned by this shard.
+    auto [collType, chunksV1] = makeCollectionMetadata(1);
+    chunksV1[0].setShard(kMyShardName);
+    mockCatalogClient()->setCollectionMetadata(collType, chunksV1);
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss, false);
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+        ASSERT_TRUE(scopedCsr->getCurrentMetadataIfKnown());
+    }
+
+    // The authoritative catalog now holds a newer shard version (same collection generation).
+    auto chunksV2 = makeCoveringChunks(collType, 2 /* nChunks */, chunksV1[0].getVersion());
+    for (auto& chunk : chunksV2) {
+        chunk.setShard(kMyShardName);
+    }
+    mockCatalogClient()->setCollectionMetadata(collType, chunksV2);
+
+    shard_catalog_commit::cloneCollectionMetadataLocally(
+        operationContext(), kTestNss, false /* isDbPrimaryShard */);
+
+    // The in-memory shard version was older than the cloned one, so the CSR was cleared.
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown());
+}
+
+// The clone leaves an in-memory CSR untouched when its shard version already matches disk, avoiding
+// a redundant refresh.
+TEST_F(CommitCollectionMetadataLocallyTest, CloneKeepsKnownUpToDateCsr) {
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    chunks[0].setShard(kMyShardName);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss, false);
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+        ASSERT_TRUE(scopedCsr->getCurrentMetadataIfKnown());
+    }
+
+    // Clone the identical metadata: the disk shard version equals the in-memory one, so kIfStale
+    // does not hold and the CSR is preserved.
+    shard_catalog_commit::cloneCollectionMetadataLocally(
+        operationContext(), kTestNss, false /* isDbPrimaryShard */);
+
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadata);
+    ASSERT_EQ(metadata->getShardPlacementVersion(), chunks[0].getVersion());
+}
+
+// The clone leaves a chunkless tracked CSR untouched when both disk and in-memory carry unset
+// placement versions for the same collection: those versions are uncomparable, so kIfStale does
+// not clear.
+TEST_F(CommitCollectionMetadataLocallyTest, CloneKeepsChunklessCsrWithUnsetPlacementVersion) {
+    auto [collType, _] = makeCollectionMetadata(0);
+    mockCatalogClient()->setCollectionMetadata(collType, {});
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss, true);
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+        auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+        ASSERT_TRUE(metadata);
+        ASSERT_FALSE(metadata->getShardPlacementVersion().isSet());
+    }
+
+    shard_catalog_commit::cloneCollectionMetadataLocally(
+        operationContext(), kTestNss, true /* isDbPrimaryShard */);
+
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadata);
+    ASSERT_FALSE(metadata->getShardPlacementVersion().isSet());
 }
 
 // The clone must not clear an existing in-memory CSR when the shard owns no chunks and is not the

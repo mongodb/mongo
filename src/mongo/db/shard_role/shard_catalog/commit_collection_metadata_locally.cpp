@@ -321,12 +321,21 @@ void logShardCatalogCommandOplogEntry(OperationContext* opCtx,
     });
 }
 
-void invalidateCollectionMetadata(OperationContext* opCtx,
-                                  const NamespaceString& nss,
-                                  const UUID& uuid,
-                                  bool forDroppedCollection) {
+void invalidateCollectionMetadata(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const UUID& uuid,
+    bool forDroppedCollection,
+    const boost::optional<ChunkVersion>& diskShardVersion = boost::none,
+    bool onlyClearIfUnowned = false) {
     auto entry = InvalidateCollectionMetadataOplogEntry{std::string(nss.coll())};
     entry.setForDroppedCollection(forDroppedCollection);
+    if (onlyClearIfUnowned) {
+        entry.setOnlyClearIfUnowned(true);
+    }
+    if (diskShardVersion) {
+        entry.setShardVersion(*diskShardVersion);
+    }
 
     // Replicate the invalidation through the oplog to secondaries via a 'c' entry.
     auto oplogEntry = makeShardCatalogCommandOplogEntry(opCtx, nss, uuid, entry.toBSON());
@@ -346,10 +355,10 @@ void setAllowChunkOperationsOnSecondaries(OperationContext* opCtx,
     logShardCatalogCommandOplogEntry(opCtx, oplogEntry, "setAllowChunkOperations");
 }
 
-void updateShardCatalogCache(OperationContext* opCtx,
-                             const NamespaceString& nss,
-                             const CollectionType& coll,
-                             const std::vector<ChunkType>& chunks) {
+CollectionMetadata buildOwnedCollectionMetadata(OperationContext* opCtx,
+                                                const NamespaceString& nss,
+                                                const CollectionType& coll,
+                                                const std::vector<ChunkType>& chunks) {
     auto thisShardId = ShardingState::get(opCtx)->shardId();
     auto rt = [&] {
         auto defaultCollator = [&]() -> std::unique_ptr<CollatorInterface> {
@@ -379,7 +388,14 @@ void updateShardCatalogCache(OperationContext* opCtx,
         RoutingTableHistoryValueHandle(std::make_shared<RoutingTableHistory>(std::move(rt)),
                                        ComparableChunkVersion::makeComparableChunkVersion(version));
 
-    CollectionMetadata ownedMetadata(CurrentChunkManager(std::move(rtHandle)), thisShardId);
+    return CollectionMetadata(CurrentChunkManager(std::move(rtHandle)), thisShardId);
+}
+
+void updateShardCatalogCache(OperationContext* opCtx,
+                             const NamespaceString& nss,
+                             const CollectionType& coll,
+                             const std::vector<ChunkType>& chunks) {
+    auto ownedMetadata = buildOwnedCollectionMetadata(opCtx, nss, coll, chunks);
 
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
     scopedCsr->setCollectionMetadata(opCtx, std::move(ownedMetadata));
@@ -446,6 +462,12 @@ struct CommitCollectionMetadataOptions {
         // collection ends up with a durable entry, eagerly reinstall the metadata afterwards via
         // updateShardCatalogCache so the next query doesn't have to recover it from disk.
         kInvalidateThenReinstallOnPrimary,
+        // Emit an oplog 'c' entry carrying the disk shard version just written to disk. Each node
+        // clears its in-memory metadata only if that metadata is known and older than the durable
+        // shard version; nodes that are unknown or already up to date are left untouched, and the
+        // metadata is never eagerly reinstalled. Only meaningful when the collection has a durable
+        // entry on this shard.
+        kInvalidateIfStale,
     };
     NotifyMode notifyMode = NotifyMode::kInvalidateThenReinstallOnPrimary;
 };
@@ -483,6 +505,19 @@ void commitCollectionMetadataLocallyImpl(OperationContext* opCtx,
                 // Update this node's CSR with collection metadata and chunks as an optimization,
                 // so the next query doesn't have to recover it from disk.
                 updateShardCatalogCache(opCtx, nss, coll, ownedChunks);
+            }
+            return;
+        case CommitCollectionMetadataOptions::NotifyMode::kInvalidateIfStale:
+            if (hasCollectionEntry) {
+                // Advertise the shard version we just persisted so each node clears its in-memory
+                // metadata only if it is known and older than this version. Nodes without a durable
+                // entry (owns no chunks and not the DB primary) knew nothing about the collection,
+                // so there is nothing to reconcile.
+                const auto diskShardVersion =
+                    buildOwnedCollectionMetadata(opCtx, nss, coll, ownedChunks)
+                        .getShardPlacementVersion();
+                invalidateCollectionMetadata(
+                    opCtx, nss, coll.getUuid(), false /* forDroppedCollection */, diskShardVersion);
             }
             return;
     }
@@ -781,17 +816,19 @@ void cloneCollectionMetadataLocally(OperationContext* opCtx,
                                     bool isDbPrimaryShard) {
     auto coll = fetchCollection(opCtx, nss);
     const auto ownedChunks = fetchOwnedChunks(opCtx, nss, coll);
-    // The clone does not change placement, so every node's CSR is either already up to date or
-    // kUnknown and recovers from the durable catalog once the cluster is fully upgraded.
-    // Installing the metadata in-memory or emitting an invalidate would only trigger a redundant
-    // and expensive refresh.
+    // The clone does not change placement, so a node whose CSR is already up to date (or unknown)
+    // needs no attention: reinstalling the metadata or unconditionally invalidating would only
+    // trigger a redundant and expensive refresh.
+    // However, a node may still hold stale in-memory metadata (e.g. legacy split or merge). Emit an
+    // invalidate carrying the freshly persisted shard version so that only nodes whose known
+    // metadata is older than disk clear and re-recover.
     commitCollectionMetadataLocallyImpl(
         opCtx,
         nss,
         coll,
         ownedChunks,
         isDbPrimaryShard,
-        {.notifyMode = CommitCollectionMetadataOptions::NotifyMode::kNone});
+        {.notifyMode = CommitCollectionMetadataOptions::NotifyMode::kInvalidateIfStale});
 
     ShardingStatistics::get(opCtx)
         .collectionShardingMetadataStatistics.registerLocalCollectionMetadataClone();
@@ -820,21 +857,17 @@ void commitChunklessCollectionMetadataLocally(OperationContext* opCtx, const Nam
     //     latter case, we need to invalidate it so that the CSS is recreated with state "tracked"
     //     (a DB primary can't have "kUnowned" entries in the CSS by definition).
 
-    const bool isUnowned = [&] {
-        // This lock is dropped before invalidating because the op observer has to reacquire it to
-        // clear the CSR. This is fine: at worst, it forces a redundant re-recovery.
-        const auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss);
-        return scopedCsr->isUnowned();
-    }();
-    if (isUnowned) {
-        invalidateCollectionMetadata(opCtx, nss, coll.getUuid(), false /* forDroppedCollection */);
-    }
+    invalidateCollectionMetadata(opCtx,
+                                 nss,
+                                 coll.getUuid(),
+                                 false /* forDroppedCollection */,
+                                 boost::none /* diskShardVersion */,
+                                 true /* onlyClearIfUnowned */);
 
     LOGV2_INFO(12721505,
                "Committed chunkless collection shard catalog metadata locally",
                "nss"_attr = nss,
-               "uuid"_attr = coll.getUuid(),
-               "wasUnownedAndInvalidated"_attr = isUnowned);
+               "uuid"_attr = coll.getUuid());
 }
 
 void commitSetAllowChunkOperationsLocally(OperationContext* opCtx,

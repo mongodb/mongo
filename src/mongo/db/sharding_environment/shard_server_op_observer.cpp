@@ -57,6 +57,7 @@
 #include "mongo/db/shard_role/shard_catalog/type_oplog_catalog_metadata_gen.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/sharding_initialization_mongod.h"
+#include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/tenant_id.h"
@@ -66,7 +67,9 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/testing_proctor.h"
 
+#include <compare>
 #include <memory>
 #include <utility>
 
@@ -107,6 +110,103 @@ private:
     const NamespaceString _nss;
     const bool _droppingCollection;
 };
+
+/**
+ * Warns that the disk and in-memory shard versions relate to each other in a way that should not
+ * normally arise.
+ */
+void warnUnexpectedVersionRelationship(const std::string& reason,
+                                       const ChunkVersion& diskShardVersion,
+                                       const ChunkVersion& currentShardVersion) {
+    LOGV2_WARNING(13069800,
+                  "invalidateCollectionMetadata unexpected shard version relationship; clearing "
+                  "collection metadata",
+                  "reason"_attr = reason,
+                  "diskShardVersion"_attr = diskShardVersion.toString(),
+                  "currentShardVersion"_attr = currentShardVersion.toString());
+
+    if (TestingProctor::instance().isEnabled()) {
+        tasserted(13069801, reason);
+    }
+}
+
+/**
+ * Evaluates the precondition carried by an invalidateCollectionMetadata oplog entry against this
+ * node's currently installed collection metadata. Every node runs this independently, so that the
+ * decision to clear the CSS reflects local state rather than the state of the node that emitted the
+ * entry.
+ */
+bool shouldInvalidateCollectionMetadataLocally(const InvalidateCollectionMetadataOplogEntry& entry,
+                                               const CollectionShardingRuntime& csr) {
+    // Emergency kill-switch: bypass all of the logic below and always clear.
+    if (forceUnconditionalInvalidateCollectionMetadata.load()) {
+        return true;
+    }
+
+    // The entry asked to only clear UNOWNED nodes, or this node is already UNOWNED and has no
+    // durable metadata to reconcile against a shard version either way: the outcome is the same,
+    // clear if and only if this node is UNOWNED.
+    if (csr.isUnowned() || entry.getOnlyClearIfUnowned()) {
+        return csr.isUnowned();
+    }
+
+    // No shard version was carried by the entry, so the invalidation is unconditional.
+    if (!entry.getShardVersion()) {
+        return true;
+    }
+
+    const auto& diskShardVersion = *entry.getShardVersion();
+
+    // This node's metadata is unknown, so there is nothing installed to compare the disk version
+    // against; leave it unknown and let it get recovered from disk lazily when next needed.
+    const auto currentMetadata = csr.getCurrentMetadataIfKnown();
+    if (!currentMetadata) {
+        return false;
+    }
+
+    const auto currentShardVersion = currentMetadata->getShardPlacementVersion();
+    const auto compareResult = diskShardVersion <=> currentShardVersion;
+
+    if (compareResult == std::partial_ordering::less) {
+        // The version durably written to disk is older than what's already installed in memory.
+        // This should not happen, but clear anyway so the node recovers from disk when next needed.
+        warnUnexpectedVersionRelationship(
+            "invalidateCollectionMetadata disk shard version is older than the in-memory shard "
+            "version",
+            diskShardVersion,
+            currentShardVersion);
+        return true;
+    } else if (compareResult == std::partial_ordering::greater) {
+        // The disk version is newer than what's installed, so clear the CSS to pick it up on the
+        // next access. This case comes from in-memory being filled from the legacy FCV model.
+        return true;
+    } else if (compareResult == std::partial_ordering::equivalent) {
+        // The in-memory metadata already reflects what's on disk, nothing to do.
+        return false;
+    } else if (compareResult == std::partial_ordering::unordered) {
+        // Both sides agree the collection is untracked, so there is nothing to reconcile.
+        if (currentShardVersion == ChunkVersion::UNTRACKED() &&
+            diskShardVersion == ChunkVersion::UNTRACKED()) {
+            return false;
+        }
+
+        // Neither side has ever had a shard version, so there's nothing to reconcile either.
+        if (!currentShardVersion.isSet() && !diskShardVersion.isSet()) {
+            return false;
+        }
+
+        // Any other unordered relationship should not happen; clear anyway and surface it.
+        warnUnexpectedVersionRelationship(
+            "invalidateCollectionMetadata disk shard version is unordered with the in-memory shard "
+            "version",
+            diskShardVersion,
+            currentShardVersion);
+
+        return true;
+    }
+
+    MONGO_UNREACHABLE_TASSERT(13069802);
+}
 
 /**
  * Invalidates the in-memory routing table cache when a collection is dropped, so the next caller
@@ -793,11 +893,13 @@ void ShardServerOpObserver::onInvalidateCollectionMetadata(OperationContext* opC
     // install is an atomic operation the presence of a recoverer means that we still haven't
     // drained and applied the changes. The invalidate has to be communicated to the recovery
     // threads such that a new durable read is performed as whatever was read before is now invalid.
+    // The recoverer evaluates the entry's precondition against the metadata it recovers from disk.
     //
-    // The lack of this means we're free to proceed with a clear of the metadata.
+    // The lack of a recoverer means we're free to evaluate the precondition against the currently
+    // installed collection metadata and, if it holds, clear it.
     if (auto recoverer = scopedCsr->getCollectionCacheRecoverer()) {
         recoverer->onOplogEntry(op.getTimestamp(), entry);
-    } else {
+    } else if (shouldInvalidateCollectionMetadataLocally(entry, *scopedCsr)) {
         scopedCsr->clearCollectionMetadata(opCtx, entry.getForDroppedCollection());
     }
 }

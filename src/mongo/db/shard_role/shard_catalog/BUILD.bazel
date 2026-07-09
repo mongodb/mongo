@@ -658,6 +658,7 @@ idl_generator(
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/global_catalog:type_database_gen",
+        "//src/mongo/db/versioning_protocol:chunk_version_gen",
     ],
 )
 

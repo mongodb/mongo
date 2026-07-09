@@ -33,6 +33,7 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/global_catalog/type_database.idl"
+    - "mongo/db/versioning_protocol/chunk_version.idl"
 
 structs:
     CreateDatabaseMetadataOplogEntry:
@@ -71,6 +72,21 @@ structs:
                 type: bool
                 description: "If true, indicates the invalidation precedes a collection drop"
                 default: false
+            onlyClearIfUnowned:
+                type: bool
+                description:
+                    "If true, only nodes whose collection metadata is UNOWNED clear their
+                    in-memory state. Used when a shard persists chunkless tracked metadata and
+                    only UNOWNED nodes need to recover it."
+                default: false
+            shardVersion:
+                type: ChunkVersion
+                optional: true
+                description:
+                    "The shard placement version durably written for this collection. UNOWNED
+                    nodes always clear their in-memory metadata regardless of this value. Other
+                    nodes only use this version to decide whether to clear: when set, they clear
+                    if their known in-memory metadata is not already equivalent to this version."
 
     UpdateCollectionMetadataOplogEntry:
         description: "Oplog entry format for delta changes to apply to the overall CSS"

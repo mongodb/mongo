@@ -283,6 +283,10 @@ boost::optional<CollectionMetadata> applyOplogEntry(
     OperationContext* opCtx,
     const InvalidateCollectionMetadataOplogEntry& entry,
     CollectionMetadata collMetadata) {
+    // While a recovery is in progress we always force another recovery round, regardless of the
+    // entry's precondition. The precondition is meant to be evaluated against a node's stable,
+    // installed collection metadata, but here the metadata is still being rebuilt from disk and is
+    // not yet installed, so it cannot be evaluated reliably.
     return boost::none;
 }
 }  // namespace
