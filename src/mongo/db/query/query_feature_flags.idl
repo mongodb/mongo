@@ -560,7 +560,8 @@ feature_flags:
     featureFlagPqsMaxTimeMS:
         description: "Feature flag to enable per-query-shape maxTimeMS timeout limits via Persistent Query Settings."
         cpp_varname: gFeatureFlagPqsMaxTimeMS
-        default: false
+        default: true
+        version: 9.0
         fcv_gated: true
 
     featureFlagPersistentStats:

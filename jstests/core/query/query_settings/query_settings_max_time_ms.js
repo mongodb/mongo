@@ -27,8 +27,6 @@
  *   # TODO(SERVER-113800): Enable setClusterParameters with replicaset started with --shardsvr
  *   transitioning_replicaset_incompatible,
  *   does_not_support_stepdowns,
- *   # 'maxTimeMS' query settings are gated behind their own dedicated PQS feature flag.
- *   featureFlagPqsMaxTimeMS,
  *   requires_fcv_90,
  *   # TODO SERVER-130738: View passthrough transparently redirects find/aggregate/count/distinct
  *   # commands to a differently-named underlying namespace (e.g. implicit_identity_views.js), but

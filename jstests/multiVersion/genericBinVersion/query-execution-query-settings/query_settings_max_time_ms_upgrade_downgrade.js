@@ -9,7 +9,7 @@
  *   - After a downgrade then re-upgrade, the stripped 'maxTimeMS' stays gone and a new one can be
  *     set again.
  *
- * @tags: [featureFlagPqsMaxTimeMS]
+ * @tags: [requires_fcv_90]
  **/
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
