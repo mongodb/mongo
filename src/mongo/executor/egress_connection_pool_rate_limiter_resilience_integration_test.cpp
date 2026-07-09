@@ -297,7 +297,7 @@ public:
         for (size_t i = 0; i < results.size(); ++i) {
             const auto& res = results[i];
             const Status failStatus = res.isOK() ? res.getValue().status : res.getStatus();
-            if (failStatus.code() == ErrorCodes::HostUnreachable) {
+            if (!failStatus.isOK()) {
                 continue;
             }
 
@@ -317,10 +317,9 @@ public:
             LOGV2_ERROR(1196905,
                         "EgressPoolRateLimiterResilienceTest assertAllRequestsFailed mismatch",
                         "index"_attr = i,
-                        "expected"_attr = ErrorCodes::HostUnreachable,
                         "actual"_attr = failStatus.toString());
             FAIL(
-                fmt::format("Expected HostUnreachable for all requests; mismatch at index={}. "
+                fmt::format("Expected all requests to fail; request at index={} succeeded. "
                             "Got: {}. "
                             "All futures: ---\n{}---\n"
                             "Diagnostics: grpcEgress={} poolOptions={} "

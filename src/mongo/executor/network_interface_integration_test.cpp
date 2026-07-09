@@ -636,8 +636,8 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, ConnectionErrorDropsSingleCo
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, TimeoutDuringConnectionHandshake) {
     SKIP_ON_GRPC("gRPC skips the handshake");
 
-    // If network timeout occurs during connection setup before handshake completes,
-    // HostUnreachable should be returned.
+    // If a network timeout occurs during connection setup before handshake completes, the egress
+    // pool reports it as ConnectionEstablishmentTimeout (previously HostUnreachable).
     FailPointEnableBlock fpb1(
         "connectionPoolDropConnectionsBeforeGetConnection",
         BSON("instance" << "NetworkInterfaceTL-NetworkInterfaceIntegrationFixture"));
@@ -649,8 +649,9 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, TimeoutDuringConnectionHands
 
     auto result = deferred.get(interruptible());
 
-    ASSERT_EQ(ErrorCodes::HostUnreachable, result.status);
-    // No timeouts are counted as a result of HostUnreachable being returned.
+    ASSERT_EQ(ErrorCodes::ConnectionEstablishmentTimeout, result.status);
+    // A connection-setup timeout is a failed establishment, not an operation timeout, so it is
+    // counted as failed (not timedOut).
     assertNumOps({.canceled = 0u, .timedOut = 0u, .failed = 1u, .succeeded = 0u});
 }
 
