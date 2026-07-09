@@ -962,7 +962,7 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
 
     ListIndexes listIndexesCmd(nss);
     if (cri) {
-        listIndexesCmd.setShardVersion(cri->getShardVersion(opCtx, fromShardId));
+        listIndexesCmd.setShardVersion(cri->getShardVersion(fromShardId));
     }
     if (afterClusterTime) {
         repl::ReadConcernArgs args(LogicalTime(*afterClusterTime),

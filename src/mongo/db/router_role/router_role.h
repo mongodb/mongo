@@ -133,8 +133,7 @@ protected:
                            CatalogCache* catalogCache,
                            const std::vector<NamespaceString>& routingNamespaces);
 
-    static void appendCRUDRoutingTokenToCommand(OperationContext* opCtx,
-                                                const ShardId& shardId,
+    static void appendCRUDRoutingTokenToCommand(const ShardId& shardId,
                                                 const CollectionRoutingInfo& cri,
                                                 BSONObjBuilder* builder);
 

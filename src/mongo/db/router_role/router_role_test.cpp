@@ -766,7 +766,7 @@ TEST_F(RouterRoleTestTxn, CollectionRouterWithRoutingContextAtTransactionCluster
                         ASSERT_TRUE(cri.hasRoutingTable());
                         ASSERT_EQ(3, cri.getCollectionVersion().placementVersion().majorVersion());
                         ASSERT_TRUE(cri.getChunkManager().keyBelongsToShard(
-                            opCtx, BSON("_id" << testId), ShardId(expectedShardId)));
+                            BSON("_id" << testId), ShardId(expectedShardId)));
                         routingCtx.onRequestSentForNss(_nss);
                         return BSONObj();
                     });
@@ -804,7 +804,7 @@ TEST_F(RouterRoleTest, CollectionRouterWithRoutingContextAtReadConcernClusterTim
                         ASSERT_TRUE(cri.hasRoutingTable());
                         ASSERT_EQ(3, cri.getCollectionVersion().placementVersion().majorVersion());
                         ASSERT_TRUE(cri.getChunkManager().keyBelongsToShard(
-                            opCtx, BSON("_id" << testId), ShardId(expectedShardId)));
+                            BSON("_id" << testId), ShardId(expectedShardId)));
                         routingCtx.onRequestSentForNss(_nss);
                         return BSONObj();
                     });
@@ -1195,8 +1195,8 @@ TEST_F(RouterRoleTestTxn, CatalogCacheGetRoutingInfoAtTransactionClusterTime) {
                        .getValue();
         ASSERT_TRUE(cri.hasRoutingTable());
         ASSERT_EQ(3, cri.getCollectionVersion().placementVersion().majorVersion());
-        ASSERT_TRUE(cri.getChunkManager().keyBelongsToShard(
-            operationContext(), BSON("_id" << testId), ShardId(expectedShardId)));
+        ASSERT_TRUE(cri.getChunkManager().keyBelongsToShard(BSON("_id" << testId),
+                                                            ShardId(expectedShardId)));
         txnId++;
     };
 
@@ -1229,8 +1229,8 @@ TEST_F(RouterRoleTest, CatalogCacheGetRoutingInfoAtReadConcernClusterTime) {
                        .getValue();
         ASSERT_TRUE(cri.hasRoutingTable());
         ASSERT_EQ(3, cri.getCollectionVersion().placementVersion().majorVersion());
-        ASSERT_TRUE(cri.getChunkManager().keyBelongsToShard(
-            operationContext(), BSON("_id" << testId), ShardId(expectedShardId)));
+        ASSERT_TRUE(cri.getChunkManager().keyBelongsToShard(BSON("_id" << testId),
+                                                            ShardId(expectedShardId)));
     };
 
     // Test different timestamps to verify history works
@@ -1265,7 +1265,7 @@ TEST_F(RouterRoleTestTxn, CollectionRouterGetRoutingInfoAtTransactionClusterTime
                         ASSERT_TRUE(cri.hasRoutingTable());
                         ASSERT_EQ(3, cri.getCollectionVersion().placementVersion().majorVersion());
                         ASSERT_TRUE(cri.getChunkManager().keyBelongsToShard(
-                            opCtx, BSON("_id" << testId), ShardId(expectedShardId)));
+                            BSON("_id" << testId), ShardId(expectedShardId)));
                     });
             });
             future.default_timed_get();
@@ -1302,7 +1302,7 @@ TEST_F(RouterRoleTest, CollectionRouterGetRoutingInfoAtReadConcernClusterTime) {
                         ASSERT_TRUE(cri.hasRoutingTable());
                         ASSERT_EQ(3, cri.getCollectionVersion().placementVersion().majorVersion());
                         ASSERT_TRUE(cri.getChunkManager().keyBelongsToShard(
-                            opCtx, BSON("_id" << testId), ShardId(expectedShardId)));
+                            BSON("_id" << testId), ShardId(expectedShardId)));
                     });
             });
             future.default_timed_get();

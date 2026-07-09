@@ -40,8 +40,7 @@ std::pair<ShardVersion, boost::optional<DatabaseVersion>> resolveShardRoleVersio
     const boost::optional<LogicalTime>& placementConflictTime) {
     const bool isTracked = cri.hasRoutingTable();
 
-    auto shardVersion =
-        isTracked ? cri.getShardVersion(opCtx, myShardId) : ShardVersion::UNTRACKED();
+    auto shardVersion = isTracked ? cri.getShardVersion(myShardId) : ShardVersion::UNTRACKED();
     if (placementConflictTime) {
         // TODO (SERVER-115178): Remove placementConflictTime stamping once v9.0 branches out.
         shardVersion.setPlacementConflictTime_DEPRECATED(*placementConflictTime);

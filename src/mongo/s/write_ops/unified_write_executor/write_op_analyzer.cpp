@@ -47,7 +47,7 @@ void WriteOpAnalyzerImpl::recordTargetingStats(OperationContext* opCtx,
     }
 
     int aproxNShardsOwningChunks =
-        cri.hasRoutingTable() ? cri.getChunkManager().getAproxNShardsOwningChunks(opCtx) : 0;
+        cri.hasRoutingTable() ? cri.getChunkManager().getAproxNShardsOwningChunks() : 0;
 
     _stats.recordTargetingStats(tr.endpoints,
                                 op.getNsInfoIdx(),

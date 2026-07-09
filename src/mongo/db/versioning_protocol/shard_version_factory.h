@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/db/global_catalog/chunk_manager.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
@@ -47,9 +46,7 @@ class MONGO_MOD_NEEDS_REPLACEMENT ShardVersionFactory {
 public:
     static ShardVersion make(const ChunkManager& chunkManager);
 
-    static ShardVersion make(OperationContext* opCtx,
-                             const ChunkManager& chunkManager,
-                             const ShardId& shardId);
+    static ShardVersion make(const ChunkManager& chunkManager, const ShardId& shardId);
 
     static ShardVersion make(const CollectionMetadata& cm,
                              boost::optional<NamespaceString> nss = boost::none);

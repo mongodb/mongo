@@ -640,9 +640,9 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterCollectionEpochChange) {
     ASSERT_EQ(2, cm.numChunks());
     ASSERT_EQ(newVersion, cm.getVersion());
     ASSERT_EQ(ChunkVersion({newVersion.epoch(), newVersion.getTimestamp()}, {1, 0}),
-              cm.getVersion(operationContext(), {"0"}));
+              cm.getVersion({"0"}));
     ASSERT_EQ(ChunkVersion({newVersion.epoch(), newVersion.getTimestamp()}, {1, 1}),
-              cm.getVersion(operationContext(), {"1"}));
+              cm.getVersion({"1"}));
 }
 
 TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterSplit) {
@@ -703,9 +703,9 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterSplit) {
     ASSERT(cm.isSharded());
     ASSERT_EQ(2, cm.numChunks());
     ASSERT_EQ(version, cm.getVersion());
-    ASSERT_EQ(version, cm.getVersion(operationContext(), {"0"}));
+    ASSERT_EQ(version, cm.getVersion({"0"}));
     ASSERT_EQ(ChunkVersion({version.epoch(), version.getTimestamp()}, {0, 0}),
-              cm.getVersion(operationContext(), {"1"}));
+              cm.getVersion({"1"}));
 }
 
 TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveWithReshardingFieldsAdded) {
@@ -750,8 +750,8 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveWithReshardingFieldsAdde
     ASSERT_EQ(2, cm.numChunks());
     ASSERT_EQ(reshardingUUID, cm.getReshardingFields()->getReshardingUUID());
     ASSERT_EQ(version, cm.getVersion());
-    ASSERT_EQ(version, cm.getVersion(operationContext(), {"0"}));
-    ASSERT_EQ(expectedDestPlacementVersion, cm.getVersion(operationContext(), {"1"}));
+    ASSERT_EQ(version, cm.getVersion({"0"}));
+    ASSERT_EQ(expectedDestPlacementVersion, cm.getVersion({"1"}));
 }
 
 TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveLastChunkWithReshardingFieldsRemoved) {
@@ -792,8 +792,8 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveLastChunkWithReshardingF
     ASSERT_EQ(1, cm.numChunks());
     ASSERT_EQ(version, cm.getVersion());
     ASSERT_EQ(ChunkVersion({version.epoch(), version.getTimestamp()}, {0, 0}),
-              cm.getVersion(operationContext(), {"0"}));
-    ASSERT_EQ(version, cm.getVersion(operationContext(), {"1"}));
+              cm.getVersion({"0"}));
+    ASSERT_EQ(version, cm.getVersion({"1"}));
     ASSERT(boost::none == cm.getReshardingFields());
 }
 

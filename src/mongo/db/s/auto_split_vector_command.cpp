@@ -122,7 +122,7 @@ public:
                         ns().toStringForErrorMsg()),
                     !acquisition.getShardingDescription().isSharded() ||
                         acquisition.getShardingFilter()->isRangeEntirelyOwned(
-                            opCtx, req.getMin(), req.getMax(), false /*includeMaxBound*/));
+                            req.getMin(), req.getMax(), false /*includeMaxBound*/));
 
 
             auto [splitPoints, continuation] = autoSplitVector(opCtx,

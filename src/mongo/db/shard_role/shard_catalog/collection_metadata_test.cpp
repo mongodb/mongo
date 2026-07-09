@@ -35,10 +35,8 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/global_catalog/type_chunk.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/s/resharding/resharding_util.h"
-#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/sharding_environment/sharding_test_fixture_common.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/s/resharding/common_types_gen.h"
@@ -190,22 +188,7 @@ struct ConstructedRangeMap : public RangeMap {
         : RangeMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()) {}
 };
 
-class CollectionMetadataTestFixture : public ServiceContextTest {
-protected:
-    void setUp() override {
-        ServiceContextTest::setUp();
-        _opCtx = makeOperationContext();
-    }
-
-    OperationContext* opCtx() const {
-        return _opCtx.get();
-    }
-
-private:
-    ServiceContext::UniqueOperationContext _opCtx;
-};
-
-class NoChunkFixture : public CollectionMetadataTestFixture {
+class NoChunkFixture : public unittest::Test {
 protected:
     CollectionMetadata makeTrackedCollectionMetadata(
         UUID existingUuid = UUID::gen(),
@@ -303,7 +286,7 @@ TEST_F(NoChunkFixture, OrphanedDataRangeEnd) {
  * Fixture with single chunk containing:
  * [10->20)
  */
-class SingleChunkFixture : public CollectionMetadataTestFixture {
+class SingleChunkFixture : public unittest::Test {
 protected:
     CollectionMetadata makeTrackedCollectionMetadata() const {
         return makeTrackedCollectionMetadataImpl(
@@ -378,8 +361,8 @@ TEST_F(SingleChunkFixture, CurrentChunkManagerMakeUpdatedAppliesChangedChunks) {
     auto updatedChunkManager = metadata.getCurrentChunkManager()->makeUpdated({changedChunk});
 
     ASSERT_EQ(changedChunk.getVersion(), updatedChunkManager.getVersion());
-    ASSERT(!updatedChunkManager.keyBelongsToShard(opCtx(), BSON("a" << 15), kThisShard));
-    ASSERT(updatedChunkManager.keyBelongsToShard(opCtx(), BSON("a" << 15), kOtherShard));
+    ASSERT(!updatedChunkManager.keyBelongsToShard(BSON("a" << 15), kThisShard));
+    ASSERT(updatedChunkManager.keyBelongsToShard(BSON("a" << 15), kOtherShard));
 }
 
 TEST_F(SingleChunkFixture, CollectionMetadataMakeUpdatedAppliesChangedChunks) {
@@ -494,7 +477,7 @@ TEST_F(SingleChunkFixture, CollectionMetadataMakeUpdatedSelectsMaxVersionRegardl
               reappliedMetadata.getChunkManager()->numChunks());
 }
 
-class GappedChunksFixture : public CollectionMetadataTestFixture {
+class GappedChunksFixture : public unittest::Test {
 protected:
     CollectionMetadata makeGappedMetadata(
         const std::vector<std::pair<BSONObj, BSONObj>>& ownedChunks) const {
@@ -531,7 +514,7 @@ TEST_F(GappedChunksFixture, MakeUpdatedPreservesGapsWithNonAdjacentChunk) {
  * Fixture with single chunk containing:
  * [(min, min)->(max, max))
  */
-class SingleChunkMinMaxCompoundKeyFixture : public CollectionMetadataTestFixture {
+class SingleChunkMinMaxCompoundKeyFixture : public unittest::Test {
 protected:
     CollectionMetadata makeTrackedCollectionMetadata() const {
         const KeyPattern shardKeyPattern(BSON("a" << 1 << "b" << 1));
@@ -556,7 +539,7 @@ TEST_F(SingleChunkMinMaxCompoundKeyFixture, KeyBelongsToMe) {
  * Fixture with chunks:
  * [(10, 0)->(20, 0)), [(30, 0)->(40, 0))
  */
-class TwoChunksWithGapCompoundKeyFixture : public CollectionMetadataTestFixture {
+class TwoChunksWithGapCompoundKeyFixture : public unittest::Test {
 protected:
     CollectionMetadata makeTrackedCollectionMetadata() const {
         return makeTrackedCollectionMetadataImpl(
@@ -593,7 +576,7 @@ TEST_F(TwoChunksWithGapCompoundKeyFixture, ChunkGapOrphanedDataRanges) {
  * Fixture with chunk containing:
  * [min->10) , [10->20) , <gap> , [30->max)
  */
-class ThreeChunkWithRangeGapFixture : public CollectionMetadataTestFixture {
+class ThreeChunkWithRangeGapFixture : public unittest::Test {
 protected:
     CollectionMetadata makeTrackedCollectionMetadata() const {
         return makeTrackedCollectionMetadataImpl(
@@ -664,7 +647,7 @@ TEST_F(ThreeChunkWithRangeGapFixture, GetNextChunkFromLast) {
  * Fixture with single chunk containing:
  * [10->20)
  */
-class StaleChunkFixture : public CollectionMetadataTestFixture {
+class StaleChunkFixture : public unittest::Test {
 protected:
     CollectionMetadata makeTrackedCollectionMetadata() const {
         return makeTrackedCollectionMetadataImpl(

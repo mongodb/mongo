@@ -165,8 +165,7 @@ protected:
                                         ConnectionString(kConfigHostAndPort),
                                         originatorShardHandle});
 
-            _shardVersion.emplace(
-                ShardVersionFactory::make(opCtx, chunkManager, originatorShardId));
+            _shardVersion.emplace(ShardVersionFactory::make(chunkManager, originatorShardId));
 
             OperationShardingState::setShardRole(
                 opCtx, kNss, _shardVersion, boost::none /* databaseVersion */);

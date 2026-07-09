@@ -92,8 +92,7 @@ GetNextResult ReshardingOwnershipMatchStage::doGetNext() {
         auto shardKey =
             _reshardingKey->extractShardKeyFromDocThrows(nextInput.getDocument().toBson());
 
-        if (_tempReshardingChunkMgr->keyBelongsToShard(
-                pExpCtx->getOperationContext(), shardKey, _recipientShardId)) {
+        if (_tempReshardingChunkMgr->keyBelongsToShard(shardKey, _recipientShardId)) {
             return nextInput;
         }
 

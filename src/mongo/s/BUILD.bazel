@@ -134,14 +134,11 @@ idl_generator(
     src = "sharding_task_executor_pool.idl",
 )
 
-# TODO (SERVER-126212): Move shard version factory back to common_s once chunk manager shard ref
-# resolution is removed
 # This library contains sharding functionality used by both mongod and mongos
 mongo_cc_library(
     name = "grid",
     srcs = [
         "balancer_configuration.cpp",
-        "//src/mongo/db/global_catalog:chunk_manager_shard_resolver.cpp",
         "//src/mongo/db/global_catalog/ddl:shard_util.cpp",
         "//src/mongo/db/router_role/routing_cache:catalog_cache.cpp",
         "//src/mongo/db/router_role/routing_cache:catalog_cache_loader.cpp",
@@ -153,7 +150,6 @@ mongo_cc_library(
         "//src/mongo/db/sharding_environment/client:config_shard_wrapper.cpp",
         "//src/mongo/db/sharding_environment/client:shard_factory.cpp",
         "//src/mongo/db/topology:shard_registry.cpp",
-        "//src/mongo/db/versioning_protocol:shard_version_factory.cpp",
     ],
     deps = [
         ":common_s",
@@ -311,6 +307,7 @@ mongo_cc_library(
         "//src/mongo/db/topology:transition_to_dedicated_config_server_gen",
         "//src/mongo/db/topology/cluster_parameters:sharding_cluster_parameters_gen",
         "//src/mongo/db/versioning_protocol:get_database_version_gen",
+        "//src/mongo/db/versioning_protocol:shard_version_factory.cpp",
         "//src/mongo/db/versioning_protocol:stale_exception.cpp",
         "//src/mongo/s/migration_blocking_operation:migration_blocking_operation_feature_flags_gen",
         "//src/mongo/s/request_types:abort_reshard_collection_gen",

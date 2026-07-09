@@ -32,6 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/topology/cluster_parameters/sharding_cluster_parameters_gen.h"
+#include "mongo/db/versioning_protocol/shard_version_factory.h"
 
 namespace mongo {
 namespace write_op_helpers {
@@ -126,7 +127,8 @@ int BulkCommandSizeEstimator::getOpSizeEstimate(int opIdx, const ShardId& shardI
     if (iter == _accountedForNsInfos.end() || !iter->second.contains(nss)) {
         // Account for optional fields that can be set per namespace to have a conservative
         // estimate.
-        const auto mockShardVersion = ShardVersion::UNTRACKED();
+        const ShardVersion mockShardVersion =
+            ShardVersionFactory::make(CollectionMetadata::UNTRACKED(), nss);
         static const DatabaseVersion mockDBVersion = DatabaseVersion(UUID::gen(), Timestamp());
 
         NamespaceInfoEntry nsEntry(nss);

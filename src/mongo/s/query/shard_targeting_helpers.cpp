@@ -81,8 +81,7 @@ std::set<ShardId> getTargetedShardsForCanonicalQuery(const CanonicalQuery& query
         }
 
         std::set<ShardId> shardIds;
-        getShardIdsForCanonicalQuery(
-            query.getExpCtx()->getOperationContext(), query, cm, &shardIds);
+        getShardIdsForCanonicalQuery(query, cm, &shardIds);
         return shardIds;
     }
 

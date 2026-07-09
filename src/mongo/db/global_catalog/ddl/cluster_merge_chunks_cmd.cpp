@@ -101,7 +101,7 @@ public:
             maxKey = cm.getShardKeyPattern().normalizeShardKey(maxKey);
 
             const auto firstChunk = cm.findIntersectingChunkWithSimpleCollation(minKey);
-            ChunkVersion placementVersion = cm.getVersion(opCtx, firstChunk.getShardId());
+            ChunkVersion placementVersion = cm.getVersion(firstChunk.getShardId());
 
             ShardsvrMergeChunks req(ns());
             req.setDbName(DatabaseName::kAdmin);

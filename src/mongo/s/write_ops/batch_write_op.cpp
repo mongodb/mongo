@@ -186,7 +186,8 @@ bool isCompatibleWithBatch(
 /**
  * Helper to determine whether there is room to add a given op to the current batch.
  */
-bool wouldFitInBatch(std::vector<std::unique_ptr<TargetedWrite>>& writes,
+bool wouldFitInBatch(OperationContext* opCtx,
+                     std::vector<std::unique_ptr<TargetedWrite>>& writes,
                      const TargetedBatchMap& batchMap,
                      int opIdx,
                      write_op_helpers::BatchCommandSizeEstimatorBase& sizeEstimator,
@@ -435,7 +436,7 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
         const bool canBeAddedToBatch =
             isCompatibleWithBatch(
                 ordered, nss, result, batchType, batchMap, shardVersionMaps, dbVersionMaps) &&
-            wouldFitInBatch(result.writes, batchMap, opIdx, sizeEstimator, estSizesForOps);
+            wouldFitInBatch(opCtx, result.writes, batchMap, opIdx, sizeEstimator, estSizesForOps);
 
         // Handle the case where 'writeOp' cannot be added to the current batch.
         if (!canBeAddedToBatch) {
@@ -530,7 +531,7 @@ StatusWith<WriteType> BatchWriteOp::targetBatch(const NSTargeter& targeter,
 
     // Note: It is fine to use 'getAproxNShardsOwningChunks' here because the result is only used to
     // update stats.
-    _nShardsOwningChunks = targeter.getAproxNShardsOwningChunks(_opCtx);
+    _nShardsOwningChunks = targeter.getAproxNShardsOwningChunks();
 
     return targetStatus;
 }

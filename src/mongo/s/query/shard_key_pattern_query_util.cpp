@@ -512,21 +512,18 @@ void getShardIdsAndChunksForQuery(boost::intrusive_ptr<ExpressionContext> expCtx
             .findCommand = std::move(findCommand),
             .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
 
-    getShardIdsAndChunksForCanonicalQuery(
-        expCtx->getOperationContext(), *cq, cm, shardIds, info, bypassIsFieldHashedCheck);
+    getShardIdsAndChunksForCanonicalQuery(*cq, cm, shardIds, info, bypassIsFieldHashedCheck);
 }
 
-void getShardIdsForCanonicalQuery(OperationContext* opCtx,
-                                  const CanonicalQuery& query,
+void getShardIdsForCanonicalQuery(const CanonicalQuery& query,
                                   const ChunkManager& cm,
                                   std::set<ShardId>* shardIds,
                                   bool bypassIsFieldHashedCheck) {
     return getShardIdsAndChunksForCanonicalQuery(
-        opCtx, query, cm, shardIds, nullptr, bypassIsFieldHashedCheck);
+        query, cm, shardIds, nullptr, bypassIsFieldHashedCheck);
 }
 
-void getShardIdsAndChunksForCanonicalQuery(OperationContext* opCtx,
-                                           const CanonicalQuery& query,
+void getShardIdsAndChunksForCanonicalQuery(const CanonicalQuery& query,
                                            const ChunkManager& cm,
                                            std::set<ShardId>* shardIds,
                                            QueryTargetingInfo* info,
@@ -579,7 +576,7 @@ void getShardIdsAndChunksForCanonicalQuery(OperationContext* opCtx,
             tassert(9607300,
                     "Shard targeting index bounds are not in the expected order",
                     SimpleBSONObjComparator::kInstance.evaluate(min <= max));
-            cm.getShardIdsForRange(opCtx, min, max, shardIds, info ? &info->chunkRanges : nullptr);
+            cm.getShardIdsForRange(min, max, shardIds, info ? &info->chunkRanges : nullptr);
 
             // Once we know we need to visit all shards no need to keep looping.
             // However, this optimization does not apply when we are reading from a snapshot
@@ -592,8 +589,8 @@ void getShardIdsAndChunksForCanonicalQuery(OperationContext* opCtx,
             // Uses getAproxNShardsOwningChunks() as getNShardsOwningChunks() is only available on
             // CurrentChunkManager, but both currently share the same implementation.
             // TODO SERVER-114823 Review the usage of getAproxNShardsOwningChunks here.
-            if (!cm.isAtPointInTime() &&
-                shardIds->size() == cm.getAproxNShardsOwningChunks(opCtx) && !info) {
+            if (!cm.isAtPointInTime() && shardIds->size() == cm.getAproxNShardsOwningChunks() &&
+                !info) {
                 break;
             }
         }

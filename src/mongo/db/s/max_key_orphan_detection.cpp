@@ -246,7 +246,7 @@ bool detectMaxKeyOrphanForCollection(OperationContext* opCtx,
     if (!cm.hasRoutingTable() || !cm.uuidMatches(collUuid)) {
         return false;
     }
-    if (cm.keyBelongsToShard(opCtx, *candidateKey, myShardId)) {
+    if (cm.keyBelongsToShard(*candidateKey, myShardId)) {
         return false;
     }
     return true;

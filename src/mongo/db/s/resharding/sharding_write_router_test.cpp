@@ -128,13 +128,13 @@ public:
                                     kDonorShardHandle});
 
         auto [chunks, chunkManager] = createSourceChunkManager();
+        _shardVersion = ShardVersionFactory::make(chunkManager, kDonorShardHandle.name());
 
         {
             const auto client = _serviceContext->getService()->makeClient("test-setup-metadata");
             const auto opCtx = client->makeOperationContext();
-
-            _shardVersion =
-                ShardVersionFactory::make(opCtx.get(), chunkManager, kDonorShardHandle.name());
+            OperationShardingState::setShardRole(
+                opCtx.get(), kNss, _shardVersion, boost::none /* databaseVersion */);
 
             CollectionShardingRuntime::acquireExclusive(opCtx.get(), kNss)
                 ->setCollectionMetadata(opCtx.get(),

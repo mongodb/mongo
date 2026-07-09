@@ -145,14 +145,10 @@ public:
     /**
      * Returns the current shard's placement version for the collection or UNTRACKED if it does not
      * have a routing table.
-     *
-     * TODO (SERVER-128786): Remove the nullptr argument once we have a shardHandle access to the
-     * chunk manager.
      */
     ChunkVersion getShardPlacementVersion() const {
-        return (hasRoutingTable()
-                    ? getChunkManagerBase().getVersion(nullptr /* opCtx */, _thisShardId)
-                    : ChunkVersion::UNTRACKED());
+        return (hasRoutingTable() ? getChunkManagerBase().getVersion(_thisShardId)
+                                  : ChunkVersion::UNTRACKED());
     }
 
     /**
@@ -160,14 +156,10 @@ public:
      * sharded. This value indicates the commit time of the latest placement change that this shard
      * participated in and is used to answer the question of "did any chunks move since some
      * timestamp".
-     *
-     * TODO (SERVER-128786): Remove the nullptr argument once we have a shardHandle access to the
-     * chunk manager.
      */
     Timestamp getShardMaxValidAfter() const {
-        return (hasRoutingTable()
-                    ? getChunkManagerBase().getMaxValidAfter(nullptr /* opCtx */, _thisShardId)
-                    : Timestamp(0, 0));
+        return (hasRoutingTable() ? getChunkManagerBase().getMaxValidAfter(_thisShardId)
+                                  : Timestamp(0, 0));
     }
 
     /**
@@ -178,14 +170,10 @@ public:
      * current chunk manager. Only use this function when logging the returned ChunkVersion. If the
      * caller must execute logic based on the returned ChunkVersion, use getShardPlacementVersion()
      * instead.
-     *
-     * TODO (SERVER-128786): Remove the nullptr argument once we have a shardHandle access to the
-     * chunk manager.
      */
     ChunkVersion getShardPlacementVersionForLogging() const {
-        return (hasRoutingTable()
-                    ? getChunkManagerBase().getVersionForLogging(nullptr /* opCtx */, _thisShardId)
-                    : ChunkVersion::UNTRACKED());
+        return (hasRoutingTable() ? getChunkManagerBase().getVersionForLogging(_thisShardId)
+                                  : ChunkVersion::UNTRACKED());
     }
 
     /**
@@ -296,28 +284,21 @@ public:
     /**
      * Returns true if the document with the given key belongs to this chunkset. If the key is empty
      * returns false. If key is not a valid shard key, the behaviour is undefined.
-     *
-     * TODO (SERVER-128349): Remove the nullptr argument once we have a shardHandle access to the
-     * chunk manager.
      */
     bool keyBelongsToMe(const BSONObj& key) const {
         tassert(10016208, "Expected a routing table to be initialized", hasRoutingTable());
-        return getChunkManagerBase().keyBelongsToShard(nullptr /* opCtx */, key, _thisShardId);
+        return getChunkManagerBase().keyBelongsToShard(key, _thisShardId);
     }
 
     /**
      * This finds the nearest chunk to a given 'key' owned by the current shard in the
      * specified chunk map scan 'direction', and returns it as a 'ChunkOwnership'. If the key is
      * empty returns false. If key is not a valid shard key, the behaviour is undefined.
-     *
-     * TODO (SERVER-128349): Remove the nullptr argument once we have a shardHandle access to the
-     * chunk manager.
      */
     ChunkManager::ChunkOwnership nearestOwnedChunk(const BSONObj& key,
                                                    ChunkMap::Direction direction) const {
         tassert(9526301, "Expected a routing table to be initialized", hasRoutingTable());
-        return getChunkManagerBase().nearestOwnedChunk(
-            nullptr /* opCtx */, key, _thisShardId, direction);
+        return getChunkManagerBase().nearestOwnedChunk(key, _thisShardId, direction);
     }
 
     /**
@@ -330,13 +311,10 @@ public:
 
     /**
      * Returns true if the argument range overlaps any chunk.
-     *
-     * TODO (SERVER-128349): Remove the nullptr argument once we have a shardHandle access to the
-     * chunk manager.
      */
     bool rangeOverlapsChunk(const ChunkRange& range) const {
         tassert(10016209, "Expected a routing table to be initialized", hasRoutingTable());
-        return getChunkManagerBase().rangeOverlapsShard(nullptr /* opCtx */, range, _thisShardId);
+        return getChunkManagerBase().rangeOverlapsShard(range, _thisShardId);
     }
 
     /**

@@ -782,9 +782,8 @@ void FilteringMetadataCache::_recoverMigrationCoordinations(OperationContext* op
                 coordinator.setMigrationDecision(DecisionEnum::kAborted);
             } else {
                 coordinator.setMigrationDecision(DecisionEnum::kCommitted);
-                bool noMoreCollectionChunksOnDonor = !currentMetadata.getChunkManager()
-                                                          ->getVersion(opCtx, doc.getDonorShardId())
-                                                          .isSet();
+                bool noMoreCollectionChunksOnDonor =
+                    !currentMetadata.getChunkManager()->getVersion(doc.getDonorShardId()).isSet();
                 notifyChangeStreamsOnChunkMigrated(
                     opCtx,
                     doc.getNss(),

@@ -417,7 +417,7 @@ void ChunkMap::_splitAndCommitUpdatedChunkVector(ChunkVectorMap::const_iterator 
 }
 
 void ChunkMap::_updateShardVersionFromDiscardedChunk(const ChunkInfo& chunk) {
-    auto placementVersionIt = _placementVersions.find(chunk.getShardRef());
+    auto placementVersionIt = _placementVersions.find(chunk.getShardId());
     if (placementVersionIt != _placementVersions.end() &&
         placementVersionIt->second.placementVersion == chunk.getLastmod()) {
         _placementVersions.erase(placementVersionIt);
@@ -432,7 +432,7 @@ void ChunkMap::_updateShardVersionFromUpdateChunk(
             ? Timestamp{0, 0}
             : chunk.getHistory().front().getValidAfter();
 
-        auto oldPlacementVersionIt = oldPlacementVersions.find(chunk.getShardRef());
+        auto oldPlacementVersionIt = oldPlacementVersions.find(chunk.getShardId());
         auto oldShardValidAfter = oldPlacementVersionIt == oldPlacementVersions.end()
             ? Timestamp{0, 0}
             : oldPlacementVersionIt->second.validAfter;
@@ -445,7 +445,7 @@ void ChunkMap::_updateShardVersionFromUpdateChunk(
     bool versionUpdated{false};
 
     auto [placementVersionIt, created] =
-        _placementVersions.try_emplace(chunk.getShardRef(), newVersion, newValidAfter);
+        _placementVersions.try_emplace(chunk.getShardId(), newVersion, newValidAfter);
 
     if (created) {
         // We just created a new entry in the _placementVersions map with
@@ -836,9 +836,7 @@ Chunk ChunkManager::findIntersectingChunk(const BSONObj& shardKey,
     return Chunk(*chunkInfo, _clusterTime);
 }
 
-bool ChunkManager::keyBelongsToShard(OperationContext*,
-                                     const BSONObj& shardKey,
-                                     const ShardId& shardId) const {
+bool ChunkManager::keyBelongsToShard(const BSONObj& shardKey, const ShardId& shardId) const {
     tassert(7626419, "Expected routing table to be initialized", _rt->optRt);
 
     if (shardKey.isEmpty()) {
@@ -854,8 +852,7 @@ bool ChunkManager::keyBelongsToShard(OperationContext*,
     return (*it)->getShardIdAt(_clusterTime) == shardId;
 }
 
-ChunkManager::ChunkOwnership ChunkManager::nearestOwnedChunk(OperationContext*,
-                                                             const BSONObj& shardKey,
+ChunkManager::ChunkOwnership ChunkManager::nearestOwnedChunk(const BSONObj& shardKey,
                                                              const ShardId& shardId,
                                                              ChunkMap::Direction direction) const {
     tassert(9526302, "Expected routing table to be initialized", _rt->optRt);
@@ -910,8 +907,7 @@ ChunkManager::ChunkOwnership ChunkManager::nearestOwnedChunk(OperationContext*,
     return {isOwned, std::move(nearestOwnedChunk)};
 }
 
-void ChunkManager::getShardIdsForRange(OperationContext*,
-                                       const BSONObj& min,
+void ChunkManager::getShardIdsForRange(const BSONObj& min,
                                        const BSONObj& max,
                                        std::set<ShardId>* shardIds,
                                        std::set<ChunkRange>* chunkRanges,
@@ -952,9 +948,7 @@ void ChunkManager::getShardIdsForRange(OperationContext*,
     });
 }
 
-bool ChunkManager::rangeOverlapsShard(OperationContext*,
-                                      const ChunkRange& range,
-                                      const ShardId& shardId) const {
+bool ChunkManager::rangeOverlapsShard(const ChunkRange& range, const ShardId& shardId) const {
     tassert(7626421, "Expected routing table to be initialized", _rt->optRt);
 
     bool overlapFound = false;
@@ -972,8 +966,7 @@ bool ChunkManager::rangeOverlapsShard(OperationContext*,
     return overlapFound;
 }
 
-boost::optional<Chunk> CurrentChunkManager::getNextChunkOnShard(OperationContext*,
-                                                                const BSONObj& shardKey,
+boost::optional<Chunk> CurrentChunkManager::getNextChunkOnShard(const BSONObj& shardKey,
                                                                 const ShardId& shardId) const {
     tassert(7626422, "Expected routing table to be initialized", _rt->optRt);
     tassert(8719704,
@@ -1012,7 +1005,7 @@ CurrentChunkManager CurrentChunkManager::makeUpdated(const std::vector<ChunkType
     return CurrentChunkManager(std::move(rtHandle));
 }
 
-ShardId ChunkManager::getMinKeyShardIdWithSimpleCollation(OperationContext*) const {
+ShardId ChunkManager::getMinKeyShardIdWithSimpleCollation() const {
     tassert(7626423, "Expected routing table to be initialized", _rt->optRt);
 
     auto minKey = getShardKeyPattern().getKeyPattern().globalMin();

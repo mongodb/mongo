@@ -34,7 +34,6 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
-#include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/uuid.h"
 
 #include <string>
@@ -134,25 +133,14 @@ public:
     }
 
     /**
-     * Functor compatible with std::hash for stdx::unordered_{map,set}
-     */
-    struct Hasher {
-        std::size_t operator()(const ShardRef& ref) const;
-    };
-
-    /**
      * Hash function compatible with absl::Hash for absl::unordered_{map,set}
      */
     template <typename H>
     friend H AbslHashValue(H h, const ShardRef& ref) {
-        return visit(
-            OverloadedVisitor{
-                [&](const ShardId& id) {
-                    return H::combine(std::move(h), std::size_t{0}, id.toString());
-                },
-                [&](const UUID& uuid) { return H::combine(std::move(h), std::size_t{1}, uuid); },
-            },
-            ref._ref);
+        if (ref.isString()) {
+            return H::combine(std::move(h), ref.getString());
+        }
+        return H::combine(std::move(h), ref.getUUID());
     }
 
     static ShardRef parse(const BSONElement& element);

@@ -500,7 +500,7 @@ void notifyChangeStreamsOnChunkMigrationCommitted(OperationContext* opCtx,
     // cache to decide whether the donor still owns any chunk of the collection.
     const auto cm = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
-    const bool noMoreCollectionChunksOnDonor = !cm.getVersion(opCtx, fromShard).isSet();
+    const bool noMoreCollectionChunksOnDonor = !cm.getVersion(fromShard).isSet();
     notifyChangeStreamsOnChunkMigrated(opCtx,
                                        nss,
                                        collectionUuid,

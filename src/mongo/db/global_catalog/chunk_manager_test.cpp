@@ -236,10 +236,8 @@ TEST_F(CurrentChunkManagerUpdateTest, MakeUpdatedForwardsDeltaAndCarriesAttribut
 
     // Delta was forwarded and applied.
     ASSERT_EQ(updated.numChunks(), 2);  // [5, 15) and the surviving [20, 30)
-    // TODO (SERVER-128349): Replace with operation context once keyBelongsToShard performs shard
-    // handle resolution.
-    ASSERT_TRUE(updated.keyBelongsToShard(nullptr /* opCtx */, key(7), kThisShard));
-    ASSERT_FALSE(updated.keyBelongsToShard(nullptr /* opCtx */, key(2), kThisShard));
+    ASSERT_TRUE(updated.keyBelongsToShard(key(7), kThisShard));
+    ASSERT_FALSE(updated.keyBelongsToShard(key(2), kThisShard));
 
     // Result is rewrapped at the delta's version.
     ASSERT_EQ(updated.getVersion(), chunkVersion(2, 0));
@@ -251,14 +249,14 @@ TEST_F(CurrentChunkManagerUpdateTest, MakeUpdatedForwardsDeltaAndCarriesAttribut
 
 TEST_F(CurrentChunkManagerUpdateTest, NearestOwnedChunkOwnedKeyReturnsContainsShardKey) {
     auto cm = makeCmAllowingGaps({makeChunk(key(10), key(20), chunkVersion(1, 0))});
-    auto result = cm.nearestOwnedChunk(nullptr, key(15), kThisShard, ChunkMap::Direction::Forward);
+    auto result = cm.nearestOwnedChunk(key(15), kThisShard, ChunkMap::Direction::Forward);
     ASSERT_TRUE(result.containsShardKey);
     ASSERT_TRUE(result.nearestOwnedChunk.has_value());
 }
 
 TEST_F(CurrentChunkManagerUpdateTest, NearestOwnedChunkForwardFromLeadingGap) {
     auto cm = makeCmAllowingGaps({makeChunk(key(10), key(20), chunkVersion(1, 0))});
-    auto result = cm.nearestOwnedChunk(nullptr, key(5), kThisShard, ChunkMap::Direction::Forward);
+    auto result = cm.nearestOwnedChunk(key(5), kThisShard, ChunkMap::Direction::Forward);
     ASSERT_FALSE(result.containsShardKey);
     ASSERT_TRUE(result.nearestOwnedChunk.has_value());
     ASSERT_BSONOBJ_EQ(result.nearestOwnedChunk->getMin(), key(10));
@@ -266,7 +264,7 @@ TEST_F(CurrentChunkManagerUpdateTest, NearestOwnedChunkForwardFromLeadingGap) {
 
 TEST_F(CurrentChunkManagerUpdateTest, NearestOwnedChunkBackwardEqualsLeftChunkBorder) {
     auto cm = makeCmAllowingGaps({makeChunk(key(5), key(20), chunkVersion(1, 0))});
-    auto result = cm.nearestOwnedChunk(nullptr, key(5), kThisShard, ChunkMap::Direction::Backward);
+    auto result = cm.nearestOwnedChunk(key(5), kThisShard, ChunkMap::Direction::Backward);
     ASSERT_TRUE(result.containsShardKey);
     ASSERT_TRUE(result.nearestOwnedChunk.has_value());
     ASSERT_BSONOBJ_EQ(result.nearestOwnedChunk->getMin(), key(5));
@@ -274,14 +272,14 @@ TEST_F(CurrentChunkManagerUpdateTest, NearestOwnedChunkBackwardEqualsLeftChunkBo
 
 TEST_F(CurrentChunkManagerUpdateTest, NearestOwnedChunkBackwardFromLeadingGap) {
     auto cm = makeCmAllowingGaps({makeChunk(key(10), key(20), chunkVersion(1, 0))});
-    auto result = cm.nearestOwnedChunk(nullptr, key(5), kThisShard, ChunkMap::Direction::Backward);
+    auto result = cm.nearestOwnedChunk(key(5), kThisShard, ChunkMap::Direction::Backward);
     ASSERT_FALSE(result.containsShardKey);
     ASSERT_FALSE(result.nearestOwnedChunk.has_value());
 }
 
 TEST_F(CurrentChunkManagerUpdateTest, NearestOwnedChunkForwardFromTrailingGap) {
     auto cm = makeCmAllowingGaps({makeChunk(key(0), key(10), chunkVersion(1, 0))});
-    auto result = cm.nearestOwnedChunk(nullptr, key(15), kThisShard, ChunkMap::Direction::Forward);
+    auto result = cm.nearestOwnedChunk(key(15), kThisShard, ChunkMap::Direction::Forward);
     ASSERT_FALSE(result.containsShardKey);
     ASSERT_FALSE(result.nearestOwnedChunk.has_value());
 }
@@ -290,7 +288,7 @@ TEST_F(CurrentChunkManagerUpdateTest, NearestOwnedChunkForwardFromGapBetweenChun
     const ShardId kOtherShard{"otherShard"};
     auto cm = makeCmAllowingGaps({makeChunk(key(0), key(10), chunkVersion(1, 0), kOtherShard),
                                   makeChunk(key(20), key(30), chunkVersion(1, 1))});
-    auto result = cm.nearestOwnedChunk(nullptr, key(15), kThisShard, ChunkMap::Direction::Forward);
+    auto result = cm.nearestOwnedChunk(key(15), kThisShard, ChunkMap::Direction::Forward);
     ASSERT_FALSE(result.containsShardKey);
     ASSERT_TRUE(result.nearestOwnedChunk.has_value());
     ASSERT_BSONOBJ_EQ(result.nearestOwnedChunk->getMin(), key(20));
@@ -300,7 +298,7 @@ TEST_F(CurrentChunkManagerUpdateTest, NearestOwnedChunkBackwardFromGapBetweenChu
     const ShardId kOtherShard{"otherShard"};
     auto cm = makeCmAllowingGaps({makeChunk(key(0), key(10), chunkVersion(1, 0)),
                                   makeChunk(key(20), key(30), chunkVersion(1, 1), kOtherShard)});
-    auto result = cm.nearestOwnedChunk(nullptr, key(15), kThisShard, ChunkMap::Direction::Backward);
+    auto result = cm.nearestOwnedChunk(key(15), kThisShard, ChunkMap::Direction::Backward);
     ASSERT_FALSE(result.containsShardKey);
     ASSERT_TRUE(result.nearestOwnedChunk.has_value());
     ASSERT_BSONOBJ_EQ(result.nearestOwnedChunk->getMax(), key(10));

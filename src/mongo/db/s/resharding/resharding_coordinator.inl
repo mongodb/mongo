@@ -1555,7 +1555,7 @@ ReshardingCoordinator::_fetchNumDocumentsToCloneFromDonors(
                                             coordinatorDoc.getDonorShards()) {
                                            donorShardVersions.emplace(
                                                donorShard.getId(),
-                                               cri.getShardVersion(opCtx, donorShard.getId()));
+                                               cri.getShardVersion(donorShard.getId()));
                                        }
                                    }
 

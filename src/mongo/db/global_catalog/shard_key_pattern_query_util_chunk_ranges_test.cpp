@@ -153,7 +153,6 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksUpdateWithRangePrefix
     shard_key_pattern_query_util::QueryTargetingInfo info;
 
     getShardIdsAndChunksForCanonicalQuery(
-        operationContext(),
         *makeCQUpdate(request, fromjson("{}"), cri.getChunkManager()),
         cri.getChunkManager(),
         &shardIds,
@@ -179,7 +178,6 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksUpdateWithRangePrefix
                                      false);
 
     getShardIdsAndChunksForCanonicalQuery(
-        operationContext(),
         *makeCQUpdate(requestAndSet, fromjson("{}"), cri.getChunkManager()),
         cri.getChunkManager(),
         &shardIds,
@@ -198,7 +196,6 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksUpdateWithRangePrefix
     auto requestLT =
         buildUpdate(kNss, fromjson("{'a.b': {$lt : -101}}"), fromjson("{a: {b: 111}}"), false);
     getShardIdsAndChunksForCanonicalQuery(
-        operationContext(),
         *makeCQUpdate(requestLT, fromjson("{}"), cri.getChunkManager()),
         cri.getChunkManager(),
         &shardIds,
@@ -217,7 +214,6 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksUpdateWithRangePrefix
     auto requestOpUpdate =
         buildUpdate(kNss, fromjson("{_id: 1}"), fromjson("{$set: {p: 111}}"), false);
     getShardIdsAndChunksForCanonicalQuery(
-        operationContext(),
         *makeCQUpdate(requestOpUpdate, fromjson("{}"), cri.getChunkManager()),
         cri.getChunkManager(),
         &shardIds,
@@ -248,7 +244,6 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksUpdateWithRangePrefix
     // holding 'null' shard key documents.
     auto requestReplUpdate = buildUpdate(kNss, fromjson("{_id: 1}"), fromjson("{p: 111}"), false);
     getShardIdsAndChunksForCanonicalQuery(
-        operationContext(),
         *makeCQUpdate(requestReplUpdate, fromjson("{}"), cri.getChunkManager()),
         cri.getChunkManager(),
         &shardIds,
@@ -263,7 +258,6 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksUpdateWithRangePrefix
     auto requestFullKey =
         buildUpdate(kNss, fromjson("{'a.b':  100}"), fromjson("{a: {b: -111}}"), true);
     getShardIdsAndChunksForCanonicalQuery(
-        operationContext(),
         *makeCQUpdate(requestFullKey, fromjson("{}"), cri.getChunkManager()),
         cri.getChunkManager(),
         &shardIds,
@@ -282,7 +276,6 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksUpdateWithRangePrefix
     auto requestSuccess =
         buildUpdate(kNss, fromjson("{'a.b': 100, 'c.d': 'val'}"), fromjson("{a: {b: -111}}"), true);
     getShardIdsAndChunksForCanonicalQuery(
-        operationContext(),
         *makeCQUpdate(requestSuccess, fromjson("{}"), cri.getChunkManager()),
         cri.getChunkManager(),
         &shardIds,
@@ -324,7 +317,6 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksUpdateWithMultipleChu
                     false);
 
     getShardIdsAndChunksForCanonicalQuery(
-        operationContext(),
         *makeCQUpdate(requestAndSetLast, fromjson("{}"), cri.getChunkManager()),
         cri.getChunkManager(),
         &shardIds,
@@ -347,7 +339,6 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksUpdateWithMultipleChu
                     false);
 
     getShardIdsAndChunksForCanonicalQuery(
-        operationContext(),
         *makeCQUpdate(requestAndSetAll, fromjson("{}"), cri.getChunkManager()),
         cri.getChunkManager(),
         &shardIds,
@@ -372,7 +363,6 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksUpdateWithMultipleChu
         buildUpdate(kNss, fromjson("{}"), fromjson("{$set: {p : 10}}"), false);
 
     getShardIdsAndChunksForCanonicalQuery(
-        operationContext(),
         *makeCQUpdate(requestAndSetAllEmpty, fromjson("{}"), cri.getChunkManager()),
         cri.getChunkManager(),
         &shardIds,
@@ -400,7 +390,6 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksUpdateWithMultipleChu
                     false);
 
     getShardIdsAndChunksForCanonicalQuery(
-        operationContext(),
         *makeCQUpdate(requestAndSet8, fromjson("{}"), cri.getChunkManager()),
         cri.getChunkManager(),
         &shardIds,
@@ -443,7 +432,6 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksUpdateWithHashedPrefi
         // 'updateQueryObj'.
         auto request = buildUpdate(kNss, updateQueryObj, fromjson("{$set: {p: 1}}"), false);
         getShardIdsAndChunksForCanonicalQuery(
-            operationContext(),
             *makeCQUpdate(request, fromjson("{}"), cri.getChunkManager()),
             cri.getChunkManager(),
             &shardIds,
@@ -464,7 +452,6 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksUpdateWithHashedPrefi
     const auto updateObj = fromjson("{a: {b: -1}}");
     auto requestUpdate = buildUpdate(kNss, fromjson("{'a.b': {$gt : 101}}"), updateObj, false);
     getShardIdsAndChunksForCanonicalQuery(
-        operationContext(),
         *makeCQUpdate(requestUpdate, fromjson("{}"), cri.getChunkManager()),
         cri.getChunkManager(),
         &shardIds,
@@ -483,7 +470,6 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksDeleteWithExactId() {
 
     auto requestId = buildDelete(kNss, fromjson("{_id: 68755000}"));
     getShardIdsAndChunksForCanonicalQuery(
-        operationContext(),
         *makeCQDelete(requestId, fromjson("{}"), cri.getChunkManager()),
         cri.getChunkManager(),
         &shardIds,
@@ -524,7 +510,6 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksDeleteWithRangePrefix
     // Can delete wih partial shard key in the query if the query only targets one shard.
     auto requestPartialKey = buildDelete(kNss, fromjson("{'a.b': {$gt : 101}}"));
     getShardIdsAndChunksForCanonicalQuery(
-        operationContext(),
         *makeCQDelete(requestPartialKey, fromjson("{}"), cri.getChunkManager()),
         cri.getChunkManager(),
         &shardIds,
@@ -542,7 +527,6 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksDeleteWithRangePrefix
     // Test delete with range query.
     auto requestPartialKey2 = buildDelete(kNss, fromjson("{'a.b': {$gt: 0}}"));
     getShardIdsAndChunksForCanonicalQuery(
-        operationContext(),
         *makeCQDelete(requestPartialKey2, fromjson("{}"), cri.getChunkManager()),
         cri.getChunkManager(),
         &shardIds,
@@ -562,7 +546,6 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksDeleteWithRangePrefix
     // Test delete with no shard key.
     auto requestNoShardKey = buildDelete(kNss, fromjson("{'k': 0}"));
     getShardIdsAndChunksForCanonicalQuery(
-        operationContext(),
         *makeCQDelete(requestNoShardKey, fromjson("{}"), cri.getChunkManager()),
         cri.getChunkManager(),
         &shardIds,
@@ -576,7 +559,6 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksDeleteWithRangePrefix
     // Delete targeted correctly with full shard key in query.
     auto requestFullKey = buildDelete(kNss, fromjson("{'a.b': -101, 'c.d': 5}"));
     getShardIdsAndChunksForCanonicalQuery(
-        operationContext(),
         *makeCQDelete(requestFullKey, fromjson("{}"), cri.getChunkManager()),
         cri.getChunkManager(),
         &shardIds,
@@ -595,7 +577,6 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksDeleteWithRangePrefix
     auto requestMinKey =
         buildDelete(kNss, BSONObjBuilder().appendMinKey("a.b").append("c.d", 4).obj());
     getShardIdsAndChunksForCanonicalQuery(
-        operationContext(),
         *makeCQDelete(requestMinKey, fromjson("{}"), cri.getChunkManager()),
         cri.getChunkManager(),
         &shardIds,
@@ -613,7 +594,6 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksDeleteWithRangePrefix
 
     auto requestMinKey2 = buildDelete(kNss, fromjson("{'a.b':  0, 'c.d': 5}"));
     getShardIdsAndChunksForCanonicalQuery(
-        operationContext(),
         *makeCQDelete(requestMinKey2, fromjson("{}"), cri.getChunkManager()),
         cri.getChunkManager(),
         &shardIds,
@@ -650,7 +630,6 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksDeleteWithHashedPrefi
         // 'queryObj'.
         auto request = buildDelete(kNss, queryObj);
         getShardIdsAndChunksForCanonicalQuery(
-            operationContext(),
             *makeCQDelete(request, fromjson("{}"), cri.getChunkManager()),
             cri.getChunkManager(),
             &shardIds,
@@ -670,7 +649,6 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksDeleteWithHashedPrefi
     // Range queries on hashed field can target using the two phase write protocol.
     auto request = buildDelete(kNss, fromjson("{'a.b': {$gt : 101}}"));
     getShardIdsAndChunksForCanonicalQuery(
-        operationContext(),
         *makeCQDelete(request, fromjson("{}"), cri.getChunkManager()),
         cri.getChunkManager(),
         &shardIds,
@@ -693,8 +671,7 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksAlwaysFalseMatch() {
     auto filter = AlwaysFalseMatchExpression().MatchExpression::serialize();
     auto cq = makeCQ(filter, fromjson("{}"), cri.getChunkManager());
 
-    getShardIdsAndChunksForCanonicalQuery(
-        operationContext(), *cq, cri.getChunkManager(), &shardIds, &info, false);
+    getShardIdsAndChunksForCanonicalQuery(*cq, cri.getChunkManager(), &shardIds, &info, false);
     ASSERT_EQUALS(shardIds.size(), 1);
     ASSERT_EQUALS(info.chunkRanges.size(), 1);
 }

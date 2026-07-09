@@ -37,7 +37,7 @@
 #include "mongo/db/global_catalog/chunk.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/util/uuid.h"
 
@@ -57,6 +57,8 @@ static const KeyPattern kShardKeyPattern{BSON(kSKey << 1)};
  * This is needed since ChunkInfo class does not provide an equal operator.
  */
 void assertEqualChunkInfo(const ChunkInfo& x, const ChunkInfo& y);
+
+ShardId getShardId(int shardIdx);
 
 /**
  * Return a vector of randomly generated split points.
@@ -80,8 +82,7 @@ std::vector<ChunkVersion> genRandomVersions(size_t num, const ChunkVersion& init
 std::vector<ChunkType> genChunkVector(const UUID& uuid,
                                       const std::vector<BSONObj>& splitPoints,
                                       const ChunkVersion& initialVersion,
-                                      size_t numShards,
-                                      bool useUuid = false);
+                                      size_t numShards);
 
 /*
  * Generate a vector of chunks.
@@ -89,8 +90,7 @@ std::vector<ChunkType> genChunkVector(const UUID& uuid,
 std::vector<ChunkType> genChunkVector(const UUID& uuid,
                                       const std::vector<BSONObj>& splitPoints,
                                       const std::vector<ChunkVersion>& versions,
-                                      size_t numShards,
-                                      bool useUuid = false);
+                                      size_t numShards);
 
 /*
  * Return a randomly generated vector of chunks that are properly sorted based on their min value
@@ -100,15 +100,14 @@ std::vector<ChunkType> genRandomChunkVector(const UUID& uuid,
                                             const OID& epoch,
                                             const Timestamp& timestamp,
                                             size_t maxNumChunks,
-                                            size_t minNumChunks,
-                                            bool useUuid = false);
+                                            size_t minNumChunks = 1);
 
-std::map<ShardRef, ChunkVersion> calculateShardVersions(const std::vector<ChunkType>& chunkVector);
+std::map<ShardId, ChunkVersion> calculateShardVersions(const std::vector<ChunkType>& chunkVector);
 
-std::map<ShardRef, Timestamp> calculateShardsMaxValidAfter(
+std::map<ShardId, Timestamp> calculateShardsMaxValidAfter(
     const std::vector<ChunkType>& chunkVector);
 
-ChunkVersion calculateCollVersion(const std::map<ShardRef, ChunkVersion>& shardVersions);
+ChunkVersion calculateCollVersion(const std::map<ShardId, ChunkVersion>& shardVersions);
 
 /*
  * Return a shardkey that is in between the given range [leftKey, rightKey]
@@ -127,9 +126,7 @@ BSONObj calculateIntermediateShardKey(const BSONObj& leftKey,
  * @chunks: list of chunks ordered by minKey
  * @numOperations: number of operations to perform
  */
-void performRandomChunkOperations(std::vector<ChunkType>* chunks,
-                                  size_t numOperations,
-                                  bool useUuid = false);
+void performRandomChunkOperations(std::vector<ChunkType>* chunks, size_t numOperations);
 
 /**
  * Helper used in chunk map generation.

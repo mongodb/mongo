@@ -366,11 +366,10 @@ CollectionRoutingInfo CollectionRouter::_createDbIfRequestedAndGetRoutingInfo() 
     return _getRoutingInfo(nss);
 }
 
-void CollectionRouterCommon::appendCRUDRoutingTokenToCommand(OperationContext* opCtx,
-                                                             const ShardId& shardId,
+void CollectionRouterCommon::appendCRUDRoutingTokenToCommand(const ShardId& shardId,
                                                              const CollectionRoutingInfo& cri,
                                                              BSONObjBuilder* builder) {
-    if (cri.getShardVersion(opCtx, shardId) == ShardVersion::UNTRACKED()) {
+    if (cri.getShardVersion(shardId) == ShardVersion::UNTRACKED()) {
         // Need to add the database version as well.
         const auto& dbVersion = cri.getDbVersion();
         if (!dbVersion.isFixed()) {
@@ -378,7 +377,7 @@ void CollectionRouterCommon::appendCRUDRoutingTokenToCommand(OperationContext* o
             dbVersion.serialize(&dbvBuilder);
         }
     }
-    appendShardVersion(*builder, cri.getShardVersion(opCtx, shardId));
+    appendShardVersion(*builder, cri.getShardVersion(shardId));
 }
 
 CollectionRouter::CollectionRouter(OperationContext* opCtx, NamespaceString nss)
@@ -419,7 +418,7 @@ bool MultiCollectionRouter::isAnyCollectionNotLocal(
             if (cm.isSharded()) {
                 return false;
             } else if (cm.isUnsplittable()) {
-                return cm.getMinKeyShardIdWithSimpleCollation(_opCtx) == myShardId;
+                return cm.getMinKeyShardIdWithSimpleCollation() == myShardId;
             } else {
                 // If collection is untracked, it is only local if this shard is the dbPrimary
                 // shard.

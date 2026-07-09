@@ -163,8 +163,7 @@ public:
         return _impl->get().nearestOwnedChunk(key, direction);
     }
 
-    bool isRangeEntirelyOwned(OperationContext* opCtx,
-                              const BSONObj& min,
+    bool isRangeEntirelyOwned(const BSONObj& min,
                               const BSONObj& max,
                               bool includeMaxBound = true) const;
 

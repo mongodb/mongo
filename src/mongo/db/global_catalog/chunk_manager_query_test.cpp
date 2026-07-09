@@ -116,7 +116,7 @@ protected:
                 .getChunkManager();
 
         std::set<ShardId> shardIds;
-        chunkManager.getShardIdsForRange(operationContext(), min, max, &shardIds);
+        chunkManager.getShardIdsForRange(min, max, &shardIds);
 
         _assertShardIdsMatch(expectedShardIds, shardIds);
     }
@@ -526,7 +526,7 @@ TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
                                Timestamp(5, 0));
 
     std::set<ShardId> shardIds;
-    cm.getShardIdsForRange(operationContext(), BSON("x" << MINKEY), BSON("x" << MAXKEY), &shardIds);
+    cm.getShardIdsForRange(BSON("x" << MINKEY), BSON("x" << MAXKEY), &shardIds);
     ASSERT_EQ(2, shardIds.size());
 
     const auto expCtx = make_intrusive<ExpressionContextForTest>();
@@ -600,10 +600,9 @@ TEST_F(ChunkManagerQueryTest, TestKeyBelongsToShard) {
 
         // Validate shard key is correctly identified as being owned by its shard & the same chunk
         // is found as the one we are curently looking at.
-        ASSERT(cm.keyBelongsToShard(operationContext(), shardKey, shardId));
+        ASSERT(cm.keyBelongsToShard(shardKey, shardId));
         {
-            auto out = cm.nearestOwnedChunk(
-                operationContext(), shardKey, shardId, ChunkMap::Direction::Forward);
+            auto out = cm.nearestOwnedChunk(shardKey, shardId, ChunkMap::Direction::Forward);
             ASSERT(out.containsShardKey);
             ASSERT(out.nearestOwnedChunk);
             ASSERT_BSONOBJ_EQ(out.nearestOwnedChunk->getMin(), (*chunkIt)->getMin());
@@ -613,8 +612,7 @@ TEST_F(ChunkManagerQueryTest, TestKeyBelongsToShard) {
 
         // Repeat for reverse direction.
         {
-            auto out = cm.nearestOwnedChunk(
-                operationContext(), shardKey, shardId, ChunkMap::Direction::Backward);
+            auto out = cm.nearestOwnedChunk(shardKey, shardId, ChunkMap::Direction::Backward);
             ASSERT(out.containsShardKey);
             ASSERT(out.nearestOwnedChunk);
             ASSERT_BSONOBJ_EQ(out.nearestOwnedChunk->getMin(), (*chunkIt)->getMin());
@@ -624,10 +622,9 @@ TEST_F(ChunkManagerQueryTest, TestKeyBelongsToShard) {
 
         // Validate that if we use a different shard id, shard key is identified as an orphan, and
         // the correct next/previous chunk is returned (we cannot return the same chunk here).
-        ASSERT_FALSE(cm.keyBelongsToShard(operationContext(), shardKey, otherShard));
+        ASSERT_FALSE(cm.keyBelongsToShard(shardKey, otherShard));
         {
-            auto out = cm.nearestOwnedChunk(
-                operationContext(), shardKey, otherShard, ChunkMap::Direction::Forward);
+            auto out = cm.nearestOwnedChunk(shardKey, otherShard, ChunkMap::Direction::Forward);
             ASSERT_FALSE(out.containsShardKey);
             if (expectedNextChunk) {
                 ASSERT(out.nearestOwnedChunk);
@@ -641,8 +638,7 @@ TEST_F(ChunkManagerQueryTest, TestKeyBelongsToShard) {
 
         // Repeat for reverse direction.
         {
-            auto out = cm.nearestOwnedChunk(
-                operationContext(), shardKey, otherShard, ChunkMap::Direction::Backward);
+            auto out = cm.nearestOwnedChunk(shardKey, otherShard, ChunkMap::Direction::Backward);
             ASSERT_FALSE(out.containsShardKey);
             if (expectedPrevChunk) {
                 ASSERT(out.nearestOwnedChunk);

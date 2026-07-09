@@ -428,10 +428,8 @@ void BM_GetShardIdsForRange(benchmark::State& state,
 
     for (auto keepRunning : state) {
         std::set<ShardId> shardIds;
-        // TODO (SERVER-128349): Replace with operation context once getShardIdsForRange performs
-        // shard handle resolution.
         metadata.getChunkManager()->getShardIdsForRange(
-            nullptr /* opCtx */, rangesIter->first, rangesIter->second, &shardIds);
+            rangesIter->first, rangesIter->second, &shardIds);
         ++rangesIter;
     }
 
@@ -450,9 +448,7 @@ void BM_GetShardIdsForRangeMinKeyToMaxKey(benchmark::State& state,
 
     for (auto keepRunning : state) {
         std::set<ShardId> shardIds;
-        // TODO (SERVER-128349): Replace with operation context once getShardIdsForRange performs
-        // shard handle resolution.
-        metadata.getChunkManager()->getShardIdsForRange(nullptr /* opCtx */, min, max, &shardIds);
+        metadata.getChunkManager()->getShardIdsForRange(min, max, &shardIds);
     }
 
     state.SetItemsProcessed(state.iterations());
