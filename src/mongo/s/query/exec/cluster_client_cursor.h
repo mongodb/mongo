@@ -277,15 +277,13 @@ public:
     }
 
     void updateMetrics(const ChangeStreamCursorMetrics& csMetrics) {
-        if (!isChangeStreamCursor()) {
+        if (!isChangeStreamCursor() || !csMetrics.getOptime()) {
             return;
         }
-        if (csMetrics.getOptime() && !csMetrics.getOptime()->isNull()) {
-            if (!_changeStreamMetrics) {
-                _changeStreamMetrics.emplace();
-            }
-            _changeStreamMetrics->setOptime(csMetrics.getOptime());
+        if (!_changeStreamMetrics) {
+            _changeStreamMetrics.emplace();
         }
+        _changeStreamMetrics->setOptime(csMetrics.getOptime());
     }
 
     const boost::optional<ChangeStreamCursorMetrics>& getChangeStreamMetrics() const {

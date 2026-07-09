@@ -653,10 +653,6 @@ public:
                 // Initialize optime to the cursor's current position before batch generation so
                 // that $currentOp shows a non-null value while this getMore is in progress.
                 auto ts = exec->getLatestOplogTimestamp();
-                tassert(12613202,
-                        "Change stream pipeline executor must have a non-null latest oplog "
-                        "timestamp",
-                        !ts.isNull());
                 curOp->debug().changeStreamMetrics.setOptime(ts);
             }
 
@@ -739,10 +735,6 @@ public:
                 // Update optime after every getMore: reflects the last event's timestamp when
                 // events were returned, or the current high-watermark when the batch was empty.
                 auto ts = exec->getLatestOplogTimestamp();
-                tassert(12613201,
-                        "Change stream pipeline executor must have a non-null latest oplog "
-                        "timestamp",
-                        !ts.isNull());
                 curOp->debug().changeStreamMetrics.setOptime(ts);
             }
 

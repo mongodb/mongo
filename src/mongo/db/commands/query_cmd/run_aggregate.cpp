@@ -472,9 +472,6 @@ bool getFirstBatch(const AggExState& aggExState,
             // from the initial post-batch resume token (resume token clusterTime,
             // startAtOperationTime, or the current oplog tip when neither is specified).
             auto ts = exec.getLatestOplogTimestamp();
-            tassert(12613200,
-                    "Change stream pipeline executor must have a non-null latest oplog timestamp",
-                    !ts.isNull());
             curOp->debug().changeStreamMetrics.setOptime(ts);
         }
 

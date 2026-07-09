@@ -16,6 +16,7 @@ import {
     assertDropAndRecreateCollection,
     assertDropCollection,
 } from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {CursorList, getClusterTime} from "jstests/libs/query/change_stream_util.js";
 import {listIdleCursors} from "jstests/libs/query/change_stream_util.js";
 import {TestDataModifyGuard} from "jstests/change_streams/change_stream_metrics_util.js";
@@ -283,6 +284,35 @@ describe("change stream cursor metrics in currentOp", function () {
             "changeStreams.optime must equal startAtOperationTime before any getMore",
         );
     });
+
+    // On a mongoD, a getMore with a past 'startAtOperationTime' scans the oplog forward from that
+    // past time to the current tip. This produces an empty batch but advances the reported optime
+    // to the current oplog tip, so the optime no longer equals 'startAtOperationTime'. Only on
+    // mongoS does the optime remain pinned to 'startAtOperationTime' before the first getMore
+    // returns data. Restrict this case to mongoS suites.
+    for (const pastTimestamp of FixtureHelpers.isMongos(db) && !TestData.forceChangeStreamReaderV1
+        ? [Timestamp(0, 0), Timestamp(1, 0), Timestamp(1, 1)]
+        : []) {
+        it(`optime initialized from past (startAtOperationTime=${tojson(pastTimestamp)})`, function () {
+            const comment = "optime initialized from past startAtOperationTime";
+            let cursor = this.cursorList.push(
+                testColl.watch([], {
+                    comment,
+                    startAtOperationTime: pastTimestamp,
+                    cursor: {batchSize: 0},
+                }),
+            );
+            let idleCursor = getIdleCursor(comment, cursor);
+            assert.eq(
+                pastTimestamp,
+                idleCursor.cursor.changeStreams.optime,
+                "changeStreams.optime must equal startAtOperationTime before any getMore",
+            );
+            // Ensure the 'getMore' command succeeds. Do not assert on actual optime since result
+            // may vary depending on a passthrough suite.
+            runGetMore(cursor);
+        });
+    }
 
     it("optime initialized to cluster time with no start option", function () {
         const comment = "optime initialized to cluster time with no start option";
