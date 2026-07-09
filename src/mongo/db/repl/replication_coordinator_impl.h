@@ -96,6 +96,7 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/observable_mutex.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/synchronized_value.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 #include "mongo/util/versioned_value.h"
@@ -1953,6 +1954,10 @@ private:
 
     // Used to signal threads that are waiting for a new value of _currentCommittedSnapshot.
     stdx::condition_variable _currentCommittedSnapshotCond;  // (M)
+
+    // Cache of _topCoord->getLastCommittedOpTime() to reduce pressure on `_mutex`. Prefer writing
+    // to this cache while holding `_mutex`, and never read from the cache while holding `_mutex`.
+    synchronized_value<OpTime> _lastCommittedOpTimeShadow;  // (S)
 
     // Callback Handle used to cancel a scheduled LivenessTimeout callback.
     DelayableTimeoutCallback _handleLivenessTimeoutCallback;  // (S)
