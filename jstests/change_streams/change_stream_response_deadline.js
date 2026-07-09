@@ -24,16 +24,19 @@
  *   5. Assert that at least two empty batches were returned before the document, each carrying a
  *      postBatchResumeToken.
  *
+ * The functionality is tested with both setting the query knob via setParameter and via query settings.
+ *
  * @tags: [
- *   assumes_stable_shard_list,
- *   assumes_unsharded_collection,
+ *   assumes_against_mongod_not_mongos,
  *   # Cannot wrap initial insert operations into a single transaction, in order to make them
  *   # individual statements, not just a single applyOps command.
  *   change_stream_does_not_expect_txns,
  *   featureFlagAllowUserFacingQuerySettings,
  *   featureFlagPqsQueryKnobs,
+ *   incompatible_aubsan,
  *   requires_fcv_90,
  *   requires_replication,
+ *   tsan_incompatible,
  *   uses_change_streams,
  * ]
  */
