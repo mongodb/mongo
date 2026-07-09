@@ -145,17 +145,6 @@ StatusWith<BSONObj> analyzeCommandAsAggregationCommand(OperationContext* opCtx,
                             << BSONObj() << "allowDiskUse" << false);
 }
 
-ce::SamplingTechniqueEnum samplingMethodToTechnique(SamplingCEMethodEnum samplingMethod) {
-    switch (samplingMethod) {
-        case SamplingCEMethodEnum::kRandom:
-            return ce::SamplingTechniqueEnum::kRandom;
-        case SamplingCEMethodEnum::kChunk:
-            return ce::SamplingTechniqueEnum::kChunk;
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
 void runSampleMode(OperationContext* opCtx,
                    const NamespaceString& nss,
                    boost::optional<int> sampleSizeOpt,
@@ -254,7 +243,7 @@ void runSampleMode(OperationContext* opCtx,
     // the requested method in this case. Otherwise it should reflect the actual method used.
     ce::SamplingTechniqueEnum samplingMethodToPersist =
         *actualSamplingMethod == ce::SamplingTechniqueEnum::kFullCollScan
-        ? samplingMethodToTechnique(requestedSamplingMethod)
+        ? ce::SamplingEstimatorImpl::samplingMethodToTechnique(requestedSamplingMethod)
         : *actualSamplingMethod;
 
     if (samplingMethodToPersist != ce::SamplingTechniqueEnum::kChunk) {

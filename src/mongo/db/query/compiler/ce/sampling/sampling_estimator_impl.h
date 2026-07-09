@@ -319,6 +319,22 @@ public:
                                       double marginOfError,
                                       int32_t sampleSizeOverride = 0);
 
+    /**
+     * TODO SERVER-129240: Remove this helper once types are unified
+     * Converts a SamplingCEMethodEnum value into its equivalent SamplingTechniqueEnum value.
+     */
+    static ce::SamplingTechniqueEnum samplingMethodToTechnique(
+        SamplingCEMethodEnum samplingMethod) {
+        switch (samplingMethod) {
+            case SamplingCEMethodEnum::kRandom:
+                return ce::SamplingTechniqueEnum::kRandom;
+            case SamplingCEMethodEnum::kChunk:
+                return ce::SamplingTechniqueEnum::kChunk;
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
+
 protected:
     /*
      * This helper creates a CanonicalQuery for the sampling plan. This CanonicalQuery is "empty"

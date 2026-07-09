@@ -496,6 +496,19 @@ void SamplingEstimatorImpl::executeSamplingQueryAndSample(
 }
 
 void SamplingEstimatorImpl::generateFullCollScanSample() {
+    // The persistent sample is stored under the _samplingStyle key (random or chunk) regardless of
+    // whether a full coll scan was used to generate it, so look it up the same way.
+    auto tryLoadStatus = tryLoadPersistentSample(samplingMethodToTechnique(_samplingStyle));
+    if (tryLoadStatus.isOK()) {
+        return;
+    }
+    if (tryLoadStatus.code() != ErrorCodes::NoSuchKey) {
+        LOGV2_WARNING(12432808,
+                      "Persistent sample not usable; falling back to full coll scan sampling",
+                      "nss"_attr = _nss.toStringForErrorMsg(),
+                      "error"_attr = tryLoadStatus);
+    }
+
     // Create a CanonicalQuery for the CollScan plan.
     auto cq = makeEmptyCanonicalQuery(_nss, _opCtx, _customerQueryExpCtx);
     auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, _nss);
