@@ -381,6 +381,11 @@ feature_flags:
         cpp_varname: gFeatureFlagParallelCollectionValidation
         default: false
         fcv_gated: false
+    featureFlagBatchedContainerWrites:
+        description: "When enabled, allows a batched container write format to support compact oplog entries."
+        cpp_varname: gFeatureFlagBatchedContainerWrites
+        default: false
+        fcv_gated: true
 
 server_parameters:
     allowDirectSystemBucketsAccess:
