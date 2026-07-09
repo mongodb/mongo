@@ -50,6 +50,8 @@ error_categories:
   - SystemOverloadedError
   # Failures while extracting index keys from a document.
   - IndexKeyExtractionError
+  # Faults attributable to an extension author, not the host/server.
+  - ExtensionError
 
 error_codes:
   #############################################################
@@ -1312,6 +1314,14 @@ error_codes:
       name: ConnectionEstablishmentTimeout,
       categories: [NetworkError, RetriableError],
     }
+
+  # Extensions API errors that flag an error due to the extension itself.
+  # Extension has a malformed vtable.
+  - {code: 517, name: InvalidExtensionVTable, categories: [ExtensionError]}
+  # Extension returned malformed/null serialized output.
+  - {code: 518, name: ExtensionSerializationError, categories: [ExtensionError]}
+  # Any other extension logical error.
+  - {code: 519, name: ExtensionError, categories: [ExtensionError]}
 
   # ^^^^
   # Add new codes, sequentially numbered, above.
