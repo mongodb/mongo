@@ -2109,7 +2109,11 @@ void enableOnlyTLS13(SSLParams& params) {
 
 // TLS 1.3 mutation tests.
 // These tests re-run the handshake tests with TLS 1.3 only mode enabled on both ingress and egress.
-#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL || \
+// These tests force TLS 1.3-only via enableOnlyTLS13(), which relies on TLS 1.3 actually being
+// available. On OpenSSL builds that predate TLS 1.3 (e.g. Amazon Linux 2's OpenSSL 1.0.2, where
+// TLS1_3_VERSION is undefined) disabling 1.0/1.1/1.2 leaves no usable protocol, and the synchronous
+// SSLTestFixture handshake hangs. Only compile these where TLS 1.3 is truly supported.
+#if (MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL && defined(TLS1_3_VERSION)) || \
     MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
 
 TEST(SSLManager, basicEgressValidationTestsTLS13Only) {
@@ -2579,8 +2583,9 @@ TEST(SSLManager, revocationWithCRLsIntermediateTestsTLS13Only) {
     ASSERT_NE(result.egress.getStatus().reason().find("revoked"), std::string::npos);
 }
 
-#endif  // MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL ||
-        // MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
+#endif  // (MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL &&
+        // defined(TLS1_3_VERSION))
+        // || MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
 
 #endif  // MONGO_CONFIG_SSL
 }  // namespace
