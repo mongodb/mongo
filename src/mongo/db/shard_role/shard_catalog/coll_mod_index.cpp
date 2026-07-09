@@ -131,19 +131,10 @@ void _processCollModIndexRequestExpireAfterSeconds(OperationContext* opCtx,
     }
 
     // This collection is already TTL. Compare the requested value against the existing setting
-    // before updating the catalog.
-    //
-    // The catalog should be updated if:
-    //  (1) The old expireAfterSeconds (cast as 'safeNumberLong') is numerically different than
-    //  the new expireAfterSeconds.
-    //  (2) The old expireAfterSeconds isn't stored as a type int or long. The old
-    //  expireAfterSeconds could be a floating point number, which, when casted to a
-    //  'safeNumberLong', could misleadingly look equivalent to the new expireAfterSeconds.
-    //
-    // TODO SERVER-91498 - Simplify equivalence logic.
+    // before updating the catalog. Also update if the stored type needs normalization to an
+    // integer type (e.g., the old value is a double like 3600.0).
     *oldExpireSecs = oldExpireSecsElement.safeNumberLong();
-    bool equivalentAsTypeLong = **oldExpireSecs == indexExpireAfterSeconds;
-    bool shouldUpdateCatalog = !equivalentAsTypeLong ||
+    bool shouldUpdateCatalog = **oldExpireSecs != indexExpireAfterSeconds ||
         (oldExpireSecsElement.type() != BSONType::numberInt &&
          oldExpireSecsElement.type() != BSONType::numberLong);
     if (shouldUpdateCatalog) {
