@@ -30,6 +30,9 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/curop_failpoint_helpers.h"
@@ -76,6 +79,18 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeAbortingTxn);
 // TODO SERVER-39704: Remove this fail point once the router can safely retry within a transaction
 // on stale version and snapshot errors.
 MONGO_FAIL_POINT_DEFINE(dontRemoveTxnCoordinatorOnAbort);
+
+void verifyAuthorizedToAlterPreparedTransaction(OperationContext* opCtx,
+                                                const DatabaseName& dbName) {
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    uassert(
+        ErrorCodes::Unauthorized,
+        "Only internal clients may commit or abort prepared transactions",
+        !txnParticipant.transactionIsPrepared() ||
+            AuthorizationSession::get(opCtx->getClient())
+                ->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::internal));
+}
 
 class CmdCommitTxn final : public CommitTransactionCmdVersion1Gen<CmdCommitTxn> {
 public:
@@ -158,6 +173,12 @@ public:
             uassert(ErrorCodes::NoSuchTransaction,
                     "Transaction isn't in progress",
                     txnParticipant.transactionIsOpen());
+
+            // Committing a prepared transaction is part of the internal two-phase commit protocol;
+            // a client must not be able to commit a prepared participant out from under the
+            // coordinator.
+            verifyAuthorizedToAlterPreparedTransaction(opCtx, request().getDbName());
+
             hangBeforeCommitingTxn.executeIf(
                 [&](const BSONObj& data) {
                     CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -283,6 +304,10 @@ public:
             uassert(ErrorCodes::NoSuchTransaction,
                     "Transaction isn't in progress",
                     txnParticipant.transactionIsOpen());
+
+            // Aborting a prepared transaction is part of the internal two-phase commit protocol; a
+            // client must not be able to abort a prepared transaction directly on the participant.
+            verifyAuthorizedToAlterPreparedTransaction(opCtx, request().getDbName());
 
             CurOpFailpointHelpers::waitWhileFailPointEnabled(
                 &hangBeforeAbortingTxn, opCtx, "hangBeforeAbortingTxn");
