@@ -37,3 +37,5 @@
 # TODO SERVER-127411: Enable in all-feature-flags after shard UUID migration is complete.
 - featureFlagUniqueShardIdentifiers
 - featureFlagUniqueShardIdentifiersDDL
+# TODO SERVER-130858: Enable in the all-feature-flags variant.
+- featureFlagContinuousInternodeValidationPerDocument
