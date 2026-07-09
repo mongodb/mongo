@@ -42,7 +42,9 @@ struct stream_core {
 
     template <typename Executor>
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
-    stream_core(SCHANNEL_CRED* context, const std::string& remoteHostName, const Executor& executor)
+    stream_core(SCH_CREDENTIALS* context,
+                const std::string& remoteHostName,
+                const Executor& executor)
 #elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
     stream_core(SSL_CTX* context, const std::string& remoteHostName, const Executor& executor)
 #elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_APPLE

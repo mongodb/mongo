@@ -215,6 +215,22 @@ enum class ssl_want {
     want_output = 1
 };
 
+// RAII wrapper to free a context buffer allocated by SSPI (e.g. via ISC_REQ_ALLOCATE_MEMORY
+// or ASC_REQ_ALLOCATE_MEMORY)
+class ContextBufferDeleter {
+public:
+    ContextBufferDeleter(void** buf) : _buf(buf) {}
+
+    ~ContextBufferDeleter() {
+        if (*_buf != nullptr) {
+            FreeContextBuffer(*_buf);
+        }
+    }
+
+private:
+    void** _buf;
+};
+
 /**
  * Manages the SSL handshake and shutdown state machines.
  *
@@ -257,7 +273,7 @@ public:
                         ReusableBuffer* pInBuffer,
                         ReusableBuffer* pOutBuffer,
                         ReusableBuffer* pExtraBuffer,
-                        SCHANNEL_CRED* cred)
+                        SCH_CREDENTIALS* cred)
         : _state(State::HandshakeStart),
           _phctxt(hctxt),
           _cred(cred),
@@ -342,33 +358,32 @@ private:
     }
 
     DWORD getClientFlags() {
+        // ISC_REQ_USE_SUPPLIED_CREDS: restricts Schannel to the credentials in _cred->paCred
+        // rather than searching the system certificate stores automatically.  When cCreds == 0
+        // (no client certificate configured) Schannel correctly sends an empty Certificate
+        // message in TLS 1.3 when the server requests one.  This flag must always be set:
+        // without it, when ISC returns SEC_E_OK with output bytes (the TLS 1.3 client final
+        // flight: Certificate + CertificateVerify + Finished), the call site signals
+        // HandshakeState::Done and returns want_output rather than want_output_and_retry.
+        // Omitting the flag can leave _hctxt in a mid-handshake state, causing
+        // QueryContextAttributesW(SECPKG_ATTR_CONNECTION_INFO) to return SEC_E_INVALID_HANDLE.
+        //
+        // ISC_REQ_MANUAL_CRED_VALIDATION: suppresses Schannel's built-in server-certificate
+        // validation (chain building, revocation, hostname checks).  MongoDB performs its own
+        // validation via CertGetCertificateChain / CertVerifyCertificateChainPolicy so that
+        // it can apply custom CA lists, allow self-signed test certificates, and produce
+        // descriptive error messages.  Without this flag, Schannel would reject any certificate
+        // not trusted by the Windows system root store before our code ever sees it.
         return ISC_REQ_SEQUENCE_DETECT | ISC_REQ_REPLAY_DETECT | ISC_REQ_CONFIDENTIALITY |
             ISC_REQ_EXTENDED_ERROR | ISC_REQ_STREAM | ISC_REQ_USE_SUPPLIED_CREDS |
             ISC_REQ_MANUAL_CRED_VALIDATION;
     }
 
-    /**
-     * RAII class to free a buffer allocated by SSPI.
-     */
-    class ContextBufferDeleter {
-    public:
-        ContextBufferDeleter(void** buf) : _buf(buf) {}
-
-        ~ContextBufferDeleter() {
-            if (*_buf != nullptr) {
-                FreeContextBuffer(*_buf);
-            }
-        }
-
-    private:
-        void** _buf;
-    };
-
     ssl_want startShutdown(asio::error_code& ec);
 
     ssl_want doServerHandshake(asio::error_code& ec, HandshakeState* pHandshakeState);
 
-    ssl_want doClientHandshake(asio::error_code& ec);
+    ssl_want doClientHandshake(asio::error_code& ec, HandshakeState* pHandshakeState);
 
 private:
     /**
@@ -443,7 +458,7 @@ private:
     ReusableBuffer _alertBuffer;
 
     // SChannel Credentials
-    SCHANNEL_CRED* _cred;
+    SCH_CREDENTIALS* _cred;
 
     // SChannel context
     PCtxtHandle _phctxt;
@@ -477,12 +492,17 @@ public:
     SSLReadManager(PCtxtHandle hctxt,
                    PCredHandle hcred,
                    ReusableBuffer* pInBuffer,
-                   ReusableBuffer* pExtraBuffer)
+                   ReusableBuffer* pExtraBuffer,
+                   ReusableBuffer* pOutBuffer,
+                   std::wstring* pServerName)
         : _state(State::NeedMoreEncryptedData),
           _phctxt(hctxt),
           _phcred(hcred),
           _pInBuffer(pInBuffer),
-          _pExtraEncryptedBuffer(pExtraBuffer) {}
+          _pExtraEncryptedBuffer(pExtraBuffer),
+          _pOutBuffer(pOutBuffer),
+          _pServerName(pServerName) {}
+
 
     /**
      * Read decrypted data if encrypted data was provided via writeData and succesfully decrypted.
@@ -505,8 +525,53 @@ public:
         _pInBuffer->append(data, length);
     }
 
+    /**
+     * Signal that the shared input buffer already contains application-data bytes left over
+     * from the TLS handshake.  This happens in TLS 1.3 when the peer bundles application data
+     * in the same TCP segment as its final handshake flight (0.5-RTT / early data).  The
+     * handshake code places those bytes into _pInBuffer but never transitions the read manager
+     * out of NeedMoreEncryptedData, so without this call readDecryptedData would stall waiting
+     * for more network bytes that will never arrive.  Must only be called when the handshake is
+     * fully done and _pInBuffer is non-empty.
+     */
+    void notifyHandshakeLeftoverData() {
+        ASIO_ASSERT(!_pInBuffer->empty());
+        setState(State::HaveEncryptedData);
+    }
+
+    void setIsClient(bool isClient) {
+        _isClient = isClient;
+    }
+
 private:
     ssl_want decryptBuffer(asio::error_code& ec, DecryptState* pDecryptState);
+
+    /**
+     * Feeds a TLS 1.3 post-handshake token (NewSessionTicket / KeyUpdate — still encrypted) to
+     * ISC (client) or ASC (server), as required after DecryptMessage returns SEC_I_RENEGOTIATE
+     * or 0x80090317.  `tokenData`/`tokenLen` must be the SECBUFFER_EXTRA bytes left undecrypted
+     * by DecryptMessage (NOT the empty SECBUFFER_DATA buffer, and NOT decrypted-in-place bytes).
+     *
+     * Any leftover bytes that ISC/ASC reports via its input SECBUFFER_EXTRA (a following record
+     * such as a second NST or application data) are copied into _pInBuffer.  Returns the ssl_want
+     * for the read loop and sets *continueLoop true when the caller should `continue` the decrypt
+     * loop to process those leftover bytes.
+     */
+    ssl_want processPostHandshakeToken(const uint8_t* tokenData,
+                                       ULONG tokenLen,
+                                       asio::error_code& ec,
+                                       bool* continueLoop);
+
+    DWORD getServerFlags() {
+        return ASC_REQ_SEQUENCE_DETECT | ASC_REQ_REPLAY_DETECT | ASC_REQ_CONFIDENTIALITY |
+            ASC_REQ_EXTENDED_ERROR | ASC_REQ_STREAM | ASC_REQ_MUTUAL_AUTH;
+    }
+
+    DWORD getClientFlags() {
+        return ISC_REQ_SEQUENCE_DETECT | ISC_REQ_REPLAY_DETECT | ISC_REQ_CONFIDENTIALITY |
+            ISC_REQ_EXTENDED_ERROR | ISC_REQ_STREAM | ISC_REQ_USE_SUPPLIED_CREDS |
+            ISC_REQ_MANUAL_CRED_VALIDATION;
+    }
 
 private:
     /**
@@ -568,6 +633,15 @@ private:
 
     // Credential handle
     PCredHandle _phcred;
+
+    // Output buffer shared with the engine (for TLS 1.3 post-handshake responses).
+    ReusableBuffer* _pOutBuffer;
+
+    // TLS SNI server name (for InitializeSecurityContextW when processing post-handshake).
+    std::wstring* _pServerName;
+
+    // True when this manager is on the client side of the TLS connection.
+    bool _isClient{false};
 };
 
 /**
@@ -609,7 +683,11 @@ private:
     // SChannel context handle
     PCtxtHandle _phctxt;
 
-    // Position to start encrypting from for messages needing fragmentation
+    // Byte offset into the caller's message buffer at which the next EncryptMessage call
+    // should start.  Non-zero only when a message exceeds _securityMaxMessageLength and
+    // must be split into multiple TLS records.  The ASIO write path re-presents the same
+    // buffer on each want_output_and_retry iteration; _lastWriteOffset advances through it
+    // until the full message is encrypted, at which point it is reset to 0.
     std::size_t _lastWriteOffset{0};
 
     // TLS packet header length

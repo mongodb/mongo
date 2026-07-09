@@ -12,3 +12,6 @@ filters:
   - "*openssl*":
     approvers:
       - 10gen/server-security
+  - "README-windowstls.md":
+    approvers:
+      - 10gen/server-security
