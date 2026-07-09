@@ -79,17 +79,11 @@ bool ShardingState::inMaintenanceMode() const {
     return _inMaintenanceMode;
 }
 
-void ShardingState::setRecoveryCompleted(RecoveredClusterRole role,
-                                         boost::optional<UUID> shardUuidOnRecovery) {
+void ShardingState::setRecoveryCompleted(RecoveredClusterRole role) {
     LOGV2(
         22081, "Sharding status of the node recovered successfully", "role"_attr = role.toString());
     std::unique_lock<std::mutex> ul(_mutex);
     invariant(!_future.isReady());
-
-    // The shard handle can only be accessed once the promise is completed;
-    // set the former first to ensure a stable view on each access.
-    auto writeLock = _shardHandleMutex.writeLock();
-    _shardHandle = ShardHandle(ShardId(role.shardId), std::move(shardUuidOnRecovery));
 
     _promise.emplaceValue(std::move(role));
 }
@@ -108,14 +102,6 @@ void ShardingState::setRecoveryFailed(Status failedStatus) {
                 "until the process is restarted. In addition some manual intervention might be "
                 "required, which would require the node to be started in maintenance mode."
              << causedBy(failedStatus)});
-}
-
-void ShardingState::onShardHandleUpdate(ShardHandle newShardHandle) {
-    invariant(_future.isReady());
-    auto writeLock = _shardHandleMutex.writeLock();
-    invariant(_shardHandle.name() == newShardHandle.name());
-
-    _shardHandle = std::move(newShardHandle);
 }
 
 SharedSemiFuture<ShardingState::RecoveredClusterRole> ShardingState::awaitClusterRoleRecovery() {
@@ -151,32 +137,15 @@ ShardId ShardingState::shardId() const {
             "ShardingState cannot be accessed before it is initialized",
             _future.isReady());
 
-    return _future.get().shardId;
+    return _future.get().shardHandle.name();
 }
 
-ShardHandle ShardingState::shardHandle() const {
-    auto readLock = _shardHandleMutex.readLock();
-    return _getShardHandleInstance(readLock);
-}
-
-ShardRef ShardingState::asShardRef(OperationContext* opCtx) const {
-    auto readLock = _shardHandleMutex.readLock();
-    return _getShardHandleInstance(readLock).toShardRef(opCtx);
-}
-
-const ShardHandle& ShardingState::_getShardHandleInstance(
-    const WriteRarelyRWMutex::ReadLock&) const {
-    if (_future.isReady()) {
-        // Access the future to allow exception propagation if an error state was reached during
-        // recovery.
-        (void)_future.get();
-    }
-
+const ShardHandle& ShardingState::getShardHandle() const {
     uassert(ErrorCodes::ShardingStateNotInitialized,
             "ShardingState cannot be accessed before it is initialized",
-            _future.isReady() && _shardHandle.name().isValid());
+            _future.isReady());
 
-    return _shardHandle;
+    return _future.get().shardHandle;
 }
 
 OID ShardingState::clusterId() const {
@@ -187,7 +156,7 @@ OID ShardingState::clusterId() const {
 
 std::string ShardingState::RecoveredClusterRole::toString() const {
     return str::stream() << clusterId << " : " << role << " : " << configShardConnectionString
-                         << " : " << shardId;
+                         << " : " << shardHandle.name();
 }
 
 }  // namespace mongo

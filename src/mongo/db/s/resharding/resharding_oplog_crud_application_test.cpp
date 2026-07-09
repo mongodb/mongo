@@ -130,8 +130,7 @@ public:
             ->setRecoveryCompleted({OID::gen(),
                                     ClusterRole::ShardServer,
                                     ConnectionString(kConfigHostAndPort),
-                                    _myDonorHandle.name()},
-                                   _myDonorHandle.uuid().value());
+                                    _myDonorHandle});
         {
             auto opCtx = makeOperationContext();
             auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext);

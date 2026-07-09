@@ -125,8 +125,7 @@ public:
             ->setRecoveryCompleted({clusterId,
                                     ClusterRole::ShardServer,
                                     ConnectionString(kConfigHostAndPort),
-                                    kDonorShardHandle.name()},
-                                   kDonorShardHandle.uuid().value());
+                                    kDonorShardHandle});
 
         auto [chunks, chunkManager] = createSourceChunkManager();
 

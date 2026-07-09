@@ -163,8 +163,7 @@ protected:
                 ->setRecoveryCompleted({clusterId,
                                         ClusterRole::ShardServer,
                                         ConnectionString(kConfigHostAndPort),
-                                        originatorShardId},
-                                       originatorShardHandle.uuid().value());
+                                        originatorShardHandle});
 
             _shardVersion.emplace(
                 ShardVersionFactory::make(opCtx, chunkManager, originatorShardId));

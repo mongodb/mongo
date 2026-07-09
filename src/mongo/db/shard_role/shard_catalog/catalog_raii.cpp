@@ -408,7 +408,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
             uassert(StaleConfigInfo(_resolvedNss,
                                     *receivedShardVersion,
                                     ShardVersion::UNTRACKED() /* wantedVersion */,
-                                    ShardingState::get(opCtx)->asShardRef(opCtx)),
+                                    ShardingState::get(opCtx)->getShardHandle().toShardRef(opCtx)),
                     str::stream() << "Namespace " << _resolvedNss.toStringForErrorMsg()
                                   << " is a view therefore the shard "
                                   << "version attached to the request must be unset or UNTRACKED",
@@ -432,7 +432,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     uassert(StaleConfigInfo(_resolvedNss,
                             *receivedShardVersion,
                             boost::none /* wantedVersion */,
-                            ShardingState::get(opCtx)->asShardRef(opCtx)),
+                            ShardingState::get(opCtx)->getShardHandle().toShardRef(opCtx)),
             str::stream() << "No metadata for namespace " << _resolvedNss.toStringForErrorMsg()
                           << " therefore the shard "
                           << "version attached to the request must be unset, UNTRACKED or IGNORED",

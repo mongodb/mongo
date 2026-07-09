@@ -136,8 +136,7 @@ TEST(CatalogContextTest, CatalogContextWithShardId) {
         ->setRecoveryCompleted({OID::gen(),
                                 ClusterRole::ShardServer,
                                 ConnectionString(HostAndPort("localhost", 27017)),
-                                expectedShardHandle.name()},
-                               expectedShardHandle.uuid().value());
+                                expectedShardHandle});
 
     const auto dbNameSd = "test"sv;
     const auto collNameSd = "namespace"sv;

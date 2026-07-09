@@ -180,8 +180,7 @@ public:
             ->setRecoveryCompleted({OID::gen(),
                                     ClusterRole::ShardServer,
                                     ConnectionString(kConfigHostAndPort),
-                                    kMyShardHandle.name()},
-                                   kMyShardHandle.uuid().value());
+                                    kMyShardHandle});
 
         _mockConfigServerCacheLoader = std::make_shared<ConfigServerCatalogCacheLoaderMock>();
         _mockShardServerCacheLoader = std::make_shared<ShardServerCatalogCacheLoaderMock>();

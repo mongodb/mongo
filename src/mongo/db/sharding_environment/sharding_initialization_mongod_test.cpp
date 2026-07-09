@@ -195,7 +195,7 @@ TEST_F(ShardingInitializationMongoDTest, ShardIdentityWithUuidPopulatesShardingS
     shardingInitialization()->initializeFromShardIdentity(operationContext(), shardIdentity);
 
     ASSERT_EQ(ShardId(kShardName), shardingState()->shardId());
-    const auto shardHandle = shardingState()->shardHandle();
+    const auto& shardHandle = shardingState()->getShardHandle();
     ASSERT_EQ(ShardHandle(kShardName, shardUuid), shardHandle);
 }
 
@@ -211,7 +211,7 @@ TEST_F(ShardingInitializationMongoDTest, ShardIdentityWithoutUuidLeavesShardHand
     shardingInitialization()->initializeFromShardIdentity(operationContext(), shardIdentity);
 
     ASSERT_EQ(ShardId(kShardName), shardingState()->shardId());
-    const auto shardHandle = shardingState()->shardHandle();
+    const auto& shardHandle = shardingState()->getShardHandle();
     ASSERT_EQ(ShardHandle(kShardName, boost::none), shardHandle);
 }
 
@@ -247,12 +247,6 @@ TEST_F(ShardingInitializationMongoDTest, InitWhilePreviouslyInErrorStateWillStay
                        ErrorCodes::ManualInterventionRequired);
     ASSERT_THROWS_CODE(
         shardingState()->enabled(), AssertionException, ErrorCodes::ManualInterventionRequired);
-
-    ASSERT_THROWS_CODE(
-        shardingState()->shardHandle(), AssertionException, ErrorCodes::ManualInterventionRequired);
-    ASSERT_THROWS_CODE(shardingState()->asShardRef(operationContext()),
-                       AssertionException,
-                       ErrorCodes::ManualInterventionRequired);
 }
 
 TEST_F(ShardingInitializationMongoDTest, InitializeAgainWithMatchingShardIdentitySucceeds) {

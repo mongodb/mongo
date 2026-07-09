@@ -106,7 +106,7 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
     const auto scopedCSR = CollectionShardingRuntime::acquireShared(opCtx, nss);
     const auto metadataAfterSplit = scopedCSR->getCurrentMetadataIfKnown();
 
-    const auto shardRef = ShardingState::get(opCtx)->asShardRef(opCtx);
+    const auto shardRef = ShardingState::get(opCtx)->getShardHandle().toShardRef(opCtx);
 
     uassert(StaleConfigInfo(nss,
                             ShardVersionPlacementIgnored() /* receivedVersion */,
