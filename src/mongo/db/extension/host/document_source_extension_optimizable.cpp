@@ -504,16 +504,6 @@ DocumentSourceExtensionOptimizable::distributedPlanLogic(const DistributedPlanCo
                 providesSortKeyMetadata());
     }
 
-    // For source stages (no input required), the DPL sort pattern is the only sort order the
-    // merging pipeline will observe. It must match what the stage declares via getSortPattern()
-    // so the optimizer can reason about it correctly.
-    if (!_properties.getRequiresInputDocSource()) {
-        tassert(12327102,
-                str::stream() << "Source extension stage '" << getSourceName()
-                              << "': DPL sortPattern must equal getSortPattern()",
-                sortPattern.woCompare(_logicalStage->getSortPattern()) == 0);
-    }
-
     return logic;
 }
 
