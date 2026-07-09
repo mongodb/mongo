@@ -41,6 +41,9 @@ ImpersonatedClientSessionGuard::ImpersonatedClientSessionGuard(
     uassert(ErrorCodes::BadValue, "$audit must contain at least one host", hosts.size() > 0);
 
     auto remote = hosts[0];
+    // $audit only carries the (possibly proxy-asserted) remote address; there is no distinct
+    // literal peer address to forward across the wire, so directRemote just mirrors remote here.
+    auto directRemote = remote;
     std::vector<HostAndPort> intermediates;
     for (size_t i = 1; i < hosts.size(); ++i) {
         // In rare occasions a node will send a request to itself (e.g.
@@ -57,6 +60,7 @@ ImpersonatedClientSessionGuard::ImpersonatedClientSessionGuard(
     AuditClientAttrs::set(client,
                           AuditClientAttrs(std::move(local),
                                            std::move(remote),
+                                           std::move(directRemote),
                                            std::move(intermediates),
                                            true /* isImpersonating */));
 }

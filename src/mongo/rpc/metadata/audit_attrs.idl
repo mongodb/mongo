@@ -83,6 +83,16 @@ structs:
                 type: HostAndPort
                 description: The remote address.
                 optional: false
+            directRemote:
+                type: HostAndPort
+                description: >-
+                    The literal, directly-connected TCP peer address for this session. Unlike
+                    'remote', this is never influenced by a PROXY protocol header, so it remains
+                    accurate even when 'remote' reflects an unauthenticated address asserted by an
+                    upstream load balancer or reverse proxy. Optional on the wire for
+                    backwards-compatibility: a peer running an older binary omits this field, and
+                    consumers fall back to 'remote' when it is absent.
+                optional: true
             proxies:
                 type: array<HostAndPort>
                 description: "The intermediate load balancers or mongos addresses that the request passed through between 'remote' and 'local'"

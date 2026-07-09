@@ -58,13 +58,17 @@ void AuditClientAttrs::resetToPeerClient(Client* client) {
 
     auto local = session->local();
     auto remote = session->getSourceRemoteEndpoint();
+    auto directRemote = session->remote();
     std::vector<HostAndPort> proxies;
     if (auto proxyEndpoint = session->getProxiedDstEndpoint()) {
         proxies.push_back(*proxyEndpoint);
     }
 
-    *getAuditClientAttrs(client) = rpc::AuditClientAttrs(
-        std::move(local), std::move(remote), std::move(proxies), false /* isImpersonating */);
+    *getAuditClientAttrs(client) = rpc::AuditClientAttrs(std::move(local),
+                                                         std::move(remote),
+                                                         std::move(directRemote),
+                                                         std::move(proxies),
+                                                         false /* isImpersonating */);
 }
 
 void AuditClientAttrs::reset(Client* client) {

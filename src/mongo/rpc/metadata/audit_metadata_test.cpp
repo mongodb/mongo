@@ -88,8 +88,9 @@ protected:
         std::vector<RoleName> roleNames{RoleName{kRoleName, kDBName}};
 
         AuditClientAttrs::set(_client,
-                              AuditClientAttrs(std::move(local),
-                                               std::move(remote),
+                              AuditClientAttrs(local,
+                                               remote,
+                                               remote /* directRemote */,
                                                std::move(proxies),
                                                true /* isImpersonating */));
         AuditUserAttrs::set(opCtx(), userName, roleNames, true /* isImpersonating */);
