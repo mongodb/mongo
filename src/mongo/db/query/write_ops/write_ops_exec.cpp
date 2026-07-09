@@ -463,7 +463,7 @@ void saveStatsOnConflict(PlanExecutor* exec, CurOp* curOp) {
 }
 
 [[noreturn]] void throwUnsupportedUpdateOnColdCollection(const NamespaceString& nss) {
-    uasserted(ErrorCodes::IllegalOperation,
+    uasserted(ErrorCodes::CommandNotSupported,
               str::stream() << "Updates are not supported on cold collection '"
                             << nss.toStringForErrorMsg() << "'");
 }
