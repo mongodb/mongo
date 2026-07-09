@@ -31,6 +31,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
@@ -108,6 +109,49 @@ template <class Service, class StateMachine, class ReshardingDocument>
 void createReshardingStateMachine(OperationContext* opCtx,
                                   const ReshardingDocument& doc,
                                   bool throwOnNotPrimaryError = false);
+
+/**
+ * Returns the in-memory StateMachine for 'reshardingUUID'. If there is no in-memory instance but a
+ * state document is still persisted at 'stateDocumentNss', reconstructs the in-memory instance from
+ * the persisted document and returns it.
+ *
+ * This recovers the state machine in the edge case where the state document was inserted but the
+ * in-memory instance was never constructed - e.g. because createReshardingStateMachine() was
+ * interrupted between the insert and getOrCreate() (see SERVER-130696). Callers such as
+ * _shardsvrAbortReshardCollection use this so that the recovered instance can be driven to
+ * completion.
+ *
+ * Returns boost::none only if neither an in-memory instance nor a persisted document exists. May
+ * uassert InterruptedDueToReplStateChange if the node is stepping or shutting down.
+ */
+template <class Service, class StateMachine, class ReshardingDocument>
+boost::optional<std::shared_ptr<StateMachine>> getOrRecoverReshardingStateMachine(
+    OperationContext* opCtx, const NamespaceString& stateDocumentNss, const UUID& reshardingUUID) {
+    if (auto instance = tryGetReshardingStateMachineAndThrowIfShuttingDown<Service,
+                                                                           StateMachine,
+                                                                           ReshardingDocument>(
+            opCtx, reshardingUUID)) {
+        return instance;
+    }
+
+    boost::optional<ReshardingDocument> persistedDoc;
+    PersistentTaskStore<ReshardingDocument> store(stateDocumentNss);
+    store.forEach(opCtx,
+                  BSON(ReshardingDocument::kReshardingUUIDFieldName << reshardingUUID),
+                  [&](const ReshardingDocument& doc) {
+                      persistedDoc.emplace(doc);
+                      return false;  // Stop iterating after the first (and only) match.
+                  });
+
+    if (!persistedDoc) {
+        return boost::none;
+    }
+
+    // Reconstruct the in-memory instance from the persisted document.
+    auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
+    auto service = registry->lookupServiceByName(Service::kServiceName);
+    return StateMachine::getOrCreate(opCtx, service, persistedDoc->toBSON());
+}
 
 /**
  * Waits for this node's most recent write (the system's last op time) to be majority committed.

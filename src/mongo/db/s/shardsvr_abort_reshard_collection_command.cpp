@@ -99,10 +99,11 @@ public:
 
             std::vector<SharedSemiFuture<void>> futuresToWait;
 
-            if (auto machine = resharding::tryGetReshardingStateMachineAndThrowIfShuttingDown<
+            if (auto machine = resharding::getOrRecoverReshardingStateMachine<
                     ReshardingRecipientService,
                     ReshardingRecipientService::RecipientStateMachine,
-                    ReshardingRecipientDocument>(opCtx, uuid())) {
+                    ReshardingRecipientDocument>(
+                    opCtx, NamespaceString::kRecipientReshardingOperationsNamespace, uuid())) {
                 futuresToWait.push_back((*machine)->getCompletionFuture());
 
                 LOGV2(5663800,
@@ -111,10 +112,11 @@ public:
                 (*machine)->abort(isUserCanceled());
             }
 
-            if (auto machine = resharding::tryGetReshardingStateMachineAndThrowIfShuttingDown<
+            if (auto machine = resharding::getOrRecoverReshardingStateMachine<
                     ReshardingDonorService,
                     ReshardingDonorService::DonorStateMachine,
-                    ReshardingDonorDocument>(opCtx, uuid())) {
+                    ReshardingDonorDocument>(
+                    opCtx, NamespaceString::kDonorReshardingOperationsNamespace, uuid())) {
                 futuresToWait.push_back((*machine)->getCompletionFuture());
 
                 LOGV2(5663801,

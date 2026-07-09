@@ -129,8 +129,14 @@ void createReshardingStateMachine(OperationContext* opCtx,
         // set shard cannot forget about being a participant.
         ensureStateDocumentInserted<StateMachine>(opCtx, doc);
 
-        reshardingInterruptAfterInsertStateMachineDocument.execute(
-            [&opCtx](const BSONObj& data) { opCtx->markKilled(); });
+        reshardingInterruptAfterInsertStateMachineDocument.execute([&opCtx](const BSONObj& data) {
+            // If an 'errorCode' is provided, instead throw that error directly.
+            if (auto errorCodeElem = data["errorCode"]) {
+                uasserted(ErrorCodes::Error(errorCodeElem.safeNumberInt()),
+                          "Failing createReshardingStateMachine due to failpoint");
+            }
+            opCtx->markKilled();
+        });
 
         auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
         auto service = registry->lookupServiceByName(Service::kServiceName);

@@ -1243,5 +1243,46 @@ TEST_F(ReshardingDonorRecipientCommonTest,
             opCtx, recipDoc, false)));
 }
 
+TEST_F(ReshardingDonorRecipientCommonTest,
+       GetOrRecoverReshardingStateMachineReconstructsOrphanedStateDocument) {
+    // Prevent the PrimaryOnlyService stepUp rebuild from constructing an instance for the persisted
+    // document, leaving it orphaned (a document on disk with no in-memory state machine).
+    FailPointEnableBlock skipRebuild("PrimaryOnlyServiceSkipRebuildingInstances");
+
+    OperationContext* opCtx = operationContext();
+    ReshardingRecipientDocument recipientDoc = makeRecipientStateDoc();
+    const auto reshardingUUID = recipientDoc.getReshardingUUID();
+    ReshardingRecipientService::RecipientStateMachine::insertStateDocument(opCtx, recipientDoc);
+
+    auto inMemoryInstance =
+        resharding::tryGetReshardingStateMachine<ReshardingRecipientService,
+                                                 ReshardingRecipientService::RecipientStateMachine,
+                                                 ReshardingRecipientDocument>(opCtx,
+                                                                              reshardingUUID);
+    ASSERT(inMemoryInstance == boost::none);
+
+    auto recoveredStateMachine = resharding::getOrRecoverReshardingStateMachine<
+        ReshardingRecipientService,
+        ReshardingRecipientService::RecipientStateMachine,
+        ReshardingRecipientDocument>(
+        opCtx, NamespaceString::kRecipientReshardingOperationsNamespace, reshardingUUID);
+
+    ASSERT(recoveredStateMachine != boost::none);
+    recoveredStateMachine.value()->interrupt({ErrorCodes::InternalError, "Shut down for test"});
+}
+
+TEST_F(ReshardingDonorRecipientCommonTest,
+       GetOrRecoverReshardingStateMachineReturnsNoneWhenNoStateDocument) {
+    OperationContext* opCtx = operationContext();
+
+    auto recipientStateMachine = resharding::getOrRecoverReshardingStateMachine<
+        ReshardingRecipientService,
+        ReshardingRecipientService::RecipientStateMachine,
+        ReshardingRecipientDocument>(
+        opCtx, NamespaceString::kRecipientReshardingOperationsNamespace, UUID::gen());
+
+    ASSERT(recipientStateMachine == boost::none);
+}
+
 }  // namespace
 }  // namespace mongo
