@@ -118,6 +118,10 @@ inline AtomicWord<bool>& gKnobNoTableScan = storageGlobalParams.noTableScan;
          kInternalQueryPlannerMaxIndexedSolutionsName,                                    \
          internalQueryPlannerMaxIndexedSolutions,                                         \
          getPlannerMaxIndexedSolutions)                                                   \
+    KNOB(kMaxEstimatedScanBytes,                                                          \
+         kMaxEstimatedScanBytesName,                                                      \
+         internalQueryMaxEstimatedScanBytes,                                              \
+         getMaxEstimatedScanBytes)                                                        \
     KNOB(kMaxScansToExplode,                                                              \
          kInternalQueryMaxScansToExplodeName,                                             \
          internalQueryMaxScansToExplode,                                                  \

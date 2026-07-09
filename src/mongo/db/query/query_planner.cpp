@@ -75,6 +75,7 @@
 #include "mongo/db/query/distinct_access.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_tag.h"
+#include "mongo/db/query/max_estimated_scan_bytes_metrics.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_diagnostic_printer.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator.h"
@@ -293,6 +294,17 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildSearchQuerySolution(
 
 using std::unique_ptr;
 
+bool isClusteredIDXScanSoln(QuerySolution* collscanSoln);
+
+/**
+ * Returns true if 'soln' is an unbounded COLLSCAN that must be rejected because
+ * COLLECTION_EXCEEDS_SCAN_BYTES is active. Exempts bounded clustered scans (minRecord/maxRecord)
+ * and resumeScanPoint, as well as queries with an effective limit.
+ */
+bool rejectsUnboundedCollscan(const CanonicalQuery& query,
+                              const QueryPlannerParams& params,
+                              QuerySolution* soln);
+
 static bool is2DIndex(const BSONObj& pattern) {
     BSONObjIterator it(pattern);
     while (it.more()) {
@@ -361,6 +373,9 @@ string optionString(size_t options) {
                 break;
             case QueryPlannerParams::TARGET_SBE_STAGE_BUILDER:
                 ss << "TARGET_SBE_STAGE_BUILDER ";
+                break;
+            case QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES:
+                ss << "COLLECTION_EXCEEDS_SCAN_BYTES ";
                 break;
             case QueryPlannerParams::DEFAULT:
                 MONGO_UNREACHABLE;
@@ -756,9 +771,16 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
         if (!soln) {
             return Status(ErrorCodes::NoQueryExecutionPlans,
                           "plan cache error: collection scan soln");
-        } else {
-            return {std::move(soln)};
         }
+        // Re-check COLLECTION_EXCEEDS_SCAN_BYTES on cache replay so that setting the parameter at
+        // runtime takes effect even for queries whose COLLSCAN was already cached.
+        if (rejectsUnboundedCollscan(query, params, soln.get())) {
+            maxEstimatedScanBytesMetrics::maxEstimatedScanRejected.increment();
+            return Status(ErrorCodes::NoQueryExecutionPlans,
+                          "Query rejected by maxEstimatedScanBytes: plan requires an unbounded "
+                          "COLLSCAN on a collection that exceeds the configured size threshold");
+        }
+        return {std::move(soln)};
     } else if (SolutionCacheData::VIRTSCAN_SOLN == solnCacheData.solnType) {
         tassert(9049200,
                 "Constructing a virtual scan plan from cache requires 'VirtualScanCacheData",
@@ -897,6 +919,14 @@ bool isClusteredIDXScanSoln(QuerySolution* collscanSoln) {
     return false;
 }
 
+bool rejectsUnboundedCollscan(const CanonicalQuery& query,
+                              const QueryPlannerParams& params,
+                              QuerySolution* soln) {
+    return (params.mainCollectionInfo.options &
+            QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES) &&
+        !isClusteredIDXScanSoln(soln) && !QueryPlannerCommon::hasEffectiveLimit(query);
+}
+
 StatusWith<std::vector<std::unique_ptr<QuerySolution>>> attemptCollectionScan(
     const CanonicalQuery& query, bool isTailable, const QueryPlannerParams& params) {
     if (auto soln = tryEofSoln(query)) {
@@ -906,7 +936,16 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> attemptCollectionScan(
         return Status(ErrorCodes::NoQueryExecutionPlans,
                       "not allowed to output a collection scan because 'notablescan' is enabled");
     }
-    if (auto soln = buildCollscanSoln(query, isTailable, params)) {
+    auto soln = buildCollscanSoln(query, isTailable, params);
+    // Check COLLECTION_EXCEEDS_SCAN_BYTES after building the solution to exempt bounded clustered
+    // scans (minRecord/maxRecord) and resumeScanPoint from rejection.
+    if (soln && rejectsUnboundedCollscan(query, params, soln.get())) {
+        maxEstimatedScanBytesMetrics::maxEstimatedScanRejected.increment();
+        return Status(ErrorCodes::NoQueryExecutionPlans,
+                      "Query rejected by maxEstimatedScanBytes: plan requires an unbounded "
+                      "COLLSCAN on a collection that exceeds the configured size threshold");
+    }
+    if (soln) {
         return singleSolution(std::move(soln));
     }
     return Status(ErrorCodes::NoQueryExecutionPlans, "Failed to build collection scan soln");
@@ -1676,13 +1715,20 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     bool collscanRequested =
         (params.mainCollectionInfo.options & QueryPlannerParams::INCLUDE_COLLSCAN);
 
+    // Suppress INCLUDE_COLLSCAN when COLLECTION_EXCEEDS_SCAN_BYTES is active and the query has no
+    // limit. An unbounded COLLSCAN on a large collection is disallowed in this case.
+    if (collscanRequested &&
+        (params.mainCollectionInfo.options & QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES) &&
+        !QueryPlannerCommon::hasEffectiveLimit(query)) {
+        collscanRequested = false;
+    }
+
     // No indexed plans?  We must provide a collscan if possible or else we can't run the query.
     bool collScanRequired = out.empty();
     if (collScanRequired && noTableAndClusteredIDXScan(params)) {
         return Status(ErrorCodes::NoQueryExecutionPlans,
                       "No indexed plans available, and running with 'notablescan'");
     }
-
     bool clusteredCollection = params.clusteredInfo.has_value();
 
     if (collScanRequired && mustUseIndexedPlan) {
@@ -1729,6 +1775,17 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     if (collScanRequired && noTableScan(params) && !isClusteredIDXScan) {
         return Status(ErrorCodes::NoQueryExecutionPlans,
                       "No indexed plans available, and running with 'notablescan' 2");
+    }
+    if (collScanRequired &&
+        (params.mainCollectionInfo.options & QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES) &&
+        // Exempt bounded clustered scans (minRecord/maxRecord) and resumeScanPoint.
+        !isClusteredIDXScan) {
+        if (!QueryPlannerCommon::hasEffectiveLimit(query)) {
+            maxEstimatedScanBytesMetrics::maxEstimatedScanRejected.increment();
+            return Status(ErrorCodes::NoQueryExecutionPlans,
+                          "Query rejected by maxEstimatedScanBytes: plan requires an unbounded "
+                          "COLLSCAN on a collection that exceeds the configured size threshold");
+        }
     }
 
     // Explain reads the plan enumerator's explain info from the winning plan's solution.

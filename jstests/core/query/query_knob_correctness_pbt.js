@@ -59,6 +59,10 @@ const excludeKnobs = [
     // legitimate NoQueryExecutionPlans server-side guardrail, not a correctness divergence, so it
     // can't be compared against a forced-COLLSCAN control.
     "notablescan",
+    // Rejects unbounded COLLSCANs on collections exceeding the configured size threshold; like
+    // notablescan, this is a legitimate server-side guardrail and can't be compared against a
+    // forced-COLLSCAN control.
+    "maxEstimatedScanBytes",
     // Non-spilling stage memory limits: small values uassert instead of returning results, a
     // server-side guardrail rather than a correctness divergence.
     "internalDocumentSourceDensifyMaxMemoryBytes",

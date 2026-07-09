@@ -43,6 +43,10 @@ const excludeKnobs = [
     // Disallows collection scans, which makes explaining the representative query fail with
     // NoQueryExecutionPlans rather than exercising the validation parity property.
     "notablescan",
+    // Can reject an unbounded COLLSCAN on the representative query's collection, which makes
+    // explaining it fail with NoQueryExecutionPlans rather than exercising the validation parity
+    // property.
+    "maxEstimatedScanBytes",
     // "histogramCE" makes explain fail with HistogramCEFailure since no histogram exists on the
     // filtered path, which is a server-side guardrail rather than a validation divergence.
     "internalQueryCBRCEMode",

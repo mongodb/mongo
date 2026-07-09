@@ -64,6 +64,7 @@
 #include "mongo/db/query/distinct_access.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_hint.h"
+#include "mongo/db/query/max_estimated_scan_bytes_metrics.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_request_helper.h"
@@ -1034,6 +1035,17 @@ QueryPlannerAnalysis::Strategy QueryPlannerAnalysis::determineLookupStrategy(
         // or the dynamic indexed loop join, which decide safety at run time.
         if (foreignIndex && collationCompatibleForDilj && !foreignIndex->sparse) {
             return EqLookupNode::LookupStrategy::kIndexedLoopJoin;
+        }
+        // Reject all remaining strategies (kDynamicIndexedLoopJoin, kHashJoin,
+        // kNestedLoopJoin) when COLLECTION_EXCEEDS_SCAN_BYTES is set. kDynamicIndexedLoopJoin is
+        // included because it has a runtime nested-loop fallback that scans the full foreign
+        // collection when local key values are strings/arrays/objects; we cannot rule that out at
+        // plan time.
+        if (foreignCollItr->second.options & QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES) {
+            maxEstimatedScanBytesMetrics::maxEstimatedScanRejected.increment();
+            uasserted(ErrorCodes::NoQueryExecutionPlans,
+                      "Query rejected by maxEstimatedScanBytes: plan requires an unbounded "
+                      "COLLSCAN on a collection that exceeds the configured size threshold");
         }
         const bool tableScanForbidden = foreignCollItr->second.options &
             (QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::STRICT_NO_TABLE_SCAN);

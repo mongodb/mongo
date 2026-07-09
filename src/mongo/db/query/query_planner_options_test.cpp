@@ -48,6 +48,7 @@
 #include "mongo/db/query/query_planner_test_fixture.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstddef>
@@ -904,6 +905,68 @@ TEST_F(QueryPlannerTest, PreserveRecordIdOptionPrecludesSimpleSort) {
     assertNumSolutions(1U);
     assertSolutionExists(
         "{sort: {pattern: {a: 1}, limit: 0, type: 'default', node: {cscan: {dir: 1}}}}");
+}
+
+// ---------------------------------------------------------------------------
+// maxEstimatedScanBytes: COLLECTION_EXCEEDS_SCAN_BYTES flag unit tests
+// ---------------------------------------------------------------------------
+
+TEST_F(QueryPlannerTest, NoLargeCollscanRejectsUnboundedCollscan) {
+    params.mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+    runInvalidQuery(fromjson("{a: 1}"));
+    assertNoSolutions();
+}
+
+TEST_F(QueryPlannerTest, NoLargeCollscanAllowsCollscanWithLimit) {
+    params.mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+    // limit > 0 exempts the COLLSCAN.
+    runQuerySortProjSkipLimit(fromjson("{a: 1}"), BSONObj(), BSONObj(), 0, 5);
+    assertNumSolutions(1U);
+    assertSolutionExists("{limit: {n: 5, node: {cscan: {dir: 1}}}}");
+}
+
+TEST_F(QueryPlannerTest, NoLargeCollscanAllowsCollscanWithLimitOne) {
+    params.mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+    runQuerySortProjSkipLimit(fromjson("{a: 1}"), BSONObj(), BSONObj(), 0, 1);
+    assertNumSolutions(1U);
+    assertSolutionExists("{limit: {n: 1, node: {cscan: {dir: 1}}}}");
+}
+
+TEST_F(QueryPlannerTest, NoLargeCollscanDoesNotRejectIndexedPlan) {
+    params.mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+    addIndex(BSON("a" << 1));
+    runQuery(fromjson("{a: 1}"));
+    assertNumSolutions(1U);
+    assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1}}}}}");
+}
+
+TEST_F(QueryPlannerTest, NoLargeCollscanFallsBackToIndexWhenCollscanBlocked) {
+    params.mainCollectionInfo.options |=
+        QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES | QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1));
+    // INCLUDE_COLLSCAN would normally add a COLLSCAN alongside the index plan,
+    // but COLLECTION_EXCEEDS_SCAN_BYTES + no limit suppresses it.
+    runQuery(fromjson("{a: 1}"));
+    assertNumSolutions(1U);
+    assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1}}}}}");
+}
+
+TEST_F(QueryPlannerTest, NoLargeCollscanAllowsBoundedClusteredScan) {
+    // A predicate on the cluster key (_id) produces a bounded scan, which is exempt.
+    params.mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+    params.clusteredInfo = clustered_util::makeDefaultClusteredIdIndex();
+    runQuery(fromjson("{_id: {$gte: 5}}"));
+    // Both the _id ixscan and the bounded clustered scan are valid solutions.
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerTest, NoLargeCollscanRejectsUnboundedClusteredScan) {
+    // A predicate on a non-cluster-key field leaves the scan unbounded — still rejected.
+    params.mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+    params.clusteredInfo = clustered_util::makeDefaultClusteredIdIndex();
+    runInvalidQuery(fromjson("{a: 1}"));
+    assertNoSolutions();
 }
 
 }  // namespace

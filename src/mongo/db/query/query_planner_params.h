@@ -199,6 +199,11 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
         // Set this if you want the planner to generate a QSN that will be compatible with the
         // SBE stage builder.
         TARGET_SBE_STAGE_BUILDER = 1 << 14,
+
+        // Set when maxEstimatedScanBytes is enabled and the collection exceeds the configured
+        // threshold. The planner will refuse to output an unbounded COLLSCAN. Cleared by a
+        // $natural hint (command-level or PQS).
+        COLLECTION_EXCEEDS_SCAN_BYTES = 1 << 15,
     };
 
     /**

@@ -34,9 +34,12 @@
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/query/compiler/stats/collection_statistics_impl.h"
 #include "mongo/db/query/distinct_access.h"
+#include "mongo/db/query/max_estimated_scan_bytes_metrics.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
+#include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_settings_decoration.h"
 #include "mongo/db/query/wildcard_multikey_paths.h"
@@ -222,6 +225,14 @@ void applyQuerySettingsIndexHintsForCollection(const CanonicalQuery& canonicalQu
     indexes.erase(std::remove_if(indexes.begin(), indexes.end(), notInAllowedIndexes),
                   indexes.end());
 }
+
+// A limit exempts a query from maxEstimatedScanBytes rejection, so an override only counts if the
+// query has no limit (i.e. it would otherwise have been rejected).
+void incrementRejectedAndOverriddenIfNoLimit(const CanonicalQuery& canonicalQuery) {
+    if (!QueryPlannerCommon::hasEffectiveLimit(canonicalQuery)) {
+        maxEstimatedScanBytesMetrics::maxEstimatedScanRejectedAndOverridden.increment();
+    }
+}
 }  // namespace
 
 // Handle the '$natural' and cluster key (for clustered indexes) cases. Iterate over the
@@ -293,16 +304,21 @@ void QueryPlannerParams::applyQuerySettingsNaturalHintsForCollection(
               allowedIndex.getHint());
     }
 
-    constexpr auto strictNoTableScan = (QueryPlannerParams::Options::NO_TABLE_SCAN |
-                                        QueryPlannerParams::Options::STRICT_NO_TABLE_SCAN);
+    // Flags PQS sets to disallow all scan types.
+    constexpr auto strictNoTableScanFlags = (QueryPlannerParams::Options::NO_TABLE_SCAN |
+                                             QueryPlannerParams::Options::STRICT_NO_TABLE_SCAN);
+    constexpr auto clearCollscanFlags =
+        (strictNoTableScanFlags | QueryPlannerParams::Options::COLLECTION_EXCEEDS_SCAN_BYTES);
     if (!forwardAllowed && !backwardAllowed) {
         // No '$natural' or cluster key hint present. Ensure that table scans are forbidden.
-        collectionInfo.options |= strictNoTableScan;
+        collectionInfo.options |= strictNoTableScanFlags;
     } else {
-        // At least one direction is allowed. Clear out the 'NO_TABLE_SCAN' and
-        // 'STRICT_NO_TABLE_SCAN' flags if they exist, as query settings should have a higher
-        // precedence over server parameters.
-        collectionInfo.options &= ~strictNoTableScan;
+        // PQS $natural hint overrides server-parameter scan restrictions. Track overrides of
+        // COLLECTION_EXCEEDS_SCAN_BYTES before clearing.
+        if (collectionInfo.options & QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES) {
+            incrementRejectedAndOverriddenIfNoLimit(canonicalQuery);
+        }
+        collectionInfo.options &= ~clearCollscanFlags;
 
         // Enforce the scan direction if needed.
         const bool bothDirectionsAllowed = forwardAllowed && backwardAllowed;
@@ -443,6 +459,17 @@ void QueryPlannerParams::fillOutSecondaryCollectionsInfo(
                     secondaryInfo.options |= QueryPlannerParams::NO_TABLE_SCAN;
                 }
             }
+            {
+                const long long maxScanBytes =
+                    QueryKnobConfiguration::get(opCtx).getMaxEstimatedScanBytes();
+                if (maxScanBytes >= 0) {
+                    const bool ignore = nss.isSystem() || nss.isOnInternalDb();
+                    if (!ignore && secondaryColl &&
+                        secondaryColl->getRecordStore()->dataSize() > maxScanBytes) {
+                        secondaryInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+                    }
+                }
+            }
         } else {
             secondaryInfo.exists = false;
         }
@@ -507,6 +534,22 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
             canonicalQuery.getQueryObj().isEmpty() || nss.isSystem() || nss.isOnInternalDb();
         if (!ignore) {
             mainCollectionInfo.options |= QueryPlannerParams::NO_TABLE_SCAN;
+        }
+    }
+
+    {
+        const long long maxScanBytes = knobConfig.getMaxEstimatedScanBytes();
+        const auto& nss = canonicalQuery.nss();
+        const bool ignore = nss.isSystem() || nss.isOnInternalDb();
+        if (maxScanBytes >= 0 && mainColl && !ignore &&
+            mainColl->getRecordStore()->dataSize() > maxScanBytes) {
+            // A $natural hint in the command overrides the rejection.
+            const auto& hint = canonicalQuery.getFindCommandRequest().getHint();
+            if (!hint.isEmpty() && hint[query_request_helper::kNaturalSortField]) {
+                incrementRejectedAndOverriddenIfNoLimit(canonicalQuery);
+            } else {
+                mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+            }
         }
     }
 

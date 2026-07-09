@@ -528,6 +528,26 @@ server_parameters:
                 fcv:
                     min: "9.0"
 
+    maxEstimatedScanBytes:
+        description: >-
+            Reject queries at plan time when the plan requires an unbounded COLLSCAN on a
+            collection whose estimated data size in bytes exceeds this threshold. The threshold is
+            compared against the collection's uncompressed logical size (equivalent to
+            collStats.size), not the on-disk compressed size. -1 (default) disables the check.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryMaxEstimatedScanBytes"
+        cpp_vartype: AtomicWord<long long>
+        default: -1
+        redact: false
+        validator:
+            gte: -1
+        annotations:
+            query_knob:
+                wire_name: maxEstimatedScanBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
+
     internalQueryEnumerationPreferLockstepOrEnumeration:
         description: >-
             If set to true, instructs the plan enumerator to enumerate contained $ors in a

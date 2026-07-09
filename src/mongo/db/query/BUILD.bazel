@@ -369,6 +369,14 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "max_estimated_scan_bytes_metrics",
+    srcs = ["max_estimated_scan_bytes_metrics.cpp"],
+    deps = [
+        "//src/mongo/db/commands/server_status:server_status_metric",
+    ],
+)
+
+mongo_cc_library(
     name = "record_id_range",
     srcs = [
         "record_id_range.cpp",
@@ -398,6 +406,7 @@ mongo_cc_library(
         "//src/mongo/db/query/plan_enumerator:plan_enumerator.cpp",
     ],
     deps = [
+        ":max_estimated_scan_bytes_metrics",
         ":record_id_range",
         "//src/mongo/db:query_expressions",
         "//src/mongo/db/commands/server_status:server_status_core",
@@ -424,6 +433,7 @@ mongo_cc_library(
     deps = [
         "collection_query_info",
         "query_planner",
+        ":max_estimated_scan_bytes_metrics",
         "//src/mongo/s/query:sharding_helpers",
         "//src/mongo/s/query/exec:target_write_op",
     ],

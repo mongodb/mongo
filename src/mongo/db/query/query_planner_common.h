@@ -119,6 +119,14 @@ public:
             kp, SimpleBSONElementComparator::kInstance);
     }
 
+    /**
+     * Returns true if 'query' has a limit that is positive, i.e. one that can exempt the query
+     * from an unbounded-scan restriction such as maxEstimatedScanBytes or notablescan.
+     */
+    static bool hasEffectiveLimit(const CanonicalQuery& query) {
+        return query.getFindCommandRequest().getLimit().value_or(0) > 0;
+    }
+
     static bool providesSortRequirementForDistinct(
         const boost::optional<CanonicalDistinct>& distinct, const BSONObj& kp) {
         return distinct && distinct->getSortRequirement() &&
