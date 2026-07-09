@@ -120,7 +120,8 @@ assertSetParameterFails("internalQueryPlanEvaluationCollFraction", -0.1);
 assertSetParameterFails("internalQueryPlanEvaluationCollFraction", 1.0001);
 
 assertSetParameterSucceeds("internalQueryPlanEvaluationMaxResults", 11);
-assertSetParameterSucceeds("internalQueryPlanEvaluationMaxResults", 0);
+assertSetParameterSucceeds("internalQueryPlanEvaluationMaxResults", 1);
+assertSetParameterFails("internalQueryPlanEvaluationMaxResults", 0);
 assertSetParameterFails("internalQueryPlanEvaluationMaxResults", -1);
 
 assertSetParameterSucceeds("internalQueryCacheMaxEntriesPerCollection", 1);
