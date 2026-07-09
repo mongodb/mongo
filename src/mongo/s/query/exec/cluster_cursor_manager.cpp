@@ -526,8 +526,7 @@ std::size_t ClusterCursorManager::killMortalCursorsInactiveSince(OperationContex
             return res;
         });
 
-    std::lock_guard<std::mutex> lk(_mutex);
-    _cursorsTimedOut += cursorsKilled;
+    _cursorsTimedOut.fetchAndAddRelaxed(cursorsKilled);
 
     return cursorsKilled;
 }
@@ -583,8 +582,7 @@ std::size_t ClusterCursorManager::killCursorsSatisfying(
 }
 
 size_t ClusterCursorManager::cursorsTimedOut() const {
-    std::lock_guard<std::mutex> lk(_mutex);
-    return _cursorsTimedOut;
+    return _cursorsTimedOut.loadRelaxed();
 }
 
 auto ClusterCursorManager::getOpenCursorStats() const -> OpenCursorStats {

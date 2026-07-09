@@ -45,6 +45,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/session_killer.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/query/exec/cluster_client_cursor.h"
 #include "mongo/s/query/exec/cluster_client_cursor_guard.h"
@@ -664,6 +665,8 @@ private:
     // concurrently accessed by multiple threads.
     ClockSource* _clockSource;
 
+    mongo::Atomic<size_t> _cursorsTimedOut{0};
+
     // Synchronizes access to all private state variables below.
     mutable std::mutex _mutex;
 
@@ -675,8 +678,6 @@ private:
 
     // Map from CursorId to CursorEntry.
     CursorEntryMap _cursorEntryMap;
-
-    size_t _cursorsTimedOut = 0;
 };
 
 /* For the killCursors command the list of users authorised to access the cursor is used to
