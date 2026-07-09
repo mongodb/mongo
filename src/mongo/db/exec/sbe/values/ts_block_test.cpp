@@ -35,6 +35,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/sbe/sbe_block_test_helpers.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
+#include "mongo/db/exec/sbe/sbe_unittest_assert.h"
 #include "mongo/db/exec/sbe/values/bsoncolumn_materializer.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -565,15 +566,15 @@ TEST_F(TsSbeValueTest, TsBlockFillEmpty) {
         ASSERT(fillRes);
         auto extracted = fillRes->extract();
         ASSERT_EQ(extracted.count(), 3);
-        assertValuesEqual(extracted[0].tag,
-                          extracted[0].value,
-                          value::TypeTags::NumberDouble,
-                          value::bitcastFrom<double>(0));
-        assertValuesEqual(extracted[1].tag, extracted[1].value, value::TypeTags::Null, 0);
-        assertValuesEqual(extracted[2].tag,
-                          extracted[2].value,
-                          value::TypeTags::NumberDouble,
-                          value::bitcastFrom<double>(9));
+        ASSERT_SBE_VALUE_EQ(extracted[0].tag,
+                            extracted[0].value,
+                            value::TypeTags::NumberDouble,
+                            value::bitcastFrom<double>(0));
+        ASSERT_SBE_VALUE_EQ(extracted[1].tag, extracted[1].value, value::TypeTags::Null, 0);
+        ASSERT_SBE_VALUE_EQ(extracted[2].tag,
+                            extracted[2].value,
+                            value::TypeTags::NumberDouble,
+                            value::bitcastFrom<double>(9));
     }
 
     {

@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
+#include "mongo/db/exec/sbe/sbe_unittest_assert.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -207,7 +208,7 @@ public:
             }
 
             // Assert that the document from SBE plan is equal to the expected one.
-            assertValuesEqual(resultTag, resultValue, expectedTag, expectedValue);
+            ASSERT_SBE_VALUE_EQ(resultTag, resultValue, expectedTag, expectedValue);
         }
 
         ASSERT_EQ(i, expected.size());
@@ -819,7 +820,7 @@ public:
                 copyValue(TypeTags::bsonObject, bitcastFrom<const char*>(document.objdata()));
             ValueGuard guardExpected(tagExpected, valExpected);
 
-            PlanStageTestFixture::assertValuesEqual(tagResult, valResult, tagExpected, valExpected);
+            ASSERT_SBE_VALUE_EQ(tagResult, valResult, tagExpected, valExpected);
         }
 
         if (enableDebugOutput) {

@@ -33,6 +33,7 @@
 
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/sbe_hash_lookup_shared_test.h"
+#include "mongo/db/exec/sbe/sbe_unittest_assert.h"
 #include "mongo/db/exec/sbe/stages/hash_lookup.h"
 
 namespace mongo::sbe {
@@ -349,13 +350,9 @@ TEST_F(HashLookupStageTest, ForceSpillTest) {
     while (lookupStage->getNext() == PlanState::ADVANCED) {
         for (size_t i = 0; i < resultAccessors.size(); ++i) {
             const auto [resTag, resValue] = resultAccessors[i]->getViewOfValue();
-            const auto [expectedTag, exprectedValue] = expectedResults[idx][i];
+            const auto [expectedTag, expectedValue] = expectedResults[idx][i];
 
-            auto [compTag, compVal] =
-                value::compareValue(expectedTag, exprectedValue, resTag, resValue);
-
-            ASSERT_EQ(value::TypeTags::NumberInt32, compTag);
-            ASSERT_EQ(0, compVal);
+            ASSERT_SBE_VALUE_EQ(expectedTag, expectedValue, resTag, resValue);
         }
 
         if (idx == 1) {
@@ -450,16 +447,14 @@ TEST_F(HashLookupStageTest, DuplicateDocumentKeyCausesSpillTest) {
 
     ASSERT_EQ(actualResults.size(), 1);
     ASSERT_EQ(actualResults[0].size(), 2);
-    ASSERT_EQ(value::compareValue(actualResults[0][0].tag(),
-                                  actualResults[0][0].value(),
-                                  value::TypeTags::bsonObject,
-                                  value::bitcastFrom<const char*>(lookupInput.objdata())),
-              std::make_pair(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0)));
-    ASSERT_EQ(value::compareValue(actualResults[0][1].tag(),
-                                  actualResults[0][1].value(),
-                                  value::TypeTags::bsonArray,
-                                  value::bitcastFrom<const char*>(lookupOutput.objdata())),
-              std::make_pair(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0)));
+    ASSERT_SBE_VALUE_EQ(actualResults[0][0].tag(),
+                        actualResults[0][0].value(),
+                        value::TypeTags::bsonObject,
+                        value::bitcastFrom<const char*>(lookupInput.objdata()));
+    ASSERT_SBE_VALUE_EQ(actualResults[0][1].tag(),
+                        actualResults[0][1].value(),
+                        value::TypeTags::bsonArray,
+                        value::bitcastFrom<const char*>(lookupOutput.objdata()));
 }
 
 TEST_F(HashLookupStageTest, SpillLargeStringWithCollationTest) {
@@ -545,15 +540,15 @@ TEST_F(HashLookupStageTest, SpillLargeStringWithCollationTest) {
         const auto& result = actualResultView[i];
         ASSERT_EQ(result.size(), 2);
         const BSONObj input = BSON("_id" << static_cast<long long>(i));
-        assertValuesEqual(result[0].first,
-                          result[0].second,
-                          value::TypeTags::bsonObject,
-                          value::bitcastFrom<const char*>(input.objdata()));
+        ASSERT_SBE_VALUE_EQ(result[0].first,
+                            result[0].second,
+                            value::TypeTags::bsonObject,
+                            value::bitcastFrom<const char*>(input.objdata()));
         const BSONArray output = BSON_ARRAY(input);
-        assertValuesEqual(result[1].first,
-                          result[1].second,
-                          value::TypeTags::bsonArray,
-                          value::bitcastFrom<const char*>(output.objdata()));
+        ASSERT_SBE_VALUE_EQ(result[1].first,
+                            result[1].second,
+                            value::TypeTags::bsonArray,
+                            value::bitcastFrom<const char*>(output.objdata()));
     }
 }
 

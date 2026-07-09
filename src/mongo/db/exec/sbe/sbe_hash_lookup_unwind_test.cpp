@@ -32,6 +32,7 @@
  */
 
 #include "mongo/db/exec/sbe/sbe_hash_lookup_shared_test.h"
+#include "mongo/db/exec/sbe/sbe_unittest_assert.h"
 #include "mongo/db/exec/sbe/stages/hash_lookup_unwind.h"
 
 namespace mongo::sbe {
@@ -339,13 +340,9 @@ TEST_F(HashLookupUnwindStageTest, ForceSpillTest) {
     while (lookupStage->getNext() == PlanState::ADVANCED) {
         for (size_t i = 0; i < resultAccessors.size(); ++i) {
             const auto [resTag, resValue] = resultAccessors[i]->getViewOfValue();
-            const auto [expectedTag, exprectedValue] = expectedResults[idx][i];
+            const auto [expectedTag, expectedValue] = expectedResults[idx][i];
 
-            auto [compTag, compVal] =
-                value::compareValue(expectedTag, exprectedValue, resTag, resValue);
-
-            ASSERT_EQ(value::TypeTags::NumberInt32, compTag);
-            ASSERT_EQ(0, compVal);
+            ASSERT_SBE_VALUE_EQ(expectedTag, expectedValue, resTag, resValue);
         }
 
         if (idx == 1) {
@@ -450,13 +447,13 @@ TEST_F(HashLookupUnwindStageTest, InnerJoinIncludeIndex) {
         ASSERT_LT(i, expected.size());
 
         auto [outerTag, outerVal] = resultAccessors[0]->getViewOfValue();
-        assertValuesEqual(outerTag, outerVal, value::TypeTags::bsonObject, expected[i][0]);
+        ASSERT_SBE_VALUE_EQ(outerTag, outerVal, value::TypeTags::bsonObject, expected[i][0]);
 
         auto [innerTag, innerVal] = resultAccessors[1]->getViewOfValue();
-        assertValuesEqual(innerTag, innerVal, value::TypeTags::bsonObject, expected[i][1]);
+        ASSERT_SBE_VALUE_EQ(innerTag, innerVal, value::TypeTags::bsonObject, expected[i][1]);
 
         auto [indexTag, indexVal] = resultAccessors[2]->getViewOfValue();
-        assertValuesEqual(indexTag, indexVal, value::TypeTags::NumberInt32, expected[i][2]);
+        ASSERT_SBE_VALUE_EQ(indexTag, indexVal, value::TypeTags::NumberInt32, expected[i][2]);
     }
     ASSERT_EQ(i, expected.size());
 
@@ -511,13 +508,13 @@ TEST_F(HashLookupUnwindStageTest, LeftJoinIncludeIndex) {
         ASSERT_LT(i, expected.size());
 
         auto [outerTag, outerVal] = resultAccessors[0]->getViewOfValue();
-        assertValuesEqual(outerTag, outerVal, value::TypeTags::bsonObject, expected[i].value());
+        ASSERT_SBE_VALUE_EQ(outerTag, outerVal, value::TypeTags::bsonObject, expected[i].value());
 
         auto [innerTag, innerVal] = resultAccessors[1]->getViewOfValue();
-        assertValuesEqual(innerTag, innerVal, value::TypeTags::Nothing, 0);
+        ASSERT_SBE_VALUE_EQ(innerTag, innerVal, value::TypeTags::Nothing, 0);
 
         auto [indexTag, indexVal] = resultAccessors[2]->getViewOfValue();
-        assertValuesEqual(indexTag, indexVal, value::TypeTags::Null, 0);
+        ASSERT_SBE_VALUE_EQ(indexTag, indexVal, value::TypeTags::Null, 0);
     }
     ASSERT_EQ(i, expected.size());
 

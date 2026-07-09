@@ -34,6 +34,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
+#include "mongo/db/exec/sbe/sbe_unittest_assert.h"
 #include "mongo/db/exec/sbe/stages/search_cursor.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -315,7 +316,7 @@ TEST_F(SearchCursorStageTest, SearchTestStoredSource) {
         auto [actualTag, actualVal] = searchCursor->getAccessor(*ctx, resultSlot)->getViewOfValue();
         auto [expectedTag, expectedVal] = stage_builder::makeValue(curElem["storedSource"].Obj());
         value::ValueGuard guard(expectedTag, expectedVal);
-        assertValuesEqual(actualTag, actualVal, expectedTag, expectedVal);
+        ASSERT_SBE_VALUE_EQ(actualTag, actualVal, expectedTag, expectedVal);
 
         for (size_t p = 0; p < metadataNames.size(); ++p) {
             ASSERT(curElem.hasField(metadataNames[p]));

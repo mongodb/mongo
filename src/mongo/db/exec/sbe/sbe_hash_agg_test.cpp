@@ -37,6 +37,7 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
+#include "mongo/db/exec/sbe/sbe_unittest_assert.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/stages/hash_agg_accumulator.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
@@ -212,7 +213,7 @@ void HashAggStageTest::performHashAggWithSpillChecking(
         sortedResultsView->push_back_raw(tagCopy, valCopy);
     }
 
-    assertValuesEqual(sortedResultsTag, sortedResultsVal, expectedTag, expectedVal);
+    ASSERT_SBE_VALUE_EQ(sortedResultsTag, sortedResultsVal, expectedTag, expectedVal);
     ASSERT_GT(stage->getMemoryTracker()->peakTrackedMemoryBytes(), 0);
     if (shouldSpill) {
         ASSERT_EQ(stage->getMemoryTracker()->inUseTrackedMemoryBytes(), 0);
@@ -1187,10 +1188,10 @@ TEST_F(HashAggStageTest, HashAggSum10Groups) {
         auto [resSumTag, resSumVal] = resultAccessors[1]->getViewOfValue();
         auto it = sums.find(value::bitcastTo<int>(resGroupByVal));
         ASSERT_TRUE(it != sums.end());
-        assertValuesEqual(resSumTag,
-                          resSumVal,
-                          value::TypeTags::NumberInt32,
-                          value::bitcastFrom<int>(it->second));
+        ASSERT_SBE_VALUE_EQ(resSumTag,
+                            resSumVal,
+                            value::TypeTags::NumberInt32,
+                            value::bitcastFrom<int>(it->second));
     }
     checkMemoryStats(stage.get(), true /*spill*/);
     stage->close();

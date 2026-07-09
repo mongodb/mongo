@@ -32,6 +32,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
+#include "mongo/db/exec/sbe/sbe_unittest_assert.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
@@ -72,17 +73,12 @@ public:
             sortedObjs.begin(), sortedObjs.end(), SbePatternValueCmp(specTag, specVal, collator));
     }
 
-    std::pair<TypeTags, Value> getOrigObj(size_t i) {
-        return objs[i];
+    TagValueView getOrigObj(size_t i) {
+        return rawToView(objs[i]);
     }
 
-    std::pair<TypeTags, Value> getSortedObj(size_t i) {
-        return sortedObjs[i];
-    }
-
-    static void assertValueEq(std::pair<TypeTags, Value> lhs, std::pair<TypeTags, Value> rhs) {
-        auto [cmpTag, cmpVal] = value::compareValue(lhs.first, lhs.second, rhs.first, rhs.second);
-        ASSERT(cmpTag == value::TypeTags::NumberInt32 && value::bitcastTo<int32_t>(cmpVal) == 0);
+    TagValueView getSortedObj(size_t i) {
+        return rawToView(sortedObjs[i]);
     }
 
 private:
@@ -98,9 +94,11 @@ TEST_F(ObjectArray, NormalOrder) {
 
     sortArray(fromjson("{'a':1,'b':1}"), collator);
 
-    assertValueEq(getOrigObj(0), getSortedObj(0));
-    assertValueEq(getOrigObj(1), getSortedObj(2));
-    assertValueEq(getOrigObj(2), getSortedObj(1));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(0), getSortedObj(0));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(1), getSortedObj(2));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(2), getSortedObj(1));
+    ASSERT_SBE_VALUE_LT(getSortedObj(0), getSortedObj(1));
+    ASSERT_SBE_VALUE_GT(getSortedObj(1), getSortedObj(0));
 }
 
 TEST_F(ObjectArray, MixedOrder) {
@@ -111,9 +109,9 @@ TEST_F(ObjectArray, MixedOrder) {
 
     sortArray(fromjson("{b:1,a:-1}"), collator);
 
-    assertValueEq(getOrigObj(0), getSortedObj(0));
-    assertValueEq(getOrigObj(1), getSortedObj(1));
-    assertValueEq(getOrigObj(2), getSortedObj(2));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(0), getSortedObj(0));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(1), getSortedObj(1));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(2), getSortedObj(2));
 }
 
 TEST_F(ObjectArray, ExtraFields) {
@@ -124,9 +122,9 @@ TEST_F(ObjectArray, ExtraFields) {
 
     sortArray(fromjson("{a:1,b:1}"), collator);
 
-    assertValueEq(getOrigObj(0), getSortedObj(0));
-    assertValueEq(getOrigObj(1), getSortedObj(2));
-    assertValueEq(getOrigObj(2), getSortedObj(1));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(0), getSortedObj(0));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(1), getSortedObj(2));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(2), getSortedObj(1));
 }
 
 TEST_F(ObjectArray, MissingFields) {
@@ -137,9 +135,9 @@ TEST_F(ObjectArray, MissingFields) {
 
     sortArray(fromjson("{b:1,c:1}"), collator);
 
-    assertValueEq(getOrigObj(0), getSortedObj(1));
-    assertValueEq(getOrigObj(1), getSortedObj(0));
-    assertValueEq(getOrigObj(2), getSortedObj(2));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(0), getSortedObj(1));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(1), getSortedObj(0));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(2), getSortedObj(2));
 }
 
 TEST_F(ObjectArray, NestedFields) {
@@ -150,9 +148,9 @@ TEST_F(ObjectArray, NestedFields) {
 
     sortArray(fromjson("{'a.b':1}"), collator);
 
-    assertValueEq(getOrigObj(0), getSortedObj(1));
-    assertValueEq(getOrigObj(1), getSortedObj(0));
-    assertValueEq(getOrigObj(2), getSortedObj(2));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(0), getSortedObj(1));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(1), getSortedObj(0));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(2), getSortedObj(2));
 }
 
 TEST_F(ObjectArray, SimpleNestedFields) {
@@ -163,9 +161,9 @@ TEST_F(ObjectArray, SimpleNestedFields) {
 
     sortArray(fromjson("{'a.b':1}"), collator);
 
-    assertValueEq(getOrigObj(0), getSortedObj(1));
-    assertValueEq(getOrigObj(1), getSortedObj(0));
-    assertValueEq(getOrigObj(2), getSortedObj(2));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(0), getSortedObj(1));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(1), getSortedObj(0));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(2), getSortedObj(2));
 }
 
 TEST_F(ObjectArray, NestedInnerObjectDescending) {
@@ -176,9 +174,9 @@ TEST_F(ObjectArray, NestedInnerObjectDescending) {
 
     sortArray(fromjson("{'a.b.d':-1}"), collator);
 
-    assertValueEq(getOrigObj(0), getSortedObj(2));
-    assertValueEq(getOrigObj(1), getSortedObj(0));
-    assertValueEq(getOrigObj(2), getSortedObj(1));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(0), getSortedObj(2));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(1), getSortedObj(0));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(2), getSortedObj(1));
 }
 
 TEST_F(ObjectArray, NestedInnerObjectAscending) {
@@ -189,9 +187,9 @@ TEST_F(ObjectArray, NestedInnerObjectAscending) {
 
     sortArray(fromjson("{'a.b.d':1}"), collator);
 
-    assertValueEq(getOrigObj(0), getSortedObj(0));
-    assertValueEq(getOrigObj(2), getSortedObj(1));
-    assertValueEq(getOrigObj(1), getSortedObj(2));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(0), getSortedObj(0));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(2), getSortedObj(1));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(1), getSortedObj(2));
 }
 
 TEST_F(ObjectArray, SortRespectsCollation) {
@@ -202,9 +200,9 @@ TEST_F(ObjectArray, SortRespectsCollation) {
 
     sortArray(fromjson("{a: 1}"), &collator);
 
-    assertValueEq(getOrigObj(0), getSortedObj(2));
-    assertValueEq(getOrigObj(1), getSortedObj(0));
-    assertValueEq(getOrigObj(2), getSortedObj(1));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(0), getSortedObj(2));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(1), getSortedObj(0));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(2), getSortedObj(1));
 }
 
 TEST_F(ObjectArray, SortSingleRespectsCollation) {
@@ -215,9 +213,9 @@ TEST_F(ObjectArray, SortSingleRespectsCollation) {
 
     sortArray(fromjson("{'': 1}"), &collator);
 
-    assertValueEq(getOrigObj(0), getSortedObj(2));
-    assertValueEq(getOrigObj(1), getSortedObj(0));
-    assertValueEq(getOrigObj(2), getSortedObj(1));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(0), getSortedObj(2));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(1), getSortedObj(0));
+    ASSERT_SBE_VALUE_EQ(getOrigObj(2), getSortedObj(1));
 }
 
 }  // namespace

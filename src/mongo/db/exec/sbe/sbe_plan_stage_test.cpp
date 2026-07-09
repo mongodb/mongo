@@ -33,31 +33,14 @@
 
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 
+#include "mongo/db/exec/sbe/sbe_unittest_assert.h"
 #include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/virtual_scan.h"
-#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 
 #include <boost/optional/optional.hpp>
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
-
 namespace mongo::sbe {
-
-void PlanStageTestFixture::assertValuesEqual(value::TypeTags lhsTag,
-                                             value::Value lhsVal,
-                                             value::TypeTags rhsTag,
-                                             value::Value rhsVal) {
-    const auto equal = valueEquals(lhsTag, lhsVal, rhsTag, rhsVal);
-    if (!equal) {
-        std::stringstream ss;
-        ss << "assertValuesEqual failure: " << std::make_pair(lhsTag, lhsVal)
-           << " != " << std::make_pair(rhsTag, rhsVal);
-        LOGV2(5075401, "{msg}", "msg"_attr = ss.str());
-    }
-    ASSERT_TRUE(equal);
-}
 
 std::pair<value::SlotId, std::unique_ptr<PlanStage>> PlanStageTestFixture::generateVirtualScan(
     value::TagValueMaybeOwned arr, PlanNodeId planNodeId /*= kEmptyPlanNodeId*/) {
@@ -264,7 +247,7 @@ void PlanStageTestFixture::runTest(value::TypeTags inputTag,
 
     value::ValueGuard resultGuard{resultsTag, resultsVal};
     // Compare the results produced with the expected output and assert that they match.
-    assertValuesEqual(resultsTag, resultsVal, expectedTag, expectedVal);
+    ASSERT_SBE_VALUE_EQ(resultsTag, resultsVal, expectedTag, expectedVal);
 }
 
 void PlanStageTestFixture::runTest(value::TagValueOwned input,
@@ -319,7 +302,7 @@ void PlanStageTestFixture::runTestMulti(int32_t numInputSlots,
     value::ValueGuard resultGuard{resultsTag, resultsVal};
 
     // Compare the results produced with the expected output and assert that they match.
-    assertValuesEqual(resultsTag, resultsVal, expectedTag, expectedVal);
+    ASSERT_SBE_VALUE_EQ(resultsTag, resultsVal, expectedTag, expectedVal);
 }
 
 }  // namespace mongo::sbe

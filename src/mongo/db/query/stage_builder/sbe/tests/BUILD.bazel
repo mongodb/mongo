@@ -19,6 +19,7 @@ mongo_cc_library(
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/exec/sbe:sbe_plan_stage_test",
+        "//src/mongo/db/exec/sbe:sbe_unittest_base",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/shard_role/shard_catalog:collection_mock",

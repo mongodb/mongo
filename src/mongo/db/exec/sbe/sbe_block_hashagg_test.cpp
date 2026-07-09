@@ -30,6 +30,7 @@
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/sbe_block_test_helpers.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
+#include "mongo/db/exec/sbe/sbe_unittest_assert.h"
 #include "mongo/db/exec/sbe/stages/block_hashagg.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -161,10 +162,10 @@ public:
 
                 // Check the expected results for each accumulator.
                 for (size_t accIdx = 0; accIdx < expectedVals.size(); accIdx++) {
-                    assertValuesEqual(results[accIdx + keySize][rowIdx].first,
-                                      results[accIdx + keySize][rowIdx].second,
-                                      value::TypeTags::NumberInt32,
-                                      value::bitcastTo<int32_t>(expectedVals[accIdx]));
+                    ASSERT_SBE_VALUE_EQ(results[accIdx + keySize][rowIdx].first,
+                                        results[accIdx + keySize][rowIdx].second,
+                                        value::TypeTags::NumberInt32,
+                                        value::bitcastTo<int32_t>(expectedVals[accIdx]));
                 }
 
                 // Delete from the expected map so we know we get the results exactly once.

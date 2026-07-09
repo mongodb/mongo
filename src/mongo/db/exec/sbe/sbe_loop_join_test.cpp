@@ -33,6 +33,7 @@
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
+#include "mongo/db/exec/sbe/sbe_unittest_assert.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -76,10 +77,10 @@ TEST_F(LoopJoinStageTest, LoopJoinNoPredicate) {
         ASSERT_LT(i, expected.size());
 
         auto [outerTag, outerVal] = outer->getViewOfValue();
-        assertValuesEqual(outerTag, outerVal, value::TypeTags::NumberInt32, expected[i].first);
+        ASSERT_SBE_VALUE_EQ(outerTag, outerVal, value::TypeTags::NumberInt32, expected[i].first);
 
         auto [innerTag, innerVal] = inner->getViewOfValue();
-        assertValuesEqual(innerTag, innerVal, value::TypeTags::NumberInt32, expected[i].second);
+        ASSERT_SBE_VALUE_EQ(innerTag, innerVal, value::TypeTags::NumberInt32, expected[i].second);
     }
     ASSERT_EQ(i, expected.size());
 }
@@ -111,10 +112,10 @@ TEST_F(LoopJoinStageTest, LoopJoinConstTruePredicate) {
         ASSERT_LT(i, expected.size());
 
         auto [outerTag, outerVal] = outer->getViewOfValue();
-        assertValuesEqual(outerTag, outerVal, value::TypeTags::NumberInt32, expected[i].first);
+        ASSERT_SBE_VALUE_EQ(outerTag, outerVal, value::TypeTags::NumberInt32, expected[i].first);
 
         auto [innerTag, innerVal] = inner->getViewOfValue();
-        assertValuesEqual(innerTag, innerVal, value::TypeTags::NumberInt32, expected[i].second);
+        ASSERT_SBE_VALUE_EQ(innerTag, innerVal, value::TypeTags::NumberInt32, expected[i].second);
     }
     ASSERT_EQ(i, expected.size());
 }
@@ -171,10 +172,10 @@ TEST_F(LoopJoinStageTest, LeftLoopJoinConstFalsePredicate) {
         ASSERT_LT(i, expected.size());
 
         auto [outerTag, outerVal] = outer->getViewOfValue();
-        assertValuesEqual(outerTag, outerVal, value::TypeTags::NumberInt32, expected[i]);
+        ASSERT_SBE_VALUE_EQ(outerTag, outerVal, value::TypeTags::NumberInt32, expected[i]);
 
         auto [innerTag, innerVal] = inner->getViewOfValue();
-        assertValuesEqual(innerTag, innerVal, value::TypeTags::Nothing, 0);
+        ASSERT_SBE_VALUE_EQ(innerTag, innerVal, value::TypeTags::Nothing, 0);
     }
     ASSERT_EQ(i, expected.size());
 }
@@ -207,7 +208,7 @@ TEST_F(LoopJoinStageTest, LoopJoinEqualityPredicate) {
         ASSERT_LT(i, expected.size());
 
         auto [innerTag, innerVal] = inner->getViewOfValue();
-        assertValuesEqual(innerTag, innerVal, value::TypeTags::NumberInt32, expected[i]);
+        ASSERT_SBE_VALUE_EQ(innerTag, innerVal, value::TypeTags::NumberInt32, expected[i]);
     }
     ASSERT_EQ(i, expected.size());
 }

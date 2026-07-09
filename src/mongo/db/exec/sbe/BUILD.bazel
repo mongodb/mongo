@@ -206,6 +206,7 @@ mongo_cc_library(
     deps = [
         ":query_sbe",
         ":query_sbe_stages",
+        ":sbe_unittest_base",
         "//src/mongo/db:query_exec",
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/auth:authmocks",
@@ -224,10 +225,15 @@ mongo_cc_library(
     name = "sbe_unittest_base",
     srcs = [
         "sbe_unittest.cpp",
+        "sbe_unittest_assert.cpp",
+    ],
+    private_hdrs = [
+        "sbe_unittest_assert.h",
     ],
     deps = [
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/unittest",
     ],
 )
 

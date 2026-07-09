@@ -32,6 +32,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
+#include "mongo/db/exec/sbe/sbe_unittest_assert.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/keypattern.h"
@@ -222,9 +223,7 @@ void GoldenSbeStageBuilderTestFixture::runTest(std::unique_ptr<QuerySolutionNode
     auto [expectedTag, expectedVal] = stage_builder::makeValue(expectedValue);
     sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
 
-    ASSERT_TRUE(PlanStageTestFixture::valueEquals(resultsTag, resultsVal, expectedTag, expectedVal))
-        << "expected: " << std::make_pair(expectedTag, expectedVal)
-        << " but got: " << std::make_pair(resultsTag, resultsVal);
+    ASSERT_SBE_VALUE_EQ(resultsTag, resultsVal, expectedTag, expectedVal);
 }
 
 std::string GoldenSbeStageBuilderTestFixture::replaceUuid(std::string input, UUID uuid) {
@@ -283,9 +282,6 @@ void GoldenSbeExprBuilderTestFixture::runTest(stage_builder::SbExpr sbExpr,
     auto results = vm.run(&code);
 
 
-    ASSERT_TRUE(
-        PlanStageTestFixture::valueEquals(results.tag(), results.value(), expectedTag, expectedVal))
-        << "for test: " << test << " expected: " << std::make_pair(expectedTag, expectedVal)
-        << " but got: " << results.raw();
+    ASSERT_SBE_VALUE_EQ(results.tag(), results.value(), expectedTag, expectedVal);
 }
 }  // namespace mongo
