@@ -35,7 +35,8 @@ namespace mongo {
 namespace {
 
 std::unique_ptr<JoinPlanCacheEntry> makeEntry() {
-    return std::make_unique<JoinPlanCacheEntry>(nullptr, join_ordering::NodeId{0});
+    return std::make_unique<JoinPlanCacheEntry>(
+        nullptr, join_ordering::NodeId{0}, std::vector<CollectionTag>{});
 }
 
 TEST(JoinPlanCacheTest, LookupOnEmptyCacheReturnsNull) {
@@ -99,7 +100,8 @@ TEST(JoinPlanCacheTest, GetComplexEntry) {
                 .solnCacheData = std::make_unique<SolutionCacheData>(SolutionCacheData{}),
             }),
         }),
-        join_ordering::NodeId{0});
+        join_ordering::NodeId{0},
+        std::vector<CollectionTag>{});
 
     const JoinPlanCacheEntry* rawPtr = entry.get();
     cache.put("key", std::move(entry));

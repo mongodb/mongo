@@ -136,6 +136,7 @@ mongo_cc_unit_test(
 mongo_cc_unit_test(
     name = "join_plan_cache_test",
     srcs = [
+        "join_plan_cache_invalidation_test.cpp",
         "join_plan_cache_key_test.cpp",
         "join_plan_cache_test.cpp",
     ],
@@ -146,5 +147,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/index_builds:index_builds_coordinator",
         "//src/mongo/db/query/compiler/optimizer/join:unit_test_helpers",
         "//src/mongo/db/query/query_knobs:query_knob_configuration_test_util",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
     ],
 )

@@ -34,12 +34,17 @@
 #include "mongo/db/query/compiler/optimizer/join/join_method.h"
 #include "mongo/db/query/compiler/optimizer/join/join_predicate.h"
 #include "mongo/db/query/compiler/optimizer/join/logical_defs.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/uuid.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <variant>
@@ -84,15 +89,72 @@ struct CachedJoinPlan {
     std::variant<CachedAccessPath, CachedJoinNode, CachedInljNode> node;
 };
 
+// Live per-Collection version counters, bumped on DDL/sample refresh. Lives as a Collection
+// decoration, so it must be default-constructible.
+struct CollectionVersionTag {
+    // Tracks current state of the collection, so a cached plan built against a different collection
+    // state (due to a DDL operation) can be detected as stale. This is bumped whenever a DDL
+    // operation runs.
+    //
+    // Safe as a plain (non-atomic) integer: DDL operations that bump this take the X lock on the
+    // Collection and perform a copy-on-write clone inside a WriteUnitOfWork (WUOW); the bump
+    // happens on that clone, which is only published (swapped into the catalog) at WUOW commit.
+    // Lock-free readers in other threads acquire a snapshot view of the catalog and thus can
+    // never observe an in-flight mutation to the Collection instance being cloned, i.e. they see
+    // either the fully-old or the fully-new value, never a partial one.
+    uint64_t collectionVersion = 0;
+
+    // Tracks the current state of this collection's persisted samples, so a cached plan built
+    // from a stale persisted sample can be detected as stale. Bumped whenever the persisted sample
+    // is refreshed.
+    //
+    // TODO SERVER-129270: Handle bumping on sample refresh and explain synchronization mechanism.
+    uint64_t sampleVersion = 0;
+
+    bool operator==(const CollectionVersionTag&) const = default;
+};
+
+
+// Captures the state of a collection referenced by a cached join plan: 'uuid' identifies which
+// collection the tag belongs to, and 'versionTag' is a copy of its version counters as they were
+// when the plan was cached.
+struct CollectionTag {
+    UUID uuid;
+    CollectionVersionTag versionTag;
+};
+
 // A full join plan cache entry: a reconstructable plan tree and its invalidation metadata.
 struct JoinPlanCacheEntry {
-    JoinPlanCacheEntry(std::unique_ptr<CachedJoinPlan> joinTree, join_ordering::NodeId baseNode)
-        : joinTree(std::move(joinTree)), baseNode(baseNode) {}
+    JoinPlanCacheEntry(std::unique_ptr<CachedJoinPlan> joinTree,
+                       join_ordering::NodeId baseNode,
+                       std::vector<CollectionTag> collections)
+        : joinTree(std::move(joinTree)), baseNode(baseNode), collections(std::move(collections)) {}
 
+    // Reconstructable plan.
     std::unique_ptr<const CachedJoinPlan> joinTree;
     const join_ordering::NodeId baseNode;
-    // TODO SERVER-129266: Add fingerprints
+
+    // One CollectionTag per collection referenced by 'joinTree', captured when this entry was
+    // cached. Each tag's 'uuid' is matched against the live collections acquired by the query
+    // to find the corresponding entry. The version tags of the entry are compared to detect
+    // invalidation on plan cache lookup.
+    std::vector<CollectionTag> collections;
+
+    // TODO: (SERVER-130368) Add relevant index invalidation.
 };
+
+/*
+ * Snapshots the current CollectionVersionTag for every collection in 'mca'.
+ */
+std::vector<CollectionTag> makeCollectionTags(const MultipleCollectionAccessor& mca);
+
+/*
+ * Returns true iff every tag in 'tags' still matches the corresponding live collection in 'mca'.
+ * A referenced collection that's no longer resolvable in 'mca' (dropped/renamed) counts as a
+ * mismatch, not an error.
+ */
+bool areCollectionTagsCurrent(const std::vector<CollectionTag>& tags,
+                              const MultipleCollectionAccessor& mca);
 
 /**
  * Global cache for join plans, keyed on a normalized join graph shape string. The cache is
@@ -100,6 +162,13 @@ struct JoinPlanCacheEntry {
  */
 class JoinPlanCache {
 public:
+    /*
+     * Current tags for the collection state, updated on DDLs and sample refresh. See
+     * CollectionVersionTag's field comments for per-field synchronization guarantees.
+     */
+    inline static const auto currentVersionTags =
+        Collection::declareDecoration<CollectionVersionTag>();
+
     /*
      * Returns a shared pointer to the cache entry, or nullptr if not present.
      */

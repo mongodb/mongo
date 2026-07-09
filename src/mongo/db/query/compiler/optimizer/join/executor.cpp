@@ -329,7 +329,9 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> checkPlanCacheForPlan(
     const AggJoinModel& model,
     PlanYieldPolicy::YieldPolicy yieldPolicy) {
     auto& cache = JoinPlanCache::get(opCtx->getServiceContext());
-    if (auto hit = cache.lookup(cacheKey)) {
+    auto hit = cache.lookup(cacheKey);
+    // TODO (SERVER-129268): Evict stale entries.
+    if (hit && areCollectionTagsCurrent(hit->collections, mca)) {
         LOGV2_DEBUG(11083906, 5, "Join plan cache hit, skipping join optimization");
         auto perCollIdxs = extractINLJEligibleIndexesFromGraph(model.getGraph(), mca);
         auto qsn = fromCachedJoinPlan(opCtx, model.getGraph(), mca, perCollIdxs, *hit->joinTree);
@@ -526,8 +528,8 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
 
     // Store the winning plan in the join plan cache for future queries with the same shape.
     if (useJoinPlanCache && reordered.cachedJoinPlan) {
-        auto entry = std::make_unique<JoinPlanCacheEntry>(std::move(reordered.cachedJoinPlan),
-                                                          reordered.baseNode);
+        auto entry = std::make_unique<JoinPlanCacheEntry>(
+            std::move(reordered.cachedJoinPlan), reordered.baseNode, makeCollectionTags(mca));
         JoinPlanCache::get(opCtx->getServiceContext()).put(std::move(*cacheKey), std::move(entry));
     }
 
