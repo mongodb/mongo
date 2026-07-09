@@ -50,10 +50,12 @@ public:
     // The default values are runtime-dependent on system properties that are computed there.
     struct Options {
         bool showEachTest{false};
-        bool useColor{details::gtestColorEnabled()};
-        // Emit a spinner when we are writing to a TTY and colors are not explicitly disabled.
-        bool useSpinner{details::stdoutIsTty() &&
-                        (details::gtestColorEnabled() || details::gtestColorDefaulted())};
+        // Colorize when we are writing to a TTY and colors are not explicitly disabled.
+        bool useColor{details::stdoutIsTty() &&
+                      (details::gtestColorEnabled() || details::gtestColorDefaulted())};
+        // The spinner applies some styling that use ANSI codes, so we should follow GTest's
+        // detection of determining whether ANSI codes are tolerable at the output destination.
+        bool useSpinner{useColor};
     };
 
     explicit EnhancedReporter(std::unique_ptr<testing::TestEventListener> defaultListener);
