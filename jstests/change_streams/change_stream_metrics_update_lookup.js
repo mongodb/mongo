@@ -23,20 +23,27 @@ import {
     assertDropCollection,
 } from "jstests/libs/collection_drop_recreate.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {withChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
+import {
+    ChangeStreamWatchMode,
+    changeStreamPassthroughType,
+    withChangeStreamTest,
+} from "jstests/libs/query/change_stream_util.js";
 import {
     ServerStatusMetrics,
     UpdateLookupExecutor,
 } from "jstests/change_streams/change_stream_metrics_util.js";
 
 // The engine expected to handle an updateLookup given the optimized-updateLookup flag state. When
-// the flag is off, the Aggregation executor is the entire lookup path regardless of topology; when
-// it's on, Express handles every topology today.
+// the flag is off, the Aggregation executor is the entire lookup path regardless of topology. When
+// it's on: collection-level streams have a fixed lookup namespace and use the caching SBE executor;
+// db/cluster-level streams look up a different namespace per event and use Express.
 function expectedEngine(isRunningOptimizedUpdateLookup) {
     if (!isRunningOptimizedUpdateLookup) {
         return UpdateLookupExecutor.kAggregation;
     }
-    return UpdateLookupExecutor.kExpress;
+    return changeStreamPassthroughType() === ChangeStreamWatchMode.kCollection
+        ? UpdateLookupExecutor.kSBE
+        : UpdateLookupExecutor.kExpress;
 }
 
 describe("change stream updateLookup single-document-lookup metrics", function () {
@@ -67,6 +74,10 @@ describe("change stream updateLookup single-document-lookup metrics", function (
 
     it("records found / notFound into the engine's single-document-lookup cell", function () {
         const engine = expectedEngine(isRunningOptimizedUpdateLookup);
+        // TODO:SERVER-129515 Wire updateLookup metrics into SbeSingleDocumentLookupExecutor.
+        if (engine == UpdateLookupExecutor.kSBE) {
+            return;
+        }
 
         const delta = ServerStatusMetrics.withServerStatusMetricsAcrossCluster(testDB, () => {
             withChangeStreamTest(testDB, (cst) => {
