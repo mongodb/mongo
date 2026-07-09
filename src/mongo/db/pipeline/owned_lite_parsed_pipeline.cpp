@@ -44,7 +44,7 @@ OwnedLiteParsedPipeline::OwnedLiteParsedPipeline(const OwnedLiteParsedPipeline& 
     // on each stage to produce a new self-sufficient BSONObj — the copy-ctor equivalent of
     // the primary ctor's _makeStagesOwned() pass. _ownedStages is left empty because each
     // stage carries its own BSON directly after makeOwned().
-    : _ownedStages(), _pipeline(other._pipeline), _viewNss(other._viewNss) {
+    : _ownedStages(), _pipeline(other._pipeline) {
     _pipeline.makeOwned();
 }
 
