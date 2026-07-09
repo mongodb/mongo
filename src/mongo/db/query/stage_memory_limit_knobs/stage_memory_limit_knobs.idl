@@ -225,9 +225,6 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: queryMaxBlockingSortMemoryUsageBytes
-                pqs_settable: true
-                fcv:
-                    min: "9.0"
 
     internalOrStageMaxMemoryBytes:
         description: >-
