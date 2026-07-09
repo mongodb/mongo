@@ -49,6 +49,10 @@ protected:
 
     bool _mustAlwaysMakeProgress() override;
 
+    ChunkOperationsStatistics::ChunkOperationType chunkOperationMetricType() const override {
+        return ChunkOperationsStatistics::ChunkOperationType::kMergeChunks;
+    }
+
 private:
     ExecutorFuture<void> _acquireLocksAsync(OperationContext* opCtx,
                                             std::shared_ptr<executor::ScopedTaskExecutor> executor,

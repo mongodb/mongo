@@ -1744,6 +1744,9 @@ TEST_F(CollectionShardingRuntimeTest, OnUpdateCollectionMetadataCSRWithMatchingU
     ASSERT_EQ(getCollectionRecoveryStatistics().getIntField(
                   "countUpdateCollectionMetadataOplogEntriesApplied"),
               1);
+    ASSERT_EQ(getCollectionRecoveryStatistics().getIntField(
+                  "countUpdateCollectionMetadataChangedChunksApplied"),
+              1);
 
     {
         auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);

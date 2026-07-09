@@ -43,6 +43,7 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_ref.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
@@ -346,6 +347,8 @@ ExecutorFuture<void> SplitChunkCoordinator::_runImpl(
                       logAttrs(nss()),
                       "range"_attr = ChunkRange(_request.getMin(), _request.getMax()).toString());
 
+                _registerChunkOperationStarted(opCtx);
+
                 _alreadyCommitted = checkPreconditions(opCtx, nss(), _request);
 
                 // Capture and persist the shard's placement version before the first commit
@@ -445,6 +448,11 @@ ExecutorFuture<void> SplitChunkCoordinator::_runImpl(
                     getNewSession(opCtx),
                     executor,
                     token);
+
+                // A split of one chunk on N points yields N + 1 chunks.
+                ShardingStatistics::get(opCtx)
+                    .chunkOperationsStatistics.registerSplitChunkResultingChunks(
+                        _request.getSplitKeys().size() + 1);
             }))
         .then(_buildPhaseHandler(
             Phase::kReleaseCriticalSection,

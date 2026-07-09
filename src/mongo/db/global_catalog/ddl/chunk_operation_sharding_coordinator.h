@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/global_catalog/ddl/sharding_coordinator.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 
 #include <string_view>
 
@@ -63,6 +64,42 @@ protected:
 
     CoordinatorStateDoc& getDoc() override {
         return this->_docWrapper;
+    }
+
+    /**
+     * Returns the statistics bucket this coordinator's lifecycle events are counted under. Each
+     * derived chunk-operation coordinator maps to a single operation type.
+     */
+    virtual ChunkOperationsStatistics::ChunkOperationType chunkOperationMetricType() const = 0;
+
+    /**
+     * Counts this coordinator as started, but only on its very first execution. Retries and
+     * failover-recovered instances continue an operation that was already counted, so they are
+     * skipped. Call this from the coordinator's first phase handler.
+     */
+    void _registerChunkOperationStarted(OperationContext* opCtx) {
+        if (this->_firstExecution) {
+            ShardingStatistics::get(opCtx).chunkOperationsStatistics.registerStarted(
+                chunkOperationMetricType());
+        }
+    }
+
+    /**
+     * Records the terminal outcome (committed vs aborted) of the operation. Runs exactly once per
+     * completion on this node. All chunk-operation coordinators drive aborts through
+     * triggerCleanup / _cleanupOnAbort, so a cleanly aborted coordinator carries an abort reason
+     * while a committed one does not.
+     */
+    void _onCleanup(OperationContext* opCtx) override {
+        // Preserve the base cleanup (e.g. releasing the retryable-write session).
+        RecoverableShardingCoordinator::_onCleanup(opCtx);
+
+        auto& stats = ShardingStatistics::get(opCtx).chunkOperationsStatistics;
+        if (this->getAbortReason()) {
+            stats.registerAborted(chunkOperationMetricType());
+        } else {
+            stats.registerCommitted(chunkOperationMetricType());
+        }
     }
 
     /**

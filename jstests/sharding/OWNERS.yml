@@ -197,3 +197,6 @@ filters:
   - "shard_requests_mongos_metrics.js":
     approvers:
       - 10gen/server-networking-and-observability
+  - "sharding_statistics_server_status.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog

@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/admission/execution_control/in_progress_time_accumulator.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/shard_role/shard_catalog/chunk_operations_statistics.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_metadata_statistics.h"
 #include "mongo/db/shard_role/shard_catalog/critical_section_statistics.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_metadata_statistics.h"
@@ -207,6 +208,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT ShardingStatistics {
 
     DatabaseShardingMetadataStatistics databaseShardingMetadataStatistics;
     CollectionShardingMetadataStatistics collectionShardingMetadataStatistics;
+    ChunkOperationsStatistics chunkOperationsStatistics;
 
     /**
      * Obtains the per-process instance of the sharding statistics object.

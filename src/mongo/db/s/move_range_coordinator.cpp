@@ -221,6 +221,8 @@ ExecutorFuture<void> MoveRangeCoordinator::_runImpl(
                 uassert(ErrorCodes::InterruptedDueToReplStateChange,
                         "MoveRangeCoordinator interrupted during data transfer",
                         _firstExecution);
+
+                _registerChunkOperationStarted(opCtx);
                 if (!_migrationAttempt) {
                     _migrationAttempt.emplace(
                         opCtx,
@@ -571,6 +573,9 @@ void MoveRangeCoordinator::_commitToShardCatalog(
                                                                    executor,
                                                                    token,
                                                                    recipientReceivingFirstChunk);
+
+    // A committed migration relocates exactly one range.
+    ShardingStatistics::get(opCtx).chunkOperationsStatistics.registerMoveRangeChunksMoved(1);
 }
 
 void MoveRangeCoordinator::_persistMigrationDecision(OperationContext* opCtx,

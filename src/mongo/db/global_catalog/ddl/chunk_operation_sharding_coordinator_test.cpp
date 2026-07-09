@@ -38,6 +38,7 @@
 #include "mongo/db/s/move_range_coordinator.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 
@@ -267,6 +268,10 @@ protected:
         bool isInCriticalSection(Phase phase) const override {
             return false;
         }
+
+        ChunkOperationsStatistics::ChunkOperationType chunkOperationMetricType() const override {
+            return ChunkOperationsStatistics::ChunkOperationType::kSplitChunk;
+        }
     };
 };
 
@@ -286,6 +291,39 @@ TEST_F(ChunkOperationShardingCoordinatorTest, SmokeTest) {
     auto future = (static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get()))
                       ->run(_scopedExecutor, cancellationSource.token());
     future.get();
+}
+
+TEST_F(ChunkOperationShardingCoordinatorTest, SuccessfulRunRecordsCommittedStatistic) {
+    const auto committedBefore = [&] {
+        BSONObjBuilder builder;
+        ShardingStatistics::get(getServiceContext()).report(&builder);
+        return builder.obj()
+            .getObjectField("chunkOperationsStatistics")
+            .getIntField("countSplitChunkCommitted");
+    }();
+
+    CancellationSource cancellationSource;
+
+    TestChunkOperationShardingCoordinatorDocument doc;
+    ShardingCoordinatorMetadata coorMetadata{{kTestNs, CoordinatorTypeEnum::kTestCoordinator}};
+    ForwardableOperationMetadata forwardableOpMetadata(_opCtx);
+    coorMetadata.setForwardableOpMetadata(forwardableOpMetadata);
+    doc.setShardingCoordinatorMetadata(std::move(coorMetadata));
+
+    auto coordinator = std::make_shared<TestChunkOperationShardingCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service), std::move(doc));
+    (static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get()))
+        ->run(_scopedExecutor, cancellationSource.token())
+        .get();
+
+    // A clean run completes without an abort reason, so the shared _onCleanup hook counts it as a
+    // committed operation of the type reported by the coordinator (kSplitChunk here).
+    BSONObjBuilder builder;
+    ShardingStatistics::get(getServiceContext()).report(&builder);
+    ASSERT_EQ(builder.obj()
+                  .getObjectField("chunkOperationsStatistics")
+                  .getIntField("countSplitChunkCommitted"),
+              committedBefore + 1);
 }
 
 TEST_F(ChunkOperationShardingCoordinatorTest, MergeChunksCheckIfOptionsConflictSameParams) {

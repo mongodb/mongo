@@ -62,6 +62,8 @@ public:
                        _countInvalidateCollectionMetadataOplogEntriesForDroppedCollections.get());
         builder.append("countUpdateCollectionMetadataOplogEntriesApplied",
                        _countUpdateCollectionMetadataOplogEntriesApplied.get());
+        builder.append("countUpdateCollectionMetadataChangedChunksApplied",
+                       _countUpdateCollectionMetadataChangedChunksApplied.get());
         builder.append("countSetAllowChunkOperationsOplogEntriesApplied",
                        _countSetAllowChunkOperationsOplogEntriesApplied.get());
         builder.append("countLocalCollectionMetadataCommits",
@@ -121,8 +123,9 @@ public:
         }
     }
 
-    void registerUpdateCollectionMetadataOplogEntryApplied() {
+    void registerUpdateCollectionMetadataOplogEntryApplied(long long numChangedChunks) {
         _countUpdateCollectionMetadataOplogEntriesApplied.incrementRelaxed();
+        _countUpdateCollectionMetadataChangedChunksApplied.incrementRelaxed(numChangedChunks);
     }
 
     void registerSetAllowChunkOperationsOplogEntryApplied() {
@@ -172,6 +175,8 @@ private:
     Counter64 _countInvalidateCollectionMetadataOplogEntriesForDroppedCollections;
     // updateCollectionMetadata ('c') oplog entries applied on replication secondaries.
     Counter64 _countUpdateCollectionMetadataOplogEntriesApplied;
+    // Total changed chunks merged by those updateCollectionMetadata delta applications.
+    Counter64 _countUpdateCollectionMetadataChangedChunksApplied;
     // setAllowChunkOperations ('c') oplog entries applied on replication secondaries.
     Counter64 _countSetAllowChunkOperationsOplogEntriesApplied;
     // Local shard-catalog collection commits (shardCollection / reshard / refresh).

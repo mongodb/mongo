@@ -933,6 +933,8 @@ void commitChunkOperationsMetadataLocally(OperationContext* opCtx,
         //
         // The value of isDbPrimaryShard is irrelevant here because it is only used when the shard
         // does not own any chunks, which cannot be the case since this shard is receiving a chunk.
+        ShardingStatistics::get(opCtx)
+            .chunkOperationsStatistics.registerMoveRangeFirstChunkReceived();
         commitCollectionMetadataLocally(opCtx, nss, false /* isDbPrimaryShard */);
         return;
     }
@@ -955,6 +957,10 @@ void commitChunkOperationsMetadataLocally(OperationContext* opCtx,
         opCtx, nss, coll.asShardCatalogType(), chunksToInsert, true /* rewritePersistedChunks */);
 
     updateCollectionMetadata(opCtx, nss, coll, chunksToInsert);
+
+    ShardingStatistics::get(opCtx)
+        .chunkOperationsStatistics.registerLocalChunkOperationsMetadataCommit(
+            chunksToInsert.size());
 
     LOGV2_INFO(12721506,
                "Committed chunk operations metadata to the local shard catalog",

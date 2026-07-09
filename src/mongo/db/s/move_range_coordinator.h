@@ -64,6 +64,10 @@ public:
 protected:
     bool isInCriticalSection(Phase phase) const override;
 
+    ChunkOperationsStatistics::ChunkOperationType chunkOperationMetricType() const override {
+        return ChunkOperationsStatistics::ChunkOperationType::kMoveRange;
+    }
+
 private:
     bool _mustAlwaysMakeProgress() override {
         return true;

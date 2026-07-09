@@ -308,6 +308,8 @@ ExecutorFuture<void> MergeChunksCoordinator::_runImpl(
                       logAttrs(nss()),
                       "range"_attr = ChunkRange(bounds[0], bounds[1]).toString());
 
+                _registerChunkOperationStarted(opCtx);
+
                 _alreadyCommitted = checkPreconditions(opCtx, nss(), _request);
 
                 // Capture and persist the shard's placement version before the first commit

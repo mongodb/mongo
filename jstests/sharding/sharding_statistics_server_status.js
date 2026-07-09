@@ -12,6 +12,7 @@ import {
     unpauseMoveChunkAtStep,
     waitForMoveChunkStep,
 } from "jstests/libs/chunk_manipulation_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {waitForCommand} from "jstests/libs/wait_for_command.js";
@@ -362,5 +363,118 @@ moveChunkThread.join();
 assert.commandFailedWithCode(moveChunkThread.returnData(), ErrorCodes.Interrupted);
 
 checkServerStatusAbortedMigrationCount(donorConn, 2);
+
+//
+// Tests for the chunk-operations statistics sub-section.
+//
+
+// All expected fields under shardingStatistics.chunkOperationsStatistics.
+const chunkOpStatFields = [
+    "countSplitChunkStarted",
+    "countSplitChunkCommitted",
+    "countSplitChunkAborted",
+    "countMergeChunksStarted",
+    "countMergeChunksCommitted",
+    "countMergeChunksAborted",
+    "countMergeAllChunksStarted",
+    "countMergeAllChunksCommitted",
+    "countMergeAllChunksAborted",
+    "countMoveRangeStarted",
+    "countMoveRangeCommitted",
+    "countMoveRangeAborted",
+    "countSplitChunkResultingChunks",
+    "countMergeAllChunksMerged",
+    "countMoveRangeChunksMoved",
+    "countMoveRangeFirstChunkReceived",
+    "countLocalChunkOperationsMetadataCommits",
+    "countChunksCommittedToShardCatalog",
+];
+
+function getChunkOpStats(shardConn) {
+    const shardStats = assert.commandWorked(
+        shardConn.getDB("admin").runCommand({serverStatus: 1}),
+    ).shardingStatistics;
+    assert(shardStats.hasOwnProperty("chunkOperationsStatistics"), "missing sub-section", {
+        shardStats,
+    });
+    return shardStats.chunkOperationsStatistics;
+}
+
+// Returns the sum of 'field' across all shards. The coordinator runs on whichever shard owns the
+// affected chunk, so summing avoids depending on per-shard attribution.
+function sumChunkOpStat(field) {
+    return shardArr.reduce((acc, shard) => acc + getChunkOpStats(shard)[field], 0);
+}
+
+// The chunkOperationsStatistics sub-section and its counters only exist on binaries that include
+// them. AuthoritativeShardsDDL can only be enabled when every node runs a recent binary, so it is a
+// safe proxy for "the field is present on all shards" and lets this test coexist with multiversion
+// suites where an older shard binary reports the legacy schema. It also gates the counters, which
+// are only incremented on the authoritative chunk-operation coordinator path.
+const isAuthoritativeShardsDDLEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    st.s.getDB("admin"),
+    "AuthoritativeShardsDDL",
+);
+
+if (isAuthoritativeShardsDDLEnabled) {
+    // The sub-section and all of its fields must be present.
+    for (const shard of shardArr) {
+        const chunkOpStats = getChunkOpStats(shard);
+        for (const field of chunkOpStatFields) {
+            assert(chunkOpStats.hasOwnProperty(field), `missing chunkOperationsStatistics field`, {
+                field,
+                chunkOpStats,
+            });
+        }
+    }
+
+    const chunkOpDbName = "chunkOpStatsDb";
+    const chunkOpNs = chunkOpDbName + ".coll";
+    assert.commandWorked(
+        admin.runCommand({enableSharding: chunkOpDbName, primaryShard: st.shard0.shardName}),
+    );
+    assert.commandWorked(admin.runCommand({shardCollection: chunkOpNs, key: {_id: 1}}));
+
+    // Split: one chunk split on one point yields two chunks.
+    let startedBefore = sumChunkOpStat("countSplitChunkStarted");
+    let committedBefore = sumChunkOpStat("countSplitChunkCommitted");
+    let resultingBefore = sumChunkOpStat("countSplitChunkResultingChunks");
+    assert.commandWorked(admin.runCommand({split: chunkOpNs, middle: {_id: 0}}));
+    assert.gte(sumChunkOpStat("countSplitChunkStarted"), startedBefore + 1);
+    assert.gte(sumChunkOpStat("countSplitChunkCommitted"), committedBefore + 1);
+    assert.gte(sumChunkOpStat("countSplitChunkResultingChunks"), resultingBefore + 2);
+
+    // MergeChunks: merge the two adjacent chunks back into one.
+    startedBefore = sumChunkOpStat("countMergeChunksStarted");
+    committedBefore = sumChunkOpStat("countMergeChunksCommitted");
+    assert.commandWorked(
+        admin.runCommand({mergeChunks: chunkOpNs, bounds: [{_id: MinKey}, {_id: MaxKey}]}),
+    );
+    assert.gte(sumChunkOpStat("countMergeChunksStarted"), startedBefore + 1);
+    assert.gte(sumChunkOpStat("countMergeChunksCommitted"), committedBefore + 1);
+
+    // MoveRange: split again to have a movable chunk, then move it to the other shard.
+    assert.commandWorked(admin.runCommand({split: chunkOpNs, middle: {_id: 0}}));
+    startedBefore = sumChunkOpStat("countMoveRangeStarted");
+    committedBefore = sumChunkOpStat("countMoveRangeCommitted");
+    let movedBefore = sumChunkOpStat("countMoveRangeChunksMoved");
+    assert.commandWorked(
+        admin.runCommand({moveChunk: chunkOpNs, find: {_id: 1}, to: st.shard1.shardName}),
+    );
+    assert.gte(sumChunkOpStat("countMoveRangeStarted"), startedBefore + 1);
+    assert.gte(sumChunkOpStat("countMoveRangeCommitted"), committedBefore + 1);
+    assert.gte(sumChunkOpStat("countMoveRangeChunksMoved"), movedBefore + 1);
+
+    // MergeAllChunks: the coordinator always runs (and completes) even if nothing is mergeable.
+    startedBefore = sumChunkOpStat("countMergeAllChunksStarted");
+    committedBefore = sumChunkOpStat("countMergeAllChunksCommitted");
+    assert.commandWorked(
+        admin.runCommand({mergeAllChunksOnShard: chunkOpNs, shard: st.shard0.shardName}),
+    );
+    assert.gte(sumChunkOpStat("countMergeAllChunksStarted"), startedBefore + 1);
+    assert.gte(sumChunkOpStat("countMergeAllChunksCommitted"), committedBefore + 1);
+
+    assert.commandWorked(mongos.getDB(chunkOpDbName).dropDatabase());
+}
 
 st.stop();

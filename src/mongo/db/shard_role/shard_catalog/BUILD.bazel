@@ -619,6 +619,19 @@ mongo_cc_unit_test(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "chunk_operations_statistics_test",
+    srcs = [
+        "chunk_operations_statistics_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:sharding_statistics",
+        "//src/mongo/unittest",
+    ],
+)
+
 mongo_cc_benchmark(
     name = "catalog_control_bm",
     srcs = [

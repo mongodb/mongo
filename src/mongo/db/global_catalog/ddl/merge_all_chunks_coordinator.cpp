@@ -41,6 +41,7 @@
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/chunk_operation_precondition_checks.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
@@ -291,6 +292,8 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
                       logAttrs(nss()),
                       "shard"_attr = _request.getShard());
 
+                _registerChunkOperationStarted(opCtx);
+
                 checkPreconditions(opCtx, nss());
             }))
         .then(_buildPhaseHandler(
@@ -447,6 +450,10 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
                         _doc.getShardVersion().has_value() &&
                             _doc.getNumMergedChunks().has_value());
                 _response.emplace(*_doc.getShardVersion(), *_doc.getNumMergedChunks());
+
+                ShardingStatistics::get(opCtx)
+                    .chunkOperationsStatistics.registerMergeAllChunksMerged(
+                        *_doc.getNumMergedChunks());
             }))
         .onError([this, anchor = shared_from_this()](const Status& status) {
             // Retry in case of getting a retryable error.

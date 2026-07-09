@@ -364,6 +364,12 @@ protected:
         return builder.obj().getObjectField("collectionShardingMetadataStatistics").getOwned();
     }
 
+    BSONObj getChunkOpStats() {
+        BSONObjBuilder builder;
+        ShardingStatistics::get(operationContext()).report(&builder);
+        return builder.obj().getObjectField("chunkOperationsStatistics").getOwned();
+    }
+
 private:
     MockCatalogClient* _mockCatalogClient = nullptr;
 };
@@ -585,6 +591,31 @@ TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsPersistsSplitToDisk) 
     ASSERT_EQ(persistedNames.count(chunks[0].getName()), 0);
 }
 
+TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsRecordsShardCatalogCommitStatistics) {
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
+
+    auto splitChunks = makeSplitChunks(collType, chunks[0]);
+    ASSERT_EQ(splitChunks.size(), 2u);
+
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, toConfigBSONVector(splitChunks));
+
+    // Each commit counts once; the chunk total accumulates the number of chunks written.
+    auto stats = getChunkOpStats();
+    ASSERT_EQ(stats.getIntField("countLocalChunkOperationsMetadataCommits"), 1);
+    ASSERT_EQ(stats.getIntField("countChunksCommittedToShardCatalog"), 2);
+
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, toConfigBSONVector(splitChunks));
+
+    stats = getChunkOpStats();
+    ASSERT_EQ(stats.getIntField("countLocalChunkOperationsMetadataCommits"), 2);
+    ASSERT_EQ(stats.getIntField("countChunksCommittedToShardCatalog"), 4);
+}
+
 TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsIsIdempotent) {
     auto [collType, chunks] = makeCollectionMetadata(1);
     mockCatalogClient()->setCollectionMetadata(collType, chunks);
@@ -747,6 +778,9 @@ TEST_F(CommitCollectionMetadataLocallyTest,
     // The bootstrap clears the CSR via an invalidate rather than replicating a delta.
     ASSERT_EQ(countCommandOplogEntries("updateCollectionMetadata", kTestNss), 0);
     ASSERT_GTE(countCommandOplogEntries("invalidateCollectionMetadata", kTestNss), 1);
+
+    // Receiving the first chunk is recorded on this (recipient) shard.
+    ASSERT_EQ(getChunkOpStats().getIntField("countMoveRangeFirstChunkReceived"), 1);
 
     // The installed metadata reflects the global catalog (one chunk, gap-allowing), NOT the stale
     // two-chunk legacy CSR.

@@ -906,7 +906,8 @@ void ShardServerOpObserver::onUpdateCollectionMetadata(OperationContext* opCtx,
     const auto entry = UpdateCollectionMetadataOplogEntry::parse(
         op.getObject(), IDLParserContext("UpdateCollectionMetadataOplogEntryContext"));
     ShardingStatistics::get(opCtx)
-        .collectionShardingMetadataStatistics.registerUpdateCollectionMetadataOplogEntryApplied();
+        .collectionShardingMetadataStatistics.registerUpdateCollectionMetadataOplogEntryApplied(
+            entry.getChangedChunks().size());
 
     LOGV2_DEBUG(12920503,
                 2,
