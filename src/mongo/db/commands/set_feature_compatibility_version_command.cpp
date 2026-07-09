@@ -691,39 +691,40 @@ public:
                     migrationutil::assertNoMigrationsRemaining(opCtx);
                 }
 
-                // Start transition to 'requestedVersion' by updating the local FCV document to a
-                // 'kUpgrading' or 'kDowngrading' state, respectively.
-                const auto fcvChangeRegion(
-                    FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
+                auto withFCVLockHeld = [&] {
+                    uassert(ErrorCodes::Error(6744303),
+                            "Failing setFeatureCompatibilityVersion before reaching the FCV "
+                            "transitional stage due to 'failBeforeTransitioning' failpoint set",
+                            !failBeforeTransitioning.shouldFail());
 
-                uassert(ErrorCodes::Error(6744303),
-                        "Failing setFeatureCompatibilityVersion before reaching the FCV "
-                        "transitional stage due to 'failBeforeTransitioning' failpoint set",
-                        !failBeforeTransitioning.shouldFail());
+                    if (role && role->has(ClusterRole::ConfigServer)) {
+                        uassert(ErrorCodes::ConflictingOperationInProgress,
+                                "Failed to start FCV change because an addShardCoordinator is in "
+                                "progress",
+                                ShardingCoordinatorService::getService(opCtx)
+                                    ->areAllCoordinatorsOfTypeFinished(
+                                        opCtx, CoordinatorTypeEnum::kAddShard));
+                    }
 
-                if (role && role->has(ClusterRole::ConfigServer)) {
-                    uassert(
-                        ErrorCodes::ConflictingOperationInProgress,
-                        "Failed to start FCV change because an addShardCoordinator is in progress",
-                        ShardingCoordinatorService::getService(opCtx)
-                            ->areAllCoordinatorsOfTypeFinished(opCtx,
-                                                               CoordinatorTypeEnum::kAddShard));
-                }
-
-                // If this is a config server, then there must be no active
-                // SetClusterParameterCoordinator instances active when downgrading.
-                if (role && role->has(ClusterRole::ConfigServer) &&
-                    requestedVersion < originalVersion) {
-                    uassert(ErrorCodes::ConflictingOperationInProgress,
+                    // If this is a config server, then there must be no active
+                    // SetClusterParameterCoordinator instances active when downgrading.
+                    if (role && role->has(ClusterRole::ConfigServer) &&
+                        requestedVersion < originalVersion) {
+                        uassert(
+                            ErrorCodes::ConflictingOperationInProgress,
                             "Cannot downgrade while cluster server parameters are being set",
                             (ConfigsvrCoordinatorService::getService(opCtx)
                                  ->areAllCoordinatorsOfTypeFinished(
                                      opCtx, ConfigsvrCoordinatorTypeEnum::kSetClusterParameter)));
-                }
+                    }
 
-                FCVStepRegistry::get(opCtx->getServiceContext())
-                    .beforeStartWithFCVLock(opCtx, originalVersion, requestedVersion);
+                    FCVStepRegistry::get(opCtx->getServiceContext())
+                        .beforeStartWithFCVLock(opCtx, originalVersion, requestedVersion);
+                };
 
+                // Start transition to 'requestedVersion' by updating the local FCV document to a
+                // 'kUpgrading' or 'kDowngrading' state, respectively.
+                //
                 // We pass boost::none as the setIsCleaningServerMetadata argument in order to
                 // indicate that we don't want to override the existing isCleaningServerMetadata FCV
                 // doc field. This is to protect against the case where a previous FCV transition
@@ -735,7 +736,8 @@ public:
                     resolvedTransition.transitionalVersion,
                     SetFCVPhaseEnum::kStart,
                     changeTimestamp,
-                    boost::none /* setIsCleaningServerMetadata */);
+                    boost::none /* setIsCleaningServerMetadata */,
+                    withFCVLockHeld);
 
                 LOGV2(6744301,
                       "setFeatureCompatibilityVersion has set the FCV to the transitional state",
@@ -849,16 +851,12 @@ public:
                 // Downgrading/ downgradingToUpgrading transition until the isCleaningServerMetadata
                 // is unset when we successfully finish the FCV upgrade/downgrade and transition to
                 // the upgraded/downgraded state.
-                {
-                    const auto fcvChangeRegion(
-                        FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
-                    FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
-                        opCtx,
-                        resolvedTransition.transitionalVersion,
-                        SetFCVPhaseEnum::kComplete,
-                        changeTimestamp,
-                        true /* setIsCleaningServerMetadata*/);
-                }
+                FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
+                    opCtx,
+                    resolvedTransition.transitionalVersion,
+                    SetFCVPhaseEnum::kComplete,
+                    changeTimestamp,
+                    true /* setIsCleaningServerMetadata*/);
 
                 uassert(ErrorCodes::Error(10778000),
                         "Failing transition due to 'failTransitionDuringIsCleaningServerMetadata' "
@@ -927,23 +925,23 @@ public:
             {
                 hangBeforeFinalizingFCV.pauseWhileSet(opCtx);
 
+                auto withFCVLockHeld = [&] {
+                    uassert(ErrorCodes::Error(6794601),
+                            "Failing downgrade due to 'failBeforeUpdatingFcvDoc' failpoint set",
+                            !failBeforeUpdatingFcvDoc.shouldFail());
+
+                    hangBeforeUpdatingFcvDoc.pauseWhileSet();
+                };
+
                 // Complete transition by updating the local FCV document to the fully upgraded or
                 // downgraded requestedVersion.
-                const auto fcvChangeRegion(
-                    FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
-
-                uassert(ErrorCodes::Error(6794601),
-                        "Failing downgrade due to 'failBeforeUpdatingFcvDoc' failpoint set",
-                        !failBeforeUpdatingFcvDoc.shouldFail());
-
-                hangBeforeUpdatingFcvDoc.pauseWhileSet();
-
                 FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                     opCtx,
                     requestedVersion,
                     boost::none, /* phase */
                     changeTimestamp,
-                    false /* setIsCleaningServerMetadata */);
+                    false /* setIsCleaningServerMetadata */,
+                    withFCVLockHeld);
             }
 
             // Under Symmetric FCV, _finalize* already ran inside the kEnableTargetFeatures block.

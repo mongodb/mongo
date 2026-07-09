@@ -38,6 +38,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/version/releases.h"
 
@@ -118,13 +119,18 @@ public:
     /**
      * Updates the on-disk feature compatibility version document to the given version.
      * `version` may be a transitional or non-transitional FCV.
+     *
+     * Holds the 'fcvLock' in exclusive mode for the duration of the update, serialising with
+     * concurrent 'FixedFCVRegions'. If provided, 'withFCVLockHeld' runs under that lock before the
+     * document is written, letting the caller perform checks that must be atomic with the update.
      */
     static void updateFeatureCompatibilityVersionDocument(
         OperationContext* opCtx,
         multiversion::FeatureCompatibilityVersion version,
         boost::optional<SetFCVPhaseEnum> phase,
         boost::optional<Timestamp> timestamp,
-        boost::optional<bool> setIsCleaningServerMetadata);
+        boost::optional<bool> setIsCleaningServerMetadata,
+        unique_function<void()> withFCVLockHeld = {});
 
     /**
      * If we are in clean startup (the server has no replicated collections), store the
@@ -151,13 +157,6 @@ public:
      * current featureCompatibilityVersion value.
      */
     static void updateMinWireVersion(OperationContext* opCtx);
-
-    /**
-     * Returns a scoped object, which holds the 'fcvLock' in exclusive mode for the given scope. It
-     * must only be used by the setFeatureCompatibilityVersion command in order to serialise with
-     * concurrent 'FixedFCVRegions'.
-     */
-    static Lock::ExclusiveLock enterFCVChangeRegion(OperationContext* opCtx);
 
     /**
      * Used by the FCV OpObserver to set the timestamp of the last opTime where the FCV was updated.

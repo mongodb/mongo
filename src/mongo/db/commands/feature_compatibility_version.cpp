@@ -571,7 +571,15 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
     FCV version,
     boost::optional<SetFCVPhaseEnum> phase,
     boost::optional<Timestamp> changeTimestamp,
-    boost::optional<bool> setIsCleaningServerMetadata) {
+    boost::optional<bool> setIsCleaningServerMetadata,
+    unique_function<void()> withFCVLockHeld) {
+
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+    Lock::ExclusiveLock fcvChangeRegion(opCtx, fcvDocumentLock);
+
+    if (withFCVLockHeld) {
+        withFCVLockHeld();
+    }
 
     // We may have just stepped down, in which case we should not proceed.
     opCtx->checkForInterrupt();
@@ -900,11 +908,6 @@ void FeatureCompatibilityVersion::fassertInitializedAfterStartup(OperationContex
 
 void FeatureCompatibilityVersion::afterStartupActions(OperationContext* opCtx) {
     fassertInitializedAfterStartup(opCtx);
-}
-
-Lock::ExclusiveLock FeatureCompatibilityVersion::enterFCVChangeRegion(OperationContext* opCtx) {
-    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
-    return Lock::ExclusiveLock(opCtx, fcvDocumentLock);
 }
 
 void FeatureCompatibilityVersion::advanceLastFCVUpdateTimestamp(Timestamp fcvUpdateTimestamp) {
