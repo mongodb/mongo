@@ -1,7 +1,7 @@
 /**
- * Tests that $_internalSearchIdLookup correctly handles documents when chunk migrations
- * occur during query execution. Documents that are migrated mid-query should not be
- * returned from both the source and destination shards (no duplicates), and documents
+ * Tests that $search (which desugars into $_internalSearchIdLookup) correctly handles documents
+ * when chunk migrations occur during query execution. Documents that are migrated mid-query should
+ * not be returned from both the source and destination shards (no duplicates), and documents
  * should not be lost.
  *
  * @tags: [
@@ -10,23 +10,15 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
-import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
+import {
+    mockPlanShardedSearchResponse,
+    mongotCommandForQuery,
+    mongotMultiCursorResponseForBatch,
+} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 
 const kFailpointName = "hangBeforeResultsInInternalSearchIdLookup";
-
-/**
- * Creates a document with the given id and shardKey.
- */
-function createDocument(id, shardKey) {
-    return {_id: id, shardKey: shardKey, value: `doc${id}`};
-}
-
-/**
- * Creates a lookup source document that references a target document.
- */
-function createLookupSourceDocument(lookupId, shardKey, targetId) {
-    return {_id: lookupId, shardKey: shardKey, lookupId: targetId};
-}
 
 /**
  * Validates that the results contain all expected IDs with no duplicates.
@@ -55,168 +47,157 @@ function validateResults(resultIds, expectedIds) {
     }
 }
 
-// `$_internalSearchIdLookup` resolves _id values on each shard through either the Express fast path
-// (flag on) or the classic local-read path (flag off). We run the full chunk-migration suite once
-// per state on a fresh cluster with the flag set at startup, to cover both executors on the
-// waterfall.
-// TODO SERVER-130493 Remove optimizedIdLookup when no-ff search variant exists.
-for (const optimizedIdLookup of [false, true]) {
-    describe(
-        `$_internalSearchIdLookup with chunk migrations ` +
-            `(featureFlagSearchOptimizedIdLookup=${optimizedIdLookup})`,
-        function () {
-            const dbName = "test";
-            const collName = "internal_search_id_lookup_chunk_migration";
+/**
+ * Sets up fresh mongot mock responses for a single $search execution: each shard's mongot returns
+ * every target _id, and mongos gets a planShardedSearch response. mongot responses are consumed per
+ * query, so this must be called before every query run.
+ */
+function setupMongotResponses(ctx) {
+    for (const shardConn of [ctx.shard0Conn, ctx.shard1Conn]) {
+        const history = [
+            {
+                expectedCommand: ctx.expectedCommand,
+                response: mongotMultiCursorResponseForBatch(
+                    ctx.searchBatch,
+                    NumberLong(0),
+                    [{val: 1}],
+                    NumberLong(0),
+                    ctx.collNS,
+                    1 /* ok */,
+                ),
+            },
+        ];
+        const mongot = ctx.stWithMock.getMockConnectedToHost(shardConn);
+        mongot.setMockResponses(history, ctx.cursorId, ctx.cursorId + 1000);
+        ctx.cursorId++;
+    }
 
-            before(function () {
-                this.st = new ShardingTest({
-                    shards: 2,
-                    mongos: 1,
-                    other: {
-                        rsOptions: {
-                            setParameter: {
-                                featureFlagSearchOptimizedIdLookup: optimizedIdLookup,
-                            },
-                        },
-                    },
-                });
+    mockPlanShardedSearchResponse(
+        ctx.collName,
+        ctx.mongotQuery,
+        ctx.dbName,
+        undefined /* sortSpec */,
+        ctx.stWithMock,
+    );
+}
 
-                const mongos = this.st.s;
-                this.testDB = mongos.getDB(dbName);
-                this.testColl = this.testDB.getCollection(collName);
+describe("$search $_internalSearchIdLookup with chunk migrations", function () {
+    const dbName = "test";
+    const collName = "internal_search_id_lookup_chunk_migration";
 
-                assert.commandWorked(
-                    this.testDB.adminCommand({
-                        enableSharding: dbName,
-                        primaryShard: this.st.shard0.name,
-                    }),
-                );
+    before(function () {
+        this.stWithMock = new ShardingTestWithMongotMock({
+            name: "id_lookup_chunk_migration",
+            shards: {
+                rs0: {nodes: 1},
+                rs1: {nodes: 1},
+            },
+            mongos: 1,
+        });
+        this.stWithMock.start();
+        this.st = this.stWithMock.st;
 
-                // Insert documents - 50 on shard0 (shardKey 0-49), 50 on shard1 (shardKey 200-249).
-                this.docs = [];
-                for (let i = 0; i < 50; i++) {
-                    this.docs.push(createDocument(i, i));
-                }
-                for (let i = 200; i < 250; i++) {
-                    this.docs.push(createDocument(i, i));
-                }
-                for (const doc of this.docs) {
-                    assert.commandWorked(this.testColl.insert(doc));
-                }
+        this.dbName = dbName;
+        this.collName = collName;
+        this.testDB = this.st.s.getDB(dbName);
+        this.testColl = this.testDB.getCollection(collName);
+        this.collNS = this.testColl.getFullName();
 
-                // Shard the collection and set up chunk layout.
-                // After sharding and splits:
-                //   shard0: [minKey, 15)   - target docs 0-14, lookup sources shardKey -100
-                //   shard0: [15, 200)      - target docs 15-49 (will be migrated during test)
-                //   shard1: [200, maxKey)  - target docs 200-249, lookup sources shardKey 500+
-                assert.commandWorked(this.testColl.createIndex({shardKey: 1}));
-                this.st.shardColl(
-                    this.testColl,
-                    {shardKey: 1},
-                    {shardKey: 200},
-                    {shardKey: 200},
-                    dbName,
-                    true /* waitForDelete */,
-                );
+        assert.commandWorked(
+            this.testDB.adminCommand({enableSharding: dbName, primaryShard: this.st.shard0.name}),
+        );
 
-                // Split at 15 to prepare for migration during test.
-                assert.commandWorked(
-                    this.testDB.adminCommand({
-                        split: this.testColl.getFullName(),
-                        middle: {shardKey: 15},
-                    }),
-                );
+        // Insert target documents - 50 on shard0 (shardKey 0-49), 50 on shard1 (shardKey 200-249).
+        this.expectedIds = [];
+        const docs = [];
+        for (let i = 0; i < 50; i++) {
+            docs.push({_id: i, shardKey: i, value: `doc${i}`});
+            this.expectedIds.push(i);
+        }
+        for (let i = 200; i < 250; i++) {
+            docs.push({_id: i, shardKey: i, value: `doc${i}`});
+            this.expectedIds.push(i);
+        }
+        assert.commandWorked(this.testColl.insertMany(docs));
 
-                // Stop the balancer to prevent automatic chunk migrations.
-                assert.commandWorked(this.testDB.adminCommand({balancerStop: 1}));
+        // Shard the collection and set up chunk layout.
+        // After sharding and splits:
+        //   shard0: [minKey, 15)   - target docs 0-14
+        //   shard0: [15, 200)      - target docs 15-49 (will be migrated during test)
+        //   shard1: [200, maxKey)  - target docs 200-249
+        assert.commandWorked(this.testColl.createIndex({shardKey: 1}));
+        this.st.shardColl(
+            this.testColl,
+            {shardKey: 1},
+            {shardKey: 200},
+            {shardKey: 200},
+            dbName,
+            true /* waitForDelete */,
+        );
 
-                this.shard0Conn = this.st.rs0.getPrimary();
-                this.shard1Conn = this.st.rs1.getPrimary();
-                this.shard0Coll = this.shard0Conn.getDB(dbName)[collName];
-                this.shard1Coll = this.shard1Conn.getDB(dbName)[collName];
+        // Split at 15 to prepare for migration during test.
+        assert.commandWorked(
+            this.testDB.adminCommand({split: this.collNS, middle: {shardKey: 15}}),
+        );
 
-                // We need to manufacture the _id input to $_internalSearchIdLookup so we insert
-                // "lookup source" documents on BOTH shards that reference ALL target documents. This
-                // ensures that after a chunk migration, the migrated docs can still be found on either
-                // shard.
-                this.lookupSourceDocs = [];
+        // Stop the balancer to prevent automatic chunk migrations.
+        assert.commandWorked(this.testDB.adminCommand({balancerStop: 1}));
 
-                // Lookup sources on shard0 (shardKey -100, stays on shard0 since < 15)
-                // Reference ALL target docs: 0-49 and 200-249
-                for (let targetDocId = 0; targetDocId < 50; targetDocId++) {
-                    const lookupId = 1000 + targetDocId;
-                    const shardKey = -100;
-                    this.lookupSourceDocs.push(
-                        createLookupSourceDocument(lookupId, shardKey, targetDocId),
-                    );
-                }
-                for (let targetDocId = 200; targetDocId < 250; targetDocId++) {
-                    const lookupId = 1000 + targetDocId;
-                    const shardKey = -100;
-                    this.lookupSourceDocs.push(
-                        createLookupSourceDocument(lookupId, shardKey, targetDocId),
-                    );
-                }
+        this.shard0Conn = this.st.rs0.getPrimary();
+        this.shard1Conn = this.st.rs1.getPrimary();
+        this.shard1Coll = this.shard1Conn.getDB(dbName)[collName];
 
-                // Lookup sources on shard1 (shardKey 500/550)
-                // Reference ALL target docs: 0-49 and 200-249
-                for (let targetDocId = 0; targetDocId < 50; targetDocId++) {
-                    const lookupId = 2000 + targetDocId;
-                    const shardKey = 500;
-                    this.lookupSourceDocs.push(
-                        createLookupSourceDocument(lookupId, shardKey, targetDocId),
-                    );
-                }
-                for (let targetDocId = 200; targetDocId < 250; targetDocId++) {
-                    const lookupId = 2000 + targetDocId;
-                    const shardKey = 550;
-                    this.lookupSourceDocs.push(
-                        createLookupSourceDocument(lookupId, shardKey, targetDocId),
-                    );
-                }
+        // A sharded collection shares one UUID across shards.
+        this.collUUID = getUUIDFromListCollections(this.shard0Conn.getDB(dbName), collName);
 
-                for (const doc of this.lookupSourceDocs) {
-                    assert.commandWorked(this.testColl.insert(doc));
-                }
+        // Each shard's mongot returns every target _id; $_internalSearchIdLookup looks each up
+        // locally and shard filtering keeps only the owned ones, so every target document is
+        // returned by exactly one shard. The exact $searchScore values are irrelevant here (results
+        // are compared as a set), so any distinct descending scores suffice.
+        this.mongotQuery = {};
+        this.searchBatch = this.expectedIds.map((id, i) => ({
+            _id: id,
+            $searchScore: this.expectedIds.length - i,
+        }));
+        this.expectedCommand = mongotCommandForQuery({
+            query: this.mongotQuery,
+            collName: collName,
+            db: dbName,
+            collectionUUID: this.collUUID,
+            protocolVersion: NumberInt(1),
+        });
 
-                // Pipeline to run $_internalSearchIdLookup on all lookup source documents.
-                this.pipeline = [
-                    {$match: {_id: {$gte: 1000, $lt: 2250}}},
-                    {$project: {_id: "$lookupId"}},
-                    {$_internalSearchIdLookup: {}},
-                    {$sort: {_id: 1}},
-                ];
+        this.pipeline = [{$search: this.mongotQuery}, {$sort: {_id: 1}}];
 
-                // Expected IDs - all target documents: 0-49 and 200-249.
-                this.expectedIds = this.docs.map((doc) => doc._id);
+        // mongot cursor ids used across query runs (responses are consumed per query).
+        this.cursorId = 100;
+    });
 
-                this.collName = collName;
-                this.dbName = dbName;
-            });
+    after(function () {
+        this.stWithMock.stop();
+    });
 
-            after(function () {
-                this.st.stop();
-            });
+    it("returns correct results", function () {
+        setupMongotResponses(this);
+        const results = this.testColl.aggregate(this.pipeline).toArray();
+        const resultIds = results.map((doc) => doc._id);
+        validateResults(resultIds, this.expectedIds);
+    });
 
-            it("returns correct results", function () {
-                const results = this.testColl.aggregate(this.pipeline).toArray();
-                const resultIds = results.map((doc) => doc._id);
-                validateResults(resultIds, this.expectedIds);
-            });
+    it("returns correct results when chunk migrates during query", function () {
+        // Prime mongot for the query the parallel shell is about to run.
+        setupMongotResponses(this);
 
-            it("returns correct results when chunk migrates during query", function () {
-                // Set up failpoints on both shards to pause the query before idLookup returns.
-                const shard0Fp = configureFailPoint(this.shard0Conn, kFailpointName);
-                const shard1Fp = configureFailPoint(this.shard1Conn, kFailpointName);
+        // Set up failpoints on both shards to pause the query before idLookup returns.
+        const shard0Fp = configureFailPoint(this.shard0Conn, kFailpointName);
+        const shard1Fp = configureFailPoint(this.shard1Conn, kFailpointName);
 
-                // Prepare parallel shell to run the query.
-                const mongosHost = this.st.s.host;
-                const resultCollName = "chunk_migration_test_results";
-                const pipelineStr = tojson(this.pipeline);
-                const dbName = this.dbName;
-                const collName = this.collName;
+        // Prepare parallel shell to run the query.
+        const mongosHost = this.st.s.host;
+        const resultCollName = "chunk_migration_test_results";
+        const pipelineStr = tojson(this.pipeline);
 
-                const shellCode = `
+        const shellCode = `
             const conn = new Mongo("${mongosHost}");
             const coll = conn.getDB("${dbName}").getCollection("${collName}");
             const resultColl = conn.getDB("${dbName}").getCollection("${resultCollName}");
@@ -227,61 +208,60 @@ for (const optimizedIdLookup of [false, true]) {
             }
         `;
 
-                // Start the query in a parallel shell.
-                const awaitQueryShell = startParallelShell(shellCode, this.st.s.port);
+        // Start the query in a parallel shell.
+        const awaitQueryShell = startParallelShell(shellCode, this.st.s.port);
 
-                // Wait for failpoints to be hit on both shards.
-                shard0Fp.wait();
-                shard1Fp.wait();
+        // Wait for failpoints to be hit on both shards.
+        shard0Fp.wait();
+        shard1Fp.wait();
 
-                // While query is paused, migrate chunk [15, 200) from shard0 to shard1.
-                // This migrates target documents with shardKey 15-49 (35 documents).
-                //   shard0: [minKey, 15)   - target docs 0-14, lookup sources shardKey -100
-                //   shard1: [15, 200)      - target docs 15-49 (migrated)
-                //   shard1: [200, maxKey)  - target docs 200-249, lookup sources shardKey 500
-                assert.commandWorked(
-                    this.testDB.adminCommand({
-                        moveChunk: this.testColl.getFullName(),
-                        find: {shardKey: 20},
-                        to: this.st.shard1.shardName,
-                        _waitForDelete: false,
-                    }),
-                );
+        // While query is paused, migrate chunk [15, 200) from shard0 to shard1.
+        // This migrates target documents with shardKey 15-49 (35 documents).
+        //   shard0: [minKey, 15)   - target docs 0-14
+        //   shard1: [15, 200)      - target docs 15-49 (migrated)
+        //   shard1: [200, maxKey)  - target docs 200-249
+        assert.commandWorked(
+            this.testDB.adminCommand({
+                moveChunk: this.collNS,
+                find: {shardKey: 20},
+                to: this.st.shard1.shardName,
+                _waitForDelete: false,
+            }),
+        );
 
-                // Resume the query.
-                shard0Fp.off();
-                shard1Fp.off();
+        // Resume the query.
+        shard0Fp.off();
+        shard1Fp.off();
 
-                // Wait for query to complete.
-                awaitQueryShell();
+        // Wait for query to complete.
+        awaitQueryShell();
 
-                // Verify the chunk migration happened: all target docs with shardKey 15-49 should now be
-                // on shard1.
-                for (let targetDocId = 15; targetDocId < 50; targetDocId++) {
-                    const docOnShard1 = this.shard1Coll.findOne({_id: targetDocId});
-                    assert.neq(
-                        docOnShard1,
-                        null,
-                        `Target doc with _id=${targetDocId} should be on shard1 after migration`,
-                    );
-                }
+        // Verify the chunk migration happened: all target docs with shardKey 15-49 should now be
+        // on shard1.
+        for (let targetDocId = 15; targetDocId < 50; targetDocId++) {
+            const docOnShard1 = this.shard1Coll.findOne({_id: targetDocId});
+            assert.neq(
+                docOnShard1,
+                null,
+                `Target doc with _id=${targetDocId} should be on shard1 after migration`,
+            );
+        }
 
-                // Read results from temp collection and validate.
-                const resultColl = this.testDB.getCollection(resultCollName);
-                const results = resultColl
-                    .find()
-                    .sort({_id: 1})
-                    .toArray()
-                    .map((r) => r.doc);
-                const resultIds = results.map((doc) => doc._id);
-                validateResults(resultIds, this.expectedIds);
-            });
+        // Read results from temp collection and validate.
+        const resultColl = this.testDB.getCollection(resultCollName);
+        const results = resultColl
+            .find()
+            .sort({_id: 1})
+            .toArray()
+            .map((r) => r.doc);
+        const resultIds = results.map((doc) => doc._id);
+        validateResults(resultIds, this.expectedIds);
+    });
 
-            it("returns correct results after chunk migration", function () {
-                const results = this.testColl.aggregate(this.pipeline).toArray();
-                const resultIds = results.map((doc) => doc._id);
-                validateResults(resultIds, this.expectedIds);
-            });
-        },
-    );
-}
+    it("returns correct results after chunk migration", function () {
+        setupMongotResponses(this);
+        const results = this.testColl.aggregate(this.pipeline).toArray();
+        const resultIds = results.map((doc) => doc._id);
+        validateResults(resultIds, this.expectedIds);
+    });
+});

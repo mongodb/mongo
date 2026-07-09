@@ -79,15 +79,6 @@ for (let i = 0; i < 10; i++) {
 // These are stages that will error when run on a timeseries collection.
 const errorTests = [
     {
-        stage: "$_internalSearchIdLookup",
-        pipeline: [{$_internalSearchIdLookup: {}}],
-        expectedErrorCodes: [
-            // TODO SERVER-121094 Delete code 10557302 once we only validate in LPP.
-            10557302, // check for 'canRunOnTimeseries' failed.
-            12093200, // LiteParsed timeseries validation.
-        ],
-    },
-    {
         stage: "$_analyzeShardKeyReadWriteDistribution",
         pipeline: [
             {
@@ -509,8 +500,10 @@ const skippedStages = [
     "$searchBeta",
     "$listSearchIndexes",
     "$setVariableFromSubPipeline",
-    // Internal container stage produced during search pipeline expansion.
+
+    // Internal stages produced during search pipeline expansion.
     "$_internalDocumentResultsAndMetadata",
+    "$_internalSearchIdLookup",
 
     // Stages tested in 'agg_stage_coverage_internal_client.js', since they require extra setup.
     "$mergeCursors",

@@ -89,9 +89,9 @@ public:
      * 'privileges' contains the privileges that were required to run this aggregation, to be used
      * later for re-checking privileges for GetMore commands.
      *
-     * 'cri' is the routing table used by the higher level code that the aggregation
-     * should use during its execution. If it's empty, the routing table will be requested
-     * internally.
+     * 'liteParsedPipeline' is the lite-parsed form of the 'request'. When 'alreadyDesugared' is
+     * true, the pipeline has already been desugared (e.g. during view resolution) and will not be
+     * re-validated under the external client.
      *
      * On success, fills out 'result' with the command response.
      *
@@ -107,7 +107,8 @@ public:
         boost::optional<ExplainOptions::Verbosity> verbosity,
         BSONObjBuilder* result,
         std::string_view comment = "ClusterAggregate::runAggregate"sv,
-        std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr);
+        std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr,
+        bool alreadyDesugared = false);
 
     /**
      * Convenience version that internally constructs the LiteParsedPipeline.

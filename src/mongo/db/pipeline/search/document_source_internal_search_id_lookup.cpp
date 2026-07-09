@@ -47,9 +47,8 @@ using namespace std::literals::string_view_literals;
 
 using boost::intrusive_ptr;
 
-REGISTER_LITE_PARSED_DOCUMENT_SOURCE(_internalSearchIdLookup,
-                                     LiteParsedInternalSearchIdLookUp::parse,
-                                     AllowedWithApiStrict::kInternal);
+REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(_internalSearchIdLookup,
+                                              LiteParsedInternalSearchIdLookUp::parse);
 DocumentSourceContainer _internalSearchIdLookupStageParamsToDocumentSourceFn(
     const std::unique_ptr<StageParams>& stageParams,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
