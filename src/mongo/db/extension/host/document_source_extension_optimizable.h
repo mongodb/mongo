@@ -581,6 +581,12 @@ public:
      */
     void applyPipelineSuffixDependencies(const host_connector::PipelineDependenciesAdapter& deps);
 
+    /**
+     * Builds the boundary adapter and forwards to applyPipelineSuffixDependencies.
+     */
+    void propagatePipelineSuffixDependencies(const DepsTracker& deps,
+                                             const std::set<std::string>& builtinVarRefs) override;
+
 protected:
     /**
      * NB : Here we keep a copy of the stage name to service getSourceName().

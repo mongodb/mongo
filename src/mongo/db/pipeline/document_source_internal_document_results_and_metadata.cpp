@@ -331,6 +331,28 @@ void DocumentSourceInternalDocumentResultsAndMetadata::elideMetadata() {
 DocumentSourceContainer::iterator DocumentSourceInternalDocumentResultsAndMetadata::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     tassert(12615007, "Expecting DocumentSource iterator pointing to this stage.", *itr == this);
+
+    // Relay the pipeline-suffix dependencies to the wrapped source. Skip on shards (which don't see
+    // merge pipeline dependencies) or when this is the last stage in the pipeline.
+    if (!getExpCtx()->getNeedsMerge() && std::next(itr) != container->end()) {
+        const auto& expCtx = getExpCtx();
+        DocumentSourceContainer suffix(std::next(itr), container->end());
+        DepsTracker suffixDeps = Pipeline::getDependenciesForContainer(
+            expCtx, suffix, DepsTracker::NoMetadataValidation{});
+        std::set<Variables::Id> varRefs;
+        for (auto next = std::next(itr); next != container->end(); ++next) {
+            (*next)->addVariableRefs(&varRefs);
+        }
+        std::set<std::string> builtinVarRefs;
+        for (const auto& [id, name] : Variables::kIdToBuiltinVarName) {
+            if (varRefs.contains(id) ||
+                (expCtx->getFromRouter() && expCtx->variables.hasValue(id))) {
+                builtinVarRefs.insert(name);
+            }
+        }
+        _sourceStage->propagatePipelineSuffixDependencies(suffixDeps, builtinVarRefs);
+    }
+
     // If metadata was already elided (e.g. by the router before serializing to shards),
     // propagate that to the source stage so it stops producing the metadata stream.
     if (!_metadata) {

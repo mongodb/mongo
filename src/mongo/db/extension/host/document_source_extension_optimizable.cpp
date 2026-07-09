@@ -644,6 +644,12 @@ void DocumentSourceExtensionOptimizable::applyPipelineSuffixDependencies(
     _logicalStage->applyPipelineSuffixDependencies(&deps);
 }
 
+void DocumentSourceExtensionOptimizable::propagatePipelineSuffixDependencies(
+    const DepsTracker& deps, const std::set<std::string>& builtinVarRefs) {
+    const host_connector::PipelineDependenciesAdapter adapter(deps, builtinVarRefs);
+    applyPipelineSuffixDependencies(adapter);
+}
+
 bool extensionDispatcherReorderingPrecondition(
     rule_based_rewrites::pipeline::PipelineRewriteContext& ctx) {
     const auto* stage = dynamic_cast<const DocumentSourceExtensionOptimizable*>(&ctx.current());
