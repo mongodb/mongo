@@ -3458,5 +3458,33 @@ TEST_F(ReshardingRecipientServiceTest, StepDownBeforeRunFulfillsCompletionPromis
     fp.setMode(FailPoint::off);
 }
 
+TEST_F(ReshardingRecipientServiceTest, OnReshardingFieldsChangesTassertsInAuthoritativePath) {
+    auto testOptions = makeBasicTestOptions().front();
+
+    auto doc = makeRecipientDocument(testOptions);
+    auto commonMetadata = doc.getCommonReshardingMetadata();
+    commonMetadata.setAuthoritativeMetadataAccessLevel(
+        ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed);
+    doc.setCommonReshardingMetadata(std::move(commonMetadata));
+
+    RecipientStateMachine recipient{checked_cast<ReshardingRecipientService*>(_service),
+                                    doc,
+                                    std::make_unique<ExternalStateForTest>(),
+                                    getServiceContext()};
+
+    auto opCtx = makeOperationContext();
+    auto reshardingFields = TypeCollectionReshardingFields{doc.getReshardingUUID()};
+    reshardingFields.setState(CoordinatorStateEnum::kApplying);
+
+    // onReshardingFieldsChanges throws when called in the authoritative path.
+    ASSERT_THROWS_WITH_CHECK(recipient.onReshardingFieldsChanges(
+                                 opCtx.get(), reshardingFields, false /* noChunksToCopy */),
+                             DBException,
+                             [](const DBException& ex) {
+                                 EXPECT_EQ(ex.code(), 12862901);
+                                 assertionCount.tripwire.subtractAndFetch(1);
+                             });
+}
+
 }  // namespace
 }  // namespace mongo

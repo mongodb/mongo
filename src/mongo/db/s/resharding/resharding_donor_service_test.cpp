@@ -1106,6 +1106,33 @@ TEST_F(ReshardingDonorServiceTest, StepDownBeforeRunFulfillsCompletionPromise) {
     fp.setMode(FailPoint::off);
 }
 
+TEST_F(ReshardingDonorServiceTest, OnReshardingFieldsChangesTassertsInAuthoritativePath) {
+    auto doc = makeStateDocument({.isAlsoRecipient = false});
+    auto commonMetadata = doc.getCommonReshardingMetadata();
+    commonMetadata.setAuthoritativeMetadataAccessLevel(
+        ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed);
+    doc.setCommonReshardingMetadata(std::move(commonMetadata));
+
+    DonorStateMachine donor{checked_cast<ReshardingDonorService*>(_service),
+                            doc,
+                            std::make_unique<ExternalStateForTest>(),
+                            getServiceContext()};
+
+    auto opCtx = makeOperationContext();
+    auto reshardingFields = TypeCollectionReshardingFields{doc.getReshardingUUID()};
+    reshardingFields.setDonorFields(TypeCollectionDonorFields{
+        doc.getTempReshardingNss(), doc.getReshardingKey(), doc.getRecipientShards()});
+    reshardingFields.setState(CoordinatorStateEnum::kCloning);
+
+    // onReshardingFieldsChanges throws when called in the authoritative path.
+    ASSERT_THROWS_WITH_CHECK(donor.onReshardingFieldsChanges(opCtx.get(), reshardingFields),
+                             DBException,
+                             [](const DBException& ex) {
+                                 EXPECT_EQ(ex.code(), 12862900);
+                                 assertionCount.tripwire.subtractAndFetch(1);
+                             });
+}
+
 TEST_F(ReshardingDonorServiceTest, RetainsSourceCollectionOnAbort) {
     for (auto& testOptions : makeAllTestOptions()) {
         LOGV2(5641803,

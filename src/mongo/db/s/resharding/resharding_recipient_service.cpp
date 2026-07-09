@@ -820,6 +820,13 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
     OperationContext* opCtx,
     const TypeCollectionReshardingFields& reshardingFields,
     bool noChunksToCopy) {
+    // onReshardingFieldsChanges is driven by shard version refreshes. In the authoritative path,
+    // the coordinator drives participant state directly so this method must never be reached.
+    tassert(12862901,
+            "onReshardingFieldsChanges must not be called in the authoritative shards path",
+            _metadata.getAuthoritativeMetadataAccessLevel() ==
+                ReshardingAuthoritativeMetadataAccessLevelEnum::kNone);
+
     if (reshardingFields.getState() == CoordinatorStateEnum::kAborting) {
         abort(reshardingFields.getUserCanceled().value());
         return;
