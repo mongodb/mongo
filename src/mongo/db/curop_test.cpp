@@ -39,6 +39,7 @@
 #include "mongo/db/operation_context_options_gen.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_stats/mock_key.h"
+#include "mongo/db/query/query_stats/plan_shape_counters/plan_shape_counts.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/transport/mock_session.h"
@@ -75,6 +76,8 @@ TEST(CurOpTest, CopyConstructors) {
 }
 
 TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
+    using plan_shape_counters::PlanShapeCounter;
+
     OpDebug::AdditiveMetrics currentAdditiveMetrics = OpDebug::AdditiveMetrics();
     OpDebug::AdditiveMetrics additiveMetricsToAdd = OpDebug::AdditiveMetrics();
 
@@ -139,6 +142,10 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     additiveMetricsToAdd.peakTrackedMemBytes = 3000;
     currentAdditiveMetrics.clusterPeakTrackedMemBytes = 2048;
     additiveMetricsToAdd.clusterPeakTrackedMemBytes = 2000;
+    currentAdditiveMetrics.planShapeCounts.increment(PlanShapeCounter::kCollscan, 3);
+    currentAdditiveMetrics.planShapeCounts.increment(PlanShapeCounter::kIxscanFetch, 5);
+    additiveMetricsToAdd.planShapeCounts.increment(PlanShapeCounter::kIxscanFetch, 2);
+    additiveMetricsToAdd.planShapeCounts.increment(PlanShapeCounter::kIxscanProject, 7);
 
     // Save the current AdditiveMetrics object before adding.
     OpDebug::AdditiveMetrics additiveMetricsBeforeAdd;
@@ -216,6 +223,16 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     ASSERT_EQ(*currentAdditiveMetrics.clusterPeakTrackedMemBytes,
               std::max(*additiveMetricsBeforeAdd.clusterPeakTrackedMemBytes,
                        *additiveMetricsToAdd.clusterPeakTrackedMemBytes));
+    // Plan shape counters should be summed per shape, including shapes present in only one object.
+    ASSERT_EQ(currentAdditiveMetrics.planShapeCounts.getCount(PlanShapeCounter::kCollscan),
+              additiveMetricsBeforeAdd.planShapeCounts.getCount(PlanShapeCounter::kCollscan) +
+                  additiveMetricsToAdd.planShapeCounts.getCount(PlanShapeCounter::kCollscan));
+    ASSERT_EQ(currentAdditiveMetrics.planShapeCounts.getCount(PlanShapeCounter::kIxscanFetch),
+              additiveMetricsBeforeAdd.planShapeCounts.getCount(PlanShapeCounter::kIxscanFetch) +
+                  additiveMetricsToAdd.planShapeCounts.getCount(PlanShapeCounter::kIxscanFetch));
+    ASSERT_EQ(currentAdditiveMetrics.planShapeCounts.getCount(PlanShapeCounter::kIxscanProject),
+              additiveMetricsBeforeAdd.planShapeCounts.getCount(PlanShapeCounter::kIxscanProject) +
+                  additiveMetricsToAdd.planShapeCounts.getCount(PlanShapeCounter::kIxscanProject));
 }
 
 TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
@@ -383,6 +400,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     additiveMetrics.keysDeleted = 1;
     additiveMetrics.planningTime = Microseconds(100);
     additiveMetrics.nDocsSampled = 10;
+    additiveMetrics.planShapeCounts.increment(plan_shape_counters::PlanShapeCounter::kCollscan, 1);
 
     CursorMetrics cursorMetrics(3 /* keysExamined */,
                                 4 /* docsExamined */,
@@ -417,6 +435,22 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     cursorMetrics.setWasLoadShed(true);
     cursorMetrics.setWasDeprioritized(true);
     cursorMetrics.setWasMarkedNonDeprioritizable(true);
+    plan_shape_counters::PlanShapeCounts planShapeCounts;
+    planShapeCounts.increment(plan_shape_counters::PlanShapeCounter::kCollscan, 2);
+    planShapeCounts.increment(plan_shape_counters::PlanShapeCounter::kIxscanFetch, 1);
+    cursorMetrics.setPlanShapeCounts(planShapeCounts);
+
+    // Assert that every field in cursor metrics is initialized.
+    BSONObj serializedCursorMetrics = cursorMetrics.toBSON();
+    for (const auto& fieldName : CursorMetrics::fieldNames) {
+        if (fieldName == "serialization_context") {
+            // This field is unrelated to cursor metric logic and is needed by IDL.
+            continue;
+        }
+        ASSERT_TRUE(serializedCursorMetrics.hasField(fieldName))
+            << "CursorMetrics field '" << fieldName
+            << "' was not populated by this test; serialized: " << serializedCursorMetrics;
+    }
 
     additiveMetrics.aggregateCursorMetrics(cursorMetrics);
 
@@ -453,6 +487,12 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getMetadata().value_or(0), 0);
     ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getCode().value_or(0), 0);
     ASSERT_EQ(*additiveMetrics.nDocsSampled, 25);
+    ASSERT_EQ(
+        additiveMetrics.planShapeCounts.getCount(plan_shape_counters::PlanShapeCounter::kCollscan),
+        3);
+    ASSERT_EQ(additiveMetrics.planShapeCounts.getCount(
+                  plan_shape_counters::PlanShapeCounter::kIxscanFetch),
+              1);
 }
 
 TEST(CurOpTest, AdditiveMetricsShouldAggregateNegativeCpuNanos) {

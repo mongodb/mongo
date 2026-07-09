@@ -32,6 +32,7 @@
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/db/query/query_stats/aggregated_metric.h"
 #include "mongo/db/query/query_stats/key.h"
+#include "mongo/db/query/query_stats/plan_shape_counters/plan_shape_counts.h"
 #include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
@@ -162,6 +163,11 @@ struct QueryPlannerEntry {
      * collected if includeCBRMetrics is true.
      */
     CostBasedRankerEntry costBasedRankerStats;
+
+    /**
+     * Aggregates the winning plan shapes observed across all executions of this query shape.
+     */
+    plan_shape_counters::PlanShapeCounts planShapeCounters;
 };
 
 struct WritesEntry {

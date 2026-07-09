@@ -262,6 +262,11 @@ public:
         // the best plan.
         boost::optional<long long> nDocsSampled;
 
+        // Counts of the winning plan's query stats plan shape. On mongod this records
+        // the single winning plan's shape (at most one count of one); on mongos it sums the
+        // shapes reported by each shard.
+        plan_shape_counters::PlanShapeCounts planShapeCounts;
+
         // Local peak tracked memory usage in bytes (max across getMore batches).
         boost::optional<uint64_t> peakTrackedMemBytes;
 

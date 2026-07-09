@@ -36,6 +36,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/resume_token.h"
+#include "mongo/db/query/query_stats/plan_shape_counters/plan_shape_counts.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -70,6 +71,7 @@ static const BSONObj basicMetricsObj = fromjson(R"({
         "Code": {"$numberLong": "0"}
     },
     nDocsSampled: {"$numberLong": "4"},
+    planShapeCounts: {collscan: {"$numberLong": "2"}, ixscanFetch: {"$numberLong": "1"}},
     cpuNanos: {"$numberLong": "18"},
     delinquentAcquisitions: {"$numberLong": "0"},
     totalAcquisitionDelinquencyMillis: {"$numberLong": "0"},
@@ -349,6 +351,13 @@ TEST(CursorResponseTest, parseFromBSONCursorMetrics) {
     ASSERT_EQ(ceMethods.getMetadata().value_or(0), 0);
     ASSERT_EQ(ceMethods.getCode().value_or(0), 0);
     ASSERT_EQ(metrics.getNDocsSampled(), 4);
+    ASSERT_TRUE(metrics.getPlanShapeCounts());
+    ASSERT_EQ(
+        metrics.getPlanShapeCounts()->getCount(plan_shape_counters::PlanShapeCounter::kCollscan),
+        2);
+    ASSERT_EQ(
+        metrics.getPlanShapeCounts()->getCount(plan_shape_counters::PlanShapeCounter::kIxscanFetch),
+        1);
     ASSERT_EQ(metrics.getCpuNanos(), 18);
     ASSERT_EQ(metrics.getDelinquentAcquisitions(), 0);
     ASSERT_EQ(metrics.getTotalAcquisitionDelinquencyMillis(), 0);
@@ -1082,6 +1091,7 @@ TEST(CursorResponseTest, parseFromBSONCursorMetricsToleratesMissingDefaultFields
     const auto& parsedCeMethods = metrics.getCardinalityEstimationMethods();
     ASSERT_EQ(parsedCeMethods.getHistogram().value_or(0), 0);
     ASSERT_EQ(metrics.getNDocsSampled(), 0);
+    ASSERT_FALSE(metrics.getPlanShapeCounts());
     ASSERT_EQ(metrics.getCpuNanos(), 0);
     ASSERT_EQ(metrics.getDelinquentAcquisitions(), 0);
     ASSERT_EQ(metrics.getTotalAcquisitionDelinquencyMillis(), 0);

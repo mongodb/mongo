@@ -132,6 +132,9 @@ void QueryPlannerEntry::toBSON(BSONObjBuilder& queryStatsBuilder,
     usedDisk.appendTo(*builder, "usedDisk");
     fromMultiPlanner.appendTo(*builder, "fromMultiPlanner");
     fromPlanCache.appendTo(*builder, "fromPlanCache");
+    if (!planShapeCounters.empty()) {
+        builder->append("planShapeCounters", planShapeCounters.toBSON());
+    }
 
     if (includeCBRMetrics) {
         planningTimeMicros.appendTo(*builder, "planningTimeMicros");

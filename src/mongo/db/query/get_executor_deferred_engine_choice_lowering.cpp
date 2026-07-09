@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/get_executor_deferred_engine_choice_lowering.h"
 
+#include "mongo/db/curop.h"
 #include "mongo/db/exec/classic/count.h"
 #include "mongo/db/exec/classic/multi_plan.h"
 #include "mongo/db/exec/runtime_planners/planner_types.h"
@@ -40,6 +41,7 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_stats/plan_shape_counters/plan_shape_counters.h"
+#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
@@ -89,7 +91,14 @@ public:
 
         // TODO SERVER-130428 remove `internalQueryEnablePlanShapeAnalysis`
         if (internalQueryEnablePlanShapeAnalysis.load()) {
-            planShape = plan_shape_counters::identifyPlanShapeForCounters(*solution);
+            auto& opDebug = CurOp::get(_opCtx)->debug();
+            // Gate on shouldRequestRemoteMetrics, which checks if metrics are requested by
+            // mongos or if the local query stats key exists.
+            if (query_stats::shouldRequestRemoteMetrics(opDebug)) {
+                if (auto shape = plan_shape_counters::identifyPlanShapeForCounters(*solution)) {
+                    opDebug.getAdditiveMetrics().planShapeCounts.increment(*shape);
+                }
+            }
         }
 
         tassert(9735001,
@@ -340,7 +349,6 @@ private:
     const MultipleCollectionAccessor& _collections;
     PlanYieldPolicy::YieldPolicy _yieldPolicy;
     Pipeline* _pipeline;
-    boost::optional<plan_shape_counters::PlanShapeCounter> planShape;
 };
 
 }  // namespace

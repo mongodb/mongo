@@ -44,6 +44,7 @@
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/getmore_command_gen.h"
+#include "mongo/db/query/query_stats/plan_shape_counters/plan_shape_counts.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -3743,6 +3744,10 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         metrics.setWasMarkedNonDeprioritizable(false);
         metrics.setOverdueInterruptApproxMaxMillis(100);
         metrics.setClusterPeakTrackedMemBytes(100);
+        plan_shape_counters::PlanShapeCounts planShapeCounts;
+        planShapeCounts.increment(plan_shape_counters::PlanShapeCounter::kCollscan, 2);
+        planShapeCounts.increment(plan_shape_counters::PlanShapeCounter::kIxscanFetch, 1);
+        metrics.setPlanShapeCounts(planShapeCounts);
         scheduleResponse(id, {fromjson("{_id: 1}")}, std::move(metrics));
     }
 
@@ -3789,6 +3794,12 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.cardinalityEstimationMethods.getCode().value_or(0), 0);
         ASSERT_EQ(remoteMetrics.nDocsSampled, 15);
         ASSERT_EQ(remoteMetrics.clusterPeakTrackedMemBytes, 100);
+        ASSERT_EQ(remoteMetrics.planShapeCounts.getCount(
+                      plan_shape_counters::PlanShapeCounter::kCollscan),
+                  2);
+        ASSERT_EQ(remoteMetrics.planShapeCounts.getCount(
+                      plan_shape_counters::PlanShapeCounter::kIxscanFetch),
+                  1);
     }
 
     // Schedule a second response.
@@ -3825,6 +3836,10 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         metrics.setWasMarkedNonDeprioritizable(true);
         metrics.setOverdueInterruptApproxMaxMillis(200);
         metrics.setClusterPeakTrackedMemBytes(400);
+        plan_shape_counters::PlanShapeCounts planShapeCounts;
+        planShapeCounts.increment(plan_shape_counters::PlanShapeCounter::kCollscan, 1);
+        planShapeCounts.increment(plan_shape_counters::PlanShapeCounter::kIxscanProject, 1);
+        metrics.setPlanShapeCounts(planShapeCounts);
         scheduleResponse(CursorId(0), {fromjson("{_id: 2}")}, std::move(metrics));
     }
 
@@ -3869,6 +3884,15 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.cardinalityEstimationMethods.getCode().value_or(0), 0);
         ASSERT_EQ(remoteMetrics.nDocsSampled, 31);
         ASSERT_EQ(remoteMetrics.clusterPeakTrackedMemBytes, 500);
+        ASSERT_EQ(remoteMetrics.planShapeCounts.getCount(
+                      plan_shape_counters::PlanShapeCounter::kCollscan),
+                  3);
+        ASSERT_EQ(remoteMetrics.planShapeCounts.getCount(
+                      plan_shape_counters::PlanShapeCounter::kIxscanFetch),
+                  1);
+        ASSERT_EQ(remoteMetrics.planShapeCounts.getCount(
+                      plan_shape_counters::PlanShapeCounter::kIxscanProject),
+                  1);
     }
 
     {
@@ -3900,6 +3924,7 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.planningTime, Microseconds(0));
         ASSERT_EQ(remoteMetrics.nDocsSampled, 0);
         ASSERT_EQ(remoteMetrics.clusterPeakTrackedMemBytes, 0);
+        ASSERT_TRUE(remoteMetrics.planShapeCounts.empty());
     }
 
     // Read the EOF

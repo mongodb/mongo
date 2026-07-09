@@ -1005,6 +1005,7 @@ mongo_cc_library(
         "//src/mongo/db/query/plan_cache:join_plan_cache",
         "//src/mongo/db/query/plan_cache:query_plan_cache",
         "//src/mongo/db/query/query_settings",
+        "//src/mongo/db/query/query_stats",
         "//src/mongo/db/query/query_stats/plan_shape_counters",
         "//src/mongo/db/query/stage_builder/sbe:stage_builder",
         "//src/mongo/db/query/stage_memory_limit_knobs",

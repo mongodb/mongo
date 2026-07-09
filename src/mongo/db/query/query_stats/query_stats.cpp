@@ -323,6 +323,7 @@ void updateQueryPlannerStatistics(QueryPlannerEntry& queryPlannerEntryToUpdate,
     queryPlannerEntryToUpdate.costBasedRankerStats.cardinalityEstimationMethods.aggregate(
         snapshot.cardinalityEstimationMethods);
     queryPlannerEntryToUpdate.costBasedRankerStats.nDocsSampled.aggregate(snapshot.nDocsSampled);
+    queryPlannerEntryToUpdate.planShapeCounters.add(snapshot.planShapeCounts);
 }
 
 void updateWriteStatistics(WritesEntry& writeEntryToUpdate, const QueryStatsSnapshot& snapshot) {
@@ -578,6 +579,7 @@ QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
         .planningTimeMicros = metrics.planningTime.value_or(Microseconds(0)).count(),
         .cardinalityEstimationMethods = metrics.cardinalityEstimationMethods,
         .nDocsSampled = static_cast<uint64_t>(metrics.nDocsSampled.value_or(0)),
+        .planShapeCounts = metrics.planShapeCounts,
         .nMatched = static_cast<uint64_t>(metrics.nMatched.value_or(0)),
         .nUpserted = static_cast<uint64_t>(metrics.nUpserted.value_or(0)),
         .nModified = static_cast<uint64_t>(metrics.nModified.value_or(0)),

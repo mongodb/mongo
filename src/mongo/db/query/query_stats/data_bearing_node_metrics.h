@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
+#include "mongo/db/query/query_stats/plan_shape_counters/plan_shape_counts.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
@@ -82,6 +83,7 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
     Microseconds planningTime{0};
     CardinalityEstimationMethods cardinalityEstimationMethods;
     uint64_t nDocsSampled{0};
+    plan_shape_counters::PlanShapeCounts planShapeCounts;
 
     uint64_t clusterPeakTrackedMemBytes{0};
 
@@ -142,6 +144,7 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
             cardinalityEstimationMethods.getCode().value_or(0) +
             other.cardinalityEstimationMethods.getCode().value_or(0));
         nDocsSampled += other.nDocsSampled;
+        planShapeCounts.add(other.planShapeCounts);
         clusterPeakTrackedMemBytes += other.clusterPeakTrackedMemBytes;
     }
 
@@ -205,6 +208,9 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
         cardinalityEstimationMethods.setCode(cardinalityEstimationMethods.getCode().value_or(0) +
                                              ce.getCode().value_or(0));
         nDocsSampled += metrics.getNDocsSampled();
+        if (const auto& psc = metrics.getPlanShapeCounts()) {
+            planShapeCounts.add(*psc);
+        }
         clusterPeakTrackedMemBytes += metrics.getClusterPeakTrackedMemBytes();
     }
 };

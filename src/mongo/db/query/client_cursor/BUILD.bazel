@@ -44,6 +44,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
+        "//src/mongo/db/query/query_stats/plan_shape_counters:plan_shape_counts",
     ],
 )
 

@@ -49,6 +49,7 @@
 #include "mongo/db/query/query_stats/aggregated_metric.h"
 #include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/query/query_stats/key.h"
+#include "mongo/db/query/query_stats/plan_shape_counters/plan_shape_counts.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_type.h"
@@ -1567,6 +1568,7 @@ struct QueryStatsBSONParams {
     BSONObj peakTrackedMemBytes = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
     BSONObj clusterPeakTrackedMemBytes =
         intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
+    BSONObj planShapeCounters = BSONObj();
 };
 
 void verifyQueryStatsBSON(QueryStatsEntry& qse, const QueryStatsBSONParams& params = {}) {
@@ -1620,6 +1622,10 @@ void verifyQueryStatsBSON(QueryStatsEntry& qse, const QueryStatsBSONParams& para
         .append("usedDisk", params.usedDisk)
         .append("fromMultiPlanner", boolMetricBson(0, 0))
         .append("fromPlanCache", boolMetricBson(0, 0));
+
+    if (!params.planShapeCounters.isEmpty()) {
+        subsectionBuilder->append("planShapeCounters", params.planShapeCounters);
+    }
 
     if (params.includeCBRMetrics) {
         subsectionBuilder->append("planningTimeMicros", params.planningTimeMicros);
@@ -1845,6 +1851,68 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsageWithCBRMetrics) {
                                      .cardinalityEstimationMethods = expectedCE,
                                      .nDocsSampled = intMetricBson(15, 15, 15, 225),
                                  });
+        }
+    }
+}
+
+TEST_F(QueryStatsStoreTest, BasicPlanShapeCounters) {
+    using plan_shape_counters::PlanShapeCounter;
+    using plan_shape_counters::PlanShapeCounts;
+    PlanShapeCounts collscan;
+    collscan.increment(PlanShapeCounter::kCollscan);
+    PlanShapeCounts ixscanFetch;
+    ixscanFetch.increment(PlanShapeCounter::kIxscanFetch);
+    for (bool useSubsections : {false, true}) {
+        QueryStatsStore queryStatsStore{5000000, 1000};
+
+        auto getMetrics = [&](BSONObj query) {
+            auto key = makeFindKeyFromQuery(query);
+            auto lookupResult = queryStatsStore.lookup(absl::HashOf(key));
+            ASSERT_OK(lookupResult);
+            return *lookupResult.getValue();
+        };
+
+        auto collectMetricsBase = [&](BSONObj query) {
+            auto key = makeFindKeyFromQuery(query);
+            auto lookupHash = absl::HashOf(key);
+            auto lookupResult = queryStatsStore.lookup(lookupHash);
+            if (!lookupResult.isOK()) {
+                queryStatsStore.put(lookupHash, QueryStatsEntry{std::move(key)});
+                lookupResult = queryStatsStore.lookup(lookupHash);
+            }
+            return lookupResult.getValue();
+        };
+
+        BSONObj query = BSON("query" << BSON("a" << 1));
+
+        // With no observed plan shapes, the planShapeCounters field is omitted entirely.
+        {
+            auto metrics = collectMetricsBase(query);
+            metrics->execCount += 1;
+            metrics->queryPlannerStats.planShapeCounters.add(PlanShapeCounts{});
+        }
+        {
+            auto qse = getMetrics(query);
+            verifyQueryStatsBSON(qse, {.useSubsections = useSubsections, .execCount = 1LL});
+        }
+
+        // Observed shapes accumulate and are reported, with zero-count shapes omitted.
+        {
+            auto metrics = collectMetricsBase(query);
+            metrics->execCount += 1;
+            metrics->queryPlannerStats.planShapeCounters.add(collscan);
+            metrics->queryPlannerStats.planShapeCounters.add(collscan);
+            metrics->queryPlannerStats.planShapeCounters.add(ixscanFetch);
+        }
+        {
+            auto qse = getMetrics(query);
+            verifyQueryStatsBSON(
+                qse,
+                {
+                    .useSubsections = useSubsections,
+                    .execCount = 2LL,
+                    .planShapeCounters = BSON("collscan" << 2LL << "ixscanFetch" << 1LL),
+                });
         }
     }
 }

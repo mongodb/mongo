@@ -36,6 +36,7 @@ mongo_cc_library(
         ":rate_limiting",
         "//src/mongo/db:api_parameters",
         "//src/mongo/db:commands",
+        "//src/mongo/db/query/query_stats/plan_shape_counters:plan_shape_counts",
         "//src/mongo/util:buildinfo",
     ],
 )
@@ -113,6 +114,7 @@ mongo_cc_unit_test(
         "rate_limiting_test.cpp",
         "supplemental_metrics_test.cpp",
         "update_key_test.cpp",
+        "//src/mongo/db/query/query_stats/plan_shape_counters:plan_shape_counts_test.cpp",
         "//src/mongo/db/query/query_stats/plan_shape_counters:plan_shape_pattern_counters_test.cpp",
     ],
     tags = ["mongo_unittest_fourth_group"],
@@ -123,6 +125,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/compiler/physical_model/query_solution:query_solution_test_util",
         "//src/mongo/db/query/query_stats/plan_shape_counters",
+        "//src/mongo/db/query/query_stats/plan_shape_counters:plan_shape_counts",
         "//src/mongo/util:version_impl",
     ],
 )

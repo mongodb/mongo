@@ -29,65 +29,13 @@
 
 #pragma once
 
-#include "mongo/db/query/util/named_enum.h"
-
-#include <cstddef>
+#include "mongo/db/query/query_stats/plan_shape_counters/plan_shape_counts.h"
 
 #include <boost/optional.hpp>
 
 namespace mongo {
 class QuerySolution;
 namespace plan_shape_counters {
-
-/**
- * Identifies a specific plan shape counter tracked by query stats.
- *
- * The shapes are mutually exclusive: a winning plan matches at most one of them, so a single query
- * execution increments at most one counter (by one).
- */
-#define PLAN_SHAPE_COUNTER_TABLE(F)   \
-    F(kCollscan)                      \
-    F(kCollscanProject)               \
-    F(kCollscanProjectSort)           \
-    F(kCollscanProjectSortProject)    \
-    F(kCollscanSort)                  \
-    F(kCollscanSortProject)           \
-    F(kCollscanSortProjectSort)       \
-    F(kIxscanFetch)                   \
-    F(kIxscanFetchOr)                 \
-    F(kIxscanFetchOrProject)          \
-    F(kIxscanFetchOrProjectSort)      \
-    F(kIxscanFetchOrSort)             \
-    F(kIxscanFetchOrSortProject)      \
-    F(kIxscanFetchProject)            \
-    F(kIxscanFetchProjectSort)        \
-    F(kIxscanFetchProjectSortProject) \
-    F(kIxscanFetchSort)               \
-    F(kIxscanFetchSortProject)        \
-    F(kIxscanFetchSortProjectSort)    \
-    F(kIxscanFetchSortMerge)          \
-    F(kIxscanFetchSortMergeProject)   \
-    F(kIxscanOrFetch)                 \
-    F(kIxscanOrFetchProject)          \
-    F(kIxscanOrFetchProjectSort)      \
-    F(kIxscanOrFetchSort)             \
-    F(kIxscanOrFetchSortProject)      \
-    F(kIxscanOrProject)               \
-    F(kIxscanOrProjectSort)           \
-    F(kIxscanProject)                 \
-    F(kIxscanProjectSort)             \
-    F(kIxscanProjectSortProject)      \
-    F(kIxscanSortFetch)               \
-    F(kIxscanSortFetchProject)        \
-    F(kIxscanSortMergeFetch)          \
-    F(kIxscanSortMergeFetchProject)   \
-    F(kIxscanSortMergeProject)        \
-    F(kNumCounters)
-
-QUERY_UTIL_NAMED_ENUM_DEFINE(PlanShapeCounter, PLAN_SHAPE_COUNTER_TABLE)
-#undef PLAN_SHAPE_COUNTER_TABLE
-
-constexpr size_t kNumPlanShapeCounters = static_cast<size_t>(PlanShapeCounter::kNumCounters);
 
 /**
  * Matches the winning 'solution' against the specific plan shapes tracked by query stats and

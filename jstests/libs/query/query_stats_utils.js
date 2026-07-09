@@ -746,7 +746,7 @@ export function getValueAtPath(object, dottedPath) {
  * @param {String} collName - The desired collection name to use. The db will be "test".
  * @param {Function} callbackFn - The function to make the assertion on each connection.
  */
-export function withQueryStatsEnabled(collName, callbackFn) {
+export function withQueryStatsEnabled(collName, callbackFn, shardKey = {_id: 1}, split = {_id: 1}) {
     {
         const conn = MongoRunner.runMongod(getQueryStatsServerParameters());
         const testDB = conn.getDB("test");
@@ -765,7 +765,7 @@ export function withQueryStatsEnabled(collName, callbackFn) {
         });
         const testDB = st.getDB("test");
         var coll = testDB[collName];
-        st.shardColl(coll, {_id: 1}, {_id: 1});
+        st.shardColl(coll, shardKey, split);
 
         callbackFn(coll);
         st.stop();

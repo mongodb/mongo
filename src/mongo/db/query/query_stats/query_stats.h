@@ -260,6 +260,7 @@ struct QueryStatsSnapshot {
     int64_t planningTimeMicros;
     CardinalityEstimationMethods cardinalityEstimationMethods;
     uint64_t nDocsSampled;
+    plan_shape_counters::PlanShapeCounts planShapeCounts;
 
     uint64_t nMatched;
     uint64_t nUpserted;

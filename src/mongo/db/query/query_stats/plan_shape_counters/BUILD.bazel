@@ -10,6 +10,19 @@ exports_files(
 )
 
 mongo_cc_library(
+    name = "plan_shape_counts",
+    srcs = [
+        "plan_shape_counts.cpp",
+    ],
+    hdrs = [
+        "plan_shape_counts.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
     name = "plan_shape_counters",
     srcs = [
         "plan_access_path_counters.cpp",
@@ -18,6 +31,7 @@ mongo_cc_library(
         "plan_shape_pattern_counters.cpp",
     ],
     deps = [
+        ":plan_shape_counts",
         "//src/mongo:base",
         "//src/mongo/db/query:query_solution_analyzer",
         "//src/mongo/db/query/compiler/physical_model/query_solution",
