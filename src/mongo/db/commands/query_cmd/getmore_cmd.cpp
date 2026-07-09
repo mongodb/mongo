@@ -961,6 +961,10 @@ public:
             // Run the change stream getMore preconditions before iterating the cursor.
             ensureChangeStreamGetMorePreconditions(opCtx, cursorPin);
 
+            if (cursorPin->isChangeStreamQuery()) {
+                change_stream::recordCursorOptionMetrics(cmd.getBatchSize(), cmd.getMaxTimeMS());
+            }
+
             // Get the read concern level here in case the cursor is exhausted while iterating.
             const auto isLinearizableReadConcern = cursorPin->getReadConcernArgs().getLevel() ==
                 repl::ReadConcernLevel::kLinearizableReadConcern;

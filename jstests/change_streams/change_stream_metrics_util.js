@@ -53,6 +53,14 @@ export class ServerStatusMetrics {
         return this.getCsMetrics(db).cursor.open.pinned;
     }
 
+    static getCsCursorOptionBatchSize(db) {
+        return this.getCsMetrics(db).option.cursor.batchSize;
+    }
+
+    static getCsCursorOptionMaxTimeMS(db) {
+        return this.getCsMetrics(db).option.cursor.maxTimeMS;
+    }
+
     static getSsMetrics(db) {
         return assert.commandWorked(db.adminCommand({serverStatus: 1, metrics: 1})).metrics;
     }

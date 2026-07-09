@@ -38,12 +38,14 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <cstdint>
 #include <vector>
 
+#include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 namespace mongo::change_stream {
 
-inline const otel::metrics::CounterOptions kCursorsTotalOpenedOpts = [] {
+inline otel::metrics::CounterOptions kCursorsTotalOpenedOpts = [] {
     otel::metrics::CounterOptions opts{};
     opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
         .dottedPath = "changeStreams.cursor.totalOpened",
@@ -66,7 +68,7 @@ inline otel::metrics::Counter<int64_t>& createCurorsTotalOpened() {
 // "serverStatus.metrics.changeStreams.cursor.lifespan". The change stream lifespan histogram is
 // updated after a change stream cursor is closed. A histogram provides accurate and thread-safe
 // average for every bucket. This is achieved by locks, so there might be some overhead.
-inline const otel::metrics::HistogramOptions kLifespanOpts = [] {
+inline otel::metrics::HistogramOptions kLifespanOpts = [] {
     otel::metrics::HistogramOptions opts{};
     opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
         .dottedPath = "changeStreams.cursor.lifespan",
@@ -98,7 +100,7 @@ inline otel::metrics::Histogram<int64_t>& createCursorsLifespan() {
         kLifespanOpts);
 }
 
-inline const otel::metrics::UpDownCounterOptions kCursorsOpenTotalOpts = [] {
+inline otel::metrics::UpDownCounterOptions kCursorsOpenTotalOpts = [] {
     otel::metrics::UpDownCounterOptions opts{};
     opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
         .dottedPath = "changeStreams.cursor.open.total",
@@ -117,7 +119,7 @@ inline otel::metrics::UpDownCounter<int64_t>& createCursorsOpenTotal() {
 }
 
 
-inline const otel::metrics::UpDownCounterOptions kCursorsOpenPinnedOpts = [] {
+inline otel::metrics::UpDownCounterOptions kCursorsOpenPinnedOpts = [] {
     otel::metrics::UpDownCounterOptions opts{};
     opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
         .dottedPath = "changeStreams.cursor.open.pinned",
@@ -178,8 +180,76 @@ inline otel::metrics::Histogram<int64_t>& createUpdateLookupLatency(otel::metric
         opts);
 }
 
-// TODO SERVER-130815: deduplicate metric initializers
+inline otel::metrics::Histogram<int64_t>& createCursorBatchSizeHistogram() {
+    otel::metrics::HistogramOptions opts{};
+    opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+        .dottedPath = "changeStreams.option.cursor.batchSize",
+        .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
+    };
+    opts.serializationFormat = otel::metrics::HistogramSerializationFormat::kBucketCounts;
+    opts.explicitBucketBoundaries = std::vector<double>({1, 10, 100, 1000, 10000});
+    return otel::metrics::MetricsService::instance().createInt64Histogram(
+        otel::metrics::MetricNames::kChangeStreamOptionCursorBatchSize,
+        "Batch size requested for change stream aggregate/getMore cursors.",
+        otel::metrics::MetricUnit::kCount,
+        opts);
+};
 
+// Histogram for the OTEL metric "serverStatus.metrics.changeStreams.option.cursor.batchSize".
+// Tracks the 'batchSize' request field of change stream aggregate/getMore commands, on both
+// mongod and mongos.
+// Needs to be created and registered already at static-initialization time rather than lazily on
+// first use, because the metrics tree is frozen shortly after startup.
+inline otel::metrics::Histogram<int64_t>& kCursorBatchSizeHistogram =
+    createCursorBatchSizeHistogram();
+
+inline otel::metrics::Histogram<int64_t>& cursorBatchSizeHistogram() {
+    return kCursorBatchSizeHistogram;
+}
+
+inline otel::metrics::Histogram<int64_t>& createCursorMaxTimeMSHistogram() {
+    otel::metrics::HistogramOptions opts{};
+    opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+        .dottedPath = "changeStreams.option.cursor.maxTimeMS",
+        .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
+    };
+    opts.serializationFormat = otel::metrics::HistogramSerializationFormat::kBucketCounts;
+    opts.explicitBucketBoundaries = std::vector<double>(
+        {100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000, 1000000});
+    return otel::metrics::MetricsService::instance().createInt64Histogram(
+        otel::metrics::MetricNames::kChangeStreamOptionCursorMaxTimeMS,
+        "maxTimeMS requested for change stream aggregate/getMore commands, in milliseconds.",
+        otel::metrics::MetricUnit::kMilliseconds,
+        opts);
+};
+
+// Histogram for the OTEL metric "serverStatus.metrics.changeStreams.option.cursor.maxTimeMS".
+// Tracks the 'maxTimeMS' request field of change stream aggregate/getMore commands, on both
+// mongod and mongos.
+// Needs to be created and registered already at static-initialization time rather than lazily on
+// first use, because the metrics tree is frozen shortly after startup.
+inline otel::metrics::Histogram<int64_t>& kCursorMaxTimeMSHistogram =
+    createCursorMaxTimeMSHistogram();
+
+inline otel::metrics::Histogram<int64_t>& cursorMaxTimeMSHistogram() {
+    return kCursorMaxTimeMSHistogram;
+}
+
+// Records cursor option usage metrics for a change stream aggregate/getMore command. Must only
+// be called when the command/cursor is a change stream. Each option is recorded if the parsed
+// request provides a value for it (which may include IDL-backfilled defaults, e.g. aggregate
+// may backfill a default cursor.batchSize when the client omits it).
+inline void recordCursorOptionMetrics(boost::optional<std::int64_t> batchSize,
+                                      boost::optional<std::int64_t> maxTimeMS) {
+    if (batchSize) {
+        cursorBatchSizeHistogram().record(*batchSize);
+    }
+    if (maxTimeMS) {
+        cursorMaxTimeMSHistogram().record(*maxTimeMS);
+    }
+}
+
+// TODO SERVER-130815: deduplicate metric initializers
 inline otel::metrics::Counter<int64_t>& errorNonRetriableHistoryLost() {
     static auto& counter = []() -> otel::metrics::Counter<int64_t>& {
         otel::metrics::CounterOptions opts{};

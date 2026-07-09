@@ -34,6 +34,7 @@
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/change_stream_metrics_util.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/extension_metrics.h"
 #include "mongo/db/commands/query_cmd/run_aggregate.h"
@@ -269,6 +270,11 @@ public:
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
             globalOpCounters().gotAggregate();
+
+            if (_liteParsedPipeline.hasChangeStream()) {
+                change_stream::recordCursorOptionMetrics(request().getCursor().getBatchSize(),
+                                                         request().getMaxTimeMS());
+            }
 
             const auto& explain = request().getExplain();
             const auto& body = unparsedRequest().body;

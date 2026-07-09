@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/config.h"
+#include "mongo/util/modules.h"
 
 #ifdef MONGO_CONFIG_OTEL
 #include <opentelemetry/metrics/meter.h>
@@ -46,7 +47,7 @@ enum class ReportingPolicy {
 };
 
 /** Controls how histogram metric is serialized by serializeToBson(). */
-enum class HistogramSerializationFormat {
+enum class MONGO_MOD_PUBLIC HistogramSerializationFormat {
     kAverage,       ///< Report exponential moving average and total count.
     kBucketCounts,  ///< Report per-bucket counts and total count.
 };

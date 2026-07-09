@@ -3826,6 +3826,19 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_unit_test(
+    name = "change_stream_cursor_option_metrics_test",
+    srcs = [
+        "change_stream_cursor_option_metrics_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "change_stream_throughput_metrics_test",
     srcs = [
         "change_stream_throughput_metrics_test.cpp",
