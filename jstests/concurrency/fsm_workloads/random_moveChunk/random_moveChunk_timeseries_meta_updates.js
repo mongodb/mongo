@@ -49,13 +49,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             {multi: true},
         );
 
-        // A multi:true update may run at the same time as a chunk migration. While the migration
-        // commits, it briefly clears the shard's routing metadata. If the update has already
-        // changed some documents when that happens, the server returns QueryPlanKilled so the
-        // router does not retry and apply the change twice. We accept this error here: the
-        // validation step only compares document _ids, and a partial update to the meta field does
-        // not add or remove any document.
-        // TODO (SERVER-129536): Remove QueryPlanKilled as expected error.
+        // A multi:true update can run while a chunk migration commits on the same shard. During the
+        // commit the shard bumps its placement version, so an update that has already changed some
+        // documents stops with a placement version mismatch, which the server reports as
+        // QueryPlanKilled. The server does this on purpose: the update is not a retryable write and
+        // not in a transaction, so a retry could apply the change twice.
         if (res.hasWriteError()) {
             assert.eq(
                 res.getWriteError().code,
