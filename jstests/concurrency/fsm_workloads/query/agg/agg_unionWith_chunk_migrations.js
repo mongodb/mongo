@@ -21,10 +21,6 @@
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/agg/agg_with_chunk_migrations.js";
-import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
-
-// TODO (SERVER-129901) Re-enable once this ticket gets fixed.
-skipTestIfAuthoritativeShardsEnabled(db);
 
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.collWithMigrations = "union_ns";

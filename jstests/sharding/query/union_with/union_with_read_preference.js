@@ -8,12 +8,8 @@
  */
 import {profilerHasAtLeastOneMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 const st = new ShardingTest({name: "union_with_read_pref", mongos: 1, shards: 2, rs: {nodes: 2}});
-
-// TODO (SERVER-129901) Re-enable once this ticket gets fixed
-skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
 
 // In this test we perform writes which we expect to read on a secondary, so we need to enable
 // causal consistency.
