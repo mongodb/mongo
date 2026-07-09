@@ -716,6 +716,10 @@ repl::OpTime MigrationDestinationManager::fetchAndApplyBatch(
         auto applicationOpCtx = CancelableOperationContext(
             cc().makeOperationContext(), opCtx->getCancellationToken(), executor);
 
+        // The operation must proceed even while replica set writes are blocked on
+        // the recipient.
+        ReplicaSetWriteBlockBypass::get(applicationOpCtx.get()).set(true);
+
         ScopeGuard consumerGuard([&] {
             batches.closeConsumerEnd();
             lastOpApplied =

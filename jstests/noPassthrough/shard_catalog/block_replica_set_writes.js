@@ -1451,4 +1451,80 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
             "Migrated document should be on shard0 after the in-flight migration completes under the block",
         );
     });
+
+    it("Test that an in-flight chunk migration completes when blockReplicaSetWrites is enabled during the batch apply (catchup) phase", function () {
+        // Shard the collection and move the chunk containing {x: 1} to shard1, so it can be migrated
+        // back to shard0 (the to-be-blocked recipient).
+        assert.commandWorked(this.testDB.createCollection(this.shardedCollName));
+        assert.commandWorked(this.st.s.adminCommand({shardCollection: this.nns, key: {x: 1}}));
+        assert.commandWorked(this.testShardedColl.insert({x: -1}));
+        assert.commandWorked(this.testShardedColl.insert({x: 1}));
+        assert.commandWorked(this.st.s.adminCommand({split: this.nns, middle: {x: 0}}));
+        assert.commandWorked(
+            this.st.s.adminCommand({
+                moveChunk: this.nns,
+                find: {x: 1},
+                to: this.st.shard1.shardName,
+                _waitForDelete: true,
+            }),
+        );
+
+        // Pause the recipient (shard0) migrate thread after the initial bulk clone has finished but
+        // before the catchup phase, where transferred modifications are applied via the batch
+        // applier. This is the window that exercises the batch-apply write path, which runs on a
+        // separate operation context that must carry the ReplicaSetWriteBlockBypass.
+        const hangRecipientAfterClone = configureFailPoint(
+            this.st.rs0.getPrimary(),
+            "migrateThreadHangAtStep4",
+        );
+
+        const awaitMoveChunk = startParallelShell(
+            funWithArgs(
+                function (ns, toShard) {
+                    assert.commandWorked(
+                        db.getSiblingDB("admin").runCommand({
+                            moveChunk: ns,
+                            find: {x: 1},
+                            to: toShard,
+                        }),
+                    );
+                },
+                this.nns,
+                this.st.shard0.shardName,
+            ),
+            this.st.s.port,
+        );
+
+        try {
+            hangRecipientAfterClone.wait();
+
+            // Insert an additional document into the migrating chunk on the donor. Because the bulk
+            // clone has already finished, this write is logged as a modification that must be
+            // transferred to and applied by the recipient during the catchup (batch apply) phase.
+            assert.commandWorked(this.testShardedColl.insert({x: 2}));
+
+            // Enable per-shard write blocking on shard0 while the migration is in flight. The batch
+            // applier that applies the transferred modification enables ReplicaSetWriteBlockBypass,
+            // so the migration must still complete rather than abort.
+            enableReplicaSetWriteBlock(
+                this.shard0PrimaryAdminDB,
+                false /* allowDeletions */,
+                "InsufficientDiskSpace" /* reason */,
+            );
+        } finally {
+            hangRecipientAfterClone.off();
+        }
+
+        awaitMoveChunk();
+
+        // Both the cloned document and the one applied during the catchup phase must be on shard0.
+        assert.eq(
+            2,
+            this.st.shard0
+                .getDB(this.testDBName)
+                [this.shardedCollName].find({x: {$gte: 0}})
+                .itcount(),
+            "Both migrated documents should be on shard0 after the migration completes under the block",
+        );
+    });
 });
