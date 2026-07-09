@@ -2,6 +2,7 @@
 
 import os
 import os.path
+import shutil
 from typing import Optional
 
 from buildscripts.resmokelib import config, core, errors, logging, utils
@@ -38,15 +39,23 @@ class ServerSelectionJsonTestCase(interface.ProcessTestCase):
         interface.append_process_tracking_options(self.program_options, self._id)
 
     def _find_executable(self):
-        binary = os.path.join(config.INSTALL_DIR, "server_selection_json_test")
+        binary_name = "server_selection_json_test"
         if os.name == "nt":
-            binary += ".exe"
+            binary_name += ".exe"
 
-        if not os.path.isfile(binary):
-            raise errors.StopExecution(
-                f"Failed to locate server_selection_json_test binary at {binary}"
-            )
-        return binary
+        # When run with an install dir (e.g. `resmoke.py run --installDir=...`),
+        # look there first.
+        if config.INSTALL_DIR:
+            binary = os.path.join(config.INSTALL_DIR, binary_name)
+            if os.path.isfile(binary):
+                return binary
+
+        # Otherwise fall back to PATH.
+        binary = shutil.which(binary_name)
+        if binary:
+            return binary
+
+        raise errors.StopExecution(f"Failed to locate {binary_name} binary")
 
     def _make_process(self):
         command_line = [self.program_executable]
