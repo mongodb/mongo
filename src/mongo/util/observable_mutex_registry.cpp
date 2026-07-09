@@ -29,15 +29,10 @@
 
 #include "mongo/util/observable_mutex_registry.h"
 
-#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/ctype.h"
 #include "mongo/util/static_immortal.h"
 
 #include <string_view>
-
-#include <fmt/format.h>
 
 namespace mongo {
 MutexStats operator+(const MutexStats& lhs, const ObservableMutexRegistry::StatsRecord& rhs) {
@@ -111,35 +106,6 @@ BSONObj serializeStats(StringMap<std::vector<ObservableMutexRegistry::StatsRecor
 }
 }  // namespace
 
-
-// Checks if a tag is a valid OpenTelemetry metric name segment.
-bool isValidSegment(std::string_view seg) {
-    if (seg.empty() || seg.front() < 'a' || seg.front() > 'z') {
-        return false;
-    }
-    bool hasUpper = false, hasUnderscore = false;
-    for (size_t i = 1; i < seg.size(); ++i) {
-        const char c = seg[i];
-        if (c == '_') {
-            hasUnderscore = true;
-            if (i + 1 == seg.size() || !ctype::isAlnum(seg[i + 1])) {
-                return false;
-            }
-        } else if (ctype::isUpper(c)) {
-            hasUpper = true;
-        } else if (!ctype::isLower(c) && !ctype::isDigit(c)) {
-            return false;
-        }
-    }
-    return !(hasUpper && hasUnderscore);
-}
-
-void ObservableMutexRegistry::_validateTag(std::string_view tag) {
-    uassert(ErrorCodes::InvalidOptions,
-            fmt::format("mutex tag is not a valid OTel metric name segment: '{}'", tag),
-            isValidSegment(tag));
-}
-
 ObservableMutexRegistry& ObservableMutexRegistry::get() {
     static StaticImmortal<ObservableMutexRegistry> obj;
     return *obj;
@@ -148,15 +114,6 @@ ObservableMutexRegistry& ObservableMutexRegistry::get() {
 BSONObj ObservableMutexRegistry::report(bool listAll) {
     auto stats = _collectStats();
     return serializeStats(stats, listAll);
-}
-
-StringMap<MutexStats> ObservableMutexRegistry::statsPerTag() {
-    auto rawStats = _collectStats();
-    StringMap<MutexStats> result;
-    for (auto& [tag, records] : rawStats) {
-        result[tag] = std::accumulate(records.begin(), records.end(), MutexStats{});
-    }
-    return result;
 }
 
 StringMap<std::vector<ObservableMutexRegistry::StatsRecord>>

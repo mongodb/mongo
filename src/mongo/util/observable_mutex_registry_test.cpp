@@ -29,9 +29,7 @@
 
 #include "mongo/util/observable_mutex_registry.h"
 
-#include "mongo/base/error_codes.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
 
 #include <iterator>
 #include <string_view>
@@ -104,41 +102,16 @@ public:
         _compare(options, stats, expected);
     }
 
-    void assertStatsPerTag(const StatsList& expected) {
-        auto stats = _registry.statsPerTag();
-
-        const size_t expectedSize = expected.size() + std::size(kInternalMutexTags);
-        ASSERT_EQ(stats.size(), expectedSize);
-
-        for (const auto& [tag, data, _] : expected) {
-            auto it = stats.find(tag);
-            ASSERT(it != stats.end()) << "Tag not found: " << tag;
-            const auto& ex = it->second.exclusiveAcquisitions;
-            const auto& sh = it->second.sharedAcquisitions;
-
-            EXPECT_EQ(ex.total, data.exclusiveAcquisitions.total) << "for tag " << tag;
-            EXPECT_EQ(ex.contentions, data.exclusiveAcquisitions.contentions) << "for tag " << tag;
-            EXPECT_EQ(ex.waitCycles, data.exclusiveAcquisitions.waitCycles) << "for tag " << tag;
-            EXPECT_EQ(sh.total, data.sharedAcquisitions.total) << "for tag " << tag;
-            EXPECT_EQ(sh.contentions, data.sharedAcquisitions.contentions) << "for tag " << tag;
-            EXPECT_EQ(sh.waitCycles, data.sharedAcquisitions.waitCycles) << "for tag " << tag;
-        }
-    }
-
 private:
     void _compare(Options options, BSONObj actual, StatsList expected) {
-        auto assertStats =
-            [](BSONObj statObj, MutexAcquisitionStats expected, std::string_view tag) {
-                ASSERT_EQ(statObj.getIntField(ObservableMutexRegistry::kTotalAcquisitionsFieldName),
-                          expected.total)
-                    << "for tag " << tag;
-                ASSERT_EQ(statObj.getIntField(ObservableMutexRegistry::kTotalContentionsFieldName),
-                          expected.contentions)
-                    << "for tag " << tag;
-                ASSERT_EQ(statObj.getIntField(ObservableMutexRegistry::kTotalWaitCyclesFieldName),
-                          expected.waitCycles)
-                    << "for tag " << tag;
-            };
+        auto assertStats = [](BSONObj statObj, MutexAcquisitionStats expected) {
+            ASSERT_EQ(statObj.getIntField(ObservableMutexRegistry::kTotalAcquisitionsFieldName),
+                      expected.total);
+            ASSERT_EQ(statObj.getIntField(ObservableMutexRegistry::kTotalContentionsFieldName),
+                      expected.contentions);
+            ASSERT_EQ(statObj.getIntField(ObservableMutexRegistry::kTotalWaitCyclesFieldName),
+                      expected.waitCycles);
+        };
 
         const std::size_t expectedSize = options.skipInternalMutexes
             ? expected.size() + std::size(kInternalMutexTags)
@@ -154,11 +127,9 @@ private:
 
             auto tagStats = actual.getObjectField(tag);
             assertStats(tagStats.getObjectField(ObservableMutexRegistry::kExclusiveFieldName),
-                        data.exclusiveAcquisitions,
-                        tag);
+                        data.exclusiveAcquisitions);
             assertStats(tagStats.getObjectField(ObservableMutexRegistry::kSharedFieldName),
-                        data.sharedAcquisitions,
-                        tag);
+                        data.sharedAcquisitions);
 
             ASSERT_EQ(options.listAll, tagStats.hasField(ObservableMutexRegistry::kMutexFieldName));
             if (options.listAll) {
@@ -181,11 +152,9 @@ private:
                     }
 
                     assertStats(obj.getObjectField(ObservableMutexRegistry::kExclusiveFieldName),
-                                listAllData->at(i).data.exclusiveAcquisitions,
-                                tag);
+                                listAllData->at(i).data.exclusiveAcquisitions);
                     assertStats(obj.getObjectField(ObservableMutexRegistry::kSharedFieldName),
-                                listAllData->at(i).data.sharedAcquisitions,
-                                tag);
+                                listAllData->at(i).data.sharedAcquisitions);
                 }
             }
         }
@@ -342,42 +311,6 @@ TEST_F(ObservableMutexRegistryReportTest, MutexIdShouldNeverChangeAfterInvalidat
     mutexA1->invalidate();
     listAllA.erase(listAllA.begin() + 1);
     assertReport({{"a", statsA.data, listAllA}}, {.listAll = true, .skipInternalMutexes = true});
-}
-
-TEST_F(ObservableMutexRegistryReportTest, StatsPerTagSingleMutex) {
-    TaggedStats statsA = {"a", {{3, 2, 500}, {1, 0, 17}}};
-    auto mutex = makeMutexAndAddToRegistry(statsA);
-
-    assertStatsPerTag({statsA});
-}
-
-TEST_F(ObservableMutexRegistryReportTest, StatsPerTagAggregatesMultipleMutexesUnderSameTag) {
-    TaggedStats statsA0 = {"a", {{3, 2, 500}, {1, 0, 17}}};
-    TaggedStats statsA1 = {"a", {{5, 1, 200}, {4, 2, 50}}};
-    TaggedStats statsB = {"b", {{7, 3, 1000}, {0, 0, 0}}};
-
-    auto mutexA0 = makeMutexAndAddToRegistry(statsA0);
-    auto mutexA1 = makeMutexAndAddToRegistry(statsA1);
-    auto mutexB = makeMutexAndAddToRegistry(statsB);
-
-    TaggedStats statsA = {"a", statsA0.data + statsA1.data};
-    assertStatsPerTag({statsA, statsB});
-}
-
-TEST_F(ObservableMutexRegistryReportTest, StatsPerTagPreservesInvalidatedMutexStats) {
-    TaggedStats statsA = {"a", {{3, 2, 500}, {1, 0, 17}}};
-    auto mutex = makeMutexAndAddToRegistry(statsA);
-
-    mutex->invalidate();
-    assertStatsPerTag({statsA});
-}
-
-TEST_F(ObservableMutexRegistryReportTest, RejectsInvalidOtelTag) {
-    for (std::string_view tag :
-         {"", "Mutex", "1mutex", "my.mutex", "my_Mutex", "my_", "my__mutex"}) {
-        ASSERT_THROWS_CODE(
-            makeMutexAndAddToRegistry({tag, {}}), DBException, ErrorCodes::InvalidOptions);
-    }
 }
 
 }  // namespace
