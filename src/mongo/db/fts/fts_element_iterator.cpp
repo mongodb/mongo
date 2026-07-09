@@ -156,7 +156,9 @@ FTSIteratorValue FTSElementIterator::advance() {
             case BSONType::string:
                 // Only index strings on exact match or wildcard.
                 if (exactMatch || _spec.wildcard()) {
-                    return FTSIteratorValue(elem.valueStringData(), _frame._language, weight);
+                    auto text = elem.valueStringData();
+                    text = text.substr(0, text.find('\0'));  // NUL-truncate
+                    return FTSIteratorValue(text, _frame._language, weight);
                 }
                 break;
 

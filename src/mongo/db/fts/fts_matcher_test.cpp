@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/unittest/unittest.h"
 
@@ -140,6 +141,38 @@ TEST(FTSMatcher, MatcherDoesNotFilterStopWordsPos) {
     FTSMatcher m(q, FTSSpec(assertGet(FTSSpec::fixSpec(BSON("key" << BSON("x" << "text"))))));
 
     ASSERT(m.hasPositiveTerm(BSON("x" << "the")));
+}
+
+// A field value with an embedded NUL is historically truncated at the NUL (strlen semantics) before
+// matching, so text appearing after the NUL is invisible to the matcher. This test pins that
+// behavior: the phrase "dog", which lives after the NUL, must not match.
+//
+// It fails if there's a regression such that NUL truncation is somehow omitted, as accidentally
+// happened when the codebase was converted to `std::string_view` (in SERVER-32422).
+TEST(FTSMatcher, PositivePhraseStopsAtEmbeddedNul) {
+    // Runs a case- and diacritic-sensitive positive-phrase query against a document field value
+    // that contains an embedded NUL. Case- and diacritic-sensitive phrase matching compares the
+    // phrase against the raw field value directly (no tokenization), so this exercises the same
+    // raw-string comparison that the scoring boost does.
+    auto doMatch = [](BSONObj spec, BSONObj doc, const std::string& search) {
+        FTSQueryImpl q;
+        q.setQuery(search);
+        q.setLanguage("english");
+        q.setCaseSensitive(true);
+        q.setDiacriticSensitive(true);
+        ASSERT_OK(q.parse(TEXT_INDEX_VERSION_3));
+        FTSMatcher m(q, FTSSpec(assertGet(FTSSpec::fixSpec(spec))));
+        return m.positivePhrasesMatch(doc);
+    };
+    BSONObj spec = fromjson(R"({"key": {"x": "text"}})");
+
+    BSONObj plainDoc = fromjson(R"({"x": "catdog"})");
+    ASSERT_TRUE(doMatch(spec, plainDoc, R"("cat")"));
+    ASSERT_TRUE(doMatch(spec, plainDoc, R"("dog")"));
+
+    BSONObj nulDoc = fromjson(R"({"x": "cat\u0000dog"})");
+    ASSERT_TRUE(doMatch(spec, nulDoc, R"("cat")")) << "before NUL";
+    ASSERT_FALSE(doMatch(spec, nulDoc, R"("dog")")) << "after NUL is invisible";
 }
 
 // Returns whether a document indexed with text data 'doc' contains any positive terms from

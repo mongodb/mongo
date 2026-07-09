@@ -206,6 +206,31 @@ TEST(FTSSpec, ScoreSingleField1) {
     ASSERT(m["cat"] > 0);
 }
 
+// A field value whose only token is identical to the (untokenized) raw field value receives a
+// small boost (adjustment of +0.1). An embedded NUL in the value should not change the fact that
+// the sole token "cat" matches the raw value: strlen-style truncation historically made
+// "cat\0..." look like "cat". This test pins that boost-equivalence.
+TEST(FTSSpec, ScoreSingleFieldWithEmbeddedNul) {
+    auto doScore = [&](BSONObj specDoc, BSONObj doc) {
+        TermFrequencyMap m;
+        FTSSpec spec(assertGet(FTSSpec::fixSpec(specDoc)));
+        spec.scoreDocument(doc, &m);
+        return m;
+    };
+    BSONObj specDoc = fromjson(R"({
+        "key": {
+            "title": "text",
+            "text": "text"
+        },
+        "weights": {
+            "title": 10
+        }
+    })");
+    ASSERT_EQ(doScore(specDoc, fromjson(R"({"title": "cat\u0000"})")),
+              doScore(specDoc, fromjson(R"({"title": "cat"})")))
+        << "Trailing NUL on a value must not affect its score.";
+}
+
 TEST(FTSSpec, ScoreMultipleField1) {
     BSONObj user = BSON("key" << BSON("title" << "text"
                                               << "text"

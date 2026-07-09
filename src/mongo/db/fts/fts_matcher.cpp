@@ -88,8 +88,8 @@ bool FTSMatcher::_hasPositiveTerm_string(const FTSLanguage* language, std::strin
     tokenizer->reset(raw, _getTokenizerOptions());
 
     while (tokenizer->moveNext()) {
-        string word = std::string{tokenizer->get()};
-        if (_query.getPositiveTerms().count(word) > 0) {
+        // This map can heterogeneously lookup `std::string_view` directly.
+        if (_query.getPositiveTerms().count(tokenizer->get())) {
             return true;
         }
     }
