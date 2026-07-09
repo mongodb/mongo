@@ -787,8 +787,9 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     }
 
     if (isEnabledWithPinnedVersion(forwardableMetadata, feature_flags::gAuthoritativeShardsDDL)) {
-        tassert(ErrorCodes::IllegalOperation,
-                "Authoritative shards requires no shard refreshes to be executed",
+        uassert(ErrorCodes::ReshardCollectionInterruptedDueToFCVChange,
+                "Resharding with authoritative shards requires shard refreshes to be disabled; "
+                "this can occur during FCV transitions. Retry after the FCV transition completes.",
                 isEnabledWithPinnedVersion(forwardableMetadata,
                                            resharding::gFeatureFlagReshardingCloneNoRefresh) &&
                     isEnabledWithPinnedVersion(forwardableMetadata,

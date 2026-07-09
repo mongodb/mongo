@@ -312,6 +312,7 @@ void MoveUnshardedPolicy::applyActionResult(OperationContext* opCtx,
                 case ErrorCodes::ReshardCollectionAborted:
                 case ErrorCodes::ReshardCollectionInProgress:
                 case ErrorCodes::ReshardCollectionTruncatedError:
+                case ErrorCodes::ReshardCollectionInterruptedDueToFCVChange:
                 case ErrorCodes::ShardNotFound:
                 case ErrorCodes::SnapshotTooOld:
                 case ErrorCodes::StaleDbVersion:
