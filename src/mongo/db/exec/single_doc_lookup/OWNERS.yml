@@ -12,6 +12,10 @@ filters:
   - "express_*":
     approvers:
       - 10gen/query-execution-classic
+  # SBE-based executor touches SBE internals (plan builder, runtime env, slot binder).
+  - "sbe_*":
+    approvers:
+      - 10gen/query-execution-sbe
   # The sharded (route-based) eligibility decision touches catalog/routing internals.
   - "sharded_cluster_local_lookup_eligibility*":
     approvers:

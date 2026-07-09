@@ -90,14 +90,6 @@ public:
     virtual void setPlanSummaryStatsSink(PlanSummaryStats* sink) {}
 
     /**
-     * Lifecycle hooks invoked by the parent stage at batch boundaries. A strategy that caches
-     * opCtx-bound resources must drop them in detachFromOperationContext(), since they do not
-     * outlive the current opCtx.
-     */
-    virtual void detachFromOperationContext() {}
-    virtual void reattachToOperationContext(OperationContext* opCtx) {}
-
-    /**
      * Releases attached catalog state (collection acquisition handle, open storage cursors). Any
      * cached plan survives. Non-throwing.
      * Must be idempotent: it may be called more than once on the same executor.
@@ -138,16 +130,6 @@ public:
     void setPlanSummaryStatsSink(PlanSummaryStats* sink) override {
         _primary->setPlanSummaryStatsSink(sink);
         _fallback->setPlanSummaryStatsSink(sink);
-    }
-
-    void detachFromOperationContext() override {
-        _primary->detachFromOperationContext();
-        _fallback->detachFromOperationContext();
-    }
-
-    void reattachToOperationContext(OperationContext* opCtx) override {
-        _primary->reattachToOperationContext(opCtx);
-        _fallback->reattachToOperationContext(opCtx);
     }
 
     void releaseResources() noexcept override {

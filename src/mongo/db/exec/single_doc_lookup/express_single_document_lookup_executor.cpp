@@ -30,6 +30,7 @@
 #include "mongo/db/exec/single_doc_lookup/express_single_document_lookup_executor.h"
 
 #include "mongo/db/exec/express/plan_executor_express.h"
+#include "mongo/db/exec/single_doc_lookup/local_lookup_util.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
@@ -52,8 +53,6 @@ namespace mongo::exec::agg {
 namespace {
 using namespace std::literals::string_view_literals;
 
-constexpr auto kIdField = "_id"sv;
-
 /**
  * Build the Express PlanExecutor for an _id-equality lookup. Returns nullptr if the documentKey
  * carries no _id, the caller should treat this as kNotHandled.
@@ -63,18 +62,15 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutor(
     const NamespaceString& nss,
     const CollectionAcquirer::Handle& coll,
     const Document& documentKey) {
-    const Value idVal = documentKey[kIdField];
-    if (idVal.missing()) {
+    const auto idFilter = makeIdEqualityFilter(documentKey);
+    if (!idFilter) {
         LOGV2_DEBUG(12841302,
                     1,
                     "ExpressSingleDocumentLookupExecutor: documentKey has no _id, falling back",
                     "documentKey"_attr = redact(documentKey.toBson()));
         return nullptr;
     }
-
-    BSONObjBuilder filterBuilder;
-    idVal.addToBsonObj(&filterBuilder, kIdField);
-    const BSONObj filter = filterBuilder.obj();
+    const BSONObj& filter = *idFilter;
 
     auto findCmd = std::make_unique<FindCommandRequest>(nss);
     findCmd->setFilter(filter);
@@ -115,27 +111,6 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutor(
                                                             /*returnOwnedBson=*/true);
 }
 
-/**
- * Publish this lookup's execution stats: record index usage so $indexStats reflects the lookup and,
- * when 'statsSink' is set, accumulate the point-lookup stats into it (no-op otherwise) so the
- * owning stage's explain and the operation-level PlanSummaryStats match the local-read path.
- */
-void recordIndexUsage(const CollectionAcquirer::Handle& coll,
-                      const PlanSummaryStats& summary,
-                      PlanSummaryStats* statsSink) {
-    CollectionIndexUsageTrackerDecoration::recordCollectionIndexUsage(
-        coll.getCollectionPtr().get(),
-        summary.collectionScans,
-        summary.collectionScansNonTailable,
-        summary.indexesUsed);
-
-    if (statsSink) {
-        statsSink->nReturned += summary.nReturned;
-        statsSink->totalKeysExamined += summary.totalKeysExamined;
-        statsSink->totalDocsExamined += summary.totalDocsExamined;
-        statsSink->indexesUsed.insert(summary.indexesUsed.begin(), summary.indexesUsed.end());
-    }
-}
 }  // namespace
 
 SingleDocumentLookupExecutor::LookupResult ExpressSingleDocumentLookupExecutor::performLookup(
@@ -167,7 +142,7 @@ SingleDocumentLookupExecutor::LookupResult ExpressSingleDocumentLookupExecutor::
             // Create ScopedSetShardRole given the local routing decision.
             const auto& local = std::get<LocalLookupEligibility::Local>(decision);
             auto shardRoleScope = createScopedShardRole(opCtx, nss, local);
-            try {
+            return withCollectionGoneMappedToNotFound([&]() -> LookupResult {
                 auto coll = _collectionAcquirer->acquireCollection(opCtx, nss, collectionUUID);
                 if (!coll.exists()) {
                     return {LookupResult::HandledStatus::kDocumentNotFound, boost::none};
@@ -184,7 +159,7 @@ SingleDocumentLookupExecutor::LookupResult ExpressSingleDocumentLookupExecutor::
 
                 PlanSummaryStats summary;
                 exec->getPlanExplainer().getSummaryStats(&summary);
-                recordIndexUsage(coll, summary, _planSummaryStatsSink);
+                recordIndexUsage(coll.getCollectionPtr().get(), summary, _planSummaryStatsSink);
 
                 switch (execState) {
                     case PlanExecutor::ExecState::ADVANCED:
@@ -197,19 +172,7 @@ SingleDocumentLookupExecutor::LookupResult ExpressSingleDocumentLookupExecutor::
                                       << "Unexpected executor state in "
                                          "ExpressSingleDocumentLookupExecutor::performLookup");
                 }
-            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
-                LOGV2_DEBUG(12841307,
-                            1,
-                            "Namespace not found while looking up document via Express path",
-                            "error"_attr = redact(ex));
-                return {LookupResult::HandledStatus::kDocumentNotFound, boost::none};
-            } catch (const ExceptionFor<ErrorCodes::CollectionUUIDMismatch>& ex) {
-                LOGV2_DEBUG(12841308,
-                            1,
-                            "Collection UUID mismatch while looking up document via Express path",
-                            "error"_attr = redact(ex));
-                return {LookupResult::HandledStatus::kDocumentNotFound, boost::none};
-            }
+            });
         });
 
     if (_recorder) {

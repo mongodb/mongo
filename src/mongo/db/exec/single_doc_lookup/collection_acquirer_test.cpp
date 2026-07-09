@@ -165,14 +165,16 @@ TEST_F(CollectionAcquirerTest, PreAcquiredAcceptsMatchingUuid) {
     ASSERT_EQ(handle.uuid(), expectedUuid);
 }
 
-DEATH_TEST_REGEX_F(CollectionAcquirerDeathTest,
-                   PreAcquiredTassertsOnUuidMismatch,
-                   "Tripwire assertion.*12841103") {
+TEST_F(CollectionAcquirerTest, PreAcquiredThrowsOnUuidMismatch) {
     auto [stasher, acquisition] = stashTestCollection();
     PreAcquiredCollectionAcquirer acquirer(std::move(stasher), std::move(acquisition));
     // A different UUID for the same nss (e.g. the namespace was dropped and recreated) must not be
-    // silently served from the held acquisition.
-    acquirer.acquireCollection(operationContext(), kTestNss, UUID::gen());
+    // silently served from the held acquisition, but must also not crash the server: this is a
+    // real, expected runtime occurrence (a stale event racing a rename+recreate), not a
+    // programming-contract violation, so it's a catchable CollectionUUIDMismatch, not a tassert.
+    ASSERT_THROWS_CODE(acquirer.acquireCollection(operationContext(), kTestNss, UUID::gen()),
+                       DBException,
+                       ErrorCodes::CollectionUUIDMismatch);
 }
 
 }  // namespace

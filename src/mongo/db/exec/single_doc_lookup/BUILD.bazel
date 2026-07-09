@@ -42,6 +42,8 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:shard_role_api",
+        # checkCollectionUUIDMismatch.
+        "//src/mongo/db/shard_role",
     ],
 )
 
@@ -54,6 +56,21 @@ mongo_cc_unit_test(
     deps = [
         ":collection_acquirer",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+    ],
+)
+
+# Header-only shared helper (makeIdEqualityFilter) used by every local single-document lookup
+# strategy to reduce a documentKey to its {_id: <value>} equality filter.
+mongo_cc_library(
+    name = "local_lookup_util",
+    hdrs = [
+        "local_lookup_util.h",
+    ],
+    deps = [
+        ":single_document_lookup_executor",
+        "//src/mongo/db/exec/document_value",
+        # CollectionIndexUsageTrackerDecoration::recordCollectionIndexUsage for $indexStats.
+        "//src/mongo/db/query:collection_query_info",
     ],
 )
 
@@ -182,6 +199,7 @@ mongo_cc_library(
     deps = [
         ":collection_acquirer",
         ":local_lookup_eligibility",
+        ":local_lookup_util",
         ":single_document_lookup_executor",
         ":single_document_lookup_stats",
         "//src/mongo/db/exec/express:express_executor",
@@ -205,6 +223,59 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/otel/metrics:metrics_test_util",
+    ],
+)
+
+# SBE-based strategy: a parameterized _id plan compiled once and reused across lookups by rebinding
+# the _id slot, with the acquisition cached across the batch window.
+mongo_cc_library(
+    name = "sbe_single_document_lookup_executor",
+    srcs = [
+        "sbe_single_document_lookup_executor.cpp",
+    ],
+    deps = [
+        ":collection_acquirer",
+        ":local_lookup_eligibility",
+        ":local_lookup_util",
+        ":single_document_lookup_executor",
+        # sbe::RuntimeEnvironment, PlanStage, value helpers.
+        "//src/mongo/db/exec/sbe:query_sbe",
+        # record_id_helpers::keyForElem.
+        "//src/mongo/db:record_id_helpers",
+        # CanonicalQuery, FindCommandRequest, ExpressionContextBuilder.
+        "//src/mongo/db/query:canonical_query_base",
+        # CollectionQueryInfo::getPlanCacheInvalidatorVersion for plan invalidation.
+        "//src/mongo/db/query:collection_query_info",
+        # PlanYieldPolicySBE.
+        "//src/mongo/db/query:plan_yield_policy_sbe",
+        # IndexBoundsBuilder::isDirectlyEncodableEqualityType.
+        "//src/mongo/db/query/compiler/optimizer/index_bounds_builder",
+        # QueryPlanner::plan + QueryPlannerParams.
+        "//src/mongo/db/query:query_planner",
+        # QueryPlannerParams::fillOutMainCollectionPlannerParams / requiresShardFiltering.
+        "//src/mongo/db/query:query_planner_params",
+        # parameterizeMatchExpression.
+        "//src/mongo/db/query/compiler/rewrites/matcher:matcher_rewrites",
+        # buildSlotBasedExecutableTree, prepareSlotBasedExecutableTree, makeKeyStringPair,
+        # PlanStageData, ParameterizedIndexScanSlots.
+        "//src/mongo/db/query/stage_builder/sbe:stage_builder",
+        # checkCollectionUUIDMismatch.
+        "//src/mongo/db/shard_role",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "sbe_single_document_lookup_executor_test",
+    srcs = [
+        "sbe_single_document_lookup_executor_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":local_lookup_eligibility_test_util",
+        ":sbe_single_document_lookup_executor",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
     ],
 )
 

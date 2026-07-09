@@ -86,6 +86,7 @@
 #include "mongo/db/query/stage_builder/sbe/gen_projection.h"
 #include "mongo/db/query/stage_builder/sbe/gen_window_function.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
+#include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
@@ -5225,6 +5226,26 @@ std::ostream& operator<<(std::ostream& os, const PlanStageReqs& reqs) {
     }
     os << "]";
     return os;
+}
+
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageData> buildSlotBasedExecutableTree(
+    OperationContext* opCtx,
+    const MultipleCollectionAccessor& collections,
+    const CanonicalQuery& cq,
+    const QuerySolution& solution,
+    PlanYieldPolicySBE* yieldPolicy,
+    const cost_based_ranker::EstimateMap* estimates) {
+    // Only QuerySolutions derived from queries parsed with context, or QuerySolutions derived from
+    // queries that disallow extensions, can be properly executed. If the query does not have
+    // $text/$where context (and $text/$where are allowed), then no attempt should be made to
+    // execute the query.
+    invariant(solution.root());
+
+    auto builder = std::make_unique<SlotBasedStageBuilder>(
+        opCtx, collections, cq, solution, yieldPolicy, estimates);
+    auto [root, data] = builder->build(solution.root());
+
+    return {std::move(root), std::move(data)};
 }
 
 }  // namespace mongo::stage_builder

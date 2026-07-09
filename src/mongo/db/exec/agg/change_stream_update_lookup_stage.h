@@ -56,16 +56,6 @@ public:
                                   const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                   std::unique_ptr<SingleDocumentLookupExecutor> lookupExecutor);
 
-    void detachFromOperationContext() override {
-        Stage::detachFromOperationContext();
-        _lookupExecutor->detachFromOperationContext();
-    }
-
-    void reattachToOperationContext(OperationContext* opCtx) override {
-        Stage::reattachToOperationContext(opCtx);
-        _lookupExecutor->reattachToOperationContext(opCtx);
-    }
-
     /**
      * Test-only: returns the injected SingleDocumentLookupExecutor so wiring tests can assert the
      * concrete strategy type via dynamic_cast.

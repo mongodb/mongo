@@ -49,9 +49,9 @@ using LookupResult = SingleDocumentLookupExecutor::LookupResult;
 using HandledStatus = LookupResult::HandledStatus;
 
 /**
- * Mock executor that records every performLookup() / detach / reattach call and returns a
- * preconfigured result, so a test can assert the PrimaryWithFallback chain's dispatch and
- * argument-forwarding behaviour without a storage engine or a real executor.
+ * Mock executor that records every performLookup() call and returns a preconfigured result, so a
+ * test can assert the PrimaryWithFallback chain's dispatch and argument-forwarding behaviour
+ * without a storage engine or a real executor.
  */
 class SingleDocumentLookupExecutorMock : public SingleDocumentLookupExecutor {
 public:
@@ -75,19 +75,11 @@ public:
         return _result;
     }
 
-    void detachFromOperationContext() override {
-        ++detachCalls;
-    }
-    void reattachToOperationContext(OperationContext*) override {
-        ++reattachCalls;
-    }
     void releaseResources() noexcept override {
         ++releaseCalls;
     }
 
     int performLookupCalls = 0;
-    int detachCalls = 0;
-    int reattachCalls = 0;
     int releaseCalls = 0;
     NamespaceString lastNss;
     boost::optional<UUID> lastCollectionUUID;
@@ -185,20 +177,6 @@ TEST_F(PrimaryWithFallbackSingleDocumentLookupExecutorTest,
     ASSERT(_fallback->lastCollectionUUID == boost::optional<UUID>(collectionUUID));
     ASSERT_BSONOBJ_EQ(_fallback->lastDocumentKey.toBson(), documentKey.toBson());
     ASSERT(_fallback->lastAfterClusterTime == boost::optional<Timestamp>(afterClusterTime));
-}
-
-TEST_F(PrimaryWithFallbackSingleDocumentLookupExecutorTest,
-       DetachAndReattachForwardedToBothChildren) {
-    auto chain = makeChain({HandledStatus::kNotHandled, boost::none},
-                           {HandledStatus::kDocumentNotFound, boost::none});
-
-    chain.detachFromOperationContext();
-    chain.reattachToOperationContext(nullptr);
-
-    ASSERT_EQ(_primary->detachCalls, 1);
-    ASSERT_EQ(_fallback->detachCalls, 1);
-    ASSERT_EQ(_primary->reattachCalls, 1);
-    ASSERT_EQ(_fallback->reattachCalls, 1);
 }
 
 TEST_F(PrimaryWithFallbackSingleDocumentLookupExecutorTest,

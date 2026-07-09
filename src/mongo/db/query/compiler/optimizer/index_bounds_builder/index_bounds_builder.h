@@ -245,6 +245,15 @@ public:
                                   OrderedIntervalList* oil,
                                   BoundsTightness* tightnessOut);
 
+    /**
+     * Whether a BSON literal of type 't' is an equality match that reduces to a single point on
+     * the index key, i.e. the shape translateEquality() above produces for it. False for types
+     * where the bounds widen to a range (regex), span multiple points (array / multikey), encode a
+     * sub-structure normalized in ways a caller's fast path may not replicate (object), or are
+     * otherwise edge cases better routed through the general bounds-building path (undefined, eoo).
+     */
+    static bool isDirectlyEncodableEqualityType(BSONType t);
+
     static void unionize(OrderedIntervalList* oilOut);
     static void intersectize(const OrderedIntervalList& arg, OrderedIntervalList* oilOut);
 

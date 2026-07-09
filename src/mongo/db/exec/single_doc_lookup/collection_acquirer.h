@@ -33,6 +33,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/shard_role_transaction_resources_stasher_for_pipeline.h"
+#include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/assert_util.h"
@@ -49,9 +50,8 @@ namespace mongo::exec::agg {
 /**
  * Causal-consistency guard for local single-document lookups.
  *
- * 'afterClusterTime' is the clusterTime of the change event being enriched. The post-image must be
- * read from a snapshot at or after that time, never from before the change, which would return
- * pre-event (stale) state.
+ * 'afterClusterTime' is the clusterTime of the document being fetched. The document must be read
+ * from a snapshot at or after that time, never from before, which would return stale results.
  */
 inline void assertLocalLookupReadAtOrAfter(OperationContext* opCtx,
                                            boost::optional<Timestamp> afterClusterTime) {
@@ -61,8 +61,8 @@ inline void assertLocalLookupReadAtOrAfter(OperationContext* opCtx,
     auto readTs = shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
     if (readTs && *readTs < *afterClusterTime) {
         tasserted(12841100,
-                  str::stream() << "change-stream post-image lookup read snapshot "
-                                << readTs->toString() << " precedes the event clusterTime "
+                  str::stream() << "document lookup read snapshot " << readTs->toString()
+                                << " precedes the requested clusterTime "
                                 << afterClusterTime->toString());
     }
 }
@@ -170,13 +170,10 @@ public:
                               << nss.toStringForErrorMsg() << "' does not match held nss '"
                               << _collection.nss().toStringForErrorMsg() << "'",
                 _collection.nss() == nss);
-        tassert(12841103,
-                str::stream() << "PreAcquiredCollectionAcquirer: requested UUID '"
-                              << (collectionUuid ? collectionUuid->toString() : "(none)")
-                              << "' for nss '" << nss.toStringForErrorMsg()
-                              << "' does not match held UUID '" << _collection.uuid().toString()
-                              << "'",
-                !collectionUuid || _collection.uuid() == *collectionUuid);
+
+        // The upfront-acquired collection's identity has moved on (DDL churn) since this
+        // acquirer was built.
+        checkCollectionUUIDMismatch(opCtx, nss, _collection.getCollectionPtr(), collectionUuid);
 
         // Swap the stashed TransactionResources onto opCtx for the duration of the returned Handle.
         // On scope exit, the handle's destructor re-stashes them.
