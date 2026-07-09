@@ -20,6 +20,7 @@ import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/ddl/rand
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // TODO SERVER-111230 Re-enable state execution.
     delete $config.states.untrackUnshardedCollection;
+    delete $config.states.unshardCollection;
 
     $config.states.setFCV = function (db, collName, connCache) {
         const fcvValues = [lastLTSFCV, lastContinuousFCV, latestFCV];
