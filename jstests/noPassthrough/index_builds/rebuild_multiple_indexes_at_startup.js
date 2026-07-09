@@ -66,9 +66,8 @@ nodes.forEach((node) =>
 // table. Because we're not advancing the stable timestamp and we're going to crash the
 // server, the catalog change won't take effect, but the WT table being dropped will.
 coll = rst.getPrimary().getDB("indexRebuild")["coll"];
-assert.commandWorked(coll.dropIndexes());
-assert.commandWorked(rst.getPrimary().adminCommand({fsync: 1}));
-rst.awaitReplication();
+assert.commandWorked(coll.dropIndexes("*", {writeConcern: {w: 1, j: true}}));
+rst.awaitReplication(undefined, ReplSetTest.OpTimeType.LAST_DURABLE);
 rst.stop(0, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true});
 rst.stop(1, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true});
 
