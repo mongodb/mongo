@@ -80,6 +80,13 @@ feature_flags:
         cpp_varname: gFeatureFlagSizeBasedOplogTruncationForDisagg
         default: false
         fcv_gated: false
+    featureFlagElegantStepDownForDisagg:
+        description: >-
+            Feature flag to enable elegant (in-process, graceful) step down for disaggregated
+            storage, instead of triggering a non-graceful shutdown on step down.
+        cpp_varname: gFeatureFlagElegantStepDownForDisagg
+        default: false
+        fcv_gated: false
     featureFlagEndOfTransactionChangeEvent:
         description: "Feature flag to enable endOfTransaction oplog entry and change stream event"
         cpp_varname: feature_flags::gFeatureFlagEndOfTransactionChangeEvent
