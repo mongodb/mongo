@@ -31,6 +31,7 @@
 #include "mongo/db/admission/ingress_admission_control_gen.h"
 #include "mongo/db/admission/ingress_admission_controller.h"
 #include "mongo/db/commands/server_status/server_status.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/transport/session_establishment_rate_limiter.h"
 #include "mongo/transport/transport_layer.h"
 
@@ -59,7 +60,7 @@ public:
             executionBuilder.done();
         }
 
-        if (gIngressAdmissionControlEnabled.load() && role.has(ClusterRole::ShardServer)) {
+        if (gIngressAdmissionControlEnabled.load() || gFeatureFlagIngressRateLimiting.isEnabled()) {
             BSONObjBuilder ingressBuilder(admissionBuilder.subobjStart("ingress"));
             auto& controller = IngressAdmissionController::get(opCtx);
             controller.appendStats(ingressBuilder);

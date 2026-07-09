@@ -60,12 +60,74 @@ export function authenticateConnection(conn) {
 }
 
 /**
+ * Returns a new authenticated non-exempt connection to host.
+ */
+export function makeAuthConn(host) {
+    const conn = new Mongo(host);
+    authenticateConnection(conn);
+    return conn;
+}
+
+/**
+ * Returns a new authenticated exempt connection to host.
+ */
+export function makeExemptConn(host) {
+    const conn = new Mongo(`mongodb://${host}/?appName=${kRateLimiterExemptAppName}`);
+    authenticateConnection(conn);
+    return conn;
+}
+
+/**
  * Returns the stats for the ingress request rate limiter.
  */
 export function getRateLimiterStats(exemptConn) {
     const db = exemptConn.getDB("admin");
     const status = db.serverStatus();
     return status.network.ingressRequestRateLimiter;
+}
+
+/**
+ * Measures ingress queue stats around an operation and returns the stat deltas.
+ */
+export function measureQueueStats(exemptConn, operationFn) {
+    const before = getRateLimiterStats(exemptConn);
+    operationFn();
+    const after = getRateLimiterStats(exemptConn);
+
+    return {
+        addedToQueue: after.addedToQueue - before.addedToQueue,
+        removedFromQueue: after.removedFromQueue - before.removedFromQueue,
+        interruptedInQueue: after.interruptedInQueue - before.interruptedInQueue,
+        rejectedAdmissions: after.rejectedAdmissions - before.rejectedAdmissions,
+    };
+}
+
+/**
+ * Runs the supplied function with the ingress request rate limiter disabled, restoring it
+ * afterwards.
+ */
+export function withRateLimitingDisabled(exemptConn, fn) {
+    assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled: 0}));
+    try {
+        fn();
+    } finally {
+        assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled: 1}));
+    }
+}
+
+/**
+ * Activates the `hangInRateLimiter` failpoint for the duration of `fn`, which forces every
+ * non-exempt request through the rate limiter to queue with a long nap time. Used by tests that
+ * want to deterministically observe queueing behavior without depending on token-bucket state
+ * (which is racy under parallel admit attempts).
+ */
+export function withForcedQueueing(exemptConn, fn) {
+    assert.commandWorked(exemptConn.adminCommand({configureFailPoint: "hangInRateLimiter", mode: "alwaysOn"}));
+    try {
+        fn();
+    } finally {
+        assert.commandWorked(exemptConn.adminCommand({configureFailPoint: "hangInRateLimiter", mode: "off"}));
+    }
 }
 
 /**

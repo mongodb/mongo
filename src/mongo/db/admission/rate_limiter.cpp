@@ -168,6 +168,73 @@ private:
     folly::TokenBucket _tokenBucket;
 };
 
+RateLimiter::DeferredToken::DeferredToken(RateLimiterPrivate* impl,
+                                          Milliseconds napTime,
+                                          double numTokens)
+    : _impl(impl), _napTime(napTime), _numTokens(numTokens) {}
+
+
+RateLimiter::DeferredToken::~DeferredToken() {
+    if (!_impl || isReady()) {
+        return;
+    }
+    // Unconsumed non-ready deferred token: return the borrowed token and release the queue slot.
+    _impl->readScopedTokenBucket().returnTokens(_numTokens);
+    _impl->queued.fetchAndSubtract(1);
+    _impl->stats.removedFromQueue.incrementRelaxed();
+}
+
+Status RateLimiter::DeferredToken::get(OperationContext* opCtx) && {
+    invariant(_impl);
+
+    if (isReady()) {
+        // Token was immediately available. No need to update stats, they were already recorded in
+        // acquireToken().
+        _impl = nullptr;
+        return Status::OK();
+    }
+
+    auto* impl = std::exchange(_impl, nullptr);
+
+    ON_BLOCK_EXIT([impl] {
+        impl->stats.removedFromQueue.incrementRelaxed();
+        impl->queued.fetchAndSubtract(1);
+    });
+
+    Date_t deadline = opCtx->getServiceContext()->getPreciseClockSource()->now() + _napTime;
+    try {
+        LOGV2_DEBUG(10550200,
+                    4,
+                    "Going to sleep waiting for token acquisition",
+                    "rateLimiterName"_attr = impl->name,
+                    "napTimeMillis"_attr = _napTime.toString());
+        opCtx->sleepUntil(deadline);
+    } catch (const DBException& e) {
+        impl->stats.interruptedInQueue.incrementRelaxed();
+        LOGV2_DEBUG(10440800,
+                    4,
+                    "Interrupted while waiting in rate limiter queue",
+                    "rateLimiterName"_attr = impl->name,
+                    "exception"_attr = e.toString());
+        impl->readScopedTokenBucket().returnTokens(_numTokens);
+        return e.toStatus().withContext(fmt::format(
+            "Interrupted while waiting in rate limiter queue. rateLimiterName={}", impl->name));
+    }
+
+    impl->stats.successfulAdmissions.incrementRelaxed();
+    impl->stats.averageTimeQueuedMicros.addSample(
+        static_cast<double>(durationCount<Microseconds>(_napTime)));
+    return Status::OK();
+}
+
+void RateLimiter::DeferredToken::recordExemption() && {
+    invariant(_impl);
+    invariant(_napTime > Milliseconds{0});  // Exemptions are only supported for queued requests.
+
+    // This method only records the exemption, token/queue cleanup is covered by the destructor.
+    _impl->stats.exemptedAdmissions.incrementRelaxed();
+}
+
 RateLimiter::RateLimiter(double refreshRatePerSec,
                          double burstCapacitySecs,
                          int64_t maxQueueDepth,
@@ -186,14 +253,22 @@ RateLimiter::RateLimiter(double refreshRatePerSec,
 
 RateLimiter::~RateLimiter() = default;
 
-Status RateLimiter::acquireToken(OperationContext* opCtx, double numTokensToConsume) {
+StatusWith<RateLimiter::DeferredToken> RateLimiter::acquireToken(double numTokensToConsume) {
+    const bool hangInLimiter = hangInRateLimiter.shouldFail();
+    const auto maxQueueDepth = _impl->maxQueueDepth.loadRelaxed();
+    if (!hangInLimiter && (maxQueueDepth <= 0 || _impl->queued.load() >= maxQueueDepth)) {
+        // Queueing unavailable (disabled or currently full): use try-acquire semantics.
+        if (auto status = tryAcquireToken(numTokensToConsume); !status.isOK()) {
+            return status;
+        }
+        _impl->stats.averageTimeQueuedMicros.addSample(0);
+        return DeferredToken(_impl.get(), Milliseconds{0}, numTokensToConsume);
+    }
+
     _impl->stats.attemptedAdmissions.incrementRelaxed();
 
-    // The consumeWithBorrowNonBlocking API consumes a token (possibly leading to a negative
-    // bucket balance), and returns how long the consumer should nap until their token
-    // reservation becomes valid.
     double waitForTokenSecs;
-    if (MONGO_unlikely(hangInRateLimiter.shouldFail())) {
+    if (hangInLimiter) {
         waitForTokenSecs = 60 * 60;  // 1 hour
     } else {
         waitForTokenSecs =
@@ -202,45 +277,30 @@ Status RateLimiter::acquireToken(OperationContext* opCtx, double numTokensToCons
                 .value_or(0);
     }
 
-    if (auto napTime = doubleToMillis(waitForTokenSecs); napTime > Milliseconds{0}) {
-        // Calculate the deadline before incrementing the queued metric to ensure that unit tests
-        // don't advance the mock clock before the sleep deadline is calculated.
-        Date_t deadline = opCtx->getServiceContext()->getPreciseClockSource()->now() + napTime;
+    auto napTime = doubleToMillis(waitForTokenSecs);
+    if (napTime > Milliseconds{0}) {
+        // Token not immediately available: reserve a queue slot.
         if (auto status = _impl->enqueue(); !status.isOK()) {
             _impl->readScopedTokenBucket().returnTokens(numTokensToConsume);
             _impl->stats.rejectedAdmissions.incrementRelaxed();
             return status;
         }
         _impl->stats.addedToQueue.incrementRelaxed();
-        ON_BLOCK_EXIT([&] {
-            _impl->stats.removedFromQueue.incrementRelaxed();
-            _impl->queued.fetchAndSubtract(1);
-        });
-        try {
-            LOGV2_DEBUG(10550200,
-                        4,
-                        "Going to sleep waiting for token acquisition",
-                        "rateLimiterName"_attr = _impl->name,
-                        "napTimeMillis"_attr = napTime.toString());
-            opCtx->sleepUntil(deadline);
-        } catch (const DBException& e) {
-            _impl->stats.interruptedInQueue.incrementRelaxed();
-            LOGV2_DEBUG(10440800,
-                        4,
-                        "Interrupted while waiting in rate limiter queue",
-                        "rateLimiterName"_attr = _impl->name,
-                        "exception"_attr = e.toString());
-            _impl->readScopedTokenBucket().returnTokens(numTokensToConsume);
-            return e.toStatus().withContext(
-                fmt::format("Interrupted while waiting in rate limiter queue. rateLimiterName={}",
-                            _impl->name));
-        }
+        return DeferredToken(_impl.get(), napTime, numTokensToConsume);
     }
 
+    // Token immediately available.
     _impl->stats.successfulAdmissions.incrementRelaxed();
-    _impl->stats.averageTimeQueuedMicros.addSample(waitForTokenSecs * 1'000'000);
+    _impl->stats.averageTimeQueuedMicros.addSample(0);
+    return DeferredToken(_impl.get(), Milliseconds{0}, numTokensToConsume);
+}
 
-    return Status::OK();
+Status RateLimiter::acquireToken(OperationContext* opCtx, double numTokensToConsume) {
+    auto tokenResult = acquireToken(numTokensToConsume);
+    if (!tokenResult.isOK()) {
+        return tokenResult.getStatus();
+    }
+    return std::move(tokenResult.getValue()).get(opCtx);
 }
 
 Status RateLimiter::tryAcquireToken(double numTokensToConsume) {
@@ -312,6 +372,10 @@ double RateLimiter::tokenBalance() const {
 
 int64_t RateLimiter::queued() const {
     return _impl->queued.load();
+}
+
+int64_t RateLimiter::maxQueueDepth() const {
+    return _impl->maxQueueDepth.loadRelaxed();
 }
 
 }  // namespace mongo::admission

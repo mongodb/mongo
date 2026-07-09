@@ -40,6 +40,7 @@
 #include "mongo/db/admission/ingress_admission_control_gen.h"
 #include "mongo/db/admission/ingress_admission_controller.h"
 #include "mongo/db/admission/ingress_request_rate_limiter.h"
+#include "mongo/db/admission/ingress_request_rate_limiter_gen.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_contract.h"
 #include "mongo/db/auth/authorization_contract_guard.h"
@@ -1856,12 +1857,19 @@ void ExecCommandDatabase::_initiateCommand() {
 
             // Respect the ingressRequestRateLimiterApplicationExemptions list so that internal
             // clients are exempt from the failpoint.
-            if (IngressRequestRateLimiter::isAppNameExempted(opCtx->getClient())) {
+            if (admission::IngressRequestRateLimiter::isAppNameExempted(opCtx->getClient())) {
                 return false;
             }
 
             return true;
         });
+
+    if (gFeatureFlagIngressRateLimiting.isEnabled()) {
+        const bool exemptFromIngressRateLimit =
+            isExemptFromAdmissionControl || !admission::gIngressRequestRateLimiterEnabled.load();
+        uassertStatusOK(admission::IngressRequestRateLimiter::waitForAdmission(
+            opCtx, exemptFromIngressRateLimit));
+    }
 
     if (gIngressAdmissionControlEnabled.load()) {
         // The way ingress admission works, one ticket should cover all the work for the operation.
