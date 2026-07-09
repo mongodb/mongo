@@ -2969,9 +2969,9 @@ export class ReplSetTest {
                                 jsTest.log.info(
                                     "checkDBHashesForReplSet dumping oplogs from all nodes",
                                 );
-                                this.dumpOplog(primary, {}, 100);
+                                this.dumpOplog(primary, {}, 1000);
                                 rst.getSecondaries().forEach((secondary) =>
-                                    this.dumpOplog(secondary, {}, 100),
+                                    this.dumpOplog(secondary, {}, 1000),
                                 );
                                 hasDumpedOplog = true;
                             }
