@@ -1465,14 +1465,18 @@ resmoke_suite_test(
 )
 
 jstestfuzz_generate(
-    name = "jstestfuzz_generated",
+    name = "jstestfuzz_tests",
+    extra_args = [
+        "--jsTestsDir",
+        "jstests",
+    ],
     npm_command = "jstestfuzz",
     num_generated_files = 75,
 )
 
 resmoke_suite_test(
     name = "jstestfuzz",
-    srcs = [":jstestfuzz_generated"],
+    srcs = [":jstestfuzz_tests"],
     config = "//buildscripts/resmokeconfig:suites/jstestfuzz.yml",
     resmoke_args = [
         "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'",

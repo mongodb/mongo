@@ -157,18 +157,24 @@ if [[ $use_es_modules -eq 1 ]]; then
     cmd+=(--useEsModules)
 fi
 
-# Default --jsTestsDir to the workspace's jstests/ (resolvable from the exec
-# root because we run unsandboxed). Authors can override via extra_args.
-have_js_tests_dir=0
-for a in "${extra_args[@]:-}"; do
-    if [[ "$a" == "--jsTestsDir" || "$a" == --jsTestsDir=* ]]; then
-        have_js_tests_dir=1
-        break
+# jstestfuzz commands that read templates from the workspace's jstests/ take a
+# --jsTestsDir argument; others (e.g. resharding-fuzzer) don't accept it, so it
+# is passed explicitly per target via extra_args only where needed.
+#
+# extra_args are set statically in BUILD files, but jstestfuzz runs from its
+# checkout (a cd below) while the workspace jstests/ lives under the exec root.
+# So a relative --jsTestsDir value is resolved against the exec root here (it's
+# reachable because we run unsandboxed); absolute values pass through unchanged.
+for i in "${!extra_args[@]}"; do
+    a=${extra_args[$i]}
+    if [[ "$a" == "--jsTestsDir" && $((i + 1)) -lt ${#extra_args[@]} ]]; then
+        v=${extra_args[$((i + 1))]}
+        [[ "$v" == /* ]] || extra_args[$((i + 1))]=$exec_root/$v
+    elif [[ "$a" == --jsTestsDir=* ]]; then
+        v=${a#--jsTestsDir=}
+        [[ "$v" == /* ]] || extra_args[$i]=--jsTestsDir=$exec_root/$v
     fi
 done
-if [[ $have_js_tests_dir -eq 0 ]]; then
-    cmd+=(--jsTestsDir "$exec_root/jstests")
-fi
 cmd+=("${extra_args[@]}")
 
 (
