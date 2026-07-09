@@ -2,6 +2,7 @@
 
 import logging
 import unittest
+from unittest import mock
 
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.fixtures import interface
@@ -17,6 +18,36 @@ class TestFixture(unittest.TestCase):
         raising_fixture = UnitTestFixture(should_raise=True)
         with self.assertRaises(errors.ServerFailure):
             raising_fixture.teardown()
+
+
+class TestGetBinaryVersion(unittest.TestCase):
+    def setUp(self):
+        self.fixture = UnitTestFixture()
+
+    def _patch_output(self, output):
+        return mock.patch(
+            "buildscripts.resmokelib.core.programs.get_binary_version_output",
+            return_value=output,
+        )
+
+    def test_parses_mongod_version(self):
+        with self._patch_output("db version v7.0.0\ngit version: abc123\n"):
+            self.assertEqual(self.fixture._get_binary_version("mongod"), "v7.0.0")
+
+    def test_parses_mongos_version(self):
+        with self._patch_output("mongos version v8.1.0-rc0\nBuild Info: {}\n"):
+            self.assertEqual(self.fixture._get_binary_version("mongos"), "v8.1.0-rc0")
+
+    def test_returns_empty_when_unparseable(self):
+        with self._patch_output("no version info here\n"):
+            self.assertEqual(self.fixture._get_binary_version("mongod"), "")
+
+    def test_returns_empty_on_error(self):
+        with mock.patch(
+            "buildscripts.resmokelib.core.programs.get_binary_version_output",
+            side_effect=RuntimeError("get_binary_version_output failed"),
+        ):
+            self.assertEqual(self.fixture._get_binary_version("mongod"), "")
 
 
 class TestFixtureTeardownHandler(unittest.TestCase):

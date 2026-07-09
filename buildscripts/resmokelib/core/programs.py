@@ -3,11 +3,13 @@
 Handles all the nitty-gritty parameter conversion.
 """
 
+import functools
 import json
 import os
 import os.path
 import re
 import stat
+from subprocess import check_output
 from typing import Any, Optional
 
 from opentelemetry import trace
@@ -45,6 +47,24 @@ def get_path_env_var(env_vars):
         path.append(config.INSTALL_DIR)
     path.append(env_vars.get("PATH", os.environ.get("PATH", "")))
     return path
+
+
+@functools.cache
+def get_binary_version_output(binary_path):
+    """Run `<binary> --version` for the given binary and return its stdout as a string.
+
+    Cached by binary path since a given binary's `--version` output never changes at runtime.
+    """
+    env_vars = os.environ.copy()
+    env_vars["PATH"] = os.pathsep.join(get_path_env_var(env_vars=env_vars))
+
+    binary = binary_path
+    # Ensure that executable files that don't already have an extension on Windows have a
+    # ".exe" extension, matching the behavior in core/process.py.
+    if utils.is_windows() and not os.path.splitext(binary)[1]:
+        binary += ".exe"
+
+    return check_output([binary, "--version"], env=env_vars).decode("utf-8")
 
 
 def get_binary_version(executable):

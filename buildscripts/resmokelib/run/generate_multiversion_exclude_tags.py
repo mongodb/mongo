@@ -6,12 +6,10 @@ import re
 import subprocess
 import tempfile
 from collections import defaultdict
-from subprocess import check_output
 
 from buildscripts.resmokelib import config
-from buildscripts.resmokelib.core.programs import get_path_env_var
+from buildscripts.resmokelib.core.programs import get_binary_version_output
 from buildscripts.resmokelib.testing import tags as _tags
-from buildscripts.resmokelib.utils import is_windows
 from buildscripts.util.fileops import read_yaml_file
 
 BACKPORT_REQUIRED_TAG = "backport_required_multiversion"
@@ -24,15 +22,7 @@ BACKPORTS_REQUIRED_BASE_URL = "https://raw.githubusercontent.com/10gen/mongo"
 
 def get_backports_required_hash(mongod_path: str | None = None):
     """Parse the old binary to get the commit hash."""
-    env_vars = os.environ.copy()
-    paths = get_path_env_var(env_vars=env_vars)
-    env_vars["PATH"] = os.pathsep.join(paths)
-
-    mongod = mongod_path
-    if is_windows():
-        mongod = mongod_path + ".exe"
-
-    version = check_output(f"{mongod} --version", shell=True, env=env_vars).decode("utf-8")
+    version = get_binary_version_output(mongod_path)
     for line in version.splitlines():
         if "gitVersion" in line:
             version_line = line.split(":")[1]

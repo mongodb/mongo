@@ -1197,6 +1197,7 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
             name=self.logger.name,
             port=self.port,
             pid=self.mongos.pid,
+            version=self._get_binary_version(self.mongos_executable),
         )
         return [info]
 

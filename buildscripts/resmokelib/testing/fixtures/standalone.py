@@ -430,6 +430,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             name=self.logger.name,
             port=self.port,
             pid=self.mongod.pid,
+            version=self._get_binary_version(self.mongod_executable),
         )
         return [info]
 

@@ -1,6 +1,7 @@
 """Interface of the different fixtures for executing JSTests against."""
 
 import os.path
+import re
 import time
 from collections import namedtuple
 from enum import Enum
@@ -177,6 +178,31 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):
     def get_node_info(self):
         """Return a list of NodeInfo objects."""
         return []
+
+    def _get_binary_version(self, executable):
+        """Parse the given binary to get its version string.
+
+        Runs `<executable> --version` and parses the reported version, e.g. "v7.0.0".
+        Returns the empty string "" if the version cannot be determined.
+        """
+        # Imported here to avoid a circular import at module load time.
+        from buildscripts.resmokelib.core.programs import get_binary_version_output
+
+        try:
+            output = get_binary_version_output(executable)
+        except Exception as err:
+            self.logger.warning("Failed to determine binary version: %s", err)
+            return ""
+
+        # The first line of `--version` looks like "db version v7.0.0" for mongod and
+        # "mongos version v7.0.0" for mongos.
+        for line in output.splitlines():
+            result = re.search(r"(?:db|mongos) version (v\S+)", line)
+            if result:
+                return result.group(1)
+
+        self.logger.warning("Could not parse binary version from: %s", output)
+        return ""
 
     def get_environment_variables(self):
         """
@@ -515,6 +541,10 @@ def create_fixture_table(fixture):
     # Filter out columns where no row has a value
     columns = {k: v for k, v in columns.items() if not all(x == "-" for x in v)}
 
+    # Only include the "version" column if nodes have differing versions
+    if "version" in columns and len(set(columns["version"])) <= 1:
+        del columns["version"]
+
     def horizontal_separator():
         row = ""
         for key in columns:
@@ -593,4 +623,4 @@ def build_hook_client(
 
 
 # Represents a row in a node info table.
-NodeInfo = namedtuple("NodeInfo", ["full_name", "name", "port", "pid"])
+NodeInfo = namedtuple("NodeInfo", ["full_name", "name", "port", "pid", "version"], defaults=[""])
