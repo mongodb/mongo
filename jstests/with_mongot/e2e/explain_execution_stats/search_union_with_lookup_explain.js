@@ -5,7 +5,7 @@
  * ]
  */
 
-import {getAggPlanStages, getUnionWithStage} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStages, getLookupStage, getUnionWithStage} from "jstests/libs/query/analyze_plan.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {prepareUnionWithExplain} from "jstests/with_mongot/common_utils.js";
 import {verifyE2ESearchExplainOutput} from "jstests/with_mongot/e2e_lib/explain_utils.js";
@@ -58,15 +58,32 @@ function runExplainTest(verbosity) {
         },
     ]);
     if (verbosity != "queryPlanner") {
+        // getAggPlanStages searches root.stages and root.shards[*].stages but not splitPipeline.
+        // When $lookup runs on the merger (e.g. because its sub-pipeline references $$SEARCH_META),
+        // it appears only in splitPipeline.mergerPart. Fall back to getLookupStage, which is
+        // splitPipeline-aware.
         let lookupStages = getAggPlanStages(result, "$lookup");
-        let lookupReturned = 0;
-        // In the sharded scenario, there will be more than one $lookup stage.
-        for (let stage of lookupStages) {
-            assert.neq(stage, null, result);
-            assert(stage.hasOwnProperty("nReturned"));
-            lookupReturned += stage["nReturned"];
+        let fromMergerPart = false;
+        if (lookupStages.length === 0) {
+            const stage = getLookupStage(result);
+            if (stage) {
+                lookupStages = [stage];
+                fromMergerPart = true;
+            }
         }
-        assert.eq(NumberLong(2), lookupReturned);
+        assert.gt(lookupStages.length, 0, result);
+        // mergerPart is always serialized at queryPlanner verbosity (execution stats are not
+        // supported there), so nReturned is unavailable when $lookup runs on the merger.
+        if (!fromMergerPart) {
+            let lookupReturned = 0;
+            // In the sharded scenario, there will be more than one $lookup stage.
+            for (let stage of lookupStages) {
+                assert.neq(stage, null, result);
+                assert(stage.hasOwnProperty("nReturned"));
+                lookupReturned += stage["nReturned"];
+            }
+            assert.eq(NumberLong(2), lookupReturned);
+        }
     }
 
     // Test with $unionWith.
