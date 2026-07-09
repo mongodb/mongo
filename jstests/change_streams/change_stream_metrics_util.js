@@ -97,11 +97,11 @@ export class ServerStatusMetrics {
     static getCsThroughputMetrics(db) {
         const cursor = this.getCsMetrics(db).cursor;
         return {
-            docsReturned: cursor.docsReturned.sum,
-            bytesReturned: cursor.bytesReturned.sum,
-            batchesReturned: cursor.batchesReturned.sum,
-            docsExamined: cursor.docsExamined.sum,
-            bytesRead: cursor.bytesRead.sum,
+            docsReturned: cursor.docsReturned,
+            bytesReturned: cursor.bytesReturned,
+            batchesReturned: cursor.batchesReturned,
+            docsExamined: cursor.docsExamined,
+            bytesRead: cursor.bytesRead,
         };
     }
 }
