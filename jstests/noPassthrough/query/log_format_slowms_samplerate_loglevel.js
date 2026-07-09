@@ -59,9 +59,12 @@ function dropAndRecreateTestCollection() {
 function runLoggingTests({db, slowMs, logLevel, sampleRate, enableQueryStats = false}) {
     dropAndRecreateTestCollection();
 
-    // We either enable query stats on every query (rate limit -1) or no queries (rate limit 0).
+    // We either enable query stats on every query or no queries.
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryStatsRateLimit: enableQueryStats ? -1 : 0}),
+        db.adminCommand({
+            setParameter: 1,
+            internalQueryStatsSampleRate: enableQueryStats ? 1 : 0,
+        }),
     );
 
     const coll = db.test;

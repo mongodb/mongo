@@ -5,7 +5,11 @@
 import {getQueryStats} from "jstests/libs/query/query_stats_utils.js";
 
 const conn = MongoRunner.runMongod({
-    setParameter: {internalQueryCollectOptimizerMetrics: true, internalQueryStatsRateLimit: -1},
+    setParameter: {
+        internalQueryCollectOptimizerMetrics: true,
+        internalQueryStatsSampleRate: 1,
+        internalQueryStatsWriteCmdSampleRate: 0,
+    },
 });
 
 assert.neq(null, conn, "mongod was unable to start up");

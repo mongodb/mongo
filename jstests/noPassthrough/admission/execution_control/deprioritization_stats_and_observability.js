@@ -514,7 +514,8 @@ describe("Execution control statistics and observability", function () {
                         executionControlDeprioritizationGate: true,
                         executionControlHeuristicNumAdmissionsDeprioritizeThreshold: 1,
                         logComponentVerbosity: {command: 2},
-                        internalQueryStatsRateLimit: -1,
+                        internalQueryStatsSampleRate: 1,
+                        internalQueryStatsWriteCmdSampleRate: 0,
                     },
                     slowms: 0,
                 },
@@ -582,7 +583,7 @@ describe("Execution control statistics and observability", function () {
                         delinquentAcquisitionIntervalMillis: delinquentIntervalMs,
                         overdueInterruptCheckIntervalMillis: delinquentIntervalMs * 100,
                         overdueInterruptCheckSamplingRate: 1.0,
-                        internalQueryStatsRateLimit: -1,
+                        internalQueryStatsSampleRate: 1,
                     },
                 },
             });

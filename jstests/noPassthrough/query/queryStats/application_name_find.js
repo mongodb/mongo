@@ -8,7 +8,10 @@ const kApplicationName = "MongoDB Shell";
 
 // Turn on the collecting of queryStats metrics.
 let options = {
-    setParameter: {internalQueryStatsRateLimit: -1},
+    setParameter: {
+        internalQueryStatsSampleRate: 1,
+        internalQueryStatsWriteCmdSampleRate: 0,
+    },
 };
 
 const conn = MongoRunner.runMongod(options);

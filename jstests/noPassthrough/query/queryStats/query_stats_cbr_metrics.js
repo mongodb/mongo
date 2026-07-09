@@ -839,7 +839,7 @@ runCBRMetricsTests(
     "Standalone",
     () => {
         const conn = MongoRunner.runMongod({
-            setParameter: {internalQueryStatsRateLimit: -1},
+            setParameter: {internalQueryStatsSampleRate: 1},
         });
         assert.neq(null, conn, "mongod was unable to start up");
         return {fixture: conn, conn: conn, testDB: conn.getDB(dbName)};
@@ -852,7 +852,9 @@ runCBRMetricsTests(
     () => {
         const st = new ShardingTest({
             shards: 2,
-            mongosOptions: {setParameter: {internalQueryStatsRateLimit: -1}},
+            mongosOptions: {
+                setParameter: {internalQueryStatsSampleRate: 1},
+            },
         });
         const testDB = st.s.getDB(dbName);
         return {fixture: st, conn: st.s, testDB: testDB};

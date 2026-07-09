@@ -31,6 +31,8 @@
 
 #include "mongo/unittest/unittest.h"
 
+#include <thread>
+
 namespace mongo {
 
 TEST(RateLimiterTest, SlidingWindowSucceeds) {
@@ -54,15 +56,18 @@ TEST(RateLimiterTest, SlidingWindowSucceedsThenFails) {
 }
 
 TEST(RateLimiterTest, SampleBasedSucceeds) {
-    auto rl = RateLimiter();
-    rl.configureSampleBased(10 /* 1% */, 0 /* seed */);
-    size_t requestCount = 10000;
+    // Run in a fresh thread to get a clean thread-local PRNG, seeded deterministically with 0.
     size_t numHandles = 0;
-    for (size_t i = 0; i < requestCount; i++) {
-        if (rl.handle()) {
-            numHandles++;
+    std::thread([&numHandles] {
+        auto rl = RateLimiter();
+        rl.configureSampleBased(10 /* 1% */, 0 /* seed */);
+        size_t requestCount = 10000;
+        for (size_t i = 0; i < requestCount; i++) {
+            if (rl.handle()) {
+                numHandles++;
+            }
         }
-    }
+    }).join();
     ASSERT_APPROX_EQUAL((double)numHandles, 100, 5 /* variance for randomness */);
 }
 

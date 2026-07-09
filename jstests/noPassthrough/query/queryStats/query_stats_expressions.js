@@ -6,7 +6,7 @@ import {getQueryStats, resetQueryStatsStore} from "jstests/libs/query/query_stat
 
 // Turn on the collecting of queryStats metrics.
 let options = {
-    setParameter: {internalQueryStatsRateLimit: -1},
+    setParameter: {internalQueryStatsSampleRate: 1},
 };
 
 const conn = MongoRunner.runMongod(options);

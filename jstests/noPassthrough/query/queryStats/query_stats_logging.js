@@ -4,7 +4,10 @@
  */
 
 let options = {
-    setParameter: {internalQueryStatsRateLimit: -1},
+    setParameter: {
+        internalQueryStatsSampleRate: 1,
+        internalQueryStatsWriteCmdSampleRate: 0,
+    },
 };
 
 function countMatching(arr, func) {

@@ -60,7 +60,7 @@ function runViewTest(conn, coll) {
 }
 
 const options = {
-    setParameter: {internalQueryStatsRateLimit: -1},
+    setParameter: {internalQueryStatsSampleRate: 1},
 };
 
 {

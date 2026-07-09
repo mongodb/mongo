@@ -26,7 +26,7 @@ describe("FLE query stats not collected", function () {
             nodes: 1,
             nodeOptions: {
                 setParameter: {
-                    internalQueryStatsRateLimit: -1,
+                    internalQueryStatsSampleRate: 1,
                     internalQueryStatsWriteCmdSampleRate: 1,
                 },
             },

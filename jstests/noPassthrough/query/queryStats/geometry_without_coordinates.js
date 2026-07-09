@@ -10,7 +10,7 @@ const st = new ShardingTest({
     rs: {nodes: 1},
     mongosOptions: {
         setParameter: {
-            internalQueryStatsRateLimit: -1,
+            internalQueryStatsSampleRate: 1,
         },
     },
 });

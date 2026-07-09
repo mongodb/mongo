@@ -445,7 +445,8 @@ function runTest(routerDb, shardDb) {
 const startupParameters = {
     featureFlagRecordDelinquentMetrics: true,
     delinquentAcquisitionIntervalMillis: delinquentIntervalMs,
-    internalQueryStatsRateLimit: -1,
+    internalQueryStatsSampleRate: 1,
+    internalQueryStatsWriteCmdSampleRate: 0,
 
     overdueInterruptCheckIntervalMillis: delinquentIntervalMs * 100,
     overdueInterruptCheckSamplingRate: 1.0, // For this test we sample 100% of the time.

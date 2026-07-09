@@ -26,7 +26,7 @@ const stWithMock = new ShardingTestWithMongotMock({
     other: {
         rsOptions: {
             setParameter: {
-                internalQueryStatsRateLimit: -1,
+                internalQueryStatsSampleRate: 1,
             },
         },
     },

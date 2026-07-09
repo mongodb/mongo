@@ -14,7 +14,10 @@ mongotmock.start();
 const mongotConn = mongotmock.getConnection();
 
 const conn = MongoRunner.runMongod({
-    setParameter: {mongotHost: mongotConn.host, internalQueryStatsRateLimit: -1},
+    setParameter: {
+        mongotHost: mongotConn.host,
+        internalQueryStatsSampleRate: 1,
+    },
 });
 
 const dbName = jsTestName();

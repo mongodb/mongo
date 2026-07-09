@@ -38,7 +38,7 @@ const checkLogForHmacKey = function (conn) {
 // Test MongoD
 const testMongoD = function () {
     const conn = MongoRunner.runMongod({
-        setParameter: {internalQueryStatsRateLimit: -1},
+        setParameter: {internalQueryStatsSampleRate: 1},
         useLogFiles: true,
     });
     assert.neq(null, conn, "mongod was unable to start up");
@@ -51,7 +51,10 @@ const testMongoD = function () {
 // Test MongoS
 const testMongoS = function () {
     const options = {
-        mongosOptions: {setParameter: {internalQueryStatsRateLimit: -1}, useLogFiles: true},
+        mongosOptions: {
+            setParameter: {internalQueryStatsSampleRate: 1},
+            useLogFiles: true,
+        },
     };
 
     const st = new ShardingTest({shards: 1, mongos: 1, other: options});

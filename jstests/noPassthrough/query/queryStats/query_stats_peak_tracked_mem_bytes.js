@@ -13,7 +13,7 @@ describe("peakTrackedMemBytes in queryStats - standalone", function () {
     before(function () {
         this.conn = MongoRunner.runMongod({
             setParameter: {
-                internalQueryStatsRateLimit: -1,
+                internalQueryStatsSampleRate: 1,
                 internalQueryMaxWriteToCurOpMemoryUsageBytes: 0,
             },
         });
@@ -79,7 +79,7 @@ describe("peakTrackedMemBytes in queryStats - sharded cluster", function () {
     before(function () {
         const queryStatsParams = {
             setParameter: {
-                internalQueryStatsRateLimit: -1,
+                internalQueryStatsSampleRate: 1,
                 internalQueryMaxWriteToCurOpMemoryUsageBytes: 0,
             },
         };
@@ -201,7 +201,7 @@ describe("peakTrackedMemBytes in queryStats - mongod as router", function () {
     before(function () {
         const queryStatsParams = {
             setParameter: {
-                internalQueryStatsRateLimit: -1,
+                internalQueryStatsSampleRate: 1,
                 internalQueryMaxWriteToCurOpMemoryUsageBytes: 0,
             },
         };

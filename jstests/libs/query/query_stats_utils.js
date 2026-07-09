@@ -1204,7 +1204,12 @@ export function exhaustCursorAndGetQueryStats({conn, cmd, key, expectedDocs}) {
  * constant that we pass around (risking modification), we return the defaults from a function.
  */
 export function getQueryStatsServerParameters() {
-    return {setParameter: {internalQueryStatsRateLimit: -1}};
+    return {
+        setParameter: {
+            internalQueryStatsSampleRate: 1,
+            internalQueryStatsWriteCmdSampleRate: 0,
+        },
+    };
 }
 
 /**

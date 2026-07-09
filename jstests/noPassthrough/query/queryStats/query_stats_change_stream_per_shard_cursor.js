@@ -194,7 +194,8 @@ function setupShardedCluster() {
         other: {
             mongosOptions: {
                 setParameter: {
-                    internalQueryStatsRateLimit: -1,
+                    internalQueryStatsSampleRate: 1,
+                    internalQueryStatsWriteCmdSampleRate: 0,
                 },
             },
         },

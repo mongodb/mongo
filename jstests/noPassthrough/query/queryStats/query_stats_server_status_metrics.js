@@ -321,7 +321,8 @@ function queryStatsAggregationStageTest(conn, testDB, coll) {
 })();
 
 const noRateLimit = {
-    internalQueryStatsRateLimit: -1,
+    internalQueryStatsSampleRate: 1,
+    internalQueryStatsWriteCmdSampleRate: 1,
 };
 /**
  * In this configuration, we insert enough entries into the queryStats store to trigger LRU
@@ -361,7 +362,7 @@ runTestWithMongodOptions({setParameter: noRateLimit}, countRateLimitedRequestsTe
  * rate-limited.
  */
 runTestWithMongodOptions(
-    {setParameter: {internalQueryStatsRateLimit: 10}},
+    {setParameter: {internalQueryStatsRateLimit: 10, internalQueryStatsSampleRate: 0}},
     countRateLimitedRequestsTest,
     {
         samplingRate: 10,

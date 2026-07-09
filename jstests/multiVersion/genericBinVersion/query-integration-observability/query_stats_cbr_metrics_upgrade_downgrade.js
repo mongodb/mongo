@@ -165,7 +165,9 @@ describe("CBR metrics should only appear after cluster is fully upgraded.", func
     it("should only appear in a fully upgraded replica set", function () {
         testPerformUpgradeReplSet({
             startingNodeOptions: {setParameter: {internalQueryStatsRateLimit: -1}},
-            upgradeNodeOptions: {setParameter: {internalQueryStatsRateLimit: -1}},
+            upgradeNodeOptions: {
+                setParameter: {internalQueryStatsSampleRate: 1},
+            },
             setupFn: setupCollection,
             whenFullyDowngraded: assertCBRMetricsDoNotAppear,
             whenSecondariesAreLatestBinary: assertCBRMetricsDoNotAppear,
@@ -177,7 +179,9 @@ describe("CBR metrics should only appear after cluster is fully upgraded.", func
     it("should only appear in a fully binary upgraded sharded cluster", function () {
         testPerformUpgradeSharded({
             startingNodeOptions: {setParameter: {internalQueryStatsRateLimit: -1}},
-            upgradeNodeOptions: {setParameter: {internalQueryStatsRateLimit: -1}},
+            upgradeNodeOptions: {
+                setParameter: {internalQueryStatsSampleRate: 1},
+            },
             setupFn: setupCollection,
             whenFullyDowngraded: assertCBRMetricsDoNotAppear,
             whenOnlyConfigIsLatestBinary: assertCBRMetricsDoNotAppear,

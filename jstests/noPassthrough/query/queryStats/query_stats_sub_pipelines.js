@@ -7,7 +7,7 @@ import {getLatestQueryStatsEntry} from "jstests/libs/query/query_stats_utils.js"
 
 const conn = MongoRunner.runMongod({
     setParameter: {
-        internalQueryStatsRateLimit: -1,
+        internalQueryStatsSampleRate: 1,
     },
 });
 

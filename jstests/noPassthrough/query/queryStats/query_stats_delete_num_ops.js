@@ -187,7 +187,7 @@ runDeleteCmdMetricsTests(
     () => {
         const conn = MongoRunner.runMongod({
             setParameter: {
-                internalQueryStatsRateLimit: -1,
+                internalQueryStatsSampleRate: 1,
                 internalQueryStatsWriteCmdSampleRate: 1,
             },
         });
@@ -206,6 +206,7 @@ runDeleteCmdMetricsTests(
             mongosOptions: {
                 setParameter: {
                     internalQueryStatsRateLimit: -1,
+                    internalQueryStatsSampleRate: 1,
                     internalQueryStatsWriteCmdSampleRate: 1,
                 },
             },

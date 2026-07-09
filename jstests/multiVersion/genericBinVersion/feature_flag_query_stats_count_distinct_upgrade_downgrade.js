@@ -20,7 +20,10 @@ replSet.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 // Upgrade the set and enable the feature flag. The feature flag will be enabled as of
 // the latest FCV. However, the repl set will still have FCV last-lts.
-replSet.upgradeSet({binVersion: "latest", setParameter: {internalQueryStatsRateLimit: -1}});
+replSet.upgradeSet({
+    binVersion: "latest",
+    setParameter: {internalQueryStatsSampleRate: 1},
+});
 
 const primary = replSet.getPrimary();
 const db = primary.getDB("test");

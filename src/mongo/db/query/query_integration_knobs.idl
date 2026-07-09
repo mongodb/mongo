@@ -116,7 +116,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_varname: "internalQueryStatsSampleRate"
         cpp_vartype: AtomicWord<double>
-        default: 0
+        default: 0.01
         validator:
             gte: 0.0
             lte: 1.0
@@ -134,7 +134,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_varname: "internalQueryStatsWriteCmdSampleRate"
         cpp_vartype: AtomicWord<double>
-        default: 0.0
+        default: 0.01
         validator:
             gte: 0.0
             lte: 1.0

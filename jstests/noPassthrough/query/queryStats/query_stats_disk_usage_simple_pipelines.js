@@ -222,7 +222,7 @@ function runTests(conn, coll) {
 }
 
 const options = {
-    setParameter: {internalQueryStatsRateLimit: -1},
+    setParameter: {internalQueryStatsSampleRate: 1},
 };
 
 jsTestLog("Standalone: Testing query stats disk usage for aggregate queries");

@@ -261,7 +261,10 @@ function runQueryStatsTest({desc, pipeline, expectedShape, runFn, transformIdent
 }
 
 // Enable query stats collection.
-testDb.adminCommand({setParameter: 1, internalQueryStatsRateLimit: -1});
+testDb.adminCommand({
+    setParameter: 1,
+    internalQueryStatsSampleRate: 1,
+});
 
 // =============================================================================
 // Basic extension stage shape tests

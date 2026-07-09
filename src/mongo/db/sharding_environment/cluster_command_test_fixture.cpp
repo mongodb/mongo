@@ -388,6 +388,7 @@ void ClusterCommandTestFixture::testIncludeQueryStatsMetrics(BSONObj cmd, bool i
         // stats. We'll always request metrics, even if the user set includeQueryStatsMetrics
         // to false.
         unittest::ServerParameterGuard rateLimit("internalQueryStatsRateLimit", -1);
+        unittest::ServerParameterGuard sampleRate("internalQueryStatsSampleRate", 1.0);
 
         runCommandInspectRequests(cmd, expectFieldIs(true), isTargeted);
         runCommandInspectRequests(cmdIncludeTrue, expectFieldIs(true), isTargeted);
@@ -397,6 +398,7 @@ void ClusterCommandTestFixture::testIncludeQueryStatsMetrics(BSONObj cmd, bool i
     {
         // Rate limit is 0 i.e., every request is rate-limited.
         unittest::ServerParameterGuard rateLimit("internalQueryStatsRateLimit", 0);
+        unittest::ServerParameterGuard sampleRate("internalQueryStatsSampleRate", 0.0);
 
         // If the user doesn't give includeQueryStatsMetrics, we won't insert the field.
         runCommandInspectRequests(cmd, expectNoField, isTargeted);
