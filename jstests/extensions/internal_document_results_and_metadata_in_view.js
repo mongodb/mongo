@@ -12,10 +12,10 @@ import {before, describe, it} from "jstests/libs/mochalite.js";
 describe("$_internalDocumentResultsAndMetadata view handling", function () {
     let coll, simpleView, outerView, idrmView;
     const idrmCollStats = {
-        $_internalDocumentResultsAndMetadata: {source: {$collStats: {latencyStats: {}}}},
+        $expandToDrm: {source: {$collStats: {latencyStats: {}}}},
     };
     const idrmDisallowViews = {
-        $_internalDocumentResultsAndMetadata: {source: {$disallowViewsSource: {}}},
+        $expandToDrm: {source: {$disallowViewsSource: {}}},
     };
 
     before(function () {
@@ -45,7 +45,7 @@ describe("$_internalDocumentResultsAndMetadata view handling", function () {
         );
         assert.commandWorked(
             db.createView(idrmViewName, coll.getName(), [
-                {$_internalDocumentResultsAndMetadata: {source: {$collStats: {latencyStats: {}}}}},
+                {$expandToDrm: {source: {$collStats: {latencyStats: {}}}}},
             ]),
         );
 
@@ -72,7 +72,7 @@ describe("$_internalDocumentResultsAndMetadata view handling", function () {
                     aggregate: outerView.getName(),
                     pipeline: [
                         {
-                            $_internalDocumentResultsAndMetadata: {
+                            $expandToDrm: {
                                 source: {$disallowViewsSource: {}},
                             },
                         },

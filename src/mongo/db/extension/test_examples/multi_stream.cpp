@@ -30,6 +30,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
+#include "mongo/db/extension/sdk/assert_util.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/host_services.h"
 #include "mongo/db/extension/sdk/test_extension_factory.h"
@@ -392,6 +393,63 @@ private:
     BSONObj _args;
 };
 
+/**
+ * $expandToDrm desugars into a single $_internalDocumentResultsAndMetadata stage that wraps a
+ * caller-supplied source stage with no metadata stream or DPL. Unlike $extensionMultiStream (whose
+ * source is the fixed $_multiStreamSource), this lets tests exercise DRM over an arbitrary source
+ * through the legitimate desugaring path.
+ */
+class ExpandToDrmParseNode : public sdk::AggStageParseNode {
+public:
+    ExpandToDrmParseNode(std::string_view name, const BSONObj& args)
+        : sdk::AggStageParseNode(name), _args(args.getOwned()) {}
+
+    size_t getExpandedSize() const override {
+        return 1;
+    }
+
+    std::vector<extension::VariantNodeHandle> expand() const override {
+        // Wrap the caller-provided source stage in a $_internalDocumentResultsAndMetadata spec and
+        // desugar into it via the host service. No metadata field and no distributed plan logic
+        // callback are attached (document-only behavior).
+        BSONObj drmSpec = BSON("$_internalDocumentResultsAndMetadata"
+                               << BSON(kSourceField << _args[kSourceField].Obj()));
+        std::vector<extension::VariantNodeHandle> expanded;
+        expanded.reserve(1);
+        expanded.emplace_back(sdk::HostServicesAPI::getInstance()->createDocumentResultsAndMetadata(
+            drmSpec, nullptr /* callback */, nullptr /* userData */, nullptr /* destroy */));
+        return expanded;
+    }
+
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
+        return BSONObj();
+    }
+
+    BSONObj toBsonForLog() const override {
+        return BSON(_name << _args);
+    }
+
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<ExpandToDrmParseNode>(getName(), _args);
+    }
+
+private:
+    BSONObj _args;
+};
+
+// $expandToDrm: user-facing stage that desugars into $_internalDocumentResultsAndMetadata wrapping
+// a caller-supplied 'source' stage.
+class ExpandToDrmStageDescriptor
+    : public sdk::TestStageDescriptor<"$expandToDrm", ExpandToDrmParseNode> {
+public:
+    void validate(const BSONObj& arguments) const override {
+        auto sourceElem = arguments[kSourceField];
+        sdk_uassert(13042900,
+                    "$expandToDrm requires a 'source' object specifying a single source stage",
+                    sourceElem.type() == BSONType::object && sourceElem.Obj().nFields() == 1);
+    }
+};
+
 // $_multiStreamSource: source stage that emits the two-stream (doc + metadata)
 // output consumed by $_internalDocumentResultsAndMetadata. See
 // MultiStreamSourceExecStage for the numMeta scenario matrix.
@@ -407,6 +465,7 @@ public:
     void initialize(const sdk::HostPortalHandle& portal) override {
         _registerStage<ExtensionMultiStreamStageDescriptor>(portal);
         _registerStage<MultiStreamSourceStageDescriptor>(portal);
+        _registerStage<ExpandToDrmStageDescriptor>(portal);
     }
 };
 

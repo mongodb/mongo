@@ -165,9 +165,8 @@ REGISTER_AGG_STAGES_MAPPING(_internalDocumentResultsAndMetadata,
                             DocumentSourceInternalDocumentResultsAndMetadata::id,
                             documentSourceInternalDocumentResultsAndMetadataToStagesFn);
 
-REGISTER_LITE_PARSED_DOCUMENT_SOURCE(_internalDocumentResultsAndMetadata,
-                                     InternalDocumentResultsAndMetadataLiteParsed::parse,
-                                     AllowedWithApiStrict::kInternal);
+REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(_internalDocumentResultsAndMetadata,
+                                              InternalDocumentResultsAndMetadataLiteParsed::parse);
 
 DocumentSourceContainer internalDocumentResultsAndMetadataStageParamsToDocumentSourceFn(
     const std::unique_ptr<StageParams>& stageParams,

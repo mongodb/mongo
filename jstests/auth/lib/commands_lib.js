@@ -261,6 +261,7 @@ const skippedAuthTestingAggStages = [
     "$set", // Alias for "$addFields" and already covered.
     "$_internalHybridSearch", // Already covered in
     // jstests/aggregation/sources/internal_hybrid_search_rejected_in_user_request.js.
+    "$_internalDocumentResultsAndMetadata", // Internal-only and rejected in all user requests.
 ];
 
 // The following commands are skipped in 'authCommandsLib' because they are unable to be
@@ -9332,69 +9333,6 @@ export const authCommandsLib = {
                         {resource: {cluster: true}, actions: ["internal"]},
                     ],
                     expectFail: true,
-                },
-            ],
-        },
-        {
-            testname: "aggregate_$_internalDocumentResultsAndMetadata",
-            command: {
-                aggregate: "foo",
-                // $collStats is used as the source stage because it requires an extra privilege
-                // (collStats action), verifying that the auth check propagates through the
-                // $_internalDocumentResultsAndMetadata container to its input stage.
-                pipeline: [
-                    {
-                        $_internalDocumentResultsAndMetadata: {
-                            source: {$collStats: {latencyStats: {}}},
-                        },
-                    },
-                ],
-                cursor: {},
-            },
-            testcases: [
-                {
-                    runOnDb: firstDbName,
-                    roles: {
-                        read: 1,
-                        readAnyDatabase: 1,
-                        readWrite: 1,
-                        readWriteAnyDatabase: 1,
-                        dbAdmin: 1,
-                        dbAdminAnyDatabase: 1,
-                        dbOwner: 1,
-                        clusterMonitor: 1,
-                        clusterAdmin: 1,
-                        backup: 1,
-                        root: 1,
-                        searchCoordinator: 1,
-                        __system: 1,
-                    },
-                    privileges: [
-                        {resource: {db: firstDbName, collection: "foo"}, actions: ["collStats"]},
-                    ],
-                    // $collStats does not produce the {_streamType, payload} transport format
-                    // that the translation function's $replaceRoot expects.
-                    expectFailWithErrorCodes: [40228],
-                },
-                {
-                    runOnDb: secondDbName,
-                    roles: {
-                        readAnyDatabase: 1,
-                        readWriteAnyDatabase: 1,
-                        dbAdminAnyDatabase: 1,
-                        clusterMonitor: 1,
-                        clusterAdmin: 1,
-                        backup: 1,
-                        root: 1,
-                        searchCoordinator: 1,
-                        __system: 1,
-                    },
-                    privileges: [
-                        {resource: {db: secondDbName, collection: "foo"}, actions: ["collStats"]},
-                    ],
-                    // $collStats does not produce the {_streamType, payload} transport format
-                    // that the translation function's $replaceRoot expects.
-                    expectFailWithErrorCodes: [40228],
                 },
             ],
         },

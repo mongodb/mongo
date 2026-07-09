@@ -86,32 +86,6 @@ assert.commandWorked(bulk.execute());
         );
     });
 
-    // $_internalDocumentResultsAndMetadata is an internal container stage produced during search
-    // pipeline expansion. Although users aren't expected to write it directly, it can be specified
-    // in a pipeline, so confirm it is also rejected on a timeseries collection when wrapping a
-    // search source stage. It inherits its source's constraints, so it is disallowed for the same
-    // reason $search is.
-    assert.commandFailedWithCode(
-        tsColl.runCommand("aggregate", {
-            pipeline: [
-                {
-                    $_internalDocumentResultsAndMetadata: {
-                        source: {
-                            $search: {
-                                index: "default",
-                                text: {query: "example", path: metaFieldName},
-                            },
-                        },
-                    },
-                },
-            ],
-            cursor: {},
-        }),
-        // TODO SERVER-121094 Delete code 10557302 once we only validate in LPP.
-        [10557302, 12093200, 10623000],
-        "Expected failure for $_internalDocumentResultsAndMetadata wrapping $search on timeseries",
-    );
-
     // Search stages should fail when querying a view on a timeseries collection.
     const viewName = "view_" + timeseriesCollName;
     assert.commandWorked(db.createView(viewName, timeseriesCollName, [{$set: {"view": 100}}]));
