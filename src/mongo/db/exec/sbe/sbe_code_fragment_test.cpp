@@ -614,9 +614,9 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal2) {
 
 TEST_F(SBECodeFragmentTest, AppendMakeOwn) {
     auto lhsValue = value::makeBigString("one not too short string");
-    value::ValueGuard lhsGuard(lhsValue);
+    value::TagValueOwned lhsOwned = value::TagValueOwned::fromRaw(lhsValue);
     auto rhsValue = value::makeBigString("another string");
-    value::ValueGuard rhsGuard(rhsValue);
+    value::TagValueOwned rhsOwned = value::TagValueOwned::fromRaw(rhsValue);
     FrameId frameId = 10;
 
     {

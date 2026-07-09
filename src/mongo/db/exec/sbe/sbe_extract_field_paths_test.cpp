@@ -107,10 +107,10 @@ public:
             inputBab << BSON_ARRAY(fromjson(inputs[i]));
             outputBab << fromjson(makeExpectedArr(outputs[i]))[expectedFieldName];
         }
-        auto [inputTag, inputVal] = stage_builder::makeValue(inputBab.arr());
-        value::ValueGuard inputGuard{inputTag, inputVal};
-        auto [expectedTag, expectedVal] = stage_builder::makeValue(outputBab.arr());
-        value::ValueGuard expectedGuard{expectedTag, expectedVal};
+        value::TagValueOwned input =
+            value::TagValueOwned::fromRaw(stage_builder::makeValue(inputBab.arr()));
+        value::TagValueOwned expected =
+            value::TagValueOwned::fromRaw(stage_builder::makeValue(outputBab.arr()));
 
         auto makeStageFn = [&, this](value::SlotVector scanSlots,
                                      std::unique_ptr<PlanStage> scanStage) {
@@ -134,8 +134,8 @@ public:
             return std::make_pair(outputSlots, std::move(extractFieldPathsStage));
         };
 
-        inputGuard.reset();
-        expectedGuard.reset();
+        auto [inputTag, inputVal] = input.releaseToRaw();
+        auto [expectedTag, expectedVal] = expected.releaseToRaw();
         runTestMulti(1, inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
     }
 };
@@ -153,13 +153,13 @@ TEST_F(ExtractFieldPathsStageTest, SinglePathNonNestedNonArrayToplevelFieldSlotT
     // `inputBab` is an array of subarrays. Each subarray has an element for each input slot.
     BSONArrayBuilder inputBab;
     inputBab << BSON_ARRAY(1) << BSON_ARRAY(2);
-    auto [inputTag, inputVal] = stage_builder::makeValue(inputBab.arr());
-    value::ValueGuard inputGuard{inputTag, inputVal};
+    value::TagValueOwned input =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(inputBab.arr()));
     // `outputBab` is an array of subarrays. Each subarray has an element for each output slot.
     BSONArrayBuilder outputBab;
     outputBab << BSON_ARRAY(1) << BSON_ARRAY(2);
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(outputBab.arr());
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expected =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(outputBab.arr()));
     auto makeStageFn = [&, this](value::SlotVector scanSlots,
                                  std::unique_ptr<PlanStage> scanStage) {
         std::vector<FieldPath> paths{"a"};
@@ -181,8 +181,8 @@ TEST_F(ExtractFieldPathsStageTest, SinglePathNonNestedNonArrayToplevelFieldSlotT
             makeS<ExtractFieldPathsStage>(std::move(scanStage), inputs, outputs, kEmptyPlanNodeId);
         return std::make_pair(outputSlots, std::move(extractFieldPathsStage));
     };
-    inputGuard.reset();
-    expectedGuard.reset();
+    auto [inputTag, inputVal] = input.releaseToRaw();
+    auto [expectedTag, expectedVal] = expected.releaseToRaw();
     runTestMulti(1, inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
 }
 
@@ -190,13 +190,13 @@ TEST_F(ExtractFieldPathsStageTest, SingleToplevelFieldSlotNestedPathTest) {
     // `inputBab` is an array of subarrays. Each subarray has an element for each input slot.
     BSONArrayBuilder inputBab;
     inputBab << BSON_ARRAY(BSON("b" << 1)) << BSON_ARRAY(BSON("b" << 2));
-    auto [inputTag, inputVal] = stage_builder::makeValue(inputBab.arr());
-    value::ValueGuard inputGuard{inputTag, inputVal};
+    value::TagValueOwned input =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(inputBab.arr()));
     // `outputBab` is an array of subarrays. Each subarray has an element for each output slot.
     BSONArrayBuilder outputBab;
     outputBab << BSON_ARRAY(1) << BSON_ARRAY(2);
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(outputBab.arr());
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expected =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(outputBab.arr()));
     auto makeStageFn = [&, this](value::SlotVector scanSlots,
                                  std::unique_ptr<PlanStage> scanStage) {
         std::vector<FieldPath> paths{"a.b"};
@@ -218,8 +218,8 @@ TEST_F(ExtractFieldPathsStageTest, SingleToplevelFieldSlotNestedPathTest) {
             makeS<ExtractFieldPathsStage>(std::move(scanStage), inputs, outputs, kEmptyPlanNodeId);
         return std::make_pair(outputSlots, std::move(extractFieldPathsStage));
     };
-    inputGuard.reset();
-    expectedGuard.reset();
+    auto [inputTag, inputVal] = input.releaseToRaw();
+    auto [expectedTag, expectedVal] = expected.releaseToRaw();
     runTestMulti(1, inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
 }
 

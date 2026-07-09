@@ -908,7 +908,7 @@ TEST_F(BlockStagesTest, BlockToRowNoValuesFilteredObjects) {
         obj->push_back_raw("a", value::TypeTags::NumberInt32, value::bitcastFrom<int>(i));
         expected->push_back_raw(value::TypeTags::Object, valArg2);
     }
-    value::ValueGuard expectedGuard(tagExpected, valExpected);
+    value::TagValueOwned expectedArray = value::TagValueOwned::fromRaw(tagExpected, valExpected);
 
     testBlockToBitmap(blocks, {std::vector<bool>{true, true, true, true, true, true}}, *expected);
 }

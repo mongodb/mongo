@@ -105,13 +105,11 @@ public:
     }
 
     static TypedValue makeArray(std::vector<TypedValue> vals) {
-        auto [arrTag, arrVal] = value::makeNewArray();
-        value::ValueGuard guard(arrTag, arrVal);
+        value::TagValueOwned arrOwner = value::TagValueOwned::fromRaw(value::makeNewArray());
         for (auto [t, v] : vals) {
-            value::getArrayView(arrVal)->push_back_raw(t, v);
+            value::getArrayView(arrOwner.value())->push_back_raw(t, v);
         }
-        guard.reset();
-        return {arrTag, arrVal};
+        return arrOwner.releaseToRaw();
     }
 
     // This helper takes an array of groupby results and compares to the expectedMap of group ID to
@@ -314,7 +312,7 @@ public:
                                    makeFn,
                                    forceSpill,
                                    assertStageStats);
-        value::ValueGuard resultGuard{result};
+        value::TagValueOwned resultOwner = value::TagValueOwned::fromRaw(result);
         assertResultMatchesMap(result, expectedResultsMap, expectedOutputBlockSizes);
     }
 
