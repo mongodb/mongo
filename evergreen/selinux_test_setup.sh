@@ -38,3 +38,22 @@ fi
 if [ "$SEORDER" == "1" ]; then
   apply_selinux_policy
 fi
+
+# install packages needed by check_has_tag.py
+# Keep this in sync with jstests/selinux/core.js.
+if command -v python3 > /dev/null 2>&1; then
+  PYTHON=python3
+elif command -v python2 > /dev/null 2>&1; then
+  PYTHON=python2
+else
+  echo "==== Could not find a Python binary needed by SELinux tests"
+  exit 1
+fi
+echo "==== Found Python for SELinux tag checks: $PYTHON"
+if ! "$PYTHON" -c 'import yaml' > /dev/null 2>&1; then
+  PYYAML_PACKAGE=pyyaml
+  if "$PYTHON" --version 2>&1 | grep -q '^Python 2'; then
+    PYYAML_PACKAGE='pyyaml<6'
+  fi
+  "$PYTHON" -m pip install "$PYYAML_PACKAGE"
+fi

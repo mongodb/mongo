@@ -62,7 +62,11 @@ def infer_platform(edition=None, version=None):
     elif syst == 'Linux':
         id_name = distro.id()
         if id_name in ('ubuntu', 'rhel'):
-            pltf = id_name + distro.major_version() + distro.minor_version()
+            major_version = distro.major_version()
+            if id_name == 'rhel' and major_version.isdigit() and int(major_version) >= 10:
+                pltf = id_name + major_version
+            else:
+                pltf = id_name + major_version + distro.minor_version()
     if pltf is None:
         raise ValueError("Platform cannot be inferred. Please specify platform explicitly with -p. "
                          f"Available platforms can be found in {config.SETUP_MULTIVERSION_CONFIG}.")

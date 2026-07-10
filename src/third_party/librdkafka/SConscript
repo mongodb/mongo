@@ -23,6 +23,9 @@ if env.ToolchainIs('clang'):
 else:
     env.Append(CCFLAGS=['-Wno-error=maybe-uninitialized'])
 
+if env.subst('$MONGO_DISTMOD') == 'rhel10':
+    env.Append(CPPDEFINES=['OPENSSL_NO_ENGINE'])
+
 
 def remove_define(env, define_to_remove):
     to_remove = []

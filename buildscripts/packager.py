@@ -177,6 +177,24 @@ class Distro(object):
         """Initialize Distro."""
         self.dname = string
 
+    @staticmethod
+    def _rhel_major_version(build_os):
+        """Return the Red Hat major version for build OS names like rhel88, rhel10, or rhel100."""
+        match = re.match(r"^rhel(\d+)", build_os)
+        if not match:
+            return None
+
+        digits = match.group(1)
+        if len(digits) == 1:
+            return digits
+
+        if len(digits) == 2:
+            if digits[0] in {"5", "6", "7", "8", "9"}:
+                return digits[0]
+            return digits
+
+        return digits[:-1]
+
     def name(self):
         """Return name."""
         return self.dname
@@ -284,7 +302,10 @@ class Distro(object):
         if self.dname == 'suse':
             return re.sub(r'^suse(\d+)$', r'\1', build_os)
         if self.dname == 'redhat':
-            return re.sub(r'^rhel(\d).*$', r'\1', build_os)
+            rhel_major = self._rhel_major_version(build_os)
+            if rhel_major is None:
+                raise Exception("unsupported build_os: %s" % build_os)
+            return rhel_major
         if self.dname == 'amazon':
             return "2013.03"
         elif self.dname == 'amazon2':
@@ -345,6 +366,7 @@ class Distro(object):
             return ["suse11", "suse12", "suse15"]
         elif re.search("(redhat|fedora|centos)", self.dname):
             return [
+                "rhel10",
                 "rhel90",
                 "rhel82",
                 "rhel80",
@@ -385,7 +407,10 @@ class Distro(object):
             return 'amzn2'
         elif self.dname == 'amazon2023':
             return 'amzn2023'
-        return re.sub(r'^rh(el\d).*$', r'\1', build_os)
+        rhel_major = self._rhel_major_version(build_os)
+        if rhel_major:
+            return "el%s" % rhel_major
+        return build_os
 
 
 def get_args(distros, arch_choices):
@@ -831,6 +856,16 @@ def make_rpm(distro, build_os, arch, spec, srcdir):
         "-D",
         f"dynamic_release {spec.prelease()}",
     ]
+
+    # Some build environments may not define a `pathfix` RPM macro even though our spec files
+    # reference it during %prep. Define it here if available so rpmbuild can expand `%{pathfix}`.
+    pathfix = None
+    for candidate in ("/usr/bin/pathfix.py", "/usr/lib/rpm/redhat/pathfix.py"):
+        if os.path.exists(candidate):
+            pathfix = candidate
+            break
+    if pathfix:
+        flags.extend(["-D", f"pathfix {pathfix}"])
 
     # Versions of RPM after 4.4 ignore our BuildRoot tag so we need to
     # specify it on the command line args to rpmbuild
