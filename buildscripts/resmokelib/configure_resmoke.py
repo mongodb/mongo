@@ -790,12 +790,6 @@ flags in common: {common_set}
 
     _config.MONGOD_EXECUTABLE = _expand_user(config.pop("mongod_executable"))
 
-    _config.JS_ENGINE = _detect_js_engine(_config.MONGOD_EXECUTABLE)
-    if _config.JS_ENGINE == "mozjs-wasm":
-        _config.EXCLUDE_WITH_ANY_TAGS.append("mozjs_wasm_unsupported")
-    else:
-        _config.EXCLUDE_WITH_ANY_TAGS.append("requires_mozjs_wasm")
-
     mongod_set_parameters = config.pop("mongod_set_parameters")
 
     _config.MONGOD_SET_PARAMETERS = _merge_set_params(mongod_set_parameters)
@@ -1237,47 +1231,6 @@ def _find_mfp_plugin_source() -> str:
         "or ensure dist-test/lib/ is populated. "
         f"Searched: {candidates}"
     )
-
-
-def _detect_js_engine(mongod_executable: Optional[str]) -> Optional[str]:
-    """Return the JS engine name reported by the mongod binary, or None if the binary does not exist
-    or it cannot be determined (i.e. --version does not output javascriptEngine).
-
-    Runs ``mongod --version`` and parses the ``javascriptEngine`` field from the Build Info JSON.
-    If the binary exists, returns e.g. ``"mozjs"`` or ``"mozjs-wasm"``, or ``none``.
-    Note that ''none'' is a valid JS engine that indicates the server was built without a JS engine,
-    and is not the same as returning None to indicate the binary doesn't exist.
-
-    When ``mongod_executable`` is not specified, falls back to the default executable name
-    (``"mongod"``), which may be resolved via PATH (e.g. via DEPS_PATH in the Bazel test runner).
-    """
-    executable = mongod_executable or _config.DEFAULT_MONGOD_EXECUTABLE
-    if shutil.which(executable) is None:
-        return None
-    # Sanitizer builds can take tens of seconds to start up.
-    version_timeout_secs = 120 if _config.IS_SAN else 10
-    try:
-        result = subprocess.run(
-            [executable, "--version"],
-            capture_output=True,
-            text=True,
-            timeout=version_timeout_secs,
-        )
-        # The output is: "db version v...\nBuild Info: <pretty-printed JSON>\n"
-        # Grab everything from "Build Info: " to the end and parse it as one JSON blob.
-        marker = "Build Info:"
-        idx = result.stdout.find(marker)
-        if idx != -1:
-            build_info = json.loads(result.stdout[idx + len(marker) :].strip())
-            return build_info.get("javascriptEngine")
-        reason = "'Build Info:' marker not found in --version output"
-    except Exception as exc:  # pylint: disable=broad-except
-        reason = repr(exc)
-    print(
-        f"Warning: failed to detect the JS engine from '{executable} --version' ({reason}).",
-        file=sys.stderr,
-    )
-    return None
 
 
 def _expand_user(pathname):
