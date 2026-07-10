@@ -43,6 +43,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/single_doc_lookup/aggregation_single_document_lookup_executor.h"
 #include "mongo/db/exec/single_doc_lookup/express_single_document_lookup_executor.h"
+#include "mongo/db/exec/single_doc_lookup/sbe_single_document_lookup_executor.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
@@ -597,10 +598,31 @@ TEST_F(ChangeStreamAddPostImageStageFnWiringTest, UpdateLookupFlagOffWiresAggreg
         updateLookupStage->getLookupExecutor_forTest()));
 }
 
-// Flag on: the updateLookup stage routes through PrimaryWithFallback(Express, Aggregation).
+// Flag on, collection-level stream (the fixture's default namespace): the updateLookup stage
+// routes through PrimaryWithFallback(Sbe, Aggregation).
 TEST_F(ChangeStreamAddPostImageStageFnWiringTest,
-       UpdateLookupFlagOnWiresExpressWithAggregationFallback) {
+       UpdateLookupFlagOnWiresSbeWithAggregationFallbackForCollectionStream) {
     unittest::ServerParameterGuard flag{"featureFlagChangeStreamOptimizedUpdateLookup", true};
+    auto stage = buildStageForMode(FullDocumentModeEnum::kUpdateLookup);
+    auto* updateLookupStage = dynamic_cast<exec::agg::ChangeStreamUpdateLookupStage*>(stage.get());
+    ASSERT(updateLookupStage);
+
+    auto* chain = dynamic_cast<const exec::agg::PrimaryWithFallbackSingleDocumentLookupExecutor*>(
+        updateLookupStage->getLookupExecutor_forTest());
+    ASSERT(chain);
+    ASSERT(
+        dynamic_cast<const exec::agg::SbeSingleDocumentLookupExecutor*>(chain->primary_forTest()));
+    ASSERT(dynamic_cast<const exec::agg::AggregationSingleDocumentLookupExecutor*>(
+        chain->fallback_forTest()));
+}
+
+// Flag on, database-level stream: the updateLookup stage routes through
+// PrimaryWithFallback(Express, Aggregation).
+TEST_F(ChangeStreamAddPostImageStageFnWiringTest,
+       UpdateLookupFlagOnWiresExpressWithAggregationFallbackForDatabaseStream) {
+    unittest::ServerParameterGuard flag{"featureFlagChangeStreamOptimizedUpdateLookup", true};
+    getExpCtx()->setNamespaceString(NamespaceString::makeCollectionlessAggregateNSS(
+        getExpCtx()->getNamespaceString().dbName()));
     auto stage = buildStageForMode(FullDocumentModeEnum::kUpdateLookup);
     auto* updateLookupStage = dynamic_cast<exec::agg::ChangeStreamUpdateLookupStage*>(stage.get());
     ASSERT(updateLookupStage);

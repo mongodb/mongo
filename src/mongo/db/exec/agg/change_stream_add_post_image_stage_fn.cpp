@@ -35,6 +35,7 @@
 #include "mongo/db/exec/single_doc_lookup/collection_acquirer.h"
 #include "mongo/db/exec/single_doc_lookup/express_single_document_lookup_executor.h"
 #include "mongo/db/exec/single_doc_lookup/local_lookup_eligibility_factory_impl.h"
+#include "mongo/db/exec/single_doc_lookup/sbe_single_document_lookup_executor.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_stats.h"
 #include "mongo/db/feature_flag.h"
@@ -74,9 +75,17 @@ exec::agg::BatchedEnrichmentStage::Limits buildUpdateLookupLimits(
 
 /**
  * Builds the SingleDocumentLookupExecutor for the updateLookup stage.
+ *
+ * With the optimization on, the primary strategy depends on the change-stream scope:
+ * - Collection-level streams have a fixed lookup namespace, so they use the SBE executor: it
+ *   compiles a parameterized '{_id: <value>}' plan once and reuses it across events (rebinding the
+ *   _id slot), with the acquisition cached across the batch window.
+ * - Database- and cluster-wide streams look up a different namespace per event, so a cached plan
+ *   buys nothing; they use the Express point-read executor.
+ * Both primaries fall back to the routed Aggregation executor when they decline.
  */
 std::unique_ptr<exec::agg::SingleDocumentLookupExecutor> buildUpdateLookupExecutor(
-    OperationContext* opCtx, bool isOptimized) {
+    OperationContext* opCtx, bool isOptimized, bool isCollectionStream) {
     using namespace exec::agg;
     auto aggExecutor = std::make_unique<AggregationSingleDocumentLookupExecutor>(
         exec::SingleDocumentLookupStatsRecorder::makeUpdateLookupAggregationRecorder());
@@ -90,12 +99,20 @@ std::unique_ptr<exec::agg::SingleDocumentLookupExecutor> buildUpdateLookupExecut
     CurOp::get(opCtx)->debug().usesOptimizedUpdateLookup = true;
 
     LocalLookupEligibilityFactoryImpl eligibilityFactory;
-    auto expressExecutor = std::make_unique<ExpressSingleDocumentLookupExecutor>(
-        std::make_unique<OnDemandCollectionAcquirer>(),
-        eligibilityFactory.makeLocalLookupEligibility(opCtx),
-        exec::SingleDocumentLookupStatsRecorder::makeUpdateLookupExpressRecorder());
+    std::unique_ptr<SingleDocumentLookupExecutor> primary;
+    if (isCollectionStream) {
+        primary = std::make_unique<SbeSingleDocumentLookupExecutor>(
+            std::make_unique<OnDemandCollectionAcquirer>(),
+            eligibilityFactory.makeLocalLookupEligibility(opCtx));
+    } else {
+        primary = std::make_unique<ExpressSingleDocumentLookupExecutor>(
+            std::make_unique<OnDemandCollectionAcquirer>(),
+            eligibilityFactory.makeLocalLookupEligibility(opCtx),
+            exec::SingleDocumentLookupStatsRecorder::makeUpdateLookupExpressRecorder());
+    }
+
     return std::make_unique<PrimaryWithFallbackSingleDocumentLookupExecutor>(
-        std::move(expressExecutor), std::move(aggExecutor));
+        std::move(primary), std::move(aggExecutor));
 }
 }  // namespace
 
@@ -120,13 +137,14 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamAddPostImageToS
         const bool isOptimized = ifrCtx &&
             ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagChangeStreamOptimizedUpdateLookup);
         const bool isCollectionStream =
-            ChangeStream::buildFromExpressionContext(expCtx).getChangeStreamType() ==
+            ChangeStream::getChangeStreamType(expCtx->getNamespaceString()) ==
             ChangeStreamType::kCollection;
 
         return make_intrusive<exec::agg::ChangeStreamUpdateLookupStage>(
             changeStreamAddPostImageDS->kStageName,
             expCtx,
-            buildUpdateLookupExecutor(expCtx->getOperationContext(), isOptimized),
+            buildUpdateLookupExecutor(
+                expCtx->getOperationContext(), isOptimized, isCollectionStream),
             buildUpdateLookupLimits(
                 expCtx->getQueryKnobConfiguration(), isOptimized, isCollectionStream));
     }
