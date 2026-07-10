@@ -95,8 +95,10 @@ public:
 
     void exhaustRetryBudget() {
         auto strategy = _makeRetryStrategyNoIncrement();
-        while (strategy.recordFailureAndEvaluateShouldRetry(
-            statusRetriableErrorCategory, target1, errorLabelsSystemOverloaded))
+        while (strategy.recordFailureAndEvaluateShouldRetry(statusRetriableErrorCategory,
+                                                            target1,
+                                                            errorLabelsSystemOverloaded,
+                                                            /*baseBackoffMS=*/boost::none))
             ;
     }
 
@@ -153,8 +155,10 @@ public:
         "capacity or lower");
 
     static bool acquireToken(AdaptiveRetryStrategy& strategy) {
-        return strategy.recordFailureAndEvaluateShouldRetry(
-            statusNonRetriable, target1, errorLabelsSystemOverloaded);
+        return strategy.recordFailureAndEvaluateShouldRetry(statusNonRetriable,
+                                                            target1,
+                                                            errorLabelsSystemOverloaded,
+                                                            /*baseBackoffMS=*/boost::none);
     }
 
     void retryCriteriaDontRetry() {
@@ -196,21 +200,22 @@ TEST_F(RetryStrategyTest, DefaultRetryStrategyMaxRetry) {
     // Exhaust the amount of retry for this strategy.
     for (std::int32_t i = 0; i < kMaxNumberOfRetries; ++i) {
         ASSERT(strategy.recordFailureAndEvaluateShouldRetry(
-            statusRetriableErrorCategory, target1, {}));
+            statusRetriableErrorCategory, target1, {}, /*baseBackoffMS=*/boost::none));
     }
 
     ASSERT_EQ(retryCriteriaCallCount(), kMaxNumberOfRetries);
 
     // Attempting to retry past the maximum amount of retry should fail and not call the callback.
-    ASSERT_FALSE(
-        strategy.recordFailureAndEvaluateShouldRetry(statusRetriableErrorCategory, target1, {}));
+    ASSERT_FALSE(strategy.recordFailureAndEvaluateShouldRetry(
+        statusRetriableErrorCategory, target1, {}, /*baseBackoffMS=*/boost::none));
     ASSERT_EQ(retryCriteriaCallCount(), kMaxNumberOfRetries);
 }
 
 TEST_F(RetryStrategyTest, DefaultRetryStrategyNoDelayNotOverloaded) {
     auto strategy = makeDefaultRetryStrategy();
 
-    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(statusRetriableErrorCategory, target1, {}));
+    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(
+        statusRetriableErrorCategory, target1, {}, /*baseBackoffMS=*/boost::none));
 
     // The retry delay should be zero since the system overloaded error label was not sent.
     ASSERT_EQ(strategy.getNextRetryDelay(), Milliseconds{0});
@@ -222,8 +227,8 @@ TEST_F(RetryStrategyTest, DefaultRetryStrategyCallbackNoRetry) {
 
     // The callback will return false, so the amount of calls should increment but the strategy
     // should return false.
-    ASSERT_FALSE(
-        strategy.recordFailureAndEvaluateShouldRetry(statusRetriableErrorCategory, target1, {}));
+    ASSERT_FALSE(strategy.recordFailureAndEvaluateShouldRetry(
+        statusRetriableErrorCategory, target1, {}, /*baseBackoffMS=*/boost::none));
     ASSERT_EQ(retryCriteriaCallCount(), 1);
 }
 
@@ -234,8 +239,10 @@ TEST_F(RetryStrategyTest, DefaultRetryStrategyHasDelay) {
 
     auto lastBackoff = Milliseconds{0};
     for (std::int32_t i = 0; i < kMaxNumberOfRetries; ++i) {
-        ASSERT(strategy.recordFailureAndEvaluateShouldRetry(
-            statusRetriableErrorCategory, target1, errorLabelsSystemOverloaded));
+        ASSERT(strategy.recordFailureAndEvaluateShouldRetry(statusRetriableErrorCategory,
+                                                            target1,
+                                                            errorLabelsSystemOverloaded,
+                                                            /*baseBackoffMS=*/boost::none));
 
         const auto backoff = strategy.getNextRetryDelay();
 
@@ -248,29 +255,61 @@ TEST_F(RetryStrategyTest, DefaultRetryStrategyHasDelay) {
     }
 }
 
+TEST_F(RetryStrategyTest, DefaultRetryStrategyBaseBackoffMSScalesBackoffWhenOverloaded) {
+    auto strategy = makeDefaultRetryStrategy();
+    auto _ = FailPointEnableBlock{"returnMaxBackoffDelay"};
+
+    constexpr auto kBaseBackoffMS = Milliseconds{500};
+
+    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(
+        statusRetriableErrorCategory, target1, errorLabelsSystemOverloaded, kBaseBackoffMS));
+
+    ASSERT_EQ(strategy.getNextRetryDelay(), kBaseBackoffMS * 2);
+}
+
+TEST_F(RetryStrategyTest, DefaultRetryStrategyBaseBackoffMSIgnoredWhenNotOverloaded) {
+    auto strategy = makeDefaultRetryStrategy();
+    auto _ = FailPointEnableBlock{"returnMaxBackoffDelay"};
+
+    constexpr auto kBaseBackoffMS = Milliseconds{500};
+
+    // 'errorLabelsRetriable' does not contain the SystemOverloadedError label, so the baseBackoffMS
+    // hint must be ignored entirely.
+    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(
+        statusRetriableErrorCategory, target1, errorLabelsRetriable, kBaseBackoffMS));
+
+    ASSERT_EQ(strategy.getNextRetryDelay(), Milliseconds{0});
+}
+
 TEST_F(RetryStrategyTest, DefaultRetryStrategyDefaultCallbackStatusRetryable) {
     auto strategy = makeDefaultRetryStrategyDefaultCallback();
 
-    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(statusRetriableErrorCategory, target1, {}));
-    ASSERT_FALSE(strategy.recordFailureAndEvaluateShouldRetry(statusNonRetriable, target1, {}));
+    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(
+        statusRetriableErrorCategory, target1, {}, /*baseBackoffMS=*/boost::none));
+    ASSERT_FALSE(strategy.recordFailureAndEvaluateShouldRetry(
+        statusNonRetriable, target1, {}, /*baseBackoffMS=*/boost::none));
 }
 
 TEST_F(RetryStrategyTest, DefaultRetryStrategyDefaultCallbackErrorLabelRetryable) {
     auto strategy = makeDefaultRetryStrategyDefaultCallback();
 
+    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(statusRetriableErrorCategory,
+                                                        target1,
+                                                        errorLabelsRetriable,
+                                                        /*baseBackoffMS=*/boost::none));
     ASSERT(strategy.recordFailureAndEvaluateShouldRetry(
-        statusRetriableErrorCategory, target1, errorLabelsRetriable));
-    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(
-        statusNonRetriable, target1, errorLabelsRetriable));
+        statusNonRetriable, target1, errorLabelsRetriable, /*baseBackoffMS=*/boost::none));
 }
 
 TEST_F(RetryStrategyTest, DefaultRetryStrategyDefaultCallbackErrorLabelNonRetryable) {
     auto strategy = makeDefaultRetryStrategyDefaultCallback();
 
-    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(
-        statusRetriableErrorCategory, target1, errorLabelsNonRetriable));
+    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(statusRetriableErrorCategory,
+                                                        target1,
+                                                        errorLabelsNonRetriable,
+                                                        /*baseBackoffMS=*/boost::none));
     ASSERT_FALSE(strategy.recordFailureAndEvaluateShouldRetry(
-        statusNonRetriable, target1, errorLabelsNonRetriable));
+        statusNonRetriable, target1, errorLabelsNonRetriable, /*baseBackoffMS=*/boost::none));
 }
 
 TEST_F(RetryStrategyTest, DefaultRetryStrategyTargetingMetadataInitiallyEmpty) {
@@ -284,8 +323,10 @@ TEST_F(RetryStrategyTest, DefaultRetryStrategyTargetingMetadataNonRetryable) {
     auto strategy = makeDefaultRetryStrategyDefaultCallback();
     const auto& targetingMetadata = strategy.getTargetingMetadata();
 
-    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(
-        statusRetriableErrorCategory, target1, errorLabelsNonRetriable));
+    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(statusRetriableErrorCategory,
+                                                        target1,
+                                                        errorLabelsNonRetriable,
+                                                        /*baseBackoffMS=*/boost::none));
     ASSERT_EQ(targetingMetadata.deprioritizedServers.size(), 0);
 }
 
@@ -293,8 +334,10 @@ TEST_F(RetryStrategyTest, DefaultRetryStrategyTargetingMetadataRetryable) {
     auto strategy = makeDefaultRetryStrategyDefaultCallback();
     const auto& targetingMetadata = strategy.getTargetingMetadata();
 
-    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(
-        statusRetriableErrorCategory, target1, errorLabelsSystemOverloaded));
+    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(statusRetriableErrorCategory,
+                                                        target1,
+                                                        errorLabelsSystemOverloaded,
+                                                        /*baseBackoffMS=*/boost::none));
     ASSERT_EQ(targetingMetadata.deprioritizedServers.size(), 1);
     ASSERT_NE(std::ranges::find(targetingMetadata.deprioritizedServers, target1),
               targetingMetadata.deprioritizedServers.end());
@@ -307,12 +350,14 @@ TEST_F(RetryStrategyTest, DefaultRetryStrategyTargetingMetadataRetryExhausted) {
     const auto& targetingMetadata = strategy.getTargetingMetadata();
 
     for (std::size_t i = 0; i < kMaxNumberOfRetries; ++i) {
-        ASSERT(strategy.recordFailureAndEvaluateShouldRetry(
-            statusRetriableErrorCategory, target1, errorLabelsSystemOverloaded));
+        ASSERT(strategy.recordFailureAndEvaluateShouldRetry(statusRetriableErrorCategory,
+                                                            target1,
+                                                            errorLabelsSystemOverloaded,
+                                                            /*baseBackoffMS=*/boost::none));
     }
 
     ASSERT_FALSE(strategy.recordFailureAndEvaluateShouldRetry(
-        statusNonRetriable, target2, errorLabelsSystemOverloaded));
+        statusNonRetriable, target2, errorLabelsSystemOverloaded, /*baseBackoffMS=*/boost::none));
 
     // The amount of deprioritized server here stays to 1 because we don't need to deprioritize
     // servers if we stop the retry loop by returning false.
@@ -325,18 +370,34 @@ TEST_F(RetryStrategyTest, AdaptiveRetryStrategyNonZeroRetryDelay) {
     auto strategy = makeAdaptiveRetryStrategy();
     auto _ = FailPointEnableBlock{"returnMaxBackoffDelay"};
 
-    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(
-        statusRetriableErrorCategory, target1, errorLabelsSystemOverloaded));
+    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(statusRetriableErrorCategory,
+                                                        target1,
+                                                        errorLabelsSystemOverloaded,
+                                                        /*baseBackoffMS=*/boost::none));
 
     ASSERT_EQ(strategy.getNextRetryDelay(), Milliseconds{200});
+}
+
+TEST_F(RetryStrategyTest, AdaptiveRetryStrategyForwardsBaseBackoffMS) {
+    auto strategy = makeAdaptiveRetryStrategy();
+    auto _ = FailPointEnableBlock{"returnMaxBackoffDelay"};
+
+    constexpr auto kBaseBackoffMS = Milliseconds{500};
+
+    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(
+        statusRetriableErrorCategory, target1, errorLabelsSystemOverloaded, kBaseBackoffMS));
+
+    ASSERT_EQ(strategy.getNextRetryDelay(), kBaseBackoffMS * 2);
 }
 
 TEST_F(RetryStrategyTest, AdaptiveRetryStrategyCallbackCalled) {
     auto strategy = makeAdaptiveRetryStrategy();
 
     for (std::int32_t i = 0; i < kBudgetCapacity; ++i) {
-        ASSERT(strategy.recordFailureAndEvaluateShouldRetry(
-            statusRetriableErrorCategory, target1, errorLabelsSystemOverloaded));
+        ASSERT(strategy.recordFailureAndEvaluateShouldRetry(statusRetriableErrorCategory,
+                                                            target1,
+                                                            errorLabelsSystemOverloaded,
+                                                            /*baseBackoffMS=*/boost::none));
     }
 
     // Validate that each of the failures recorded have called the callback and depleted the budget.
@@ -348,8 +409,10 @@ TEST_F(RetryStrategyTest, AdaptiveRetryStrategyNoBudget) {
     auto strategy = makeAdaptiveRetryStrategy();
     exhaustRetryBudget();
 
-    ASSERT_FALSE(strategy.recordFailureAndEvaluateShouldRetry(
-        statusRetriableErrorCategory, target1, errorLabelsSystemOverloaded));
+    ASSERT_FALSE(strategy.recordFailureAndEvaluateShouldRetry(statusRetriableErrorCategory,
+                                                              target1,
+                                                              errorLabelsSystemOverloaded,
+                                                              /*baseBackoffMS=*/boost::none));
 
     ASSERT_EQ(retryCriteriaCallCount(), 0);
 }
@@ -361,21 +424,25 @@ TEST_F(RetryStrategyTest, AdaptiveRetryStrategyFailNoReturnToken) {
     // Failing because of other reasons than system overloaded should replenish the budget by
     // returnRate. We do not return a whole token because no system overloaded failure were
     // recorded.
-    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(statusRetriableErrorCategory, target1, {}));
+    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(
+        statusRetriableErrorCategory, target1, {}, /*baseBackoffMS=*/boost::none));
     ASSERT_EQ(_retryBudget.getBalance_forTest(), kReturnRate);
 }
 
 TEST_F(RetryStrategyTest, AdaptiveRetryStrategyReturnWholeToken) {
     auto strategy = makeAdaptiveRetryStrategy();
 
-    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(
-        statusRetriableErrorCategory, target1, errorLabelsSystemOverloaded));
+    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(statusRetriableErrorCategory,
+                                                        target1,
+                                                        errorLabelsSystemOverloaded,
+                                                        /*baseBackoffMS=*/boost::none));
 
     exhaustRetryBudget();
 
     // Since we failed with the system overloaded error label before exhausting the budget, a whole
     // token will be returned in addition of the return rate.
-    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(statusRetriableErrorCategory, target1, {}));
+    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(
+        statusRetriableErrorCategory, target1, {}, /*baseBackoffMS=*/boost::none));
     ASSERT_EQ(_retryBudget.getBalance_forTest(), kReturnRate + 1);
 }
 
@@ -399,13 +466,17 @@ TEST_F(RetryStrategyTest, AdaptiveRetryStrategyReplenishBudgetByError) {
     // We should have accumulated one token after non overloaded errors.
     for (std::int32_t i = 0; i < kAmountOfSuccessForOneReturnedToken; ++i) {
         ASSERT(strategy.recordFailureAndEvaluateShouldRetry(
-            statusRetriableErrorCategory, target1, {}));
+            statusRetriableErrorCategory, target1, {}, /*baseBackoffMS=*/boost::none));
     }
 
-    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(
-        statusRetriableErrorCategory, target1, errorLabelsSystemOverloaded));
-    ASSERT_FALSE(strategy.recordFailureAndEvaluateShouldRetry(
-        statusRetriableErrorCategory, target1, errorLabelsSystemOverloaded));
+    ASSERT(strategy.recordFailureAndEvaluateShouldRetry(statusRetriableErrorCategory,
+                                                        target1,
+                                                        errorLabelsSystemOverloaded,
+                                                        /*baseBackoffMS=*/boost::none));
+    ASSERT_FALSE(strategy.recordFailureAndEvaluateShouldRetry(statusRetriableErrorCategory,
+                                                              target1,
+                                                              errorLabelsSystemOverloaded,
+                                                              /*baseBackoffMS=*/boost::none));
 }
 
 TEST_F(RetryStrategyTest, RetryBudgetHighlyConcurrentAcquire) {

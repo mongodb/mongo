@@ -1390,7 +1390,8 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
         } else if (retryStrategy.recordFailureAndEvaluateShouldRetry(
                        parsedResponse.getStatus(),
                        remote->shardHostAndPort,
-                       cbData.response.getErrorLabels())) {
+                       cbData.response.getErrorLabels(),
+                       cbData.response.getBaseBackoffMS())) {
             const auto delay = retryStrategy.getNextRetryDelay();
             auto callback = [weak = weak_from_this(),
                              request = cbData.request,

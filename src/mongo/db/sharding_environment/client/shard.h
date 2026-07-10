@@ -201,9 +201,11 @@ public:
                       Shard::RetryStrategy::RequestStartTransactionState isStartTransaction);
 
 
-        bool recordFailureAndEvaluateShouldRetry(Status s,
-                                                 const boost::optional<HostAndPort>& target,
-                                                 std::span<const std::string> errorLabels) override;
+        bool recordFailureAndEvaluateShouldRetry(
+            Status s,
+            const boost::optional<HostAndPort>& target,
+            std::span<const std::string> errorLabels,
+            boost::optional<Milliseconds> baseBackoffMS = boost::none) override;
 
         void recordSuccess(const boost::optional<HostAndPort>& target) override;
         void recordBackoff(Milliseconds backoff) override;
@@ -286,8 +288,10 @@ public:
         bool recordFailureAndEvaluateShouldRetry(
             Status s,
             const boost::optional<HostAndPort>& target,
-            std::span<const std::string> errorLabels) override {
-            return _underlyingStrategy.recordFailureAndEvaluateShouldRetry(s, target, errorLabels);
+            std::span<const std::string> errorLabels,
+            boost::optional<Milliseconds> baseBackoffMS = boost::none) override {
+            return _underlyingStrategy.recordFailureAndEvaluateShouldRetry(
+                s, target, errorLabels, baseBackoffMS);
         }
 
         void recordSuccess(const boost::optional<HostAndPort>& target) override {

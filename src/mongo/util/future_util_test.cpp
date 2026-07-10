@@ -587,7 +587,8 @@ using AsyncTryWithRetryStrategyTest = FutureUtilTest;
 struct TestRetryStrategy : RetryStrategy {
     bool recordFailureAndEvaluateShouldRetry(Status s,
                                              const boost::optional<HostAndPort>& origin,
-                                             std::span<const std::string> errorLabels) override {
+                                             std::span<const std::string> errorLabels,
+                                             boost::optional<Milliseconds> baseBackoffMS) override {
         return shouldRetry(s, origin, errorLabels);
     }
 

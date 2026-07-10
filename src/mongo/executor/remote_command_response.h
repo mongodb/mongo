@@ -56,6 +56,7 @@ class ReplyInterface;
 namespace [[MONGO_MOD_PUBLIC]] executor {
 
 std::vector<std::string> extractErrorLabels(BSONObj data);
+boost::optional<Milliseconds> extractBaseBackoffMS(BSONObj data);
 
 /**
  * Type of object describing the response of previously sent RemoteCommandRequest.
@@ -79,6 +80,7 @@ struct RemoteCommandResponse {
 
     std::string toString() const;
     std::vector<std::string> getErrorLabels() const;
+    boost::optional<Milliseconds> getBaseBackoffMS() const;
 
     bool operator==(const RemoteCommandResponse& rhs) const;
     bool operator!=(const RemoteCommandResponse& rhs) const;

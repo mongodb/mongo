@@ -116,7 +116,8 @@ void AsyncMulticaster::_scheduleAttempt(std::shared_ptr<State> state,
                 shouldRetry = hostRetryStrategy->recordFailureAndEvaluateShouldRetry(
                     cbData.response.status,
                     cbData.request.target,
-                    cbData.response.getErrorLabels());
+                    cbData.response.getErrorLabels(),
+                    cbData.response.getBaseBackoffMS());
             }
             if (shouldRetry) {
                 const auto delay = hostRetryStrategy->getNextRetryDelay();

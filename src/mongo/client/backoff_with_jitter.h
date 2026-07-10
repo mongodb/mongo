@@ -35,6 +35,8 @@
 
 #include <cstdint>
 
+#include <boost/optional.hpp>
+
 namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
@@ -53,6 +55,13 @@ struct BackoffWithJitter {
     }
 
     Milliseconds getBackoffDelay() const;
+
+    /**
+     * Same as getBackoffDelay(), but when 'baseBackoffOverride' is present, it is used in place
+     * of '_baseBackoff'. When 'baseBackoffOverride' is boost::none, behavior is identical to
+     * getBackoffDelay().
+     */
+    Milliseconds getBackoffDelay(boost::optional<Milliseconds> baseBackoffOverride) const;
 
     Milliseconds getBackoffDelayAndIncrementAttemptCount() {
         const auto delay = getBackoffDelay();

@@ -61,7 +61,8 @@ class TestRetryStrategy final : public mongo::RetryStrategy {
 public:
     bool recordFailureAndEvaluateShouldRetry(Status s,
                                              const boost::optional<HostAndPort>& target,
-                                             std::span<const std::string> errorLabels) override {
+                                             std::span<const std::string> errorLabels,
+                                             boost::optional<Milliseconds> baseBackoffMS) override {
         if (_numRetriesPerformed == _maxRetries) {
             return false;
         }

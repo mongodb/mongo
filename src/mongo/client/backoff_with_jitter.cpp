@@ -37,6 +37,11 @@ MONGO_FAIL_POINT_DEFINE(setBackoffDelayForTesting);
 MONGO_FAIL_POINT_DEFINE(returnMaxBackoffDelay);
 
 Milliseconds BackoffWithJitter::getBackoffDelay() const {
+    return getBackoffDelay(boost::none);
+}
+
+Milliseconds BackoffWithJitter::getBackoffDelay(
+    boost::optional<Milliseconds> baseBackoffOverride) const {
     if (_attemptCount == 0) {
         return Milliseconds{0};
     }
@@ -52,8 +57,10 @@ Milliseconds BackoffWithJitter::getBackoffDelay() const {
     }
 
     const std::int64_t minDelay = 0;
-    const auto maxDelay = static_cast<std::int64_t>(std::min(
-        static_cast<double>(_maxBackoff.count()), _baseBackoff.count() * std::exp2(_attemptCount)));
+    const auto baseBackoff =
+        baseBackoffOverride ? baseBackoffOverride->count() : _baseBackoff.count();
+    const auto maxDelay = static_cast<std::int64_t>(
+        std::min(static_cast<double>(_maxBackoff.count()), baseBackoff * std::exp2(_attemptCount)));
 
     if (MONGO_unlikely(returnMaxBackoffDelay.shouldFail())) {
         return Milliseconds(maxDelay);

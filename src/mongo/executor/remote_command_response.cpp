@@ -113,6 +113,25 @@ std::vector<std::string> RemoteCommandResponse::getErrorLabels() const {
     return extractErrorLabels(data);
 }
 
+boost::optional<Milliseconds> extractBaseBackoffMS(BSONObj data) {
+    if (BSONElement retryAfterElement = data["baseBackoffMS"]; !retryAfterElement.eoo()) {
+        if (!retryAfterElement.isNumber()) {
+            return boost::none;
+        }
+        return Milliseconds{retryAfterElement.safeNumberLong()};
+    }
+
+    return boost::none;
+}
+
+boost::optional<Milliseconds> RemoteCommandResponse::getBaseBackoffMS() const {
+    if (!status.isOK()) {
+        return boost::none;
+    }
+
+    return extractBaseBackoffMS(data);
+}
+
 bool RemoteCommandResponse::operator==(const RemoteCommandResponse& rhs) const {
     if (this == &rhs) {
         return true;

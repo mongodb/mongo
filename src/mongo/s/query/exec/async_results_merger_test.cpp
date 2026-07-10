@@ -122,7 +122,8 @@ NextHighWaterMarkDeterminingStrategyPtr buildNextHighWaterMarkDeterminingStrateg
 
 BSONObj makeResponseObjWithErrorLabels(int errorCode,
                                        std::string_view reason,
-                                       std::vector<std::string_view> errorLabels) {
+                                       std::vector<std::string_view> errorLabels,
+                                       boost::optional<Milliseconds> baseBackoffMS = boost::none) {
     BSONObjBuilder responseBuilder;
     responseBuilder.append("ok", 0);
     responseBuilder.append("code", errorCode);
@@ -133,6 +134,10 @@ BSONObj makeResponseObjWithErrorLabels(int errorCode,
         arr.append(label);
     }
     arr.done();
+
+    if (baseBackoffMS) {
+        responseBuilder.append("baseBackoffMS", static_cast<long long>(baseBackoffMS->count()));
+    }
 
     return responseBuilder.obj();
 }
@@ -4958,15 +4963,16 @@ TEST_F(AsyncResultsMergerTest,
 }
 
 TEST_F(AsyncResultsMergerTest,
-       RetryRequestAndBackoffIfErrorLabelsIncludesRetryableErrorAndSystemOverloadedError) {
+       RetryRequestAndBackoffUsingBaseBackoffMSHintWhenErrorLabelsIncludeSystemOverloadedError) {
+    constexpr Milliseconds baseBackoffMS{500};
 
     const BSONObj response = makeResponseObjWithErrorLabels(
         ErrorCodes::HostUnreachable,
         "dummy msg",
-        {ErrorLabel::kRetryableError, ErrorLabel::kSystemOverloadedError});
+        {ErrorLabel::kRetryableError, ErrorLabel::kSystemOverloadedError},
+        baseBackoffMS);
 
-    const auto backOffDelayMs = 1000;
-    FailPointEnableBlock fp{"setBackoffDelayForTesting", BSON("backoffDelayMs" << backOffDelayMs)};
+    FailPointEnableBlock fp{"returnMaxBackoffDelay"};
 
     const int maxAttempts = 3;
     unittest::ServerParameterGuard multitenancyController("defaultClientMaxRetryAttempts",
@@ -5018,7 +5024,7 @@ TEST_F(AsyncResultsMergerTest,
     ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
 
     // Force failures on the response including a retryable label
-    for (auto i = 0; i < maxAttempts; ++i) {
+    for (auto i = 1; i <= maxAttempts; ++i) {
         readyEvent = unittest::assertGet(arm->nextEvent());
 
         scheduleNetworkResponseObjs({response});
@@ -5031,10 +5037,12 @@ TEST_F(AsyncResultsMergerTest,
         // implies entering in an exponential backoff delay.
         ASSERT_FALSE(networkHasReadyRequests());
 
-        advanceTime(Milliseconds(backOffDelayMs - 1));
+        const auto expectedBackoff = Milliseconds{baseBackoffMS.count() << i};
+
+        advanceTime(expectedBackoff - Milliseconds{1});
         ASSERT_FALSE(networkHasReadyRequests());
 
-        advanceTime(Milliseconds(backOffDelayMs));
+        advanceTime(expectedBackoff);
 
         runScheduledTasks(operationContext());
         ASSERT_TRUE(networkHasReadyRequests());
@@ -5042,10 +5050,9 @@ TEST_F(AsyncResultsMergerTest,
 
     readyEvent = unittest::assertGet(arm->nextEvent());
 
-    // We should stop retrying at 'maxAttempts'.
     scheduleNetworkResponseObjs({response});
 
-    advanceTime(Milliseconds(backOffDelayMs));
+    advanceTime(Milliseconds{baseBackoffMS.count() << maxAttempts});
 
     ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
 
@@ -5084,7 +5091,8 @@ TEST_F(AsyncResultsMergerTest,
         ASSERT_EQ(0, stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.load());
         ASSERT_EQ(3, stats.numRetriesDueToOverloadAttempted.load());
         ASSERT_EQ(maxAttempts + 1, stats.numOverloadErrorsReceived.load());
-        ASSERT_EQ(backOffDelayMs * maxAttempts, stats.totalBackoffTimeMillis.load());
+        constexpr auto kExpectedTotalBackoffMillis = 1000 + 2000 + 4000;
+        ASSERT_EQ(kExpectedTotalBackoffMillis, stats.totalBackoffTimeMillis.load());
     }
 }
 

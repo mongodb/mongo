@@ -85,11 +85,18 @@ public:
      * Returns true if the request that generated the status and error labels should be retried.
      *
      * This function should be called at the end of each failed request.
+     *
+     * 'baseBackoffMS', when present, overrides the strategy's configured base backoff for
+     * computing the next retry delay. The server sends this value in a response for system
+     * overloaded errors when a different base backoff is configured. It is only applied when
+     * 'errorLabels' contains the 'SystemOverloadedError' label; otherwise it is ignored.
      */
     [[nodiscard]]
-    virtual bool recordFailureAndEvaluateShouldRetry(Status s,
-                                                     const boost::optional<HostAndPort>& origin,
-                                                     std::span<const std::string> errorLabels) = 0;
+    virtual bool recordFailureAndEvaluateShouldRetry(
+        Status s,
+        const boost::optional<HostAndPort>& origin,
+        std::span<const std::string> errorLabels,
+        boost::optional<Milliseconds> baseBackoffMS = boost::none) = 0;
 
     /**
      * Records a successful request. Should be called at the end of successful request even if no
@@ -398,9 +405,11 @@ public:
           _maxRetryAttempts{retryParameters.maxRetryAttempts} {}
 
     [[nodiscard]]
-    bool recordFailureAndEvaluateShouldRetry(Status s,
-                                             const boost::optional<HostAndPort>& target,
-                                             std::span<const std::string> errorLabels) override;
+    bool recordFailureAndEvaluateShouldRetry(
+        Status s,
+        const boost::optional<HostAndPort>& target,
+        std::span<const std::string> errorLabels,
+        boost::optional<Milliseconds> baseBackoffMS = boost::none) override;
 
     void recordSuccess(const boost::optional<HostAndPort>& target) override {
         // Noop, as there's nothing to cleanup on success.
@@ -413,7 +422,7 @@ public:
     static RetryParameters getRetryParametersFromServerParameters();
 
     Milliseconds getNextRetryDelay() const override {
-        return _backoffWithJitter.getBackoffDelay();
+        return _backoffWithJitter.getBackoffDelay(_lastBaseBackoffMS);
     }
 
     const TargetingMetadata& getTargetingMetadata() const override {
@@ -427,6 +436,7 @@ private:
     std::int32_t _retryAttemptCount = 0;
     TargetingMetadata _targetingMetadata{.deprioritizedServers = {},
                                          .stats = std::make_shared<TargetingMetadata::Stats>()};
+    boost::optional<Milliseconds> _lastBaseBackoffMS;
 };
 
 /**
@@ -443,9 +453,11 @@ public:
      * regardless of the failure status or error labels.
      */
     [[nodiscard]]
-    bool recordFailureAndEvaluateShouldRetry(Status s,
-                                             const boost::optional<HostAndPort>& target,
-                                             std::span<const std::string> errorLabels) override {
+    bool recordFailureAndEvaluateShouldRetry(
+        Status s,
+        const boost::optional<HostAndPort>& target,
+        std::span<const std::string> errorLabels,
+        boost::optional<Milliseconds> baseBackoffMS = boost::none) override {
         return false;
     }
 
@@ -566,9 +578,11 @@ public:
      * delegates to the underlying strategy.
      */
     [[nodiscard]]
-    bool recordFailureAndEvaluateShouldRetry(Status s,
-                                             const boost::optional<HostAndPort>& target,
-                                             std::span<const std::string> errorLabels) override;
+    bool recordFailureAndEvaluateShouldRetry(
+        Status s,
+        const boost::optional<HostAndPort>& target,
+        std::span<const std::string> errorLabels,
+        boost::optional<Milliseconds> baseBackoffMS = boost::none) override;
 
     /**
      * Replenishes the retry budget to allow more retries.
@@ -605,11 +619,13 @@ struct RetryStrategyWithFailureRetryHook : RetryStrategy {
         : _underlyingStrategy{std::move(underlyingStrategy)},
           _onRetryFunction{std::move(onRetry)} {}
 
-    bool recordFailureAndEvaluateShouldRetry(Status s,
-                                             const boost::optional<HostAndPort>& target,
-                                             std::span<const std::string> errorLabels) override {
-        const bool shouldRetry =
-            _underlyingStrategy.recordFailureAndEvaluateShouldRetry(s, target, errorLabels);
+    bool recordFailureAndEvaluateShouldRetry(
+        Status s,
+        const boost::optional<HostAndPort>& target,
+        std::span<const std::string> errorLabels,
+        boost::optional<Milliseconds> baseBackoffMS = boost::none) override {
+        const bool shouldRetry = _underlyingStrategy.recordFailureAndEvaluateShouldRetry(
+            s, target, errorLabels, baseBackoffMS);
 
         if (shouldRetry) {
             _onRetryFunction(s);

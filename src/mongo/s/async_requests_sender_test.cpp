@@ -568,14 +568,15 @@ TEST_P(AsyncRequestsSenderTest, MultipleRetriesSystemOverloaded) {
     requests.emplace_back(shardRef(1), BSON("find" << "bar"));
     requests.emplace_back(shardRef(2), BSON("find" << "bar"));
 
-    constexpr int backoffMillis = 100;
-    FailPointEnableBlock fp{"setBackoffDelayForTesting", BSON("backoffDelayMs" << backoffMillis)};
+    constexpr Milliseconds baseBackoffMS{500};
+
+    FailPointEnableBlock fp{"returnMaxBackoffDelay"};
 
     auto shardState =
         ShardSharedStateCache::get(operationContext()).getShardState(kTestShardHandles[2].name());
 
     BSONObj resWithSystemOverloadedError =
-        createErrorSystemOverloaded(ErrorCodes::IngressRequestRateLimitExceeded);
+        createErrorSystemOverloaded(ErrorCodes::IngressRequestRateLimitExceeded, baseBackoffMS);
 
     auto ars = AsyncRequestsSender(operationContext(),
                                    executor(),
@@ -624,8 +625,9 @@ TEST_P(AsyncRequestsSenderTest, MultipleRetriesSystemOverloaded) {
         }
     }
 
+    constexpr auto kExpectedTotalBackoffWithBaseBackoffMS = Milliseconds{1000 + 2000 + 4000};
     ASSERT_EQ(shardState->stats.totalBackoffTimeMillis.load(),
-              backoffMillis * kDefaultClientMaxRetryAttemptsDefault);
+              kExpectedTotalBackoffWithBaseBackoffMS.count());
 
     future.default_timed_get();
 }

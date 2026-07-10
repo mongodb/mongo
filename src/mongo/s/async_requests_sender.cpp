@@ -411,7 +411,10 @@ auto AsyncRequestsSender::RemoteData::handleResponse(RemoteCommandCallbackArgs r
             }
 
             if (_retryStrategy->recordFailureAndEvaluateShouldRetry(
-                    status, rcr.response.target, rcr.response.getErrorLabels()) &&
+                    status,
+                    rcr.response.target,
+                    rcr.response.getErrorLabels(),
+                    rcr.response.getBaseBackoffMS()) &&
                 !_ars->_stopRetrying) {
                 const auto delay = _retryStrategy->getNextRetryDelay();
 

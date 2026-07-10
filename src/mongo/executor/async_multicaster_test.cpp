@@ -49,6 +49,8 @@
 #include <string>
 #include <vector>
 
+#include <boost/optional.hpp>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 namespace {
@@ -63,7 +65,8 @@ public:
     // Common response factories
     RemoteCommandResponse makeSuccessResponse(const std::string& result = "success");
     RemoteCommandResponse makeRetryableErrorResponse();
-    RemoteCommandResponse makeSystemOverloadedErrorResponse();
+    RemoteCommandResponse makeSystemOverloadedErrorResponse(
+        boost::optional<Milliseconds> baseBackoffMS = boost::none);
 
     std::vector<AsyncMulticaster::Reply> runMulticast(OperationContext* opCtx,
                                                       const std::vector<HostAndPort>& hosts,
@@ -198,11 +201,18 @@ RemoteCommandResponse AsyncMulticasterTest::makeRetryableErrorResponse() {
         BSON("errorLabels" << BSON_ARRAY(ErrorLabel::kRetryableError)), Milliseconds(0));
 }
 
-RemoteCommandResponse AsyncMulticasterTest::makeSystemOverloadedErrorResponse() {
-    return RemoteCommandResponse::make_forTest(
-        BSON("errorLabels" << BSON_ARRAY(ErrorLabel::kRetryableError
-                                         << ErrorLabel::kSystemOverloadedError)),
-        Milliseconds(0));
+RemoteCommandResponse AsyncMulticasterTest::makeSystemOverloadedErrorResponse(
+    boost::optional<Milliseconds> baseBackoffMS) {
+    BSONObjBuilder bob;
+    {
+        BSONArrayBuilder arrayBuilder = bob.subarrayStart("errorLabels");
+        arrayBuilder.append(ErrorLabel::kRetryableError);
+        arrayBuilder.append(ErrorLabel::kSystemOverloadedError);
+    }
+    if (baseBackoffMS) {
+        bob.append("baseBackoffMS", static_cast<long long>(baseBackoffMS->count()));
+    }
+    return RemoteCommandResponse::make_forTest(bob.obj(), Milliseconds(0));
 }
 
 std::vector<AsyncMulticaster::Reply> AsyncMulticasterTest::runMulticast(
@@ -438,6 +448,31 @@ TEST_F(AsyncMulticasterTest, MulticastToSingleHostSuccessfulResponseWithDelay) {
     // Retry after delay succeeds
     processAllNetworkRequests(successResponses);
     assertCountAndAllSuccessful(future.get(), hosts, successResponses);
+}
+
+TEST_F(AsyncMulticasterTest, MulticastRetryBackoffUsesBaseBackoffMSHintWhenSystemOverloaded) {
+    auto opCtx = makeOperationContext();
+    auto hosts = makeHostList(1);
+
+    constexpr Milliseconds baseBackoffMS{500};
+    FailPointEnableBlock fp{"returnMaxBackoffDelay"};
+
+    auto future =
+        std::async(std::launch::async, [&]() { return runMulticast(opCtx.get(), hosts); });
+
+    // The default max retry attempts is 3, so we expect 3 backoffs, each honoring the
+    // 'baseBackoffMS' hint carried on the system-overloaded response, before giving up.
+    const int maxRetryAttempts = 3;
+    for (int i = 1; i <= maxRetryAttempts; ++i) {
+        processAllNetworkRequests({makeSystemOverloadedErrorResponse(baseBackoffMS)});
+        const auto expectedBackoff = Milliseconds{baseBackoffMS.count() << i};
+        checkRequestReadyAfterDelay(expectedBackoff.count());
+    }
+
+    // After exhausting retries, the final (still-failing) response is returned to the caller.
+    auto errorResponse = {makeSystemOverloadedErrorResponse(baseBackoffMS)};
+    processAllNetworkRequests(errorResponse);
+    assertCountAndAllSuccessful(future.get(), hosts, errorResponse);
 }
 
 TEST_F(AsyncMulticasterTest, MulticastToMultipleHostSuccessfulResponseWithDelay) {

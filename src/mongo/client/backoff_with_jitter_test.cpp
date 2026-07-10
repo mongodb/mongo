@@ -36,6 +36,9 @@
 #include <cmath>
 #include <cstdint>
 
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+
 namespace mongo {
 namespace {
 
@@ -92,6 +95,57 @@ TEST_F(BackoffWithJitterTest, BackoffWithJitterNoOverflow) {
     backoffWithJitter.setAttemptCount_forTest(veryLargeTime.count());
 
     ASSERT_LTE(backoffWithJitter.getBackoffDelay(), veryLargeTime);
+}
+
+TEST_F(BackoffWithJitterTest, BackoffOverrideFirstAttemptDoublesOverrideValue) {
+    auto _ = FailPointEnableBlock{"returnMaxBackoffDelay"};
+
+    constexpr Milliseconds kOverride{1000};
+    backoffWithJitter.setAttemptCount_forTest(1);
+
+    const auto backoff = backoffWithJitter.getBackoffDelay(kOverride);
+    ASSERT_EQ(backoff, std::min(kMaxBackoff, Milliseconds{kOverride.count() * 2}));
+}
+
+TEST_F(BackoffWithJitterTest, BackoffOverrideSecondAttemptQuadruplesOverrideValue) {
+    auto _ = FailPointEnableBlock{"returnMaxBackoffDelay"};
+
+    constexpr Milliseconds kOverride{1000};
+    backoffWithJitter.setAttemptCount_forTest(2);
+
+    const auto backoff = backoffWithJitter.getBackoffDelay(kOverride);
+    ASSERT_EQ(backoff, std::min(kMaxBackoff, Milliseconds{kOverride.count() * 4}));
+}
+
+TEST_F(BackoffWithJitterTest, BackoffOverrideZeroAttemptCountReturnsZero) {
+    auto _ = FailPointEnableBlock{"returnMaxBackoffDelay"};
+
+    constexpr Milliseconds kOverride{1000};
+    backoffWithJitter.setAttemptCount_forTest(0);
+
+    const auto backoff = backoffWithJitter.getBackoffDelay(kOverride);
+    ASSERT_EQ(backoff, Milliseconds{0});
+}
+
+TEST_F(BackoffWithJitterTest, BackoffOverrideNoneMatchesNoArgOverload) {
+    auto _ = FailPointEnableBlock{"returnMaxBackoffDelay"};
+
+    backoffWithJitter.setAttemptCount_forTest(3);
+
+    const auto noArgResult = backoffWithJitter.getBackoffDelay();
+    const auto overloadResult = backoffWithJitter.getBackoffDelay(boost::none);
+    ASSERT_EQ(noArgResult, overloadResult);
+    ASSERT_EQ(overloadResult, Milliseconds{800});
+}
+
+TEST_F(BackoffWithJitterTest, BackoffOverrideCapsAtMaxBackoff) {
+    auto _ = FailPointEnableBlock{"returnMaxBackoffDelay"};
+
+    constexpr Milliseconds kOverride{10000};
+    backoffWithJitter.setAttemptCount_forTest(5);
+
+    const auto backoff = backoffWithJitter.getBackoffDelay(kOverride);
+    ASSERT_EQ(backoff, kMaxBackoff);
 }
 
 }  // namespace

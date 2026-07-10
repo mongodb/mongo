@@ -62,9 +62,10 @@ PrimaryOnlyServiceRetryStrategy::PrimaryOnlyServiceRetryStrategy(
 bool PrimaryOnlyServiceRetryStrategy::recordFailureAndEvaluateShouldRetry(
     Status s,
     const boost::optional<HostAndPort>& origin,
-    std::span<const std::string> errorLabels) {
-    auto willRetry =
-        _underlyingStrategy->recordFailureAndEvaluateShouldRetry(s, origin, errorLabels);
+    std::span<const std::string> errorLabels,
+    boost::optional<Milliseconds> baseBackoffMS) {
+    auto willRetry = _underlyingStrategy->recordFailureAndEvaluateShouldRetry(
+        s, origin, errorLabels, baseBackoffMS);
     if (willRetry) {
         _backoffWithJitter.incrementAttemptCount();
         _onTransientError(s);

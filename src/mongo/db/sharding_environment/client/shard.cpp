@@ -199,9 +199,10 @@ Shard::RetryStrategy::RetryStrategy(AdaptiveRetryStrategy::RetryCriteria retryCr
 bool Shard::RetryStrategy::recordFailureAndEvaluateShouldRetry(
     Status s,
     const boost::optional<HostAndPort>& target,
-    std::span<const std::string> errorLabels) {
-    const bool willRetry =
-        _underlyingStrategy.recordFailureAndEvaluateShouldRetry(s, target, errorLabels);
+    std::span<const std::string> errorLabels,
+    boost::optional<Milliseconds> baseBackoffMS) {
+    const bool willRetry = _underlyingStrategy.recordFailureAndEvaluateShouldRetry(
+        s, target, errorLabels, baseBackoffMS);
 
     _recordOperationAttempted();
 

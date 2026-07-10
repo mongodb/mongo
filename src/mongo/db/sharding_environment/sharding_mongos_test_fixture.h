@@ -47,12 +47,15 @@
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <memory>
 #include <tuple>
 #include <vector>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -155,7 +158,8 @@ protected:
      * Mocks an error response from a remote that includes the error labels 'SystemOverloadError'
      * and 'RetryableError'
      */
-    static BSONObj createErrorSystemOverloaded(ErrorCodes::Error errorCode) {
+    static BSONObj createErrorSystemOverloaded(
+        ErrorCodes::Error errorCode, boost::optional<Milliseconds> baseBackoffMS = boost::none) {
         BSONObjBuilder bob;
         bob.append("ok", 0.0);
         bob.append("code", errorCode);
@@ -165,6 +169,9 @@ protected:
             BSONArrayBuilder arrayBuilder = bob.subarrayStart(kErrorLabelsFieldName);
             arrayBuilder.append(ErrorLabel::kSystemOverloadedError);
             arrayBuilder.append(ErrorLabel::kRetryableError);
+        }
+        if (baseBackoffMS) {
+            bob.append("baseBackoffMS", static_cast<long long>(baseBackoffMS->count()));
         }
         return bob.obj();
     }

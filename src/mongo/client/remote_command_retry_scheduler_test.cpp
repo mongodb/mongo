@@ -132,10 +132,13 @@ public:
         : _underlyingStrategy(std::move(retryStrategy)),
           _testBaseBackoffMillis(testBaseBackoffMillis) {}
 
-    bool recordFailureAndEvaluateShouldRetry(Status s,
-                                             const boost::optional<HostAndPort>& target,
-                                             std::span<const std::string> errorLabels) override {
-        return _underlyingStrategy.recordFailureAndEvaluateShouldRetry(s, target, errorLabels);
+    bool recordFailureAndEvaluateShouldRetry(
+        Status s,
+        const boost::optional<HostAndPort>& target,
+        std::span<const std::string> errorLabels,
+        boost::optional<Milliseconds> baseBackoffMS = boost::none) override {
+        return _underlyingStrategy.recordFailureAndEvaluateShouldRetry(
+            s, target, errorLabels, baseBackoffMS);
     }
 
     void recordSuccess(const boost::optional<HostAndPort>& target) override {

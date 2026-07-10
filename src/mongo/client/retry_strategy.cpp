@@ -66,7 +66,8 @@ bool DefaultRetryStrategy::unconditionallyRetryableCriteria(
 bool DefaultRetryStrategy::recordFailureAndEvaluateShouldRetry(
     Status s,
     const boost::optional<HostAndPort>& target,
-    std::span<const std::string> errorLabels) {
+    std::span<const std::string> errorLabels,
+    boost::optional<Milliseconds> baseBackoffMS) {
 
     if (_retryAttemptCount >= _maxRetryAttempts || !_retryCriteria(s, errorLabels)) {
         return false;
@@ -79,6 +80,7 @@ bool DefaultRetryStrategy::recordFailureAndEvaluateShouldRetry(
             _targetingMetadata.deprioritizedServers.emplace_back(*target);
         }
         _backoffWithJitter.incrementAttemptCount();
+        _lastBaseBackoffMS = baseBackoffMS;
     }
 
     ++_retryAttemptCount;
@@ -96,7 +98,8 @@ auto DefaultRetryStrategy::getRetryParametersFromServerParameters() -> RetryPara
 bool AdaptiveRetryStrategy::recordFailureAndEvaluateShouldRetry(
     Status s,
     const boost::optional<HostAndPort>& target,
-    std::span<const std::string> errorLabels) {
+    std::span<const std::string> errorLabels,
+    boost::optional<Milliseconds> baseBackoffMS) {
     const bool targetOverloaded = containsSystemOverloadedErrorLabel(errorLabels);
 
     const auto evaluateShouldRetry = [&] {
@@ -111,7 +114,8 @@ bool AdaptiveRetryStrategy::recordFailureAndEvaluateShouldRetry(
     };
 
     return evaluateShouldRetry() &&
-        _underlyingStrategy->recordFailureAndEvaluateShouldRetry(s, target, errorLabels);
+        _underlyingStrategy->recordFailureAndEvaluateShouldRetry(
+            s, target, errorLabels, baseBackoffMS);
 }
 
 void AdaptiveRetryStrategy::recordSuccess(const boost::optional<HostAndPort>& target) {
