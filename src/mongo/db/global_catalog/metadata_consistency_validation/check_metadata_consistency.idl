@@ -61,7 +61,7 @@ server_parameters:
         set_at:
             - startup
             - runtime
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         cpp_varname: gProbabilityOfFilteringMetadataRecovery
         default: 0.5
         validator:

@@ -44,7 +44,7 @@ server_parameters:
     dbCheckHealthLogEveryNBatches:
         description: "Emit an info-severity health log batch every N batches processed"
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<int>"
+        cpp_vartype: "Atomic<int>"
         cpp_varname: gDbCheckHealthLogEveryNBatches
         default: 25
         validator:
@@ -59,7 +59,7 @@ server_parameters:
             Setting it to 0 turns off throttling."
         set_at: [startup, runtime]
         cpp_varname: gMaxDbCheckMBperSec
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         validator: {gte: 0}
         default: 1
         redact: false
@@ -67,7 +67,7 @@ server_parameters:
     dbCheckMaxRunsOnQueue:
         description: "Parameter for how many dbcheck runs can be in the queue."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<int>"
+        cpp_vartype: "Atomic<int>"
         cpp_varname: gDbCheckMaxRunsOnQueue
         default: 5
         validator:

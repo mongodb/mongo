@@ -45,7 +45,7 @@
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/modules_incompletely_marked_header.h"
@@ -678,8 +678,8 @@ public:
 private:
     friend class CatalogCache;
 
-    static AtomicWord<uint64_t> _epochDisambiguatingSequenceNumSource;
-    static AtomicWord<uint64_t> _forcedRefreshSequenceNumSource;
+    static Atomic<uint64_t> _epochDisambiguatingSequenceNumSource;
+    static Atomic<uint64_t> _forcedRefreshSequenceNumSource;
 
     ComparableChunkVersion(uint64_t forcedRefreshSequenceNum,
                            boost::optional<ChunkVersion> version,

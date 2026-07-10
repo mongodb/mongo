@@ -47,9 +47,9 @@ namespace {
  */
 void logExceptionRateLimited(const DBException& ex) {
     // Atomics to implement lockless log rate limiting
-    static AtomicWord<int64_t> lastLogTime{std::numeric_limits<int64_t>::min()};
-    static AtomicWord<int64_t> numErrorsSinceAdvanceLogTime{0};
-    static AtomicWord<int64_t> numErrorsTotal{0};
+    static Atomic<int64_t> lastLogTime{std::numeric_limits<int64_t>::min()};
+    static Atomic<int64_t> numErrorsSinceAdvanceLogTime{0};
+    static Atomic<int64_t> numErrorsTotal{0};
 
     // Keep track on how many times we've hit this in total.
     auto total = numErrorsTotal.addAndFetch(1);

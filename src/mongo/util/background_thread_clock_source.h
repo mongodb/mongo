@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/clock_source.h"
@@ -92,7 +92,7 @@ private:
         kTimerWillPause,
         kTimerPaused,
     };
-    AtomicWord<uint8_t> _state;
+    Atomic<uint8_t> _state;
 
     const Milliseconds _granularity;
 

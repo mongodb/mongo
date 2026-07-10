@@ -705,8 +705,8 @@ private:
      */
     static void uassertExceedsMemoryLimit(uint64_t accumLen, int32_t objLen) {
         // Atomics to implement lockless log rate limiting
-        static AtomicWord<long long> lastLogTime{std::numeric_limits<long long>::min()};
-        static AtomicWord<long long> numDocsExceedLimit{0};
+        static Atomic<long long> lastLogTime{std::numeric_limits<long long>::min()};
+        static Atomic<long long> numDocsExceedLimit{0};
 
         // Keep track on how many times we've exceeded the limit
         auto num = numDocsExceedLimit.addAndFetch(1);

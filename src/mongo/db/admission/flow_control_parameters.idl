@@ -33,7 +33,7 @@ server_parameters:
     enableFlowControl:
         description: "Enable flow control"
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<bool>"
+        cpp_vartype: "Atomic<bool>"
         cpp_varname: "gFlowControlEnabled"
         default: true
         redact: false
@@ -41,7 +41,7 @@ server_parameters:
     flowControlTargetLagSeconds:
         description: "Target maximum majority committed lag with flow control enabled"
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<std::int32_t>"
+        cpp_vartype: "Atomic<std::int32_t>"
         cpp_varname: "gFlowControlTargetLagSeconds"
         default: 10
         validator: {gt: 0}
@@ -50,7 +50,7 @@ server_parameters:
     flowControlThresholdLagPercentage:
         description: "Threshold percentage of target lag where flow control will become engaged"
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<double>"
+        cpp_vartype: "Atomic<double>"
         cpp_varname: "gFlowControlThresholdLagPercentage"
         default: 0.5
         validator: {gte: 0.0, lte: 1.0}
@@ -59,7 +59,7 @@ server_parameters:
     flowControlMaxSamples:
         description: "The maximum number of samples the flow control algorithm will hold onto."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<int32_t>"
+        cpp_vartype: "Atomic<int32_t>"
         cpp_varname: "gFlowControlMaxSamples"
         default: 1000000
         validator: {gt: 0}
@@ -68,7 +68,7 @@ server_parameters:
     flowControlSamplePeriod:
         description: "How often flow control samples optimes. Smaller periods have higher resolution, but will suffer degredation sooner in the event of commit point lag."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<int>"
+        cpp_vartype: "Atomic<int>"
         cpp_varname: "gFlowControlSamplePeriod"
         default: 1000
         validator: {gt: 0}
@@ -77,7 +77,7 @@ server_parameters:
     flowControlMinTicketsPerSecond:
         description: "The minimum number of tickets flow control will hand out per second. A smaller value will have better resolution on batch-write workloads, but may unintentionally delay system operations."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<int>"
+        cpp_vartype: "Atomic<int>"
         cpp_varname: "gFlowControlMinTicketsPerSecond"
         default: 100
         validator: {gte: 0}
@@ -86,7 +86,7 @@ server_parameters:
     flowControlScaleMinTicketsByLocksPerOp:
         description: "If true, scales the flowControlMinTicketsPerSecond floor by the locksPerOp ratio to prevent batch operations from amplifying the effective minimum throughput."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<bool>"
+        cpp_vartype: "Atomic<bool>"
         cpp_varname: "gFlowControlScaleMinTicketsByLocksPerOp"
         default: false
         redact: false
@@ -94,7 +94,7 @@ server_parameters:
     flowControlDecayConstant:
         description: "The rate at which flow control will throttle based on how lagged the commit point is in time relative to the flow control threshold."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<double>"
+        cpp_vartype: "Atomic<double>"
         cpp_varname: "gFlowControlDecayConstant"
         default: 0.5
         validator: {gt: 0.0, lt: 1.0}
@@ -103,7 +103,7 @@ server_parameters:
     flowControlFudgeFactor:
         description: "When commit point lag is close to the threshold lag, the primary should track the sustainer rate, with some small penalty. This value represents that penalty. A value of 1.0 represents no penalty, a value close to 0.0 represents a large penalty. Reducing oscillations should keep this value close to 1.0."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<double>"
+        cpp_vartype: "Atomic<double>"
         cpp_varname: "gFlowControlFudgeFactor"
         default: 0.95
         validator: {gt: 0.0, lte: 1.0}
@@ -112,7 +112,7 @@ server_parameters:
     flowControlTicketAdderConstant:
         description: "When the commit point lag is small, flow control will add at least this many tickets per second. This provides meaningful ticket increase when immediately recovering from stalling events."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<int>"
+        cpp_vartype: "Atomic<int>"
         cpp_varname: "gFlowControlTicketAdderConstant"
         default: 1000
         validator: {gt: 0}
@@ -121,7 +121,7 @@ server_parameters:
     flowControlTicketMultiplierConstant:
         description: "When the commit point lag is small, flow control will increase its ticket allocation by this factor. This provides meaningful ticket increase in more general recovery scenarios."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<double>"
+        cpp_vartype: "Atomic<double>"
         cpp_varname: "gFlowControlTicketMultiplierConstant"
         default: 1.05
         validator: {gt: 1.0}
@@ -130,7 +130,7 @@ server_parameters:
     flowControlWarnThresholdSeconds:
         description: "If flow control detects the replica set is lagged and the sustainer point is not moving, it will eventually log a warning. This value controls how much time the flow control is in this state before it logs. A value of zero will disable the warnings."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<int>"
+        cpp_vartype: "Atomic<int>"
         cpp_varname: "gFlowControlWarnThresholdSeconds"
         default: 10
         validator: {gte: 0}
@@ -139,7 +139,7 @@ server_parameters:
     flowControlPollIntervalMs:
         description: "Interval in milliseconds between FlowControl refresh cycles. Lower values provide faster response to lag changes but increase CPU usage."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<int>"
+        cpp_vartype: "Atomic<int>"
         cpp_varname: "gFlowControlPollIntervalMs"
         default: 1000
         validator: {gte: 100, lte: 5000}
@@ -148,7 +148,7 @@ server_parameters:
     flowControlUseRateLimiter:
         description: "If true, enforce flow control ticket grants with the rate limiter instead of the legacy ticketholder."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<bool>"
+        cpp_vartype: "Atomic<bool>"
         cpp_varname: "gFlowControlUseRateLimiter"
         default: false
         redact: false
@@ -156,7 +156,7 @@ server_parameters:
     flowControlRateLimiterBurstCapacitySecs:
         description: "Seconds of unused flow control rate that can accumulate as burst capacity when using the rate limiter."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<double>"
+        cpp_vartype: "Atomic<double>"
         cpp_varname: "gFlowControlRateLimiterBurstCapacitySecs"
         default: 0.5
         validator: {gt: 0.0}
@@ -165,7 +165,7 @@ server_parameters:
     flowControlRateLimiterMaxQueueDepth:
         description: "Maximum number of threads that can block waiting for a flow control rate limiter token. Requests exceeding this depth are rejected immediately with RateLimitExceeded."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<long long>"
+        cpp_vartype: "Atomic<long long>"
         cpp_varname: "gFlowControlRateLimiterMaxQueueDepth"
         default: 1000000
         validator: {gt: 0}

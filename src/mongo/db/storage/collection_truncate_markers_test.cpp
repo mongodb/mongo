@@ -635,7 +635,7 @@ TEST_F(CollectionMarkersTest, CursorYieldsAndIgnoresNewRecords) {
     auto iterator = CollectionTruncateMarkers::makeIterator(
         opCtx.get(), coll->getRecordStore(), &mockTickSource, Milliseconds(10));
 
-    AtomicWord<bool> hasYielded(false);
+    Atomic<bool> hasYielded(false);
     stdx::thread yieldNotifier([this, &collNs, &hasYielded] {
         ThreadClient client(getServiceContext()->getService());
         auto innerOpCtx = cc().makeOperationContext();
@@ -678,7 +678,7 @@ TEST_F(CollectionMarkersTest, CursorYieldWithRandomCursor) {
     auto iterator = CollectionTruncateMarkers::makeIterator(
         opCtx.get(), coll->getRecordStore(), &mockTickSource, Milliseconds(10));
 
-    AtomicWord<bool> hasYielded(false);
+    Atomic<bool> hasYielded(false);
     stdx::thread yieldNotifier([this, &collNs, &hasYielded] {
         ThreadClient client(getServiceContext()->getService());
         auto innerOpCtx = cc().makeOperationContext();
@@ -714,7 +714,7 @@ TEST_F(CollectionMarkersTest, CursorYieldSerialCursorHandlesTruncate) {
     auto iterator = CollectionTruncateMarkers::makeIterator(
         opCtx.get(), coll->getRecordStore(), &mockTickSource, Milliseconds(10));
 
-    AtomicWord<bool> hasYielded(false);
+    Atomic<bool> hasYielded(false);
     stdx::thread yieldNotifier([this, &collNs, &hasYielded] {
         ThreadClient client(getServiceContext()->getService());
         auto innerOpCtx = cc().makeOperationContext();
@@ -761,7 +761,7 @@ TEST_F(CollectionMarkersTest, CursorYieldRandomCursorHandlesTruncate) {
     auto iterator = CollectionTruncateMarkers::makeIterator(
         opCtx.get(), coll->getRecordStore(), &mockTickSource, Milliseconds(10));
 
-    AtomicWord<bool> hasYielded(false);
+    Atomic<bool> hasYielded(false);
     stdx::thread yieldNotifier([this, &collNs, &hasYielded] {
         ThreadClient client(getServiceContext()->getService());
         auto innerOpCtx = cc().makeOperationContext();
@@ -804,7 +804,7 @@ TEST_F(CollectionMarkersTest, SamplingWorksWithTruncate) {
     std::unique_lock waitingLock(waitingMutex);
     stdx::condition_variable waitingCv;
 
-    AtomicWord<bool> hasYielded(false);
+    Atomic<bool> hasYielded(false);
     stdx::thread yieldNotifier([this, &collNs, &hasYielded, &waitingCv, &waitingMutex] {
         ThreadClient client(getServiceContext()->getService());
         auto innerOpCtx = cc().makeOperationContext();
@@ -857,7 +857,7 @@ TEST_F(CollectionMarkersTest, ScanningWorksWithTruncate) {
     std::unique_lock waitingLock(waitingMutex);
     stdx::condition_variable waitingCv;
 
-    AtomicWord<bool> hasYielded(false);
+    Atomic<bool> hasYielded(false);
     stdx::thread yieldNotifier([this, &collNs, &hasYielded, &waitingCv, &waitingMutex] {
         ThreadClient client(getServiceContext()->getService());
         auto innerOpCtx = cc().makeOperationContext();

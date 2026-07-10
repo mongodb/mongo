@@ -43,7 +43,7 @@ server_parameters:
     batchUserMultiDeletes:
         description: "When set, it batches multi-doc deletes"
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: gBatchUserMultiDeletes
         default: true
         redact: false

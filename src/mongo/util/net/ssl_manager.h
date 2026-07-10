@@ -43,7 +43,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/attribute_storage.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/sock.h"
@@ -167,11 +167,11 @@ const ASN1OID mongodbClusterMembershipOID(
  * Counts of negogtiated version used by TLS connections.
  */
 struct TLSVersionCounts {
-    AtomicWord<long long> tlsUnknown;
-    AtomicWord<long long> tls10;
-    AtomicWord<long long> tls11;
-    AtomicWord<long long> tls12;
-    AtomicWord<long long> tls13;
+    Atomic<long long> tlsUnknown;
+    Atomic<long long> tls10;
+    Atomic<long long> tls11;
+    Atomic<long long> tls12;
+    Atomic<long long> tls13;
 
     static TLSVersionCounts& get(ServiceContext* serviceContext);
 };

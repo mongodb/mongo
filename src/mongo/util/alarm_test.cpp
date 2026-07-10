@@ -32,7 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/alarm_runner_background_thread.h"
 #include "mongo/util/assert_util.h"
@@ -118,7 +118,7 @@ TEST(AlarmRunner, BasicTest) {
     auto alarm1 = scheduler->alarmFromNow(Milliseconds(10));
     auto alarm2 = scheduler->alarmFromNow(Milliseconds(20));
 
-    AtomicWord<bool> future2Filled{false};
+    Atomic<bool> future2Filled{false};
     auto pf = makePromiseFuture<void>();
     std::move(alarm2.future)
         .getAsync([&future2Filled, promise = std::move(pf.promise)](Status status) mutable {

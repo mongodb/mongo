@@ -31,7 +31,7 @@
 
 #include "mongo/otel/traces/sampler/sampling_config.h"
 #include "mongo/otel/traces/span/span_names.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"

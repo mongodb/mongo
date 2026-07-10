@@ -32,7 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
@@ -125,7 +125,7 @@ public:
     void appendNetworkInterfaceStats(BSONObjBuilder&, bool forServerStatus = false) const;
 
 private:
-    AtomicWord<unsigned> _counter;
+    Atomic<unsigned> _counter;
 
     std::vector<std::shared_ptr<TaskExecutor>> _executors;
 

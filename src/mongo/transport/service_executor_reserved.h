@@ -32,7 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
@@ -91,7 +91,7 @@ private:
     static thread_local std::deque<Task> _localWorkQueue;
     static thread_local int64_t _localThreadIdleCounter;
 
-    AtomicWord<bool> _stillRunning{false};
+    Atomic<bool> _stillRunning{false};
 
     mutable std::mutex _mutex;
     stdx::condition_variable _threadWakeup;
@@ -99,7 +99,7 @@ private:
 
     std::deque<Task> _readyTasks;
 
-    AtomicWord<unsigned> _numRunningWorkerThreads{0};
+    Atomic<unsigned> _numRunningWorkerThreads{0};
     Atomic<size_t> _numReadyThreads{0};
     Atomic<size_t> _numStartingThreads{0};
 

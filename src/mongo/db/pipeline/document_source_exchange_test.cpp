@@ -49,7 +49,7 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/random.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -628,7 +628,7 @@ TEST_F(DocumentSourceExchangeTest, RangeRandomExchangeNConsumer) {
     std::vector<ThreadInfo> threads = createNProducers(nConsumers, ex);
     std::vector<executor::TaskExecutor::CallbackHandle> handles;
 
-    AtomicWord<size_t> processedDocs{0};
+    Atomic<size_t> processedDocs{0};
 
     for (size_t id = 0; id < nConsumers; ++id) {
         auto docSourceExchange = exec::agg::buildStage(threads[id].documentSourceExchange);
@@ -714,7 +714,7 @@ TEST_F(DocumentSourceExchangeTest, RandomExchangeNConsumerResourceYielding) {
 
     std::vector<executor::TaskExecutor::CallbackHandle> handles;
 
-    AtomicWord<size_t> processedDocs{0};
+    Atomic<size_t> processedDocs{0};
 
     for (size_t id = 0; id < nConsumers; ++id) {
         ThreadInfo* threadInfo = &threads[id];
@@ -775,7 +775,7 @@ TEST_F(DocumentSourceExchangeTest, RangeRandomHashExchangeNConsumer) {
 
     std::vector<ThreadInfo> threads = createNProducers(nConsumers, ex);
     std::vector<executor::TaskExecutor::CallbackHandle> handles;
-    AtomicWord<size_t> processedDocs{0};
+    Atomic<size_t> processedDocs{0};
 
     for (size_t id = 0; id < nConsumers; ++id) {
         auto docSourceExchange = exec::agg::buildStage(threads[id].documentSourceExchange);

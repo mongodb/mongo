@@ -2056,7 +2056,7 @@ TEST_F(ShardRoleTest, RestoreForWriteJoinsCriticalSectionWhenNotRetryableWrite) 
     const BSONObj criticalSectionReason = BSON("reason" << 1);
 
     unittest::Barrier barrier(2);
-    AtomicWord<bool> restoreCompleted{false};
+    Atomic<bool> restoreCompleted{false};
 
     stdx::thread parallelThread([&] {
         ThreadClient client(operationContext()->getService());

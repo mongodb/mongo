@@ -141,7 +141,7 @@ private:
     // are additional fields that have to be referenced in commit/rollback handlers, this
     // counter should be moved to a new IndexBuildsInterceptor::InternalState structure that
     // will be managed as a shared resource.
-    std::shared_ptr<AtomicWord<uint64_t>> _counter = std::make_shared<AtomicWord<uint64_t>>(0);
+    std::shared_ptr<Atomic<uint64_t>> _counter = std::make_shared<Atomic<uint64_t>>(0);
 
     uint64_t _numApplied{0};
 };

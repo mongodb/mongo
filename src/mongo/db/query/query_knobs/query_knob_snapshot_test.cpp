@@ -403,7 +403,7 @@ TEST(QueryKnobSnapshotCacheTest, SnapshotReflectsSetParameterUpdateEnum) {
 }
 
 // SERVER-130638: regression test for a stale thread-local cache after many knob updates.
-// '_version' used to be an AtomicWord<uint8_t>, so exactly 256 knob updates would bring it back to
+// '_version' used to be an Atomic<uint8_t>, so exactly 256 knob updates would bring it back to
 // the same value, and a thread whose cached snapshot matched the pre-wraparound value would see a
 // false cache hit in getThreadLocalSnapshot() and never refresh. This drives 256 updates (far more
 // than a uint8_t could survive) and confirms the thread-local cache still reflects the latest

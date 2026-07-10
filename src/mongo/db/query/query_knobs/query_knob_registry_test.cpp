@@ -78,7 +78,7 @@ BSONObj annotations(QueryKnobAnnotationArgs args) {
 
 template <typename T>
 auto createDummyServerParameter(std::string_view paramName, BSONObj annotations) {
-    using Storage = AtomicWord<T>;
+    using Storage = Atomic<T>;
     using SPT = IDLServerParameterWithStorage<ServerParameterType::kStartupAndRuntime, Storage>;
     static Storage atomic;
     auto param = std::make_unique<SPT>(paramName, atomic);

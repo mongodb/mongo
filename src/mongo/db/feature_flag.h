@@ -274,7 +274,7 @@ protected:
                                                 ServerGlobalParams::FCVSnapshot fcv) const;
 
 private:
-    AtomicWord<bool> _enabled;
+    Atomic<bool> _enabled;
     bool _enableOnTransitionalFCV;
     multiversion::FeatureCompatibilityVersion _version;
 };

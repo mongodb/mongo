@@ -36,7 +36,7 @@ server_parameters:
         description: "Enables additional diagnostic logging during tassert, invariant, and signal handing. If set to false, diagnostic logging won't happen in any scenario."
         set_at: ["startup", "runtime"]
         cpp_varname: "enableDiagnosticLogging"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
         on_update: onUpdateEnableDiagnosticLogging
@@ -45,7 +45,7 @@ server_parameters:
         description: "When true, diagnostic logging will occur during invariant and signal handling."
         set_at: ["startup", "runtime"]
         cpp_varname: "signalHandlerUsesDiagnosticLogging"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
         on_update: onUpdateSignalHandlerUsesDiagnosticLogging

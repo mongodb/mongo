@@ -37,6 +37,6 @@ server_parameters:
             be overriden at the per-query level.
         set_at: [startup, runtime]
         cpp_varname: "allowDiskUseByDefault"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false

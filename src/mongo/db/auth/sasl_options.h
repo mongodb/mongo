@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 #include <atomic>

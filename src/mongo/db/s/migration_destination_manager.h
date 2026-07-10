@@ -54,7 +54,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/cancellation.h"
@@ -386,7 +386,7 @@ private:
 
     // The number of session oplog entries recieved from the source shard. Not all oplog
     // entries recieved from the source shard may be committed
-    AtomicWord<long long> _sessionOplogEntriesMigrated{0};
+    Atomic<long long> _sessionOplogEntriesMigrated{0};
 
     // Mutex to guard all fields below
     mutable std::mutex _mutex;

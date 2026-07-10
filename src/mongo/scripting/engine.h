@@ -36,7 +36,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/config_engine_gen.h"
 #include "mongo/scripting/js_regex.h"
@@ -221,7 +221,7 @@ protected:
     DatabaseName _localDBName;
     int64_t _loadedVersion;
     std::set<std::string> _storedNames;
-    static AtomicWord<long long> _lastVersion;
+    static Atomic<long long> _lastVersion;
     FunctionCacheMap _cachedFunctions;
     Date_t _createTime;
     bool _lastRetIsNativeCode;  // v8 only: set to true if eval'd script returns a native func

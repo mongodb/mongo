@@ -44,7 +44,7 @@ constexpr long long kNumActiveBucketsSentinel = std::numeric_limits<long long>::
  * No-op if 'atomicValue' is already set to the sentinel value.
  * 'increment' can be negative but the result of the addition has to be non-negative.
  */
-long long addFloored(AtomicWord<long long>& atomicValue, long long increment) {
+long long addFloored(Atomic<long long>& atomicValue, long long increment) {
     if (MONGO_unlikely(!increment)) {
         return static_cast<long long>(0);
     }

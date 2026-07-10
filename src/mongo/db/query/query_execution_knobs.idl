@@ -35,7 +35,7 @@ global:
         - "mongo/db/query/query_knob_expressions.h"
         - "mongo/db/query/query_knobs/with_on_update_util.h"
         - "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
-        - "mongo/platform/atomic_word.h"
+        - "mongo/platform/atomic.h"
     mod_visibility: public
 
 enums:
@@ -70,7 +70,7 @@ server_parameters:
             Maximum amount of memory bytes tracked by a stage's memory tracker before writing to CurOp.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxWriteToCurOpMemoryUsageBytes"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default:
             expr: 1024 * 1024
         validator:
@@ -87,7 +87,7 @@ server_parameters:
             unbounded, preserving existing per-stage behavior.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxMemoryUsageBytesPerOperation"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: std::numeric_limits<long long>::max()
         validator:
@@ -103,7 +103,7 @@ server_parameters:
             limit; otherwise this per-expression safety cap is enforced.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxSingleExpressionMemoryUsageBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
@@ -115,7 +115,7 @@ server_parameters:
             Maximum amount of memory bytes tracked by a stage's memory tracker before writing to serverStatus.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxWriteToServerStatusMemoryUsageBytes"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default:
             expr: 1024 * 1024
         validator:
@@ -126,7 +126,7 @@ server_parameters:
         description: 'Yield after this many "should yield?" checks.'
         set_at: [startup, runtime]
         cpp_varname: "internalQueryExecYieldIterations"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: -1
         redact: false
 
@@ -134,7 +134,7 @@ server_parameters:
         description: "Yield if it's been at least this many milliseconds since we last yielded."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryExecYieldPeriodMS"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 10
         validator:
             gte: 0
@@ -144,7 +144,7 @@ server_parameters:
         description: "In some potentially long running expressions every n checks, we wake up and see if the query was killed."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryExpressionInterruptIterations"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 10
         redact: false
 
@@ -152,7 +152,7 @@ server_parameters:
         description: "In some potentially long running expressions check if the query has been killed every time this period has elapsed."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryExpressionInterruptPeriodMS"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 1000
         validator:
             gte: 0
@@ -162,7 +162,7 @@ server_parameters:
         description: "The maximum size of the result that will be returned from a document's $facet stage."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryFacetMaxOutputDocSizeBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
@@ -175,7 +175,7 @@ server_parameters:
             $lookup.
         set_at: [startup, runtime]
         cpp_varname: "internalLookupStageIntermediateDocumentMaxSizeBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
@@ -188,7 +188,7 @@ server_parameters:
             $graphLookup.
         set_at: [startup, runtime]
         cpp_varname: "internalGraphLookupStageIntermediateDocumentMaxSizeBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
@@ -201,7 +201,7 @@ server_parameters:
             PlanExecutor before pipeline processing.
         set_at: [startup, runtime]
         cpp_varname: "internalDocumentSourceCursorBatchSizeBytes"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default:
             expr: 4 * 1024 * 1024
         validator:
@@ -215,7 +215,7 @@ server_parameters:
             internalDocumentSourceCursorBatchSizeBytes, A value of 0 means unlimited.
         set_at: [startup, runtime]
         cpp_varname: "internalDocumentSourceCursorInitialBatchSize"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 32
         validator:
             gte: 0
@@ -227,7 +227,7 @@ server_parameters:
             from running on mongoS.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryProhibitBlockingMergeOnMongoS"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
 
@@ -237,7 +237,7 @@ server_parameters:
             the update portion.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryReuseCursorForExpressPathUpdates"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
 
@@ -247,7 +247,7 @@ server_parameters:
             given size in bytes.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxJsEmitBytes"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default:
             expr: 100 * 1024 * 1024
         validator:
@@ -260,7 +260,7 @@ server_parameters:
             $push accumulator.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxPushBytes"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default:
             expr: 100 * 1024 * 1024
         validator:
@@ -273,7 +273,7 @@ server_parameters:
             result.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxRangeBytes"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default:
             expr: 100 * 1024 * 1024
         validator:
@@ -284,7 +284,7 @@ server_parameters:
         description: "Limits the amount of memory that can be used while constructing the result of a $map or $range expression"
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxMapFilterReduceBytes"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default:
             expr: 100 * 1024 * 1024
         validator:
@@ -297,7 +297,7 @@ server_parameters:
             $addToSet accumulator.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxAddToSetBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
@@ -310,7 +310,7 @@ server_parameters:
             $concatArrays accumulator.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxConcatArraysBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
@@ -323,7 +323,7 @@ server_parameters:
             $setUnion accumulator.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxSetUnionBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
@@ -334,7 +334,7 @@ server_parameters:
         description: "The maximum amount of memory that can be used by an individual $percentile accumulator."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxPercentileAccumulatorBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
@@ -347,7 +347,7 @@ server_parameters:
             'jsHeapLimitMB' limit if the global limit is smaller.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryJavaScriptHeapSizeLimitMB"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 100
         redact: false
 
@@ -357,7 +357,7 @@ server_parameters:
             query.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryJavaScriptFnTimeoutMillis"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default:
             expr: 60 * 1000
         validator:
@@ -368,7 +368,7 @@ server_parameters:
         description: "When true, desugars $where to $expr/$function."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryDesugarWhereToFunction"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
 
@@ -378,7 +378,7 @@ server_parameters:
             not be changed on live systems.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryDefaultDOP"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 1
         test_only: true
         validator:
@@ -391,7 +391,7 @@ server_parameters:
             bounds into when possible.
         set_at: [startup, runtime]
         cpp_varname: "internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 1000
         validator:
             gt: 0
@@ -403,7 +403,7 @@ server_parameters:
             generating a descriptive document validation error.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxDocValidationErrorConsideredValues"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 10
         validator:
             gt: 0
@@ -415,7 +415,7 @@ server_parameters:
             output.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryExplainSizeThresholdBytes"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default:
             expr: 10 * 1024 * 1024
         validator:
@@ -432,7 +432,7 @@ server_parameters:
             internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill].
         set_at: [startup, runtime]
         cpp_varname: "internalQuerySBEAggMemoryUseCheckMargin"
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         default: 0.7
         validator:
             gt: 0.0
@@ -447,7 +447,7 @@ server_parameters:
             internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill].
         set_at: [startup, runtime]
         cpp_varname: "internalQuerySBEAggMemoryCheckPerAdvanceAtMost"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default: 2
         validator:
             gt: 0
@@ -463,7 +463,7 @@ server_parameters:
             [see internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill].
         set_at: [startup, runtime]
         cpp_varname: "internalQuerySBEAggMemoryCheckPerAdvanceAtLeast"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default: 1024
         validator:
             gt: 0
@@ -489,7 +489,7 @@ server_parameters:
         description: "If true, the system will not push down $lookup to the SBE execution engine."
         set_at: [startup, runtime]
         cpp_varname: "internalQuerySlotBasedExecutionDisableLookupPushdown"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -503,7 +503,7 @@ server_parameters:
         description: "If true, the system will not push down $lookup with absorbed $unwind to the SBE execution engine."
         set_at: [startup, runtime]
         cpp_varname: "internalQuerySlotBasedExecutionDisableLookupUnwindPushdown"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -517,7 +517,7 @@ server_parameters:
         description: "If true, the system will not push down $group to the SBE execution engine."
         set_at: [startup, runtime]
         cpp_varname: "internalQuerySlotBasedExecutionDisableGroupPushdown"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -533,7 +533,7 @@ server_parameters:
             ensure deterministic sort order.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryAppendIdToSetWindowFieldsSort"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
 
@@ -543,7 +543,7 @@ server_parameters:
             family of accumulators.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryTopNAccumulatorBytes"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default:
             expr: 100 * 1024 * 1024
         validator:
@@ -556,7 +556,7 @@ server_parameters:
             processing. If set to zero, the pcre2 library default value will be used instead.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryRegexHeapLimitKB"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default:
             expr: 100 * 1024
         validator:
@@ -570,7 +570,7 @@ server_parameters:
             default value will be used instead.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryRegexMatchLimit"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 0
         validator:
             gte: 0
@@ -580,7 +580,7 @@ server_parameters:
         description: "If true, cursors opened within sessions are eligible for inactive cursor timeout."
         set_at: [startup, runtime]
         cpp_varname: "enableTimeoutOfInactiveSessionCursors"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
 
@@ -588,7 +588,7 @@ server_parameters:
         description: "Limits the number of documents that $densify is allowed to generate."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxAllowedDensifyDocs"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 500000
         validator:
             gt: 0
@@ -611,7 +611,7 @@ server_parameters:
         description: "Knob to control whether single-field equalities (other than IDHACK) can use the express executor."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryDisableSingleFieldExpressExecutor"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -625,7 +625,7 @@ server_parameters:
         description: "Knob to control whether we collect plan shape counters for query stats."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryEnablePlanShapeAnalysis"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
 
@@ -635,7 +635,7 @@ server_parameters:
             is translated to a SBE plan.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 10 * 1000
         validator:
@@ -654,7 +654,7 @@ server_parameters:
             is translated to a SBE plan.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryCollectionMaxDataSizeBytesToChooseHashJoin"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
@@ -673,7 +673,7 @@ server_parameters:
             is translated to a SBE plan.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
@@ -692,7 +692,7 @@ server_parameters:
             eligible for the hash join strategy, to fall back to using the nested loop join strategy.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryDisableLookupExecutionUsingHashJoin"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -711,7 +711,7 @@ server_parameters:
             off performance for precision.
         set_at: [startup, runtime]
         cpp_varname: "internalMeasureQueryExecutionTimeInNanoseconds"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -725,7 +725,7 @@ server_parameters:
             at a future time.
         set_at: [startup, runtime]
         cpp_varname: "minAllocationToShardsPollPeriodSecs"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 1
         validator:
             gt: 0
@@ -739,7 +739,7 @@ server_parameters:
             that are opened with the 'showMigrationEvents' flag.
         set_at: [startup, runtime]
         cpp_varname: "changeStreamsEmitFromMigrate"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
 
@@ -750,7 +750,7 @@ server_parameters:
             This parameter is deprecated, and its value is not used after setting it.
         set_at: [startup]
         cpp_varname: "internalChangeStreamUseTenantIdForTesting"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         is_deprecated: true
@@ -790,7 +790,7 @@ server_parameters:
     internalQueryAggMulticastTimeoutMS:
         description: "Timeout in MS for requests to shard servers when aggregations are sent to all shard servers"
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: internalQueryAggMulticastTimeoutMS
         default: 60000
         validator:
@@ -800,7 +800,7 @@ server_parameters:
     internalQueryAggMulticastMaxConcurrency:
         description: "Max number of concurrent requests when aggregations are sent to all shard servers"
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: internalQueryAggMulticastMaxConcurrency
         default: 100
         validator:
@@ -811,7 +811,7 @@ server_parameters:
         description: "Enables access to $$USER_ROLES in queries."
         set_at: [startup, runtime]
         cpp_varname: enableAccessToUserRoles
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
 
@@ -819,7 +819,7 @@ server_parameters:
         description: "The number of RecordIDs after which the hybrid container switches from hash table to Roaring Bitmaps."
         set_at: [startup, runtime]
         cpp_varname: internalRoaringBitmapsThreshold
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 1000000
         redact: false
 
@@ -827,7 +827,7 @@ server_parameters:
         description: "The minimal density required for the hybrid container to switch from hash table to Roaring Bitmaps."
         set_at: [startup, runtime]
         cpp_varname: internalRoaringBitmapsMinimalDensity
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         default: 0.00001
         redact: false
 
@@ -835,7 +835,7 @@ server_parameters:
         description: "The batch size used for the data migration in the hybrid container."
         set_at: [startup, runtime]
         cpp_varname: internalRoaringBitmapsBatchSize
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 100
         redact: false
 
@@ -848,7 +848,7 @@ server_parameters:
             most datasets.
         set_at: [startup, runtime]
         cpp_varname: internalQueryTdigestDelta
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 2000
         validator:
             gte: 0
@@ -862,7 +862,7 @@ server_parameters:
             The threshold has been determined empirically from benchmarks.
         set_at: [startup, runtime]
         cpp_varname: internalQueryPercentileExprSelectToSortThreshold
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 20
         validator:
             gte: 0
@@ -874,7 +874,7 @@ server_parameters:
             spool, measured in bytes.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxSpoolDiskUsageBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 10 * 100 * 1024 * 1024
         validator:
@@ -884,7 +884,7 @@ server_parameters:
     internalQueryDocumentSourceWriterBatchExtraReservedBytes:
         description: "Space to reserve in document source writer batches for miscellaneous metadata"
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: internalQueryDocumentSourceWriterBatchExtraReservedBytes
         validator:
             gte: 0
@@ -899,7 +899,7 @@ server_parameters:
             backoff way on the processed records. This setting defines the least sampling frequency.
         set_at: [startup, runtime]
         cpp_varname: "internalQuerySlotBasedExecutionWindowBufferMemorySamplingAtLeast"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default: 1024
         validator:
             gt: 0
@@ -911,7 +911,7 @@ server_parameters:
             backoff way for different window frame size. This setting defines the least sampling frequency.
         set_at: [startup, runtime]
         cpp_varname: "internalQuerySlotBasedExecutionWindowStateMemorySamplingAtLeast"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default: 1024
         validator:
             gt: 0
@@ -921,7 +921,7 @@ server_parameters:
         description: "If true, the system will not push down time-series queries to the SBE execution engine."
         set_at: [startup, runtime]
         cpp_varname: "internalQuerySlotBasedExecutionDisableTimeSeriesPushdown"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -936,7 +936,7 @@ server_parameters:
             Timeout in MS that the storage engine will block a spilling operation when the
             cache is under pressure.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: internalQuerySpillingMaxWaitTimeout
         default: 1000
         validator:
@@ -946,7 +946,7 @@ server_parameters:
     internalQuerySpillingMinAvailableDiskSpaceBytes:
         description: "Minimum disk space that should be available before spilling"
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         cpp_varname: internalQuerySpillingMinAvailableDiskSpaceBytes
         default:
             expr: 500 * 1024 * 1024 # 500 MB
@@ -961,7 +961,7 @@ server_parameters:
         description: "The batch size used for find commands as a default if none is specified."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryFindCommandBatchSize"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 101
         validator:
@@ -972,7 +972,7 @@ server_parameters:
         description: "Enable spilling in $group every time there is a duplicate id to stress merge logic."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryEnableAggressiveSpillsInGroup"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
 
@@ -982,7 +982,7 @@ server_parameters:
             cursor is already pinned by releaseMemory command.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryGetMoreMaxCursorPinRetryAttempts"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default: 10
         redact: false
         validator:
@@ -991,7 +991,7 @@ server_parameters:
     internalQuerySettingsDisableBackfill:
         description: "Disables the query settings backfill mechanism."
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: internalQuerySettingsDisableBackfill
         default: false
         redact: false
@@ -1001,7 +1001,7 @@ server_parameters:
             The time delay in seconds to wait for representative queries to be buffered in between
             the first recorded query and the backfill operation.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: internalQuerySettingsBackfillDelaySeconds
         default: 60
         validator:
@@ -1013,7 +1013,7 @@ server_parameters:
             Controlls the maximum amount of memory that the backfill operation can use while buffering.
             Surpasing this limit will cause subsequent queries to be skipped for the current period.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: internalQuerySettingsBackfillMemoryLimitBytes
         default: 104857600 # 100MB
         validator:
@@ -1025,7 +1025,7 @@ server_parameters:
             Configures how frequently $reduce checks if its accumulated value has exceeded the maximum
             allowable nestedness. Arrays and subdocuments both count. If set to 0, no check is performed.
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<long long>"
+        cpp_vartype: "Atomic<long long>"
         cpp_varname: gInternalReduceAccumulatedValueDepthCheckInterval
         default: 16
         validator:
@@ -1038,7 +1038,7 @@ server_parameters:
             Using the forcedPlanSolution argument to find/aggregate commands, force selection of a given plan by solution hash.
         set_at: [startup, runtime]
         cpp_varname: internalQueryAllowForcedPlanByHash
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
 
@@ -1048,7 +1048,7 @@ server_parameters:
             attempts before it can switch to update permamently.
         set_at: [startup, runtime]
         cpp_varname: internalQueryMergeMinInsertAttempts
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default: 1000
         redact: false
 
@@ -1059,7 +1059,7 @@ server_parameters:
             insert first.
         set_at: [startup, runtime]
         cpp_varname: internalQueryMergeMaxInsertErrorRate
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         default: 0.7
         redact: false
 
@@ -1069,7 +1069,7 @@ server_parameters:
             accumulators than this maximum. The limit does not apply for $group on a time-series
             collection or for pipelines forced to use SBE by featureFlagSbeFull.
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<long long>"
+        cpp_vartype: "Atomic<long long>"
         cpp_varname: gInternalMaxGroupAccumulatorsInSbe
         default: 25
         validator:
@@ -1085,7 +1085,7 @@ server_parameters:
             conflicts.
         set_at: [startup, runtime]
         cpp_varname: internalQueryEnableWriteConflictBackoffWithoutTicket
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
 
@@ -1101,7 +1101,7 @@ server_parameters:
             is intentional and not a misconfiguration.
         set_at: [startup, runtime]
         cpp_varname: gInternalQueryWriteConflictBackoffMaxReleaseTicketCycles
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 2147483647
         validator:
             gte: 0
@@ -1115,7 +1115,7 @@ server_parameters:
             with backoff -- zero-delay retry re-enters the limit.
         set_at: [startup, runtime]
         cpp_varname: internalQueryWriteConflictRetryLimitMax
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 0
         validator:
             gte: 0
@@ -1132,7 +1132,7 @@ server_parameters:
             that still absorbs single-doc transient conflicts.
         set_at: [startup, runtime]
         cpp_varname: internalQueryWriteConflictRetryLimitMin
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 3
         validator:
             gte: 1
@@ -1147,7 +1147,7 @@ server_parameters:
             its plan executor.
         set_at: [startup, runtime]
         cpp_varname: internalQueryWriteConflictRetryLimitWaitersThreshold
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 0
         validator:
             gte: 0
@@ -1157,7 +1157,7 @@ server_parameters:
         description: "Enables change stream cursors to respect readPreference after replica set elections."
         set_at: [startup, runtime]
         cpp_varname: internalChangeStreamRespectsReadPreference
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
         annotations:
@@ -1175,7 +1175,7 @@ server_parameters:
             amortizes cost behind a caching executor, so production keeps this at 100.
         set_at: [startup, runtime]
         cpp_varname: "internalChangeStreamUpdateLookupMaxBatchSize"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 100
         validator:
             gte: 1
@@ -1195,7 +1195,7 @@ server_parameters:
             buffer without limit; at least one event is always admitted.
         set_at: [startup, runtime]
         cpp_varname: "internalChangeStreamUpdateLookupMaxInputBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default: 16777216
         validator:
             gte: 1
@@ -1215,7 +1215,7 @@ server_parameters:
             post-image is enriched as a batch-of-one and never split.
         set_at: [startup, runtime]
         cpp_varname: "internalChangeStreamUpdateLookupMaxOutputBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default: 16777216
         validator:
             gte: 1
@@ -1234,7 +1234,7 @@ server_parameters:
             dotted paths and reverts to the pre-fix behavior.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryLegacyDottedPathNullSemantics"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
 
@@ -1254,7 +1254,7 @@ server_parameters:
             queries.
         set_at: [startup, runtime]
         cpp_varname: "internalOperationResponseMaxMS"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         validator: {gte: 0}
         default: 0
         redact: false

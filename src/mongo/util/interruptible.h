@@ -36,7 +36,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -344,7 +344,7 @@ public:
 
 
 private:
-    AtomicWord<bool> _isWaiting{false};
+    Atomic<bool> _isWaiting{false};
 };
 
 /**

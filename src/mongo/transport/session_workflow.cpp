@@ -57,7 +57,7 @@
 #include "mongo/executor/split_timer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity_suppressor.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/message.h"
@@ -559,7 +559,7 @@ private:
     ServiceEntryPoint* _sep;
     RunnerAndSource _taskRunner;
 
-    AtomicWord<bool> _isTerminated{false};
+    Atomic<bool> _isTerminated{false};
     ClientStrandPtr _clientStrand;
 
     bool _inFirstIteration = true;

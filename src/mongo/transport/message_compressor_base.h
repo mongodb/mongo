@@ -31,7 +31,7 @@
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/status_with.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 #include <string_view>
@@ -155,10 +155,10 @@ private:
     const MessageCompressorId _id;
     const std::string _name;
 
-    AtomicWord<long long> _compressBytesIn;
-    AtomicWord<long long> _compressBytesOut;
+    Atomic<long long> _compressBytesIn;
+    Atomic<long long> _compressBytesOut;
 
-    AtomicWord<long long> _decompressBytesIn;
-    AtomicWord<long long> _decompressBytesOut;
+    Atomic<long long> _decompressBytesIn;
+    Atomic<long long> _decompressBytesOut;
 };
 }  // namespace mongo

@@ -94,7 +94,7 @@
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"

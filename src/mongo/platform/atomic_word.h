@@ -31,12 +31,4 @@
 
 // This is a shim header to ease transition to new name. Prefer the new name in new code.
 // The new name is "Atomic." The old name is "AtomicWord."
-#include "mongo/platform/atomic.h"
-#include "mongo/util/modules.h"
-
-[[MONGO_MOD_PUBLIC]];
-
-namespace mongo {
-template <typename T>
-using AtomicWord = Atomic<T>;
-}  // namespace mongo
+#include "mongo/platform/atomic.h"  // IWYU pragma: export

@@ -33,7 +33,7 @@
 #include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 #include "mongo/db/s/resharding/resharding_oplog_batch_preparer.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
@@ -86,8 +86,8 @@ private:
     const ReshardingOplogApplicationRules& _crudApplication;
     const ReshardingOplogSessionApplication& _sessionApplication;
 
-    mutable AtomicWord<bool> _bypassWriteBlock{false};
-    mutable AtomicWord<long long> _lastWriteBlockWarningAt{std::numeric_limits<long long>::min()};
+    mutable Atomic<bool> _bypassWriteBlock{false};
+    mutable Atomic<long long> _lastWriteBlockWarningAt{std::numeric_limits<long long>::min()};
 };
 
 }  // namespace mongo

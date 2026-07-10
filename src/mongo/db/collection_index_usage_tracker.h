@@ -31,7 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/aggregated_index_usage_tracker.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
@@ -64,8 +64,8 @@ class CollectionIndexUsageTracker
 
     // Statistics that are shared among versions of the same logical collection.
     struct CollectionScanStatsStorage : public RefCountable {
-        AtomicWord<unsigned long long> _collectionScans{0};
-        AtomicWord<unsigned long long> _collectionScansNonTailable{0};
+        Atomic<unsigned long long> _collectionScans{0};
+        Atomic<unsigned long long> _collectionScansNonTailable{0};
     };
 
 public:
@@ -94,7 +94,7 @@ public:
         }
 
         // Number of operations that have used this index.
-        AtomicWord<long long> accesses;
+        Atomic<long long> accesses;
 
         // Date/Time that we started tracking index usage.
         Date_t trackerStartTime;

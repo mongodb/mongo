@@ -266,6 +266,6 @@ bool DBClientConnection::isUsingTransientSSLParams() const {
 
 #endif
 
-AtomicWord<int> DBClientConnection::_numConnections;
+Atomic<int> DBClientConnection::_numConnections;
 
 }  // namespace mongo

@@ -254,7 +254,7 @@ FlowControl::FlowControl(ServiceContext* service,
     _jobAnchor.start();
 
     using ParamT =
-        IDLServerParameterWithStorage<ServerParameterType::kStartupAndRuntime, AtomicWord<int>>;
+        IDLServerParameterWithStorage<ServerParameterType::kStartupAndRuntime, Atomic<int>>;
     ServerParameterSet::getNodeParameterSet()
         ->get<ParamT>("flowControlPollIntervalMs")
         ->setOnUpdate([this](const int newValue) -> Status {

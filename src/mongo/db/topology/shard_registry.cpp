@@ -1226,7 +1226,7 @@ BSONObj ShardRegistryData::toBSON() const {
 }
 
 ////////////// ShardRegistry::Time
-AtomicWord<ShardRegistry::Increment> ShardRegistry::Time::_forceReloadIncrementSource{0};
+Atomic<ShardRegistry::Increment> ShardRegistry::Time::_forceReloadIncrementSource{0};
 
 ShardRegistry::Time ShardRegistry::Time::makeForForcedReload() {
     // An empty topologyTime signifies that the refresh was due to a forced reload. This is

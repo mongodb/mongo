@@ -34,7 +34,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
@@ -51,8 +51,8 @@
 namespace mongo::logv2 {
 
 namespace {
-AtomicWord<bool> redactionEnabled{false};
-AtomicWord<bool> redactBinDataEncrypt{true};
+Atomic<bool> redactionEnabled{false};
+Atomic<bool> redactBinDataEncrypt{true};
 std::map<std::string_view, LogRotateCallback> logRotateCallbacks;
 }  // namespace
 

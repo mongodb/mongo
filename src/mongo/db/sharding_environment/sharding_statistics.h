@@ -36,7 +36,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_metadata_statistics.h"
 #include "mongo/db/shard_role/shard_catalog/critical_section_statistics.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_metadata_statistics.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
@@ -50,63 +50,63 @@ class ServiceContext;
 struct [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardingStatistics {
     // Counts how many times threads hit stale config exception (which is what triggers metadata
     // refreshes).
-    AtomicWord<long long> countStaleConfigErrors{0};
+    Atomic<long long> countStaleConfigErrors{0};
 
     // Cumulative, always-increasing counter of how many chunks this node has started to donate
     // (whether they succeeded or not).
-    AtomicWord<long long> countDonorMoveChunkStarted{0};
+    Atomic<long long> countDonorMoveChunkStarted{0};
 
     // Cumulative, always-increasing counter of how many chunks this node successfully committed.
-    AtomicWord<long long> countDonorMoveChunkCommitted{0};
+    Atomic<long long> countDonorMoveChunkCommitted{0};
 
     // Cumulative, always-increasing counter of how many move chunks this node aborted.
-    AtomicWord<long long> countDonorMoveChunkAborted{0};
+    Atomic<long long> countDonorMoveChunkAborted{0};
 
     // Cumulative, always-increasing counter of how much time the entire move chunk operation took
     // (excluding range deletion).
-    AtomicWord<long long> totalDonorMoveChunkTimeMillis{0};
+    Atomic<long long> totalDonorMoveChunkTimeMillis{0};
 
     // Cumulative, always-increasing counter of how much time the clone phase took on the donor
     // node, before it was appropriate to enter the critical section.
-    AtomicWord<long long> totalDonorChunkCloneTimeMillis{0};
+    Atomic<long long> totalDonorChunkCloneTimeMillis{0};
 
     // Cumulative, always-increasing counter of how many documents have been cloned on the
     // recipient node.
-    AtomicWord<long long> countDocsClonedOnRecipient{0};
+    Atomic<long long> countDocsClonedOnRecipient{0};
 
     // Cumulative, always-increasing counter of how many documents have been cloned on the catch up
     // phase on the recipient node.
-    AtomicWord<long long> countDocsClonedOnCatchUpOnRecipient{0};
+    Atomic<long long> countDocsClonedOnCatchUpOnRecipient{0};
 
     // Cumulative, always-increasing counter of how many bytes have been cloned on the catch up
     // phase on the recipient node.
-    AtomicWord<long long> countBytesClonedOnCatchUpOnRecipient{0};
+    Atomic<long long> countBytesClonedOnCatchUpOnRecipient{0};
 
     // Cumulative, always-increasing counter of how many bytes have been cloned on the
     // recipient node.
-    AtomicWord<long long> countBytesClonedOnRecipient{0};
+    Atomic<long long> countBytesClonedOnRecipient{0};
 
     // Cumulative, always-increasing counter of how many documents have been cloned on the donor
     // node.
-    AtomicWord<long long> countDocsClonedOnDonor{0};
+    Atomic<long long> countDocsClonedOnDonor{0};
 
     // Cumulative, always-increasing counter of how many bytes have been cloned on the donor
     // node.
-    AtomicWord<long long> countBytesClonedOnDonor{0};
+    Atomic<long long> countBytesClonedOnDonor{0};
 
     // Cumulative, always-increasing counter of how many documents have been deleted by the
     // rangeDeleter.
-    AtomicWord<long long> countDocsDeletedByRangeDeleter{0};
+    Atomic<long long> countDocsDeletedByRangeDeleter{0};
 
     // Cumulative, always-increasing counter of how many bytes have been deleted by the
     // rangeDeleter.
-    AtomicWord<long long> countBytesDeletedByRangeDeleter{0};
+    Atomic<long long> countBytesDeletedByRangeDeleter{0};
 
     // Cumulative, always-increasing counters of how many execution tickets the rangeDeleter
     // acquired (including how many came from the low-priority pool, which the rangeDeleter uses
     // when background task deprioritization is enabled).
-    AtomicWord<long long> rangeDeleterTicketAdmissions{0};
-    AtomicWord<long long> rangeDeleterLowPriorityTicketAdmissions{0};
+    Atomic<long long> rangeDeleterTicketAdmissions{0};
+    Atomic<long long> rangeDeleterLowPriorityTicketAdmissions{0};
 
     // Total time rangeDeleter operations have spent queued waiting for an execution ticket, and
     // processing while holding one, each including the in-progress time of any deletion currently
@@ -121,12 +121,12 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardingStatistics {
 
     // Cumulative, always-increasing counter of how many chunks this node started to receive
     // (whether the receiving succeeded or not)
-    AtomicWord<long long> countRecipientMoveChunkStarted{0};
+    Atomic<long long> countRecipientMoveChunkStarted{0};
 
     // Cumulative, always-increasing counter of how much time the critical section's commit phase
     // took (this is the period of time when all operations on the collection are blocked, not just
     // the reads)
-    AtomicWord<long long> totalCriticalSectionCommitTimeMillis{0};
+    Atomic<long long> totalCriticalSectionCommitTimeMillis{0};
 
     // Cumulative, always-increasing counter of how much time the entire critical section took. It
     // includes the time the recipient took to fetch the latest modifications from the donor and
@@ -135,78 +135,78 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardingStatistics {
     // The value of totalCriticalSectionTimeMillis - totalCriticalSectionCommitTimeMillis gives the
     // duration of the catch-up phase of the critical section (where the last mods are transferred
     // from the donor to the recipient).
-    AtomicWord<long long> totalCriticalSectionTimeMillis{0};
+    Atomic<long long> totalCriticalSectionTimeMillis{0};
 
     // Cumulative, always-increasing counter of the number of migrations aborted on this node
     // after timing out waiting to acquire a lock.
-    AtomicWord<long long> countDonorMoveChunkLockTimeout{0};
+    Atomic<long long> countDonorMoveChunkLockTimeout{0};
 
     // Cumulative, always-increasing counter of how much time the migration recipient critical
     // section took (this is the period of time when write operations on the collection on the
     // recipient are blocked).
-    AtomicWord<long long> totalRecipientCriticalSectionTimeMillis{0};
+    Atomic<long long> totalRecipientCriticalSectionTimeMillis{0};
 
     // Cumulative, always-increasing counter of the number of migrations aborted on this node
     // due to concurrent index operations.
-    AtomicWord<long long> countDonorMoveChunkAbortConflictingIndexOperation{0};
+    Atomic<long long> countDonorMoveChunkAbortConflictingIndexOperation{0};
 
     // Total number of migrations leftover from previous primaries that needs to be run to
     // completion. Valid only when this process is the repl set primary.
-    AtomicWord<long long> unfinishedMigrationFromPreviousPrimary{0};
+    Atomic<long long> unfinishedMigrationFromPreviousPrimary{0};
 
     // Total number of commands run directly against this shard without the directShardOperations
     // role.
-    AtomicWord<long long> unauthorizedDirectShardOperations{0};
+    Atomic<long long> unauthorizedDirectShardOperations{0};
 
     // Total number of times the _configsvrTransitionToDedicatedConfigServer command has started.
-    AtomicWord<long long> countTransitionToDedicatedConfigServerStarted{0};
+    Atomic<long long> countTransitionToDedicatedConfigServerStarted{0};
 
     // Total number of times the _configsvrTransitionToDedicatedConfigServer command has completed.
-    AtomicWord<long long> countTransitionToDedicatedConfigServerCompleted{0};
+    Atomic<long long> countTransitionToDedicatedConfigServerCompleted{0};
 
     // Total number of times the _configsvrTransitionFromDedicatedConfigServer command has
     // completed.
-    AtomicWord<long long> countTransitionFromDedicatedConfigServerCompleted{0};
+    Atomic<long long> countTransitionFromDedicatedConfigServerCompleted{0};
 
     // Cumulative, always-increasing total number of sharding metadata refreshes that have been
     // kicked off by the _flushReshardingStateChange command.
-    AtomicWord<long long> countFlushReshardingStateChangeTotalShardingMetadataRefreshes{0};
+    Atomic<long long> countFlushReshardingStateChangeTotalShardingMetadataRefreshes{0};
     // Cumulative, always-increasing number of successful and failed sharding metadata refreshes
     // that have been kicked off by the _flushReshardingStateChange command.
-    AtomicWord<long long> countFlushReshardingStateChangeSuccessfulShardingMetadataRefreshes{0};
-    AtomicWord<long long> countFlushReshardingStateChangeFailedShardingMetadataRefreshes{0};
+    Atomic<long long> countFlushReshardingStateChangeSuccessfulShardingMetadataRefreshes{0};
+    Atomic<long long> countFlushReshardingStateChangeFailedShardingMetadataRefreshes{0};
 
     // Total number of times a compound wildcard index prefixed by shard key has been detected
     // during a moveChunk, range deleter or any other operation which needs to fetch a valid shard
     // key index. This will help estimate the impact of SERVER-103774.
     //
     // TODO (SERVER-112793) Remove once v9.0 branches out.
-    AtomicWord<long long> countHitsOfCompoundWildcardIndexesWithShardKeyPrefix{0};
+    Atomic<long long> countHitsOfCompoundWildcardIndexesWithShardKeyPrefix{0};
 
     // Cumulative, always-increasing counter of how many chunk migrations had to wait for
     // reclaimed prepared transactions from precise checkpoint recovery to resolve before cloning.
-    AtomicWord<long long> chunkMigrationWaitedOnReclaimedPreparedTxns{0};
+    Atomic<long long> chunkMigrationWaitedOnReclaimedPreparedTxns{0};
 
     // Cumulative, always-increasing counter of total time (ms) chunk migrations spent waiting for
     // reclaimed prepared transactions from precise checkpoint recovery to resolve.
-    AtomicWord<long long> chunkMigrationWaitForReclaimedPreparedTxnsMillis{0};
+    Atomic<long long> chunkMigrationWaitForReclaimedPreparedTxnsMillis{0};
 
     // FTDC metrics for the MaxKey orphan detection sweep run on shard primaries.
     // The *Complete/*FoundMaxKey/*AlertEmitted fields are 0/1 flags describing the last published
     // sweep outcome on this process. *Errors counts non-fatal per-collection errors encountered
     // while running the sweep.
-    AtomicWord<long long> maxKeyOrphanScanComplete{0};
-    AtomicWord<long long> maxKeyOrphanScanFoundMaxKey{0};
-    AtomicWord<long long> maxKeyOrphanScanAlertEmitted{0};
-    AtomicWord<long long> maxKeyOrphanScanErrors{0};
+    Atomic<long long> maxKeyOrphanScanComplete{0};
+    Atomic<long long> maxKeyOrphanScanFoundMaxKey{0};
+    Atomic<long long> maxKeyOrphanScanAlertEmitted{0};
+    Atomic<long long> maxKeyOrphanScanErrors{0};
 
     // FTDC metrics for the MaxKey zone inventory scan run by the balancer on config primaries.
     // The *Complete/*FoundBuggyZone/*AlertEmitted fields are 0/1 flags describing the last
     // published scan outcome on this process. *Errors counts non-fatal scan errors.
-    AtomicWord<long long> maxKeyZoneScanComplete{0};
-    AtomicWord<long long> maxKeyZoneScanFoundBuggyZone{0};
-    AtomicWord<long long> maxKeyZoneScanAlertEmitted{0};
-    AtomicWord<long long> maxKeyZoneScanErrors{0};
+    Atomic<long long> maxKeyZoneScanComplete{0};
+    Atomic<long long> maxKeyZoneScanFoundBuggyZone{0};
+    Atomic<long long> maxKeyZoneScanAlertEmitted{0};
+    Atomic<long long> maxKeyZoneScanErrors{0};
 
     CriticalSectionStatistics<DatabaseName> databaseCriticalSectionStatistics;
     CriticalSectionStatistics<NamespaceString> collectionCriticalSectionStatistics;

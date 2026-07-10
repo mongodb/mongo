@@ -49,7 +49,7 @@
 namespace mongo::catalog_stats {
 
 // Number of time-series collections requiring extended range support
-AtomicWord<int> requiresTimeseriesExtendedRangeSupport;
+Atomic<int> requiresTimeseriesExtendedRangeSupport;
 
 namespace {
 class CatalogStatsSSS : public ServerStatusSection {

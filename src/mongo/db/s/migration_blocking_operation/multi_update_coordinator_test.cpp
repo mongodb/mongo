@@ -179,12 +179,12 @@ private:
     SharedPromise<DbResponse> _updateResponse;
     bool _autoCompleteUpdates{true};
     BSONObj _autoCompleteResponse{updateSuccessResponseBSONObj()};
-    AtomicWord<bool> _isUpdatePending{false};
-    AtomicWord<int> _startBlockingMigrationsCount{0};
-    AtomicWord<int> _stopBlockingMigrationsCount{0};
+    Atomic<bool> _isUpdatePending{false};
+    Atomic<int> _startBlockingMigrationsCount{0};
+    Atomic<int> _stopBlockingMigrationsCount{0};
     const InternalSessionPool::Session _session{makeLogicalSessionIdForTest(), 42};
-    AtomicWord<bool> _sessionIsCheckedOut{false};
-    AtomicWord<bool> _migrationsAreBlocked{false};
+    Atomic<bool> _sessionIsCheckedOut{false};
+    Atomic<bool> _migrationsAreBlocked{false};
 
     std::mutex _collectionsLock;
     std::map<NamespaceString, bool> _collections;

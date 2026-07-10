@@ -129,7 +129,7 @@
 #include "mongo/db/views/pipeline_resolver.h"
 #include "mongo/db/views/view.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/query/exec/document_source_merge_cursors.h"

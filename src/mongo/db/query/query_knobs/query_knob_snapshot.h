@@ -184,7 +184,7 @@ private:
     QueryKnobSnapshot _defaults;  // immutable reference for kDefault vs kSetParameter detection
     QueryKnobSnapshot _snapshot;  // live snapshot used by queries
     // Must be wide enough to never wrap over a server's lifetime.
-    alignas(64) AtomicWord<uint64_t> _version{0};
+    alignas(64) Atomic<uint64_t> _version{0};
 };
 
 }  // namespace mongo

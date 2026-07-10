@@ -142,7 +142,7 @@ private:
      * Max size of the queryStats store. Tracked here to avoid having to recompute after it's
      * divided up into partitions.
      */
-    AtomicWord<size_t> _maxSize;
+    Atomic<size_t> _maxSize;
 };
 
 /**

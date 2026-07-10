@@ -42,7 +42,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
@@ -108,9 +108,9 @@ public:
     }
 
 private:
-    AtomicWord<bool> _done;
-    AtomicWord<int64_t> _numResponses;
-    AtomicWord<int64_t> _maxResponses;
+    Atomic<bool> _done;
+    Atomic<int64_t> _numResponses;
+    Atomic<int64_t> _maxResponses;
 };
 
 /**

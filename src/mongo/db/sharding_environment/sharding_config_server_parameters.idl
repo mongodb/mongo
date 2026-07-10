@@ -34,7 +34,7 @@ server_parameters:
         description: >-
             Deprecated. Has no effect on the number of chunks for config.system.sessions collection.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: minNumChunksForSessionsCollection
         default: 1024
         validator: {gte: 1, lte: 1000000}
@@ -45,7 +45,7 @@ server_parameters:
             The minimum amount of time between two consecutive mergeChunks/splitChunk commands
             issued by the balancer when 'configureCollectionBalancing' is invoked on a collection.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: chunkDefragmentationThrottlingMS
         validator:
             gte: 0
@@ -55,7 +55,7 @@ server_parameters:
     autoMergerIntervalSecs:
         description: Time interval in seconds between subsequent auto-merging rounds
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: autoMergerIntervalSecs
         default: 3600 # 1 hour
         redact: false
@@ -64,7 +64,7 @@ server_parameters:
         description: >-
             The minimum amount of time between two consecutive auto-merge commands for the same collection.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: autoMergerThrottlingMS
         validator:
             gte: 0
@@ -78,7 +78,7 @@ server_parameters:
         # not being able to establish a stable shard version.
         description: The minimum amount of time between two consecutive balancing rounds
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: balancerMigrationsThrottlingMs
         default: 1000 # 1 sec
         redact: false
@@ -88,7 +88,7 @@ server_parameters:
             Maximum time in milliseconds the balancer will spend deciding which ranges to move in
             the current balancing round.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: balancerChunksSelectionTimeoutMs
         default: 5000 # 5 seconds
         redact: false
@@ -99,7 +99,7 @@ server_parameters:
             key documents fetched from a replica set when it gets added to the cluster
             as a shard.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gNewShardExistingClusterTimeKeysExpirationSecs
         default:
             expr: 7 * 24 * 3600 # 1 week
@@ -113,7 +113,7 @@ server_parameters:
             The count of sharded collections with inconsistent indexes is exposed via the
             'shardedIndexConsistency' section in the serverStatus output.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: enableShardedIndexConsistencyCheck
         default: true
         redact: false
@@ -131,7 +131,7 @@ server_parameters:
             Maximum time in milliseconds the command mergeAllChunksOnShard scheduled by the
             autoMerger will spend looking for mergeable chunks.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: autoMergerMaxTimeProcessingChunksMS
         default: 500 # 500 milliseconds
         redact: false
@@ -141,7 +141,7 @@ server_parameters:
             The maximum number of chunks merged in a single mergeAllChunksOnShard request
             issued by the auto-merger.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: autoMergerMaxChunksToMerge
         validator:
             gte: 2
@@ -153,7 +153,7 @@ server_parameters:
             Minimum number of entries in config.placementHistory before the periodic cleaner
             attempts to remove stale documents.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: placementHistoryCleanerMinEntries
         default: 100000 # 100k entries
         validator:
@@ -165,7 +165,7 @@ server_parameters:
             Interval in seconds between successive runs of the placement history cleanup job.
             Changes take effect after the next primary step-up.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: placementHistoryCleanerJobIntervalSecs
         default: 86400 # 1 day
         validator:
@@ -177,7 +177,7 @@ server_parameters:
             When set to false the MaxKey zone inventory scan is skipped. Re-enabling it will run
             the scan on next stepup. Has no effect unless featureFlagMaxKeyDetection is enabled.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: gMaxKeyZoneScanEnabled
         default: true
         redact: false

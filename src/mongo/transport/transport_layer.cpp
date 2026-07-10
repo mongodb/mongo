@@ -31,7 +31,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/future_util.h"
 
 #include <cstdint>
@@ -41,7 +41,7 @@ namespace transport {
 
 namespace {
 
-AtomicWord<uint64_t> reactorTimerIdCounter(0);
+Atomic<uint64_t> reactorTimerIdCounter(0);
 
 }  // namespace
 

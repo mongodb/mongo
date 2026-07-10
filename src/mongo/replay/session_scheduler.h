@@ -28,7 +28,7 @@
  */
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/functional.h"
@@ -121,10 +121,10 @@ private:
     std::queue<SessionTask> _tasks;       // The task queue
     std::mutex _queueMutex;               // Synchronizes access to the task queue
     stdx::condition_variable _condition;  // Used for thread synchronization
-    AtomicWord<bool> _stop;               // Indicates whether the pool is stopping
+    Atomic<bool> _stop;                   // Indicates whether the pool is stopping
 
     std::mutex _errorMutex;                   // Synchronizes access to the error vector
     std::vector<std::exception_ptr> _errors;  // List of errors recorded during execution
-    AtomicWord<bool> _hasRecordedErrors;  // Indicates whether the pool has recorded errors or not
+    Atomic<bool> _hasRecordedErrors;  // Indicates whether the pool has recorded errors or not
 };
 }  // namespace mongo

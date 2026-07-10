@@ -34,7 +34,7 @@ server_parameters:
     clientCursorMonitorFrequencySecs:
         description: "Interval at which expired cursors are identified and reaped"
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gClientCursorMonitorFrequencySecs
         default: 4
         redact: false
@@ -42,7 +42,7 @@ server_parameters:
     cursorTimeoutMillis:
         description: "Period of time, in milliseconds, after which mortal cursors are killed for inactivity"
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         cpp_varname: gCursorTimeoutMillis
         default: 600000
         redact: false
@@ -51,7 +51,7 @@ server_parameters:
         description: >-
             Limit the size of the bulkWrite replies. Test-only.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: gBulkWriteMaxRepliesSize
         default:
             expr: 30 * 1024 * 1024

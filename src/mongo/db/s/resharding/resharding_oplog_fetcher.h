@@ -236,7 +236,7 @@ private:
     boost::optional<bool> _supportEstimatingRemainingTimeBasedOnMovingAverage;
 
     int _numOplogEntriesCopied = 0;
-    AtomicWord<bool> _oplogApplicationStarted{false};
+    Atomic<bool> _oplogApplicationStarted{false};
 
     // The mutex that protects all the members below.
     mutable std::mutex _mutex;
@@ -250,7 +250,7 @@ private:
     stdx::condition_variable _batchProcessedCV;
     int _totalNumBatchesProcessed = 0;
 
-    AtomicWord<bool> _isPreparingForCriticalSection;
+    Atomic<bool> _isPreparingForCriticalSection;
     // The cancellation source for the current aggregation.
     boost::optional<CancellationSource> _aggCancelSource;
 

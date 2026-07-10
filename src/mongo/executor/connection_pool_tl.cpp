@@ -92,7 +92,7 @@ MONGO_FAIL_POINT_DEFINE(triggerConnectionSetupHandshakeTimeout);
 
 const auto kMaxTimerDuration = Milliseconds::max();
 struct TimeoutHandler {
-    AtomicWord<bool> done;
+    Atomic<bool> done;
     Promise<void> promise;
 
     explicit TimeoutHandler(Promise<void> p) : promise(std::move(p)) {}
@@ -400,7 +400,7 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string ins
     // SpecificPool::finishRefresh single-drops), whereas a timeout during the authentication step
     // must (-> HostUnreachable, which flushes the pool). Both the timer callback and the
     // continuation that sets it run on _reactor, so the store happens-before any timer read.
-    auto helloDone = std::make_shared<AtomicWord<bool>>(false);
+    auto helloDone = std::make_shared<Atomic<bool>>(false);
 
     if (MONGO_unlikely(triggerConnectionSetupHandshakeTimeout.shouldFail())) {
         triggerConnectionSetupHandshakeTimeout.executeIf(

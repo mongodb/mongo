@@ -66,7 +66,7 @@
 namespace mongo {
 
 [[MONGO_MOD_FILE_PRIVATE]]
-extern const SharedCollectionDecorations::Decoration<AtomicWord<bool>>
+extern const SharedCollectionDecorations::Decoration<Atomic<bool>>
     historicalIDTrackerAllowsMixedModeWrites;
 
 namespace catalog {

@@ -35,7 +35,7 @@ server_parameters:
         description: >-
             Enables detailed log lines related to connection health in a cluster.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: "gEnableDetailedConnectionHealthMetricLogLines"
         default: true
         redact: false

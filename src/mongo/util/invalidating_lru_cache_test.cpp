@@ -31,7 +31,7 @@
 #include "mongo/util/invalidating_lru_cache.h"
 
 #include "mongo/bson/timestamp.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 
@@ -545,7 +545,7 @@ TEST(InvalidatingLRUCacheParallelTest, CacheSizeZeroInsertOrAssignAndGet) {
 }
 
 TEST(InvalidatingLRUCacheParallelTest, AdvanceTime) {
-    AtomicWord<uint64_t> counter{1};
+    Atomic<uint64_t> counter{1};
     std::mutex insertOrAssignMutex;
 
     parallelTest<TestValueCacheCausallyConsistent>(0, [&](auto& cache) {

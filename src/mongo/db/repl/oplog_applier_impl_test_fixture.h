@@ -59,7 +59,7 @@
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"

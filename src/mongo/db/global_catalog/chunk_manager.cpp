@@ -1153,8 +1153,8 @@ RoutingTableHistory RoutingTableHistory::makeUpdated(
                                std::move(chunkMap));
 }
 
-AtomicWord<uint64_t> ComparableChunkVersion::_epochDisambiguatingSequenceNumSource{1ULL};
-AtomicWord<uint64_t> ComparableChunkVersion::_forcedRefreshSequenceNumSource{1ULL};
+Atomic<uint64_t> ComparableChunkVersion::_epochDisambiguatingSequenceNumSource{1ULL};
+Atomic<uint64_t> ComparableChunkVersion::_forcedRefreshSequenceNumSource{1ULL};
 
 ComparableChunkVersion ComparableChunkVersion::makeComparableChunkVersion(
     const ChunkVersion& version) {

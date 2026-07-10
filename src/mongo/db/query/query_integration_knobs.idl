@@ -34,7 +34,7 @@ global:
     cpp_includes:
         - "mongo/db/query/query_knob_expressions.h"
         - "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
-        - "mongo/platform/atomic_word.h"
+        - "mongo/platform/atomic.h"
     mod_visibility: public
 
 structs:
@@ -56,7 +56,7 @@ server_parameters:
             required on 4.4 to access SEARCH_META variables. Does not do anything.
         set_at: [startup, runtime]
         cpp_varname: "enableSearchMeta"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
 
@@ -66,7 +66,7 @@ server_parameters:
             more than zero and less than 16Mb
         set_at: [startup, runtime]
         cpp_varname: "internalQueryFLERewriteMemoryLimit"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default:
             expr: 14 * 1024 * 1024
         validator:
@@ -78,7 +78,7 @@ server_parameters:
         description: "Boolean flag to force FLE to always use low selectivity mode"
         set_at: [startup, runtime]
         cpp_varname: "internalQueryFLEAlwaysUseEncryptedCollScanMode"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default:
             expr: false
         redact: false
@@ -95,7 +95,7 @@ server_parameters:
             internalQueryStatsWriteCmdSampleRate to rate-limit query stats collection for write commands.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryStatsRateLimit"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 0
         validator:
             gte: -1
@@ -115,7 +115,7 @@ server_parameters:
             internalQueryStatsWriteCmdSampleRate to rate-limit query stats collection for write commands.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryStatsSampleRate"
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         default: 0.01
         validator:
             gte: 0.0
@@ -133,7 +133,7 @@ server_parameters:
             approach (window-based not supported).
         set_at: [startup, runtime]
         cpp_varname: "internalQueryStatsWriteCmdSampleRate"
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         default: 0.01
         validator:
             gte: 0.0
@@ -163,7 +163,7 @@ server_parameters:
             immediately fail and report the error. Note that this is always the case for debug builds.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryStatsErrorsAreCommandFatal"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
 
@@ -171,7 +171,7 @@ server_parameters:
         description: "Enables the setProfilingFilterGlobally command."
         set_at: [startup, runtime]
         cpp_varname: internalQueryGlobalProfilingFilter
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
 
@@ -181,7 +181,7 @@ server_parameters:
             system.profile collection.
         set_at: [startup, runtime]
         cpp_varname: internalQueryGlobalProfilingLockDeadlineMs
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 1
         redact: false
         validator:
@@ -195,7 +195,7 @@ server_parameters:
             profiling for the db.
         set_at: [startup, runtime]
         cpp_varname: internalProfilingMaxAbandonedWritesPerSecondPerDb
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 1000
         redact: false
         validator:
@@ -205,7 +205,7 @@ server_parameters:
         description: "If true, collect query optimizer metrics in queryStats."
         set_at: [startup, runtime]
         cpp_varname: internalQueryCollectOptimizerMetrics
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
 

@@ -32,7 +32,7 @@ global:
 server_parameters:
     skipCorruptDocumentsWhenCloning:
         description: "Skip corrupt documents when cloning"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: gSkipCorruptDocumentsWhenCloning
         set_at: [startup, runtime]
         redact: false

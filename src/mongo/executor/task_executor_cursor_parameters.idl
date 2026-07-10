@@ -36,7 +36,7 @@ server_parameters:
             TaskExecutorCursor will `pin` the transport connection it uses to establish
             cursors and re-use that same connection for all subsequent operations on those cursors.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: "gPinTaskExecCursorConns"
         default: true
         redact: false

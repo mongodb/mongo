@@ -34,7 +34,7 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/restriction_environment.h"
 #include "mongo/db/baton.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/message.h"
 #include "mongo/transport/session_id.h"
 #include "mongo/util/decorable.h"

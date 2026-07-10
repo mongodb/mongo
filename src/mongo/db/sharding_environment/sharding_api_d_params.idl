@@ -35,7 +35,7 @@ server_parameters:
             Maximum time in milliseconds to wait on a blocking operation when refreshing the filtering 
             metadata within a transaction.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: metadataRefreshInTransactionMaxWaitMS
         deprecated_name: metadataRefreshInTransactionMaxWaitBehindCritSecMS
         validator:
@@ -49,7 +49,7 @@ server_parameters:
             only a single shard in the cluster. Will have no effect on the behavior in clusters with
             two or more shards.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: directConnectionChecksWithSingleShard
         default: true
         redact: false
@@ -60,7 +60,7 @@ server_parameters:
             direct shard DDL checks. This should only be used in extreme cases, e.g., restore a
             sharded cluster backup to a replica set.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: enableDirectShardDDLOperations
         default: false
         redact: false
@@ -70,7 +70,7 @@ server_parameters:
             Prohibits upgrading from last LTS FCV to last continuous FCV if the replica set contains
             user data during addShard. **Not a supported feature**. For emergency use only.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: disableTransitionFromLastLTSToLastContinuousWithUserData
         default: true
         redact: false
@@ -80,7 +80,7 @@ server_parameters:
             Maximum number of times a shard will retry a ShardRole operation after detecting stale
             or missing sharding metadata.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: maxShardStaleMetadataRetryAttempts
         validator:
             gte: 1
@@ -93,7 +93,7 @@ server_parameters:
             a collection's authoritative collection metadata from the on-disk catalog. Attempts that
             wait for concurrent placement-version work reset this cap.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: maxShardMetadataDiskRecoveryAttempts
         validator:
             gte: 1
@@ -106,7 +106,7 @@ server_parameters:
             Enable logging whether a compound wildcard index prefixed by the shard key exists
             when a shard key index is fetched for a sharded collection.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: enableCompoundWildcardIndexLog
         default: true
         redact: false

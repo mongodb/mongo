@@ -31,7 +31,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/s/router_transactions_stats_gen.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/duration.h"
@@ -57,13 +57,13 @@ public:
     // Cumulative metrics for a particular type of commit that a router can use.
     struct CommitStats {
         // Total number of times this commit was started.
-        AtomicWord<std::int64_t> initiated{0};
+        Atomic<std::int64_t> initiated{0};
 
         // Total number of times this commit completed successfully.
-        AtomicWord<std::int64_t> successful{0};
+        Atomic<std::int64_t> successful{0};
 
         // Total commit duration of successful transactions in microseconds.
-        AtomicWord<std::int64_t> successfulDurationMicros{0};
+        Atomic<std::int64_t> successfulDurationMicros{0};
     };
 
     RouterTransactionsMetrics() = default;
@@ -122,32 +122,32 @@ private:
     CommitTypeStats _constructCommitTypeStats(const CommitStats& stats);
 
     // Total number of currently open transactions.
-    AtomicWord<std::int64_t> _currentOpen{0};
+    Atomic<std::int64_t> _currentOpen{0};
 
     // Total number of currently active transactions.
-    AtomicWord<std::int64_t> _currentActive{0};
+    Atomic<std::int64_t> _currentActive{0};
 
     // Total number of currently inactive transactions.
-    AtomicWord<std::int64_t> _currentInactive{0};
+    Atomic<std::int64_t> _currentInactive{0};
 
     // The total number of multi-document transactions started since the last server startup.
-    AtomicWord<std::int64_t> _totalStarted{0};
+    Atomic<std::int64_t> _totalStarted{0};
 
     // The total number of multi-document transactions that were committed through this router.
-    AtomicWord<std::int64_t> _totalCommitted{0};
+    Atomic<std::int64_t> _totalCommitted{0};
 
     // The total number of multi-document transaction that were aborted by this router.
-    AtomicWord<std::int64_t> _totalAborted{0};
+    Atomic<std::int64_t> _totalAborted{0};
 
     // Total number of shard participants contacted over the course of any transaction, including
     // shards that may not be included in a final participant list.
-    AtomicWord<std::int64_t> _totalContactedParticipants{0};
+    Atomic<std::int64_t> _totalContactedParticipants{0};
 
     // Total number of shard participants included in a participant list at commit.
-    AtomicWord<std::int64_t> _totalParticipantsAtCommit{0};
+    Atomic<std::int64_t> _totalParticipantsAtCommit{0};
 
     // Total number of network requests targeted by mongos as part of a transaction.
-    AtomicWord<std::int64_t> _totalRequestsTargeted{0};
+    Atomic<std::int64_t> _totalRequestsTargeted{0};
 
     // Structs with metrics for each type of commit a router can use.
     CommitStats _noShardsCommitStats;

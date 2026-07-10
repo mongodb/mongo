@@ -33,7 +33,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/system_tick_source.h"
@@ -341,10 +341,10 @@ private:
 
     // Minimum number of bytes the marker being filled should contain before it gets added to the
     // deque of collection markers.
-    AtomicWord<int64_t> _minBytesPerMarker;
+    Atomic<int64_t> _minBytesPerMarker;
 
-    AtomicWord<int64_t> _currentRecords;  // Number of records in the marker being filled.
-    AtomicWord<int64_t> _currentBytes;    // Number of bytes in the marker being filled.
+    Atomic<int64_t> _currentRecords;  // Number of records in the marker being filled.
+    Atomic<int64_t> _currentBytes;    // Number of bytes in the marker being filled.
 
     // Protects against concurrent access to the deque of collection markers and the
     // _initialSamplingFinished variable.
@@ -356,8 +356,8 @@ private:
 
 protected:
     struct PartialMarkerMetrics {
-        AtomicWord<int64_t>* currentRecords;
-        AtomicWord<int64_t>* currentBytes;
+        Atomic<int64_t>* currentRecords;
+        Atomic<int64_t>* currentBytes;
     };
 
     template <typename F>

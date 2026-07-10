@@ -40,7 +40,7 @@
 #include "mongo/db/shard_role/lock_manager/fast_list_based_map.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/lock_manager/lock_stats.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/duration.h"
@@ -123,7 +123,7 @@ public:
      * reference to AtomicLockStats, meaning that they can change at any time after they are
      * returned.
      */
-    using AtomicLockStats = LockStats<AtomicWord<long long>>;
+    using AtomicLockStats = LockStats<Atomic<long long>>;
     const AtomicLockStats& stats() const {
         return _stats;
     }
@@ -833,7 +833,7 @@ protected:
     LockMode _modeForTicket = MODE_NONE;
 
     // Indicates whether the client is active reader/writer or is queued.
-    AtomicWord<ClientState> _clientState{ClientState::kInactive};
+    Atomic<ClientState> _clientState{ClientState::kInactive};
 
     // If true, shared locks will participate in two-phase locking.
     bool _sharedLocksShouldTwoPhaseLock = false;
@@ -855,7 +855,7 @@ protected:
     unsigned char _globalLockMode = (1 << MODE_NONE);
 
     // Tracks whether this operation should be killed on step down.
-    AtomicWord<bool> _wasGlobalLockTakenInModeConflictingWithWrites{false};
+    Atomic<bool> _wasGlobalLockTakenInModeConflictingWithWrites{false};
 
     // If isValid(), the ResourceId of the resource currently waiting for the lock. If not valid,
     // there is no resource currently waiting.

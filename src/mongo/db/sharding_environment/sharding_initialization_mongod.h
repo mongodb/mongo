@@ -126,7 +126,7 @@ private:
         return "ShardingInitializationMongoD";
     }
 
-    AtomicWord<bool> _isPrimary;
+    Atomic<bool> _isPrimary;
 
     // This mutex ensures that only one thread at a time executes the sharding
     // initialization/teardown sequence

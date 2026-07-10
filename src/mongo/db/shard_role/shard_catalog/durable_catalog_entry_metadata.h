@@ -34,7 +34,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
@@ -128,7 +128,7 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] CatalogEntryMetaData {
         mutable std::mutex multikeyMutex;
         mutable bool multikey = false;
         mutable MultikeyPaths multikeyPaths;
-        mutable AtomicWord<int32_t> concurrentWriters;
+        mutable Atomic<int32_t> concurrentWriters;
     };
 
 

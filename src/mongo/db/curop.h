@@ -57,7 +57,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log_options.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/message.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -906,7 +906,7 @@ private:
     std::string _failPointMessage;  // Used to store FailPoint information.
     std::string _message;
     boost::optional<ProgressMeter> _progressMeter;
-    AtomicWord<int> _numYields{0};
+    Atomic<int> _numYields{0};
     // A GenericCursor containing information about the active cursor for a getMore operation.
     boost::optional<GenericCursor> _genericCursor;
 
@@ -957,8 +957,8 @@ private:
     // from the operation context and curop::reportState.
     // These metrics refer to local memory use, i.e. on a mongos process, as opposed to rolling up
     // memory from shards.
-    AtomicWord<int64_t> _inUseTrackedMemoryBytes{0};
-    AtomicWord<int64_t> _peakTrackedMemoryBytes{0};
+    Atomic<int64_t> _inUseTrackedMemoryBytes{0};
+    Atomic<int64_t> _peakTrackedMemoryBytes{0};
 
     // Long running queries are logged only once to avoid excessive logging.
     bool _eligibleForLongRunningQueryLogging{true};

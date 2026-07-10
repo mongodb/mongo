@@ -3649,7 +3649,7 @@ TEST_F(ReplCoordTest, HelloReturnsErrorOnEnteringQuiesceModeAfterWaitingTimesOut
     auto maxAwaitTime = Milliseconds(5000);
     auto deadline = getNet()->now() + maxAwaitTime;
 
-    AtomicWord<bool> helloReturned{false};
+    Atomic<bool> helloReturned{false};
     stdx::thread getHelloThread([&] {
         ASSERT_THROWS_CODE(
             awaitHelloWithNewOpCtx(getReplCoord(), currentTopologyVersion, {}, deadline),
@@ -3706,7 +3706,7 @@ TEST_F(ReplCoordTest, AlwaysDecrementNumAwaitingTopologyChangesOnErrorMongoD) {
     auto deadline = getNet()->now() + Milliseconds(5000);
     auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
 
-    AtomicWord<bool> helloReturned{false};
+    Atomic<bool> helloReturned{false};
     stdx::thread getHelloThread([&] {
         ASSERT_THROWS_CODE(
             awaitHelloWithNewOpCtx(getReplCoord(), currentTopologyVersion, {}, deadline),
@@ -4236,7 +4236,7 @@ TEST_F(ReplCoordTest, AwaitableHelloOnNodeWithUninitializedConfig) {
     auto halfwayToDeadline = getNet()->now() + maxAwaitTime / 2;
     auto deadline = getNet()->now() + maxAwaitTime;
 
-    AtomicWord<bool> isHelloReturned{false};
+    Atomic<bool> isHelloReturned{false};
     stdx::thread awaitHelloTimeout([&] {
         const auto expectedTopologyVersion = getTopoCoord().getTopologyVersion();
         const auto response =
@@ -4719,7 +4719,7 @@ TEST_F(ReplCoordTest, HelloOnRemovedNode) {
     ASSERT_EQUALS(responseTopologyVersion->getCounter(), currentTopologyVersion.getCounter());
     ASSERT_FALSE(response->isWritablePrimary());
 
-    AtomicWord<bool> helloReturned{false};
+    Atomic<bool> helloReturned{false};
     // A request with an equal TopologyVersion should wait and timeout once the deadline is reached.
     const auto halfwayToDeadline = getNet()->now() + maxAwaitTime / 2;
     stdx::thread getHelloThread([&, deadline] {

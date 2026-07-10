@@ -34,7 +34,7 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_with_storage_test_structs_gen.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -48,10 +48,10 @@ constexpr std::int32_t kStartupIntWithExpressionsMinimum = 10;
 constexpr std::int32_t kStartupIntWithExpressionsMaximum = 1000;
 
 // Storage for set parameter defined in server_parameter_with_storage.idl
-extern AtomicWord<int> gStdIntPreallocated;
+extern Atomic<int> gStdIntPreallocated;
 
 // Counter for how many times gStdIntPreallocated has been modified.
-extern AtomicWord<int> gStdIntPreallocatedUpdateCount;
+extern Atomic<int> gStdIntPreallocatedUpdateCount;
 
 // Counter for how many times changeStreamOptions has been modified.
 extern size_t count;

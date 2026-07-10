@@ -45,7 +45,7 @@ namespace mongo::repl {
 // ServiceContext::make() time (via ConstructorActionRegisterer), which runs after
 // runGlobalInitializers() — meaning --setParameter has already been applied. Calling setDefault at
 // that point would silently clobber any explicit operator configuration.
-AtomicWord<bool> oplogApplicationEnforcesSteadyStateConstraintsInitializedUsingDefault{true};
+Atomic<bool> oplogApplicationEnforcesSteadyStateConstraintsInitializedUsingDefault{true};
 
 Status onOplogApplicationEnforcesSteadyStateConstraintsUpdate(bool) {
     oplogApplicationEnforcesSteadyStateConstraintsInitializedUsingDefault.store(false);

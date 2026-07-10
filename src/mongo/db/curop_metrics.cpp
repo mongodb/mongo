@@ -39,7 +39,7 @@
 #include "mongo/otel/metrics/metric_unit.h"
 #include "mongo/otel/metrics/metrics_counter.h"
 #include "mongo/otel/metrics/metrics_service.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 
 #include <memory>
 
@@ -85,7 +85,7 @@ void incrCounter(Counter64* stat, const T& in) {
 
 /** If `in` is an atomic, load it and increment by that value. */
 template <typename T>
-void incrCounter(Counter64* stat, const AtomicWord<T>& in) {
+void incrCounter(Counter64* stat, const Atomic<T>& in) {
     incrCounter(stat, in.load());
 }
 

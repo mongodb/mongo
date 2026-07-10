@@ -31,7 +31,7 @@
 
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 #include <mutex>
@@ -95,12 +95,12 @@ private:
     // the same severity as kDefault.
     // This is also used to update the severities of unconfigured components when the severity
     // for kDefault is modified.
-    AtomicWord<bool> _hasMinimumLoggedSeverity[LogComponent::kNumLogComponents];
+    Atomic<bool> _hasMinimumLoggedSeverity[LogComponent::kNumLogComponents];
 
     // Log severities for components.
     // Store numerical values of severities to be cache-line friendly.
     // Set to kDefault minimum logged severity if _hasMinimumLoggedSeverity[i] is false.
-    AtomicWord<int> _minimumLoggedSeverity[LogComponent::kNumLogComponents];
+    Atomic<int> _minimumLoggedSeverity[LogComponent::kNumLogComponents];
 };
 
 }  // namespace mongo::logv2

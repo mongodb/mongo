@@ -201,7 +201,7 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
 
 TEST_F(TimestampKVEngineTest, TimestampAdvancesOnNotification) {
     Timestamp previous = Timestamp();
-    AtomicWord<int> timesNotified{0};
+    Atomic<int> timesNotified{0};
 
     TimestampListener listener([&](OperationContext* opCtx, const Timestamps& timestamps) {
         ASSERT_TRUE(previous < timestamps.stable);

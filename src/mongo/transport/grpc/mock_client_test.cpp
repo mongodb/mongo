@@ -226,7 +226,7 @@ TEST_F(MockClientTest, MockNoAuthToken) {
 
 TEST_F(MockClientTest, MockClientShutdown) {
     const int kNumRpcs = 10;
-    AtomicWord<int> numRpcsRemaining(kNumRpcs);
+    Atomic<int> numRpcsRemaining(kNumRpcs);
     Notification<void> rpcsFinished;
 
     auto serverHandler = [&](HostAndPort local, std::shared_ptr<IngressSession> session) {

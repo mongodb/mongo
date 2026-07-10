@@ -31,7 +31,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/decorable.h"
 
 #include <utility>
@@ -42,8 +42,7 @@ namespace {
 const auto getLogicalSessionCache =
     ServiceContext::declareDecoration<std::unique_ptr<LogicalSessionCache>>();
 
-const auto getLogicalSessionCacheIsRegistered =
-    ServiceContext::declareDecoration<AtomicWord<bool>>();
+const auto getLogicalSessionCacheIsRegistered = ServiceContext::declareDecoration<Atomic<bool>>();
 }  // namespace
 
 LogicalSessionCache::~LogicalSessionCache() = default;

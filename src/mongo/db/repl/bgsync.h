@@ -44,7 +44,7 @@
 #include "mongo/db/repl/rollback_impl.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_source_resolver.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -264,7 +264,7 @@ private:
 
     // Flag that marks whether a node's oplog has no common point with any
     // potential sync sources.
-    AtomicWord<bool> _tooStale{false};  // (S)
+    Atomic<bool> _tooStale{false};  // (S)
 
     ProducerState _state = ProducerState::Starting;  // (M)
 

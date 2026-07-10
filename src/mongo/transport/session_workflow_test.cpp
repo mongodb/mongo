@@ -59,7 +59,7 @@
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/legacy_reply.h"
@@ -210,7 +210,7 @@ template <Event e>
 using EventResultT = typename EventTraits<e>::result_type;
 
 Message makeOpMsg() {
-    static auto nextId = AtomicWord<int>{0};
+    static auto nextId = Atomic<int>{0};
     auto omb = OpMsgBuilder{};
     omb.setBody(BSONObjBuilder{}.append("id", nextId.fetchAndAdd(1)).obj());
     return omb.finish();

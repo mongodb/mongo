@@ -39,7 +39,7 @@
 #include "mongo/db/s/transaction_coordinator.h"
 #include "mongo/db/s/transaction_coordinators_stats_gen.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 
 #include <cstdint>
 #include <memory>
@@ -84,22 +84,22 @@ public:
 private:
     // The total number of transaction coordinators created on this process since the process's
     // inception.
-    AtomicWord<std::int64_t> _totalCreated{0};
+    Atomic<std::int64_t> _totalCreated{0};
 
     // The total number of transaction coordinators on this process that started a two-phase commit
     // since the process's inception.
-    AtomicWord<std::int64_t> _totalStartedTwoPhaseCommit{0};
+    Atomic<std::int64_t> _totalStartedTwoPhaseCommit{0};
 
     // The total number of transaction coordinators on this process that aborted a two-phase commit
     // since the process's inception.
-    AtomicWord<std::int64_t> _totalAbortedTwoPhaseCommit{0};
+    Atomic<std::int64_t> _totalAbortedTwoPhaseCommit{0};
 
     // The total number of transaction coordinators on this process that committed a two-phase
     // commit since the process's inception.
-    AtomicWord<std::int64_t> _totalSuccessfulTwoPhaseCommit{0};
+    Atomic<std::int64_t> _totalSuccessfulTwoPhaseCommit{0};
 
     // The number of transaction coordinators currently in the given step
-    std::array<AtomicWord<std::int64_t>,
+    std::array<Atomic<std::int64_t>,
                static_cast<size_t>(TransactionCoordinator::Step::kLastStep) + 1>
         _totalInStep;
 };

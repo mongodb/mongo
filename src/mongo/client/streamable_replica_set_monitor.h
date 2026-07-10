@@ -50,7 +50,7 @@
 #include "mongo/executor/egress_connection_closer.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -229,7 +229,7 @@ private:
         // Used to compute latency.
         Date_t start;
 
-        AtomicWord<bool> done{false};
+        Atomic<bool> done{false};
 
         Promise<std::vector<HostAndPort>> promise;
     };
@@ -340,7 +340,7 @@ private:
     std::shared_ptr<executor::EgressConnectionCloser> _connectionManager;
     std::shared_ptr<executor::TaskExecutor> _executor;
 
-    AtomicWord<bool> _isDropped{true};
+    Atomic<bool> _isDropped{true};
 
     mutable ObservableMutex<std::mutex> _mutex;
     std::list<HostQueryPtr> _outstandingQueries;

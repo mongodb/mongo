@@ -36,7 +36,7 @@
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/s/sharding_task_executor_pool_controller.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/ssl_connection_context.h"
@@ -122,7 +122,7 @@ private:
     std::string _instanceName;
 
     mutable ObservableMutex<std::mutex> _mutex;
-    AtomicWord<bool> _inShutdown{false};
+    Atomic<bool> _inShutdown{false};
     stdx::unordered_set<Type*> _collars;
 };
 

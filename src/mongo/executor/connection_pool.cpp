@@ -36,7 +36,7 @@
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity_suppressor.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/debug_util.h"
@@ -648,9 +648,9 @@ private:
     // connections in the processing pool that are establising for the first time.
     size_t _establishedConnectionsReprocessing = 0;
 
-    AtomicWord<size_t> _neverUsed{0};
+    Atomic<size_t> _neverUsed{0};
 
-    AtomicWord<size_t> _usedOnce{0};
+    Atomic<size_t> _usedOnce{0};
 
     Milliseconds _totalConnUsageTime{0};
 

@@ -66,7 +66,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"

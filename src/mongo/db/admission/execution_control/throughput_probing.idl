@@ -35,7 +35,7 @@ server_parameters:
     throughputProbingStepMultiple:
         description: "The step size for throughput probing is this multiple of the current concurrency"
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         cpp_varname: gStepMultiple
         default: 0.1
         validator:
@@ -63,7 +63,7 @@ server_parameters:
             The minimum number of concurrent read/write transactions for throughput probing. This minimum
             is applied to reads and writes separately.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: gMinConcurrency
         default: 4
         validator:
@@ -75,7 +75,7 @@ server_parameters:
             The maximum number of concurrent read/write transactions for throughput probing. This maximum
             is applied to reads and writes separately.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: gMaxConcurrency
         default: 128
         validator:
@@ -87,7 +87,7 @@ server_parameters:
             The ratio of reads/writes when using throughput probing. A value of 0.5 indicates a 1:1 ratio,
             while a value greater than 0.5 favors reads and a value less than 0.5 favors writes.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         cpp_varname: gReadWriteRatio
         default: 0.5
         validator:
@@ -101,7 +101,7 @@ server_parameters:
             average. Higher values respond faster to changes, but with more variability. Lower values
             respond slower, but with less variability.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         cpp_varname: gConcurrencyMovingAverageWeight
         default: 0.2
         validator:
@@ -113,7 +113,7 @@ server_parameters:
         description: >-
             How long we wait until we report a stall
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: gStallDetectionTimeoutMs
         default: 60000
         validator:
@@ -124,7 +124,7 @@ server_parameters:
         description: >-
             The interval in milliseconds in which to run the concurrency adjustment algorithm.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: gConcurrencyAdjustmentIntervalMillis
         deprecated_name:
             - storageEngineConcurrencyAdjustmentIntervalMillis

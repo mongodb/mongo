@@ -28,15 +28,15 @@
  */
 
 #include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/processinfo.h"
 
 #include <cstdint>
 
 namespace mongo {
 
-AtomicWord<long long> gTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes{-1};
-AtomicWord<long long> gTimeseriesSideBucketCatalogMemoryUsageThresholdBytes{104857600};  // 100MB
+Atomic<long long> gTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes{-1};
+Atomic<long long> gTimeseriesSideBucketCatalogMemoryUsageThresholdBytes{104857600};  // 100MB
 
 uint64_t getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes() {
     long long userValue = gTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes.load();

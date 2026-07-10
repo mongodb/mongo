@@ -418,7 +418,7 @@ private:
     // Whether or not this InListData has been "shared". Once an InListData transitions to the
     // "shared" state, it cannot be modified and will remain in the "shared" state for the res
     // of its lifetime.
-    mutable AtomicWord<bool> _shared{false};
+    mutable Atomic<bool> _shared{false};
 
     // An optional BSON array field. If this field is not boost::none, it will point to a BSON array
     // that contains all of the BSONElements from '_originalElements'.

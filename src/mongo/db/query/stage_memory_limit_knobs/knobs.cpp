@@ -35,7 +35,7 @@ namespace mongo {
 
 namespace {
 
-AtomicWord<long long>& getMemoryLimitKnob(StageMemoryLimit stage) {
+Atomic<long long>& getMemoryLimitKnob(StageMemoryLimit stage) {
     switch (stage) {
         case StageMemoryLimit::DocumentSourceLookupCacheSizeBytes:
             return internalDocumentSourceLookupCacheSizeBytes;

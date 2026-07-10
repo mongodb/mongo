@@ -37,7 +37,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/unittest/unittest.h"
@@ -317,7 +317,7 @@ TEST_F(MongosTopoCoordTest, AlwaysDecrementNumAwaitingTopologyChangesOnErrorMong
     auto deadline = now() + maxAwaitTime;
     auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
 
-    AtomicWord<bool> helloReturned{false};
+    Atomic<bool> helloReturned{false};
     stdx::thread getHelloThread([&] {
         Client::setCurrent(getServiceContext()->getService()->makeClient("getHelloThread"));
         auto threadOpCtx = cc().makeOperationContext();

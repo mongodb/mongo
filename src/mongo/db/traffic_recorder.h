@@ -36,7 +36,6 @@
 #include "mongo/db/traffic_recorder_event.h"
 #include "mongo/db/traffic_recorder_gen.h"
 #include "mongo/platform/atomic.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/session.h"
@@ -187,8 +186,8 @@ protected:
             return _scheduledTimes;
         }
 
-        AtomicWord<uint64_t> order{0};
-        AtomicWord<Microseconds> startTime{
+        Atomic<uint64_t> order{0};
+        Atomic<Microseconds> startTime{
             Microseconds::zero()};  // Start time of the recording in microseconds since the epoch.
     protected:
         struct CostFunction {
@@ -253,7 +252,7 @@ protected:
 
     std::shared_ptr<Recording> _getCurrentRecording() const;
 
-    AtomicWord<bool> _shouldRecord = false;
+    Atomic<bool> _shouldRecord = false;
 
     mongo::synchronized_value<std::shared_ptr<Recording>> _recording;
     std::unique_ptr<TaskScheduler> _worker = nullptr;

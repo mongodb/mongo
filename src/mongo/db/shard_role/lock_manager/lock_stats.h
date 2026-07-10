@@ -84,7 +84,7 @@ struct [[MONGO_MOD_PUBLIC]] LockStatCounters {
  * Templatized lock statistics management class, which can be specialized with atomic integers
  * for the global stats and with regular integers for the per-locker stats.
  *
- * CounterType allows the code to operate on both int64_t and AtomicWord<long long>
+ * CounterType allows the code to operate on both int64_t and Atomic<long long>
  */
 template <typename CounterType>
 class [[MONGO_MOD_PUBLIC]] LockStats {

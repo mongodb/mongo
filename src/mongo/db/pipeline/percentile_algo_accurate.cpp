@@ -34,7 +34,7 @@
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/sorter/file_based_spiller.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 
 #include <algorithm>
 #include <cmath>
@@ -55,7 +55,7 @@ using std::vector;
  */
 namespace {
 std::string nextFileName() {
-    static AtomicWord<unsigned> percentileAccumulatorFileCounter;
+    static Atomic<unsigned> percentileAccumulatorFileCounter;
     return "percentile-accumulator." +
         std::to_string(percentileAccumulatorFileCounter.fetchAndAdd(1));
 }

@@ -58,7 +58,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
@@ -512,7 +512,7 @@ private:
         // set it from a const method on the Collection. In order to do this, we need to make it
         // mutable. Given that the value may only transition from false to true, but never back
         // again, and that we store and retrieve it atomically, this should be safe.
-        mutable AtomicWord<bool> _requiresTimeseriesExtendedRangeSupport{false};
+        mutable Atomic<bool> _requiresTimeseriesExtendedRangeSupport{false};
     };
 
     NamespaceString _ns;

@@ -142,7 +142,7 @@ private:
     int _activeCursors;                  // (M)
     int _openConsumers;                  // (M)
     Status _finalResult = Status::OK();  // (M)
-    AtomicWord<bool> _failPointHit;
+    Atomic<bool> _failPointHit;
     stdx::condition_variable _allProducerConsumerClosed;
     ReshardingMetrics* _metrics;
 };

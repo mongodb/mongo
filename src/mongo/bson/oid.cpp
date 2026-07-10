@@ -33,7 +33,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/str.h"
@@ -50,7 +50,7 @@
 namespace mongo {
 
 namespace {
-std::unique_ptr<AtomicWord<int64_t>> counter;
+std::unique_ptr<Atomic<int64_t>> counter;
 
 const std::size_t kTimestampOffset = 0;
 const std::size_t kInstanceUniqueOffset = kTimestampOffset + OID::kTimestampSize;
@@ -66,7 +66,7 @@ bool isHexit(char c) {
 MONGO_INITIALIZER_GENERAL(OIDGeneration, (), ("default"))
 (InitializerContext* context) {
     SecureRandom entropy;
-    counter = std::make_unique<AtomicWord<int64_t>>(entropy.nextInt64());
+    counter = std::make_unique<Atomic<int64_t>>(entropy.nextInt64());
     _instanceUnique = OID::InstanceUnique::generate(entropy);
 }
 

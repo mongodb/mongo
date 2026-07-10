@@ -314,7 +314,7 @@ private:
      */
     bool _exceedsMaxSizeBytes();
 
-    AtomicWord<bool> _isPrimary{false};
+    Atomic<bool> _isPrimary{false};
 
     mutable std::mutex _mutex;
 

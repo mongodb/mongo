@@ -36,7 +36,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/tools/workload_simulation/simulation.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/options_parser/environment.h"

@@ -37,7 +37,7 @@ server_parameters:
         description: "This parameter will be removed in the new version"
         set_at: [startup, runtime]
         cpp_varname: gTestRemovedParameter
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 100
         validator: {gte: 0}
         redact: false

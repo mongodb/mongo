@@ -89,7 +89,7 @@ server_parameters:
         description: "The maximum number of connections that the MirrorMaestro connection pool can keep open"
         set_at: [startup, runtime]
         cpp_varname: "gMirrorMaestroConnPoolMaxSize"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         validator:
             gte: 1
         default: 4

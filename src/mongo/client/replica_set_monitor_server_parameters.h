@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/str.h"
 
 #include <string>

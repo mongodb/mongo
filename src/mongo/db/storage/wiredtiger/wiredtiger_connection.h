@@ -32,7 +32,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_compiled_configuration.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_managed_session.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_snapshot_manager.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/interruptible.h"
@@ -270,7 +270,7 @@ private:
     //   Bit 30 is set iff the in-progress shutdown is a kCleanShutdown (the WT_CONNECTION will be
     //     torn down). Set together with kShuttingDownMask; cleared by restart().
     //   Bit 31 is set if and only if we're shutting down.
-    AtomicWord<unsigned> _shuttingDown{0};
+    Atomic<unsigned> _shuttingDown{0};
     static const uint32_t kShuttingDownMask = 1u << 31;
     static const uint32_t kCleanShutdownMask = 1u << 30;
 
@@ -286,13 +286,13 @@ private:
     //      the cursor immediately without caching to prevent leaking the cursor since the cursor is
     //      no longer tracked.
     //  The engine epoch takes precedence over the RTS epoch and should be checked first.
-    AtomicWord<unsigned long long> _engineEpoch;  // atomic so we can check it outside of the lock
-    AtomicWord<unsigned long long> _rtsEpoch;     // atomic so we can check it outside of the lock
+    Atomic<unsigned long long> _engineEpoch;  // atomic so we can check it outside of the lock
+    Atomic<unsigned long long> _rtsEpoch;     // atomic so we can check it outside of the lock
 
     // Mutex and cond var for waiting on prepare commit or abort.
     std::mutex _prepareCommittedOrAbortedMutex;
     stdx::condition_variable _prepareCommittedOrAbortedCond;
-    AtomicWord<std::uint64_t> _prepareCommitOrAbortCounter{0};
+    Atomic<std::uint64_t> _prepareCommitOrAbortCounter{0};
 
     Atomic<int> _openSessions{0};
     Atomic<int> _openUserSessions{0};

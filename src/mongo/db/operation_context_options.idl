@@ -36,7 +36,7 @@ server_parameters:
             The interval in milliseconds after which an interrupt check is considered overdue.
             Interrupt checks are only tracked for a sample of operations.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: gOverdueInterruptCheckIntervalMillis
         default: 30
         validator:
@@ -47,7 +47,7 @@ server_parameters:
         description: >-
             The fraction of operations where time between interrupt checks are tracked.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         cpp_varname: gOverdueInterruptCheckSamplingRate
         default: 0.001
         validator:

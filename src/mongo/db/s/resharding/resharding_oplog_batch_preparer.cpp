@@ -43,7 +43,7 @@
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/redaction.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

@@ -37,7 +37,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -121,10 +121,10 @@ private:
     // (S) Self-synchronizing; access in any way from any context.
 
     // Whether the logAction call should attempt to create the actionlog collection
-    AtomicWord<int> _actionLogCollectionCreated{0};  // (S)
+    Atomic<int> _actionLogCollectionCreated{0};  // (S)
 
     // Whether the logChange call should attempt to create the changelog collection
-    AtomicWord<int> _changeLogCollectionCreated{0};  // (S)
+    Atomic<int> _changeLogCollectionCreated{0};  // (S)
 };
 
 }  // namespace mongo

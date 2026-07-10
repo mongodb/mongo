@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 
 namespace mongo::test {
-AtomicWord<int> gStdIntPreallocated;
-AtomicWord<int> gStdIntPreallocatedUpdateCount;
+Atomic<int> gStdIntPreallocated;
+Atomic<int> gStdIntPreallocatedUpdateCount;
 size_t count;
 
 }  // namespace mongo::test

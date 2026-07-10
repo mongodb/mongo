@@ -29,7 +29,7 @@
 
 #include "mongo/db/admission/execution_control/in_progress_time_accumulator.h"
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
@@ -153,9 +153,9 @@ TEST(InProgressTimeAccumulatorConcurrencyTest, ConcurrentWritersAndReaders) {
     constexpr int kReaders = 4;
     constexpr int kIterations = 20000;
 
-    AtomicWord<bool> readersShouldStop{false};
-    AtomicWord<bool> sawNegativeCount{false};
-    AtomicWord<bool> sawNonMonotonicTotal{false};
+    Atomic<bool> readersShouldStop{false};
+    Atomic<bool> sawNegativeCount{false};
+    Atomic<bool> sawNonMonotonicTotal{false};
 
     // Release all threads to hit the accumulator at once, maximizing contention/overlap.
     unittest::Barrier barrier(kWriters + kReaders);

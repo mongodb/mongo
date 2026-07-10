@@ -798,7 +798,7 @@ void ScopedDbConnection::clearPool() {
     globalConnPool.clear();
 }
 
-AtomicWord<int> AScopedConnection::_numConnections;
+Atomic<int> AScopedConnection::_numConnections;
 
 MONGO_INITIALIZER(SetupDBClientBaseWithConnection)(InitializerContext*) {
     DBClientBase::withConnection_do_not_use = [](std::string host,

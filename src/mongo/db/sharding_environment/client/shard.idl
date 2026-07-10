@@ -35,7 +35,7 @@ server_parameters:
             Prohibit retrying shard operations.
         set_at: [startup, runtime]
         default: false
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: gInternalProhibitShardOperationRetry
         redact: false
 
@@ -43,7 +43,7 @@ server_parameters:
         description: >-
             The timeout for find operations against config.chunks.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: gFindChunksOnConfigTimeoutMS
         default: 900000
         validator:
@@ -54,7 +54,7 @@ server_parameters:
         description: >-
             The timeout for find operations against config.shards.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: gFindShardsOnConfigTimeoutMS
         default: 20000
         validator:
@@ -64,7 +64,7 @@ server_parameters:
     defaultConfigCommandTimeoutMS:
         description: Default timeout used for operations run against the config server.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: defaultConfigCommandTimeoutMS
         # Default to 30 seconds
         default: 30000

@@ -71,7 +71,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/views/util.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -114,9 +114,9 @@ MONGO_FAIL_POINT_DEFINE(failToCreatePITCollectionFromDropPendingIdent);
  * timestamped collection creation followed by untimestamped drop) that violates wiredtiger's
  * timestamp rules.
  */
-const SharedCollectionDecorations::Decoration<AtomicWord<bool>>
+const SharedCollectionDecorations::Decoration<Atomic<bool>>
     historicalIDTrackerAllowsMixedModeWrites =
-        SharedCollectionDecorations::declareDecoration<AtomicWord<bool>>();
+        SharedCollectionDecorations::declareDecoration<Atomic<bool>>();
 
 namespace catalog {
 void initializeCollectionCatalog(OperationContext* opCtx, StorageEngine* engine) {
@@ -393,7 +393,7 @@ public:
         return section.obj();
     }
 
-    AtomicWord<long long> numScansDueToMissingMapping;
+    Atomic<long long> numScansDueToMissingMapping;
 };
 
 auto& gCollectionCatalogSection =

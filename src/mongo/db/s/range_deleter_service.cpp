@@ -62,7 +62,7 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/decorable.h"

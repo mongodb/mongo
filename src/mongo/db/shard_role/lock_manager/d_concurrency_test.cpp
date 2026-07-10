@@ -53,7 +53,7 @@
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -193,7 +193,7 @@ TEST_F(DConcurrencyTestFixture, ResourceMutex) {
         void waitFor(int n) {
             waitFor([this, n]() { return this->step.load() == n; });
         }
-        AtomicWord<int> step{0};
+        Atomic<int> step{0};
     } state;
 
     stdx::thread t1([&]() {
@@ -1356,7 +1356,7 @@ TEST_F(DConcurrencyTestFixture, Stress) {
     std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
         clients = makeKClientsWithLockers(kMaxStressThreads);
 
-    AtomicWord<int> ready{0};
+    Atomic<int> ready{0};
     std::vector<stdx::thread> threads;
 
     DatabaseName fooDb = DatabaseName::createDatabaseName_forTest(boost::none, "foo");
@@ -1491,7 +1491,7 @@ TEST_F(DConcurrencyTestFixture, StressPartitioned) {
     std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
         clients = makeKClientsWithLockers(kMaxStressThreads);
 
-    AtomicWord<int> ready{0};
+    Atomic<int> ready{0};
     std::vector<stdx::thread> threads;
 
     for (int threadId = 0; threadId < kMaxStressThreads; threadId++) {
@@ -2191,8 +2191,8 @@ TEST_F(DConcurrencyTestFixture, CompatibleFirstWithXSXIXIS) {
 TEST_F(DConcurrencyTestFixture, CompatibleFirstStress) {
     int numThreads = 8;
     int testMicros = 500'000;
-    AtomicWord<unsigned long long> readOnlyInterval{0};
-    AtomicWord<bool> done{false};
+    Atomic<unsigned long long> readOnlyInterval{0};
+    Atomic<bool> done{false};
     std::vector<uint64_t> acquisitionCount(numThreads);
     std::vector<uint64_t> timeoutCount(numThreads);
     std::vector<uint64_t> busyWaitCount(numThreads);
@@ -2656,7 +2656,7 @@ TEST_F(DConcurrencyTestFixture, CollectionLockWithCallback_ActionCalledWhenConte
     boost::optional<Lock::CollectionLock> collLock1;
     collLock1.emplace(opCtx1, collNss, MODE_X);
 
-    AtomicWord<bool> actionCalled{false};
+    Atomic<bool> actionCalled{false};
     stdx::thread t2([&] {
         Lock::GlobalLock globalLock2(opCtx2, MODE_IS);
         Lock::DBLock dbLock2(opCtx2, collNss.dbName(), MODE_IS);
@@ -2691,7 +2691,7 @@ TEST_F(DConcurrencyTestFixture, CollectionLockWithCallback_ActionCalledThenTimeo
     Lock::DBLock dbLock1(opCtx1, collNss.dbName(), MODE_IX);
     Lock::CollectionLock collLock1(opCtx1, collNss, MODE_X);
 
-    AtomicWord<bool> actionCalled{false};
+    Atomic<bool> actionCalled{false};
     stdx::thread t2([&] {
         Lock::GlobalLock globalLock2(opCtx2, MODE_IS);
         Lock::DBLock dbLock2(opCtx2, collNss.dbName(), MODE_IS);
@@ -2829,7 +2829,7 @@ TEST_F(DConcurrencyTestFixture, GetConflictingLockerIds_MultipleIXHoldersConflic
 
     // Use the callback to get the MODE_S conflict with MODE_IX list.
     std::vector<LockerId> capturedIds;
-    AtomicWord<bool> callbackDone{false};
+    Atomic<bool> callbackDone{false};
     stdx::thread t([&] {
         Lock::GlobalLock queryGlobal(queryOpCtx, MODE_IS);
         Lock::DBLock queryDb(queryOpCtx, collNss.dbName(), MODE_IS);

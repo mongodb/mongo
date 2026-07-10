@@ -132,7 +132,7 @@ public:
 } unusedLockCleaner;
 
 // Dispenses unique LockerId identifiers
-AtomicWord<LockerId> idCounter(0);
+Atomic<LockerId> idCounter(0);
 
 // Tracks lock statistics across all Locker instances. Distributes stats across multiple buckets
 // indexed by LockerId in order to minimize concurrent access conflicts.

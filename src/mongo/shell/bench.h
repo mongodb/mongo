@@ -39,7 +39,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
@@ -482,8 +482,8 @@ private:
     unsigned _numUnstartedWorkers;
     unsigned _numActiveWorkers;
 
-    AtomicWord<unsigned> _isShuttingDown;
-    AtomicWord<unsigned> _isCollectingStats;
+    Atomic<unsigned> _isShuttingDown;
+    Atomic<unsigned> _isCollectingStats;
 };
 
 /**

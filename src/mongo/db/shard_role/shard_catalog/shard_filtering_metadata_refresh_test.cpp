@@ -1576,7 +1576,7 @@ TEST_F(RefreshCancellationFixture, InterruptIncompatibleRefreshesWaitsForDrain) 
     setDbPrimaryShardForTest(opCtx, kTestNss, kMyShardName, Timestamp(2, 0));
     unittest::ServerParameterGuard authoritativeScope("featureFlagAuthoritativeShardsCRUD", true);
 
-    AtomicWord<bool> interruptFinished{false};
+    Atomic<bool> interruptFinished{false};
     stdx::thread interruptThread([&] {
         auto client = getGlobalServiceContext()->getService()->makeClient("bgInterrupt");
         auto interruptOpCtx = client->makeOperationContext();

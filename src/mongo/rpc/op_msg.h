@@ -37,7 +37,7 @@
 #include "mongo/db/auth/validated_tenancy_scope_factory.h"
 #include "mongo/db/database_name_util.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/telemetry_context_section_gen.h"
 #include "mongo/util/assert_util.h"
@@ -313,7 +313,7 @@ public:
      * the server handles them. Is false by default, although the check only happens in debug
      * builds.
      */
-    [[MONGO_MOD_NEEDS_REPLACEMENT]] static AtomicWord<bool> disableDupeFieldCheck_forTest;
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] static Atomic<bool> disableDupeFieldCheck_forTest;
 
     /**
      * Similar to finish, any calls on this object after are illegal.

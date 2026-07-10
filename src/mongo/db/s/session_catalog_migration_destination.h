@@ -39,7 +39,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/cancellation.h"
@@ -165,7 +165,7 @@ private:
 
     // The number of session oplog entries processed. This is not always equal to the number of
     // session oplog entries comitted because entries may have been processed but not committed
-    AtomicWord<long long> _sessionOplogEntriesMigrated{0};
+    Atomic<long long> _sessionOplogEntriesMigrated{0};
 };
 
 }  // namespace mongo

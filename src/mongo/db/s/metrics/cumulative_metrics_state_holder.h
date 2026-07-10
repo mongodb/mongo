@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/modules.h"
 
@@ -65,12 +65,12 @@ public:
         }
     }
 
-    std::array<AtomicWord<int64_t>, Size>* getStateArrayFor() {
+    std::array<Atomic<int64_t>, Size>* getStateArrayFor() {
         return &_roleStateList;
     }
 
     template <typename T>
-    const AtomicWord<int64_t>* getStateCounter(T state) const {
+    const Atomic<int64_t>* getStateCounter(T state) const {
         auto index = static_cast<size_t>(state);
         invariant(index >= 0);
         invariant(index < Size);
@@ -78,7 +78,7 @@ public:
     }
 
     template <typename T>
-    AtomicWord<int64_t>* getMutableStateCounter(T state) {
+    Atomic<int64_t>* getMutableStateCounter(T state) {
         auto index = static_cast<size_t>(state);
         invariant(index >= 0);
         invariant(index < Size);
@@ -87,6 +87,6 @@ public:
 
 
 private:
-    std::array<AtomicWord<int64_t>, Size> _roleStateList;
+    std::array<Atomic<int64_t>, Size> _roleStateList;
 };
 }  // namespace mongo

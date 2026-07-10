@@ -33,7 +33,7 @@
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/modules.h"
@@ -137,7 +137,7 @@ private:
     };
 
     mutable std::mutex _stateMutex;
-    AtomicWord<State> _state{State::kSecondary};
+    Atomic<State> _state{State::kSecondary};
     ServiceContext::UniqueOperationContext _initOpCtxHolder;
 
     mutable std::mutex _mutex;

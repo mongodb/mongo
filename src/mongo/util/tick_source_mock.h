@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
@@ -83,7 +83,7 @@ public:
     }
 
 private:
-    AtomicWord<TickSource::Tick> _currentTicks{0};
+    Atomic<TickSource::Tick> _currentTicks{0};
     D _durationToAdvanceBy = D{0};
 };
 

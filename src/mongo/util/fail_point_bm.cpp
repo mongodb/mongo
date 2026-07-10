@@ -30,7 +30,7 @@
 
 #include "mongo/util/fail_point.h"
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 
 #include <string>
@@ -41,7 +41,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(failPointBench);
-AtomicWord<bool> atomic;
+Atomic<bool> atomic;
 
 void BM_AtomicLoadAndBranch(benchmark::State& state) {
     atomic.store(!!state.range(0));

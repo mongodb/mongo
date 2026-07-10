@@ -50,7 +50,7 @@ server_parameters:
             affect already-running JS scopes; the new value is picked up the
             next time a WASM bridge is instantiated.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gWasmtimeStoreMemoryLimitMB
         default: 1210
         validator:

@@ -41,7 +41,7 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
@@ -387,7 +387,7 @@ private:
 
     // Used to determine whether local ops should be marked non-deprioritizable. This is only needed
     // for jumbo chunk migrations to ensure that we prioritize local ops prior to calling commit.
-    AtomicWord<bool> _prioritizeLocalOps{false};
+    Atomic<bool> _prioritizeLocalOps{false};
 
     // Holds the latest request for notification of new oplog entries that needs to be fetched.
     // Sets to true if there is no need to fetch an oplog anymore (for example, because migration
@@ -396,13 +396,13 @@ private:
 
     // The number of session oplog entries that need to be migrated
     // from the source to the destination
-    AtomicWord<long long> _sessionOplogEntriesToBeMigratedSoFar{0};
+    Atomic<long long> _sessionOplogEntriesToBeMigratedSoFar{0};
 
     // There are optimizations so that we do not send all of the oplog
     // entries to the destination. This stat provides a lower bound on the number of session oplog
     // entries that we did not send to the destination. It is a lower bound because some of the
     // optimizations do not allow us to know the exact number of oplog entries we skipped.
-    AtomicWord<long long> _sessionOplogEntriesSkippedSoFarLowerBound{0};
+    Atomic<long long> _sessionOplogEntriesSkippedSoFarLowerBound{0};
 };
 
 }  // namespace mongo

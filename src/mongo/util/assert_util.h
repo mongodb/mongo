@@ -34,7 +34,7 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/source_location.h"
 #include "mongo/util/assert_util_core.h"  // IWYU pragma: export
@@ -76,12 +76,12 @@ public:
     void rollover();
     void condrollover(int newValue);
 
-    AtomicWord<int> regular;
-    AtomicWord<int> warning;
-    AtomicWord<int> msg;
-    AtomicWord<int> user;
-    AtomicWord<int> tripwire;
-    AtomicWord<int> rollovers;
+    Atomic<int> regular;
+    Atomic<int> warning;
+    Atomic<int> msg;
+    Atomic<int> user;
+    Atomic<int> tripwire;
+    Atomic<int> rollovers;
 };
 
 [[MONGO_MOD_NEEDS_REPLACEMENT]] extern AssertionCount assertionCount;
@@ -180,14 +180,14 @@ public:
         return _status.extraInfo<ErrorDetail>();
     }
 
-    [[MONGO_MOD_NEEDS_REPLACEMENT]] static inline AtomicWord<bool> traceExceptions{false};
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] static inline Atomic<bool> traceExceptions{false};
 
     /**
      * Allows handling `ErrorCodes::WriteConflict` as a special case and if true, will call
      * `printStackTrace` on every `WriteConflict` error. Can be set via the
      * `traceWriteConflictExceptions` server parameter.
      */
-    [[MONGO_MOD_PRIVATE]] static inline AtomicWord<bool> traceWriteConflictExceptions{false};
+    [[MONGO_MOD_PRIVATE]] static inline Atomic<bool> traceWriteConflictExceptions{false};
 
 protected:
     DBException(const Status& status) : _status(status) {

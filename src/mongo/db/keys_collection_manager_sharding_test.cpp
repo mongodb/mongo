@@ -46,7 +46,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/time_proof_service.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -98,7 +98,7 @@ TEST_F(KeysManagerShardedTest, GetKeyForValidationTimesOutIfRefresherIsNotRunnin
     Milliseconds maxTime{25};
     operationContext()->setDeadlineAfterNowBy(maxTime, ErrorCodes::ExceededTimeLimit);
 
-    AtomicWord<bool> done{false};
+    Atomic<bool> done{false};
     stdx::thread t{[&] {
         ASSERT_THROWS(keyManager()->getKeysForValidation(
                           operationContext(), 1, LogicalTime(Timestamp(100, 0))),

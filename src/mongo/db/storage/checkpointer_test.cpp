@@ -34,7 +34,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/checkpoint_schedule_policy.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
@@ -64,7 +64,7 @@ public:
         cv.wait(lock, std::move(shouldWake));
     }
 
-    AtomicWord<int64_t> enteredCount{0};
+    Atomic<int64_t> enteredCount{0};
 };
 
 /**
@@ -96,7 +96,7 @@ public:
         _gateCv.notify_all();
     }
 
-    AtomicWord<int64_t> enteredCount{0};
+    Atomic<int64_t> enteredCount{0};
 
 private:
     std::mutex _gateMutex;
@@ -106,7 +106,7 @@ private:
 
 // Polls until the schedule has been entered at least 'target' times, failing the test rather than
 // hanging forever if the Checkpointer thread never gets there.
-void waitForEnteredCountAtLeast(AtomicWord<int64_t>& enteredCount, int64_t target) {
+void waitForEnteredCountAtLeast(Atomic<int64_t>& enteredCount, int64_t target) {
     const auto deadline = Date_t::now() + Seconds(30);
     while (enteredCount.load() < target) {
         ASSERT_LT(Date_t::now(), deadline)
@@ -165,7 +165,7 @@ TEST_F(CheckpointerTest, ShutdownWakesCallerBlockedInWaitForFirstCheckpoint) {
     // caller on its own. The only thing that can release the caller is shutdown().
     waitForEnteredCountAtLeast(policyPtr->enteredCount, 1);
 
-    AtomicWord<bool> waiterReturned{false};
+    Atomic<bool> waiterReturned{false};
     stdx::thread waiter([&] {
         checkpointer.pauseCheckpointing();
         waiterReturned.store(true);
@@ -227,7 +227,7 @@ TEST_F(CheckpointerWithStorageTest, PauseWaitsForInProgressCheckpoint) {
     // Wait until the thread is parked in the failpoint: a checkpoint is now genuinely in progress.
     fp->waitForTimesEntered(timesEnteredBefore + 1);
 
-    AtomicWord<bool> pauseReturned{false};
+    Atomic<bool> pauseReturned{false};
     stdx::thread pauser([&] {
         checkpointer.pauseCheckpointing();
         pauseReturned.store(true);

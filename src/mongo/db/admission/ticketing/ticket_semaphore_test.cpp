@@ -625,8 +625,8 @@ TEST_P(TicketSemaphoreTest, ConcurrentAcquireDoesNotOverbookOrLeak) {
     auto* rawSem = sem.get();
 
     // Track maximum concurrent permit holders to verify no overbooking.
-    AtomicWord<int> concurrentHolders{0};
-    AtomicWord<int> maxConcurrentHolders{0};
+    Atomic<int> concurrentHolders{0};
+    Atomic<int> maxConcurrentHolders{0};
 
     std::vector<stdx::thread> threads;
     for (int i = 0; i < numThreads; ++i) {

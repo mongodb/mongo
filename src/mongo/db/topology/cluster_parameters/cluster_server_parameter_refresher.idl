@@ -40,7 +40,7 @@ server_parameters:
             On a mongos instance, specifies the interval (in seconds) at which the mongos instance
             refreshes its in-memory cache of cluster server parameters.
         cpp_varname: clusterServerParameterRefreshIntervalSecs
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         set_at: [startup, runtime]
         default: 30
         on_update: clusterServerParameterRefreshIntervalSecsNotify

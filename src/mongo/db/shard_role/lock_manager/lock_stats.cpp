@@ -31,7 +31,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/stats/counter_ops.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 
 #include <memory>
 
@@ -170,9 +170,9 @@ int64_t LockStats<CounterType>::_getWaitTime(const PerModeLockStatCounters& stat
     return timeAcquiringLocks;
 }
 
-// Ensures that these are the only instances compiled for LockStats for AtomicWord<long long> and
+// Ensures that these are the only instances compiled for LockStats for Atomic<long long> and
 // int64_t
 template class LockStats<int64_t>;
-template class LockStats<AtomicWord<long long>>;
+template class LockStats<Atomic<long long>>;
 
 }  // namespace mongo

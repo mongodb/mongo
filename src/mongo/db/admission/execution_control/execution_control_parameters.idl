@@ -52,7 +52,7 @@ server_parameters:
             The number of maximum concurrent write transactions (write tickets) allowed for
             execution control.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: gConcurrentWriteTransactions
         on_update: "TicketingSystem::NormalPrioritySettings::updateConcurrentWriteTransactions"
         deprecated_name:
@@ -69,7 +69,7 @@ server_parameters:
             for execution control. Using the default value means to use the number of logical CPU
             cores.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: gConcurrentWriteLowPriorityTransactions
         on_update: "TicketingSystem::LowPrioritySettings::updateConcurrentWriteTransactions"
         default:
@@ -85,7 +85,7 @@ server_parameters:
             The number of maximum concurrent read transactions (read tickets) allowed for execution
             control.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: gConcurrentReadTransactions
         on_update: "TicketingSystem::NormalPrioritySettings::updateConcurrentReadTransactions"
         deprecated_name:
@@ -102,7 +102,7 @@ server_parameters:
             for execution control. Using the default value means to use the number of logical CPU
             cores.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: gConcurrentReadLowPriorityTransactions
         on_update: "TicketingSystem::LowPrioritySettings::updateConcurrentReadTransactions"
         default:
@@ -190,7 +190,7 @@ server_parameters:
             permitted to take effect. When false, all deprioritization mechanisms are blocked,
             regardless of their individual settings.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: gDeprioritizationGate
         on_update: "TicketingSystem::updateDeprioritizationGate"
         default: false
@@ -201,7 +201,7 @@ server_parameters:
             Enables a heuristic that will evaluate long-running operations and deprioritize them to
             the low priority ticket pool.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: gHeuristicDeprioritization
         on_update: "TicketingSystem::updateHeuristicDeprioritization"
         default: true
@@ -214,7 +214,7 @@ server_parameters:
             background tasks always run at low priority. When false, background tasks run at normal
             priority and are immune to heuristic deprioritization.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: gBackgroundTasksDeprioritization
         on_update: "TicketingSystem::updateBackgroundTasksDeprioritization"
         default: true

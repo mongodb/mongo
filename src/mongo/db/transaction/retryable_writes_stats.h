@@ -32,7 +32,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction/transactions_stats_gen.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
@@ -64,14 +64,14 @@ public:
 
 private:
     // The number of received commands that contained a statement that had already been executed.
-    AtomicWord<unsigned long long> _retriedCommandsCount{0};
+    Atomic<unsigned long long> _retriedCommandsCount{0};
 
     // The number of received statements found to have been previously executed.
-    AtomicWord<unsigned long long> _retriedStatementsCount{0};
+    Atomic<unsigned long long> _retriedStatementsCount{0};
 
     // The number of writes to the config.transactions collection. Includes writes initiated by a
     // migration.
-    AtomicWord<unsigned long long> _transactionsCollectionWriteCount{0};
+    Atomic<unsigned long long> _transactionsCollectionWriteCount{0};
 };
 
 }  // namespace mongo

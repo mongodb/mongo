@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/histogram.h"
 #include "mongo/util/modules.h"
@@ -101,7 +101,7 @@ private:
      */
     size_t _getBucketIndex(int32_t admissions);
 
-    std::array<AtomicWord<int64_t>, kNumBuckets> _buckets{};
+    std::array<Atomic<int64_t>, kNumBuckets> _buckets{};
 };
 
 /**
@@ -142,9 +142,9 @@ public:
 
     void appendStats(BSONObjBuilder& b) const;
 
-    AtomicWord<int64_t> totalDelinquentAcquisitions{0};
-    AtomicWord<int64_t> totalAcquisitionDelinquencyMillis{0};
-    AtomicWord<int64_t> maxAcquisitionDelinquencyMillis{0};
+    Atomic<int64_t> totalDelinquentAcquisitions{0};
+    Atomic<int64_t> totalAcquisitionDelinquencyMillis{0};
+    Atomic<int64_t> maxAcquisitionDelinquencyMillis{0};
 };
 
 /**
@@ -161,14 +161,14 @@ public:
 
     void appendStats(BSONObjBuilder& b) const;
 
-    AtomicWord<int64_t> totalCPUUsageMicros{0};
-    AtomicWord<int64_t> totalElapsedTimeMicros{0};
-    AtomicWord<int64_t> totalOpsFinished{0};
-    AtomicWord<int64_t> totalOpsLoadShed{0};
-    AtomicWord<int64_t> totalCPUUsageLoadShed{0};
-    AtomicWord<int64_t> totalElapsedTimeMicrosLoadShed{0};
-    AtomicWord<int64_t> totalAdmissionsLoadShed{0};
-    AtomicWord<int64_t> totalQueuedTimeMicrosLoadShed{0};
+    Atomic<int64_t> totalCPUUsageMicros{0};
+    Atomic<int64_t> totalElapsedTimeMicros{0};
+    Atomic<int64_t> totalOpsFinished{0};
+    Atomic<int64_t> totalOpsLoadShed{0};
+    Atomic<int64_t> totalCPUUsageLoadShed{0};
+    Atomic<int64_t> totalElapsedTimeMicrosLoadShed{0};
+    Atomic<int64_t> totalAdmissionsLoadShed{0};
+    Atomic<int64_t> totalQueuedTimeMicrosLoadShed{0};
 };
 
 /**
@@ -185,11 +185,11 @@ public:
 
     void appendStats(BSONObjBuilder& b) const;
 
-    AtomicWord<int64_t> totalTimeQueuedMicros{0};
-    AtomicWord<int64_t> totalTimeProcessingMicros{0};
-    AtomicWord<int64_t> totalAdmissions{0};
-    AtomicWord<int64_t> totalNormalPriorityAdmissions{0};
-    AtomicWord<int64_t> totalLowPriorityAdmissions{0};
+    Atomic<int64_t> totalTimeQueuedMicros{0};
+    Atomic<int64_t> totalTimeProcessingMicros{0};
+    Atomic<int64_t> totalAdmissions{0};
+    Atomic<int64_t> totalNormalPriorityAdmissions{0};
+    Atomic<int64_t> totalLowPriorityAdmissions{0};
     DelinquencyStats delinquencyStats;
 };
 

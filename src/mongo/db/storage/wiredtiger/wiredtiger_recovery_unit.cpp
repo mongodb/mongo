@@ -100,7 +100,7 @@ void handleWriteContextForDebugging(WiredTigerRecoveryUnit& ru, Timestamp& ts) {
 
 }  // namespace
 
-AtomicWord<std::int64_t> snapshotTooOldErrorCount{0};
+Atomic<std::int64_t> snapshotTooOldErrorCount{0};
 
 WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerConnection* sc)
     : WiredTigerRecoveryUnit(sc, sc->getKVEngine()->getOplogManager()) {}

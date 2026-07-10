@@ -72,7 +72,7 @@ Future<ResultType> processMultipleFutures(std::vector<ExecutorFuture<FutureType>
 template <typename ResultType, typename ConditionCallable>
 Future<ResultType> whenAnyThat(std::vector<ExecutorFuture<ResultType>>&& futures,
                                ConditionCallable&& shouldAccept) {
-    std::shared_ptr<AtomicWord<bool>> done = std::make_shared<AtomicWord<bool>>(false);
+    std::shared_ptr<Atomic<bool>> done = std::make_shared<Atomic<bool>>(false);
     invariant(futures.size() > 0);
 
     auto processSW = [shouldAccept, done](StatusOrStatusWith<ResultType> value,

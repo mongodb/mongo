@@ -103,7 +103,7 @@ private:
 namespace {
 
 auto registryDecoration = ServiceContext::declareDecoration<IntentRegistry>();
-const auto writeIntentCountOnOpCtx = OperationContext::declareDecoration<AtomicWord<int32_t>>();
+const auto writeIntentCountOnOpCtx = OperationContext::declareDecoration<Atomic<int32_t>>();
 // Declared after writeIntentCountOnOpCtx so it destructs first (reverse order), ensuring the
 // counter pointer is removed from the registry before the counter memory is freed.
 const auto writeIntentCleanup = OperationContext::declareDecoration<WriteIntentCleanup>();

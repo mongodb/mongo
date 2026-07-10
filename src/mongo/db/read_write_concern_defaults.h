@@ -37,7 +37,7 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/functional.h"
@@ -245,9 +245,9 @@ private:
     Cache _defaults;
 
     // Indicate whether implicit default write concern should be majority or not.
-    AtomicWord<bool> _implicitDefaultWriteConcernMajority;
+    Atomic<bool> _implicitDefaultWriteConcernMajority;
 
-    AtomicWord<bool> _customDefaultReadConcernSet{false};
+    Atomic<bool> _customDefaultReadConcernSet{false};
 };
 
 }  // namespace mongo

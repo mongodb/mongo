@@ -39,7 +39,7 @@
 #include "mongo/db/session/service_liaison.h"
 #include "mongo/db/session/session_killer.h"
 #include "mongo/executor/async_timer_mock.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"

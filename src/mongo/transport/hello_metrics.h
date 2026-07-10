@@ -31,7 +31,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/modules.h"
 
@@ -135,11 +135,11 @@ private:
     void decrementNumExhaustHello();
 
     // The number of clients currently waiting in isMaster for a topology change.
-    AtomicWord<size_t> _connectionsAwaitingTopologyChanges{0};
+    Atomic<size_t> _connectionsAwaitingTopologyChanges{0};
     // The number of connections whose last request was an isMaster with exhaustAllowed.
-    AtomicWord<size_t> _exhaustIsMasterConnections{0};
+    Atomic<size_t> _exhaustIsMasterConnections{0};
     // The number of connections whose last request was a hello with exhaustAllowed.
-    AtomicWord<size_t> _exhaustHelloConnections{0};
+    Atomic<size_t> _exhaustHelloConnections{0};
 };
 
 }  // namespace mongo

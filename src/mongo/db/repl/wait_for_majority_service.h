@@ -35,7 +35,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
@@ -115,7 +115,7 @@ private:
     struct Request {
         explicit Request(Promise<void> promise)
             : hasBeenProcessed{false}, result(std::move(promise)) {}
-        AtomicWord<bool> hasBeenProcessed;
+        Atomic<bool> hasBeenProcessed;
         Promise<void> result;
     };
 

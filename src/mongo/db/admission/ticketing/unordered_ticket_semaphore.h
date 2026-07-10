@@ -31,7 +31,7 @@
 
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/admission/ticketing/ticket_semaphore.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/waitable_atomic.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"

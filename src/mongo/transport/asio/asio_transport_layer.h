@@ -173,7 +173,7 @@ public:
         // State transitions: `kInitialized` --> `kStarted` --> `kStopped`
         //                          |_______________________________^
         enum class State { kInitialized, kStarted, kStopped };
-        AtomicWord<State> _state;
+        Atomic<State> _state;
 
         Spawn _spawn = [](std::function<void()> f) {
             return stdx::thread{std::move(f)};
@@ -462,7 +462,7 @@ private:
     // Tracks the cumulative time the listener spends between accepting incoming connections to
     // handing them off to dedicated connection threads. We use an int64 since Microseconds is not
     // an arithmetic type for atomic operations.
-    AtomicWord<std::int64_t> _listenerProcessingTotalMicros;
+    Atomic<std::int64_t> _listenerProcessingTotalMicros;
 
     // Tracks the number of connections that are dropped by the client before the server gets to
     // process them (e.g. perform TLS handshake).

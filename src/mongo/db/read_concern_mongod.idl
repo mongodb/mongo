@@ -38,7 +38,7 @@ server_parameters:
             the last applied time, the secondary makes a no-op write to advance the last applied
             time.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: waitForSecondaryBeforeNoopWriteMS
         default: 10
         redact: false

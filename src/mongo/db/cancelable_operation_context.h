@@ -31,7 +31,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
@@ -91,7 +91,7 @@ public:
 
 private:
     struct SharedBlock {
-        AtomicWord<bool> done{false};
+        Atomic<bool> done{false};
     };
 
     const std::shared_ptr<SharedBlock> _sharedBlock;

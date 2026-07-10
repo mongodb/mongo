@@ -481,7 +481,7 @@ BSONObjBuilder OpMsgBuilder::resumeBody() {
     return BSONObjBuilder(BSONObjBuilder::ResumeBuildingTag(), _buf, _bodyStart);
 }
 
-AtomicWord<bool> OpMsgBuilder::disableDupeFieldCheck_forTest{false};
+Atomic<bool> OpMsgBuilder::disableDupeFieldCheck_forTest{false};
 
 Message OpMsgBuilder::finish() {
     const auto size = _buf.len();

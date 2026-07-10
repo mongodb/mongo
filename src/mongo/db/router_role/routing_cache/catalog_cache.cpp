@@ -208,8 +208,8 @@ ShardVersion CollectionRoutingInfo::getShardVersion(const ShardId& shardId) cons
     return sv;
 }
 
-AtomicWord<uint64_t> ComparableDatabaseVersion::_disambiguatingSequenceNumSource{1ULL};
-AtomicWord<uint64_t> ComparableDatabaseVersion::_forcedRefreshSequenceNumSource{1ULL};
+Atomic<uint64_t> ComparableDatabaseVersion::_disambiguatingSequenceNumSource{1ULL};
+Atomic<uint64_t> ComparableDatabaseVersion::_forcedRefreshSequenceNumSource{1ULL};
 
 ComparableDatabaseVersion ComparableDatabaseVersion::makeComparableDatabaseVersion(
     const boost::optional<DatabaseVersion>& version) {

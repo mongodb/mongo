@@ -402,7 +402,7 @@ server_parameters:
             even when the feature flag is enabled. This parameter is intended as an
             emergency escape hatch.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: allowDirectSystemBucketsAccess
         default: false
         redact: false

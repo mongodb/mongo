@@ -77,7 +77,7 @@ const auto kTimedPhaseNamesMap = [] {
         {TimedPhase::kChangeStreamMonitor, "changeStreamMonitorTotalTimeElapsedSecs"}};
 }();
 
-boost::optional<Milliseconds> readCoordinatorEstimate(const AtomicWord<Milliseconds>& field) {
+boost::optional<Milliseconds> readCoordinatorEstimate(const Atomic<Milliseconds>& field) {
     auto estimate = field.load();
     if (estimate == kNoEstimate) {
         return boost::none;

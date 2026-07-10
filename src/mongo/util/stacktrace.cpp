@@ -210,7 +210,7 @@ void StackTrace::sink(StackTraceSink* sink, bool withHumanReadable) const {
 
 #ifdef MONGO_CONFIG_DEV_STACKTRACE
 namespace {
-AtomicWord<bool> gDevStackTraceEnabled{true};
+Atomic<bool> gDevStackTraceEnabled{true};
 }
 void enableDevStackTrace() {
     gDevStackTraceEnabled.store(true);

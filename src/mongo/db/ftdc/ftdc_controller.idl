@@ -38,6 +38,6 @@ server_parameters:
             BSONObjectTooLarge exceptions are consistently encountered."
         default: false
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<bool>"
+        cpp_vartype: "Atomic<bool>"
         cpp_varname: gDiagnosticDataCollectionDiscardLargeSamples
         redact: false

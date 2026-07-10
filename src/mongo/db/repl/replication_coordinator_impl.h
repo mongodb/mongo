@@ -79,7 +79,6 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -798,7 +797,7 @@ private:
         Promise<void> promise;
         boost::optional<WriteConcernOptions> writeConcern;
         // A flag to mark this waiter abandoned which allows early clean-up for the waiter.
-        AtomicWord<bool> givenUp{false};
+        Atomic<bool> givenUp{false};
         explicit Waiter(Promise<void> p, boost::optional<WriteConcernOptions> w = boost::none)
             : promise(std::move(p)), writeConcern(w) {}
     };
@@ -1063,7 +1062,7 @@ private:
         // it, must have either the RSTL or the replication coordinator mutex. To set it, must have
         // both the RSTL in mode X and the replication coordinator mutex.
         // Always true for standalone nodes.
-        AtomicWord<bool> _canAcceptNonLocalWrites;
+        Atomic<bool> _canAcceptNonLocalWrites;
 
         // Flag that indicates whether reads from databases other than "local" are allowed. Unlike
         // _canAcceptNonLocalWrites, above, this question is about admission control on secondaries.
@@ -1071,7 +1070,7 @@ private:
         // during rollback. In order to read it, must have the RSTL. To set it when transitioning
         // into RS_ROLLBACK, must have the RSTL in mode X. Otherwise, no lock or mutex is necessary
         // to set it.
-        AtomicWord<unsigned> _canServeNonLocalReads;
+        Atomic<unsigned> _canServeNonLocalReads;
     };
 
     void _resetMyLastOpTimes(WithLock lk);
@@ -1902,11 +1901,11 @@ private:
 
     // The term of the last election that resulted in this node becoming primary.  "Shadow" because
     // this follows the authoritative value in the topology coordinatory.
-    AtomicWord<long long> _electionIdTermShadow;  // (S)
+    Atomic<long long> _electionIdTermShadow;  // (S)
 
     // Shadow of the lastAppliedOpTime timestamp for lock-free reads in computeOperationTime.
     // Written under _mutex when lastAppliedOpTime changes, readable without _mutex.
-    AtomicWord<unsigned long long> _lastAppliedTimestampShadow;  // (I)
+    Atomic<unsigned long long> _lastAppliedTimestampShadow;  // (I)
 
     // Used to signal threads waiting for changes to _memberState.
     stdx::condition_variable _memberStateChange;  // (M)
@@ -1991,7 +1990,7 @@ private:
     int _earliestMemberId = -1;  // (M)
 
     // Cached copy of the current config protocol version.
-    AtomicWord<long long> _protVersion{1};  // (S)
+    Atomic<long long> _protVersion{1};  // (S)
 
     // Source of random numbers used in setting election timeouts, etc.
     PseudoRandom _random;  // (M)
@@ -2008,13 +2007,13 @@ private:
     // function.
     // This variable must be written immediately after _term, and thus its value can lag.
     // Reading this value does not require the replication coordinator mutex to be locked.
-    AtomicWord<long long> _termShadow;  // (S)
+    Atomic<long long> _termShadow;  // (S)
 
     // When we decide to step down due to hearing about a higher term, we remember the term we heard
     // here so we can update our term to match as part of finishing stepdown.
     boost::optional<long long> _pendingTermUpdateDuringStepDown;  // (M)
 
-    AtomicWord<bool> _startedSteadyStateReplication{false};
+    Atomic<bool> _startedSteadyStateReplication{false};
 
     // If we're in stepdown code and therefore should claim we don't allow
     // writes.  This is a counter rather than a flag because there are scenarios where multiple
@@ -2031,7 +2030,7 @@ private:
     Date_t _quiesceDeadline;  // (M)
 
     // The cached value of the 'counter' field in the server's TopologyVersion.
-    AtomicWord<int64_t> _cachedTopologyVersionCounter;  // (S)
+    Atomic<int64_t> _cachedTopologyVersionCounter;  // (S)
 
     // The cached value of the topology from the most recent SplitHorizonChange.
     int64_t _lastHorizonTopologyChange{-1};  // (M)
@@ -2055,7 +2054,7 @@ private:
     // setConsistentDataAvailable is called - that's after replSetInitiate, after initial sync
     // completes, after storage recovers from a stable checkpoint, or after replication recovery
     // from an unstable checkpoint.
-    AtomicWord<bool> _isDataConsistent{false};
+    Atomic<bool> _isDataConsistent{false};
 
     rss::consensus::IntentRegistry& _intentRegistry;
     /**

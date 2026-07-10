@@ -29,7 +29,7 @@
 #pragma once
 
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 
 #include <functional>
@@ -68,7 +68,7 @@ private:
     const std::function<void(std::string cause)> _crashCb;
     // This flag is set after the _taskExecutor join() returns, thus
     // we know no more health checks are still running.
-    AtomicWord<bool> _terminate{false};
+    Atomic<bool> _terminate{false};
     stdx::thread _progressMonitorThread;
 };
 

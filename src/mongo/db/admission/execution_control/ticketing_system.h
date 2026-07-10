@@ -135,7 +135,7 @@ public:
      * If the server parameter matches the default, this function returns the number of logical
      * cores. Otherwise, it returns the specific value loaded from the atomic.
      */
-    static int resolveLowPriorityTickets(const AtomicWord<int32_t>& serverParam);
+    static int resolveLowPriorityTickets(const Atomic<int32_t>& serverParam);
 
     static TicketingSystem* get(ServiceContext* svcCtx);
 
@@ -322,7 +322,7 @@ private:
      * Atomically holds the current state of the ticketing system. The TicketingState struct
      * contains both the raw algorithm enum and the logic to interpret it.
      */
-    AtomicWord<TicketingState> _state;
+    Atomic<TicketingState> _state;
 
     /**
      * Returns true if the operation should be downgraded to low priority.
@@ -353,14 +353,14 @@ private:
     /**
      * Counts the total number of operations deprioritized.
      */
-    AtomicWord<std::int64_t> _opsDeprioritized;
+    Atomic<std::int64_t> _opsDeprioritized;
 
     /**
      * Counts the total number of operations marked non-deprioritizable. This includes operations
      * that use ScopedTaskTypeNonDeprioritizable and operations which are affected by client based
      * exemptions.
      */
-    AtomicWord<std::int64_t> _opsMarkedNonDeprioritizable;
+    Atomic<std::int64_t> _opsMarkedNonDeprioritizable;
 
     /**
      * Accumulate deprioritizable/non-deprioritizable operation statistics for read and write

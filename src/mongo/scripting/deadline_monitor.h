@@ -29,7 +29,7 @@
 #pragma once
 
 // IWYU pragma: no_include "cxxabi.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"

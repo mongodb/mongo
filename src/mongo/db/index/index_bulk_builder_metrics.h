@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/sorter/sorter_stats.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 [[MONGO_MOD_PUBLIC]];
@@ -45,11 +45,11 @@ struct IndexBulkBuilderMetricsSnapshot {
 
 struct IndexBulkBuilderMetrics {
     // Number of instances of the bulk builder created.
-    AtomicWord<long long> count;
+    Atomic<long long> count;
 
     // Number of times the bulk builder was created for a resumable index build.
     // This value should not exceed 'count'.
-    AtomicWord<long long> resumed;
+    Atomic<long long> resumed;
 
     // Sorter statistics that are aggregate of all sorters.
     SorterTracker sorterTracker;

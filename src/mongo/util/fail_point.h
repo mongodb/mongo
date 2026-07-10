@@ -33,7 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
@@ -543,14 +543,14 @@ private:
         // Bit layout:
         // 31: tells whether this fail point is active.
         // 0~30: ref counter: # of outstanding LockHandles.
-        AtomicWord<std::uint32_t> _fpInfo{0};
+        Atomic<std::uint32_t> _fpInfo{0};
 
         /* Number of times this has been locked with a `hit` result. */
-        AtomicWord<EntryCountT> _hitCount{0};
+        Atomic<EntryCountT> _hitCount{0};
 
         // Invariant: These should be read only if _kActiveBit of _fpInfo is set.
         Mode _mode{off};
-        AtomicWord<int> _modeValue{0};
+        Atomic<int> _modeValue{0};
         BSONObj _data;
 
         const std::string _name;
@@ -582,7 +582,7 @@ private:
      * True only when `_impl()` should succeed.
      * We exploit zero-initialization of statics to detect use-before-init.
      */
-    AtomicWord<bool> _ready;
+    Atomic<bool> _ready;
 
     std::aligned_storage_t<sizeof(Impl), alignof(Impl)> _implStorage;
 };

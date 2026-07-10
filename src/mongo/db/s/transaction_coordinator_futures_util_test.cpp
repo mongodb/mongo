@@ -46,7 +46,7 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/future_impl.h"
@@ -523,7 +523,7 @@ TEST_F(AsyncWorkSchedulerTest, ShutdownInterruptsRunningBlockedTasks) {
 TEST_F(AsyncWorkSchedulerTest, ShutdownInterruptsNotYetScheduledTasks) {
     AsyncWorkScheduler async(getServiceContext());
 
-    AtomicWord<int> numInvocations{0};
+    Atomic<int> numInvocations{0};
 
     auto future1 =
         async.scheduleWorkIn(Milliseconds(1), [&numInvocations](OperationContext* opCtx) {
@@ -832,7 +832,7 @@ TEST_F(DoWhileTest, LoopObeysBackoff) {
 TEST_F(DoWhileTest, LoopObeysShutdown) {
     AsyncWorkScheduler async(getServiceContext());
 
-    AtomicWord<int> numLoops{0};
+    Atomic<int> numLoops{0};
     auto future = doWhile(
         async,
         boost::none,

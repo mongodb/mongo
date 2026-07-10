@@ -86,8 +86,8 @@ using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(forceLockTimeoutForProfiler);
 
-AtomicWord<int64_t> profilerWritesTotal{0};
-AtomicWord<int64_t> profilerWritesActive{0};
+Atomic<int64_t> profilerWritesTotal{0};
+Atomic<int64_t> profilerWritesActive{0};
 
 // Under heavy load we will choose to abandon and drop profile writes to preserve availability.
 // The observability tool shouldn't cause an availability problem. This metric serves to capture
@@ -102,12 +102,12 @@ ConcurrentSharedValuesMap<DatabaseName, AbandonedWriteMetrics> profilerAbandonme
 
 // Track some overall counters to report in serverStatus. Reporting a map by dbName is potentially
 // too large for serverStatus.
-AtomicWord<int64_t> profilerWritesAbandonedGlobally{0};
+Atomic<int64_t> profilerWritesAbandonedGlobally{0};
 
 // Please note that this counter will not ever reset/decrease, but writes to the profiler can be
 // re-activated by raising the cap. If the cap is raised and then hit again, this counter will
 // double-increment for the same db.
-AtomicWord<int64_t> dbsPastThreshold{0};
+Atomic<int64_t> dbsPastThreshold{0};
 
 static const auto profilerDisabledWarningString =
     "The profiler in this db has been automatically disabled due to server load. This tool is "

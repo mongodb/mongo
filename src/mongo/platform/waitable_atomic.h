@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
@@ -62,7 +62,7 @@ bool waitUntil(const void* uaddr,
 }  // namespace waitable_atomic_details
 
 /**
- * Extends the AtomicWord interface to include wait functionality with deadline and timeout.
+ * Extends the Atomic interface to include wait functionality with deadline and timeout.
  *
  * This class is very similar to the wait() and notify() functions on std::atomic, with these
  * exceptions:
@@ -81,10 +81,10 @@ bool waitUntil(const void* uaddr,
  */
 template <typename T>
 requires(std::has_unique_object_representations_v<T> && sizeof(T) == 4 &&
-         sizeof(AtomicWord<T>) == 4)  //
-class BasicWaitableAtomic : public AtomicWord<T> {
+         sizeof(Atomic<T>) == 4)  //
+class BasicWaitableAtomic : public Atomic<T> {
 public:
-    using AtomicWord<T>::AtomicWord;
+    using Atomic<T>::Atomic;
 
     /**
      * Returns this->load() once it doesn't equal old.
@@ -113,7 +113,7 @@ public:
      */
     boost::optional<T> waitUntil(
         T old, boost::optional<std::chrono::system_clock::time_point> deadline) const {
-        // We know that T and AtomicWord<T> are 4 bytes but we should also ensure we are too.
+        // We know that T and Atomic<T> are 4 bytes but we should also ensure we are too.
         static_assert(sizeof(*this) == 4);
 
         while (true) {
@@ -188,10 +188,10 @@ public:
 };
 
 /**
- * Extends the AtomicWord interface to provide wait functionality with deadline and timeout.
+ * Extends the Atomic interface to provide wait functionality with deadline and timeout.
  *
  * This is a more flexible and easier to use version of BasicAtomicWaitable. It supports any size T
- * that is supported by our AtomicWord type, and takes care of tracking whether there are any
+ * that is supported by our Atomic type, and takes care of tracking whether there are any
  * waiters so that notifyAll() is cheap when there aren't.
  *
  * notifyOne() is not supported because we only track whether there are any waiters, not how many
@@ -201,9 +201,9 @@ public:
 template <typename T,
           // try to put counter (member) and value (base) on same cache line.
           size_t alignment = 2 * std::max(sizeof(T), sizeof(uint32_t))>
-class alignas(alignment) WaitableAtomic : public AtomicWord<T> {
+class alignas(alignment) WaitableAtomic : public Atomic<T> {
 public:
-    using AtomicWord<T>::AtomicWord;
+    using Atomic<T>::Atomic;
 
     /**
      * Returns this->load() once it doesn't equal old.

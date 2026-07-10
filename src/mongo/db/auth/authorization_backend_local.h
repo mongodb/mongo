@@ -130,6 +130,6 @@ protected:
      */
     virtual RolesSnapshot _snapshotRoles(OperationContext* opCtx);
 
-    AtomicWord<bool> _hasAnyPrivilegeDocuments{false};
+    Atomic<bool> _hasAnyPrivilegeDocuments{false};
 };
 }  // namespace mongo::auth

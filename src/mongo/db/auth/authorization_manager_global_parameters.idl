@@ -58,7 +58,7 @@ server_parameters:
     useInternalAuthzForX509:
         description: "Use internal authorization for X.509 authentication"
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: useInternalAuthzForX509
         default: false
         redact: false
@@ -75,7 +75,7 @@ server_parameters:
             is replaced by internal authorization and the authenticatedMechanism field is included
             in usersInfo.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: enableInternalAuthzFallback
         default: false
         redact: false

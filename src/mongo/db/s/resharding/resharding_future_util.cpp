@@ -39,7 +39,7 @@
 
 namespace mongo::resharding {
 
-bool shouldLogWriteBlockWarning(AtomicWord<long long>& lastWarningAt) {
+bool shouldLogWriteBlockWarning(Atomic<long long>& lastWarningAt) {
     const auto now = Date_t::now();
     auto last = lastWarningAt.load();
     if (now <= Date_t::fromMillisSinceEpoch(last) + Minutes(1)) {

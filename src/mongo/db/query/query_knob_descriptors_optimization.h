@@ -43,7 +43,7 @@ namespace mongo {
 // storageGlobalParams.noTableScan) as a non-type template argument. Bind the target member to a
 // named reference so the KNOB() macro can pass it as a simple identifier.
 // TODO (SERVER-129983): Remove this workaround once the underlying MSVC ICE is fixed.
-inline AtomicWord<bool>& gKnobNoTableScan = storageGlobalParams.noTableScan;
+inline Atomic<bool>& gKnobNoTableScan = storageGlobalParams.noTableScan;
 }  // namespace mongo
 
 // clang-format off

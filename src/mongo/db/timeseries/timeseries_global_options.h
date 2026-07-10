@@ -30,15 +30,15 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 namespace [[MONGO_MOD_PUBLIC]] mongo {
 
-extern AtomicWord<long long> gTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes;
+extern Atomic<long long> gTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes;
 uint64_t getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes();
 
-extern AtomicWord<long long> gTimeseriesSideBucketCatalogMemoryUsageThresholdBytes;
+extern Atomic<long long> gTimeseriesSideBucketCatalogMemoryUsageThresholdBytes;
 uint64_t getTimeseriesSideBucketCatalogMemoryUsageThresholdBytes();
 /**
  * Checks the time or the meta field doesn't contain embedded null bytes.

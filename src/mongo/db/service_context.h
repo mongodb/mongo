@@ -35,7 +35,7 @@
 #include "mongo/db/operation_id.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
@@ -140,7 +140,7 @@ public:
     }
 
 private:
-    AtomicWord<T*> _ptr{nullptr};
+    Atomic<T*> _ptr{nullptr};
 };
 
 template <typename T>
@@ -853,13 +853,13 @@ private:
     SyncUnique<ClockSource> _preciseClockSource;
 
     // Flag set to indicate that all operations are to be interrupted ASAP.
-    AtomicWord<bool> _globalKill{false};
+    Atomic<bool> _globalKill{false};
 
     // protected by _mutex
     std::vector<KillOpListenerInterface*> _killOpListeners;
 
     // Server-wide flag indicating whether users' writes are allowed.
-    AtomicWord<bool> _userWritesAllowed{true};
+    Atomic<bool> _userWritesAllowed{true};
 
     bool _startupComplete = false;
     stdx::condition_variable _startupCompleteCondVar;

@@ -29,7 +29,7 @@
 
 #include "mongo/util/concurrent_shared_values_map.h"
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"
 
@@ -131,7 +131,7 @@ TEST(ConcurrentSharedValuesMapTest, ForEachTest) {
 }
 
 TEST(ConcurrentSharedValuesMapTest, TestSnapshotCanModifyValues) {
-    ConcurrentSharedValuesMap<int, AtomicWord<int>> map;
+    ConcurrentSharedValuesMap<int, Atomic<int>> map;
 
     map.getOrEmplace(1, 1);
     map.getOrEmplace(2, 1);

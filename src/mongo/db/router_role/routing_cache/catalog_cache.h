@@ -41,7 +41,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/modules.h"
@@ -314,8 +314,8 @@ public:
 private:
     friend class CatalogCache;
 
-    static AtomicWord<uint64_t> _disambiguatingSequenceNumSource;
-    static AtomicWord<uint64_t> _forcedRefreshSequenceNumSource;
+    static Atomic<uint64_t> _disambiguatingSequenceNumSource;
+    static Atomic<uint64_t> _forcedRefreshSequenceNumSource;
 
     ComparableDatabaseVersion(boost::optional<DatabaseVersion> version,
                               uint64_t disambiguatingSequenceNum,
@@ -521,14 +521,14 @@ private:
         // TODO (SERVER-34164): Potentially rework database refreshes stats
         struct Stats {
             // Tracks how many full refreshes are waiting to complete currently
-            AtomicWord<long long> numActiveDatabaseFullRefreshes{0};
+            Atomic<long long> numActiveDatabaseFullRefreshes{0};
 
             // Cumulative, always-increasing counter of how many full refreshes have been kicked off
-            AtomicWord<long long> countDatabaseFullRefreshesStarted{0};
+            Atomic<long long> countDatabaseFullRefreshesStarted{0};
 
             // Cumulative, always-increasing counter of how many full or incremental refreshes
             // failed for whatever reason
-            AtomicWord<long long> countFailedDatabaseRefreshes{0};
+            Atomic<long long> countFailedDatabaseRefreshes{0};
 
             /**
              * Reports the accumulated statistics for serverStatus.
@@ -563,21 +563,21 @@ private:
 
         struct Stats {
             // Tracks how many incremental refreshes are waiting to complete currently
-            AtomicWord<long long> numActiveIncrementalRefreshes{0};
+            Atomic<long long> numActiveIncrementalRefreshes{0};
 
             // Cumulative, always-increasing counter of how many incremental refreshes have been
             // kicked off
-            AtomicWord<long long> countIncrementalRefreshesStarted{0};
+            Atomic<long long> countIncrementalRefreshesStarted{0};
 
             // Tracks how many full refreshes are waiting to complete currently
-            AtomicWord<long long> numActiveFullRefreshes{0};
+            Atomic<long long> numActiveFullRefreshes{0};
 
             // Cumulative, always-increasing counter of how many full refreshes have been kicked off
-            AtomicWord<long long> countFullRefreshesStarted{0};
+            Atomic<long long> countFullRefreshesStarted{0};
 
             // Cumulative, always-increasing counter of how many full or incremental refreshes
             // failed for whatever reason
-            AtomicWord<long long> countFailedRefreshes{0};
+            Atomic<long long> countFailedRefreshes{0};
 
             /**
              * Reports the accumulated statistics for serverStatus.
@@ -618,7 +618,7 @@ private:
     ThreadPool _executor;
 
     // Used to make the shutdowns idempotent.
-    AtomicWord<bool> _hasShutDownAndJoined{false};
+    Atomic<bool> _hasShutDownAndJoined{false};
 
     // Flags set at construction time to determine whether the database and collection catalog cache
     // loaders should be shut down at destruction time. This allows for independent control if they
@@ -636,11 +636,11 @@ private:
     struct Stats {
         // Counts how many times threads hit stale config exception (which is what triggers metadata
         // refreshes)
-        AtomicWord<long long> countStaleConfigErrors{0};
+        Atomic<long long> countStaleConfigErrors{0};
 
         // Cumulative, always-increasing counter of how much time threads waiting for refresh
         // combined
-        AtomicWord<long long> totalRefreshWaitTimeMicros{0};
+        Atomic<long long> totalRefreshWaitTimeMicros{0};
 
         /**
          * Reports the accumulated statistics for serverStatus.

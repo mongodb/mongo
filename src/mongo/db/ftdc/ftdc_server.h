@@ -37,7 +37,7 @@
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/controller.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/modules.h"
 
@@ -118,17 +118,17 @@ private:
  * Used to provide default values from FTDCConfig to the FTDC set parameters.
  */
 struct FTDCStartupParams {
-    AtomicWord<bool> enabled;
-    AtomicWord<int> periodMillis;
-    AtomicWord<int> metadataCaptureFrequency;
-    AtomicWord<int> sampleTimeoutMillis;
-    AtomicWord<int> minThreads;
-    AtomicWord<int> maxThreads;
+    Atomic<bool> enabled;
+    Atomic<int> periodMillis;
+    Atomic<int> metadataCaptureFrequency;
+    Atomic<int> sampleTimeoutMillis;
+    Atomic<int> minThreads;
+    Atomic<int> maxThreads;
 
-    AtomicWord<int> maxDirectorySizeMB;
-    AtomicWord<int> maxFileSizeMB;
-    AtomicWord<int> maxSamplesPerArchiveMetricChunk;
-    AtomicWord<int> maxSamplesPerInterimMetricChunk;
+    Atomic<int> maxDirectorySizeMB;
+    Atomic<int> maxFileSizeMB;
+    Atomic<int> maxSamplesPerArchiveMetricChunk;
+    Atomic<int> maxSamplesPerInterimMetricChunk;
 
     FTDCStartupParams()
         : enabled(FTDCConfig::kEnabledDefault),

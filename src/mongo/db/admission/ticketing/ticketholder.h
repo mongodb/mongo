@@ -33,7 +33,7 @@
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/admission/ticketing/ticket_semaphore.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
@@ -237,17 +237,17 @@ private:
      * tickets.
      */
     struct QueueStats {
-        AtomicWord<std::int64_t> totalAddedQueue{0};
-        AtomicWord<std::int64_t> totalRemovedQueue{0};
-        AtomicWord<std::int64_t> totalFinishedProcessing{0};
-        AtomicWord<std::int64_t> totalNewAdmissions{0};
-        AtomicWord<std::int64_t> totalTimeProcessingMicros{0};
-        AtomicWord<std::int64_t> totalStartedProcessing{0};
-        AtomicWord<std::int64_t> totalCanceled{0};
-        AtomicWord<std::int64_t> totalTimeQueuedMicros{0};
+        Atomic<std::int64_t> totalAddedQueue{0};
+        Atomic<std::int64_t> totalRemovedQueue{0};
+        Atomic<std::int64_t> totalFinishedProcessing{0};
+        Atomic<std::int64_t> totalNewAdmissions{0};
+        Atomic<std::int64_t> totalTimeProcessingMicros{0};
+        Atomic<std::int64_t> totalStartedProcessing{0};
+        Atomic<std::int64_t> totalCanceled{0};
+        Atomic<std::int64_t> totalTimeQueuedMicros{0};
         // Instantaneous sum of the admission counts (i.e. number of yields) of all operations
         // currently waiting in the queue.
-        AtomicWord<std::int64_t> queuedOperationsTotalAdmissions{0};
+        Atomic<std::int64_t> queuedOperationsTotalAdmissions{0};
     };
 
     /**

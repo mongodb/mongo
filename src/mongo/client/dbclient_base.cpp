@@ -97,7 +97,7 @@ using std::stringstream;
 using std::unique_ptr;
 using std::vector;
 
-AtomicWord<long long> DBClientBase::ConnectionIdSequence;
+Atomic<long long> DBClientBase::ConnectionIdSequence;
 
 void (*DBClientBase::withConnection_do_not_use)(std::string host,
                                                 std::function<void(DBClientBase*)>) = nullptr;

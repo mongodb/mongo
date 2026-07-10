@@ -40,7 +40,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/random.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
@@ -458,7 +458,7 @@ private:
 
     PseudoRandom _prng;
 
-    AtomicWord<bool> _killed{false};
+    Atomic<bool> _killed{false};
 
     // Whether this client used { helloOk: true } when opening its connection, indicating that
     // it supports the hello command.
@@ -478,7 +478,7 @@ private:
 
     ErrorCodes::Error _disconnectErrorCode = ErrorCodes::ClientDisconnect;
 
-    AtomicWord<TagMask> _tags;
+    Atomic<TagMask> _tags;
 };
 
 /**

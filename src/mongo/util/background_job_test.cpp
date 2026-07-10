@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
@@ -42,7 +42,7 @@ namespace {
 class TestJob final : public BackgroundJob {
 public:
     TestJob(bool selfDelete,
-            AtomicWord<bool>* flag,
+            Atomic<bool>* flag,
             Notification<void>* canProceed = nullptr,
             Notification<void>* destructorInvoked = nullptr)
         : BackgroundJob(selfDelete),
@@ -66,13 +66,13 @@ public:
     }
 
 private:
-    AtomicWord<bool>* const _flag;
+    Atomic<bool>* const _flag;
     Notification<void>* const _canProceed;
     Notification<void>* const _destructorInvoked;
 };
 
 TEST(BackgroundJobBasic, NormalCase) {
-    AtomicWord<bool> flag(false);
+    Atomic<bool> flag(false);
     TestJob tj(false, &flag);
     tj.go();
     ASSERT(tj.wait());
@@ -80,7 +80,7 @@ TEST(BackgroundJobBasic, NormalCase) {
 }
 
 TEST(BackgroundJobBasic, TimeOutCase) {
-    AtomicWord<bool> flag(false);
+    Atomic<bool> flag(false);
     Notification<void> canProceed;
     TestJob tj(false, &flag, &canProceed);
     tj.go();
@@ -94,7 +94,7 @@ TEST(BackgroundJobBasic, TimeOutCase) {
 }
 
 TEST(BackgroundJobBasic, SelfDeletingCase) {
-    AtomicWord<bool> flag(false);
+    Atomic<bool> flag(false);
     Notification<void> destructorInvoked;
     // Though it looks like one, this is not a leak since the job is self deleting.
     (new TestJob(true, &flag, nullptr, &destructorInvoked))->go();

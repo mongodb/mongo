@@ -57,7 +57,7 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
@@ -318,8 +318,8 @@ Future<void> ConfigServerHealthObserver::_runPingSeveralReplicas(
     // We also use this cancelation source to block until we can return from this method.
     CancellationSource completionCancellationSource(ctx->cancellationToken);
     // Keeps track of how many servers we reached or failed.
-    auto reachedCount = std::make_shared<AtomicWord<int>>();
-    auto failedCount = std::make_shared<AtomicWord<int>>();
+    auto reachedCount = std::make_shared<Atomic<int>>();
+    auto failedCount = std::make_shared<Atomic<int>>();
 
     for (uint64_t i = 0; i < servers.size(); ++i) {
         const auto& server = servers[i];

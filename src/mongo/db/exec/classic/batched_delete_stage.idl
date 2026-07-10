@@ -37,7 +37,7 @@ server_parameters:
     batchedDeletesTargetStagedDocBytes:
         description: "Threshold in bytes accounting for documents (not index entries) at which a batch of document deletions is committed. A value of zero means unlimited"
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<long long>"
+        cpp_vartype: "Atomic<long long>"
         cpp_varname: gBatchedDeletesTargetStagedDocBytes
         default: 2097152 # 2MB
         validator:
@@ -48,7 +48,7 @@ server_parameters:
     batchedDeletesTargetBatchDocs:
         description: "Threshold of documents at which a batch of document deletions is committed. A value of zero means unlimited"
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<long long>"
+        cpp_vartype: "Atomic<long long>"
         cpp_varname: "gBatchedDeletesTargetBatchDocs"
         default: 10
         validator:
@@ -58,7 +58,7 @@ server_parameters:
     batchedDeletesTargetBatchTimeMS:
         description: "Threshold in milliseconds of batch processing time at which a batch of document deletions is committed. A value of zero means unlimited"
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<long long>"
+        cpp_vartype: "Atomic<long long>"
         cpp_varname: "gBatchedDeletesTargetBatchTimeMS"
         default: 5
         validator:

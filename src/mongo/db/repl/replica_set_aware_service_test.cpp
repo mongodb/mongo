@@ -42,7 +42,7 @@
 #include "mongo/db/shard_role/shard_catalog/database_holder_mock.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state_factory_mock.h"
 #include "mongo/db/topology/sharding_state.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/notification.h"
@@ -344,7 +344,7 @@ private:
         TestService::onStartup(opCtx);
     }
 
-    AtomicWord<bool> _blockStartup{false};
+    Atomic<bool> _blockStartup{false};
     Notification<void> _startupReached;
     Notification<void> _proceedWithStartup;
 };
@@ -613,7 +613,7 @@ TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareServiceShutdownInterruptsStart
         reg.onStartup(opCtx.get());
     });
 
-    AtomicWord<bool> shutdownReturned{false};
+    Atomic<bool> shutdownReturned{false};
     stdx::thread shutdownThread;
 
     // Always release startup and join the threads, even if an assertion throws below.

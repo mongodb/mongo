@@ -35,7 +35,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 #include <string>
@@ -159,7 +159,7 @@ private:
 
     // Indicates whether this chunk should be treated as jumbo and not attempted to be moved or
     // split
-    AtomicWord<bool> _jumbo;
+    Atomic<bool> _jumbo;
 };
 
 class [[MONGO_MOD_NEEDS_REPLACEMENT]] Chunk {

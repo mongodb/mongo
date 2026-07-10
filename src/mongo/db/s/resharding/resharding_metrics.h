@@ -40,7 +40,7 @@
 #include "mongo/db/s/resharding/resharding_metrics_helpers.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
@@ -408,8 +408,8 @@ private:
     void appendChangeStreamMonitorLagMetrics(BSONObjBuilder& bob) const;
 
     template <typename T>
-    T getElapsed(const AtomicWord<Date_t>& startTime,
-                 const AtomicWord<Date_t>& endTime,
+    T getElapsed(const Atomic<Date_t>& startTime,
+                 const Atomic<Date_t>& endTime,
                  ClockSource* clock) const {
         auto start = startTime.load();
         if (start == kNoDate) {
@@ -536,26 +536,26 @@ private:
     ObserverPtr _observer;
     ReshardingCumulativeMetrics* _cumulativeMetrics;
 
-    AtomicWord<int64_t> _approxDocumentsToProcess;
-    AtomicWord<int64_t> _documentsProcessed;
-    AtomicWord<int64_t> _approxBytesToScan;
-    AtomicWord<int64_t> _bytesWritten;
+    Atomic<int64_t> _approxDocumentsToProcess;
+    Atomic<int64_t> _documentsProcessed;
+    Atomic<int64_t> _approxBytesToScan;
+    Atomic<int64_t> _bytesWritten;
 
-    AtomicWord<int64_t> _writesToStashCollections;
+    Atomic<int64_t> _writesToStashCollections;
 
-    AtomicWord<Milliseconds> _coordinatorHighEstimateRemainingTimeMillis;
-    AtomicWord<Milliseconds> _coordinatorLowEstimateRemainingTimeMillis;
+    Atomic<Milliseconds> _coordinatorHighEstimateRemainingTimeMillis;
+    Atomic<Milliseconds> _coordinatorLowEstimateRemainingTimeMillis;
 
-    AtomicWord<int64_t> _readsDuringCriticalSection;
-    AtomicWord<int64_t> _writesDuringCriticalSection;
+    Atomic<int64_t> _readsDuringCriticalSection;
+    Atomic<int64_t> _writesDuringCriticalSection;
 
-    AtomicWord<ReshardingCumulativeMetrics::AnyState> _state;
+    Atomic<ReshardingCumulativeMetrics::AnyState> _state;
 
-    AtomicWord<int64_t> _insertsApplied{0};
-    AtomicWord<int64_t> _updatesApplied{0};
-    AtomicWord<int64_t> _deletesApplied{0};
-    AtomicWord<int64_t> _oplogEntriesApplied{0};
-    AtomicWord<int64_t> _oplogEntriesFetched{0};
+    Atomic<int64_t> _insertsApplied{0};
+    Atomic<int64_t> _updatesApplied{0};
+    Atomic<int64_t> _deletesApplied{0};
+    Atomic<int64_t> _oplogEntriesApplied{0};
+    Atomic<int64_t> _oplogEntriesFetched{0};
 
     // To be used by recipients only. This map stores the OplogLatencyMetrics for each donor that a
     // recipient is copying data from. The map is populated by 'registerDonors' before the oplog
@@ -569,16 +569,16 @@ private:
 
     resharding_metrics::PhaseDurationTracker _phaseDurations;
 
-    AtomicWord<bool> _ableToEstimateRemainingRecipientTime;
+    Atomic<bool> _ableToEstimateRemainingRecipientTime;
 
-    AtomicWord<bool> _isSameKeyResharding;
-    AtomicWord<int64_t> _indexesToBuild;
-    AtomicWord<int64_t> _indexesBuilt;
+    Atomic<bool> _isSameKeyResharding;
+    Atomic<int64_t> _indexesToBuild;
+    Atomic<int64_t> _indexesBuilt;
 
     // Change stream monitor metrics (donors and recipients only).
     // Pre-computed lag between the majority-committed oplog timestamp and the change stream
     // monitor's resume token timestamp, in milliseconds. -1 means "not yet set".
-    AtomicWord<int64_t> _changeStreamMonitorLagMillis{-1};
+    Atomic<int64_t> _changeStreamMonitorLagMillis{-1};
 
     UniqueScopedObserver _scopedObserver;
     const ReshardingProvenanceEnum _provenance;

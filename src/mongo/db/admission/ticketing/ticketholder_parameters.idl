@@ -37,7 +37,7 @@ server_parameters:
             execution window is considered delinquent. Controls both the queues.execution
             delinquency counters and the metrics.query.aggregation.nonTicketed counters.
         set_at: [startup]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: gDelinquentAcquisitionIntervalMillis
         default: 30
         validator:

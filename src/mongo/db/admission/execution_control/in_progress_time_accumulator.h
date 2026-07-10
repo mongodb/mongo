@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
@@ -141,7 +141,7 @@ private:
     mutable std::mutex _mutex;
 
     // Written only under _mutex; read without the lock by currentCount() and _inProgressTicks().
-    AtomicWord<int64_t> _count{0};
+    Atomic<int64_t> _count{0};
 
     // The following are owned by _mutex. '_accumulatedTicks' stores the time-integral of the
     // operation count in count × tick units since construction.
@@ -150,7 +150,7 @@ private:
 
     // Snapshot of totalMicros() published under _mutex, returned by non-blocking readers that find
     // the lock held.
-    mutable AtomicWord<int64_t> _cachedTotalMicros{0};
+    mutable Atomic<int64_t> _cachedTotalMicros{0};
 };
 
 }  // namespace mongo::admission::execution_control

@@ -35,7 +35,7 @@
 #include "mongo/crypto/fle_stats_gen.h"
 #include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/concurrent_shared_values_map.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/tick_source.h"
@@ -95,7 +95,7 @@ public:
 private:
     TickSource* _tickSource;
     const TickSource::Tick _ticksPerPeriod;
-    AtomicWord<long long> _count{0};
+    Atomic<long long> _count{0};
     Atomic<TickSource::Tick> _lastUpdate{0};
 };
 
@@ -110,7 +110,7 @@ public:
 
     void serialize(BSONObjBuilder* builder) const;
 
-    AtomicWord<long long> insertOpCounter = 0;
+    Atomic<long long> insertOpCounter = 0;
     RateLimitedCounter findOpCounter;
     RateLimitedCounter updateOpCounter;
     RateLimitedCounter deleteOpCounter;
@@ -193,9 +193,9 @@ private:
 
     TickSource* _tickSource;
 
-    AtomicWord<long long> emuBinaryCalls;
-    AtomicWord<long long> emuBinarySuboperation;
-    AtomicWord<long long> emuBinaryTotalMillis;
+    Atomic<long long> emuBinaryCalls;
+    Atomic<long long> emuBinarySuboperation;
+    Atomic<long long> emuBinaryTotalMillis;
 
     // Tracks and reports statistics about how many collections in the catalog use each of the
     // Queryable Encryption index types, and how many collections use unindexed encryption.

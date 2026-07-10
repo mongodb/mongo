@@ -38,7 +38,7 @@
 #include "mongo/db/stats/opcounters.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/otel/metrics/metrics_counter.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/message.h"
 #include "mongo/util/aligned.h"
 #include "mongo/util/assert_util.h"
@@ -106,10 +106,10 @@ public:
 private:
     // Physical byte counters — not OTel-exported.
     // TODO SERVER-127423: Replace these with OTel-exported counters.
-    CacheExclusive<AtomicWord<long long>> _ingressPhysicalBytesIn{0};
-    CacheExclusive<AtomicWord<long long>> _ingressPhysicalBytesOut{0};
-    CacheExclusive<AtomicWord<long long>> _egressPhysicalBytesIn{0};
-    CacheExclusive<AtomicWord<long long>> _egressPhysicalBytesOut{0};
+    CacheExclusive<Atomic<long long>> _ingressPhysicalBytesIn{0};
+    CacheExclusive<Atomic<long long>> _ingressPhysicalBytesOut{0};
+    CacheExclusive<Atomic<long long>> _egressPhysicalBytesIn{0};
+    CacheExclusive<Atomic<long long>> _egressPhysicalBytesOut{0};
 
     // Logical ingress counters.
     otel::metrics::Counter<int64_t>& _ingressLogicalBytesIn;
@@ -126,7 +126,7 @@ private:
 
     // Counter of inbound connections at runtime.
     // TODO SERVER-127423: Replace this with an OTel-exported counter.
-    CacheExclusive<AtomicWord<std::int64_t>> _tfoAccepted{0};
+    CacheExclusive<Atomic<std::int64_t>> _tfoAccepted{0};
 
     // TFO info determined at startup.
     std::int64_t _tfoKernelSetting{0};
@@ -190,8 +190,8 @@ public:
 
 private:
     struct SuccessCounter {
-        AtomicWord<long long> total;
-        AtomicWord<long long> successful;
+        Atomic<long long> total;
+        Atomic<long long> successful;
         void appendAsSubobj(BSONObjBuilder& bob, std::string_view fieldName) const;
     };
     struct MechanismData {
@@ -208,9 +208,9 @@ private:
     };
     using MechanismMap = std::map<std::string, MechanismData, std::less<>>;
 
-    AtomicWord<long long> _saslSupportedMechanismsReceived;
-    AtomicWord<long long> _ingressAuthenticationCumulativeMicros;
-    AtomicWord<long long> _egressAuthenticationCumulativeMicros;
+    Atomic<long long> _saslSupportedMechanismsReceived;
+    Atomic<long long> _ingressAuthenticationCumulativeMicros;
+    Atomic<long long> _egressAuthenticationCumulativeMicros;
     // Mechanism maps are initialized at startup to contain all possible mechanisms. Mechanisms not
     // present in the authenticationMechanisms setParam are marked as egress only; this is
     // because this parameter only restricts which mechanisms can be used for ingress.  After

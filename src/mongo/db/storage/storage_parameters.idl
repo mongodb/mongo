@@ -70,7 +70,7 @@ server_parameters:
     operationMemoryPoolBlockInitialSizeKB:
         description: "Initial block size in KB for the per operation temporary object memory pool"
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: gOperationMemoryPoolBlockInitialSizeKB
         default: 1
         validator:
@@ -80,7 +80,7 @@ server_parameters:
     operationMemoryPoolBlockMaxSizeKB:
         description: "Maximum block size in KB for the per operation temporary object memory pool"
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: gOperationMemoryPoolBlockMaxSizeKB
         default: 2048
         validator:
@@ -90,7 +90,7 @@ server_parameters:
     indexMaxNumGeneratedKeysPerDocument:
         description: "Maximum number of index keys a single document is allowed to generate"
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: gIndexMaxNumGeneratedKeysPerDocument
         default: 100000
         validator:
@@ -107,7 +107,7 @@ server_parameters:
     timeseriesValidateCompressedBuckets:
         description: "Validate that there is no data loss before committing compressed timeseries buckets"
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: gValidateTimeseriesCompression
         default: true
         redact: false
@@ -116,7 +116,7 @@ server_parameters:
         description: "Maximum number of documents that we will insert in a single batch."
         set_at: [startup, runtime]
         cpp_varname: "internalInsertMaxBatchSize"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 500
         validator:
             gt: 0
@@ -128,7 +128,7 @@ server_parameters:
             format for batched writes is in use. See batchedDeletesTargetBatchDocs and
             maxNumberOfTransactionOperationsInSingleOplogEntry.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gMaxNumberOfBatchedOperationsInSingleOplogEntry
         default: 2147483647 # INT_MAX
         validator: {gte: 1}
@@ -140,7 +140,7 @@ server_parameters:
             format for batched writes is in use.
             See batchedDeletesTargetStagedDocBytes and BSONObjMaxUserSize.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gMaxSizeOfBatchedOperationsInSingleOplogEntryBytes
         default: 16777216 # 16 MB
         validator: {gte: 1}
@@ -151,7 +151,7 @@ server_parameters:
             Maximum number of inserts that cross-db collection renames can batch into one applyOps
             oplog entry.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gMaxNumberOfInsertsBatchInsertsForRenameAcrossDatabases
         default: 500
         validator: {gte: 1, lte: 16777216}
@@ -162,7 +162,7 @@ server_parameters:
             Maximum size (bytes) of each batched applyOps oplog entry for cross-db collection renames.
             If any one document exceeds this limit, falls back to a plain insert oplog entry for that doc.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gMaxSizeOfBatchedInsertsForRenameAcrossDatabasesBytes
         default:
             4194304 # 4 MB, an arbitrary but conservative fraction of the 16 MB BSON limit. Similar
@@ -173,7 +173,7 @@ server_parameters:
     collectionSamplingLogIntervalSeconds:
         description: "The approximate interval between log messages indicating collection sampling progress. Once interval seconds have elapsed since the last log message, a progress message will be logged after the current sample is completed. A value of zero will disable this logging."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<int>"
+        cpp_vartype: "Atomic<int>"
         cpp_varname: gCollectionSamplingLogIntervalSeconds
         deprecated_name:
             - oplogSamplingLogIntervalSeconds
@@ -201,7 +201,7 @@ server_parameters:
     cachePressureEvictionStallThresholdProportion:
         description: "To adjust the thread pressure sensitivity proportion in detecting cache pressure for the storage engine."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<double>"
+        cpp_vartype: "Atomic<double>"
         cpp_varname: gCachePressureEvictionStallThresholdProportion
         default: 0.95
         validator: {gte: 0, lte: 1}
@@ -210,7 +210,7 @@ server_parameters:
     cachePressureEvictionStallDetectionWindowSeconds:
         description: "The duration of time to allow cache pressure statistics to accumulate and average."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<int>"
+        cpp_vartype: "Atomic<int>"
         cpp_varname: gCachePressureEvictionStallDetectionWindowSeconds
         default: 20
         validator: {gte: 1}
@@ -219,7 +219,7 @@ server_parameters:
     cachePressureExponentiallyDecayingMovingAverageAlphaValue:
         description: "The alpha value used to calculate the exponentially decaying moving average of total tickets."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<double>"
+        cpp_vartype: "Atomic<double>"
         cpp_varname: gCachePressureExponentiallyDecayingMovingAverageAlphaValue
         default: 0.1
         validator: {gte: 0, lte: 1}

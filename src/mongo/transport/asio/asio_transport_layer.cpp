@@ -312,7 +312,7 @@ private:
 
     asio::io_context _ioContext;
 
-    AtomicWord<bool> _closedForScheduling{false};
+    Atomic<bool> _closedForScheduling{false};
 };
 
 AsioTransportLayer::Options::Options(const ServerGlobalParams* params)
@@ -427,7 +427,7 @@ struct AsioTransportLayer::AcceptorRecord {
     GenericAcceptor acceptor;
     // Tracks the amount of incoming connections waiting to be accepted by the server on this
     // acceptor.
-    AtomicWord<int> backlogQueueDepth{0};
+    Atomic<int> backlogQueueDepth{0};
 };
 
 class WrappedEndpoint {
@@ -1137,7 +1137,7 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
               peer(std::move(peer)),
               reactor(reactor) {}
 
-        AtomicWord<bool> done{false};
+        Atomic<bool> done{false};
         Promise<std::shared_ptr<Session>> promise;
 
         std::mutex mutex;

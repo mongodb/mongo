@@ -37,7 +37,7 @@ server_parameters:
             rollback, and data files containing rolled back oplog entries. This server parameter affects 
             rollback via recovery to stable timestamp.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: gCreateRollbackDataFiles
         default: true
         redact: false
@@ -48,7 +48,7 @@ server_parameters:
             It is calculated by taking the difference of the wall clock times of the oplog entries
             at the top of the local oplog and the first oplog entry after the common point.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gRollbackTimeLimitSecs
         default:
             expr: "60 * 60 * 24" # Default 1 day

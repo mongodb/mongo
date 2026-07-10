@@ -33,7 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/client/retry_strategy.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
@@ -683,9 +683,9 @@ SemiFuture<ResultVector> whenAllSucceed(std::vector<FutureLike>&& futures) {
         // Total number of input futures.
         const size_t numFuturesToWaitFor;
         // Tracks the number of input futures which have resolved with success so far.
-        AtomicWord<size_t> numResultsReturnedWithSuccess{0};
+        Atomic<size_t> numResultsReturnedWithSuccess{0};
         // Tracks whether or not the resultPromise has been set. Only used for the error case.
-        AtomicWord<bool> completedWithError{false};
+        Atomic<bool> completedWithError{false};
         // The promise corresponding to the resulting SemiFuture returned by this function.
         Promise<ResultVector> resultPromise;
         // A vector containing the results of each input future.
@@ -743,9 +743,9 @@ SemiFuture<void> whenAllSucceed(std::vector<FutureLike>&& futures) {
         // Total number of input futures.
         const size_t numFuturesToWaitFor;
         // Tracks the number of input futures which have resolved with success so far.
-        AtomicWord<size_t> numResultsReturnedWithSuccess{0};
+        Atomic<size_t> numResultsReturnedWithSuccess{0};
         // Tracks whether or not the resultPromise has been set. Only used for the error case.
-        AtomicWord<bool> completedWithError{false};
+        Atomic<bool> completedWithError{false};
         // The promise corresponding to the resulting SemiFuture returned by this function.
         Promise<void> resultPromise;
     };
@@ -804,7 +804,7 @@ SemiFuture<ResultVector> whenAll(std::vector<FutureT>&& futures) {
         // Total number of input futures.
         const size_t numFuturesToWaitFor;
         // Tracks the number of input futures which have resolved so far.
-        AtomicWord<size_t> numReady{0};
+        Atomic<size_t> numReady{0};
         // A vector containing the results of each input future.
         ResultVector intermediateResult;
         // The promise corresponding to the resulting SemiFuture returned by this function.
@@ -859,7 +859,7 @@ SemiFuture<Result> whenAny(std::vector<FutureT>&& futures) {
     struct SharedBlock {
         SharedBlock(Promise<Result> result) : resultPromise(std::move(result)) {}
         // Tracks whether or not the resultPromise has been set.
-        AtomicWord<bool> done{false};
+        Atomic<bool> done{false};
         // The promise corresponding to the resulting SemiFuture returned by this function.
         Promise<Result> resultPromise;
     };
@@ -929,7 +929,7 @@ SemiFuture<Value> withCancellation(FutureT&& inputFuture, const CancellationToke
     struct SharedBlock {
         SharedBlock(Promise<Value> result) : resultPromise(std::move(result)) {}
         // Tracks whether or not the resultPromise has been set.
-        AtomicWord<bool> done{false};
+        Atomic<bool> done{false};
         // The promise corresponding to the resulting SemiFuture returned by this function.
         Promise<Value> resultPromise;
     };

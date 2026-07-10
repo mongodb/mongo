@@ -33,7 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
@@ -104,7 +104,7 @@ public:
 private:
     friend class DummyInstance;
 
-    AtomicWord<int> _instanceCount;
+    Atomic<int> _instanceCount;
 };
 
 TEST_F(ClientOutOfLineExecutorTest, CheckDecoration) {

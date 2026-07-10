@@ -34,7 +34,7 @@ global:
 server_parameters:
     maxLogSizeKB:
         cpp_varname: gMaxLogAttributeSizeKB
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         default:
             expr: logv2::constants::kDefaultMaxAttributeOutputSizeKB
         validator:

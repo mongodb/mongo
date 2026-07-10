@@ -161,7 +161,7 @@ private:
     TickSourceMock<Nanoseconds>* _tickSource;
     std::unique_ptr<EventQueue> _eventQueue;
     stdx::thread _monitor;
-    AtomicWord<bool> _stopping{false};
+    Atomic<bool> _stopping{false};
 };
 
 class SimulationRegistry {

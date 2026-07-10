@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/timer.h"
 
@@ -55,8 +55,8 @@ public:
     }
 
 private:
-    AtomicWord<long long> _num;
-    AtomicWord<long long> _totalMillis;
+    Atomic<long long> _num;
+    Atomic<long long> _totalMillis;
 };
 
 /**

@@ -328,7 +328,7 @@ Status TicketingSystem::updateBackgroundTasksDeprioritization(bool enabled) {
                           });
 }
 
-int TicketingSystem::resolveLowPriorityTickets(const AtomicWord<int32_t>& serverParam) {
+int TicketingSystem::resolveLowPriorityTickets(const Atomic<int32_t>& serverParam) {
     const int loadedValue = serverParam.load();
 
     return loadedValue == kUnsetLowPriorityConcurrentTransactionsValue

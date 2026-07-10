@@ -34,7 +34,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/s/primary_only_service_helpers/retrying_cancelable_operation_context_factory.h"
 #include "mongo/db/s/primary_only_service_helpers/with_automatic_retry.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/functional.h"
@@ -87,7 +87,7 @@ const auto kRetryabilityPredicateIncludeReplicaSetWritesBlockedAndWriteConcern =
  * Rate-limits the "writes to this replica set are blocked" warning that the resharding cloner,
  * oplog applier, and recipient state machine each emit while held on a replica set write block.
  */
-bool shouldLogWriteBlockWarning(AtomicWord<long long>& lastWarningAt);
+bool shouldLogWriteBlockWarning(Atomic<long long>& lastWarningAt);
 
 template <typename BodyCallable>
 primary_only_service_helpers::WithAutomaticRetry<BodyCallable> WithAutomaticRetry(

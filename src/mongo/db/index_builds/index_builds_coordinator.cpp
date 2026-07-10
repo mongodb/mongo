@@ -207,24 +207,24 @@ public:
         return indexBuilds.obj();
     }
 
-    AtomicWord<int> registered{0};
-    AtomicWord<int> killedDueToInsufficientDiskSpace{0};
-    AtomicWord<int> failedDueToDataCorruption{0};
+    Atomic<int> registered{0};
+    Atomic<int> killedDueToInsufficientDiskSpace{0};
+    Atomic<int> failedDueToDataCorruption{0};
 
     // The number of times a unique index build has failed because the existing collection contains
     // duplicate keys.
-    AtomicWord<int> failedDueToDuplicateKeyError{0};
+    Atomic<int> failedDueToDuplicateKeyError{0};
 
     // The number of times an index build has failed due to the user dropping the index before
     // it is committed.
-    AtomicWord<int> failedDueToManualCancellation{0};
+    Atomic<int> failedDueToManualCancellation{0};
 
     //
     // Execution ticket metrics.
     //
 
-    AtomicWord<int64_t> ticketAdmissions{0};
-    AtomicWord<int64_t> lowPriorityTicketAdmissions{0};
+    Atomic<int64_t> ticketAdmissions{0};
+    Atomic<int64_t> lowPriorityTicketAdmissions{0};
 
     // Total time index builds have spent queued waiting for an execution ticket, including the
     // in-progress wait of any build currently queued. Also exposes the "currently queued" gauge.
@@ -238,27 +238,27 @@ public:
     // Phase metrics
     //
 
-    AtomicWord<int> scanCollection{0};
-    AtomicWord<int> drainSideWritesTable{0};
-    AtomicWord<int> waitForCommitQuorum{0};
-    AtomicWord<int> drainSideWritesTableOnCommit{0};
-    AtomicWord<int> processConstraintsViolationTableOnCommit{0};
-    AtomicWord<int> commit{0};
+    Atomic<int> scanCollection{0};
+    Atomic<int> drainSideWritesTable{0};
+    Atomic<int> waitForCommitQuorum{0};
+    Atomic<int> drainSideWritesTableOnCommit{0};
+    Atomic<int> processConstraintsViolationTableOnCommit{0};
+    Atomic<int> commit{0};
 
     // The duration of the last committed index build.
-    AtomicWord<int64_t> lastCommittedMillis{0};
+    Atomic<int64_t> lastCommittedMillis{0};
     // The duration between receiving the commitIndexBuild oplog entry and committing the index
     // build for steady state replication for the last committed index build.
-    AtomicWord<int64_t> lastTimeBetweenCommitOplogAndCommitMillis;
+    Atomic<int64_t> lastTimeBetweenCommitOplogAndCommitMillis;
     // The duration between receiving the commitIndexBuild oplog entry and committing the index
     // build during startup recovery for the last committed index build.
-    AtomicWord<int64_t> lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery;
+    Atomic<int64_t> lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery;
     // The duration between receiving the commitIndexBuild oplog entry and committing the index
     // build for the last index build, when restoring a node using magic restore or when restoring
     // it from the oplog as a standalone node.
-    AtomicWord<int64_t> lastTimeBetweenCommitOplogAndCommitMillisRestore;
+    Atomic<int64_t> lastTimeBetweenCommitOplogAndCommitMillisRestore;
     // The duration between voting to commit and committing the index build.
-    AtomicWord<int64_t> lastTimeBetweenVoteAndCommitMillis;
+    Atomic<int64_t> lastTimeBetweenVoteAndCommitMillis;
 };
 
 IndexBuildsSSS& indexBuildsSSS =
@@ -723,7 +723,7 @@ void storeLastTimeBetweenVoteAndCommitMillis(const ReplIndexBuildState& replStat
  */
 void storeLastTimeBetweenCommitOplogAndCommit(const ReplIndexBuildState& replState,
                                               std::string_view metricName,
-                                              AtomicWord<int64_t>& metric) {
+                                              Atomic<int64_t>& metric) {
     const auto metrics = replState.getIndexBuildMetrics();
     const auto now = Date_t::now();
     tassert(11436300,

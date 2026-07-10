@@ -28,7 +28,7 @@
  */
 #include "mongo/executor/task_executor.h"
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
@@ -74,7 +74,7 @@ public:
 
 private:
     Promise<T> _promise;
-    AtomicWord<bool> _completed;
+    Atomic<bool> _completed;
 };
 
 namespace {

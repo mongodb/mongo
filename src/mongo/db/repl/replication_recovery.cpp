@@ -76,7 +76,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -133,8 +133,8 @@ public:
         return recoveryOplogApplier.obj();
     }
 
-    AtomicWord<size_t> numBatches{0};
-    AtomicWord<size_t> numOpsApplied{0};
+    Atomic<size_t> numBatches{0};
+    Atomic<size_t> numOpsApplied{0};
 };
 
 auto& recoveryOplogApplierSection =

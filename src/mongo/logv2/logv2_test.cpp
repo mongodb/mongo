@@ -65,7 +65,7 @@
 #include "mongo/logv2/ramlog_sink.h"
 #include "mongo/logv2/text_formatter.h"
 #include "mongo/logv2/uassert_sink.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/int128.h"
 #include "mongo/stdx/thread.h"
@@ -2107,7 +2107,7 @@ TEST_F(LogV2JsonTruncationTest, JsonTruncationDisabled) {
 }
 
 TEST_F(LogV2Test, StringTruncation) {
-    const AtomicWord<int32_t> maxAttributeSizeKB(1);
+    const Atomic<int32_t> maxAttributeSizeKB(1);
     auto lines = makeLineCapture(JSONFormatter(&maxAttributeSizeKB));
 
     std::size_t maxLength = maxAttributeSizeKB.load() << 10;
@@ -2157,7 +2157,7 @@ TEST_F(LogV2Test, StringTruncation) {
 // While having a very large maxAttributeSizeKB is impractical, this test should catch any potential
 // issues due to that (e.g., from sanitizers).
 TEST_F(LogV2Test, MaxIntMaxAttributeSize) {
-    const AtomicWord<int32_t> maxAttributeSizeKB(std::numeric_limits<int32_t>::max());
+    const Atomic<int32_t> maxAttributeSizeKB(std::numeric_limits<int32_t>::max());
     auto lines = makeLineCapture(JSONFormatter(&maxAttributeSizeKB));
 
     LOGV2(11792000, "name", "name"_attr = "some_name");

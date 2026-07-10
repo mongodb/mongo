@@ -44,7 +44,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_specialized_test_gen.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"

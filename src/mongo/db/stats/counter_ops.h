@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
@@ -37,14 +37,14 @@
 namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
- * Helper functions to operate on AtomicWord<long long> and int64_t interchangibly.
+ * Helper functions to operate on Atomic<long long> and int64_t interchangibly.
  */
 namespace counter_ops {
 static int64_t get(const int64_t& counter) {
     return counter;
 }
 
-static int64_t get(const AtomicWord<long long>& counter) {
+static int64_t get(const Atomic<long long>& counter) {
     return counter.load();
 }
 
@@ -52,15 +52,15 @@ static void set(int64_t& counter, int64_t value) {
     counter = value;
 }
 
-static void set(int64_t& counter, const AtomicWord<long long>& value) {
+static void set(int64_t& counter, const Atomic<long long>& value) {
     counter = value.load();
 }
 
-static void set(AtomicWord<long long>& counter, int64_t value) {
+static void set(Atomic<long long>& counter, int64_t value) {
     counter.store(value);
 }
 
-static void set(AtomicWord<long long>& counter, const AtomicWord<long long>& value) {
+static void set(Atomic<long long>& counter, const Atomic<long long>& value) {
     counter.store(value.load());
 }
 
@@ -68,11 +68,11 @@ static void add(int64_t& counter, int64_t value) {
     counter += value;
 }
 
-static void add(int64_t& counter, const AtomicWord<long long>& value) {
+static void add(int64_t& counter, const Atomic<long long>& value) {
     counter += value.load();
 }
 
-static void add(AtomicWord<long long>& counter, int64_t value) {
+static void add(Atomic<long long>& counter, int64_t value) {
     counter.addAndFetch(value);
 }
 

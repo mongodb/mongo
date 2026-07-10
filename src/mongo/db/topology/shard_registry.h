@@ -41,7 +41,7 @@
 #include "mongo/db/sharding_environment/shard_handle.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -507,7 +507,7 @@ private:
         }
 
         // Source for the _forceReloadIncrement field.
-        static AtomicWord<Increment> _forceReloadIncrementSource;
+        static Atomic<Increment> _forceReloadIncrementSource;
 
         // The _forceReloadIncrement is used to indicate that the latest data should be fetched
         // from the configsvrs regardless of the topologyTime (ie. when the topologyTime can't be
@@ -521,9 +521,9 @@ private:
     };
 
     struct Stats {
-        AtomicWord<long long> activeRefreshCount{0};
-        AtomicWord<long long> totalRefreshCount{0};
-        AtomicWord<long long> failedRefreshCount{0};
+        Atomic<long long> activeRefreshCount{0};
+        Atomic<long long> totalRefreshCount{0};
+        Atomic<long long> failedRefreshCount{0};
 
         void report(BSONObjBuilder* builder) const;
     } _stats;
@@ -631,7 +631,7 @@ private:
     mutable ObservableMutex<std::mutex> _mutex;
 
     // Set to true once one of the init methods have been called.
-    AtomicWord<bool> _isInitialized{false};
+    Atomic<bool> _isInitialized{false};
 
     // Stores a reference to the configShard.
     ShardRegistryData _configShardData;
@@ -644,10 +644,10 @@ private:
     LatestConnStrings _latestConnStrings;
 
     // Set to true in shutdown call to prevent calling it twice.
-    AtomicWord<bool> _isShutdown{false};
+    Atomic<bool> _isShutdown{false};
 
     // Set to true when in recovery mode
-    AtomicWord<bool> _isRecoveryMode{false};
+    Atomic<bool> _isRecoveryMode{false};
 
     /**
      * Clears the cached latest connection strings and ReplicaSetMonitors.

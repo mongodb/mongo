@@ -50,7 +50,7 @@
 #include "mongo/db/version_context.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -83,7 +83,7 @@ LogicalSessionId getSystemLogicalSessionId() {
 }
 
 TxnNumber getNextTxnNumber() {
-    static AtomicWord<TxnNumber> nextTxnNumber{0};
+    static Atomic<TxnNumber> nextTxnNumber{0};
     return nextTxnNumber.fetchAndAdd(2);
 }
 

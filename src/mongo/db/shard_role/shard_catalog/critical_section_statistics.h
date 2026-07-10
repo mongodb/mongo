@@ -140,7 +140,7 @@ private:
     stdx::unordered_map<Key, Timer> _catchupModeCriticalSections;
     std::list<Timer> _waitersList;
 
-    AtomicWord<int64_t> _activeWaiters{0};
-    AtomicWord<int64_t> _totalTimeWaiting{0};
+    Atomic<int64_t> _activeWaiters{0};
+    Atomic<int64_t> _totalTimeWaiting{0};
 };
 }  // namespace mongo

@@ -34,7 +34,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
@@ -469,7 +469,7 @@ TEST_F(PeriodicRunnerImplTest, ChangingIntervalWorks) {
 TEST_F(PeriodicRunnerImplTest, StopProperlyInterruptsOpCtx) {
     Milliseconds interval{5};
     unittest::Barrier barrier(2);
-    AtomicWord<bool> killed{false};
+    Atomic<bool> killed{false};
 
     PeriodicRunner::PeriodicJob job(
         "job",

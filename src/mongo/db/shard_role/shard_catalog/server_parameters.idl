@@ -37,7 +37,7 @@ server_parameters:
             - startup
             - runtime
         cpp_varname: gChanceForDurableCollectionMetadataRecovery
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         test_only: true
         default: 1
         validator:
@@ -51,7 +51,7 @@ server_parameters:
             - startup
             - runtime
         cpp_varname: gEnableBackgroundCleanupOfShardCatalog
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
 

@@ -34,7 +34,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/user_write_block/user_writes_block_reason_gen.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 #include <array>
@@ -105,13 +105,13 @@ public:
 
 
 private:
-    AtomicWord<bool> _globalUserWritesBlocked{false};
-    AtomicWord<UserWritesBlockReasonEnum> _globalUserWritesBlockedReason{
+    Atomic<bool> _globalUserWritesBlocked{false};
+    Atomic<UserWritesBlockReasonEnum> _globalUserWritesBlockedReason{
         UserWritesBlockReasonEnum::kUnspecified};
-    std::array<AtomicWord<size_t>, idlEnumCount<UserWritesBlockReasonEnum>>
+    std::array<Atomic<size_t>, idlEnumCount<UserWritesBlockReasonEnum>>
         _globalUserWriteBlockCounters{};
-    AtomicWord<bool> _userShardedDDLBlocked{false};
-    AtomicWord<bool> _userIndexBuildsBlocked{false};
+    Atomic<bool> _userShardedDDLBlocked{false};
+    Atomic<bool> _userIndexBuildsBlocked{false};
 };
 
 }  // namespace mongo

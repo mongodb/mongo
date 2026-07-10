@@ -738,7 +738,7 @@ private:
     State _state{kNew};
 
     // Used to keep track of the critical section to mark transfer mods as non-deprioritizable
-    AtomicWord<bool> _prioritizeLocalOps{false};
+    Atomic<bool> _prioritizeLocalOps{false};
 
     CloneList _cloneList;
 

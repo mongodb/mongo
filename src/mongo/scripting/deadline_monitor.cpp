@@ -29,7 +29,7 @@
 
 #include "mongo/scripting/deadline_monitor.h"
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/scripting/deadline_monitor_gen.h"
 
 

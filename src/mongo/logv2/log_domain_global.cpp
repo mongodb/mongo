@@ -130,7 +130,7 @@ struct LogDomainGlobal::Impl {
 #ifdef BOOST_LOG_USE_NATIVE_SYSLOG
     boost::shared_ptr<boost::log::sinks::unlocked_sink<SyslogBackend>> _syslogSink;
 #endif
-    AtomicWord<int32_t> activeSourceThreadLocals{0};
+    Atomic<int32_t> activeSourceThreadLocals{0};
     LogSource shutdownLogSource{&_parent, true};
     bool isInShutdown{false};
 };

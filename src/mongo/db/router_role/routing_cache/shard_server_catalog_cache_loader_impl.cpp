@@ -75,7 +75,7 @@
 #include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/util/assert_util.h"
@@ -110,7 +110,7 @@ MONGO_FAIL_POINT_DEFINE(hangCollectionFlush);
 MONGO_FAIL_POINT_DEFINE(hangDatabaseFlush);
 MONGO_FAIL_POINT_DEFINE(noCacheMetadataTassert);
 
-AtomicWord<unsigned long long> taskIdGenerator{0};
+Atomic<unsigned long long> taskIdGenerator{0};
 
 // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
 void uassertAuthoritativeShardsDisabled(OperationContext* opCtx) {

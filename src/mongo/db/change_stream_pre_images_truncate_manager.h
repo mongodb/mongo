@@ -33,7 +33,7 @@
 #include "mongo/db/change_stream_pre_images_truncate_markers.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/util/modules.h"
 
@@ -53,17 +53,17 @@ public:
         /**
          * Total number of marker creation passes completed.
          */
-        AtomicWord<int64_t> totalPass;
+        Atomic<int64_t> totalPass;
 
         /**
          * Cumulative number of pre-image collections scanned for the marker creation.
          */
-        AtomicWord<int64_t> scannedInternalCollections;
+        Atomic<int64_t> scannedInternalCollections;
 
         /**
          * Cumulative number of milliseconds elapsed during the marker creation.
          */
-        AtomicWord<int64_t> timeElapsedMillis;
+        Atomic<int64_t> timeElapsedMillis;
 
         /**
          * Serializes the marker creation statistics to the BSON object.

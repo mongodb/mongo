@@ -37,7 +37,7 @@
 #include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 #include <string_view>
@@ -91,7 +91,7 @@ public:
     }
 
 private:
-    AtomicWord<long long> _duplicateCounter{0};
+    Atomic<long long> _duplicateCounter{0};
     LazyRecordStore _keyConstraintsTable;
 };
 

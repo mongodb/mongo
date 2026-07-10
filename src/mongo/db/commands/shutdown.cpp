@@ -34,7 +34,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit.h"
@@ -77,7 +77,7 @@ void finishShutdown(OperationContext* opCtx,
 
     // Only allow the first shutdown command to spawn a new thread and execute the shutdown.
     // Late arrivers will skip and wait until operations are killed.
-    static StaticImmortal<AtomicWord<bool>> shutdownAlreadyInProgress{false};
+    static StaticImmortal<Atomic<bool>> shutdownAlreadyInProgress{false};
     if (!shutdownAlreadyInProgress->swap(true)) {
         stdx::thread([quiesceTime] {
             ShutdownTaskArgs shutdownArgs;

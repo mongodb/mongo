@@ -38,7 +38,7 @@ server_parameters:
             avoid blocking startup and keep the persisted valid-as-of timestamp advancing, at the
             cost of potentially inaccurate size and count.
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<int>"
+        cpp_vartype: "Atomic<int>"
         cpp_varname: gReplicatedFastCountMaxOplogScanLagSecs
         default: 3600
         validator: {gt: 0}

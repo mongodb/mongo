@@ -57,7 +57,7 @@
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
@@ -181,8 +181,8 @@ private:
     int _skipNTimes{0};
     int _timesYielded{0};
     int _timesUnyielded{0};
-    AtomicWord<ErrorCodes::Error> _yieldError{ErrorCodes::OK};
-    AtomicWord<ErrorCodes::Error> _unyieldError{ErrorCodes::OK};
+    Atomic<ErrorCodes::Error> _yieldError{ErrorCodes::OK};
+    Atomic<ErrorCodes::Error> _unyieldError{ErrorCodes::OK};
 };
 
 namespace txn_api::details {

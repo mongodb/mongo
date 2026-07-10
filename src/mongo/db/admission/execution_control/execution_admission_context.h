@@ -245,8 +245,8 @@ public:
             return *this;
         }
 
-        AtomicWord<int64_t> totalQueuedMicros{0};
-        AtomicWord<bool> touched{false};
+        Atomic<int64_t> totalQueuedMicros{0};
+        Atomic<bool> touched{false};
     };
 
     /**

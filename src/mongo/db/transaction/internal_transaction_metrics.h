@@ -31,7 +31,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
@@ -81,16 +81,16 @@ public:
 
 private:
     // The total number of initiated internal transactions
-    AtomicWord<std::int64_t> _started{0};
+    Atomic<std::int64_t> _started{0};
 
     // The total number of retried internal transactions
-    AtomicWord<std::int64_t> _retriedTransactions{0};
+    Atomic<std::int64_t> _retriedTransactions{0};
 
     // The total number of retried internal transaction commits
-    AtomicWord<std::int64_t> _retriedCommits{0};
+    Atomic<std::int64_t> _retriedCommits{0};
 
     // The total number of successfully completed internal transactions
-    AtomicWord<std::int64_t> _succeeded{0};
+    Atomic<std::int64_t> _succeeded{0};
 };
 
 }  // namespace mongo

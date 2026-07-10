@@ -34,7 +34,7 @@
 #include "mongo/logv2/json_formatter.h"
 #include "mongo/logv2/log_format.h"
 #include "mongo/logv2/plain_formatter.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 #include <boost/log/core/record_view.hpp>
@@ -52,7 +52,7 @@ namespace mongo::logv2 {
  */
 class [[MONGO_MOD_NEEDS_REPLACEMENT]] DevStacktraceFormatter {
 public:
-    DevStacktraceFormatter(const AtomicWord<int32_t>* maxAttributeSizeKB,
+    DevStacktraceFormatter(const Atomic<int32_t>* maxAttributeSizeKB,
                            LogTimestampFormat timestampFormat)
         : _plainFormatter(PlainFormatter(maxAttributeSizeKB)),
           _jsonFormatter(JSONFormatter(maxAttributeSizeKB, timestampFormat)) {}

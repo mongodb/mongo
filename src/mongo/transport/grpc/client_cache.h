@@ -77,7 +77,7 @@ private:
 
     // An APPROXIMATION of unique clients seen over time.
     // As clients fall out of the LRU, reconnects will cause them to be counted again.
-    AtomicWord<std::size_t> _uniqueClientsSeen{0};
+    Atomic<std::size_t> _uniqueClientsSeen{0};
 };
 
 }  // namespace mongo::transport::grpc

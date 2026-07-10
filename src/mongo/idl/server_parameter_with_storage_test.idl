@@ -50,7 +50,7 @@ server_parameters:
     stdIntDeclared:
         set_at: [startup, runtime]
         description: "Create a simple int value, and declare storage"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gStdIntDeclared
         default: 42
         validator:
@@ -115,7 +115,7 @@ server_parameters:
     storageIntDeprecated:
         set_at: [startup, runtime]
         description: "Server parameter with storage marked deprecated."
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gIntDeprecated
         default: 42
         validator:
@@ -127,7 +127,7 @@ server_parameters:
     storageIntAnnotated:
         set_at: [startup, runtime]
         description: "Server parameter with annotations."
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gIntAnnotated
         default: 7
         redact: false
@@ -141,7 +141,7 @@ server_parameters:
     storageIntArrayOfObjects:
         set_at: [startup, runtime]
         description: "Parameter with array-of-objects annotations."
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gIntArrayOfObjects
         default: 1
         redact: false
@@ -155,7 +155,7 @@ server_parameters:
     storageIntNestedArrays:
         set_at: [startup, runtime]
         description: "Parameter with nested array annotations."
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gIntNestedArrays
         default: 1
         redact: false
@@ -169,7 +169,7 @@ server_parameters:
     storageIntEmptyArray:
         set_at: [startup, runtime]
         description: "Parameter with empty array annotation."
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gIntEmptyArray
         default: 1
         redact: false

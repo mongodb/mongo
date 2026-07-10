@@ -33,7 +33,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/cluster_role.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/waitable_atomic.h"
 #include "mongo/util/modules.h"
 
@@ -327,7 +327,7 @@ private:
 
     // Set by the first onShutdown call. Lets an in-progress onStartup bail out of its loop early
     // so shutdown does need not wait for every service to start up.
-    AtomicWord<bool> _inShutdown{false};
+    Atomic<bool> _inShutdown{false};
 
     std::vector<ReplicaSetAwareInterface*> _services;
 };

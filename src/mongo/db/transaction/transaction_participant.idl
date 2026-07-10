@@ -40,7 +40,7 @@ server_parameters:
             maxTransactionLockRequestTimeoutMillis will override it. If this is set to a negative value, it
             is inactive and nothing will be overridden.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gMaxTransactionLockRequestTimeoutMillis
         # 5 milliseconds will help avoid deadlocks, but will still allow fast-running metadata operations
         # to run without aborting transactions.
@@ -52,7 +52,7 @@ server_parameters:
             Lifetime given to each transaction.
             Transactions must eventually expire to preempt storage cache pressure immobilizing the system.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<decltype(TransactionParticipant::observeTransactionLifetimeLimitSeconds)::Argument>
+        cpp_vartype: Atomic<decltype(TransactionParticipant::observeTransactionLifetimeLimitSeconds)::Argument>
         cpp_varname: gTransactionLifetimeLimitSeconds
         validator:
             gte: 1
@@ -64,7 +64,7 @@ server_parameters:
         description: >-
             Period in which to run aborts on oldest transactions under cache pressure.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<decltype(TransactionParticipant::observeCachePressureQueryPeriodMilliseconds)::Argument>
+        cpp_vartype: Atomic<decltype(TransactionParticipant::observeCachePressureQueryPeriodMilliseconds)::Argument>
         cpp_varname: gCachePressureQueryPeriodMilliseconds
         validator:
             gte: 0
@@ -92,7 +92,7 @@ server_parameters:
             server-wide, so process-internal transactions may still contribute to the total used
             when enforcing this limit for external clients. A value of 0 disables the limit.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gMaxConcurrentMultiDocumentTransactions
         default: 10000
         validator:
@@ -103,7 +103,7 @@ server_parameters:
         description: >-
             Maximum total size of operations in a multi-document transaction.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         cpp_varname: gTransactionSizeLimitBytes
         default:
             expr: std::numeric_limits<long long>::max()

@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 #include <string>
@@ -87,8 +87,8 @@ public:
 
 private:
     std::unique_ptr<LogLineListener> _logListener;
-    AtomicWord<bool> _enabled{true};
-    AtomicWord<bool> _stripEol;
+    Atomic<bool> _enabled{true};
+    Atomic<bool> _stripEol;
 };
 }  // namespace logv2
 }  // namespace mongo

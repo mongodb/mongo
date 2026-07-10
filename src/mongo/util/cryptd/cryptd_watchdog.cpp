@@ -30,7 +30,7 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/exit_code.h"
@@ -114,7 +114,7 @@ private:
 
 private:
     // A generation number that increases on each new connection.
-    AtomicWord<long long> _generation{0};
+    Atomic<long long> _generation{0};
 
     // Number of seconds user asked to wait after going idle to wait before shuting down.
     Seconds _userTimeout;
@@ -128,7 +128,7 @@ private:
     transport::TransportLayerManager* _transportLayerManager;
 
     // A flag used to avoid recursive watchdog shutdown.
-    AtomicWord<bool> _inShutdown{false};
+    Atomic<bool> _inShutdown{false};
 };
 
 const auto getIdleWatchdogMonitor =

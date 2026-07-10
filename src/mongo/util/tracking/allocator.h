@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -92,7 +92,7 @@ private:
     // The counter is signed to handle the case where a thread closes a time-series bucket that
     // deallocates more memory than is going to be allocated.
     struct AlignedAtomic {
-        alignas(std::hardware_destructive_interference_size) AtomicWord<int64_t> value;
+        alignas(std::hardware_destructive_interference_size) Atomic<int64_t> value;
     };
     static_assert(alignof(AlignedAtomic) == std::hardware_destructive_interference_size);
 

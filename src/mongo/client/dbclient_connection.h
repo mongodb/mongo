@@ -39,7 +39,7 @@
 #include "mongo/client/mongo_uri.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/executor/remote_command_response.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/unique_message.h"
@@ -133,7 +133,7 @@ protected:
 
     absl::flat_hash_map<DatabaseName, BSONObj> authCache;
 
-    static AtomicWord<int> _numConnections;
+    static Atomic<int> _numConnections;
 
 private:
     StatusWith<std::shared_ptr<transport::Session>> _makeSession(

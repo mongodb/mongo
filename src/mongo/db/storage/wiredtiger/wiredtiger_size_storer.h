@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
@@ -72,12 +72,12 @@ public:
         ~SizeInfo() {
             invariant(!_dirty.load());
         }
-        AtomicWord<long long> numRecords;
-        AtomicWord<long long> dataSize;
+        Atomic<long long> numRecords;
+        Atomic<long long> dataSize;
 
     private:
         friend WiredTigerSizeStorer;
-        AtomicWord<bool> _dirty;
+        Atomic<bool> _dirty;
     };
 
     WiredTigerSizeStorer(WiredTigerConnection* conn, const std::string& storageUri);

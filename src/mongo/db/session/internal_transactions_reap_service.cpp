@@ -33,7 +33,7 @@
 #include "mongo/db/session/internal_transactions_reap_service_gen.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"

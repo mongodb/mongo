@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 #include "mongo/watchdog/watchdog.h"
 
@@ -61,7 +61,7 @@ public:
     bool getShouldRunChecks_forTest() override;
 
 private:
-    AtomicWord<bool> _shouldRunChecks{true};
+    Atomic<bool> _shouldRunChecks{true};
 };
 
 }  // namespace mongo

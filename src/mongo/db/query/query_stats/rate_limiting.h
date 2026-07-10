@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
@@ -105,7 +105,7 @@ class RateLimiter {
         /*
          * Sampling rate is the bound on the number of requests we want to admit per window.
          */
-        AtomicWord<RequestCount> _requestLimit = 0;
+        Atomic<RequestCount> _requestLimit = 0;
 
         /*
          * Time period is the window size in ms.
@@ -126,7 +126,7 @@ class RateLimiter {
          * Count of requests handled in the current window.
          * Atomic to allow a lock-free pre-check in handle() before acquiring _windowMutex.
          */
-        AtomicWord<RequestCount> _currentCount{0};
+        Atomic<RequestCount> _currentCount{0};
 
         /*
          * Mutex used when reading/writing the window.
@@ -176,8 +176,8 @@ class RateLimiter {
         bool handle();
 
     private:
-        AtomicWord<SampleRate> _samplingRate = 0;
-        AtomicWord<uint64_t> _randomSeed = 0;
+        Atomic<SampleRate> _samplingRate = 0;
+        Atomic<uint64_t> _randomSeed = 0;
     };
 
 public:
@@ -228,6 +228,6 @@ public:
 private:
     SampleBasedPolicy _samplePolicy;
     WindowBasedPolicy _windowPolicy;
-    AtomicWord<PolicyType> _mode = PolicyType::kWindowBasedPolicy;
+    Atomic<PolicyType> _mode = PolicyType::kWindowBasedPolicy;
 };
 }  // namespace mongo

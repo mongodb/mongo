@@ -46,7 +46,7 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
@@ -118,16 +118,16 @@ template <typename T>
 constexpr inline bool hasClusterServerParameter = stdx::is_detected_v<HasClusterServerParameter, T>;
 
 // Wrapped type unwrappers.
-// e.g. Given AtomicWord<int>, get std::int32_t and normalized store/load methods.
+// e.g. Given Atomic<int>, get std::int32_t and normalized store/load methods.
 template <typename U>
 struct storage_wrapper;
 
 template <typename U>
-struct storage_wrapper<AtomicWord<U>> {
+struct storage_wrapper<Atomic<U>> {
     static constexpr bool isTenantAware = false;
 
     using type = U;
-    storage_wrapper(AtomicWord<U>& storage) : _storage(storage), _defaultValue(storage.load()) {}
+    storage_wrapper(Atomic<U>& storage) : _storage(storage), _defaultValue(storage.load()) {}
 
     void store(const U& value, const boost::optional<TenantId>& id) {
         invariant(!id.is_initialized());
@@ -151,7 +151,7 @@ struct storage_wrapper<AtomicWord<U>> {
     }
 
 private:
-    AtomicWord<U>& _storage;
+    Atomic<U>& _storage;
 
     // Copy of original value to be read from during resets.
     U _defaultValue;

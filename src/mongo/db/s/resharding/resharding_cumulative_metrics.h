@@ -206,59 +206,59 @@ private:
 
     StateTracker _stateTracker;
 
-    AtomicWord<bool> _shouldReportMetrics;
+    Atomic<bool> _shouldReportMetrics;
 
-    AtomicWord<int64_t> _countStarted{0};
-    AtomicWord<int64_t> _countSucceeded{0};
-    AtomicWord<int64_t> _countFailed{0};
-    AtomicWord<int64_t> _countCancelled{0};
+    Atomic<int64_t> _countStarted{0};
+    Atomic<int64_t> _countSucceeded{0};
+    Atomic<int64_t> _countFailed{0};
+    Atomic<int64_t> _countCancelled{0};
 
-    AtomicWord<int64_t> _totalBatchRetrievedDuringClone{0};
-    AtomicWord<int64_t> _totalBatchRetrievedDuringCloneMillis{0};
-    AtomicWord<int64_t> _documentsProcessed{0};
-    AtomicWord<int64_t> _bytesWritten{0};
+    Atomic<int64_t> _totalBatchRetrievedDuringClone{0};
+    Atomic<int64_t> _totalBatchRetrievedDuringCloneMillis{0};
+    Atomic<int64_t> _documentsProcessed{0};
+    Atomic<int64_t> _bytesWritten{0};
 
-    AtomicWord<int64_t> _lastOpEndingChunkImbalance{0};
-    AtomicWord<int64_t> _readsDuringCriticalSection{0};
-    AtomicWord<int64_t> _writesDuringCriticalSection{0};
+    Atomic<int64_t> _lastOpEndingChunkImbalance{0};
+    Atomic<int64_t> _readsDuringCriticalSection{0};
+    Atomic<int64_t> _writesDuringCriticalSection{0};
 
-    AtomicWord<int64_t> _collectionCloningTotalLocalBatchInserts{0};
-    AtomicWord<int64_t> _collectionCloningTotalLocalInsertTimeMillis{0};
-    AtomicWord<int64_t> _writesToStashedCollections{0};
+    Atomic<int64_t> _collectionCloningTotalLocalBatchInserts{0};
+    Atomic<int64_t> _collectionCloningTotalLocalInsertTimeMillis{0};
+    Atomic<int64_t> _writesToStashedCollections{0};
 
-    AtomicWord<int64_t> _insertsApplied{0};
-    AtomicWord<int64_t> _updatesApplied{0};
-    AtomicWord<int64_t> _deletesApplied{0};
-    AtomicWord<int64_t> _oplogEntriesApplied{0};
-    AtomicWord<int64_t> _oplogEntriesFetched{0};
+    Atomic<int64_t> _insertsApplied{0};
+    Atomic<int64_t> _updatesApplied{0};
+    Atomic<int64_t> _deletesApplied{0};
+    Atomic<int64_t> _oplogEntriesApplied{0};
+    Atomic<int64_t> _oplogEntriesFetched{0};
 
-    AtomicWord<int64_t> _oplogFetchingTotalRemoteBatchesRetrieved{0};
-    AtomicWord<int64_t> _oplogFetchingTotalRemoteBatchesRetrievalTimeMillis{0};
-    AtomicWord<int64_t> _oplogFetchingTotalLocalInserts{0};
-    AtomicWord<int64_t> _oplogFetchingTotalLocalInsertTimeMillis{0};
-    AtomicWord<int64_t> _oplogApplyingTotalBatchesRetrieved{0};
-    AtomicWord<int64_t> _oplogApplyingTotalBatchesRetrievalTimeMillis{0};
-    AtomicWord<int64_t> _oplogBatchApplied{0};
-    AtomicWord<int64_t> _oplogBatchAppliedMillis{0};
+    Atomic<int64_t> _oplogFetchingTotalRemoteBatchesRetrieved{0};
+    Atomic<int64_t> _oplogFetchingTotalRemoteBatchesRetrievalTimeMillis{0};
+    Atomic<int64_t> _oplogFetchingTotalLocalInserts{0};
+    Atomic<int64_t> _oplogFetchingTotalLocalInsertTimeMillis{0};
+    Atomic<int64_t> _oplogApplyingTotalBatchesRetrieved{0};
+    Atomic<int64_t> _oplogApplyingTotalBatchesRetrievalTimeMillis{0};
+    Atomic<int64_t> _oplogBatchApplied{0};
+    Atomic<int64_t> _oplogBatchAppliedMillis{0};
 
-    AtomicWord<int64_t> _countSameKeyStarted{0};
-    AtomicWord<int64_t> _countSameKeySucceeded{0};
-    AtomicWord<int64_t> _countSameKeyFailed{0};
-    AtomicWord<int64_t> _countSameKeyCancelled{0};
+    Atomic<int64_t> _countSameKeyStarted{0};
+    Atomic<int64_t> _countSameKeySucceeded{0};
+    Atomic<int64_t> _countSameKeyFailed{0};
+    Atomic<int64_t> _countSameKeyCancelled{0};
 
-    AtomicWord<int64_t> _countSearchIndexAborts{0};
+    Atomic<int64_t> _countSearchIndexAborts{0};
 
-    AtomicWord<int64_t> _countPreApplyVerificationSucceeded{0};
-    AtomicWord<int64_t> _countPreApplyVerificationFailed{0};
-    AtomicWord<int64_t> _countPreApplyVerificationSkipped{0};
-    AtomicWord<int64_t> _countPreApplyVerificationTimedOut{0};
-    AtomicWord<int64_t> _countPreApplyVerificationRetried{0};
-    AtomicWord<int64_t> _countPreCommitVerificationSucceeded{0};
-    AtomicWord<int64_t> _countPreCommitVerificationFailed{0};
-    AtomicWord<int64_t> _countPreCommitVerificationSkipped{0};
-    AtomicWord<int64_t> _countPreCommitVerificationTimedOut{0};
-    AtomicWord<int64_t> _countPreCommitDonorVerificationRetried{0};
-    AtomicWord<int64_t> _countPreCommitRecipientVerificationRetried{0};
+    Atomic<int64_t> _countPreApplyVerificationSucceeded{0};
+    Atomic<int64_t> _countPreApplyVerificationFailed{0};
+    Atomic<int64_t> _countPreApplyVerificationSkipped{0};
+    Atomic<int64_t> _countPreApplyVerificationTimedOut{0};
+    Atomic<int64_t> _countPreApplyVerificationRetried{0};
+    Atomic<int64_t> _countPreCommitVerificationSucceeded{0};
+    Atomic<int64_t> _countPreCommitVerificationFailed{0};
+    Atomic<int64_t> _countPreCommitVerificationSkipped{0};
+    Atomic<int64_t> _countPreCommitVerificationTimedOut{0};
+    Atomic<int64_t> _countPreCommitDonorVerificationRetried{0};
+    Atomic<int64_t> _countPreCommitRecipientVerificationRetried{0};
 
     std::set<UUID> _activeReshardingOperations;
     std::mutex _activeReshardingOperationsMutex;

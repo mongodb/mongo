@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::catalog_stats {
 
 [[MONGO_MOD_PRIVATE]]
-extern AtomicWord<int> requiresTimeseriesExtendedRangeSupport;
+extern Atomic<int> requiresTimeseriesExtendedRangeSupport;
 
 }  // namespace mongo::catalog_stats

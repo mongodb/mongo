@@ -196,7 +196,7 @@ TEST(AtomicWaitableTests, TestActiveWaiters) {
 
 template <typename TypeToTest>
 void tryToInduceRaces() {
-    auto keepGoing = AtomicWord<bool>(true);
+    auto keepGoing = Atomic<bool>(true);
     auto atomic = TypeToTest(false);
     auto waitingForNot = WaitableAtomic<int>();
 
@@ -265,7 +265,7 @@ TEST(AtomicWaitableTests, NotifyOneOnlyWakesOneThread) {
         try {
             constexpr int nThreads = 10;  // takes at least 100ms + 10ms per thread.
             auto keepWaiting = BasicWaitableAtomic<int>(true);
-            auto numWoken = AtomicWord<int>(0);
+            auto numWoken = Atomic<int>(0);
             JoinThread threads[nThreads];
             ON_BLOCK_EXIT([&] {
                 keepWaiting.store(false);  // should be false already, but to be safe.

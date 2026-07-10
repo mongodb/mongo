@@ -45,7 +45,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
@@ -145,7 +145,7 @@ private:
     const bool _relaxed;
     const boost::optional<ForwardableOperationMetadata> _forwardableOpMetadata;
 
-    AtomicWord<long long> _lastWriteBlockWarningAt{std::numeric_limits<long long>::min()};
+    Atomic<long long> _lastWriteBlockWarningAt{std::numeric_limits<long long>::min()};
 };
 
 }  // namespace mongo

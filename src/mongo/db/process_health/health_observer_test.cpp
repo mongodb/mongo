@@ -39,7 +39,7 @@
 #include "mongo/db/process_health/health_observer_registration.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -80,7 +80,7 @@ TEST_F(FaultManagerTest, Registration) {
 TEST_F(FaultManagerTest, Stats) {
     resetManager(std::make_unique<FaultManagerConfig>());
     auto faultFacetType = FaultFacetType::kMock1;
-    AtomicWord<Severity> mockResult(Severity::kFailure);
+    Atomic<Severity> mockResult(Severity::kFailure);
     registerMockHealthObserver(faultFacetType, [&mockResult] { return mockResult.load(); });
 
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
@@ -124,7 +124,7 @@ TEST_F(FaultManagerTest, Stats) {
 }
 
 TEST_F(FaultManagerTest, ProgressMonitorCheck) {
-    AtomicWord<bool> shouldBlock{true};
+    Atomic<bool> shouldBlock{true};
     registerMockHealthObserver(FaultFacetType::kMock1, [&shouldBlock] {
         while (shouldBlock.load()) {
             sleepFor(Milliseconds(1));
@@ -160,7 +160,7 @@ TEST_F(FaultManagerTest, HealthCheckRunsPeriodically) {
         BSON("values" << BSON_ARRAY(BSON("type" << "test"
                                                 << "interval" << 1)))};
     auto faultFacetType = FaultFacetType::kMock1;
-    AtomicWord<Severity> severity{Severity::kOk};
+    Atomic<Severity> severity{Severity::kOk};
     registerMockHealthObserver(faultFacetType, [&severity] { return severity.load(); });
 
     assertSoon([this] { return (manager().getFaultState() == FaultState::kStartupCheck); });
@@ -199,7 +199,7 @@ TEST_F(FaultManagerTest,
                                                 << "interval" << 1)))};
     unittest::ServerParameterGuard _serverParamController{"activeFaultDurationSecs", 5};
 
-    AtomicWord<bool> shouldBlock{true};
+    Atomic<bool> shouldBlock{true};
     registerMockHealthObserver(
         FaultFacetType::kMock1,
         [&shouldBlock] {
@@ -258,7 +258,7 @@ TEST_F(FaultManagerTest, HealthCheckThrowingExceptionMakesFailedStatus) {
     resetManager(std::make_unique<FaultManagerConfig>());
 
     FaultFacetType facetType = FaultFacetType::kMock1;
-    AtomicWord<bool> shouldThrow{false};
+    Atomic<bool> shouldThrow{false};
 
     std::string logMsg = "Failed due to exception";
 

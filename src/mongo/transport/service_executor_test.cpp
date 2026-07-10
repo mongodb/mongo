@@ -48,7 +48,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/service_executor.h"

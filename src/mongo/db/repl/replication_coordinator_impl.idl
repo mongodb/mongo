@@ -34,7 +34,7 @@ server_parameters:
         description: <-
             Number of attempts to make at replica set initial synchronization.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: numInitialSyncAttempts
         default: 10
         redact: false
@@ -44,7 +44,7 @@ server_parameters:
             Reduce the downtime after the primary steps down from either the
             rs.stepDown() method or the replSetStepDown command.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: enableElectionHandoff
         default: true
         redact: false
@@ -53,7 +53,7 @@ server_parameters:
         description: <-
             The time taken for stepdown and quiesce mode at shutdown in response to SIGTERM.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: shutdownTimeoutMillisForSignaledShutdown
         default: 15000
         validator:

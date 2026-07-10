@@ -46,7 +46,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
@@ -1098,10 +1098,10 @@ private:
     // Follows the values of ErrorCodes::Error. The default value is 0 (OK), which means the
     // operation is not killed. If killed, it will contain a specific code. This value changes only
     // once from OK to some kill code.
-    AtomicWord<ErrorCodes::Error> _killCode{ErrorCodes::OK};
+    Atomic<ErrorCodes::Error> _killCode{ErrorCodes::OK};
 
     // When the operation was marked as killed.
-    AtomicWord<TickSource::Tick> _killTime{0};
+    Atomic<TickSource::Tick> _killTime{0};
 
     // Tracks total number of interrupt checks.
     Atomic<int64_t> _numInterruptChecks{0};
@@ -1170,7 +1170,7 @@ private:
 
     // If true, this OpCtx will get interrupted during replica set stepUp and stepDown, regardless
     // of what locks it's taken.
-    AtomicWord<bool> _alwaysInterruptAtStepDownOrUp{false};
+    Atomic<bool> _alwaysInterruptAtStepDownOrUp{false};
 
     // If populated, this is an owned singleton BSONObj whose only field, 'comment', is a copy of
     // the 'comment' field from the input command object.

@@ -167,10 +167,10 @@ TEST(ServerParameterWithStorage, StorageTest) {
     doStorageTestByType<double>("DoubleD", doubleVals, stringVals);
     doStorageTestByType<std::string>("String", stringVals, {});
 
-    doStorageTestByAtomic<AtomicWord<bool>>("AtomicWord<bool>", boolVals, stringVals);
-    doStorageTestByAtomic<AtomicWord<int>>("AtomicWord<int>", numberVals, stringVals);
-    doStorageTestByAtomic<AtomicWord<double>>("AtomicWord<double>I", numberVals, stringVals);
-    doStorageTestByAtomic<AtomicWord<double>>("AtomicWord<double>D", doubleVals, stringVals);
+    doStorageTestByAtomic<Atomic<bool>>("Atomic<bool>", boolVals, stringVals);
+    doStorageTestByAtomic<Atomic<int>>("Atomic<int>", numberVals, stringVals);
+    doStorageTestByAtomic<Atomic<double>>("Atomic<double>I", numberVals, stringVals);
+    doStorageTestByAtomic<Atomic<double>>("Atomic<double>D", doubleVals, stringVals);
 }
 
 TEST(ServerParameterWithStorage, BoundsTest) {

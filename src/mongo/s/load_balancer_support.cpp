@@ -36,7 +36,7 @@
 #include "mongo/db/repl/hello/hello_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/mongos_server_parameters_gen.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"

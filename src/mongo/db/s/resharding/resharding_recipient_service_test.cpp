@@ -686,7 +686,7 @@ BSONObj makeTestDocumentUpdateStatement() {
 void runRandomizedLocking(OperationContext* opCtx,
                           Locker& locker,
                           const ResourceId& resId,
-                          AtomicWord<bool>& keepRunning) {
+                          Atomic<bool>& keepRunning) {
     PseudoRandom random = PseudoRandom(123456);
 
     while (keepRunning.load()) {
@@ -3361,7 +3361,7 @@ TEST_F(ReshardingRecipientServiceTest, VerifyRecipientRetriesOnLockTimeoutError)
         // Start a thread to create randomized lock/unlock contention.
         const ResourceId resId(RESOURCE_COLLECTION, doc.getTempReshardingNss());
         Locker locker(opCtx->getServiceContext());
-        AtomicWord<bool> keepRunning{true};
+        Atomic<bool> keepRunning{true};
         stdx::thread lockThread(
             [&] { runRandomizedLocking(opCtx.get(), locker, resId, keepRunning); });
 

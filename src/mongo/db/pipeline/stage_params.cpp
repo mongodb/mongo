@@ -36,7 +36,7 @@
 namespace mongo {
 
 StageParams::Id StageParams::allocateId(std::string_view name) {
-    static AtomicWord<Id> next{kUnallocatedId + 1};
+    static Atomic<Id> next{kUnallocatedId + 1};
     auto id = next.fetchAndAdd(1);
     return id;
 }

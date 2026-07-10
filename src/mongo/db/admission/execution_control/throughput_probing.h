@@ -35,7 +35,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
@@ -136,14 +136,14 @@ private:
     struct Stats {
         void serialize(BSONObjBuilder& builder) const;
 
-        AtomicWord<int64_t> timesDecreased;
-        AtomicWord<int64_t> timesIncreased;
-        AtomicWord<int64_t> totalAmountDecreased;
-        AtomicWord<int64_t> totalAmountIncreased;
-        AtomicWord<int64_t> resizeDurationMicros;
-        AtomicWord<int64_t> timesProbedStable;
-        AtomicWord<int64_t> timesProbedUp;
-        AtomicWord<int64_t> timesProbedDown;
+        Atomic<int64_t> timesDecreased;
+        Atomic<int64_t> timesIncreased;
+        Atomic<int64_t> totalAmountDecreased;
+        Atomic<int64_t> totalAmountIncreased;
+        Atomic<int64_t> resizeDurationMicros;
+        Atomic<int64_t> timesProbedStable;
+        Atomic<int64_t> timesProbedUp;
+        Atomic<int64_t> timesProbedDown;
     } _stats;
 
     mutable std::mutex _mutex;

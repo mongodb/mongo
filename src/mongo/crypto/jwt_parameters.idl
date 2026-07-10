@@ -33,7 +33,7 @@ server_parameters:
     JWKSMinimumQuiescePeriodSecs:
         description: Minimum time to wait after a successful JWKS fetch before repulling.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gJWKSMinimumQuiescePeriodSecs
         default: 60 # One minute
         validator: {gte: 0}

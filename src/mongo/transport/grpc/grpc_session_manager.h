@@ -58,7 +58,7 @@ protected:
     void configureServiceExecutorContext(mongo::Client& client,
                                          bool isPrivilegedSession) const override;
 
-    AtomicWord<std::size_t> _successfulSessions{0};
+    Atomic<std::size_t> _successfulSessions{0};
     std::shared_ptr<ClientCache> _clientCache;
 };
 

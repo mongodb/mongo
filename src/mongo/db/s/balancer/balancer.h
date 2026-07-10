@@ -40,7 +40,7 @@
 #include "mongo/db/s/balancer/cluster_statistics.h"
 #include "mongo/db/s/balancer/move_unsharded_policy.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/s/request_types/balancer_collection_status_gen.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/stdx/condition_variable.h"
@@ -331,9 +331,9 @@ private:
     // thread.
     OperationContext* _threadOperationContext{nullptr};
 
-    AtomicWord<int> _outstandingStreamingOps{0};
+    Atomic<int> _outstandingStreamingOps{0};
 
-    AtomicWord<bool> _actionStreamsStateUpdated{true};
+    Atomic<bool> _actionStreamsStateUpdated{true};
 
     // Indicates whether the balancer is currently executing a balancer round
     bool _inBalancerRound{false};

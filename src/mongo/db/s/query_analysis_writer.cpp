@@ -46,7 +46,7 @@
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
@@ -553,7 +553,7 @@ void QueryAnalysisWriter::onStepUpComplete(OperationContext* opCtx, long long te
 ExecutorFuture<void> QueryAnalysisWriter::createTTLIndexes(OperationContext* opCtx) {
     invariant(_executor);
 
-    static AtomicWord<unsigned int> tryCount{0};
+    static Atomic<unsigned int> tryCount{0};
 
     auto future =
         AsyncTry([this] {

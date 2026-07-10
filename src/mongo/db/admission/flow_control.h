@@ -38,7 +38,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_fwd.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/time_support.h"
@@ -216,14 +216,14 @@ private:
 
     // These values are updated with each flow control computation and are also surfaced in server
     // status.
-    AtomicWord<int> _lastTargetTicketsPermitted{kMaxTickets};
-    AtomicWord<double> _lastLocksPerOp{0.0};
-    AtomicWord<int> _lastSustainerAppliedCount{0};
-    AtomicWord<bool> _isLagged{false};
-    AtomicWord<int> _isLaggedCount{0};
+    Atomic<int> _lastTargetTicketsPermitted{kMaxTickets};
+    Atomic<double> _lastLocksPerOp{0.0};
+    Atomic<int> _lastSustainerAppliedCount{0};
+    Atomic<bool> _isLagged{false};
+    Atomic<int> _isLaggedCount{0};
     // Use an int64_t as this is serialized to bson which does not support unsigned 64-bit numbers.
-    AtomicWord<std::int64_t> _isLaggedTimeMicros{0};
-    AtomicWord<Date_t> _disableUntil;
+    Atomic<std::int64_t> _isLaggedTimeMicros{0};
+    Atomic<Date_t> _disableUntil;
 
     mutable std::mutex _sampledOpsMutex;
     std::deque<Sample> _sampledOpsApplied;

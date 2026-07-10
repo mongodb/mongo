@@ -34,7 +34,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/storage/exceptions.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/aligned.h"
 
 #include <fmt/format.h>
@@ -63,7 +63,7 @@ namespace {
 
 // Count of plan executors (both classic and express) currently in a WCE retry streak.
 // CacheExclusive puts the gauge on its own cache line.
-CacheExclusive<AtomicWord<int32_t>> gWriteConflictRetryWaiters{};
+CacheExclusive<Atomic<int32_t>> gWriteConflictRetryWaiters{};
 
 // serverStatus / FTDC mirror.
 auto& writeConflictRetryWaitersGauge =

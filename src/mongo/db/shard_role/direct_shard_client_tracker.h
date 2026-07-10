@@ -73,8 +73,8 @@ public:
     void appendStats(BSONObjBuilder* bob) const;
 
 private:
-    AtomicWord<long long> _created{0};
-    AtomicWord<long long> _destroyed{0};
+    Atomic<long long> _created{0};
+    Atomic<long long> _destroyed{0};
 };
 
 }  // namespace mongo

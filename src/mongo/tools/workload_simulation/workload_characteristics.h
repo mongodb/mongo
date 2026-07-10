@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
@@ -107,8 +107,8 @@ protected:
     Nanoseconds _latency(int32_t concurrency, int32_t throughput) const;
 
 protected:
-    AtomicWord<RWPair> _optimalConcurrency;
-    AtomicWord<RWPair> _throughputAtOptimalConcurrency;
+    Atomic<RWPair> _optimalConcurrency;
+    Atomic<RWPair> _throughputAtOptimalConcurrency;
     double _jitterDev = 0.0;
     mutable std::mutex _mutex;
     mutable std::mt19937 _rng;

@@ -50,7 +50,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/validate/validate_results.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
@@ -403,7 +403,7 @@ protected:
 
     // Protects initialization of the _nextIdNum.
     mutable std::mutex _initNextIdMutex;
-    AtomicWord<long long> _nextIdNum{0};
+    Atomic<long long> _nextIdNum{0};
 
     WiredTigerSizeStorer* _sizeStorer;  // not owned, can be NULL
     std::shared_ptr<WiredTigerSizeStorer::SizeInfo> _sizeInfo;
@@ -504,8 +504,8 @@ private:
 
     StatusWith<Timestamp> _readEarliestTimestamp(RecoveryUnit&);
 
-    AtomicWord<int64_t> _maxSize;
-    AtomicWord<uint64_t> _cachedEarliestTimestamp{0};
+    Atomic<int64_t> _maxSize;
+    Atomic<uint64_t> _cachedEarliestTimestamp{0};
 };
 
 class WiredTigerRecordStoreCursorBase : public SeekableRecordCursor {

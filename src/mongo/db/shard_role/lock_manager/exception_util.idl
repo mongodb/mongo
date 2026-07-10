@@ -35,7 +35,7 @@ server_parameters:
         mod_visibility: private
         set_at: [startup, runtime]
         cpp_varname: "gTemporarilyUnavailableExceptionMaxRetryAttempts"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default: 10
         validator:
             gte: 0
@@ -46,7 +46,7 @@ server_parameters:
         mod_visibility: private
         set_at: [startup, runtime]
         cpp_varname: "gMinimalWriteConflictRetryCountForStateDump"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 10000
         validator:
             gte: 10000
@@ -60,7 +60,7 @@ server_parameters:
         mod_visibility: private
         set_at: [startup, runtime]
         cpp_varname: "gTemporarilyUnavailableExceptionRetryBackoffBaseMs"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default: 1000
         validator:
             gte: 0

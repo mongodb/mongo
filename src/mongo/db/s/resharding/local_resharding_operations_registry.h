@@ -33,7 +33,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/resharding/resharding_metrics_common.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/modules.h"
@@ -70,10 +70,10 @@ private:
     mutable ObservableMutex<std::shared_mutex> _mutex;
     stdx::unordered_map<NamespaceString, UuidToOperation> _namespaceToOperations;
 
-    AtomicWord<int64_t> _registrationCount{0};
-    AtomicWord<int64_t> _unregistrationCount{0};
-    AtomicWord<int64_t> _resyncCount{0};
-    AtomicWord<int64_t> _currentOperationCount{0};
+    Atomic<int64_t> _registrationCount{0};
+    Atomic<int64_t> _unregistrationCount{0};
+    Atomic<int64_t> _resyncCount{0};
+    Atomic<int64_t> _currentOperationCount{0};
 };
 
 namespace resharding {

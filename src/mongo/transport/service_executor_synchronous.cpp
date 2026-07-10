@@ -32,7 +32,7 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/transport/service_executor_utils.h"
 #include "mongo/util/assert_util.h"
@@ -114,8 +114,8 @@ private:
     const RunTaskInline _runTaskInline;
     mutable std::mutex _mutex;
     stdx::condition_variable _cv;
-    AtomicWord<bool> _isRunning;
-    AtomicWord<size_t> _threads{0};
+    Atomic<bool> _isRunning;
+    Atomic<size_t> _threads{0};
 };
 
 class ServiceExecutorSyncImpl::SharedState::WorkerThreadInfo {

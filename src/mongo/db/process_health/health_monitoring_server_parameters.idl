@@ -140,7 +140,7 @@ server_parameters:
     activeFaultDurationSecs:
         description: "A server parameter for specifying the duration after which we transition to active fault."
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gActiveFaultDurationSecs
         default:
             expr: 120
@@ -151,7 +151,7 @@ server_parameters:
     reachableConfigReplicasRequiredByHealthMonitoring:
         description: "Minimal count of reachable Config server replicas required to pass the health check"
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gReachableConfigReplicasRequired
         default:
             expr: 1
@@ -162,7 +162,7 @@ server_parameters:
     configReplicasProbedByHealthMonitoring:
         description: "Count of Config server replicas probed by the health check"
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gConfigReplicasProbed
         default:
             expr: 2

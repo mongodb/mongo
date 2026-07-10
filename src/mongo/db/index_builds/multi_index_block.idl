@@ -48,7 +48,7 @@ server_parameters:
             - runtime
             - startup
         cpp_varname: maxIndexBuildMemoryUsageMegabytes
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         default: 200
         validator:
             callback: validateMaxIndexBuildMemoryUsageMegabytesSetting
@@ -60,7 +60,7 @@ server_parameters:
             - runtime
             - startup
         cpp_varname: internalIndexBuildBulkLoadYieldIterations
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 1000
         validator:
             gte: 1
@@ -72,7 +72,7 @@ server_parameters:
             - runtime
             - startup
         cpp_varname: primaryDrivenIndexBuildIndexInsertionBatchSize
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 1000
         validator:
             gte: 1
@@ -84,7 +84,7 @@ server_parameters:
             - runtime
             - startup
         cpp_varname: primaryDrivenIndexBuildIndexInsertionBatchBytes
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 4 * 1024 * 1024 # 4 MB
         validator:
@@ -97,7 +97,7 @@ server_parameters:
             - runtime
             - startup
         cpp_varname: primaryDrivenIndexBuildSorterInsertionBatchSize
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 1000
         validator:
             gte: 1
@@ -109,7 +109,7 @@ server_parameters:
             - runtime
             - startup
         cpp_varname: primaryDrivenIndexBuildSorterInsertionBatchBytes
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 4 * 1024 * 1024 # 4 MB
         validator:
@@ -122,7 +122,7 @@ server_parameters:
             - runtime
             - startup
         cpp_varname: primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default: 1000000
         validator:
             gte: 1
@@ -131,7 +131,7 @@ server_parameters:
     indexBuildSpillingMinAvailableDiskSpaceBytes:
         description: "Minimum disk space that should be available before spilling for an index build"
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         cpp_varname: indexBuildSpillingMinAvailableDiskSpaceBytes
         default:
             expr: 500 * 1024 * 1024 # 500 MB

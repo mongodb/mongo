@@ -73,7 +73,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/util/assert_util.h"
@@ -328,7 +328,7 @@ public:
 
 private:
     WiredTigerConnection* _connection;
-    AtomicWord<bool> _shuttingDown{false};
+    Atomic<bool> _shuttingDown{false};
 
     std::mutex _mutex;  // protects _condvar
     // The session sweeper thread idles on this condition variable for a particular time

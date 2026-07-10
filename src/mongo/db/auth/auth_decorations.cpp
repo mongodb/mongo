@@ -37,7 +37,7 @@
 #include "mongo/db/commands/authentication_commands.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 
@@ -63,7 +63,7 @@ const auto getAuthorizationSession =
 
 const auto getDisabledAuthMechanisms = Service::declareDecoration<DisabledAuthMechanisms>();
 
-const auto getClusterAuthMode = ServiceContext::declareDecoration<AtomicWord<ClusterAuthMode>>();
+const auto getClusterAuthMode = ServiceContext::declareDecoration<Atomic<ClusterAuthMode>>();
 
 const auto getAuthorizationBackendInterface =
     Service::declareDecoration<std::unique_ptr<auth::AuthorizationBackendInterface>>();

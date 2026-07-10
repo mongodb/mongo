@@ -33,7 +33,7 @@
 #include "mongo/db/repl/hello/hello_response.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
@@ -146,7 +146,7 @@ private:
      *
      * This variable is set to true from false outside the worker thread
      */
-    AtomicWord<bool> _shouldShutdown;
+    Atomic<bool> _shouldShutdown;
 
     // The reference to the latest cached version of `HelloResponse`
     std::shared_ptr<const HelloResponse> _cache;
@@ -156,7 +156,7 @@ private:
      *
      * This variable is only changed from the worker thread
      */
-    AtomicWord<State> _state;
+    Atomic<State> _state;
 
     /**
      * A list of callbacks to be called when a topology change is detected.

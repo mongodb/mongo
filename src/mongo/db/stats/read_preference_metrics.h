@@ -65,8 +65,8 @@ public:
 
 private:
     struct Counter {
-        AtomicWord<unsigned long long> internal{0};
-        AtomicWord<unsigned long long> external{0};
+        Atomic<unsigned long long> internal{0};
+        Atomic<unsigned long long> external{0};
 
         // Loads an individual counter's internal and external operation counters into a
         // 'ReadPrefOps' object.

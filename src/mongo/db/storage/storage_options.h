@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 #include <string>
@@ -103,11 +103,11 @@ struct StorageGlobalParams {
     // This parameter is both a server parameter and a configuration parameter, and to resolve
     // conflicts between the two the default must be set here.
     static constexpr int kMaxJournalCommitIntervalMs = 500;
-    AtomicWord<int> journalCommitIntervalMs{100};
+    Atomic<int> journalCommitIntervalMs{100};
 
     // --notablescan
     // no table scans allowed
-    AtomicWord<bool> noTableScan;
+    Atomic<bool> noTableScan;
 
     // --directoryperdb
     // Stores each database’s files in its own folder in the data directory.
@@ -124,7 +124,7 @@ struct StorageGlobalParams {
     // This parameter is both a server parameter and a configuration parameter, and to resolve
     // conflicts between the two, a default sentinel (<0) must be set here.
     static constexpr double kMaxSyncdelaySecs = 60 * 60;  // 1hr
-    AtomicWord<double> syncdelay{-1.0};                   // seconds between checkpoints
+    Atomic<double> syncdelay{-1.0};                       // seconds between checkpoints
 
     // --queryableBackupMode
     // Prevents user-originating operations from performing writes to the server. Internally
@@ -144,7 +144,7 @@ struct StorageGlobalParams {
     //
     // If the value isn't explicitly set during configuration, a default value of 0 is used. This
     // default may be overridden depending on architecture.
-    AtomicWord<double> oplogMinRetentionHours{0.0};
+    Atomic<double> oplogMinRetentionHours{0.0};
     bool oplogMinRetentionInitializedUsingDefault{true};
 
     // Controls whether we allow the OplogTruncateMarkers mechanism to delete oplog history on WT.

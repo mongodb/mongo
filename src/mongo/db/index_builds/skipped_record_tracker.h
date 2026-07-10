@@ -37,7 +37,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
@@ -111,7 +111,7 @@ public:
 private:
     LazyRecordStore _skippedRecordsTable;
 
-    AtomicWord<std::uint32_t> _skippedRecordCounter{0};
+    Atomic<std::uint32_t> _skippedRecordCounter{0};
 
     boost::optional<MultikeyPaths> _multikeyPaths;
 };

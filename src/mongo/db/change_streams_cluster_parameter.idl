@@ -80,7 +80,7 @@ server_parameters:
             job in serverless will sleep between each cycle.
             This parameter is deprecated, and its value is not used after setting it.
         set_at: [startup]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: "gChangeCollectionExpiredDocumentsRemoverJobSleepSeconds"
         validator:
             gte: 1

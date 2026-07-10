@@ -63,7 +63,7 @@
 #include "mongo/db/validate/validate_adaptor.h"
 #include "mongo/db/validate/validate_state.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
@@ -103,7 +103,7 @@ namespace collection_validation {
 namespace {
 
 // Indicates whether the failpoint turned on by testing has been reached.
-AtomicWord<bool> _validationIsPausedForTest{false};
+Atomic<bool> _validationIsPausedForTest{false};
 
 /**
  * Validates the internal structure of each index in the Index Catalog 'indexCatalog', ensuring that

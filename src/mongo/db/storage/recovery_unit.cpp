@@ -30,7 +30,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/demangle.h"
 #include "mongo/util/scopeguard.h"
 
@@ -49,7 +49,7 @@ namespace {
 // SnapshotIds need to be globally unique, as they are used in a WorkingSetMember to
 // determine if documents changed, but a different recovery unit may be used across a getMore,
 // so there is a chance the snapshot ID will be reused.
-AtomicWord<unsigned long long> nextSnapshotId{1};
+Atomic<unsigned long long> nextSnapshotId{1};
 
 SnapshotId getNextSnapshotId() {
     return SnapshotId(nextSnapshotId.fetchAndAdd(1));

@@ -51,7 +51,7 @@ namespace moe = mongo::optionenvironment;
 /**
  * The sole purpose of this class is to avoid compilation errors with the definition of 'nokillop'
  * field in shell_options.idl which the generated option parser requires assignment operator for the
- * field to work but AtomicWord<T> does not support assignment operator(s).
+ * field to work but Atomic<T> does not support assignment operator(s).
  */
 class AssignableAtomicBool {
 public:

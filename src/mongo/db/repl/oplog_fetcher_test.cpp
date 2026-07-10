@@ -60,7 +60,7 @@
 #include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
@@ -779,7 +779,7 @@ TEST_F(OplogFetcherTest,
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, shutdownState.getStatus());
 }
 
-AtomicWord<bool> sharedCallbackStateDestroyed{false};
+Atomic<bool> sharedCallbackStateDestroyed{false};
 bool sharedCallbackStateDestroyedSoon() {
     // Wait up to 10 seconds.
     for (auto i = 0; i < 100; i++) {

@@ -75,7 +75,7 @@ TEST(WaiterList, MultipleWaitersWithDifferentContinuations) {
 
     auto executor = InlineQueuedCountingExecutor::make();
 
-    AtomicWord<int> i = 0;
+    Atomic<int> i = 0;
 
     // We now attach different continuation chains to the returned futures. The expectation is that
     // each chain will be executed separately without overwriting each other on the returned future

@@ -41,7 +41,7 @@ server_parameters:
             into compressed time-series buckets that are reopened. On by default, can be
             turned off for a performance boost."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<bool>"
+        cpp_vartype: "Atomic<bool>"
         cpp_varname: "gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnReopening"
         default: true
         redact: false
@@ -51,7 +51,7 @@ server_parameters:
             "Whether or not to perform data integrity checks when inserting measurements
             into compressed time-series buckets."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<bool>"
+        cpp_vartype: "Atomic<bool>"
         cpp_varname: "gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert"
         default: true
         redact: false
@@ -62,7 +62,7 @@ server_parameters:
             measurements into compressed time-series buckets.  Will only be used if
             performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert is true"
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<int>"
+        cpp_vartype: "Atomic<int>"
         cpp_varname: "gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsertFrequency"
         default: 1
         validator: {gte: 0, lte: 100}
@@ -137,7 +137,7 @@ server_parameters:
             size (in bytes) of measurements we pack into buckets. This value represents
             the absolute lowest size we will limit buckets to."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<int>"
+        cpp_vartype: "Atomic<int>"
         cpp_varname: "gTimeseriesBucketMinSize"
         default: 5120 # 5KB
         validator: {gte: 1}
@@ -149,7 +149,7 @@ server_parameters:
             those bucket documents automatically for a limited number of times. This value
             represents the number of retries we would perform."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<int>"
+        cpp_vartype: "Atomic<int>"
         cpp_varname: "gTimeseriesInsertMaxRetriesOnDuplicates"
         default: 32
         validator: {gte: 1}
@@ -161,7 +161,7 @@ server_parameters:
             being inserted into a bucket, we use the element's uncompressed size towards
             the bucket size limit."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<int>"
+        cpp_vartype: "Atomic<int>"
         cpp_varname: "gTimeseriesLargeMeasurementThreshold"
         default: 32
         validator: {gte: 0}
@@ -174,7 +174,7 @@ server_parameters:
             This value represents the maximum number of retries the bucket catalog would perform before attempting
             to find an existing open bucket, and if unsuccessful, then allocating a new bucket."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<int>"
+        cpp_vartype: "Atomic<int>"
         cpp_varname: "gTimeseriesMaxRetriesForWriteConflictsOnReopening"
         default: 16
         validator: {gte: 1}
@@ -183,7 +183,7 @@ server_parameters:
     "timeseriesDisableStrictBucketValidator":
         description: "Disable the strict bucket validator for timeseries collection and use the legacy schema validator instead."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<bool>"
+        cpp_vartype: "Atomic<bool>"
         cpp_varname: "gTimeseriesDisableStrictBucketValidator"
         default: false
         redact: false
@@ -191,7 +191,7 @@ server_parameters:
     "timeseriesLessStrictBucketValidator":
         description: "Make the timeseries bucket validator for timeseries collection less strict."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<bool>"
+        cpp_vartype: "Atomic<bool>"
         cpp_varname: "gTimeseriesLessStrictBucketValidator"
         default: false
         redact: false

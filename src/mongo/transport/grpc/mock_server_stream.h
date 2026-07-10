@@ -85,7 +85,7 @@ private:
         /**
          * Whether or not the metadata has been made available to the client end of the stream.
          */
-        AtomicWord<bool> _sent;
+        Atomic<bool> _sent;
         MetadataContainer _headers;
     };
 

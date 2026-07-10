@@ -220,7 +220,7 @@ TEST_F(DBClientGRPCTest, GetMaxWireVersionCallsClusterMaxWireVersion) {
 }
 
 TEST_F(DBClientGRPCTest, AutoReconnectionSucceeds) {
-    AtomicWord<bool> hasBeenCancelledOnce(false);
+    Atomic<bool> hasBeenCancelledOnce(false);
     auto serverCb = [&](auto session) {
         // Cancel the first RPC.
         if (!hasBeenCancelledOnce.load()) {
@@ -250,7 +250,7 @@ TEST_F(DBClientGRPCTest, AutoReconnectionSucceeds) {
 }
 
 TEST_F(DBClientGRPCTest, ShutdownBehavior) {
-    AtomicWord<bool> firstRun(true);
+    Atomic<bool> firstRun(true);
     Notification<void> firstSessionReady;
 
     auto serverCb = [&](auto session) {

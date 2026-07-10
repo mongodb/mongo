@@ -31,7 +31,7 @@
 
 #include "mongo/logv2/constants.h"
 #include "mongo/logv2/log_format.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
@@ -45,14 +45,14 @@ namespace mongo::logv2 {
 // Text formatter without metadata. Just contains the formatted message.
 class [[MONGO_MOD_OPEN]] PlainFormatter {
 public:
-    PlainFormatter(const AtomicWord<int32_t>* maxAttributeSizeKB = nullptr)
+    PlainFormatter(const Atomic<int32_t>* maxAttributeSizeKB = nullptr)
         : _maxAttributeSizeKB(maxAttributeSizeKB) {}
 
     void operator()(boost::log::record_view const& rec, fmt::memory_buffer& buffer) const;
     void operator()(boost::log::record_view const& rec, boost::log::formatting_ostream& strm) const;
 
 private:
-    const AtomicWord<int32_t>* _maxAttributeSizeKB;
+    const Atomic<int32_t>* _maxAttributeSizeKB;
 };
 
 }  // namespace mongo::logv2

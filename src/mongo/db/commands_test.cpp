@@ -54,7 +54,7 @@
 #include "mongo/db/service_entry_point_shard_role.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"

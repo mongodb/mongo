@@ -32,7 +32,7 @@
 #include "mongo/db/admission/ticketing/ticketholder.h"
 #include "mongo/db/client.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -117,7 +117,7 @@ class ThreadPoolTest {
     static const unsigned iterations = 10000;
     static const unsigned nThreads = 8;
 
-    AtomicWord<unsigned> counter;
+    Atomic<unsigned> counter;
     void increment(unsigned n) {
         for (unsigned i = 0; i < n; i++) {
             counter.fetchAndAdd(1);
@@ -183,7 +183,7 @@ private:
     char pad2[128];
     unsigned locks;
     char pad3[128];
-    AtomicWord<int> k;
+    Atomic<int> k;
 
     void validate() override {
         if (once++ == 0) {
@@ -205,7 +205,7 @@ private:
                 break;
         }
     }
-    AtomicWord<bool> done;
+    Atomic<bool> done;
     void subthread(int x) override {
         if (x == 1) {
             watch();
@@ -232,8 +232,8 @@ private:
 };
 
 class StdxMutexSlackTest : public Slack<std::mutex, std::lock_guard<std::mutex>> {};
-class UIsAtomicWordAtomicTest : public IsAtomicWordAtomic<AtomicWord<unsigned>> {};
-class ULLIsAtomicWordAtomicTest : public IsAtomicWordAtomic<AtomicWord<unsigned long long>> {};
+class UIsAtomicWordAtomicTest : public IsAtomicWordAtomic<Atomic<unsigned>> {};
+class ULLIsAtomicWordAtomicTest : public IsAtomicWordAtomic<Atomic<unsigned long long>> {};
 
 class All : public unittest::OldStyleSuiteSpecification {
 public:

@@ -29,7 +29,7 @@
 
 #include "mongo/db/query/util/throughput_gauge.h"
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
@@ -164,7 +164,7 @@ TEST_F(ThroughputGaugeTest, ConcurrentRecordEvents) {
     constexpr int eventsPerThread = 100;
 
     std::vector<stdx::thread> threads;
-    AtomicWord<unsigned> ready{0};
+    Atomic<unsigned> ready{0};
 
     // Each thread will record events.
     for (int i = 0; i < numThreads; i++) {
@@ -196,8 +196,8 @@ TEST_F(ThroughputGaugeTest, ConcurrentRecordAndRead) {
     constexpr int eventsPerThread = 50;
 
     std::vector<stdx::thread> threads;
-    AtomicWord<unsigned> ready{0};
-    AtomicWord<bool> stopReading{false};
+    Atomic<unsigned> ready{0};
+    Atomic<bool> stopReading{false};
 
     // Writer threads.
     for (int i = 0; i < numWriteThreads; i++) {
@@ -248,7 +248,7 @@ TEST_F(ThroughputGaugeTest, ConcurrentRecordWithExpiration) {
     constexpr int eventsPerThread = 25;
 
     std::vector<stdx::thread> threads;
-    AtomicWord<unsigned> ready{0};
+    Atomic<unsigned> ready{0};
 
     auto startTime = now();
 

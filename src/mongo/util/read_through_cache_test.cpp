@@ -33,7 +33,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -569,7 +569,7 @@ TEST_F(ReadThroughCacheAsyncTest, InvalidateReissuesLookup) {
     ThreadPool threadPool{ThreadPool::Options()};
     threadPool.startup();
 
-    AtomicWord<int> countLookups(0);
+    Atomic<int> countLookups(0);
     Barrier lookupStartedBarriers[] = {Barrier{2}, Barrier{2}, Barrier{2}};
     Barrier completeLookupBarriers[] = {Barrier{2}, Barrier{2}, Barrier{2}};
 

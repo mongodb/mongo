@@ -54,7 +54,7 @@ namespace [[MONGO_MOD_PUBLIC]] mongo {
 class OplogSlotTimeContext {
     int64_t _batchCount = 0;
     boost::optional<Timer> _timer;
-    AtomicWord<int64_t> _totalOplogSlotDurationMicros;
+    Atomic<int64_t> _totalOplogSlotDurationMicros;
 
 public:
     /**

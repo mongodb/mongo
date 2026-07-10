@@ -300,7 +300,7 @@ private:
         }
 
     private:
-        AtomicWord<long long> _prepareReadConflicts{0};
+        Atomic<long long> _prepareReadConflicts{0};
     };
 
     // The struct containing the transaction number and transaction retry counter.

@@ -80,7 +80,7 @@ using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
 
-AtomicWord<long long> Scope::_lastVersion(1);
+Atomic<long long> Scope::_lastVersion(1);
 
 
 namespace {

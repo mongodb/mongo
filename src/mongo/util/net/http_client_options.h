@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 
 namespace mongo {
 struct HttpClientOptions {
@@ -39,7 +39,7 @@ struct HttpClientOptions {
      * Note: only affects new handles. This means that if connection pooling is in use, this will
      * not take affect on existing connections.
      */
-    AtomicWord<bool> verboseLogging;
+    Atomic<bool> verboseLogging;
 };
 
 extern HttpClientOptions httpClientOptions;

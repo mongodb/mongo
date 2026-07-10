@@ -618,7 +618,7 @@ TEST_F(GRPCClientTest, GRPCClientMetadata) {
 
 TEST_F(GRPCClientTest, GRPCClientShutdown) {
     const int kNumRpcs = 10;
-    AtomicWord<int> numRpcsRemaining(kNumRpcs);
+    Atomic<int> numRpcsRemaining(kNumRpcs);
     Notification<void> rpcsFinished;
 
     auto serverHandler = [&](std::shared_ptr<IngressSession> session) {

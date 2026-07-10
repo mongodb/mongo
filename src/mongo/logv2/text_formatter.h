@@ -31,7 +31,7 @@
 
 #include "mongo/logv2/log_format.h"
 #include "mongo/logv2/plain_formatter.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
@@ -43,7 +43,7 @@ namespace mongo::logv2 {
 
 class TextFormatter : protected PlainFormatter {
 public:
-    TextFormatter(const AtomicWord<int32_t>* maxAttributeSizeKB = nullptr,
+    TextFormatter(const Atomic<int32_t>* maxAttributeSizeKB = nullptr,
                   LogTimestampFormat timestampFormat = LogTimestampFormat::kISO8601UTC)
         : PlainFormatter(maxAttributeSizeKB), _timestampFormat(timestampFormat) {}
 

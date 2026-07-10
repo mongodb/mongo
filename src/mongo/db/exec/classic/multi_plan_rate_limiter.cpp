@@ -173,7 +173,7 @@ MultiPlanTicketManager::MultiPlanTicketManager(std::shared_ptr<MultiPlanTicketHo
                                                OperationContext* opCtx)
     : _holder(std::move(holder)), _opCtx(opCtx), _admCtx(&MultiPlanAdmissionContext::get(opCtx)) {}
 
-AtomicWord<long> MultiPlanRateLimiter::concurrentMultiPlansCounter{0};
+Atomic<long> MultiPlanRateLimiter::concurrentMultiPlansCounter{0};
 
 MultiPlanRateLimiter& MultiPlanRateLimiter::get(ServiceContext* serviceContext) {
     return rateLimiterDecoration(serviceContext);

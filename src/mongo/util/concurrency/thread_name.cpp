@@ -44,7 +44,7 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/config.h"     // IWYU pragma: keep
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
@@ -229,7 +229,7 @@ private:
     static std::string _makeAnonymousThreadName() {
         if (isMainThread())
             return "main";
-        static AtomicWord<uint64_t> next{1};
+        static Atomic<uint64_t> next{1};
         using namespace fmt::literals;
         return fmt::format("thread{}"_cf, next.fetchAndAdd(1));
     }

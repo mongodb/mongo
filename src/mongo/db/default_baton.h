@@ -98,7 +98,7 @@ private:
 
     OperationContext* _opCtx;
 
-    AtomicWord<size_t> _nextTimerId;
+    Atomic<size_t> _nextTimerId;
     // Sorted in order of nearest -> furthest in future.
     std::multimap<Date_t, Timer> _timers;
     stdx::unordered_map<size_t, std::multimap<Date_t, Timer>::iterator> _timersById;

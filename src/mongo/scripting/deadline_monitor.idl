@@ -34,7 +34,7 @@ server_parameters:
     scriptingEngineInterruptIntervalMS:
         description: "The number of milliseconds between executions of the deadline monitor."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<int>"
+        cpp_vartype: "Atomic<int>"
         cpp_varname: gScriptingEngineInterruptIntervalMS
         default: 1000
         redact: false

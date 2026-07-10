@@ -52,7 +52,7 @@
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/s/request_types/cleanup_orphaned_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"

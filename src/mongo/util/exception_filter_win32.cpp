@@ -39,7 +39,7 @@
 
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
@@ -53,7 +53,7 @@
 namespace mongo {
 
 namespace {
-AtomicWord<bool> win32MinidumpEnabled{true};
+Atomic<bool> win32MinidumpEnabled{true};
 }  // namespace
 
 void setWin32MinidumpEnabled(bool enabled) {

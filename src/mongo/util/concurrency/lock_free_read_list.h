@@ -297,7 +297,7 @@ private:
 
     private:
         WaitableAtomic<uint32_t> _readers;
-        AtomicWord<T> _data;
+        Atomic<T> _data;
         EntryImpl* const _next;
     };
 

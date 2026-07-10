@@ -33,7 +33,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/modules.h"
 

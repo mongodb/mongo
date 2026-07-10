@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/tick_source.h"
@@ -83,7 +83,7 @@ private:
     /**
      * Set to true when a read operation is currently blocked on a prepare conflict.
      */
-    AtomicWord<bool> _waitingOnPrepareConflict{false};
+    Atomic<bool> _waitingOnPrepareConflict{false};
 
     /**
      * Prepare conflicts are monitored continuously over their duration.
@@ -94,13 +94,13 @@ private:
     /**
      * Stores the number of prepare conflicts caused by this operation, if any.
      */
-    AtomicWord<long long> _numPrepareConflictsThisOp{0};
+    Atomic<long long> _numPrepareConflictsThisOp{0};
 
     /**
      * Stores the amount of time spent blocked on a prepare read conflict for this operation, if
      * any.
      */
-    AtomicWord<int64_t> _thisOpPrepareConflictDuration{0};
+    Atomic<int64_t> _thisOpPrepareConflictDuration{0};
 };
 
 }  // namespace mongo

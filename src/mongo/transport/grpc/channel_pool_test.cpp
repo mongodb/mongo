@@ -29,7 +29,7 @@
 
 #include "mongo/transport/grpc/channel_pool.h"
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
@@ -100,7 +100,7 @@ private:
 
     std::unique_ptr<ClockSourceMock> _clockSource;
     std::shared_ptr<PoolType> _pool;
-    AtomicWord<bool> _sslMode{false};
+    Atomic<bool> _sslMode{false};
 };
 
 TEST_F(ChannelPoolTest, StartsEmpty) {

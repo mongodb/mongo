@@ -468,7 +468,7 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
 
     // Simulate the callback that queries config.transactions for the oldest active transaction.
     boost::optional<Timestamp> oldestActiveTxnTimestamp;
-    AtomicWord<bool> callbackShouldFail{false};
+    Atomic<bool> callbackShouldFail{false};
     auto callback = [&](Timestamp stableTimestamp) {
         using ResultType = StorageEngine::OldestActiveTransactionTimestampResult;
         if (callbackShouldFail.load()) {

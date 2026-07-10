@@ -38,7 +38,7 @@ server_parameters:
         description: Controls whether ingress admission control mechanism is enabled.
         set_at: [startup, runtime]
         cpp_varname: gIngressAdmissionControlEnabled
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
     ingressAdmissionControllerTicketPoolSize:
@@ -48,7 +48,7 @@ server_parameters:
             ingress admission control.
         set_at: [startup, runtime]
         cpp_varname: gIngressAdmissionControllerTicketPoolSize
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         on_update: IngressAdmissionController::onUpdateTicketPoolSize
         # Setting the pool size equal to the max connections default means it is
         # effectively infinite. See maxIncomingConnections in server_options_general.idl

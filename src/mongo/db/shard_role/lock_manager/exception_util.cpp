@@ -36,7 +36,7 @@
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/log_and_backoff.h"

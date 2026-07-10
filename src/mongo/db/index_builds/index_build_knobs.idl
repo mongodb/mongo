@@ -39,7 +39,7 @@ server_parameters:
             delay scheduling user index builds even when the number of active user index builds is below
             the limit.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: maxNumActiveUserIndexBuilds
         default: 3
         validator:
@@ -49,7 +49,7 @@ server_parameters:
     indexBuildMinAvailableDiskSpaceMB:
         description: Minimum disk space required to build an index
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         cpp_varname: gIndexBuildMinAvailableDiskSpaceMB
         default: 500
         validator:
@@ -64,6 +64,6 @@ server_parameters:
             - runtime
             - startup
         cpp_varname: useReadOnceCursorsForIndexBuilds
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false

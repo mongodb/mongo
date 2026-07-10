@@ -41,7 +41,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
@@ -585,7 +585,7 @@ private:
     // Note: This method has to be accessed only via _setHasExecutor() and _getHasExecutor()
     // methods. This is present to make PrimaryOnlyService::_executor to have (W) synchronization
     // rule instead of (M).
-    AtomicWord<bool> _hasExecutor{false};  //(S)
+    Atomic<bool> _hasExecutor{false};  //(S)
 
     // TODO SERVER-52901: Make the synchronization rule as (R).
     // The concrete TaskExecutor backing _scopedExecutor. While _scopedExecutor is created and

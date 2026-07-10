@@ -44,7 +44,7 @@ server_parameters:
             The timeout used for finding a replica set host.
 
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<int>"
+        cpp_vartype: "Atomic<int>"
         cpp_varname: gDefaultFindReplicaSetHostTimeoutMS
         default: 15000
         test_only: true

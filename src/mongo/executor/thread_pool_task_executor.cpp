@@ -43,7 +43,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
@@ -98,7 +98,7 @@ public:
     boost::optional<stdx::condition_variable> finishedCondition;
     boost::optional<std::list<std::shared_ptr<CallbackState>>::iterator> iter;
 
-    AtomicWord<bool> isFinished{false};
+    Atomic<bool> isFinished{false};
     CancellationSource cancelSource;
 };
 

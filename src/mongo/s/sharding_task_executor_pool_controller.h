@@ -33,7 +33,7 @@
 #include "mongo/client/replica_set_change_notifier.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/executor/connection_pool.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
@@ -113,21 +113,21 @@ public:
 
     class Parameters {
     public:
-        AtomicWord<int> minConnections;
-        AtomicWord<int> maxConnections;
-        AtomicWord<int> maxConnecting;
+        Atomic<int> minConnections;
+        Atomic<int> maxConnections;
+        Atomic<int> maxConnecting;
 
-        AtomicWord<int> hostTimeoutMS;
-        AtomicWord<int> pendingTimeoutMS;
-        AtomicWord<int> toRefreshTimeoutMS;
+        Atomic<int> hostTimeoutMS;
+        Atomic<int> pendingTimeoutMS;
+        Atomic<int> toRefreshTimeoutMS;
 
-        AtomicWord<int> connectionRequestsMaxQueueDepth;
+        Atomic<int> connectionRequestsMaxQueueDepth;
 
         synchronized_value<std::string> matchingStrategyString;
-        AtomicWord<MatchingStrategy> matchingStrategy;
+        Atomic<MatchingStrategy> matchingStrategy;
 
-        AtomicWord<int> minConnectionsForConfigServers;
-        AtomicWord<int> maxConnectionsForConfigServers;
+        Atomic<int> minConnectionsForConfigServers;
+        Atomic<int> maxConnectionsForConfigServers;
     };
 
     static inline Parameters gParameters;

@@ -57,7 +57,7 @@
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -107,14 +107,13 @@ struct InitialSyncSummaryStats {
     Atomic64Metric failedInitialSyncAttempts;
     Atomic64Metric maxFailedInitialSyncAttempts;
     Counter64 totalAttempts;
-    AtomicWord<Date_t> initialSyncStart;
-    AtomicWord<Date_t> initialSyncEnd;
-    AtomicWord<int> phase{
-        0};  // Phase enum stored as int; cast to int only at write, to Phase at read.
+    Atomic<Date_t> initialSyncStart;
+    Atomic<Date_t> initialSyncEnd;
+    Atomic<int> phase{0};  // Phase enum stored as int; cast to int only at write, to Phase at read.
     Atomic64Metric appliedOps;
-    AtomicWord<unsigned long long> beginApplyingTimestamp{0};
-    AtomicWord<unsigned long long> beginFetchingTimestamp{0};
-    AtomicWord<unsigned long long> stopTimestamp{0};
+    Atomic<unsigned long long> beginApplyingTimestamp{0};
+    Atomic<unsigned long long> beginFetchingTimestamp{0};
+    Atomic<unsigned long long> stopTimestamp{0};
 
     // AllDatabaseCloner-owned fields:
     Atomic64Metric approxTotalDataSize;
@@ -905,7 +904,7 @@ private:
     void _shutdownComponent(WithLock lk, Component& component);
 
     // Counts how many documents have been refetched from the source in the current batch.
-    AtomicWord<unsigned> _fetchCount;
+    Atomic<unsigned> _fetchCount;
 
     //
     // All member variables are labeled with one of the following codes indicating the

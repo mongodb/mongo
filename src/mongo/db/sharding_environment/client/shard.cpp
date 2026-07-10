@@ -38,7 +38,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/shard_shared_state_cache.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

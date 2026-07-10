@@ -34,7 +34,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/user_write_block/replica_set_writes_block_reason_gen.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 #include <array>
@@ -170,11 +170,11 @@ private:
     // Atomic<T> enforces lock-free access at compile time.
     Atomic<WriteBlockInfo> _writeBlockInfo{WriteBlockInfo{}};
     Atomic<bool> _deletionsBlocked{false};
-    std::array<AtomicWord<std::uint64_t>, idlEnumCount<ReplicaSetWritesBlockReasonEnum>>
+    std::array<Atomic<std::uint64_t>, idlEnumCount<ReplicaSetWritesBlockReasonEnum>>
         _replicaSetWritesBlockCounters{};
-    mutable AtomicWord<std::uint64_t> _replicaSetWriteBlockRejectedInserts{0};
-    mutable AtomicWord<std::uint64_t> _replicaSetWriteBlockRejectedUpdates{0};
-    mutable AtomicWord<std::uint64_t> _replicaSetWriteBlockRejectedDeletes{0};
+    mutable Atomic<std::uint64_t> _replicaSetWriteBlockRejectedInserts{0};
+    mutable Atomic<std::uint64_t> _replicaSetWriteBlockRejectedUpdates{0};
+    mutable Atomic<std::uint64_t> _replicaSetWriteBlockRejectedDeletes{0};
     Atomic<bool> _userIndexBuildsBlocked{false};
 };
 

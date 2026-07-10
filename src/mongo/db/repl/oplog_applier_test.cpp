@@ -38,7 +38,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -712,7 +712,7 @@ public:
 protected:
     std::shared_ptr<ClockSourceMock> _mockClock;
     ServiceContext::UniqueOperationContext _opCtxHolder;
-    AtomicWord<bool> _failWaits{false};
+    Atomic<bool> _failWaits{false};
 
 private:
     std::string _origThreadName;

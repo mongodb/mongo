@@ -38,7 +38,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/transport/message_compressor_registry.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session_manager.h"

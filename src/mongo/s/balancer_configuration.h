@@ -33,7 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/s/balancer_configuration_gen.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
 #include "mongo/util/modules.h"
@@ -322,8 +322,8 @@ private:
 
     // Max chunk size after which a chunk would be considered jumbo and won't be moved. This value
     // is read on the critical path after each write operation, that's why it is cached.
-    AtomicWord<unsigned long long> _maxChunkSizeBytes;
-    AtomicWord<bool> _shouldAutoMerge;
+    Atomic<unsigned long long> _maxChunkSizeBytes;
+    Atomic<bool> _shouldAutoMerge;
 
     // Mutex used to serialize the balancer configuration refreshes. It should be taken in exclusive
     // mode to prevent having more than one refresh happening at the same time.

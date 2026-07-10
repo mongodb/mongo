@@ -39,7 +39,7 @@
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/util/assert_util.h"

@@ -56,13 +56,13 @@ constexpr int INVALID_SOCKET_VALUE = -1;
 
 // Network state
 int _clientSocket = INVALID_SOCKET_VALUE;
-AtomicWord<bool> _running{false};
+Atomic<bool> _running{false};
 std::unique_ptr<std::thread> _messageThread;
 
 // Configuration state
 std::mutex _configMutex;
 stdx::condition_variable _configCV;
-static AtomicWord<bool> _configured{false};
+static Atomic<bool> _configured{false};
 
 
 /**

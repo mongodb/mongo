@@ -30,7 +30,7 @@ global:
     cpp_includes:
         - "mongo/db/query/query_knobs/query_knob_test_callbacks.h"
         - "mongo/db/query/query_knobs/with_on_update_util.h"
-        - "mongo/platform/atomic_word.h"
+        - "mongo/platform/atomic.h"
         - "mongo/util/synchronized_value.h"
 
 enums:
@@ -45,7 +45,7 @@ server_parameters:
     testIntKnob:
         set_at: [startup, runtime]
         description: "Synthetic int knob for QueryKnob descriptor tests."
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gTestIntKnob
         default: 42
         validator:
@@ -63,7 +63,7 @@ server_parameters:
     testDoubleKnob:
         set_at: [startup, runtime]
         description: "Synthetic double knob for QueryKnob descriptor tests."
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         cpp_varname: gTestDoubleKnob
         default: 3.14
         validator:
@@ -80,7 +80,7 @@ server_parameters:
     testBoolKnob:
         set_at: [startup, runtime]
         description: "Synthetic bool knob for QueryKnob descriptor tests."
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: gTestBoolKnob
         default: true
         redact: false
@@ -94,7 +94,7 @@ server_parameters:
     testLowFcvKnob:
         set_at: [startup, runtime]
         description: "Synthetic int knob with a low minimum FCV for FCV-gating tests."
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gTestLowFcvKnob
         default: 5
         redact: false
@@ -108,7 +108,7 @@ server_parameters:
     testLLKnob:
         set_at: [startup, runtime]
         description: "Synthetic long long knob for QueryKnob descriptor tests."
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         cpp_varname: gTestLLKnob
         default: 100
         redact: false
@@ -132,7 +132,7 @@ server_parameters:
     testPlainParam:
         set_at: [startup, runtime]
         description: "Plain ServerParameter (no query_knob annotation) for QueryKnobRegistry tests."
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         cpp_varname: gTestPlainParam
         default: 0.0
         redact: false

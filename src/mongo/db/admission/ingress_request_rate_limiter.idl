@@ -41,7 +41,7 @@ server_parameters:
         description: Controls whether ingress request rate limiter mechanism is enabled.
         set_at: [startup, runtime]
         cpp_varname: gIngressRequestRateLimiterEnabled
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
 
@@ -94,7 +94,7 @@ server_parameters:
             retryable.
         set_at: [startup, runtime]
         cpp_varname: gIngressRequestRateLimiterAllowRetries
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
 

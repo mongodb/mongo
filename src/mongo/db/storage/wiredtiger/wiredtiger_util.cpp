@@ -1428,7 +1428,7 @@ Status WiredTigerUtil::canRunAutoCompact(bool isEphemeral) {
 
 // static
 uint64_t WiredTigerUtil::genTableId() {
-    static AtomicWord<unsigned long long> nextTableId(WiredTigerUtil::kLastTableId);
+    static Atomic<unsigned long long> nextTableId(WiredTigerUtil::kLastTableId);
     return nextTableId.fetchAndAdd(1);
 }
 

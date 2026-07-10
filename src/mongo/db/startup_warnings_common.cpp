@@ -34,7 +34,7 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/net/ssl_options.h"
 
 #include <fstream>  // IWYU pragma: keep

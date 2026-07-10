@@ -286,8 +286,8 @@ void TicketHolderTest::runTicketWaitTimeoutTest(Milliseconds maxTimeMS,
     Timer timer;
 
     // Spawn a thread that will try to acquire a ticket and should timeout
-    AtomicWord<bool> didTimeout{false};
-    AtomicWord<ErrorCodes::Error> errorCode{ErrorCodes::OK};
+    Atomic<bool> didTimeout{false};
+    Atomic<ErrorCodes::Error> errorCode{ErrorCodes::OK};
     Future<void> ticketFuture = spawn([&]() {
         try {
             holder->waitForTicket(timedOutAdmission.opCtx.get(), &timedOutAdmission.admCtx);

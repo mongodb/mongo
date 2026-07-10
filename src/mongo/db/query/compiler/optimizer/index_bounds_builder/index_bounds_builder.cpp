@@ -57,7 +57,7 @@
 #include "mongo/db/query/index_multikey_helpers.h"
 #include "mongo/db/query/indexability.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/scopeguard.h"

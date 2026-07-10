@@ -92,7 +92,7 @@ static size_t kApplyOpsNonArrayEntryPaddingBytes = 256;
 // Size of an applyOps entry, excluding its array.
 static size_t kApplyOpsArrayEntryPaddingBytes = 256;
 
-void incrementSSSMetricNoOverflow(AtomicWord<long long>& metric, long long value) {
+void incrementSSSMetricNoOverflow(Atomic<long long>& metric, long long value) {
     const int64_t MAX = 1ULL << 60;
 
     if (metric.loadRelaxed() > MAX) {
@@ -124,11 +124,11 @@ struct BatchedDeletesSSS : ServerStatusSection {
         return bob.obj();
     }
 
-    AtomicWord<long long> batches{0};
-    AtomicWord<long long> docs{0};
-    AtomicWord<long long> stagedSizeBytes{0};
-    AtomicWord<long long> timeInBatchMillis{0};
-    AtomicWord<long long> refetchesDueToYield{0};
+    Atomic<long long> batches{0};
+    Atomic<long long> docs{0};
+    Atomic<long long> stagedSizeBytes{0};
+    Atomic<long long> timeInBatchMillis{0};
+    Atomic<long long> refetchesDueToYield{0};
 };
 auto& batchedDeletesSSS =
     *ServerStatusSectionBuilder<BatchedDeletesSSS>("batchedDeletes").forShard();

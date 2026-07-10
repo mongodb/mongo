@@ -38,7 +38,7 @@ server_parameters:
             Defaults to 0, which turns off throttling."
         set_at: [startup, runtime]
         cpp_varname: gMaxValidateMBperSec
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         validator: {gte: 0}
         default: 0
         redact: false
@@ -47,7 +47,7 @@ server_parameters:
         description: "Limits the amount of memory that a single validate command will use."
         set_at: [startup, runtime]
         cpp_varname: maxValidateMemoryUsageMB
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         validator: {gt: 0}
         default: 200
         redact: false

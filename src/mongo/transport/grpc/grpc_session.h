@@ -414,7 +414,7 @@ public:
      * No alignment is needed as the shared state is not expected to be modified frequently.
      */
     struct SharedState {
-        AtomicWord<int> clusterMaxWireVersion;
+        Atomic<int> clusterMaxWireVersion;
     };
 
     EgressSession(TransportLayer* tl,
@@ -507,7 +507,7 @@ private:
 
     const std::shared_ptr<GRPCReactor> _reactor;
 
-    AtomicWord<bool> _checkedWireVersion;
+    Atomic<bool> _checkedWireVersion;
     const std::shared_ptr<ClientContext> _ctx;
     const std::shared_ptr<ClientStream> _stream;
     UUID _channelId;

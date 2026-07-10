@@ -40,7 +40,7 @@
 #include "mongo/db/query/query_planner_test_fixture.h"
 #include "mongo/db/query/util/cartesian_product.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"

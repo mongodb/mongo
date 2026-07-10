@@ -91,7 +91,7 @@ public:
 
 private:
     TicketHolder _ticketHolder;
-    AtomicWord<bool> _isReleased;
+    Atomic<bool> _isReleased;
 };
 
 /**
@@ -160,7 +160,7 @@ class MultiPlanRateLimiter {
 public:
     static MultiPlanRateLimiter& get(ServiceContext* serviceContext);
 
-    static AtomicWord<long> concurrentMultiPlansCounter;
+    static Atomic<long> concurrentMultiPlansCounter;
 
     MultiPlanRateLimiter() = default;
 

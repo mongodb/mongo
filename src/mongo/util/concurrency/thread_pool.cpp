@@ -35,7 +35,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
@@ -63,7 +63,7 @@ namespace mongo {
 namespace {
 
 // Counter used to assign unique names to otherwise-unnamed thread pools.
-AtomicWord<int> nextUnnamedThreadPoolId{1};
+Atomic<int> nextUnnamedThreadPoolId{1};
 
 std::string threadIdToString(stdx::thread::id id) {
     std::ostringstream oss;

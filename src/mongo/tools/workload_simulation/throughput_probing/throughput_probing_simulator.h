@@ -88,10 +88,10 @@ private:
     MockPeriodicRunner* _runner;
     std::unique_ptr<admission::execution_control::ThroughputProbing> _throughputProbing;
     stdx::thread _probingThread;
-    AtomicWord<bool> _probing;
+    Atomic<bool> _probing;
 
     std::unique_ptr<TicketedWorkloadDriver> _driver;
-    AtomicWord<bool> _running;
+    Atomic<bool> _running;
 };
 
 }  // namespace mongo::workload_simulation

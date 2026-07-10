@@ -31,7 +31,7 @@
 
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
@@ -71,11 +71,11 @@ private:
     const ShardId _donorShardId;
 
     ReshardingMetrics* _metrics;
-    AtomicWord<int64_t> _insertsApplied{0};
-    AtomicWord<int64_t> _updatesApplied{0};
-    AtomicWord<int64_t> _deletesApplied{0};
-    AtomicWord<int64_t> _oplogEntriesApplied{0};
-    AtomicWord<int64_t> _writesToStashCollections{0};
+    Atomic<int64_t> _insertsApplied{0};
+    Atomic<int64_t> _updatesApplied{0};
+    Atomic<int64_t> _deletesApplied{0};
+    Atomic<int64_t> _oplogEntriesApplied{0};
+    Atomic<int64_t> _writesToStashCollections{0};
 };
 
 }  // namespace mongo

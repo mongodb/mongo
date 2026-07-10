@@ -65,13 +65,13 @@ const auto getMaintainerThread =
     ServiceContext::declareDecoration<std::unique_ptr<OplogCapMaintainerThread>>();
 
 // Cumulative amount of time spent truncating the oplog.
-AtomicWord<int64_t> totalTimeTruncating;
+Atomic<int64_t> totalTimeTruncating;
 
 // Cumulative number of truncates of the oplog.
-AtomicWord<int64_t> truncateCount;
+Atomic<int64_t> truncateCount;
 
 // Cumulative number of times the thread has been interrupted
-AtomicWord<int64_t> interruptCount;
+Atomic<int64_t> interruptCount;
 
 MONGO_FAIL_POINT_DEFINE(hangOplogCapMaintainerThread);
 MONGO_FAIL_POINT_DEFINE(hangBeforeOplogSampling);

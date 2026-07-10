@@ -39,7 +39,7 @@
 
 namespace mongo {
 namespace {
-const auto getInReplicationRecovery = ServiceContext::declareDecoration<AtomicWord<int32_t>>();
+const auto getInReplicationRecovery = ServiceContext::declareDecoration<Atomic<int32_t>>();
 const auto getSizeRecoveryState = ServiceContext::declareDecoration<SizeRecoveryState>();
 }  // namespace
 

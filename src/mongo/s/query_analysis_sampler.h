@@ -301,7 +301,7 @@ private:
 
     std::shared_ptr<PeriodicJobAnchor> _periodicConfigurationsRefresher;
     std::map<NamespaceString, SampleRateLimiter> _sampleRateLimiters;
-    std::array<AtomicWord<uint64_t>, srlBloomFilterNumBlocks> _srlBloomFilter{};
+    std::array<Atomic<uint64_t>, srlBloomFilterNumBlocks> _srlBloomFilter{};
 };
 
 }  // namespace analyze_shard_key

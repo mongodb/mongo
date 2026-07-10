@@ -64,19 +64,19 @@ namespace debugger {
 using namespace protocol;
 
 // Execution state
-static AtomicWord<bool> _paused{false};
+static Atomic<bool> _paused{false};
 static std::string _pausedScript;
 static int _pausedLine{0};
 
-AtomicWord<bool> _configurationDone{false};
+Atomic<bool> _configurationDone{false};
 static stdx::condition_variable _pauseCV;
 
 // Evaluation state for debugger REPL
 std::string _pendingEval;
 std::string _evalResult;
-AtomicWord<bool> _hasEvalRequest{false};
-AtomicWord<bool> _evalComplete{false};
-AtomicWord<bool> _fromInteractiveREPL{false};
+Atomic<bool> _hasEvalRequest{false};
+Atomic<bool> _evalComplete{false};
+Atomic<bool> _fromInteractiveREPL{false};
 
 // Data captured when paused
 static std::vector<Scope> _capturedScopes;
@@ -92,7 +92,7 @@ static std::map<std::string, std::set<int>> _breakpoints;
 
 // URLs that were updated after scripts may have already loaded (for retroactive application)
 static std::vector<std::string> _pendingBPUpdateUrls;
-static AtomicWord<bool> _hasBPUpdateRequest{false};
+static Atomic<bool> _hasBPUpdateRequest{false};
 
 /**
  *  DebuggerObject
@@ -951,7 +951,7 @@ void DebuggerGlobal::unpause() {
     _pauseCV.notify_all();
 }
 
-static AtomicWord<bool> _shouldStop{false};
+static Atomic<bool> _shouldStop{false};
 std::unique_ptr<std::thread> _stdinThread;
 
 void DebuggerGlobal::cleanup() {
@@ -1054,7 +1054,7 @@ void DebuggerGlobal::handleStdinThread() {
 Status DebuggerGlobal::init(JSContext* cx) {
     // The shell may create multiple JS scopes (e.g., for parallel operations). The debugger
     // is process-wide state: only initialize it once for the first scope.
-    static AtomicWord<bool> _initialized{false};
+    static Atomic<bool> _initialized{false};
     if (_initialized.swap(true)) {
         return Status::OK();
     }

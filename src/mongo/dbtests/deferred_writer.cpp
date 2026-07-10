@@ -46,7 +46,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 
@@ -65,7 +65,7 @@ namespace mongo {
 namespace deferred_writer_tests {
 
 namespace {
-AtomicWord<int64_t> counter;
+Atomic<int64_t> counter;
 
 // Get a new well-formed object with a unique _id field.
 BSONObj getObj(void) {

@@ -311,7 +311,7 @@ private:
     // Owns the Session objects for all current Sessions.
     SessionRuntimeInfoMap _sessions;
 
-    AtomicWord<bool> _disallowNewTransactions{false};
+    Atomic<bool> _disallowNewTransactions{false};
 };
 
 /**

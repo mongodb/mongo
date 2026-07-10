@@ -40,7 +40,7 @@ server_parameters:
             "The minimum number of expired internal sessions that must be buffered in memory
             before they are early reaped. 0 disables early reaping."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<int>"
+        cpp_vartype: "Atomic<int>"
         cpp_varname: internalSessionsReapThreshold
         default: 1000
         validator:

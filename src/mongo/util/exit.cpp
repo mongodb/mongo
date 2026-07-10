@@ -32,7 +32,7 @@
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
@@ -55,7 +55,7 @@ std::mutex shutdownMutex;
 stdx::condition_variable shutdownTasksComplete;
 boost::optional<ExitCode> shutdownExitCode;
 bool shutdownTasksInProgress = false;
-AtomicWord<unsigned> shutdownFlag;
+Atomic<unsigned> shutdownFlag;
 std::stack<ShutdownTask> shutdownTasks;
 stdx::thread::id shutdownTasksThreadId;
 

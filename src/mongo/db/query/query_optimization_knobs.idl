@@ -36,7 +36,7 @@ global:
         - "mongo/db/query/query_knobs/with_on_update_util.h"
         - "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
         - "mongo/db/query/util/memory_util.h"
-        - "mongo/platform/atomic_word.h"
+        - "mongo/platform/atomic.h"
     mod_visibility: public
 
 enums:
@@ -145,7 +145,7 @@ server_parameters:
             and this parameter.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlanEvaluationWorks"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 10000
         validator:
             gt: 0
@@ -166,7 +166,7 @@ server_parameters:
             and this parameter.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlanEvaluationCollFraction"
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         default: 0.3
         validator:
             gte: 0.0
@@ -188,7 +188,7 @@ server_parameters:
             and this parameter.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlanTotalEvaluationCollFraction"
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         default: 2.0
         validator:
             gte: 0.0
@@ -204,7 +204,7 @@ server_parameters:
         description: "Stop working plans once a plan returns this many results."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlanEvaluationMaxResults"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 101
         validator:
             gt: 0
@@ -222,7 +222,7 @@ server_parameters:
             on update because this might affect replanning.
         set_at: [startup, runtime]
         cpp_varname: "internalQuerySBEPlanEvaluationMaxMemoryBytes"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default:
             expr: 100 * 1024 * 1024
         validator:
@@ -242,7 +242,7 @@ server_parameters:
             contiguous prefix of equality predicates in any index.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlanTieBreakingWithIndexHeuristics"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
         annotations:
@@ -258,7 +258,7 @@ server_parameters:
             plans to be chosen when possible.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryForceIntersectionPlans"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -272,7 +272,7 @@ server_parameters:
         description: "Controls whether the planner will generate and consider index intersection plans."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlannerEnableIndexIntersection"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
         annotations:
@@ -286,7 +286,7 @@ server_parameters:
         description: "Controls whether we use hash-based intersection for rooted $and queries."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlannerEnableHashIntersection"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -300,7 +300,7 @@ server_parameters:
         description: "Controls whether we use sort-based intersection for rooted $and queries."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlannerEnableSortIndexIntersection"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -314,7 +314,7 @@ server_parameters:
         description: "Prunes unnecessary candidate plans so we trial less duplicate options."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlannerEnableIndexPruning"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -328,7 +328,7 @@ server_parameters:
         description: "The number of concurrent trialing multiplan candidates required to enable the MultiPlan rate limiter."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryConcurrentMultiPlanningThreshold"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 32000
         validator:
             gt: 0
@@ -345,7 +345,7 @@ server_parameters:
             finished or an active plan cache entry is added.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxConcurrentMultiPlanJobsPerCacheKey"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 320
         validator:
             gt: 0
@@ -362,7 +362,7 @@ server_parameters:
         description: "Disables caching of query plans for both classic and SBE engines."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryDisablePlanCache"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -378,7 +378,7 @@ server_parameters:
             only to the classic plan cache, not to the SBE plan cache.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryCacheMaxEntriesPerCollection"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         deprecated_name: "internalQueryCacheSize"
         default: 5000
         validator:
@@ -398,7 +398,7 @@ server_parameters:
             only to the classic plan cache, not to the SBE plan cache.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryCacheMaxSizeBytesBeforeStripDebugInfo"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 512 * 1024 * 1024
         validator:
@@ -414,7 +414,7 @@ server_parameters:
             and replanning?
         set_at: [startup, runtime]
         cpp_varname: "internalQueryCacheEvictionRatio"
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         default: 10.0
         validator:
             gte: 0.0
@@ -429,7 +429,7 @@ server_parameters:
             exponentially. The value of this server parameter is the base.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryCacheWorksGrowthCoefficient"
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         default: 2.0
         validator:
             gt: 1.0
@@ -442,7 +442,7 @@ server_parameters:
         description: "Whether or not cache entries can be marked as 'inactive'."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryCacheDisableInactiveEntries"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -472,7 +472,7 @@ server_parameters:
         description: "The maximum length allowed for an aggregation pipeline."
         set_at: [startup, runtime]
         cpp_varname: "internalPipelineLengthLimit"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default:
             expr: "defaultInternalPipelineLengthLimit()"
         validator:
@@ -486,7 +486,7 @@ server_parameters:
         description: "The maximum length allowed for an aggregation sub-pipeline view."
         set_at: [startup, runtime]
         cpp_varname: "internalMaxSubPipelineViewDepth"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default: 20
         test_only: true
         validator:
@@ -500,7 +500,7 @@ server_parameters:
         description: "The maximum depth allowed for a partialFilterExpression."
         set_at: [startup, runtime]
         cpp_varname: "internalPartialFilterExpressionMaxDepth"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default: 4
         validator:
             gt: 0
@@ -516,7 +516,7 @@ server_parameters:
         description: "How many indexed solutions will QueryPlanner::plan output?"
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlannerMaxIndexedSolutions"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 64
         validator:
             gte: 0
@@ -536,7 +536,7 @@ server_parameters:
             collStats.size), not the on-disk compressed size. -1 (default) disables the check.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxEstimatedScanBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default: -1
         redact: false
         validator:
@@ -565,7 +565,7 @@ server_parameters:
             the same fields and have the same indexes available, as in this example.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryEnumerationPreferLockstepOrEnumeration"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
         annotations:
@@ -579,7 +579,7 @@ server_parameters:
         description: "How many solutions will the enumerator consider at each OR?"
         set_at: [startup, runtime]
         cpp_varname: "internalQueryEnumerationMaxOrSolutions"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 10
         validator:
             gte: 0
@@ -595,7 +595,7 @@ server_parameters:
         description: "How many intersections will the enumerator consider at each AND?"
         set_at: [startup, runtime]
         cpp_varname: "internalQueryEnumerationMaxIntersectPerAnd"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 3
         validator:
             gte: 0
@@ -611,7 +611,7 @@ server_parameters:
         description: "Do we want to plan each child of the OR independently?"
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlanOrChildrenIndependently"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
         annotations:
@@ -627,7 +627,7 @@ server_parameters:
             during explodeForSort?
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxScansToExplode"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 200
         validator:
             gte: 0
@@ -645,7 +645,7 @@ server_parameters:
             to a COLLSCAN.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlannerGenerateCoveredWholeIndexScans"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -661,7 +661,7 @@ server_parameters:
             Used for testing to increase multiplanning and replanning test coverage.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlannerUseMultiplannerForSingleSolutions"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -675,7 +675,7 @@ server_parameters:
         description: "Ignore unknown JSON Schema keywords."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryIgnoreUnknownJSONSchemaKeywords"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -686,7 +686,7 @@ server_parameters:
         description: "Do we want to leverage indexes with collation for regex predicates?"
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlannerIgnoreIndexWithCollationForRegex"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
         annotations:
@@ -697,7 +697,7 @@ server_parameters:
         description: "Enable cost-based reordering of $lookup-$unwind pairs producing SBE plans."
         set_at: [startup, runtime]
         cpp_varname: "internalEnableJoinOptimization"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -711,7 +711,7 @@ server_parameters:
             sequentialIOPages, randomIOPages, localOpCost).
         set_at: [startup, runtime]
         cpp_varname: "internalQueryExplainJoinCostComponents"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -752,7 +752,7 @@ server_parameters:
             specifified in the aggregation pipeline.
         set_at: [startup, runtime]
         cpp_varname: internalMaxNodesInJoinGraph
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 10
         validator:
             gt: 1
@@ -769,7 +769,7 @@ server_parameters:
             order as specifified in the aggregation pipeline.
         set_at: [startup, runtime]
         cpp_varname: internalMaxEdgesInJoinGraph
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 256
         validator:
             gt: 0
@@ -785,7 +785,7 @@ server_parameters:
             implicit edge finding.
         set_at: [startup, runtime]
         cpp_varname: internalMaxNumberNodesConsideredForImplicitEdges
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 4
         validator:
             gte: 0
@@ -799,7 +799,7 @@ server_parameters:
         description: "Infer and propagate single table predicates across equivalence classes. This "
         set_at: [startup, runtime]
         cpp_varname: "internalInferSingleTablePredicates"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
         annotations:
@@ -810,7 +810,7 @@ server_parameters:
         description: "Maximum number of pipeline rewrite rules to apply"
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxPipelineRewrites"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 1_000_000
         validator:
             gte: 0
@@ -823,7 +823,7 @@ server_parameters:
         description: "Select a seed for randomized join reordering."
         set_at: [startup, runtime]
         cpp_varname: "internalRandomJoinOrderSeed"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 44
         redact: false
         annotations:
@@ -834,7 +834,7 @@ server_parameters:
         description: "Whether or not to prune un-promising HJ orders during join plan enumeration"
         set_at: [startup, runtime]
         cpp_varname: "internalEnableJoinEnumerationHJOrderPruning"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
         annotations:
@@ -845,7 +845,7 @@ server_parameters:
         description: "Whether or not to use index uniqueness metadata during join optimization"
         set_at: [startup, runtime]
         cpp_varname: "internalEnableJoinOptimizationUseIndexUniqueness"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -871,7 +871,7 @@ server_parameters:
         description: "If true, use the grammar-based parser and CST to parse queries."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryEnableCSTParser"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -894,7 +894,7 @@ server_parameters:
             If set to 0, then no limit will be applied.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryAutoParameterizationMaxParameterCount"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 512
         validator:
             gte: 0
@@ -909,7 +909,7 @@ server_parameters:
             Form and applies some simplifications.
         set_at: [startup, runtime]
         cpp_varname: internalQueryEnableBooleanExpressionsSimplifier
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
         annotations:
@@ -922,7 +922,7 @@ server_parameters:
             'maximumNumberOfUniquePredicates' the expression is considered too big to be simplified.
         set_at: [startup, runtime]
         cpp_varname: internalQueryMaximumNumberOfUniquePredicatesToSimplify
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 64
         redact: false
         annotations:
@@ -933,7 +933,7 @@ server_parameters:
         description: "Maximum number of minterms allowed during boolean transformations."
         set_at: [startup, runtime]
         cpp_varname: internalQueryMaximumNumberOfMintermsInSimplifier
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 1000
         redact: false
         annotations:
@@ -944,7 +944,7 @@ server_parameters:
         description: "Threshold capping number of prime implicants generated by Petrick's method."
         set_at: [startup, runtime]
         cpp_varname: internalQueryMaxNumPrimeImplicants
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 10000
         redact: false
         annotations:
@@ -957,7 +957,7 @@ server_parameters:
             `internalQueryMaxSizeFactorToSimplify`, the simplified one will be rejected.
         set_at: [startup, runtime]
         cpp_varname: internalQueryMaxSizeFactorToSimplify
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         default: 1.0
         redact: false
         annotations:
@@ -970,7 +970,7 @@ server_parameters:
             common predicate of the simplified conjunctive terms are taken out of brackets.
         set_at: [startup, runtime]
         cpp_varname: internalQueryDoNotOpenContainedOrsInSimplifier
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
         annotations:
@@ -1035,7 +1035,7 @@ server_parameters:
             than 10% lead to very wide confidence interval and poor estimate accuracy.
         set_at: [startup, runtime]
         cpp_varname: samplingMarginOfError
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         default: 5.0
         validator:
             gte: 1.0
@@ -1056,7 +1056,7 @@ server_parameters:
             A value of 0 (the default) means the sample size is derived from those two parameters.
         set_at: [startup, runtime]
         cpp_varname: internalSamplingSizeOverride
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 0
         validator:
             gte: 0
@@ -1110,7 +1110,7 @@ server_parameters:
             and the performance of the sampling process.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryNumChunksForChunkBasedSampling"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 10
         validator:
             gt: 0
@@ -1126,7 +1126,7 @@ server_parameters:
             purposes and should not be used in production.
         set_at: [startup, runtime]
         cpp_varname: "internalQuerySamplingBySequentialScan"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -1142,7 +1142,7 @@ server_parameters:
             This sampling method is useful for testing purposes and should not be used in production.
         set_at: [startup, runtime]
         cpp_varname: "internalQuerySamplingByStrides"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -1153,7 +1153,7 @@ server_parameters:
         description: For queries running through join optimization, control the sample size.
         set_at: [startup, runtime]
         cpp_varname: "internalJoinPlanSamplingSize"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 1000
         validator:
             gt: 0
@@ -1168,7 +1168,7 @@ server_parameters:
             as potential plans for single table plan fragments.
         set_at: [startup, runtime]
         cpp_varname: "internalJoinEnumerateCollScanPlans"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
         annotations:
@@ -1183,7 +1183,7 @@ server_parameters:
             as many levels as nodes in the join graph.
         set_at: [startup, runtime]
         cpp_varname: "internalMinAllPlansEnumerationSubsetLevel"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 64
         validator:
             gte: 0
@@ -1201,7 +1201,7 @@ server_parameters:
             have at most as many levels as nodes in the join graph.
         set_at: [startup, runtime]
         cpp_varname: "internalMaxAllPlansEnumerationSubsetLevel"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 64
         validator:
             gte: 0
@@ -1217,7 +1217,7 @@ server_parameters:
             the cost of multi-planning.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryNumWorksPerPlanForMPEstimation"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 384
         validator:
             gt: 100
@@ -1236,7 +1236,7 @@ server_parameters:
             multi-planning cost while choosing between them during AutomaticCE.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMinRequiredImprovementRatioForCostBasedRankerChoice"
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         default: 2.0
         validator:
             gte: 1.0
@@ -1255,7 +1255,7 @@ server_parameters:
             an extra predicate in order to allow indexes on $fieldpath to be used. This optimization
             is applied irrespective of this query knob if we are dealing with a FLE query.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: internalQueryExtraPredicateForReversedIn
         default: false
         redact: false
@@ -1277,7 +1277,7 @@ server_parameters:
             reshaping operation.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPermitMatchSwappingForComplexRenames"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -1288,7 +1288,7 @@ server_parameters:
         description: "Whether or not to enable pipeline optimization rules with Testing tag."
         set_at: [startup, runtime]
         cpp_varname: "internalEnablePipelineOptimizationAdditionalTestingRules"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -1299,7 +1299,7 @@ server_parameters:
         description: "Enable insertion of $_internalAssertDataAssumptions stages to validate dependency graph arrayness analysis."
         set_at: [startup, runtime]
         cpp_varname: "internalEnableDependencyGraphValidation"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         test_only: true
         redact: false
@@ -1311,7 +1311,7 @@ server_parameters:
         description: "Whether or not to use PathArrayness when applying optimizations"
         set_at: [startup, runtime]
         cpp_varname: "internalEnablePathArrayness"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
         annotations:
@@ -1324,7 +1324,7 @@ server_parameters:
             possible in those queries where an index is leveraged to provide sorting.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlannerPushdownFilterToIxscanForSort"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
         annotations:
@@ -1358,7 +1358,7 @@ server_parameters:
             internalQueryTransformHoistPolicy is always.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryTransformHoistMaximumPaths"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 1024
         validator: {gte: 0}
         redact: false
@@ -1371,7 +1371,7 @@ server_parameters:
             Enables the join plan cache. Join-eligible queries will consult the cache when this is enabled.
         set_at: [startup, runtime]
         cpp_varname: "internalEnableJoinPlanCache"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:

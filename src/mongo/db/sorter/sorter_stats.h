@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
@@ -41,14 +41,14 @@ namespace mongo {
  * For collecting cumulative stats of all sorters.
  */
 struct SorterTracker {
-    AtomicWord<long long> spilledRanges{0};
-    AtomicWord<long long> mergedSpills{0};
-    AtomicWord<long long> spilledKeyValuePairs{0};
-    AtomicWord<long long> bytesSpilled{0};
-    AtomicWord<long long> bytesSpilledUncompressed{0};
-    AtomicWord<long long> numSorted{0};
-    AtomicWord<long long> bytesSorted{0};
-    AtomicWord<long long> memUsage{0};
+    Atomic<long long> spilledRanges{0};
+    Atomic<long long> mergedSpills{0};
+    Atomic<long long> spilledKeyValuePairs{0};
+    Atomic<long long> bytesSpilled{0};
+    Atomic<long long> bytesSpilledUncompressed{0};
+    Atomic<long long> numSorted{0};
+    Atomic<long long> bytesSorted{0};
+    Atomic<long long> memUsage{0};
 };
 
 /**
@@ -78,9 +78,9 @@ public:
 private:
     SorterTracker* _sorterTracker;
 
-    AtomicWord<long long> _bytesSpilled;
-    AtomicWord<long long> _bytesSpilledUncompressed;
-    AtomicWord<long long> _numSpilledEntries;
+    Atomic<long long> _bytesSpilled;
+    Atomic<long long> _bytesSpilledUncompressed;
+    Atomic<long long> _numSpilledEntries;
 };
 
 
@@ -94,8 +94,8 @@ public:
     void addSpilledDataSize(long long size);
     void addSpilledDataSizeUncompressed(long long size);
 
-    AtomicWord<long long> opened;
-    AtomicWord<long long> closed;
+    Atomic<long long> opened;
+    Atomic<long long> closed;
 
     long long bytesSpilled() const {
         return _bytesSpilled.load();
@@ -108,8 +108,8 @@ public:
 private:
     SorterTracker* _sorterTracker;
 
-    AtomicWord<long long> _bytesSpilled;
-    AtomicWord<long long> _bytesSpilledUncompressed;
+    Atomic<long long> _bytesSpilled;
+    Atomic<long long> _bytesSpilledUncompressed;
 };
 
 /**

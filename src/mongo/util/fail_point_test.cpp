@@ -36,7 +36,7 @@
 #include "mongo/db/exec/mutable_bson/mutable_bson_test_utils.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
@@ -213,7 +213,7 @@ TEST(FailPoint, Stress) {
     mongo::unittest::ThreadAssertionMonitor monitor;
     monitor
         .spawnController([&] {
-            mongo::AtomicWord<bool> done{false};
+            mongo::Atomic<bool> done{false};
             FailPoint fp("testFP");
             fp.setMode(FailPoint::alwaysOn, 0, BSON("a" << 44));
             auto fpGuard =

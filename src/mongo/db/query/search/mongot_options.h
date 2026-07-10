@@ -55,8 +55,8 @@ struct [[MONGO_MOD_PUBLIC]] MongotParams {
     bool skipAuthToMongot = false;
     bool useGRPC = false;
 
-    AtomicWord<int> minConnections;
-    AtomicWord<int> maxConnections;
+    Atomic<int> minConnections;
+    Atomic<int> maxConnections;
     transport::ConnectSSLMode sslMode;
 };
 

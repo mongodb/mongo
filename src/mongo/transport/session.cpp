@@ -43,7 +43,7 @@ MONGO_FAIL_POINT_DEFINE(clientIsLoadBalancedPeer);
 
 namespace {
 
-AtomicWord<unsigned long long> sessionIdCounter(0);
+Atomic<unsigned long long> sessionIdCounter(0);
 
 }  // namespace
 

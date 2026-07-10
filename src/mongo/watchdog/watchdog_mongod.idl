@@ -35,7 +35,7 @@ server_parameters:
     "watchdogPeriodSeconds":
         description: "Watchdog Period (seconds)"
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<int>"
+        cpp_vartype: "Atomic<int>"
         cpp_varname: gWatchdogPeriodSeconds
         default: -1
         validator:

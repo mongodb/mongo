@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
@@ -60,8 +60,8 @@ public:
 private:
     boost::optional<Milliseconds> getElapsedMs(ClockSource* clock) const;
 
-    AtomicWord<Date_t> _start;
-    AtomicWord<Date_t> _end;
+    Atomic<Date_t> _start;
+    Atomic<Date_t> _end;
 };
 
 }  // namespace mongo

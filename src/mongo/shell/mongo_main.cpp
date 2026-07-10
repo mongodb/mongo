@@ -91,7 +91,7 @@
 #include "mongo/logv2/log_manager.h"
 #include "mongo/logv2/log_tag.h"
 #include "mongo/logv2/plain_formatter.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/linenoise.h"
@@ -157,7 +157,7 @@ namespace {
 
 bool gotInterrupted = false;
 bool inMultiLine = false;
-static AtomicWord<bool> atPrompt(false);  // can eval before getting to prompt
+static Atomic<bool> atPrompt(false);  // can eval before getting to prompt
 
 
 // Initialize the featureCompatibilityVersion server parameter since the mongo shell does not have a

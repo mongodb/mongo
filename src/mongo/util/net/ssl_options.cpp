@@ -202,7 +202,7 @@ std::string SSLParams::sslModeFormat(int mode) {
         case SSLParams::SSLMode_requireSSL:
             return "requireSSL";
         default:
-            // Default case because sslMode is an AtomicWord<int> and not bound by enum rules.
+            // Default case because sslMode is an Atomic<int> and not bound by enum rules.
             return "unknown";
     }
 }
@@ -218,7 +218,7 @@ std::string SSLParams::tlsModeFormat(int mode) {
         case SSLParams::SSLMode_requireSSL:
             return "requireTLS";
         default:
-            // Default case because sslMode is an AtomicWord<int> and not bound by enum rules.
+            // Default case because sslMode is an Atomic<int> and not bound by enum rules.
             return "unknown";
     }
 }

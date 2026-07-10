@@ -31,7 +31,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/wasm/wasmtime_engine.h"
 #include "mongo/stdx/thread.h"
@@ -96,13 +96,13 @@ protected:
  */
 class CountingScriptEngine : public MockScriptEngine {
 public:
-    explicit CountingScriptEngine(AtomicWord<long long>* counter) : _counter(counter) {}
+    explicit CountingScriptEngine(Atomic<long long>* counter) : _counter(counter) {}
     void interrupt(ClientLock&, OperationContext*) override {
         _counter->fetchAndAdd(1);
     }
 
 private:
-    AtomicWord<long long>* _counter;
+    Atomic<long long>* _counter;
 };
 
 class ScriptEngineKillOpProxyTest : public unittest::Test,
@@ -184,10 +184,10 @@ TEST_F(ScriptEngineKillOpProxyTest, ProxyIsNoOpWhenNoEngineSet) {
 // proxy, this races on the global engine pointer and can use a freed engine; the guard in
 // setGlobalScriptEngine()/ScriptEngineKillOpProxy must keep it safe (also exercised under TSAN).
 TEST_F(ScriptEngineKillOpProxyTest, ConcurrentSwapAndInterruptIsSafe) {
-    AtomicWord<long long> interruptCount{0};
+    Atomic<long long> interruptCount{0};
     setGlobalScriptEngine(new CountingScriptEngine(&interruptCount));
 
-    AtomicWord<bool> stop{false};
+    Atomic<bool> stop{false};
 
     stdx::thread swapper([&] {
         while (!stop.load()) {
@@ -284,7 +284,7 @@ TEST_F(ScriptEngineSetupTest, ReSetupAfterClearRegistersProxyOnce) {
 
     // Swap in a counting engine and trigger a single kill. A duplicate proxy registration would
     // delegate twice, so the count must be exactly one.
-    AtomicWord<long long> interruptCount{0};
+    Atomic<long long> interruptCount{0};
     setGlobalScriptEngine(new CountingScriptEngine(&interruptCount));
 
     auto client = makeClient();

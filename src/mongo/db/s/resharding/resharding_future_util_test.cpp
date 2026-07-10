@@ -29,7 +29,7 @@
 
 #include "mongo/db/s/resharding/resharding_future_util.h"
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -71,8 +71,8 @@ TEST_F(ReshardingFutureUtilTest, CancelWhenAnyErrorThenQuiesceDuringExecutorShut
     CancellationSource cancelSource;
     auto token = cancelSource.token();
     PromiseAndFuture<void> taskThreadsReady;
-    AtomicWord<int> tasksRunningCount{0};
-    AtomicWord<bool> taskWasCancelled{false};
+    Atomic<int> tasksRunningCount{0};
+    Atomic<bool> taskWasCancelled{false};
     auto checkSignalReady = [&]() {
         auto running = tasksRunningCount.addAndFetch(1);
         if (running == 2) {

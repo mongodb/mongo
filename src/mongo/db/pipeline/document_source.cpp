@@ -54,7 +54,7 @@ DocumentSource::DocumentSource(std::string_view stageName,
     : _expCtx(pCtx), _sortPattern(std::move(sortPattern)) {}
 
 DocumentSource::Id DocumentSource::allocateId(std::string_view name) {
-    static AtomicWord<Id> next{kUnallocatedId + 1};
+    static Atomic<Id> next{kUnallocatedId + 1};
     auto id = next.fetchAndAdd(1);
     LOGV2_DEBUG(9901900, 5, "Allocating DocumentSourceId", "id"_attr = id, "name"_attr = name);
     return id;

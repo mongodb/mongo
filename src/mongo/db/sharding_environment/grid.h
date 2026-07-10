@@ -36,7 +36,7 @@
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/observable_mutex.h"
@@ -219,8 +219,8 @@ private:
     // questions about the network configuration, such as getting the current server's hostname.
     executor::NetworkInterface* _network{nullptr};
 
-    AtomicWord<bool> _shardingInitialized{false};
-    AtomicWord<bool> _isGridInitialized{false};
+    Atomic<bool> _shardingInitialized{false};
+    Atomic<bool> _isGridInitialized{false};
 
     mutable ObservableMutex<std::mutex> _mutex;
 

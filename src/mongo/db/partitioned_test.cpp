@@ -33,7 +33,7 @@
 // IWYU pragma: no_include "boost/align/detail/aligned_alloc_posix.hpp"
 
 #include "mongo/db/partitioned.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/unittest.h"
@@ -253,7 +253,7 @@ TEST(PartitionedConcurrency, ShouldProtectConcurrentAccesses) {
     std::vector<stdx::thread> threads;
     const size_t opsPerThread = 1000;
 
-    AtomicWord<unsigned> ready{0};
+    Atomic<unsigned> ready{0};
     for (size_t threadId = 1; threadId <= numThreads; ++threadId) {
         auto workerThreadBody = [&, threadId, opsPerThread]() {
             // Busy-wait until everybody is ready

@@ -86,7 +86,7 @@ server_parameters:
     maxNumStaleVersionRetries:
         description: "Max num of retries when getting a Stale Version error"
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: "gMaxNumStaleVersionRetries"
         default: 10
         validator: {gte: 10, lte: 100}

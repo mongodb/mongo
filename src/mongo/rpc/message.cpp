@@ -30,7 +30,7 @@
 #include "mongo/rpc/message.h"
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/op_msg.h"
 
 #include <ostream>
@@ -41,7 +41,7 @@
 namespace mongo {
 
 namespace {
-AtomicWord<int32_t> NextMsgId;
+Atomic<int32_t> NextMsgId;
 }  // namespace
 
 int32_t nextMessageId() {

@@ -35,7 +35,7 @@ server_parameters:
     ttlMonitorEnabled:
         description: "Enable the TTL monitor."
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: ttlMonitorEnabled
         default: true
         redact: false
@@ -43,7 +43,7 @@ server_parameters:
     ttlMonitorSleepSecs:
         description: "Period of TTL monitor thread (used for testing)."
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: ttlMonitorSleepSecs
         on_update: "TTLMonitor::onUpdateTTLMonitorSleepSeconds"
         default: 60
@@ -57,7 +57,7 @@ server_parameters:
             more fairly among the TTL indexes. When disabled, it falls back to legacy
             doc-by-document deletions."
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: ttlMonitorBatchDeletes
         default: true
         redact: false
@@ -70,7 +70,7 @@ server_parameters:
             iterated over once before the sub-pass completes. Only applicable when
             'ttlMonitorBatchDeletes' is true."
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: ttlMonitorSubPassTargetSecs
         default: 60
         validator:
@@ -83,7 +83,7 @@ server_parameters:
             pass over a given TTL index. 0 means unlimited. Only applicable when
             'ttlMonitorBatchDeletes' is true."
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: ttlIndexDeleteTargetTimeMS
         default: 1000
         validator:
@@ -96,7 +96,7 @@ server_parameters:
             batched delete. 0 means unlimited. Only applicable when 'ttlMonitorBatchDeletes' is
             true."
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: ttlIndexDeleteTargetDocs
         default: 50000
         validator:
@@ -108,7 +108,7 @@ server_parameters:
             "Limits the maximum size of the thread pool the TTLMonitor uses to recover sharding
             metadata."
         set_at: [startup]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: ttlMonitorMaxMetadataRecoveryThreads
         default: 5
         validator:
@@ -120,7 +120,7 @@ server_parameters:
             "Switches the TTL monitor from being non-deprioritizable to a background task when the
             server is overloaded. Should only be used if config.system.sessions is small."
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: ttlMonitorBackgroundOperation
         default: false
         redact: false

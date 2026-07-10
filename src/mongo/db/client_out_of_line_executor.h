@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/client.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
@@ -94,7 +94,7 @@ public:
 
 private:
     // Shutdown is not required so long as the executor is not exposed to the outside world.
-    AtomicWord<bool> _requireShutdown{false};
+    Atomic<bool> _requireShutdown{false};
 
     class Impl;
     std::unique_ptr<Impl> _impl;

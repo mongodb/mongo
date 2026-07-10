@@ -33,7 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/utility.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/duration.h"
@@ -204,7 +204,7 @@ private:
 class ServiceExecutorStats {
 public:
     // The number of Clients that are allowed to ignore maxConns and use reserved resources.
-    AtomicWord<std::size_t> limitExempt{0};
+    Atomic<std::size_t> limitExempt{0};
 };
 
 }  // namespace transport

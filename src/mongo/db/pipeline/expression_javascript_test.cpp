@@ -44,7 +44,7 @@
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"

@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/config.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 namespace [[MONGO_MOD_PUBLIC]] mongo {
@@ -50,7 +50,7 @@ public:
     }
 
 private:
-    AtomicWord<long long> _count{0};
+    Atomic<long long> _count{0};
 };
 
 struct Occasionally : SampleEveryNth<16> {};

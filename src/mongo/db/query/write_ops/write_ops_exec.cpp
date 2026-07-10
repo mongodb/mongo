@@ -120,7 +120,7 @@
 #include "mongo/db/version_context.h"
 #include "mongo/executor/inline_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/message.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"

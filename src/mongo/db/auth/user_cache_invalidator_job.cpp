@@ -45,7 +45,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"

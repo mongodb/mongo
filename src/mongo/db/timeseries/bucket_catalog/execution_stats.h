@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/tracking/memory.h"
 
@@ -45,50 +45,50 @@ struct ExecutionStats {
 
     // Cardinality of opened and archived buckets. Used to estimate storage engine cache usage for
     // the workload.
-    AtomicWord<long long> numActiveBuckets;
+    Atomic<long long> numActiveBuckets;
 
     /**
      * Counters. The values represent statistics of what has happened in the system for diagnostics.
      * The values only increment and are not decremented from the global statistics when collections
      * are dropped.
      */
-    AtomicWord<long long> numBucketInserts;
-    AtomicWord<long long> numBucketUpdates;
-    AtomicWord<long long> numBucketsOpenedDueToMetadata;
-    AtomicWord<long long> numBucketsClosedDueToCount;
-    AtomicWord<long long> numBucketsClosedDueToSchemaChange;
-    AtomicWord<long long> numBucketsClosedDueToSize;
-    AtomicWord<long long> numBucketsClosedDueToCachePressure;
-    AtomicWord<long long> numBucketsClosedDueToTimeForward;
-    AtomicWord<long long> numBucketsClosedDueToMemoryThreshold;
-    AtomicWord<long long> numBucketsClosedDueToReopening;
-    AtomicWord<long long> numBucketsArchivedDueToMemoryThreshold;
-    AtomicWord<long long> numBucketsArchivedDueToTimeBackward;
-    AtomicWord<long long> numBucketsFrozen;
-    AtomicWord<long long> numCompressedBucketsConvertedToUnsorted;
-    AtomicWord<long long> numCommits;
-    AtomicWord<long long> numWaits;
-    AtomicWord<long long> numMeasurementsCommitted;
-    AtomicWord<long long> numBucketsReopened;
-    AtomicWord<long long> numBucketsKeptOpenDueToLargeMeasurements;
-    AtomicWord<long long> numBucketsFetched;
-    AtomicWord<long long> numBucketsQueried;
-    AtomicWord<long long> numBucketFetchesFailed;
-    AtomicWord<long long> numBucketQueriesFailed;
-    AtomicWord<long long> numBucketReopeningsFailedDueToEraMismatch;
-    AtomicWord<long long> numBucketReopeningsFailedDueToMalformedIdField;
-    AtomicWord<long long> numBucketReopeningsFailedDueToHashCollision;
-    AtomicWord<long long> numBucketReopeningsFailedDueToMarkedFrozen;
-    AtomicWord<long long> numBucketReopeningsFailedDueToValidator;
-    AtomicWord<long long> numBucketReopeningsFailedDueToMarkedClosed;
-    AtomicWord<long long> numBucketReopeningsFailedDueToMinMaxCalculation;
-    AtomicWord<long long> numBucketReopeningsFailedDueToSchemaGeneration;
-    AtomicWord<long long> numBucketReopeningsFailedDueToUncompressedTimeColumn;
-    AtomicWord<long long> numBucketReopeningsFailedDueToCompressionFailure;
-    AtomicWord<long long> numBucketReopeningsFailedDueToWriteConflict;
-    AtomicWord<long long> numDuplicateBucketsReopened;
-    AtomicWord<long long> numBucketDocumentsTooLargeInsert;
-    AtomicWord<long long> numBucketDocumentsTooLargeUpdate;
+    Atomic<long long> numBucketInserts;
+    Atomic<long long> numBucketUpdates;
+    Atomic<long long> numBucketsOpenedDueToMetadata;
+    Atomic<long long> numBucketsClosedDueToCount;
+    Atomic<long long> numBucketsClosedDueToSchemaChange;
+    Atomic<long long> numBucketsClosedDueToSize;
+    Atomic<long long> numBucketsClosedDueToCachePressure;
+    Atomic<long long> numBucketsClosedDueToTimeForward;
+    Atomic<long long> numBucketsClosedDueToMemoryThreshold;
+    Atomic<long long> numBucketsClosedDueToReopening;
+    Atomic<long long> numBucketsArchivedDueToMemoryThreshold;
+    Atomic<long long> numBucketsArchivedDueToTimeBackward;
+    Atomic<long long> numBucketsFrozen;
+    Atomic<long long> numCompressedBucketsConvertedToUnsorted;
+    Atomic<long long> numCommits;
+    Atomic<long long> numWaits;
+    Atomic<long long> numMeasurementsCommitted;
+    Atomic<long long> numBucketsReopened;
+    Atomic<long long> numBucketsKeptOpenDueToLargeMeasurements;
+    Atomic<long long> numBucketsFetched;
+    Atomic<long long> numBucketsQueried;
+    Atomic<long long> numBucketFetchesFailed;
+    Atomic<long long> numBucketQueriesFailed;
+    Atomic<long long> numBucketReopeningsFailedDueToEraMismatch;
+    Atomic<long long> numBucketReopeningsFailedDueToMalformedIdField;
+    Atomic<long long> numBucketReopeningsFailedDueToHashCollision;
+    Atomic<long long> numBucketReopeningsFailedDueToMarkedFrozen;
+    Atomic<long long> numBucketReopeningsFailedDueToValidator;
+    Atomic<long long> numBucketReopeningsFailedDueToMarkedClosed;
+    Atomic<long long> numBucketReopeningsFailedDueToMinMaxCalculation;
+    Atomic<long long> numBucketReopeningsFailedDueToSchemaGeneration;
+    Atomic<long long> numBucketReopeningsFailedDueToUncompressedTimeColumn;
+    Atomic<long long> numBucketReopeningsFailedDueToCompressionFailure;
+    Atomic<long long> numBucketReopeningsFailedDueToWriteConflict;
+    Atomic<long long> numDuplicateBucketsReopened;
+    Atomic<long long> numBucketDocumentsTooLargeInsert;
+    Atomic<long long> numBucketDocumentsTooLargeUpdate;
 };
 
 class ExecutionStatsController {

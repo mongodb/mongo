@@ -70,7 +70,7 @@ public:
     }
 
 private:
-    using AtomicState = AtomicWord<StateVariant>;
+    using AtomicState = Atomic<StateVariant>;
     template <typename T>
     void setState(T nextState) {
         static_assert(std::is_assignable_v<decltype(_state.load()), T>);

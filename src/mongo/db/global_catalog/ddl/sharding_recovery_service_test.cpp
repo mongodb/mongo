@@ -1446,7 +1446,7 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary,
 
     // Start a new transaction thread that tries to acquire MODE_IX on collNss.
     // Since Critical section's MODE_S is in the conflict queue, new MODE_IX requests will wait.
-    AtomicWord<bool> newTxnLockAcquired{false};
+    Atomic<bool> newTxnLockAcquired{false};
     std::mutex newTxnMu;
     stdx::condition_variable newTxnCv;
     bool newTxnEnqueued = false;

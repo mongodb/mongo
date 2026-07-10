@@ -108,7 +108,7 @@ private:
     Timestamp _latestTimeSeen;
     // Timestamp indicating point in the oplog with no holes.
     // Can be read without holding the _mutex due to its atomic nature.
-    AtomicWord<Timestamp> _oplogVisibilityTimestamp;
+    Atomic<Timestamp> _oplogVisibilityTimestamp;
     // List of timestamps tracked.
     SlottedTimestampList _oplogTimestampList;
     // The recordStore of the oplog collection.

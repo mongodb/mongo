@@ -49,7 +49,7 @@ server_parameters:
         description: >-
             Specifies the period within which expired pre-image removal job is running.
         set_at: [startup]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gExpiredChangeStreamPreImageRemovalJobSleepSecs
         validator:
             gte: 1
@@ -82,7 +82,7 @@ server_parameters:
             affect number of I/O operations needed for pre-images sampling.
         set_at: [startup, runtime]
         cpp_varname: "gChangeStreamPreImagesSamplePointsPerUUID"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 10
         validator:
             gte: 1

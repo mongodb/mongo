@@ -71,7 +71,7 @@ public:
     }
 
 private:
-    AtomicWord<uint64_t> _byNameCount = 0, _byTenantCount = 0, _wholeCacheCount = 0;
+    Atomic<uint64_t> _byNameCount = 0, _byTenantCount = 0, _wholeCacheCount = 0;
 };
 
 }  // namespace mongo

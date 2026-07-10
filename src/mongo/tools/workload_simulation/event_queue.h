@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/duration.h"
@@ -122,8 +122,8 @@ private:
     queue_type _eventQueue;
     queue_type _observerQueue;
     stdx::thread _timer;
-    AtomicWord<bool> _stopping{false};
-    AtomicWord<bool> _draining{false};
+    Atomic<bool> _stopping{false};
+    Atomic<bool> _draining{false};
 };
 
 }  // namespace mongo::workload_simulation

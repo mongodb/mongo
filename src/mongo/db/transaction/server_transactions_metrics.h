@@ -33,7 +33,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction/transactions_stats_gen.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
@@ -109,37 +109,37 @@ public:
 
 private:
     // The number of multi-document transactions currently active.
-    AtomicWord<unsigned long long> _currentActive{0};
+    Atomic<unsigned long long> _currentActive{0};
 
     // The number of multi-document transactions currently inactive.
-    AtomicWord<unsigned long long> _currentInactive{0};
+    Atomic<unsigned long long> _currentInactive{0};
 
     // The total number of open transactions.
-    AtomicWord<unsigned long long> _currentOpen{0};
+    Atomic<unsigned long long> _currentOpen{0};
 
     // The total number of multi-document transactions started since the last server startup.
-    AtomicWord<unsigned long long> _totalStarted{0};
+    Atomic<unsigned long long> _totalStarted{0};
 
     // The total number of multi-document transaction aborts.
-    AtomicWord<unsigned long long> _totalAborted{0};
+    Atomic<unsigned long long> _totalAborted{0};
 
     // The total number of multi-document transaction commits.
-    AtomicWord<unsigned long long> _totalCommitted{0};
+    Atomic<unsigned long long> _totalCommitted{0};
 
     // The total number of prepared transactions since the last server startup.
-    AtomicWord<unsigned long long> _totalPrepared{0};
+    Atomic<unsigned long long> _totalPrepared{0};
 
     // The total number of prepared transaction commits.
-    AtomicWord<unsigned long long> _totalPreparedThenCommitted{0};
+    Atomic<unsigned long long> _totalPreparedThenCommitted{0};
 
     // The total number of prepared transaction aborts.
-    AtomicWord<unsigned long long> _totalPreparedThenAborted{0};
+    Atomic<unsigned long long> _totalPreparedThenAborted{0};
 
     // The current number of transactions in the prepared state.
-    AtomicWord<unsigned long long> _currentPrepared{0};
+    Atomic<unsigned long long> _currentPrepared{0};
 
-    AtomicWord<long long> _reclaimedPreparedTxnsCommitted{0};
-    AtomicWord<long long> _reclaimedPreparedTxnsAborted{0};
+    Atomic<long long> _reclaimedPreparedTxnsCommitted{0};
+    Atomic<long long> _reclaimedPreparedTxnsAborted{0};
 
     // Protects member variables below.
     mutable std::mutex _mutex;

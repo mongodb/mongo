@@ -37,7 +37,7 @@
 #include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_tag.h"
 #include "mongo/logv2/log_truncation.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
@@ -53,7 +53,7 @@ namespace mongo::logv2 {
 
 class [[MONGO_MOD_OPEN]] JSONFormatter {
 public:
-    JSONFormatter(const AtomicWord<int32_t>* maxAttributeSizeKB = nullptr,
+    JSONFormatter(const Atomic<int32_t>* maxAttributeSizeKB = nullptr,
                   LogTimestampFormat timestampFormat = LogTimestampFormat::kISO8601UTC)
         : _maxAttributeSizeKB(maxAttributeSizeKB), _timestampFormat(timestampFormat) {}
 
@@ -72,7 +72,7 @@ public:
     void operator()(boost::log::record_view const& rec, boost::log::formatting_ostream& strm) const;
 
 private:
-    const AtomicWord<int32_t>* _maxAttributeSizeKB;
+    const Atomic<int32_t>* _maxAttributeSizeKB;
     const LogTimestampFormat _timestampFormat;
 };
 

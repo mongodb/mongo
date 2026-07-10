@@ -37,7 +37,7 @@ namespace mongo {
 
 namespace {
 static constexpr auto kNoDate = Date_t::min();
-boost::optional<Date_t> readAtomicDate(const AtomicWord<Date_t>& date) {
+boost::optional<Date_t> readAtomicDate(const Atomic<Date_t>& date) {
     auto value = date.load();
     if (value == kNoDate) {
         return boost::none;

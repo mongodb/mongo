@@ -204,7 +204,7 @@ protected:
          *  +--------------------------+--------------+
          */
         enum class State { kNotStarted, kRunning, kCanceled };
-        AtomicWord<State> _state{State::kNotStarted};
+        Atomic<State> _state{State::kNotStarted};
     };
 
     Future<Message> sourceMessageImpl(const BatonHandle& baton = nullptr);

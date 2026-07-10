@@ -51,7 +51,7 @@ server_parameters:
             - runtime
             - startup
         cpp_varname: maxIteratorsMemoryUsagePercentage
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         default: 0.1
         validator:
             gte: 0.0

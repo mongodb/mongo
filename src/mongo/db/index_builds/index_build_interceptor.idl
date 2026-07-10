@@ -43,7 +43,7 @@ server_parameters:
             - runtime
             - startup
         cpp_varname: maxIndexBuildDrainBatchSize
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 1000
         validator:
             gte: 1
@@ -58,7 +58,7 @@ server_parameters:
             - runtime
             - startup
         cpp_varname: maxIndexBuildDrainMemoryUsageMegabytes
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 16
         validator:
             gte: 16

@@ -31,7 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"

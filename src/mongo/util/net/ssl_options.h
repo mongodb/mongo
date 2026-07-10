@@ -64,7 +64,7 @@ struct SSLParams {
     using TLSCATrusts = std::map<SHA256Block, std::set<RoleName>>;
 
     enum class Protocols { TLS1_0, TLS1_1, TLS1_2, TLS1_3 };
-    AtomicWord<int> sslMode;        // --tlsMode - the TLS operation mode, see enum SSLModes
+    Atomic<int> sslMode;            // --tlsMode - the TLS operation mode, see enum SSLModes
     std::string sslPEMTempDHParam;  // --setParameter OpenSSLDiffieHellmanParameters=file : PEM file
                                     // with DH parameters.
     std::string sslPEMKeyFile;      // --tlsCertificateKeyFile

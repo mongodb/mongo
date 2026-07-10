@@ -57,7 +57,7 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -381,7 +381,7 @@ private:
     // Even if _isInitialized is true, any member function of the variables below must still be
     // inately thread safe. If _isInitialized is false, there may not even be correct pointers to
     // call member functions upon.
-    AtomicWord<bool> _isInitialized;
+    Atomic<bool> _isInitialized;
 
     // The mirrorReads server parameter options. _paramsMutex serializes updates to the stored
     // params and _cachedHostsForTargetedMirroring, which stores the list of hosts to mirror reads
@@ -484,50 +484,50 @@ public:
 
     // Counts the total number of mirrorable operations (either general or targeted), regardless of
     // whether they are mirrored.
-    AtomicWord<CounterT> seen;
+    Atomic<CounterT> seen;
     // Counts the number of remote requests (for general mirroring as primary) that have ever been
     // scheduled to be sent over the network.
-    AtomicWord<CounterT> sent;
+    Atomic<CounterT> sent;
     // Counts the number of remote requests (for targeted mirroring) that have ever been
     // scheduled to be sent over the network.
-    AtomicWord<CounterT> targetedSent;
+    Atomic<CounterT> targetedSent;
     // Counts the number of remote requests (as primary) for general mirroring that failed with some
     // error when sending.
-    AtomicWord<CounterT> erroredDuringSend;
+    Atomic<CounterT> erroredDuringSend;
     // Counts the number of remote requests for targeted mirroring that failed with some error when
     // sending.
-    AtomicWord<CounterT> targetedErroredDuringSend;
+    Atomic<CounterT> targetedErroredDuringSend;
     // Counts the number of general mirroring response from secondaries after mirrored operations.
     // Only reported if mirrorMaestroExpectsResponse failpoint is enabled.
-    AtomicWord<CounterT> resolved;
+    Atomic<CounterT> resolved;
     // Counts the number of responses for targeted mirroring from secondaries after
     // mirrored operations. Only reported if mirrorMaestroExpectsResponse failpoint is enabled.
-    AtomicWord<CounterT> targetedResolved;
+    Atomic<CounterT> targetedResolved;
     // Counts the number of responses (as primary) for general mirroring of successful mirrored
     // operations. Disabled by default, hidden behind the mirrorMaestroExpectsResponse fail point.
-    AtomicWord<CounterT> succeeded;
+    Atomic<CounterT> succeeded;
     // Counts the number of responses for targeted mirroring of successful mirrored
     // operations. Disabled by default, hidden behind the mirrorMaestroExpectsResponse fail point.
-    AtomicWord<CounterT> targetedSucceeded;
+    Atomic<CounterT> targetedSucceeded;
     // Counts the number of operations (as primary) for general mirroring that will be mirrored but
     // are not yet scheduled. Disabled by default, hidden behind the mirrorMaestroTracksPending fail
     // point.
-    AtomicWord<CounterT> pending;
+    Atomic<CounterT> pending;
     // Counts the number of operations for targeted mirroring that will be mirrored but
     // are not yet scheduled. Disabled by default, hidden behind the mirrorMaestroTracksPending fail
     // point.
-    AtomicWord<CounterT> targetedPending;
+    Atomic<CounterT> targetedPending;
     // Counts the number of operations (as primary) for general mirroring that are currently
     // scheduled to be mirrored, but have not yet received any response. Disabled by default, hidden
     // behind the mirrorMaestroTracksPending fail point.
-    AtomicWord<CounterT> scheduled;
+    Atomic<CounterT> scheduled;
     // Counts the number of operations for targeted mirroring that are currently
     // scheduled to be mirrored, but have not yet received any response. Disabled by default, hidden
     // behind the mirrorMaestroTracksPending fail point.
-    AtomicWord<CounterT> targetedScheduled;
+    Atomic<CounterT> targetedScheduled;
     // Counts the number of mirrored operations processed successfully by this node as a
     // secondary.
-    AtomicWord<CounterT> processedAsSecondary;
+    Atomic<CounterT> processedAsSecondary;
 };
 auto& gMirroredReadsSection = *ServerStatusSectionBuilder<MirroredReadsSection>(
                                    std::string{MirrorMaestro::kServerStatusSectionName})

@@ -277,4 +277,7 @@ public:
     using atomic_detail::Base<T>::Base;
 };
 
+/// Temporary shim from deprecated name for Atomic.
+template <typename T>
+using AtomicWord = Atomic<T>;
 }  // namespace mongo

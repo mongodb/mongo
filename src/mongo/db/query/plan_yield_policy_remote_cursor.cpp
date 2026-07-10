@@ -35,7 +35,7 @@
 #include "mongo/db/query/restore_context.h"
 #include "mongo/db/query/yield_policy_callbacks_impl.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/duration.h"
 
 #include <utility>

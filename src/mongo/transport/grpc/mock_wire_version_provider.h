@@ -51,7 +51,7 @@ public:
     }
 
 private:
-    AtomicWord<int> _clusterMaxWireVersion{util::constants::kMinimumWireVersion};
+    Atomic<int> _clusterMaxWireVersion{util::constants::kMinimumWireVersion};
 };
 
 }  // namespace mongo::transport::grpc

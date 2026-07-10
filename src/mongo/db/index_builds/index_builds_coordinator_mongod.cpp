@@ -68,7 +68,7 @@
 #include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
@@ -220,7 +220,7 @@ IndexBuildsCoordinatorMongod::IndexBuildsCoordinatorMongod() {
     // Change the 'setOnUpdate' function for the server parameter to signal the condition variable
     // when the value changes.
     using ParamT =
-        IDLServerParameterWithStorage<ServerParameterType::kStartupAndRuntime, AtomicWord<int>>;
+        IDLServerParameterWithStorage<ServerParameterType::kStartupAndRuntime, Atomic<int>>;
     ServerParameterSet::getNodeParameterSet()
         ->get<ParamT>(kMaxNumActiveUserIndexBuildsServerParameterName)
         ->setOnUpdate([this](const int) -> Status {

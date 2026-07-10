@@ -36,7 +36,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
@@ -54,7 +54,7 @@ public:
         /**
          * Total number of deletion passes completed by the purging job.
          */
-        AtomicWord<int64_t> totalPass;
+        Atomic<int64_t> totalPass;
 
         /**
          * Cumulative number of pre-image documents deleted by the purging job.
@@ -62,7 +62,7 @@ public:
          * 'CollectionTruncateMarker's, and initially is only as accurate as the initial size/count
          * information for the collection is.
          */
-        AtomicWord<int64_t> docsDeleted;
+        Atomic<int64_t> docsDeleted;
 
         /**
          * Cumulative size in bytes of all deleted documents from all pre-image collections by the
@@ -71,36 +71,36 @@ public:
          * 'CollectionTruncateMarker's, and initially is only as accurate as the initial size/count
          * information for the collection is.
          */
-        AtomicWord<int64_t> bytesDeleted;
+        Atomic<int64_t> bytesDeleted;
 
         /**
          * Cumulative number of pre-image collections scanned by the purging job. As
          * system.preimages is the only collection that is scanned during purging, this counter will
          * be incremented by one on every purge job invocation.
          */
-        AtomicWord<int64_t> scannedCollections;
+        Atomic<int64_t> scannedCollections;
 
         /**
          * Cumulative number of internal pre-image collections scanned by the purging job. Internal
          * collections are the segments of actual pre-images of collections within system.preimages.
          */
-        AtomicWord<int64_t> scannedInternalCollections;
+        Atomic<int64_t> scannedInternalCollections;
 
         /**
          * Cumulative number of milliseconds elapsed since the first pass by the purging job.
          */
-        AtomicWord<int64_t> timeElapsedMillis;
+        Atomic<int64_t> timeElapsedMillis;
 
         /**
          * The wall time of the pre-image with the highest 'operationTime' which has been truncated.
          */
-        AtomicWord<Date_t> maxStartWallTime;
+        Atomic<Date_t> maxStartWallTime;
 
         /**
          * The maximum timestamp expired pre-images, in the most recent pass, could have to be
          * eligible for truncate.
          */
-        AtomicWord<Timestamp> maxTimestampEligibleForTruncate;
+        Atomic<Timestamp> maxTimestampEligibleForTruncate;
 
         /**
          * Serializes the purging job statistics to the BSON object.
@@ -199,7 +199,7 @@ private:
 
     PurgingJobStats _purgingJobStats;
 
-    AtomicWord<int64_t> _docsInserted;
+    Atomic<int64_t> _docsInserted;
 
     /**
      * Manages truncate markers.

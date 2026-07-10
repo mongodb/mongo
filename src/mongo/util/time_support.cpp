@@ -76,7 +76,7 @@
 
 namespace mongo {
 
-AtomicWord<long long> Date_t::lastNowVal;
+Atomic<long long> Date_t::lastNowVal;
 
 Date_t Date_t::now() {
     decltype(lastNowVal)::WordType curTime = curTimeMillis64();
