@@ -651,6 +651,32 @@ TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitThrowsWhenOnlyGlobalLi
     } catch (const AssertionException& ex) {
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
         ASSERT_STRING_CONTAINS(ex.reason(), "Global memory limit: 100");
+        // The overflowing level is the base, so surface how much memory the base is actually using
+        // (200).
+        ASSERT_STRING_CONTAINS(ex.reason(), "Global memory used: 200");
+    }
+}
+
+TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitReportsUsageForIntermediateLevel) {
+    // Three-level chain (leaf -> intermediate -> global root) where the intermediate tracker is the
+    // one that overflows: the leaf and root limits are generous, the intermediate limit is small.
+    SimpleMemoryUsageTracker root{100000};
+    SimpleMemoryUsageTracker intermediate{&root, 100};
+    SimpleMemoryUsageTracker tracker{&intermediate, 100000};
+    // add() propagates up the chain, so every tracker ends up holding 200 bytes.
+    tracker.add(200);
+    try {
+        tracker.assertWithinMemoryLimit("$testExpr");
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        // The overflowing tracker is the intermediate base, so its in-use memory (200) and limit
+        // (100) must be surfaced under a "Level N" entry rather than only the leaf's usage.
+        ASSERT_STRING_CONTAINS(ex.reason(),
+                               "Level 1 memory used: 200 bytes. Level 1 memory limit: 100 bytes");
+        // The root beyond the intermediate is still reported as the global level.
+        ASSERT_STRING_CONTAINS(ex.reason(), "Global memory used: 200");
+        ASSERT_STRING_CONTAINS(ex.reason(), "Global memory limit: 100000");
     }
 }
 

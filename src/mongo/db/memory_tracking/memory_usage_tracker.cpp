@@ -212,11 +212,14 @@ void SimpleMemoryUsageTracker::assertWithinMemoryLimit(std::string_view name,
     int level = 1;
     for (const SimpleMemoryUsageTracker* current = _base; current; current = current->_base) {
         if (current->_base) {
-            msg << " Level " << level << " memory limit: " << current->maxAllowedMemoryUsageBytes()
-                << " bytes.";
+            msg << " Level " << level << " memory used: " << current->inUseTrackedMemoryBytes()
+                << " bytes. Level " << level
+                << " memory limit: " << current->maxAllowedMemoryUsageBytes() << " bytes.";
             ++level;
         } else {
-            msg << " Global memory limit: " << current->maxAllowedMemoryUsageBytes() << " bytes.";
+            msg << " Global memory used: " << current->inUseTrackedMemoryBytes()
+                << " bytes. Global memory limit: " << current->maxAllowedMemoryUsageBytes()
+                << " bytes.";
         }
     }
     std::string errmsg = msg;
