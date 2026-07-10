@@ -41,6 +41,7 @@
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
+#include "mongo/util/duration.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
@@ -99,9 +100,22 @@ std::map<ShardId, int64_t> extractDocumentsToCopy(
 
     LOGV2(9929908,
           "Fetched cloning metrics for donor shards",
+          "reshardingUUID"_attr = coordinatorDoc.getReshardingUUID(),
           "documentsToCopy"_attr = reportBuilder.obj());
 
     return docsToCopy;
+}
+
+/**
+ * Builds a BSON object mapping each shard id to the string form of its error, for use in a
+ * summary log line.
+ */
+BSONObj errorsToBSON(const std::map<ShardId, Status>& errors) {
+    BSONObjBuilder errorsBuilder;
+    for (const auto& [shardId, error] : errors) {
+        errorsBuilder.append(shardId.toString(), error.toString());
+    }
+    return errorsBuilder.obj();
 }
 
 }  // namespace
@@ -346,19 +360,25 @@ std::map<ShardId, int64_t> ReshardingCoordinatorExternalStateImpl::getDocumentsT
     auto readPref = ReadPreferenceSetting{ReadPreference::SecondaryPreferred};
     cmd.setReadPreference(readPref);
 
+    auto fetchStart = resharding::getCurrentTime();
+
     const auto opts =
         std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrReshardingDonorGetCloneCount>>(
             executor, token, cmd);
-    auto responses = resharding::sendCommandToShards(opCtx, opts, shardVersions, readPref);
+    auto responses = resharding::sendCommandToShards(
+        opCtx, opts, shardVersions, readPref, false /* throwOnError */);
 
     std::map<ShardId, int64_t> docsToCopy;
+    std::map<ShardId, Status> errors;
 
     for (auto&& response : responses) {
         const auto& donorShardId = response.shardId;
 
-        // A retryable per-shard error propagates out of this function so the coordinator's
-        // automatic-retry wrapper can re-run the whole fetch.
-        uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
+        auto status = AsyncRequestsSender::Response::getEffectiveStatus(response);
+        if (!status.isOK()) {
+            errors.emplace(donorShardId, status);
+            continue;
+        }
         auto reply = ShardsvrReshardingDonorGetCloneCountResponse::parse(
             response.swResponse.getValue().data, IDLParserContext("getDocumentsToCopyFromDonors"));
         int64_t count = reply.getDocumentsToCopy();
@@ -366,9 +386,25 @@ std::map<ShardId, int64_t> ReshardingCoordinatorExternalStateImpl::getDocumentsT
 
         LOGV2(9858107,
               "Fetched documents to copy from donor shard",
+              "reshardingUUID"_attr = reshardingUUID,
               "shardId"_attr = donorShardId,
               "documentsToCopy"_attr = count);
     }
+
+    if (!errors.empty()) {
+        LOGV2(12992507,
+              "Failed to fetch documents to copy from one or more donor shards",
+              "reshardingUUID"_attr = reshardingUUID,
+              "errors"_attr = errorsToBSON(errors));
+        uassertStatusOK(errors.begin()->second);
+    }
+
+    LOGV2(12992501,
+          "Completed RPC fetch of documents to copy from donor shards",
+          "reshardingUUID"_attr = reshardingUUID,
+          "numDonorShards"_attr = docsToCopy.size(),
+          "durationMillis"_attr =
+              durationCount<Milliseconds>(resharding::getCurrentTime() - fetchStart));
 
     return docsToCopy;
 }
@@ -430,6 +466,7 @@ ReshardingCoordinatorExternalStateImpl::_getDocumentsCopiedFromRecipients(
     const auto opts = std::make_shared<async_rpc::AsyncRPCOptions<AggregateCommandRequest>>(
         executor, token, aggRequest);
     opts->cmd.setDbName(DatabaseName::kConfig);
+    auto fetchStart = resharding::getCurrentTime();
     auto responses = resharding::sendCommandToShards(opCtx, opts, shardIds);
 
     std::map<ShardId, int64_t> docsCopied;
@@ -488,9 +525,17 @@ ReshardingCoordinatorExternalStateImpl::_getDocumentsCopiedFromRecipients(
 
         LOGV2(9929911,
               "Fetched cloning metrics for recipient shard",
+              "reshardingUUID"_attr = reshardingUUID,
               "shardId"_attr = recipientShardId,
               "documentsCopied"_attr = obj);
     }
+
+    LOGV2(12992506,
+          "Completed RPC fetch of documents copied from recipient shards",
+          "reshardingUUID"_attr = reshardingUUID,
+          "numRecipientShards"_attr = shardIds.size(),
+          "durationMillis"_attr =
+              durationCount<Milliseconds>(resharding::getCurrentTime() - fetchStart));
 
     return docsCopied;
 }
@@ -507,18 +552,41 @@ std::map<ShardId, int64_t> ReshardingCoordinatorExternalStateImpl::getDocumentsD
         async_rpc::AsyncRPCOptions<ShardsvrReshardingDonorFetchFinalCollectionStats>>(
         executor, token, cmd);
     opts->cmd.setDbName(DatabaseName::kAdmin);
-    auto responses = resharding::sendCommandToShards(opCtx, opts, shardIds);
+    // Fetch from all donors without throwing on the first failure so that every per-shard error
+    // can be logged before the fetch is retried.
+    auto responses =
+        resharding::sendCommandToShards(opCtx, opts, shardIds, false /* throwOnError */);
 
     std::map<ShardId, int64_t> docsDelta;
+    std::map<ShardId, Status> errors;
 
     for (auto&& response : responses) {
         const auto& donorShardId = response.shardId;
 
-        uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
+        auto status = AsyncRequestsSender::Response::getEffectiveStatus(response);
+        if (!status.isOK()) {
+            errors.emplace(donorShardId, status);
+            continue;
+        }
         auto collStatsResponse = ShardsvrReshardingDonorFetchFinalCollectionStatsResponse::parse(
             response.swResponse.getValue().data, IDLParserContext("getDocumentsDeltaFromDonors"));
 
-        docsDelta.emplace(donorShardId, collStatsResponse.getDocumentsDelta());
+        int64_t delta = collStatsResponse.getDocumentsDelta();
+        docsDelta.emplace(donorShardId, delta);
+
+        LOGV2(12992503,
+              "Fetched documents delta from donor shard",
+              "reshardingUUID"_attr = reshardingUUID,
+              "shardId"_attr = donorShardId,
+              "documentsDelta"_attr = delta);
+    }
+
+    if (!errors.empty()) {
+        LOGV2(12992508,
+              "Failed to fetch documents delta from one or more donor shards",
+              "reshardingUUID"_attr = reshardingUUID,
+              "errors"_attr = errorsToBSON(errors));
+        uassertStatusOK(errors.begin()->second);
     }
 
     return docsDelta;
@@ -536,20 +604,41 @@ std::map<ShardId, int64_t> ReshardingCoordinatorExternalStateImpl::getDocumentsD
         async_rpc::AsyncRPCOptions<ShardsvrReshardingRecipientFetchFinalCollectionStats>>(
         executor, token, cmd);
     opts->cmd.setDbName(DatabaseName::kAdmin);
-    auto responses = resharding::sendCommandToShards(opCtx, opts, shardIds);
+    auto responses =
+        resharding::sendCommandToShards(opCtx, opts, shardIds, false /* throwOnError */);
 
     std::map<ShardId, int64_t> docsDelta;
+    std::map<ShardId, Status> errors;
 
     for (auto&& response : responses) {
         const auto& recipientShardId = response.shardId;
 
-        uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
+        auto status = AsyncRequestsSender::Response::getEffectiveStatus(response);
+        if (!status.isOK()) {
+            errors.emplace(recipientShardId, status);
+            continue;
+        }
         auto collStatsResponse =
             ShardsvrReshardingRecipientFetchFinalCollectionStatsResponse::parse(
                 response.swResponse.getValue().data,
                 IDLParserContext("getDocumentsDeltaFromRecipients"));
 
-        docsDelta.emplace(recipientShardId, collStatsResponse.getDocumentsDelta());
+        int64_t delta = collStatsResponse.getDocumentsDelta();
+        docsDelta.emplace(recipientShardId, delta);
+
+        LOGV2(12992505,
+              "Fetched documents delta from recipient shard",
+              "reshardingUUID"_attr = reshardingUUID,
+              "shardId"_attr = recipientShardId,
+              "documentsDelta"_attr = delta);
+    }
+
+    if (!errors.empty()) {
+        LOGV2(12992509,
+              "Failed to fetch documents delta from one or more recipient shards",
+              "reshardingUUID"_attr = reshardingUUID,
+              "errors"_attr = errorsToBSON(errors));
+        uassertStatusOK(errors.begin()->second);
     }
 
     return docsDelta;

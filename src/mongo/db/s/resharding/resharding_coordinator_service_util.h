@@ -110,8 +110,9 @@ template <typename CommandType>
 std::vector<AsyncRequestsSender::Response> sendCommandToShards(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts,
-    const std::vector<ShardId>& shardIds) {
-    return sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
+    const std::vector<ShardId>& shardIds,
+    bool throwOnError = true) {
+    return sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds, throwOnError);
 }
 
 template <typename CommandType>
@@ -119,9 +120,10 @@ std::vector<AsyncRequestsSender::Response> sendCommandToShards(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts,
     const std::map<ShardId, ShardVersion>& shardVersions,
-    const ReadPreferenceSetting& readPref) {
+    const ReadPreferenceSetting& readPref,
+    bool throwOnError = true) {
     return sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, opts, shardVersions, readPref, true /* throwOnError */);
+        opCtx, opts, shardVersions, readPref, throwOnError);
 }
 
 void sendFlushReshardingStateChangeToShards(OperationContext* opCtx,

@@ -1502,7 +1502,7 @@ ReshardingCoordinator::_fetchNumDocumentsToCloneFromDonors(
     auto fetchOpCtxFactory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
         fetchToken, _markKilledExecutor);
 
-    _metrics->setStartFor(ReshardingMetrics::TimedPhase::kVerificationPreApplying,
+    _metrics->setStartFor(ReshardingMetrics::TimedPhase::kDonorCloneCountFetchDuration,
                           resharding::getCurrentTime());
 
     LOGV2(9858100,
@@ -1584,7 +1584,12 @@ ReshardingCoordinator::_fetchNumDocumentsToCloneFromDonors(
                   "number of documents to copy from donor shards",
                   "error"_attr = status);
         })
-        .runOn(**executor, fetchToken);
+        .runOn(**executor, fetchToken)
+        .onCompletion([this](StatusWith<std::map<ShardId, int64_t>> swDocsToCopy) {
+            _metrics->setEndFor(ReshardingMetrics::TimedPhase::kDonorCloneCountFetchDuration,
+                                resharding::getCurrentTime());
+            return swDocsToCopy;
+        });
 }
 
 ExecutorFuture<void> ReshardingCoordinator::_verifyClonedCollection(
@@ -1597,6 +1602,10 @@ ExecutorFuture<void> ReshardingCoordinator::_verifyClonedCollection(
         12042400,
         "Expected documentsToCopy fetch future to be present before verifying cloned collection",
         _fetchNumDocumentsToCopyFuture);
+
+    auto verifyPreApplyStart = resharding::getCurrentTime();
+    _metrics->setStartFor(ReshardingMetrics::TimedPhase::kVerificationPreApplying,
+                          verifyPreApplyStart);
 
     const Seconds timeout{resharding::gReshardingFetchDocumentsToCopyTimeoutSecs.load()};
     // timeoutFuture must match the value type of _fetchNumDocumentsToCopyFuture for whenAny.
@@ -1615,9 +1624,6 @@ ExecutorFuture<void> ReshardingCoordinator::_verifyClonedCollection(
             if (_ctHolder->isAbortedOrSteppingDown()) {
                 return false;
             }
-
-            _metrics->setEndFor(ReshardingMetrics::TimedPhase::kVerificationPreApplying,
-                                resharding::getCurrentTime());
 
             if (!swDocsToCopy.isOK()) {
                 _ctHolder->cancelDocumentFetch();
@@ -1680,10 +1686,20 @@ ExecutorFuture<void> ReshardingCoordinator::_verifyClonedCollection(
                         _metrics->onPreApplyVerificationFailure();
                         throw;
                     }
-                    LOGV2(9858412,
-                          "Verification before applying completed",
-                          "reshardingUUID"_attr = _metadata.getReshardingUUID());
                 });
+        })
+        .onCompletion([this](Status status) -> Status {
+            _metrics->setEndFor(ReshardingMetrics::TimedPhase::kVerificationPreApplying,
+                                resharding::getCurrentTime());
+            auto opCtx = _makeOperationContext();
+            auto durationMillis = _metrics->getElapsed<Milliseconds>(
+                ReshardingMetrics::TimedPhase::kVerificationPreApplying,
+                opCtx->getServiceContext()->getFastClockSource());
+            LOGV2(9858412,
+                  "Verification before applying completed",
+                  "reshardingUUID"_attr = _metadata.getReshardingUUID(),
+                  "duration"_attr = durationMillis);
+            return status;
         });
 }
 
@@ -2024,7 +2040,8 @@ ReshardingCoordinatorDocument ReshardingCoordinator::_verifyFinalCollection(
     LOGV2(9858413,
           "Verification before commit completed",
           "reshardingUUID"_attr = _metadata.getReshardingUUID(),
-          "durationSecs"_attr = durationCount<Seconds>(verifyPreCommitEnd - verifyPreCommitStart));
+          "durationMillis"_attr =
+              durationCount<Milliseconds>(verifyPreCommitEnd - verifyPreCommitStart));
 
     return coordinatorDocChangedOnDisk;
 }

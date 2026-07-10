@@ -1809,6 +1809,27 @@ TEST_F(ReshardingMetricsTest, CoordinatorVerificationPreCommitTimeReported) {
     ASSERT_EQ(report.getIntField("verificationPreCommitTimeElapsedSecs"), 25);
 }
 
+TEST_F(ReshardingMetricsTest, CoordinatorDonorCloneCountFetchTimeReported) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kCoordinator);
+
+    // Before start, elapsed should be the default (0).
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("donorCloneCountFetchTimeElapsedSecs"), 0);
+
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kDonorCloneCountFetchDuration,
+                         clock->now());
+    clock->advance(Seconds(10));
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("donorCloneCountFetchTimeElapsedSecs"), 10);
+
+    // After end time is set, duration is fixed.
+    metrics->setEndFor(ReshardingMetrics::TimedPhase::kDonorCloneCountFetchDuration, clock->now());
+    clock->advance(Seconds(100));
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("donorCloneCountFetchTimeElapsedSecs"), 10);
+}
+
 TEST_F(ReshardingMetricsTest, CoordinatorDoesNotReportChangeStreamMonitorLagOrCrossPhase) {
     auto clock = getClockSource();
     auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kCoordinator);
@@ -1898,6 +1919,7 @@ TEST_F(ReshardingMetricsTest, CoordinatorDiagnosticMetricsAllDefaultsWhenNoData)
     auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kCoordinator);
 
     auto diag = metrics->getDiagnosticMetrics();
+    ASSERT_EQ(diag.getField("coordinatorDonorCloneCountFetchTimeElapsedMillis").Long(), -1);
     ASSERT_EQ(diag.getField("coordinatorVerificationPreApplyingTimeElapsedMillis").Long(), -1);
     ASSERT_EQ(diag.getField("coordinatorVerificationPreCommitTimeElapsedMillis").Long(), -1);
 }
@@ -1955,6 +1977,19 @@ TEST_F(ReshardingMetricsTest, RecipientDiagnosticMetricsCrossPhaseAndElapsed) {
     auto diag = metrics->getDiagnosticMetrics();
     ASSERT_EQ(diag.getField("recipientStrictConsistencyToMonitorCompletionMillis").Long(), 60000);
     ASSERT_EQ(diag.getField("recipientChangeStreamMonitorTotalTimeElapsedMillis").Long(), 60000);
+}
+
+TEST_F(ReshardingMetricsTest, CoordinatorDiagnosticMetricsDonorCloneCountFetch) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kCoordinator);
+
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kDonorCloneCountFetchDuration,
+                         clock->now());
+    clock->advance(Seconds(15));
+    metrics->setEndFor(ReshardingMetrics::TimedPhase::kDonorCloneCountFetchDuration, clock->now());
+
+    auto diag = metrics->getDiagnosticMetrics();
+    ASSERT_EQ(diag.getField("coordinatorDonorCloneCountFetchTimeElapsedMillis").Long(), 15000);
 }
 
 TEST_F(ReshardingMetricsTest, CoordinatorDiagnosticMetricsVerificationPhases) {

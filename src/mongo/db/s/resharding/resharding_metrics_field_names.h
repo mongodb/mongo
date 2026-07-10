@@ -145,6 +145,8 @@ constexpr auto kRecipientStrictConsistencyToMonitorCompletionMillis =
 constexpr auto kRecipientChangeStreamMonitorTotalTimeElapsedMillis =
     "recipientChangeStreamMonitorTotalTimeElapsedMillis";
 // Coordinator fields.
+constexpr auto kCoordinatorDonorCloneCountFetchTimeElapsedMillis =
+    "coordinatorDonorCloneCountFetchTimeElapsedMillis";
 constexpr auto kCoordinatorVerificationPreApplyingTimeElapsedMillis =
     "coordinatorVerificationPreApplyingTimeElapsedMillis";
 constexpr auto kCoordinatorVerificationPreCommitTimeElapsedMillis =

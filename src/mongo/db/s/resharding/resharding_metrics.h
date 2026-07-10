@@ -67,12 +67,13 @@ enum TimedPhase {
     kApplying,
     kCriticalSection,
     kBuildingIndex,
+    kDonorCloneCountFetchDuration,
     kVerificationPreApplying,
     kVerificationPreCommit,
     kChangeStreamMonitor,
     kStrictConsistency,
 };
-constexpr auto kNumTimedPhase = 8;
+constexpr auto kNumTimedPhase = 9;
 using PhaseDurationTracker = PhaseDurationTracker<TimedPhase, kNumTimedPhase>;
 
 }  // namespace resharding_metrics
