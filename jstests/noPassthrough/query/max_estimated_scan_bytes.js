@@ -8,6 +8,8 @@
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
+import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 describe("maxEstimatedScanBytes", function () {
@@ -23,7 +25,7 @@ describe("maxEstimatedScanBytes", function () {
     }
 
     function getCounters() {
-        const ss = db.adminCommand({serverStatus: 1});
+        const ss = assert.commandWorked(db.adminCommand({serverStatus: 1}));
         return ss.metrics.query.maxEstimatedScanBytes;
     }
 
@@ -274,4 +276,221 @@ describe("maxEstimatedScanBytes", function () {
     });
 
     // TODO SERVER-130345: add integration tests for PQS $natural hint override path.
+});
+
+// setQuerySettings requires a replica set; it is not supported on a standalone mongod.
+describe("maxEstimatedScanBytes with PQS $natural hint override", function () {
+    let rst;
+    let db;
+    let qsutils;
+    let heavyColl;
+    let belowHeavy;
+    let aboveHeavy;
+
+    function setParam(val) {
+        assert.commandWorked(db.adminCommand({setParameter: 1, maxEstimatedScanBytes: val}));
+    }
+
+    function getCounters() {
+        const ss = assert.commandWorked(db.adminCommand({serverStatus: 1}));
+        return ss.metrics.query.maxEstimatedScanBytes;
+    }
+
+    function makeHeavyCollection(collName) {
+        assertDropAndRecreateCollection(db, collName);
+        const coll = db[collName];
+        const bulk = coll.initializeUnorderedBulkOp();
+        for (let i = 0; i < 100; i++) {
+            bulk.insert({a: i, padding: "x".repeat(1024)});
+        }
+        assert.commandWorked(bulk.execute());
+        return coll;
+    }
+
+    before(function () {
+        rst = new ReplSetTest({nodes: 1});
+        rst.startSet();
+        rst.initiate();
+        db = rst.getPrimary().getDB("test");
+        qsutils = new QuerySettingsUtils(db, "heavy_pqs");
+
+        heavyColl = makeHeavyCollection("heavy_pqs");
+        const heavySize = heavyColl.stats().size;
+        assert.gt(heavySize, 0, "heavy_pqs collection must have non-zero dataSize");
+        belowHeavy = heavySize - 1;
+        aboveHeavy = heavySize * 10;
+    });
+
+    after(function () {
+        setParam(-1);
+        rst.stopSet();
+    });
+
+    it("PQS $natural hint overrides rejection on the main collection", function () {
+        setParam(belowHeavy);
+        const query = qsutils.makeFindQueryInstance({filter: {a: 1}});
+        const ns = {db: db.getName(), coll: "heavy_pqs"};
+        qsutils.withQuerySettings(
+            query,
+            {indexHints: [{ns, allowedIndexes: [{$natural: 1}]}]},
+            () => {
+                const beforeOverride = getCounters().rejectedAndOverridden;
+                assert.commandWorked(db.runCommand({find: "heavy_pqs", filter: {a: 1}}));
+                assert.eq(
+                    getCounters().rejectedAndOverridden,
+                    beforeOverride + 1,
+                    "rejectedAndOverridden should increment for PQS $natural hint override",
+                );
+            },
+        );
+    });
+
+    it("PQS $natural hint overrides rejection on a $lookup foreign collection", function () {
+        assertDropAndRecreateCollection(db, "local_lookup_pqs");
+        assert.commandWorked(
+            db["local_lookup_pqs"].insertMany([
+                {_id: 1, k: 1},
+                {_id: 2, k: 2},
+            ]),
+        );
+        setParam(belowHeavy);
+
+        const cmd = {
+            aggregate: "local_lookup_pqs",
+            pipeline: [
+                {
+                    $lookup: {
+                        from: "heavy_pqs",
+                        localField: "k",
+                        foreignField: "a",
+                        as: "joined",
+                    },
+                },
+            ],
+            cursor: {},
+        };
+        // The query settings namespace targets the $lookup foreign collection, not the main
+        // collection being aggregated.
+        const ns = {db: db.getName(), coll: "heavy_pqs"};
+        qsutils.withQuerySettings(
+            {...cmd, $db: db.getName()},
+            {indexHints: [{ns, allowedIndexes: [{$natural: 1}]}]},
+            () => {
+                const beforeOverride = getCounters().rejectedAndOverridden;
+                assert.commandWorked(db.runCommand(cmd));
+                // The classic NLJ replans the foreign collection scan once per outer document
+                // (2 here), so the override is recorded multiple times for one command. The
+                // override decision itself is stable: it does not re-evaluate live PQS/threshold
+                // state per document, so an in-progress $lookup cannot flip from allowed to
+                // rejected mid-execution.
+                assert.gt(
+                    getCounters().rejectedAndOverridden,
+                    beforeOverride,
+                    "rejectedAndOverridden should increment for PQS $natural hint override on $lookup foreign collection",
+                );
+            },
+        );
+    });
+
+    it("PQS $natural hint on the main collection does not override rejection on a $lookup foreign collection", function () {
+        assertDropAndRecreateCollection(db, "local_lookup_pqs");
+        assert.commandWorked(
+            db["local_lookup_pqs"].insertMany([
+                {_id: 1, k: 1},
+                {_id: 2, k: 2},
+            ]),
+        );
+        setParam(belowHeavy);
+
+        const cmd = {
+            aggregate: "local_lookup_pqs",
+            pipeline: [
+                {
+                    $lookup: {
+                        from: "heavy_pqs",
+                        localField: "k",
+                        foreignField: "a",
+                        as: "joined",
+                    },
+                },
+            ],
+            cursor: {},
+        };
+        // The query settings namespace targets the main aggregated collection, not the $lookup
+        // foreign collection that actually requires the unbounded COLLSCAN, so the foreign scan is
+        // still rejected.
+        const ns = {db: db.getName(), coll: "local_lookup_pqs"};
+        qsutils.withQuerySettings(
+            {...cmd, $db: db.getName()},
+            {indexHints: [{ns, allowedIndexes: [{$natural: 1}]}]},
+            () => {
+                assert.commandFailedWithCode(
+                    db.runCommand(cmd),
+                    ErrorCodes.NoQueryExecutionPlans,
+                    "PQS $natural hint on the main collection should not override rejection on the $lookup foreign collection",
+                );
+            },
+        );
+    });
+
+    it("PQS index hint on a non-existent index does not override rejection", function () {
+        setParam(belowHeavy);
+        const query = qsutils.makeFindQueryInstance({filter: {a: 1}});
+        const ns = {db: db.getName(), coll: "heavy_pqs"};
+        qsutils.withQuerySettings(
+            query,
+            {indexHints: [{ns, allowedIndexes: [{doesNotExist: 1}]}]},
+            () => {
+                assert.commandFailedWithCode(
+                    db.runCommand({find: "heavy_pqs", filter: {a: 1}}),
+                    ErrorCodes.NoQueryExecutionPlans,
+                    "a PQS hint on a non-existent index is not a $natural override and should not exempt the query from rejection",
+                );
+            },
+        );
+    });
+
+    it("PQS queryKnobs can lower maxEstimatedScanBytes for a specific query shape", function () {
+        setParam(-1);
+        const targetShape = qsutils.makeFindQueryInstance({filter: {a: 1}});
+        qsutils.withQuerySettings(
+            targetShape,
+            {queryKnobs: {maxEstimatedScanBytes: belowHeavy}},
+            () => {
+                assert.commandFailedWithCode(
+                    db.runCommand({find: "heavy_pqs", filter: {a: 1}}),
+                    ErrorCodes.NoQueryExecutionPlans,
+                    "the targeted query shape should be rejected by the per-shape maxEstimatedScanBytes override",
+                );
+                // A different query shape is untouched by the per-shape override and still uses the
+                // globally disabled (-1) threshold.
+                assert.commandWorked(
+                    db.runCommand({find: "heavy_pqs", filter: {b: 1}}),
+                    "a differently-shaped query should not be affected by the per-shape override",
+                );
+            },
+        );
+    });
+
+    it("PQS queryKnobs can raise maxEstimatedScanBytes for a specific query shape", function () {
+        setParam(belowHeavy);
+        const targetShape = qsutils.makeFindQueryInstance({filter: {a: 1}});
+        qsutils.withQuerySettings(
+            targetShape,
+            {queryKnobs: {maxEstimatedScanBytes: aboveHeavy}},
+            () => {
+                assert.commandWorked(
+                    db.runCommand({find: "heavy_pqs", filter: {a: 1}}),
+                    "the targeted query shape should be exempted by the per-shape maxEstimatedScanBytes override",
+                );
+                // A different query shape is untouched by the per-shape override and still uses the
+                // globally-set (low) threshold.
+                assert.commandFailedWithCode(
+                    db.runCommand({find: "heavy_pqs", filter: {b: 1}}),
+                    ErrorCodes.NoQueryExecutionPlans,
+                    "a differently-shaped query should still be rejected by the global threshold",
+                );
+            },
+        );
+    });
 });
