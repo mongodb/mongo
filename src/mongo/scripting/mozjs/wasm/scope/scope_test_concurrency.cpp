@@ -33,12 +33,16 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/scripting/deadline_monitor_gen.h"
 #include "mongo/scripting/mozjs/wasm/scope/scope.h"
 #include "mongo/scripting/mozjs/wasm/wasmtime_engine.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <mutex>
 #include <thread>
@@ -192,11 +196,36 @@ TEST(WasmtimeScopeConcurrency, ConcurrentFunctionInvoke) {
 // throw MaxTimeMSExpired, not Interrupted.
 // ---------------------------------------------------------------------------
 
+// A mock session whose connectivity can be flipped from the test, to simulate the client's
+// socket closing while an operation is running.
+class DisconnectableMockSession : public transport::MockSession {
+public:
+    DisconnectableMockSession() : MockSession(nullptr) {}
+
+    bool isConnected() override {
+        return _connected.load();
+    }
+
+    void setConnected(bool connected) {
+        _connected.store(connected);
+    }
+
+private:
+    Atomic<bool> _connected{true};
+};
+
 // Fixture that provides a full ServiceContext so we can create OperationContexts.
 class WasmtimeScopeInterruptTranslationTest : public unittest::Test,
                                               public ScopedGlobalServiceContextForTest {
 protected:
     void setUp() override {
+        // Shrink the DeadlineMonitor poll interval from its 1s default: the monitor-poll tests
+        // below wait a full interval for a kill to be delivered, and if the poll ever regressed
+        // the only backstop is the 60s JS-fn timeout. A small interval keeps the suite fast and
+        // turns a regression into a fast failure instead of a 60s hang.
+        _savedInterruptIntervalMs = gScriptingEngineInterruptIntervalMS.load();
+        gScriptingEngineInterruptIntervalMS.store(20);
+
         // Register the WASM engine as the global script engine, which is required by
         // registerOperation().
         setGlobalScriptEngine(new WasmtimeScriptEngine());
@@ -204,7 +233,11 @@ protected:
 
     void tearDown() override {
         setGlobalScriptEngine(nullptr);
+        gScriptingEngineInterruptIntervalMS.store(_savedInterruptIntervalMs);
     }
+
+private:
+    int _savedInterruptIntervalMs = 0;
 };
 
 // Runs invokerBody in a background thread with a pre-killed OperationContext (marked with
@@ -381,6 +414,211 @@ TEST_F(WasmtimeScopeInterruptTranslationTest, RegisterOperationForwardsRealCodeW
         assertTranslatedCode(
             result, killCode, "invoke() after registerOperation() found opCtx already killed");
     }
+}
+
+// A kill that lands after the opCtx's own deadline has already expired must surface as the
+// deadline error (e.g. MaxTimeMSExpired), not the killer's code. This mirrors
+// OperationContext::checkForInterruptNoAssert(), which checks hasDeadlineExpired() before
+// consulting the recorded kill status, and matches the native engine (MozJSImplScope::kill()
+// re-derives the status via checkForInterruptNoAssert()). Regression test for BF-44481: a
+// $where stuck in sleep() past maxTimeMS was later killed via killCursors, and the getMore
+// surfaced CursorKilled instead of MaxTimeMSExpired, breaking allowPartialResults on mongos.
+TEST_F(WasmtimeScopeInterruptTranslationTest, ExpiredDeadlineOutranksLaterKillCode) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    ScriptingFunction fn = scope->createFunction("while (true) {}");
+
+    // The client and opCtx are owned by this thread, not the invoker: the DeadlineMonitor's
+    // opCtx poll may deliver the expired deadline on its own, letting the invoker finish (and,
+    // if it owned them, destroy the opCtx) while this thread is still using it below.
+    auto client = getService()->makeClient("deadline-vs-kill-code-test");
+    auto opCtx = client->makeOperationContext();
+    // A short, real maxTimeMS that will expire while the JS below is still running. The op
+    // thread never calls checkForInterrupt() while inside JS, so nothing records
+    // MaxTimeMSExpired on the opCtx before the external kill arrives.
+    opCtx->setDeadlineAfterNowBy(Milliseconds(200), ErrorCodes::MaxTimeMSExpired);
+
+    std::exception_ptr result;
+    std::thread invoker([&] {
+        scope->registerOperation(opCtx.get());
+        try {
+            scope->invoke(fn, nullptr, nullptr, /*timeoutMs=*/60000);
+        } catch (...) {
+            result = std::current_exception();
+        }
+        scope->unregisterOperation();
+    });
+
+    // Let the maxTimeMS deadline lapse while the op thread is stuck in JS.
+    while (opCtx->getRemainingMaxTimeMillis() > Milliseconds::zero()) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    // Deliver an external kill with a different code, exactly as a killCursors would in
+    // production: markKilled + engine interrupt, both under the client lock. The
+    // DeadlineMonitor's own opCtx poll may already have delivered the expired deadline by now;
+    // either way the surfaced error must be the deadline's code, not the killer's.
+    {
+        ClientLock clientLock(client.get());
+        opCtx->markKilled(ErrorCodes::CursorKilled);
+        engine.interrupt(clientLock, opCtx.get());
+    }
+    invoker.join();
+
+    assertTranslatedCode(
+        result, ErrorCodes::MaxTimeMSExpired, "invoke() killed after deadline expiry");
+}
+
+// ---------------------------------------------------------------------------
+// DeadlineMonitor opCtx-poll tests (SERVER-130767)
+// ---------------------------------------------------------------------------
+//
+// Plain markKilled() (the baton client-disconnect path), silent deadline expiry, and a client
+// disconnect that nothing ever records on the opCtx all bypass the kill-op listeners, so no one
+// calls killWithReason() on the scope. The scope's isKillPending()/kill() consult the registered
+// opCtx so that the DeadlineMonitor's periodic pass (every scriptingEngineInterruptIntervalMS,
+// default 1s) delivers these kills to a thread stuck inside JS.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Runs 'while (true) {}' in a background thread with 'opCtx' registered on the scope, invokes
+// 'triggerKill' from the calling thread once the invoker is up, and returns the exception the
+// invocation threw. No explicit kill()/killWithReason()/engine.interrupt() is ever issued --
+// only the DeadlineMonitor's periodic opCtx poll can stop the JS.
+template <typename TriggerKill>
+std::exception_ptr runUntilMonitorDeliversKill(Scope& scope,
+                                               ScriptingFunction fn,
+                                               OperationContext* opCtx,
+                                               TriggerKill&& triggerKill) {
+    std::mutex readyMutex;
+    std::condition_variable readyCv;
+    bool ready = false;
+    std::exception_ptr result;
+
+    std::thread invoker([&] {
+        scope.registerOperation(opCtx);
+        {
+            std::lock_guard<std::mutex> lk(readyMutex);
+            ready = true;
+        }
+        readyCv.notify_one();
+        try {
+            scope.invoke(fn, nullptr, nullptr, /*timeoutMs=*/60000);
+        } catch (...) {
+            result = std::current_exception();
+        }
+        scope.unregisterOperation();
+    });
+
+    {
+        std::unique_lock<std::mutex> lk(readyMutex);
+        readyCv.wait(lk, [&] { return ready; });
+    }
+    triggerKill();
+    invoker.join();
+    return result;
+}
+
+}  // namespace
+
+// A plain markKilled() with no kill-op listener notification (exactly what the networking baton
+// does when the client socket closes) must still stop running JS, with the marked code.
+TEST_F(WasmtimeScopeInterruptTranslationTest, MonitorPollDeliversPlainMarkKilled) {
+    auto client = getService()->makeClient("monitor-poll-mark-killed-test");
+    AlternativeClientRegion acr(client);
+    auto opCtx = cc().makeOperationContext();
+
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    ScriptingFunction fn = scope->createFunction("while (true) {}");
+
+    auto ex = runUntilMonitorDeliversKill(*scope, fn, opCtx.get(), [&] {
+        // markKilled() from a non-operation thread requires the Client lock, exactly as
+        // ServiceContext::killOperation() holds it in production.
+        ClientLock clientLock(opCtx->getClient());
+        opCtx->markKilled(ErrorCodes::CursorKilled);
+    });
+    assertTranslatedCode(ex, ErrorCodes::CursorKilled, "invoke() after plain markKilled()");
+}
+
+// A maxTimeMS deadline that expires while the op is stuck inside JS must stop the JS within the
+// monitor's poll interval -- nothing ever records the expiry on the opCtx, so only the poll can
+// discover it.
+TEST_F(WasmtimeScopeInterruptTranslationTest, MonitorPollDeliversSilentDeadlineExpiry) {
+    auto client = getService()->makeClient("monitor-poll-deadline-test");
+    AlternativeClientRegion acr(client);
+    auto opCtx = cc().makeOperationContext();
+    opCtx->setDeadlineAfterNowBy(Milliseconds(300), ErrorCodes::MaxTimeMSExpired);
+
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    ScriptingFunction fn = scope->createFunction("while (true) {}");
+
+    auto ex = runUntilMonitorDeliversKill(*scope, fn, opCtx.get(), [] {});
+    assertTranslatedCode(
+        ex, ErrorCodes::MaxTimeMSExpired, "invoke() past a silently expired deadline");
+}
+
+// A disconnected client session must stop running JS with the client's disconnect error code,
+// even though the disconnect is never recorded on the opCtx by anyone (SERVER-130767).
+TEST_F(WasmtimeScopeInterruptTranslationTest, MonitorPollDeliversClientDisconnect) {
+    auto session = std::make_shared<DisconnectableMockSession>();
+    auto client = getService()->makeClient("monitor-poll-disconnect-test", session);
+    AlternativeClientRegion acr(client);
+    auto opCtx = cc().makeOperationContext();
+
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    ScriptingFunction fn = scope->createFunction("while (true) {}");
+
+    auto ex =
+        runUntilMonitorDeliversKill(*scope, fn, opCtx.get(), [&] { session->setConnected(false); });
+    assertTranslatedCode(
+        ex, cc().getDisconnectErrorCode(), "invoke() after client session disconnected");
+}
+
+// The maxTimeNeverTimeOut failpoint must suppress deadline expiry in scriptKillReasonFor() exactly
+// as it does in OperationContext: an op with a lapsed deadline that is then killed with a different
+// code must surface that code, not the (suppressed) deadline error. This pins the
+// maxTimeNeverTimeOut branch of opCtxDeadlineHasExpired().
+TEST_F(WasmtimeScopeInterruptTranslationTest, MaxTimeNeverTimeOutSuppressesDeadline) {
+    auto client = getService()->makeClient("monitor-poll-never-timeout-test");
+    AlternativeClientRegion acr(client);
+    auto opCtx = cc().makeOperationContext();
+    opCtx->setDeadlineAfterNowBy(Milliseconds(100), ErrorCodes::MaxTimeMSExpired);
+
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    ScriptingFunction fn = scope->createFunction("while (true) {}");
+
+    FailPointEnableBlock fp("maxTimeNeverTimeOut");
+    auto ex = runUntilMonitorDeliversKill(*scope, fn, opCtx.get(), [&] {
+        // Give the deadline time to lapse in wall-clock terms, then kill with a non-deadline code.
+        // With the deadline suppressed, that code -- not MaxTimeMSExpired -- must win.
+        std::this_thread::sleep_for(std::chrono::milliseconds(150));
+        ClientLock clientLock(opCtx->getClient());
+        opCtx->markKilled(ErrorCodes::CursorKilled);
+    });
+    assertTranslatedCode(ex, ErrorCodes::CursorKilled, "invoke() with maxTimeNeverTimeOut");
+}
+
+// The maxTimeAlwaysTimeOut failpoint must force deadline expiry in scriptKillReasonFor() before the
+// wall-clock deadline arrives: an op with a far-future deadline is killed with its timeout error
+// via the monitor poll. This pins the maxTimeAlwaysTimeOut branch of opCtxDeadlineHasExpired().
+TEST_F(WasmtimeScopeInterruptTranslationTest, MaxTimeAlwaysTimeOutForcesDeadline) {
+    auto client = getService()->makeClient("monitor-poll-always-timeout-test");
+    AlternativeClientRegion acr(client);
+    auto opCtx = cc().makeOperationContext();
+    // A deadline far enough out that only the failpoint, not the clock, can trip it.
+    opCtx->setDeadlineAfterNowBy(Hours(1), ErrorCodes::MaxTimeMSExpired);
+
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    ScriptingFunction fn = scope->createFunction("while (true) {}");
+
+    FailPointEnableBlock fp("maxTimeAlwaysTimeOut");
+    auto ex = runUntilMonitorDeliversKill(*scope, fn, opCtx.get(), [] {});
+    assertTranslatedCode(ex, ErrorCodes::MaxTimeMSExpired, "invoke() with maxTimeAlwaysTimeOut");
 }
 
 // ---------------------------------------------------------------------------

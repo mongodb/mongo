@@ -36,6 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/scripting/config_engine_gen.h"
 #include "mongo/scripting/config_engine_wasm_gen.h"
@@ -570,15 +571,54 @@ void WasmtimeImplScope::unregisterOperation() {
     }
 }
 void WasmtimeImplScope::kill() {
+    // Reason-less kill: derive the real reason from the registered opCtx when there is one.
+    // The DeadlineMonitor lands here both for its periodic isKillPending() pass (SERVER-130767:
+    // that pass is what delivers opCtx kills -- killOp, maxTimeMS expiry, client disconnect --
+    // to a thread stuck inside JS, since such a thread never polls checkForInterrupt()) and for
+    // the JS-fn timeout, where no opCtx state is set and Interrupted is the correct reason.
+    auto reason = ErrorCodes::Interrupted;
+    if (auto* opCtx = _opCtx.load(std::memory_order_acquire)) {
+        // Lock the Client, per getKillStatus()'s concurrency contract for non-operation
+        // threads (this runs on the DeadlineMonitor thread). The opCtx cannot be destroyed
+        // underneath us: _opCtx is only non-null between registerOperation() and
+        // unregisterOperation(), i.e. while the operation's own thread is inside the
+        // invocation, and the DeadlineMonitor only polls tasks whose deadline is still
+        // registered (stopDeadline() serialises against the poll via the monitor mutex).
+        ClientLock clientLock(opCtx->getClient());
+        if (auto opReason = scriptKillReasonFor(opCtx); opReason != ErrorCodes::OK) {
+            reason = opReason;
+            // The direct kill-op listener path (WasmtimeScriptEngine::interrupt()) logs its own
+            // delivery; log here too so the poll-driven path -- the only one that delivers a
+            // silent deadline expiry or unrecorded client disconnect (SERVER-130767) -- is
+            // equally observable.
+            LOGV2_DEBUG(11542381,
+                        2,
+                        "Delivering opCtx kill to Wasmtime op via DeadlineMonitor poll",
+                        "opId"_attr = opCtx->getOpID(),
+                        "reason"_attr = reason);
+        }
+    }
     if (_bridge)
-        _bridge->kill(ErrorCodes::Interrupted);
+        _bridge->kill(reason);
 }
 void WasmtimeImplScope::killWithReason(ErrorCodes::Error reason) {
     if (_bridge)
         _bridge->kill(reason);
 }
 bool WasmtimeImplScope::isKillPending() const {
-    return _bridge && _bridge->isKillPending();
+    if (_bridge && _bridge->isKillPending()) {
+        return true;
+    }
+    // Also report a pending kill when the registered opCtx is interrupted but nobody has told
+    // this scope yet (plain markKilled() does not notify kill-op listeners, and a client
+    // disconnect or deadline expiry may not be recorded anywhere at all). The DeadlineMonitor
+    // polls this every scriptingEngineInterruptIntervalMS and calls kill() when it turns true.
+    // Client lock and opCtx lifetime: see kill() above.
+    if (auto* opCtx = _opCtx.load(std::memory_order_acquire)) {
+        ClientLock clientLock(opCtx->getClient());
+        return scriptKillReasonFor(opCtx) != ErrorCodes::OK;
+    }
+    return false;
 }
 
 bool WasmtimeImplScope::hasOutOfMemoryException() {

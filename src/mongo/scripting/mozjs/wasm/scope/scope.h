@@ -185,13 +185,16 @@ private:
 
     std::unique_ptr<wasm::MozJSWasmBridge> _bridge;
     int64_t _storeLinearMemBytes = 0;
-    DeadlineMonitor<WasmtimeImplScope> _deadlineMonitor;
     void _drainEmitToCallback();
     void _installHelpers();
     BSONObj _resolveGlobal(const char* field) const;
     NativeFunction _emitCallback = nullptr;
     void* _emitCallbackData = nullptr;
     std::atomic<OperationContext*> _opCtx{nullptr};  // NOLINT: explicit memory orders required
+    // Declared last so ~DeadlineMonitor() joins the monitor thread before any member the poll
+    // reads (notably _opCtx) is destroyed: the poll dereferences _opCtx from that thread, and
+    // reverse-declaration destruction order must tear the thread down first.
+    DeadlineMonitor<WasmtimeImplScope> _deadlineMonitor;
 
     // setupEmit allocates ~117 MB of WASM linear memory each call; cache the last byte limit
     // so we skip the WIT round-trip when it hasn't changed. Reset to 0 on bridge teardown/reset.

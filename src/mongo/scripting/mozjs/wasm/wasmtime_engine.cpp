@@ -272,13 +272,83 @@ bool WasmtimeScriptEngine::hasIdleBridgeForTest() {
     return static_cast<bool>(tl_idleBridge.bridge);
 }
 
+namespace {
+// Near-equivalent of OperationContext::hasDeadlineExpired() (which is private), built from
+// public API: getRemainingMaxTimeMillis() returns Milliseconds::max() when there is no deadline
+// and clamps to zero once the deadline has passed. The maxTimeNeverTimeOut/maxTimeAlwaysTimeOut
+// failpoints suppress/force deadline expiry exactly as they do there (both only apply to ops
+// that actually have a deadline).
+//
+// One deliberate divergence: hasDeadlineExpired() compares against the *extended* deadline
+// (OverrideDeadlineGuard), while getRemainingMaxTimeMillis() uses the base deadline. The guard
+// is only armed around egress RPCs (see network_interface_tl.cpp), which an op executing JS on
+// its own thread is never inside, so the extension cannot be active when this decides a JS kill
+// reason; at worst an extended op would be attributed its timeout error marginally early.
+bool opCtxDeadlineHasExpired(OperationContext* opCtx) {
+    const auto remaining = opCtx->getRemainingMaxTimeMillis();
+    if (remaining == Milliseconds::max()) {
+        return false;  // No deadline.
+    }
+    if (MONGO_unlikely(maxTimeNeverTimeOut.shouldFail())) {
+        return false;
+    }
+    if (MONGO_unlikely(maxTimeAlwaysTimeOut.shouldFail())) {
+        return true;
+    }
+    return remaining == Milliseconds::zero();
+}
+}  // namespace
+
+ErrorCodes::Error scriptKillReasonFor(OperationContext* opCtx) {
+    // An expired deadline outranks the recorded kill status, matching
+    // checkForInterruptNoAssert() priority (see BF-44481: a late external kill on a timed-out op
+    // must still surface as the deadline error).
+    if (opCtxDeadlineHasExpired(opCtx)) {
+        return opCtx->getTimeoutError();
+    }
+    if (auto killStatus = opCtx->getKillStatus(); killStatus != ErrorCodes::OK) {
+        return killStatus;
+    }
+    // SERVER-130767: nothing proactively kills an operation whose client disconnected -- the
+    // disconnect is only discovered inside checkForInterruptNoAssert() on the operation's own
+    // thread, which a thread stuck inside JS never reaches. Check the session directly, exactly
+    // as _checkClientConnected() does (Client::session() is immutable after Client construction
+    // and Session::isConnected() is called from non-operation threads in production, so this is
+    // safe from the DeadlineMonitor thread).
+    //
+    // One divergence from checkForInterruptNoAssert(): that path only consults the session when
+    // the op opted in via markKillOnClientDisconnect(), but that flag has no public getter, so
+    // this checks unconditionally. That is the desired behavior for the JS path -- a $where/
+    // $function stuck in a loop after its client vanished is exactly the SERVER-130767 hang we
+    // want to break -- but it does mean a JS op that deliberately did not opt into
+    // disconnect-kill is still stopped on socket close.
+    auto client = opCtx->getClient();
+    if (!client->isInDirectClient()) {
+        if (const auto& session = client->session(); session && !session->isConnected()) {
+            return client->getDisconnectErrorCode();
+        }
+    }
+    return ErrorCodes::OK;
+}
+
 void WasmtimeScriptEngine::interrupt(ClientLock&, OperationContext* opCtx) {
     if (opCtx && (*opCtx)[operationWasmtimeScopeDecoration].scope) {
         // ServiceContext::killOperation() has already called opCtx->markKilled(killCode) by the
         // time it notifies us -- on this same thread, in the same call -- so the real reason is
         // known with certainty right here. Pass it straight through instead of losing it behind
         // a reason-less kill() and reconstructing it later from (possibly stale) opCtx state.
-        (*opCtx)[operationWasmtimeScopeDecoration].scope->killWithReason(opCtx->getKillStatus());
+        //
+        // One exception, mirroring checkForInterruptNoAssert() priority: if the opCtx's own
+        // deadline has already expired, the deadline error (e.g. MaxTimeMSExpired) outranks the
+        // killer's code. An op stuck inside JS never observes its deadline via
+        // checkForInterrupt(), so the first kill it sees may be a later external one (e.g. a
+        // killCursors after mongos gave up) -- reporting that code instead of MaxTimeMSExpired
+        // breaks callers that dispatch on it, such as allowPartialResults (BF-44481).
+        // killOperation() guarantees a kill status is recorded, so scriptKillReasonFor() cannot
+        // return OK here; Interrupted is a defensive fallback (killWithReason() rejects OK).
+        auto reason = scriptKillReasonFor(opCtx);
+        (*opCtx)[operationWasmtimeScopeDecoration].scope->killWithReason(
+            reason != ErrorCodes::OK ? reason : ErrorCodes::Interrupted);
         LOGV2_DEBUG(11542360, 2, "Interrupting Wasmtime op", "opId"_attr = opCtx->getOpID());
     }
 }
@@ -293,7 +363,8 @@ void WasmtimeScriptEngine::interruptAll(ServiceContextLock& svcCtxLock) {
             // interruptOperations(), except clients excluded from that per-op loop
             // (shouldExcludeFromInterruptAtShutdown()). Fall back to InterruptedAtShutdown for
             // those rather than propagating a stale OK as the kill reason.
-            auto reason = opCtx->getKillStatus();
+            // Same deadline-outranks-killer rule as interrupt() above.
+            auto reason = scriptKillReasonFor(opCtx);
             (*opCtx)[operationWasmtimeScopeDecoration].scope->killWithReason(
                 reason != ErrorCodes::OK ? reason : ErrorCodes::InterruptedAtShutdown);
         }

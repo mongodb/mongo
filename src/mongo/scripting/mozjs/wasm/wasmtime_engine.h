@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/error_codes.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/wasm/bridge/bridge.h"
 #include "mongo/util/time_support.h"
@@ -42,6 +43,22 @@ namespace mongo {
 namespace mozjs {
 
 class WasmtimeImplScope;
+
+/**
+ * Derives the kill reason a JS scope should be killed with for 'opCtx', or ErrorCodes::OK if the
+ * operation is not interrupted. Mirrors OperationContext::checkForInterruptNoAssert() priority:
+ *   1. an expired deadline (honoring the maxTimeNeverTimeOut/maxTimeAlwaysTimeOut failpoints)
+ *      outranks everything, e.g. MaxTimeMSExpired;
+ *   2. then the recorded kill status (killOp, killCursors, shutdown, ...);
+ *   3. then a disconnected client session (SERVER-130767: an op stuck inside JS never polls
+ *      checkForInterrupt(), so nothing else ever discovers the disconnect).
+ *
+ * Concurrency: per getKillStatus()'s contract, the caller must either be the thread executing
+ * on behalf of 'opCtx' or hold the lock on the Client owning it. The kill-op listener paths
+ * (interrupt()/interruptAll()) are called with that lock held; WasmtimeImplScope's
+ * kill()/isKillPending() take it before calling this from the DeadlineMonitor thread.
+ */
+ErrorCodes::Error scriptKillReasonFor(OperationContext* opCtx);
 
 /**
  * Host-side JavaScript engine that runs on mongod. Implements the ScriptEngine interface by

@@ -39,6 +39,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -154,19 +155,21 @@ private:
                 lastInterruptCycle = now;
             }
 
-            // wait for a task to be added or a deadline to expire
+            // Wait for a task to be added, a deadline to expire, or the next interrupt cycle to
+            // come due. Waking for the interrupt cycle even when a (possibly much later) task
+            // deadline exists is what keeps the isKillPending() pass above periodic; that pass
+            // is how kills recorded only on a task's OperationContext (killOp, maxTimeMS expiry,
+            // client disconnect -- see SERVER-130767) reach a thread stuck inside JS.
             if (_nearestDeadlineWallclock > now) {
                 MONGO_IDLE_THREAD_BLOCK;
-                if (_nearestDeadlineWallclock == Date_t::max()) {
-                    if ((interruptInterval.count() > 0) &&
-                        (_nearestDeadlineWallclock - now > interruptInterval)) {
-                        _newDeadlineAvailable.wait_for(lk, interruptInterval.toSystemDuration());
-                    } else {
-                        _newDeadlineAvailable.wait(lk);
-                    }
+                auto waitDeadline = _nearestDeadlineWallclock;
+                if ((interruptInterval.count() > 0) && !_tasks.empty()) {
+                    waitDeadline = std::min(waitDeadline, lastInterruptCycle + interruptInterval);
+                }
+                if (waitDeadline == Date_t::max()) {
+                    _newDeadlineAvailable.wait(lk);
                 } else {
-                    _newDeadlineAvailable.wait_until(lk,
-                                                     _nearestDeadlineWallclock.toSystemTimePoint());
+                    _newDeadlineAvailable.wait_until(lk, waitDeadline.toSystemTimePoint());
                 }
                 continue;
             }
