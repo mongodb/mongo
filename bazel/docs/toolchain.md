@@ -58,3 +58,33 @@ recast paths relative to the exec directory.
 Engflow has a lot of helpful views showing remote execution stats and the remote file structure. We
 don't intent to duplicate their documentation but be careful as some of their data (particularly
 remotely executed actions) may not be accurate immediately after execution.
+
+# Native (system-compiler) toolchain
+
+By default the build uses the hermetic mongo toolchain (a pinned clang/gcc shipped as
+`@mongo_toolchain`). The **native toolchain** instead builds against a clang or gcc already
+installed on the host, using the system standard library and runtime. This is useful for
+experimenting with a compiler version we don't ship, or for reproducing a distro/system-compiler
+issue.
+
+> **Note: this is a lightly supported feature.** It is not as a primary build configuration, and it
+> is not exercised by most of CI.
+
+## Usage
+
+Point `CC`/`CXX` at the compiler you want and select the matching `--compiler_type`:
+
+```bash
+# clang
+CC=clang-19 CXX=clang++-19 bazel build \
+  --config=native_toolchain --compiler_type=clang --linker=lld install-dist-test
+
+# gcc
+CC=gcc-14 CXX=g++-14 bazel build \
+  --config=native_toolchain --compiler_type=gcc --linker=lld install-dist-test
+```
+
+## Not all compiler versions work
+
+The build only compiles cleanly with a sufficiently modern compiler and standard library — this is
+the same modernity the hermetic toolchain pins, and older toolchains will fail.

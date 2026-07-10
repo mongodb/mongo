@@ -10,6 +10,16 @@ constraint_value(
     constraint_setting = ":mongo_toolchain",
 )
 
+# Marks the auto-generated host platform as using a native/third-party system
+# compiler. The native cc toolchain requires this so it never matches on a
+# platform configured for the hermetic mongo toolchain.
+constraint_setting(name = "native_toolchain")
+
+constraint_value(
+    name = "use_native_toolchain",
+    constraint_setting = ":native_toolchain",
+)
+
 constraint_setting(name = "distro")
 
 [

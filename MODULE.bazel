@@ -252,6 +252,16 @@ register_execution_platforms("@internal_platforms_do_not_use//host:host")
 ##    "mongo_toolchain_v5",
 ##)
 #
+# Native/third-party system-compiler toolchain. Only matches the host platform
+# when it is generated with USE_NATIVE_TOOLCHAIN=1 (which adds the
+# use_native_toolchain constraint), so it never competes with the hermetic
+# mongo toolchain on a normal build.
+setup_mongo_native_toolchain = use_repo_rule("//bazel/toolchains/cc/mongo_native:native_toolchain.bzl", "setup_mongo_native_toolchain")
+
+setup_mongo_native_toolchain(name = "mongo_native_toolchain")
+
+register_toolchains("@mongo_native_toolchain//:mongo_native_toolchain")
+
 setup_mongo_apple_toolchains_extension = use_extension("//bazel/toolchains/cc/mongo_apple:mongo_apple_toolchain.bzl", "setup_mongo_apple_toolchain_extension")
 use_repo(setup_mongo_apple_toolchains_extension, "mongo_apple_toolchain")
 

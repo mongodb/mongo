@@ -18,6 +18,9 @@ filters:
   - "/generate_evergreen_bazelrc.sh":
     approvers:
       - 10gen/devprod-build
+  - "/native_toolchain_setup.sh":
+    approvers:
+      - 10gen/devprod-build
   - "get_custom_build_promotion_expansions.sh":
     approvers:
       - 10gen/devprod-release-infrastructure

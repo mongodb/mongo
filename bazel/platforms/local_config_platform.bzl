@@ -49,7 +49,8 @@ def _setup_local_config_platform(ctx):
             break
 
     cache_silo = '"cache-silo-key": "' + platform_key + '",' if ctx.os.environ.get("evergreen_remote_exec") == "off" else ""
-    if ctx.os.environ.get("USE_NATIVE_TOOLCHAIN"):
+    if ctx.os.environ.get("USE_NATIVE_TOOLCHAIN") == "1":
+        constraints_str += ',\n        "@//bazel/platforms:use_native_toolchain"'
         exec_props = ""
         result = {"USE_NATIVE_TOOLCHAIN": "1"}
     elif distro != None and distro in REMOTE_EXECUTION_CONTAINERS:

@@ -171,6 +171,8 @@ def _impl(ctx):
                         flags = [
                             "-std=c++20",
                             "-nostdinc++",
+                        ] if ctx.attr.hermetic else [
+                            "-std=c++20",
                         ],
                     ),
                 ],
@@ -330,6 +332,25 @@ def _impl(ctx):
                 ])],
             ),
         ] if ctx.attr.includes != None and len(ctx.attr.includes) > 0 else [],
+    )
+
+    # C++-only system include dirs. These must not be added to C compiles: some
+    # standard libraries (e.g. libstdc++ >= 13) ship a C++ <stdatomic.h> under
+    # their C++ include dir that would otherwise shadow the C library's
+    # <stdatomic.h> and break C sources (e.g. libunwind's atomic_bool).
+    cpp_includes_feature = feature(
+        name = "cpp_includes",
+        enabled = True,
+        flag_sets = [
+            flag_set(
+                actions = all_cpp_compile_actions,
+                flag_groups = [flag_group(flags = [
+                    final_include
+                    for include in ctx.attr.cpp_includes
+                    for final_include in ["-isystem", include]
+                ])],
+            ),
+        ] if ctx.attr.cpp_includes != None and len(ctx.attr.cpp_includes) > 0 else [],
     )
 
     bin_dirs_feature = feature(
@@ -1118,9 +1139,11 @@ def _impl(ctx):
         ],
     )
 
+    # The resource dir points at the hermetic toolchain's bundled clang runtime.
+    # A native clang finds its own resource dir, so this is hermetic-only.
     clang_toolchain_resource_dir_feature = feature(
         name = "clang_toolchain_resource_dir",
-        enabled = ctx.attr.compiler == COMPILERS.CLANG,
+        enabled = ctx.attr.hermetic and ctx.attr.compiler == COMPILERS.CLANG,
         flag_sets = [
             flag_set(
                 actions = all_link_actions + lto_index_actions,
@@ -1146,7 +1169,7 @@ def _impl(ctx):
     # mongo toolchain rather than relying on one being installed on the host.
     mold_linker_env_entries = [
         env_entry(key = "LD_LIBRARY_PATH", value = "external/mongo_toolchain_v5/stow/gcc-v5/lib64/"),
-    ]
+    ] if ctx.attr.hermetic else []
 
     default_linker_lld_feature = feature(
         name = "default_linker_lld",
@@ -2089,6 +2112,10 @@ def _impl(ctx):
         unfiltered_compile_flags_feature,
         omitted_timestamps_feature,
         thin_archive_feature,
+        # cpp_includes must come before includes so that on C++ compiles the
+        # C++ standard-library dirs are searched before the C dirs (libstdc++
+        # headers use #include_next to reach the C library headers).
+        cpp_includes_feature,
         includes_feature,
         dependency_file_feature,
         verbose_feature,
@@ -2202,6 +2229,7 @@ mongo_linux_cc_toolchain_config = rule(
     implementation = _impl,
     attrs = {
         "builtin_sysroot": attr.string(),
+        "hermetic": attr.bool(default = True, mandatory = False),
         "cxx_builtin_include_directories": attr.string_list(mandatory = True),
         "cpu": attr.string(mandatory = True),
         "compiler": attr.string(mandatory = True),
@@ -2213,6 +2241,7 @@ mongo_linux_cc_toolchain_config = rule(
         "extra_cxxflags": attr.string_list(mandatory = False),
         "extra_ldflags": attr.string_list(mandatory = False),
         "includes": attr.string_list(mandatory = False),
+        "cpp_includes": attr.string_list(mandatory = False),
         "bin_dirs": attr.string_list(mandatory = False),
         "tool_paths": attr.string_dict(mandatory = True),
         "toolchain_identifier": attr.string(mandatory = True),

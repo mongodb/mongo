@@ -494,6 +494,17 @@ common --define codeowners_default_owner=@10gen/mongo-default-approvers
 # Opt out of this by passing --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=0 on the command line.
 common:linux --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 
+# Build with a native/third-party C++ toolchain instead of the hermetic mongo toolchain.
+# This should be passed as the last config if passing multiple configs
+# Example command lines:
+# CC=gcc-14 CXX=g++-14 bazel build --config=opt --config=native_toolchain --compiler_type=gcc install-dist-test
+# CC=clang-19 CXX=clang++-19 bazel build --config=opt_profiled --config=native_toolchain --compiler_type=clang install-dist-test
+common:native_toolchain --repo_env=USE_NATIVE_TOOLCHAIN=1
+common:native_toolchain --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=0
+# Even if we use the native toolchain, we only support mold and lld as linkers
+common:native_toolchain --linker=lld
+common:native_toolchain --config=local
+
 # Only use fission and debug compression on Linux
 common:windows --fission=no
 common:windows --//bazel/config:create_dwp=False
