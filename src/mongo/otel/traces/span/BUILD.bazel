@@ -74,8 +74,31 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(
+    name = "span_name",
+    hdrs = ["span_name.h"],
+    deps = ["//src/mongo:base"],
+)
+
+mongo_cc_library(
     name = "span_names",
     srcs = ["span_names.cpp"],
     hdrs = ["span_names.h"],
-    deps = ["//src/mongo:base"],
+    deps = [
+        ":span_name",
+        "//src/mongo:base",
+        "//src/mongo/otel/traces/sampler",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "span_names_test",
+    srcs = ["span_names_test.cpp"],
+    tags = [
+        "mongo_unittest_second_group",
+        "tracing_test",
+    ],
+    deps = [
+        ":span_names",
+        "//src/mongo/otel/traces/sampler",
+    ],
 )

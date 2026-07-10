@@ -31,7 +31,7 @@
 
 #include "mongo/db/admission/rate_limiter.h"
 #include "mongo/otel/traces/sampler/sampling_config.h"
-#include "mongo/otel/traces/span/span_names.h"
+#include "mongo/otel/traces/span/span_name.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/functional.h"
