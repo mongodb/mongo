@@ -18,7 +18,6 @@
 // ]
 import {isWiredTiger} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     aggPlanHasStage,
     getAggPlanStage,
@@ -34,8 +33,6 @@ import {
 
 const sbeFullyEnabled = checkSbeFullyEnabled(db);
 const sbeRestricted = checkSbeRestrictedOrFullyEnabled(db);
-const sbeNonLeadingMatchEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "SbeNonLeadingMatch");
-const sbeTransformStagesEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "SbeTransformStages");
 
 const coll = db.optimize_away_pipeline;
 coll.drop();
@@ -309,7 +306,7 @@ assertPipelineIfSbeEnabled(
             expectedResult: [{count: 2}],
         });
     },
-    sbeTransformStagesEnabled /* hasEligibleRestrictedStage */,
+    sbeRestricted /* hasEligibleRestrictedStage */,
 );
 
 assertPipelineIfSbeEnabled(
@@ -721,7 +718,7 @@ assertPipelineIfSbeEnabled(
             expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE"],
         });
     },
-    sbeTransformStagesEnabled /* hasEligibleRestrictedStage */,
+    sbeRestricted /* hasEligibleRestrictedStage */,
 );
 explain = coll.explain().aggregate(pipeline);
 let projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");
@@ -884,7 +881,7 @@ assertPipelineIfSbeEnabled(
             expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE", "$project"],
         });
     },
-    sbeTransformStagesEnabled /* hasEligibleRestrictedStage */,
+    sbeRestricted /* hasEligibleRestrictedStage */,
 );
 explain = coll.explain().aggregate(pipeline);
 projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");
@@ -907,7 +904,7 @@ assertPipelineIfSbeEnabled(
             expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE", "$project"],
         });
     },
-    sbeTransformStagesEnabled /* hasEligibleRestrictedStage */,
+    sbeRestricted /* hasEligibleRestrictedStage */,
 );
 explain = coll.explain().aggregate(pipeline);
 projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");
