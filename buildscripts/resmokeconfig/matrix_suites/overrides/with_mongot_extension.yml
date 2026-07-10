@@ -15,10 +15,6 @@
       # Tests that fail due to unimplemented behavior in mongot-extension.
       - jstests/with_mongot/e2e/views/search_with_view_injected.js
       - jstests/with_mongot/e2e/views/mongot_stage_in_view_definition.js
-      # TODO SERVER-130914: Remove this exclusion caused by the extension's $vectorSearch rejecting the server-injected 'view' field.
-      - jstests/with_mongot/e2e/views/vector_search/unionWith.js
-      - jstests/with_mongot/e2e/views/vector_search/unionWith_nested.js
-      - jstests/with_mongot/e2e/views/vector_search/undefined_or_underlying_index.js
       # TODO SERVER-130916: Remove this exclusion; the $sort-after-$vectorSearch optimization is not applied to the extension stage.
       - jstests/with_mongot/e2e/hybridSearch/sort_after_vector_search_optimization.js
       # TODO SERVER-130913: Remove these exclusions. Extension $vectorSearch inside a $lookup/$graphLookup subpipeline hits
@@ -53,18 +49,6 @@
       - jstests/with_mongot/e2e/hybridSearch/score_fusion_on_view.js
       - jstests/with_mongot/e2e/hybridSearch/score_fusion_score_details_test.js
       - jstests/with_mongot/e2e/hybridSearch/score_multiple_stages.js
-
-# Failures that only reproduce on sharded topologies: the sharded query path injects the
-# resolved view into the extension's $vectorSearch, hitting the same reserved-'view'-field
-# rejection as the exclusions above. These pass on single-node, so they are excluded only in
-# the sharded suites.
-# TODO SERVER-130914: Remove these exclusions.
-- name: exclude_incompatible_tests_sharded
-  value:
-    exclude_files:
-      - jstests/with_mongot/e2e/views/vector_search/addFields_base_case.js
-      - jstests/with_mongot/e2e/views/vector_search/match_base_case.js
-      - jstests/with_mongot/e2e/views/vector_search/nested_view.js
 
 # REPLACES the base suite's list, dropping its in-tree test extensions (see note at top).
 - name: load_extension
