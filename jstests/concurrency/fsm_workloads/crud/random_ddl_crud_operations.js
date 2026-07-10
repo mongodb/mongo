@@ -2,19 +2,19 @@
  * Performs a series of CRUD operations while DDL commands are running in the background
  * and verifies guarantees are not broken.
  *
+ * This test also covers concurrent chunk operations by virtue of running with the balancer on.
+ *
  * @tags: [
  *   requires_sharding,
- *   assumes_balancer_off,
  *   does_not_support_causal_consistency,
  *   # The mutex mechanism used in CRUD and drop states does not support stepdown
  *   does_not_support_stepdowns,
- *   # Can be removed once PM-1965-Milestone-1 is completed.
- *   does_not_support_transactions,
  *   # Relies on internalInsertMaxBatchSize to be 64 or above, but it may be fuzzed to lower values.
  *   does_not_support_config_fuzzer,
  *  ]
  */
 
+import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 
@@ -22,6 +22,19 @@ export const $config = (function () {
     function threadCollectionName(prefix, tid) {
         return prefix + tid;
     }
+
+    const kReshardingSetFcvErrors = [
+        ErrorCodes.CommandNotSupported,
+        ErrorCodes.ReshardCollectionInterruptedDueToFCVChange,
+    ];
+    const kReshardingAcceptableErrors = [
+        // Concurrent resharding with the same collection is ongoing
+        ErrorCodes.ConflictingOperationInProgress,
+        ErrorCodes.ReshardCollectionInProgress,
+        // The collection got dropped so there's nothing to reshard
+        ErrorCodes.NamespaceNotSharded,
+        ErrorCodes.NamespaceNotFound,
+    ].concat(kReshardingSetFcvErrors);
 
     function countDocuments(coll, query) {
         let count;
@@ -85,7 +98,7 @@ export const $config = (function () {
                 currentTid: this.tid,
                 collection: targetThreadColl,
             });
-            assert.commandWorkedOrFailedWithCode(
+            const res = assert.commandWorkedOrFailedWithCode(
                 db.runCommand({
                     createUnsplittableCollection: targetThreadColl,
                 }),
@@ -97,6 +110,14 @@ export const $config = (function () {
                     ErrorCodes.CannotCreateCollection,
                 ],
             );
+
+            if (!res.ok) {
+                // If we're running with transactions and an acceptable error occurred then the transaction will
+                // fail due to an implicit abort. If the returned error is sticky then that would cause the
+                // operation to be retried indefinitely. To prevent this we force this command to be executed
+                // again outside of the transaction where it will see the acceptable error and succeed.
+                fsm.forceRunningOutsideTransaction(this);
+            }
 
             jsTest.log.info("createUnsplittable finished");
         },
@@ -238,42 +259,29 @@ export const $config = (function () {
             while (tid === this.tid) tid = Random.randInt(this.threadCount);
             const fullNs = db[threadCollectionName(collName, tid)].getFullName();
             let newKey = "tid_" + tid + "_" + Random.randInt(2);
-            try {
-                jsTestLog(
-                    "resharding state tid:" +
-                        tid +
-                        " currentTid:" +
-                        this.tid +
-                        " collection:" +
-                        fullNs +
-                        " newKey " +
-                        newKey,
-                );
-                assert.commandWorked(
-                    db.adminCommand({
-                        reshardCollection: fullNs,
-                        key: {[`${newKey}`]: 1},
-                        numInitialChunks: 1,
-                    }),
-                );
-            } catch (e) {
-                const exceptionCode = e.code;
-                if (
-                    exceptionCode == ErrorCodes.ConflictingOperationInProgress ||
-                    exceptionCode == ErrorCodes.ReshardCollectionInProgress ||
-                    exceptionCode == ErrorCodes.NamespaceNotSharded ||
-                    exceptionCode == ErrorCodes.NamespaceNotFound
-                ) {
-                    // It is fine for a resharding operation to throw ConflictingOperationInProgress
-                    // if a concurrent resharding with the same collection is ongoing.
-                    // It is also fine for a resharding operation to throw NamespaceNotSharded or
-                    // NamespaceNotFound because a drop state could've happend recently.
-                    return;
-                }
-                throw e;
-            } finally {
-                jsTestLog("resharding state finished");
-            }
+            const isHashed = Random.rand() < 0.5;
+
+            jsTest.log.info("resharding state", {
+                tid,
+                currentTid: this.tid,
+                collection: fullNs,
+                newKey,
+                isHashed,
+            });
+
+            // We explicitly flip between hashed/plain shard keys because hashed keys can be pre-split.
+            // This is important for suites that have balancing enabled because those will trigger chunk
+            // operations in the background of this test which is a desirable testing action here.
+            assert.commandWorkedOrFailedWithCode(
+                db.adminCommand({
+                    reshardCollection: fullNs,
+                    key: {[`${newKey}`]: isHashed ? "hashed" : 1},
+                    numInitialChunks: isHashed ? 10 : 1,
+                }),
+                kReshardingAcceptableErrors,
+            );
+
+            jsTest.log.info("resharding state finished");
         },
         checkDatabaseMetadataConsistency: function (db, collName, connCache) {
             jsTestLog("Check database metadata state");
@@ -303,15 +311,10 @@ export const $config = (function () {
             const targetThreadColl = threadCollectionName(collName, tid);
             const namespace = `${db}.${targetThreadColl}`;
             jsTest.log.info(`Started to unshard collection ${namespace}`);
-            assert.commandWorkedOrFailedWithCode(db.adminCommand({unshardCollection: namespace}), [
-                // Handles the case where the collection/db does not exist
-                ErrorCodes.NamespaceNotFound,
-                // Handles the case where another resharding operation is in progress
-                ErrorCodes.ConflictingOperationInProgress,
-                ErrorCodes.ReshardCollectionInProgress,
-                // Handles the case where the collection is already unsharded
-                ErrorCodes.NamespaceNotSharded,
-            ]);
+            assert.commandWorkedOrFailedWithCode(
+                db.adminCommand({unshardCollection: namespace}),
+                kReshardingAcceptableErrors,
+            );
             jsTest.log.info(`Unsharding completed ${namespace}`);
         },
         untrackUnshardedCollection: function untrackUnshardedCollection(db, collName, connCache) {
@@ -323,15 +326,16 @@ export const $config = (function () {
             jsTestLog(`Started to untrack collection ${namespace}`);
             // Attempt to unshard the collection first
             jsTestLog(`1. Attempting to unshard collection ${namespace}`);
-            assert.commandWorkedOrFailedWithCode(db.adminCommand({unshardCollection: namespace}), [
-                // Handles the case where the collection/db does not exist
-                ErrorCodes.NamespaceNotFound,
-                // Handles the case where another resharding operation is in progress
-                ErrorCodes.ConflictingOperationInProgress,
-                ErrorCodes.ReshardCollectionInProgress,
-                // Handles the case where the collection is already unsharded
-                ErrorCodes.NamespaceNotSharded,
-            ]);
+            const res = assert.commandWorkedOrFailedWithCode(
+                db.adminCommand({unshardCollection: namespace}),
+                kReshardingAcceptableErrors,
+            );
+            if (!res.ok && kReshardingSetFcvErrors.includes(res.code)) {
+                jsTest.log.info(
+                    `Unsharding failed due to concurrent setFCV, performing an early exit since the operation cannot safely continue`,
+                );
+                return;
+            }
             jsTestLog(`Unsharding completed ${namespace}`);
             jsTestLog(`2. Untracking collection ${namespace}`);
             // Note this command will behave as no-op in case the collection is not tracked.
