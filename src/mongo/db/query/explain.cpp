@@ -504,7 +504,13 @@ void Explain::explainStages(PlanExecutor* exec,
     }
 
     explain_common::generateQueryShapeHash(exec->getOpCtx(), out);
-    explain_common::generatePeakTrackedMemBytes(exec->getOpCtx(), out);
+    // Report peak tracked memory only at executionStats verbosity or higher, matching how execution
+    // stats are reported. Memory consumed during planning/optimization is still counted in the
+    // operation-wide total, but must not surface in a queryPlanner-verbosity explain (which does no
+    // execution).
+    if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        explain_common::generatePeakTrackedMemBytes(exec->getOpCtx(), out);
+    }
     explain_common::appendIfRoom(command, "command", out);
 }
 
@@ -568,7 +574,13 @@ void Explain::explainPipeline(PlanExecutor* exec,
     }
 
     explain_common::generateQueryShapeHash(exec->getOpCtx(), out);
-    explain_common::generatePeakTrackedMemBytes(exec->getOpCtx(), out);
+    // Report peak tracked memory only at executionStats verbosity or higher, matching how execution
+    // stats are reported. Memory consumed during planning/optimization is still counted in the
+    // operation-wide total, but must not surface in a queryPlanner-verbosity explain (which does no
+    // execution).
+    if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        explain_common::generatePeakTrackedMemBytes(exec->getOpCtx(), out);
+    }
     explain_common::generateServerInfo(out);
 
     const auto& expCtx = pipelineExec->getPipeline()->getContext();
