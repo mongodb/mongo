@@ -29,6 +29,7 @@
 
 #include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
 
+#include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/sharding_catalog_client_mock.h"
@@ -1329,6 +1330,81 @@ TEST_F(CommitCollectionMetadataLocallyTest, CommitChunklessPreservesCSRWithOwned
                       kShardKeyPattern);
     ASSERT_EQ(metadata->getChunkManager()->getVersion().epoch(), collType1.getEpoch());
     ASSERT_EQ(metadata->getChunkManager()->getVersion().getTimestamp(), collType1.getTimestamp());
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, CommitMarksOpCtxNonDeprioritizable) {
+    auto [collType, chunks] = makeCollectionMetadata(2);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    // The shard catalog commit holds the critical section, so it must mark the opCtx as
+    // non-deprioritizable rather than relying on the invoking command to do so.
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
+
+    ASSERT_TRUE(ExecutionAdmissionContext::get(operationContext()).getMarkedNonDeprioritizable());
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, CommitChunklessMarksOpCtxNonDeprioritizable) {
+    auto [collType, _] = makeCollectionMetadata(0);
+    mockCatalogClient()->setCollectionMetadata(collType, {});
+
+    shard_catalog_commit::commitChunklessCollectionMetadataLocally(operationContext(), kTestNss);
+
+    ASSERT_TRUE(ExecutionAdmissionContext::get(operationContext()).getMarkedNonDeprioritizable());
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, DropCollectionMarksOpCtxNonDeprioritizable) {
+    auto uuid = UUID::gen();
+
+    shard_catalog_commit::commitDropCollectionLocally(operationContext(), kTestNss, uuid);
+
+    ASSERT_TRUE(ExecutionAdmissionContext::get(operationContext()).getMarkedNonDeprioritizable());
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, RenameMarksOpCtxNonDeprioritizable) {
+    mockCatalogClient()->setCollectionNotFound();
+
+    shard_catalog_commit::commitRenameOfCollectionMetadata(operationContext(),
+                                                           kFromNss,
+                                                           boost::none,
+                                                           kToNss,
+                                                           boost::none,
+                                                           boost::none,
+                                                           false /* isUpgrading */,
+                                                           false /* isDbPrimaryShard */);
+
+    ASSERT_TRUE(ExecutionAdmissionContext::get(operationContext()).getMarkedNonDeprioritizable());
+}
+
+// The clone path runs outside the critical section, so it must not be marked non-deprioritizable.
+TEST_F(CommitCollectionMetadataLocallyTest, CloneDoesNotMarkOpCtxNonDeprioritizable) {
+    auto [collType, chunks] = makeCollectionMetadata(2);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    shard_catalog_commit::cloneCollectionMetadataLocally(
+        operationContext(), kTestNss, true /* isDbPrimaryShard */);
+
+    ASSERT_FALSE(ExecutionAdmissionContext::get(operationContext()).getMarkedNonDeprioritizable());
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsMarksOpCtxNonDeprioritizable) {
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
+
+    auto splitChunks = makeSplitChunks(collType, chunks[0]);
+
+    shard_catalog_commit::commitChunkOperationsMetadataLocally(
+        operationContext(), kTestNss, toConfigBSONVector(splitChunks));
+
+    ASSERT_TRUE(ExecutionAdmissionContext::get(operationContext()).getMarkedNonDeprioritizable());
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest,
+       DropOfStaleChunksForRenameDoesNotMarkOpCtxNonDeprioritizable) {
+    shard_catalog_commit::commitDropOfStaleChunksForRename(operationContext(), UUID::gen());
+
+    ASSERT_FALSE(ExecutionAdmissionContext::get(operationContext()).getMarkedNonDeprioritizable());
 }
 
 // The chunkless commit emits a 'c' entry carrying the kIfUnowned precondition, delegating the
