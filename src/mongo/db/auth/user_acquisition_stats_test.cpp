@@ -32,6 +32,7 @@
 #include "mongo/db/auth/ldap_cumulative_operation_stats.h"
 #include "mongo/db/auth/ldap_operation_stats.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
@@ -91,6 +92,7 @@ TEST_F(UserAcquisitionStatsTest, userCacheAccessStats) {
     ASSERT_FALSE(userAcquisitionStats->shouldReportLDAPOperationStats());
     ASSERT_FALSE(userAcquisitionStats->shouldReportUserCacheAccessStats());
 
+    auto expectedStartTime = mockTickSource.ticksTo<Microseconds>(mockTickSource.getTicks());
     UserAcquisitionStatsHandle handle(userAcquisitionStats.get(), &mockTickSource, kCache);
     auto ongoingUserCacheAccessStats = userAcquisitionStats->getUserCacheAccessStatsSnapshot();
 
@@ -98,7 +100,7 @@ TEST_F(UserAcquisitionStatsTest, userCacheAccessStats) {
     handle.recordTimerEnd();
 
     auto completedUserCacheAccessStats = userAcquisitionStats->getUserCacheAccessStatsSnapshot();
-    assertUserCacheStats(ongoingUserCacheAccessStats, 1, 0, Microseconds(1000000), Microseconds(0));
+    assertUserCacheStats(ongoingUserCacheAccessStats, 1, 0, expectedStartTime, Microseconds(0));
     assertUserCacheStats(
         completedUserCacheAccessStats, 1, 1, Microseconds(0), Microseconds(1000000));
 
@@ -128,6 +130,7 @@ TEST_F(UserAcquisitionStatsTest, ldapOperationBindStats) {
 
     UserAcquisitionStatsHandle firstHandle(userAcquisitionStats.get(), &mockTickSource, kBind);
     UserAcquisitionStatsHandle secondHandle(userAcquisitionStats.get(), &mockTickSource, kBind);
+    auto expectedStartTime = mockTickSource.ticksTo<Microseconds>(mockTickSource.getTicks());
     auto ongoingLdapOperationStats = userAcquisitionStats->getLdapOperationStatsSnapshot();
 
     mockTickSource.advance(Seconds(1));
@@ -135,7 +138,7 @@ TEST_F(UserAcquisitionStatsTest, ldapOperationBindStats) {
 
     auto completedLdapOperationStats = userAcquisitionStats->getLdapOperationStatsSnapshot();
     assertLdapBindOrSearchStats(
-        ongoingLdapOperationStats, 2, Microseconds(1000000), Microseconds(0), kBind);
+        ongoingLdapOperationStats, 2, expectedStartTime, Microseconds(0), kBind);
     assertLdapBindOrSearchStats(
         ongoingLdapOperationStats, 0, Microseconds(0), Microseconds(0), kSearch);
     assertLdapBindOrSearchStats(
@@ -182,6 +185,7 @@ TEST_F(UserAcquisitionStatsTest, ldapOperationSearchStats) {
 
     UserAcquisitionStatsHandle firstHandle(userAcquisitionStats.get(), &mockTickSource, kSearch);
     UserAcquisitionStatsHandle secondHandle(userAcquisitionStats.get(), &mockTickSource, kSearch);
+    auto expectedStartTime = mockTickSource.ticksTo<Microseconds>(mockTickSource.getTicks());
     auto ongoingLdapOperationStats = userAcquisitionStats->getLdapOperationStatsSnapshot();
 
     mockTickSource.advance(Seconds(1));
@@ -189,7 +193,7 @@ TEST_F(UserAcquisitionStatsTest, ldapOperationSearchStats) {
 
     auto completedLdapOperationStats = userAcquisitionStats->getLdapOperationStatsSnapshot();
     assertLdapBindOrSearchStats(
-        ongoingLdapOperationStats, 2, Microseconds(1000000), Microseconds(0), kSearch);
+        ongoingLdapOperationStats, 2, expectedStartTime, Microseconds(0), kSearch);
     assertLdapBindOrSearchStats(
         ongoingLdapOperationStats, 0, Microseconds(0), Microseconds(0), kBind);
     assertLdapBindOrSearchStats(

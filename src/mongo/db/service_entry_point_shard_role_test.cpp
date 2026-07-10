@@ -37,6 +37,7 @@
 #include "mongo/db/admission/rate_limiter.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
@@ -45,6 +46,7 @@
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/cluster_role.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/message.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point.h"
@@ -54,6 +56,8 @@
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/tick_source_mock.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::admission {
 namespace {
@@ -454,6 +458,8 @@ TEST_F(ServiceEntryPointShardServerTest, QueuedAdmissionWithLargeMaxTimeMSSuccee
     auto opCtx = makeOperationContext();
     auto* client = opCtx->getClient();
 
+    CurOp::get(opCtx.get())->setTickSource_forTest(tickSource);
+
     // ServiceEntryPointShardRole has a contract guard ensuring presence of an AuthorizationSession.
     AuthorizationSession::get(client);
 
@@ -491,6 +497,9 @@ TEST_F(ServiceEntryPointShardServerTest, QueuedAdmissionWithLargeMaxTimeMSSuccee
     ASSERT_OK(swDbResponse);
     ASSERT_EQ(getStatusFromCommandResult(dbResponseToBSON(swDbResponse.getValue())), Status::OK());
     ASSERT_EQ(limiterForDeferredToken.stats().successfulAdmissions(), 2);
+
+    // Time spent in the queue should not be represented in the "working" time.
+    ASSERT_LESS_THAN(CurOp::get(opCtx.get())->debug().workingTimeMillis, Milliseconds(1000));
 }
 
 TEST_F(ServiceEntryPointShardServerTest, SpanCreatedWhenTelemetryContextDeserializedFromRequest) {

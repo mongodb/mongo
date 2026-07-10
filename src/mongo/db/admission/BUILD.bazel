@@ -82,6 +82,7 @@ mongo_cc_library(
         ":rate_limiter",
         ":rate_limiter_otel_metrics_recorder",
         "//src/mongo:base",
+        "//src/mongo/db:commands",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:service_context",
         "//src/mongo/db/admission/ticketing:admission_context",

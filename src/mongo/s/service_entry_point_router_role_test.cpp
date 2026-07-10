@@ -32,6 +32,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/admission/ingress_request_rate_limiter.h"
 #include "mongo/db/admission/rate_limiter.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/thread.h"
@@ -228,8 +230,15 @@ TEST_F(ServiceEntryPointRouterRoleTest, QueuedAdmissionWithLargeMaxTimeMSSucceed
     auto* tickSource =
         static_cast<TickSourceMock<Milliseconds>*>(getGlobalServiceContext()->getTickSource());
 
-    // Create the limiter with the mock tick source so clock advancement controls token
-    // availability.
+    auto opCtx = makeOperationContext();
+    auto* client = opCtx->getClient();
+
+    CurOp::get(opCtx.get())->setTickSource_forTest(tickSource);
+
+    // ServiceEntryPointRouterRole has a contract guard ensuring presence of an
+    // AuthorizationSession.
+    AuthorizationSession::get(client);
+
     RateLimiter limiterForDeferredToken(
         /*refreshRatePerSec=*/1.0,
         /*burstCapacitySecs=*/1.0,
@@ -237,12 +246,11 @@ TEST_F(ServiceEntryPointRouterRoleTest, QueuedAdmissionWithLargeMaxTimeMSSucceed
         "QueuedAdmissionWithLargeMaxTimeMSSucceeds",
         tickSource);
 
-    auto opCtx = makeOperationContext();
     ASSERT_OK(limiterForDeferredToken.acquireToken(opCtx.get()));
     auto queuedTokenResult = limiterForDeferredToken.acquireToken();
     ASSERT_TRUE(queuedTokenResult);
     ASSERT_FALSE(queuedTokenResult->isReady());
-    IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(opCtx->getClient(),
+    IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(client,
                                                                  std::move(*queuedTokenResult));
 
     // handleRequest will block in waitForAdmission while the queued token's napTime (~1000ms at
@@ -265,6 +273,9 @@ TEST_F(ServiceEntryPointRouterRoleTest, QueuedAdmissionWithLargeMaxTimeMSSucceed
     ASSERT_OK(swDbResponse);
     ASSERT_EQ(getStatusFromCommandResult(dbResponseToBSON(swDbResponse.getValue())), Status::OK());
     ASSERT_EQ(limiterForDeferredToken.stats().successfulAdmissions(), 2);
+
+    // Time spent in the queue should not be represented in the "working" time.
+    ASSERT_LESS_THAN(CurOp::get(opCtx.get())->debug().workingTimeMillis, Milliseconds(1000));
 }
 
 TEST_F(ServiceEntryPointRouterRoleTest, HandleRequestException) {

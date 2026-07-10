@@ -38,11 +38,13 @@
 #include "mongo/db/admission/rate_limiter_otel_metrics_recorder.h"
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/service_context.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/transport/cidr_range_list_parameter.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/scopeguard.h"
 
 #include <memory>
 #include <string_view>
@@ -271,6 +273,10 @@ Status IngressRequestRateLimiter::waitForAdmission(OperationContext* opCtx) {
 
     WaitingForAdmissionGuard waitingGuard(&IngressAdmissionContext::get(opCtx),
                                           opCtx->getServiceContext()->getTickSource());
+    // TODO SERVER-131015: remove this pause invocation and rely on the queue registry to account
+    // for this queueing time.
+    CurOp::get(opCtx)->pauseTimer();
+    ON_BLOCK_EXIT([&] { CurOp::get(opCtx)->resumeTimer(); });
     return std::move(*deferredToken).get(opCtx);
 }
 

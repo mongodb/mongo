@@ -101,7 +101,6 @@ TEST(TracingSupportTest, TraceIsEmptyWithActiveSpans) {
 TEST(TracingSupportTest, BasicUsage) {
     const auto kSpanDuration = Seconds(5);
     auto tracer = TracerProvider::get().getTracer(kTracerName);  // NOLINT
-    const auto startTicks = tracer->getTickSource()->getTicks();
 
     {
         auto rootSpan = tracer->startSpan("root");
@@ -130,22 +129,20 @@ TEST(TracingSupportTest, BasicUsage) {
     const auto expected = BSON(
         "tracer" << kTracerName << "root"
                  << BSON("startedMicros"
-                         << startTicks << "spans"
+                         << 0 << "spans"
                          << BSON("child" << BSON(
                                      "startedMicros"
-                                     << startTicks + kSpanDurationMicros << "spans"
+                                     << kSpanDurationMicros << "spans"
                                      << BSON("grand child #1"
-                                             << BSON("startedMicros"
-                                                     << startTicks + 2 * kSpanDurationMicros
-                                                     << "stoppedMicros"
-                                                     << startTicks + 3 * kSpanDurationMicros)
+                                             << BSON("startedMicros" << 2 * kSpanDurationMicros
+                                                                     << "stoppedMicros"
+                                                                     << 3 * kSpanDurationMicros)
                                              << "grand child #2"
-                                             << BSON("startedMicros"
-                                                     << startTicks + 3 * kSpanDurationMicros
-                                                     << "stoppedMicros"
-                                                     << startTicks + 4 * kSpanDurationMicros))
-                                     << "stoppedMicros" << startTicks + 4 * kSpanDurationMicros))
-                         << "stoppedMicros" << startTicks + 4 * kSpanDurationMicros));
+                                             << BSON("startedMicros" << 3 * kSpanDurationMicros
+                                                                     << "stoppedMicros"
+                                                                     << 4 * kSpanDurationMicros))
+                                     << "stoppedMicros" << 4 * kSpanDurationMicros))
+                         << "stoppedMicros" << 4 * kSpanDurationMicros));
     ASSERT_BSONOBJ_EQ(expected, trace.value());
 }
 

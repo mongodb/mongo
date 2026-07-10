@@ -83,7 +83,9 @@ public:
     }
 
 private:
-    Atomic<TickSource::Tick> _currentTicks{0};
+    // Start at 1 because some consumers (e.g. CurOp::startTime()) treat 0 as an "unstarted"
+    // sentinel.
+    Atomic<TickSource::Tick> _currentTicks{1};
     D _durationToAdvanceBy = D{0};
 };
 
