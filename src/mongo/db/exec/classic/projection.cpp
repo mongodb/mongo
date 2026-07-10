@@ -35,7 +35,9 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/projection_executor_builder.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/util/assert_util.h"
@@ -166,6 +168,9 @@ std::unique_ptr<PlanStageStats> ProjectionStage::getStats() {
 
     auto projStats = std::make_unique<ProjectionStats>(_specificStats);
     projStats->projObj = _projObj.value_or(BSONObj{});
+    if (const auto* tracker = expressionMemoryTracker()) {
+        projStats->peakTrackedMemBytes = static_cast<uint64_t>(tracker->peakTrackedMemoryBytes());
+    }
     ret->specific = std::move(projStats);
 
     ret->children.emplace_back(child()->getStats());
@@ -181,7 +186,15 @@ ProjectionStageDefault::ProjectionStageDefault(boost::intrusive_ptr<ExpressionCo
       _requestedMetadata{projection->metadataDeps()},
       _projectType{projection->type()},
       _executor{projection_executor::buildProjectionExecutor(
-          expCtx, projection, {}, projection_executor::kDefaultBuilderParams)} {}
+          expCtx, projection, {}, projection_executor::kDefaultBuilderParams)} {
+    if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
+        feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
+        _memoryTracker =
+            OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*expCtx);
+        _expressionEvalCtx.tracker = &_memoryTracker;
+    }
+    _expressionEvalCtx.stageName = _commonStats.stageTypeStr;
+}
 
 void ProjectionStageDefault::transform(WorkingSetMember* member) const {
     Document input;
@@ -222,9 +235,9 @@ void ProjectionStageDefault::transform(WorkingSetMember* member) const {
     auto projected = _requestedMetadata.any()
         ? attachMetadataToWorkingSetMember(
               _executor->applyTransformation(attachMetadataToDocument(std::move(input), member),
-                                             {}),
+                                             _expressionEvalCtx),
               member)
-        : _executor->applyTransformation(input, {});
+        : _executor->applyTransformation(input, _expressionEvalCtx);
 
     // An exclusion projection can return an unowned object since the output document is
     // constructed from the input one backed by BSON which is owned by the storage system, so we

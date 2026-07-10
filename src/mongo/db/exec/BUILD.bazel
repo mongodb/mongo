@@ -149,6 +149,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/classic:multi_plan_test.cpp",
         "//src/mongo/db/exec/classic:or_test.cpp",
         "//src/mongo/db/exec/classic:orphan_chunk_skipper_test.cpp",
+        "//src/mongo/db/exec/classic:projection_test.cpp",
         "//src/mongo/db/exec/classic:queued_data_stage_test.cpp",
         "//src/mongo/db/exec/classic:recordid_deduplicator_test.cpp",
         "//src/mongo/db/exec/classic:sort_test.cpp",

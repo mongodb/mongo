@@ -564,6 +564,17 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
     } else if (isProjectionStageType(stats.stageType)) {
         ProjectionStats* spec = static_cast<ProjectionStats*>(stats.specific.get());
         bob->append("transformBy", spec->projObj);
+
+        // Only the default projection implementation evaluates expressions and tracks their memory.
+        // Reporting also requires both the query and expression memory tracking feature flags, so
+        // the peak isn't emitted as a misleading zero when tracking is off.
+        if (stats.stageType == STAGE_PROJECTION_DEFAULT &&
+            verbosity >= ExplainOptions::Verbosity::kExecStats &&
+            feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
+            feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
+            bob->appendNumber("peakTrackedMemBytes",
+                              static_cast<long long>(spec->peakTrackedMemBytes));
+        }
     } else if (STAGE_RECORD_STORE_FAST_COUNT == stats.stageType) {
         CountStats* spec = static_cast<CountStats*>(stats.specific.get());
 

@@ -823,6 +823,11 @@ struct ProjectionStats : public SpecificStats {
 
     // Object specifying the projection transformation to apply.
     BSONObj projObj;
+
+    // Peak memory (in bytes) tracked while evaluating the projection's expressions. Only populated
+    // for PROJECTION_DEFAULT when both featureFlagQueryMemoryTracking and
+    // featureFlagExpressionMemoryTracking are enabled; zero otherwise.
+    uint64_t peakTrackedMemBytes = 0;
 };
 
 /**
