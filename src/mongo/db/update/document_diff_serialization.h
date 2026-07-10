@@ -71,12 +71,12 @@ enum DiffType : uint8_t { kDocument, kArray };
 
 // Below are string constants used in the diff format.
 // TODO SERVER-115821 remove external dependencies on these constants.
-MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kArrayHeader = "a"sv;
-MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kDeleteSectionFieldName = "d"sv;
-MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kInsertSectionFieldName = "i"sv;
-MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kUpdateSectionFieldName = "u"sv;
-MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kBinarySectionFieldName = "b"sv;
-MONGO_MOD_NEEDS_REPLACEMENT constexpr char kSubDiffSectionFieldPrefix = 's';
+[[MONGO_MOD_NEEDS_REPLACEMENT]] constexpr std::string_view kArrayHeader = "a"sv;
+[[MONGO_MOD_NEEDS_REPLACEMENT]] constexpr std::string_view kDeleteSectionFieldName = "d"sv;
+[[MONGO_MOD_NEEDS_REPLACEMENT]] constexpr std::string_view kInsertSectionFieldName = "i"sv;
+[[MONGO_MOD_NEEDS_REPLACEMENT]] constexpr std::string_view kUpdateSectionFieldName = "u"sv;
+[[MONGO_MOD_NEEDS_REPLACEMENT]] constexpr std::string_view kBinarySectionFieldName = "b"sv;
+[[MONGO_MOD_NEEDS_REPLACEMENT]] constexpr char kSubDiffSectionFieldPrefix = 's';
 // 'l' for length.
 constexpr std::string_view kResizeSectionFieldName = "l"sv;
 

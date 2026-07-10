@@ -134,7 +134,7 @@ std::shared_ptr<RangeDeletionWithOngoingQueries> createRangeDeletionTaskWithOngo
     boost::optional<KeyPattern> keyPattern = boost::none,
     const ChunkVersion& shardVersion = ChunkVersion::IGNORED());
 
-MONGO_MOD_NEEDS_REPLACEMENT SharedSemiFuture<void> registerAndCreatePersistentTask(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] SharedSemiFuture<void> registerAndCreatePersistentTask(
     OperationContext* opCtx,
     const RangeDeletionTask& rdt,
     SemiFuture<void>&& waitForActiveQueriesToComplete);

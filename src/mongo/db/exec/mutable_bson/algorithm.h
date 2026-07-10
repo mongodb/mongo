@@ -83,8 +83,8 @@ inline ElementType findElement(ElementType first, FieldNameEquals predicate) {
 
 /** A convenience wrapper around findElement<ElementType, FieldNameEquals>. */
 template <typename ElementType>
-MONGO_MOD_PUBLIC inline ElementType findElementNamed(ElementType first,
-                                                     std::string_view fieldName) {
+[[MONGO_MOD_PUBLIC]] inline ElementType findElementNamed(ElementType first,
+                                                         std::string_view fieldName) {
     return findElement(first, FieldNameEquals(fieldName));
 }
 
@@ -108,8 +108,8 @@ inline ElementType findFirstChild(ElementType parent, FieldNameEquals predicate)
  *  Element is found, the returned Element's 'ok' method will return false.
  */
 template <typename ElementType>
-MONGO_MOD_PUBLIC inline ElementType findFirstChildNamed(ElementType parent,
-                                                        std::string_view fieldName) {
+[[MONGO_MOD_PUBLIC]] inline ElementType findFirstChildNamed(ElementType parent,
+                                                            std::string_view fieldName) {
     return findFirstChild(parent, FieldNameEquals(fieldName));
 }
 

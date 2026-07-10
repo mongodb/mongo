@@ -51,7 +51,7 @@ class OperationContext;
  * Different server deployments (standalone, replica set, sharded cluster) should
  * implement their own classes that fulfill this interface.
  */
-class MONGO_MOD_OPEN SessionsCollection {
+class [[MONGO_MOD_OPEN]] SessionsCollection {
 public:
     static constexpr std::string_view kSessionsTTLIndex = "lsidTTLIndex"sv;
 

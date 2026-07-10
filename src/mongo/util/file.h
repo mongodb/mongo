@@ -36,13 +36,13 @@
 #include <cstdint>
 #include <string>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 typedef uint64_t fileofs;
 
 // NOTE: not thread-safe. (at least the windows implementation isn't)
 
-class MONGO_MOD_NEEDS_REPLACEMENT File {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] File {
 public:
     // NEEDS_REPLACEMENT: This is an old API with design issues (explicit bad() calls, no error
     // reporting)
@@ -71,4 +71,4 @@ private:
 #endif
     std::string _name;
 };
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

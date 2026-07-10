@@ -60,7 +60,7 @@ class Client;
 /**
  * Type representing an ongoing authentication session.
  */
-class MONGO_MOD_PUBLIC AuthenticationSession {
+class [[MONGO_MOD_PUBLIC]] AuthenticationSession {
     AuthenticationSession(const AuthenticationSession&) = delete;
     AuthenticationSession& operator=(const AuthenticationSession&) = delete;
 

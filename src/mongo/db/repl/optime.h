@@ -46,7 +46,7 @@
 
 namespace mongo {
 
-namespace MONGO_MOD_PUB repl {
+namespace [[MONGO_MOD_PUBLIC]] repl {
 using namespace std::literals::string_view_literals;
 
 /**
@@ -55,7 +55,7 @@ using namespace std::literals::string_view_literals;
  * label every op in an oplog with a unique identifier.
  */
 
-class MONGO_MOD_PUB OpTime {
+class [[MONGO_MOD_PUBLIC]] OpTime {
 public:
     static constexpr auto kTermFieldName = "t"sv;
     static constexpr auto kTimestampFieldName = "ts"sv;
@@ -183,7 +183,7 @@ private:
     long long _term = kInitialTerm;
 };
 
-class MONGO_MOD_PUB OpTimeAndWallTime {
+class [[MONGO_MOD_PUBLIC]] OpTimeAndWallTime {
 public:
     static constexpr auto kWallClockTimeFieldName = "wall"sv;
 
@@ -220,11 +220,11 @@ public:
 std::ostream& operator<<(std::ostream& out, const OpTimeAndWallTime& opTime);
 
 // A convenience class for holding both a Timestamp and a Date_t.
-struct MONGO_MOD_PUB TimestampAndWallTime {
+struct [[MONGO_MOD_PUBLIC]] TimestampAndWallTime {
     Timestamp timestamp;
     Date_t wallTime;
 };
 
-}  // namespace MONGO_MOD_PUB repl
+}  // namespace repl
 
 }  // namespace mongo

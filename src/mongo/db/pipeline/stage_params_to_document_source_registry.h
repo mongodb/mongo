@@ -75,7 +75,7 @@ using StageParamsToDocumentSourceFn = std::function<std::list<boost::intrusive_p
  * DO NOT call this function directly. Instead, use the
  * REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING macro defined in this file.
  */
-MONGO_MOD_PUBLIC  // Needed by enterprise hot backup registrations.
+[[MONGO_MOD_PUBLIC]]  // Needed by enterprise hot backup registrations.
     void
     registerStageParamsToDocumentSourceFn(StageParams::Id stageParamsId,
                                           StageParamsToDocumentSourceFn fn);

@@ -50,7 +50,7 @@ namespace mongo {
  * UserAcquisitionStats object. All methods must be called while holding that UserAcquisitionStats'
  * lock.
  */
-class MONGO_MOD_PUBLIC LDAPOperationStats {
+class [[MONGO_MOD_PUBLIC]] LDAPOperationStats {
 public:
     LDAPOperationStats() = default;
     ~LDAPOperationStats() = default;

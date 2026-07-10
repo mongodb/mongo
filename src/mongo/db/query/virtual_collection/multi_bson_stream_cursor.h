@@ -47,8 +47,8 @@
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
-namespace MONGO_MOD_PUB mongo {
-class MONGO_MOD_NEEDS_REPLACEMENT MultiBsonStreamCursor : public SeekableRecordCursor {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] MultiBsonStreamCursor : public SeekableRecordCursor {
 public:
     MultiBsonStreamCursor(const VirtualCollectionOptions& vopts)
         : _numStreams(vopts.dataSources.size()), _vopts(vopts) {
@@ -118,4 +118,4 @@ private:
 
     const VirtualCollectionOptions& _vopts;  // metadata containing the pipe URLs
 };
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

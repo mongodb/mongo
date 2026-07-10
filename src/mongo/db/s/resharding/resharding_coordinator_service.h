@@ -45,7 +45,7 @@ namespace mongo {
 using namespace std::literals::string_view_literals;
 class ReshardingCoordinator;
 
-class MONGO_MOD_PUBLIC ReshardingCoordinatorService : public repl::PrimaryOnlyService {
+class [[MONGO_MOD_PUBLIC]] ReshardingCoordinatorService : public repl::PrimaryOnlyService {
 public:
     static constexpr std::string_view kServiceName = "ReshardingCoordinatorService"sv;
 
@@ -55,26 +55,26 @@ public:
 
     friend ReshardingCoordinator;
 
-    MONGO_MOD_PRIVATE std::string_view getServiceName() const override {
+    [[MONGO_MOD_PRIVATE]] std::string_view getServiceName() const override {
         return kServiceName;
     }
 
-    MONGO_MOD_PRIVATE NamespaceString getStateDocumentsNS() const override {
+    [[MONGO_MOD_PRIVATE]] NamespaceString getStateDocumentsNS() const override {
         return NamespaceString::kConfigReshardingOperationsNamespace;
     }
 
-    MONGO_MOD_PRIVATE ThreadPoolLimits getThreadPoolLimits() const override;
+    [[MONGO_MOD_PRIVATE]] ThreadPoolLimits getThreadPoolLimits() const override;
 
     // The service implemented its own conflict check before this method was added.
-    MONGO_MOD_PRIVATE void checkIfConflictsWithOtherInstances(
+    [[MONGO_MOD_PRIVATE]] void checkIfConflictsWithOtherInstances(
         OperationContext* opCtx,
         BSONObj initialState,
         const std::vector<const PrimaryOnlyService::Instance*>& existingInstances) override;
 
-    MONGO_MOD_PRIVATE std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(
+    [[MONGO_MOD_PRIVATE]] std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(
         BSONObj initialState) override;
 
-    MONGO_MOD_PRIVATE std::vector<std::shared_ptr<PrimaryOnlyService::Instance>>
+    [[MONGO_MOD_PRIVATE]] std::vector<std::shared_ptr<PrimaryOnlyService::Instance>>
     getAllReshardingInstances(OperationContext* opCtx) {
         return getAllInstances(opCtx);
     }
@@ -87,11 +87,11 @@ public:
      *
      * This call skips quiesce periods for all aborted coordinators.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT void abortAllReshardCollection(
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] void abortAllReshardCollection(
         OperationContext* opCtx, ReshardingCoordinator::AbortRequest abortRequest);
 
-    MONGO_MOD_PRIVATE void stepDown_forTest();
-    MONGO_MOD_PRIVATE void stepUp_forTest();
+    [[MONGO_MOD_PRIVATE]] void stepDown_forTest();
+    [[MONGO_MOD_PRIVATE]] void stepUp_forTest();
 
 private:
     ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,

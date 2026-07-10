@@ -40,7 +40,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC logv2 {
+namespace [[MONGO_MOD_PUBLIC]] logv2 {
 using namespace std::literals::string_view_literals;
 
 constexpr auto kServerLogTag = "server"sv;
@@ -135,5 +135,5 @@ inline bool isLogPathWindowsNul(const std::string& path) {
 }
 #endif
 
-}  // namespace MONGO_MOD_PUBLIC logv2
+}  // namespace logv2
 }  // namespace mongo

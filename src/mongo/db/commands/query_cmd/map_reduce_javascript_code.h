@@ -72,7 +72,7 @@ private:
  * Same as above, but allows for null. This is required for older versions of the Java driver which
  * send finalize: null if the argument is omitted by the user.
  */
-class MONGO_MOD_PRIVATE MapReduceJavascriptCodeOrNull {
+class [[MONGO_MOD_PRIVATE]] MapReduceJavascriptCodeOrNull {
 public:
     static MapReduceJavascriptCodeOrNull parseFromBSON(const BSONElement& element) {
         if (element.type() == BSONType::null) {

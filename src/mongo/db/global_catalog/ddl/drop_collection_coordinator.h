@@ -55,7 +55,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_NEEDS_REPLACEMENT DropCollectionCoordinator final
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DropCollectionCoordinator final
     : public RecoverableShardingDDLCoordinator<DropCollectionCoordinatorDocument> {
 public:
     DropCollectionCoordinator(ShardingCoordinatorService* service, const BSONObj& initialState)

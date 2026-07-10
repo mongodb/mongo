@@ -37,13 +37,13 @@
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace repl {
 /**
  * An interface for the Initial Syncer that declares functions that are used by
  * ReplicationCoordinatorImpl for initial sync.
  */
-class MONGO_MOD_PARENT_PRIVATE InitialSyncerInterface {
+class [[MONGO_MOD_PARENT_PRIVATE]] InitialSyncerInterface {
 public:
     /**
      * Type of function to create a database client
@@ -140,4 +140,4 @@ public:
 };
 
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

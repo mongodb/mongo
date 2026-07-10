@@ -32,7 +32,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class SnapshotId {
     static constexpr uint64_t kNullId = 0;
@@ -112,4 +112,4 @@ private:
     SnapshotId _id;
     T _value;
 };
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

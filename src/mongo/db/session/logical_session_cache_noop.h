@@ -37,7 +37,7 @@ namespace mongo {
 /**
  * A noop logical session cache for use in tests
  */
-class MONGO_MOD_PUB LogicalSessionCacheNoop : public LogicalSessionCache {
+class [[MONGO_MOD_PUBLIC]] LogicalSessionCacheNoop : public LogicalSessionCache {
 public:
     void joinOnShutDown() override {}
 

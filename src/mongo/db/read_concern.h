@@ -35,7 +35,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class BSONObj;
 
@@ -99,4 +99,4 @@ Status waitForSpeculativeMajorityReadConcern(OperationContext* opCtx,
  */
 Status makeNoopWriteToAdvanceClusterTime(OperationContext* opCtx, LogicalTime clusterTime);
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

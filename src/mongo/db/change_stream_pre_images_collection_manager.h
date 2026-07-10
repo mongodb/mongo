@@ -48,7 +48,7 @@ namespace mongo {
  * Manages the lifecycle of the change stream pre-images collection(s). Also is responsible for
  * inserting the pre-images into the pre-images collection.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ChangeStreamPreImagesCollectionManager {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ChangeStreamPreImagesCollectionManager {
 public:
     struct PurgingJobStats {
         /**

@@ -101,7 +101,7 @@ public:
     std::int64_t getTotalRequestsTargeted() const;
     void incrementTotalRequestsTargeted();
 
-    MONGO_MOD_PRIVATE const CommitStats& getCommitTypeStats_forTest(
+    [[MONGO_MOD_PRIVATE]] const CommitStats& getCommitTypeStats_forTest(
         TransactionRouter::CommitType commitType) const;
     void incrementCommitInitiated(TransactionRouter::CommitType commitType);
     void incrementCommitSuccessful(TransactionRouter::CommitType commitType,

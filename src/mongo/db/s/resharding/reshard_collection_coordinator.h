@@ -48,14 +48,14 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-class MONGO_MOD_PUBLIC ReshardCollectionCoordinator
+class [[MONGO_MOD_PUBLIC]] ReshardCollectionCoordinator
     : public RecoverableShardingDDLCoordinator<ReshardCollectionCoordinatorDocument> {
 public:
     ReshardCollectionCoordinator(ShardingCoordinatorService* service, const BSONObj& initialState);
 
-    MONGO_MOD_PRIVATE void checkIfOptionsConflict(const BSONObj& coorDoc) const override;
+    [[MONGO_MOD_PRIVATE]] void checkIfOptionsConflict(const BSONObj& coorDoc) const override;
 
-    MONGO_MOD_PRIVATE void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override;
+    [[MONGO_MOD_PRIVATE]] void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override;
 
 protected:
     ReshardCollectionCoordinator(ShardingCoordinatorService* service,

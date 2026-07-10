@@ -44,7 +44,7 @@
  * Caches the set of collections containing a TTL index.
  * This class is thread safe.
  */
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class TTLCollectionCache {
 public:
@@ -102,7 +102,7 @@ public:
                                            Info::ExpireAfterSecondsType type);
 
     using InfoMap = stdx::unordered_map<UUID, std::vector<Info>, UUID::Hash>;
-    MONGO_MOD_PRIVATE InfoMap getTTLInfos();
+    [[MONGO_MOD_PRIVATE]] InfoMap getTTLInfos();
 
 private:
     /**
@@ -113,4 +113,4 @@ private:
     std::mutex _ttlInfosLock;
     InfoMap _ttlInfos;
 };
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

@@ -55,7 +55,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC transport {
+namespace [[MONGO_MOD_PUBLIC]] transport {
 using namespace std::literals::string_view_literals;
 
 /**
@@ -150,5 +150,5 @@ private:
     std::shared_ptr<SessionManager> _sessionManager;
 };
 
-}  // namespace MONGO_MOD_PUBLIC transport
+}  // namespace transport
 }  // namespace mongo

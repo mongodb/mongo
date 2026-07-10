@@ -88,7 +88,7 @@ struct RewriteOnFirstDocumentResult {
  *  - Computing the group key
  *  - Accumulating values in a hash table and populating output documents.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceGroupBase : public DocumentSource {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DocumentSourceGroupBase : public DocumentSource {
 public:
     using Accumulators = std::vector<boost::intrusive_ptr<AccumulatorState>>;
     using GroupsMap = ValueUnorderedMap<Accumulators>;

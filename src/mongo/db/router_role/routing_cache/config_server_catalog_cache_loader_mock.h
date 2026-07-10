@@ -55,7 +55,7 @@ namespace mongo {
  * Mocks the metadata refresh results with settable return values. The purpose of this class is to
  * facilitate testing of classes that use a ConfigServerCatalogCacheLoader.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ConfigServerCatalogCacheLoaderMock final
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ConfigServerCatalogCacheLoaderMock final
     : public ConfigServerCatalogCacheLoader {
     ConfigServerCatalogCacheLoaderMock(const ConfigServerCatalogCacheLoaderMock&) = delete;
     ConfigServerCatalogCacheLoaderMock& operator=(const ConfigServerCatalogCacheLoaderMock&) =

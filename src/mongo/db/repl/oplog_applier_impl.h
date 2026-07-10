@@ -53,7 +53,7 @@
 
 #include <vector>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace repl {
 
 /**
@@ -151,7 +151,7 @@ protected:
      * This function has been marked as virtual to allow certain unit tests to skip oplog
      * application.
      */
-    MONGO_MOD_FILE_PRIVATE virtual Status applyOplogBatchPerWorker(
+    [[MONGO_MOD_FILE_PRIVATE]] virtual Status applyOplogBatchPerWorker(
         OperationContext* opCtx,
         std::vector<ApplierOperation>& ops,
         WorkerMultikeyPathInfo& workerMultikeyPathInfo,
@@ -167,4 +167,4 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
                                        bool isDataConsistent);
 
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

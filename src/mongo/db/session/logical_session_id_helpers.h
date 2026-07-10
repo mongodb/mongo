@@ -44,7 +44,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 constexpr size_t kMaximumUserNameLengthForLogicalSessions = 10000;
 
@@ -102,10 +102,10 @@ bool isInternalSessionForNonRetryableWrite(const LogicalSessionId& sessionId);
 /**
  * Helpers to make internal sessions.
  */
-MONGO_MOD_PRIVATE LogicalSessionId
-makeLogicalSessionIdWithTxnNumberAndUUID(const LogicalSessionId& parentLsid, TxnNumber txnNumber);
-MONGO_MOD_PRIVATE LogicalSessionId
-makeLogicalSessionIdWithTxnUUID(const LogicalSessionId& parentLsid);
+[[MONGO_MOD_PRIVATE]] LogicalSessionId makeLogicalSessionIdWithTxnNumberAndUUID(
+    const LogicalSessionId& parentLsid, TxnNumber txnNumber);
+[[MONGO_MOD_PRIVATE]] LogicalSessionId makeLogicalSessionIdWithTxnUUID(
+    const LogicalSessionId& parentLsid);
 
 /**
  * Factory functions to generate logical session records.
@@ -119,7 +119,7 @@ LogicalSessionId makeLogicalSessionId(OperationContext* opCtx);
  * We recommend acquiring a system session through the session pool. It can be acquired through this
  * method InternalSessionPool::acquireSystemSession().
  */
-MONGO_MOD_USE_REPLACEMENT(InternalSessionPool::acquireSystemSession())
+[[MONGO_MOD_USE_REPLACEMENT(InternalSessionPool::acquireSystemSession())]]
 LogicalSessionId makeSystemLogicalSessionId();
 
 /**
@@ -149,11 +149,11 @@ LogicalSessionId makeLogicalSessionIdWithTxnUUIDForTest(
 
 LogicalSessionRecord makeLogicalSessionRecordForTest();
 
-namespace MONGO_MOD_PUB logical_session_id_helpers {
+namespace [[MONGO_MOD_PUBLIC]] logical_session_id_helpers {
 
 void serializeLsidAndTxnNumber(OperationContext* opCtx, BSONObjBuilder* builder);
 
 void serializeLsid(OperationContext* opCtx, BSONObjBuilder* builder);
 
-}  // namespace MONGO_MOD_PUB logical_session_id_helpers
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace logical_session_id_helpers
+}  // namespace mongo

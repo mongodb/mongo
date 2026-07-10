@@ -55,7 +55,7 @@ class ViewDefinition;
  *
  * This is owned and managed by the ViewCatalog.
  */
-class MONGO_MOD_PUBLIC ViewGraph {
+class [[MONGO_MOD_PUBLIC]] ViewGraph {
 public:
     static const int kMaxViewDepth;
     static const int kMaxViewPipelineSizeBytes;

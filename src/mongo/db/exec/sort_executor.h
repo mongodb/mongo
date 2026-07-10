@@ -60,7 +60,7 @@ namespace mongo {
  * TODO SERVER-112777: Remove 'atlas_streams' dependency on this class.
  */
 template <typename T>
-class MONGO_MOD_NEEDS_REPLACEMENT SortExecutor {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] SortExecutor {
 public:
     using DocumentSorter = Sorter<Value, T>;
     class Comparator {

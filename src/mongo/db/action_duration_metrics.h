@@ -32,7 +32,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/timer.h"
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 

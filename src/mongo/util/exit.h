@@ -40,7 +40,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * ShutdownTaskArgs holds any arguments we might like to pass from a manual invocation of the
@@ -110,4 +110,4 @@ MONGO_COMPILER_NORETURN inline void exitCleanly(ExitCode code) {
     shutdown(code);
 }
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

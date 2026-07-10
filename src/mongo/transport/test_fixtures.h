@@ -79,7 +79,7 @@ private:
 
 using unittest::JoinThread;
 
-struct MONGO_MOD_NEEDS_REPLACEMENT SessionThread {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] SessionThread {
     struct StopException {};
 
     explicit SessionThread(std::shared_ptr<transport::Session> s)
@@ -119,7 +119,7 @@ private:
     JoinThread _thread;  // Appears after the members _run uses.
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT InlineReactor : public Reactor {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] InlineReactor : public Reactor {
 public:
     void run() override {}
     void stop() override {}
@@ -183,7 +183,7 @@ private:
     ReactorHandle _mockReactor = std::make_unique<NoopReactor>();
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT MockSessionManager : public SessionManager {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] MockSessionManager : public SessionManager {
 public:
     MockSessionManager() = default;
     explicit MockSessionManager(std::function<void(SessionThread&)> onStartSession)

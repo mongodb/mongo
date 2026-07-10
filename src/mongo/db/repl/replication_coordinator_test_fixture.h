@@ -78,7 +78,7 @@ using executor::NetworkInterfaceMock;
 /**
  * Fixture for testing ReplicationCoordinatorImpl behaviors.
  */
-class MONGO_MOD_OPEN ReplCoordTest : public ServiceContextMongoDTest {
+class [[MONGO_MOD_OPEN]] ReplCoordTest : public ServiceContextMongoDTest {
 public:
     /**
      * Makes a command response with the given "doc" response and optional elapsed time "millis".

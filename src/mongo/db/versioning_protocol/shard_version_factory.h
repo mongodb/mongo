@@ -42,7 +42,7 @@ namespace mongo {
 /**
  * This class is used to build shard version objects.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ShardVersionFactory {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardVersionFactory {
 public:
     static ShardVersion make(const ChunkManager& chunkManager);
 

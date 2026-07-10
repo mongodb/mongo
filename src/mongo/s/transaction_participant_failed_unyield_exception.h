@@ -48,7 +48,7 @@ namespace mongo {
  * local error versus a remote error, which is important for transaction machinery to correctly
  * handle the error.
  */
-class MONGO_MOD_PUB TransactionParticipantFailedUnyieldInfo final : public ErrorExtraInfo {
+class [[MONGO_MOD_PUBLIC]] TransactionParticipantFailedUnyieldInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::TransactionParticipantFailedUnyield;
 

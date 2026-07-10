@@ -48,7 +48,7 @@ namespace mongo {
 /**
  * Map of one-snot notifications for changes to a particular namespace.
  */
-class MONGO_MOD_PRIVATE NamespaceMetadataChangeNotifications {
+class [[MONGO_MOD_PRIVATE]] NamespaceMetadataChangeNotifications {
     NamespaceMetadataChangeNotifications(const NamespaceMetadataChangeNotifications&) = delete;
     NamespaceMetadataChangeNotifications& operator=(const NamespaceMetadataChangeNotifications&) =
         delete;

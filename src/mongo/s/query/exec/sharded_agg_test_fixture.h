@@ -55,7 +55,7 @@ public:
 /**
  * TODO SERVER-111290 Remove external dependencies on this class.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ShardedAggTestFixture : public ShardCatalogCacheTestFixture {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardedAggTestFixture : public ShardCatalogCacheTestFixture {
 public:
     const NamespaceString kTestAggregateNss =
         NamespaceString::createNamespaceString_forTest("unittests", "sharded_agg_test");

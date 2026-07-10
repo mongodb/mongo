@@ -42,7 +42,7 @@
 #endif
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC otel {
+namespace [[MONGO_MOD_PUBLIC]] otel {
 namespace traces {
 
 #ifdef MONGO_CONFIG_OTEL
@@ -95,5 +95,5 @@ inline boost::optional<::mongo::TelemetryContextSection> toWireType(const Teleme
 #endif
 
 }  // namespace traces
-}  // namespace MONGO_MOD_PUBLIC otel
+}  // namespace otel
 }  // namespace mongo

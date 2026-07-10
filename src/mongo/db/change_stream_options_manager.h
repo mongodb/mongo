@@ -45,7 +45,7 @@ namespace mongo {
  * Manages fetching and storing of the change streams options. The class manages the complete read
  * and write path for the change-streams options.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ChangeStreamOptionsManager {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ChangeStreamOptionsManager {
 public:
     explicit ChangeStreamOptionsManager(ServiceContext* service) {}
 

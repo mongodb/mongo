@@ -57,7 +57,7 @@ extern const double DEFAULT_WEIGHT;
 
 // This type is used in index_catalog_entry_helpers::computeUpdateIndexData() to create an iterator.
 // Said iterator could be replaced with auto in order to avoid exposing this typedef.
-MONGO_MOD_NEEDS_REPLACEMENT typedef std::map<std::string, double> Weights;  // TODO cool map
+[[MONGO_MOD_NEEDS_REPLACEMENT]] typedef std::map<std::string, double> Weights;  // TODO cool map
 typedef stdx::unordered_map<std::string, double> TermFrequencyMap;
 
 struct ScoreHelperStruct {
@@ -68,7 +68,7 @@ struct ScoreHelperStruct {
 };
 typedef StringMap<ScoreHelperStruct> ScoreHelperMap;
 
-class MONGO_MOD_PUB FTSSpec {
+class [[MONGO_MOD_PUBLIC]] FTSSpec {
     struct Tools {
         Tools(const FTSLanguage& _language, const Stemmer* _stemmer, const StopWords* _stopwords)
             : language(_language), stemmer(_stemmer), stopwords(_stopwords) {}

@@ -39,7 +39,7 @@ namespace mongo {
  *
  * Resets to original value when leaving scope.
  */
-class MONGO_MOD_PUBLIC AllowReadFromLatestOnSecondaryBlock_UNSAFE {
+class [[MONGO_MOD_PUBLIC]] AllowReadFromLatestOnSecondaryBlock_UNSAFE {
     AllowReadFromLatestOnSecondaryBlock_UNSAFE(const AllowReadFromLatestOnSecondaryBlock_UNSAFE&) =
         delete;
     AllowReadFromLatestOnSecondaryBlock_UNSAFE& operator=(
@@ -54,6 +54,6 @@ private:
     const bool _initialState;
 };
 
-MONGO_MOD_PUB bool allowReadFromLatestOnSecondary(const OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] bool allowReadFromLatestOnSecondary(const OperationContext* opCtx);
 
 };  // namespace mongo

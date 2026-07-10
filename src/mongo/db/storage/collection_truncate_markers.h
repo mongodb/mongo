@@ -63,7 +63,7 @@ namespace mongo {
 // If these requirements hold then this class can be used to compute and maintain up-to-date markers
 // for ranges of deletions. These markers will be expired and returned to the deleter whenever the
 // implementation defined '_hasExcessMarkers' returns true.
-class MONGO_MOD_OPEN CollectionTruncateMarkers
+class [[MONGO_MOD_OPEN]] CollectionTruncateMarkers
     : public std::enable_shared_from_this<CollectionTruncateMarkers> {
 public:
     /** Markers represent "waypoints" of the collection that contain information between the current
@@ -216,7 +216,7 @@ public:
      * If we were to use query framework scans here we would incur on a layering violation as the
      * storage layer shouldn't have to interact with the query (higher) layer in here.
      */
-    class MONGO_MOD_OPEN CollectionIterator {
+    class [[MONGO_MOD_OPEN]] CollectionIterator {
     public:
         virtual ~CollectionIterator() = default;
 
@@ -311,17 +311,17 @@ public:
     // The following methods are public only for use in tests.
     //
 
-    MONGO_MOD_PUBLIC
+    [[MONGO_MOD_PUBLIC]]
     int64_t currentBytes_forTest() const {
         return _currentBytes.load();
     }
 
-    MONGO_MOD_PUBLIC
+    [[MONGO_MOD_PUBLIC]]
     int64_t currentRecords_forTest() const {
         return _currentRecords.load();
     }
 
-    MONGO_MOD_PUBLIC
+    [[MONGO_MOD_PUBLIC]]
     std::deque<Marker> getMarkers_forTest() const {
         // Return a copy of the vector.
         return _markers;
@@ -412,7 +412,7 @@ protected:
  * This is useful in time-based expiration systems as there could be low activity collections
  * containing expired data that can't be removed until covered by a full marker.
  */
-class MONGO_MOD_OPEN CollectionTruncateMarkersWithPartialExpiration
+class [[MONGO_MOD_OPEN]] CollectionTruncateMarkersWithPartialExpiration
     : public CollectionTruncateMarkers {
 public:
     /**
@@ -459,7 +459,7 @@ public:
                                                 int64_t countInserted,
                                                 bool oplogSamplingAsyncEnabled) final;
 
-    MONGO_MOD_PUBLIC
+    [[MONGO_MOD_PUBLIC]]
     std::pair<const RecordId&, const Date_t&> getHighestRecordMetrics_forTest() const {
         return {_highestRecordId, _highestWallTime};
     }

@@ -46,7 +46,7 @@ namespace repl {
 /**
  * Arguments to the update position command.
  */
-class MONGO_MOD_PARENT_PRIVATE UpdatePositionArgs {
+class [[MONGO_MOD_PARENT_PRIVATE]] UpdatePositionArgs {
 public:
     static const char kCommandFieldName[];
     static const char kUpdateArrayFieldName[];

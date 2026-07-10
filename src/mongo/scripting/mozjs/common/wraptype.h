@@ -237,7 +237,7 @@ void trace(JSTracer* trc, JSObject* obj) {
 }  // namespace smUtils
 
 template <typename T>
-class MONGO_MOD_PUB WrapType : public T {
+class [[MONGO_MOD_PUBLIC]] WrapType : public T {
 public:
     WrapType(JSContext* context) : _context(context), _proto(), _constructor() {
 

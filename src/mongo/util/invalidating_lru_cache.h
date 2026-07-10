@@ -53,7 +53,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 
@@ -137,7 +137,7 @@ struct IsTrustedHasher<LruKeyHasher<Key>, Key> : std::true_type {};
  * the lowest possible value for the time.
  */
 template <typename Key, typename Value, typename Time = CacheNotCausallyConsistent>
-class MONGO_MOD_OPEN InvalidatingLRUCache {
+class [[MONGO_MOD_OPEN]] InvalidatingLRUCache {
     /**
      * Data structure representing the values stored in the cache.
      */

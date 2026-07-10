@@ -44,7 +44,7 @@ namespace mongo {
  * Implementation of ResourceYielder that yields resources checked out in the course of running a
  * local replica set transaction.
  */
-class MONGO_MOD_PUB TransactionParticipantResourceYielder : public ResourceYielder {
+class [[MONGO_MOD_PUBLIC]] TransactionParticipantResourceYielder : public ResourceYielder {
 public:
     TransactionParticipantResourceYielder(std::string_view cmdName) : _cmdName(cmdName) {
         invariant(!cmdName.empty());

@@ -37,7 +37,7 @@
 
 #include <memory>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Represents an error returned from a mongod or a mongos when it is in quiesce mode. The
@@ -62,4 +62,4 @@ private:
     long long _remainingQuiesceTimeMillis = 0;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -62,7 +62,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class Fetcher {
     Fetcher(const Fetcher&) = delete;
@@ -315,4 +315,4 @@ private:
  */
 std::ostream& operator<<(std::ostream& os, const Fetcher::State& state);
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

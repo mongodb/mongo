@@ -39,8 +39,8 @@
 
 namespace mongo {
 
-MONGO_MOD_PUBLIC BSONObj fromFuzzerJson(const char* jsonString, int* len = nullptr);
-MONGO_MOD_PUBLIC BSONObj fromFuzzerJson(std::string_view str);
+[[MONGO_MOD_PUBLIC]] BSONObj fromFuzzerJson(const char* jsonString, int* len = nullptr);
+[[MONGO_MOD_PUBLIC]] BSONObj fromFuzzerJson(std::string_view str);
 
 /**
  * An extended JSON parser that takes in fuzzer output and returns a BSONObj. The underlying

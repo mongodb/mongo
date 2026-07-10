@@ -146,7 +146,7 @@ std::ostream& operator<<(std::ostream& out, const ResumeTokenData& tokenData);
  *
  *   As an optimization, the _typeBits field may be missing and should not affect token comparison.
  */
-class MONGO_MOD_PUBLIC ResumeToken {
+class [[MONGO_MOD_PUBLIC]] ResumeToken {
 public:
     constexpr static std::string_view kDataFieldName = "_data"sv;
     constexpr static std::string_view kTypeBitsFieldName = "_typeBits"sv;

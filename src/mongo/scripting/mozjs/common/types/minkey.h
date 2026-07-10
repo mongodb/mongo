@@ -47,7 +47,7 @@ namespace mozjs {
  * whenever you call the constructor to make a new one you just get the
  * "singleton" MinKey from the prototype. See the postInstall for details.
  */
-struct MONGO_MOD_PUB MinKeyInfo : public BaseInfo {
+struct [[MONGO_MOD_PUBLIC]] MinKeyInfo : public BaseInfo {
     static void call(JSContext* cx, JS::CallArgs args);
     static void construct(JSContext* cx, JS::CallArgs args);
     struct Functions {

@@ -43,7 +43,7 @@ namespace mongo {
  * An interface that provides methods to manipulate in-memory cluster server parameter values in
  * response to on-disk changes, specifically in a replica set context.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ClusterServerParameterInitializer
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ClusterServerParameterInitializer
     : public ReplicaSetAwareService<ClusterServerParameterInitializer> {
     ClusterServerParameterInitializer(const ClusterServerParameterInitializer&) = delete;
     ClusterServerParameterInitializer& operator=(const ClusterServerParameterInitializer&) = delete;

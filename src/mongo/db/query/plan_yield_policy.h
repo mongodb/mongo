@@ -69,7 +69,7 @@ public:
     virtual void preCheckInterruptOnly(OperationContext* opCtx) const = 0;
 };
 
-class MONGO_MOD_PUBLIC PlanYieldPolicy {
+class [[MONGO_MOD_PUBLIC]] PlanYieldPolicy {
 public:
     enum class YieldPolicy {
         // Any call to getNext() may yield. In particular, the executor may die on any call to

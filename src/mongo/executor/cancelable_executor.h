@@ -39,7 +39,7 @@
 #include <memory>
 #include <utility>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * An executor supporting cancellation via a cancellation token.  Given an existing
@@ -103,4 +103,4 @@ private:
     ExecutorPtr _exec;
     CancellationSource _source;
 };
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

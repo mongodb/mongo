@@ -40,7 +40,7 @@
 #include <mutex>
 #include <vector>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace executor {
 
 class NetworkInterfaceMock;
@@ -94,4 +94,4 @@ private:
 };
 
 }  // namespace executor
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

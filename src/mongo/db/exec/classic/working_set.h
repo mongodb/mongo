@@ -56,7 +56,7 @@ namespace mongo {
 class WorkingSetMember;
 
 // TODO SERVER-112968: Remove uses of this typedef outside of the 'query' module.
-MONGO_MOD_NEEDS_REPLACEMENT typedef size_t WorkingSetID;
+[[MONGO_MOD_NEEDS_REPLACEMENT]] typedef size_t WorkingSetID;
 
 /**
  * A type used to identify indexes that have been registered with the WorkingSet. A WorkingSetMember
@@ -124,7 +124,7 @@ struct IndexKeyDatum {
  *
  * TODO SERVER-112968: Remove uses of this class outside of the 'query' module.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT WorkingSetMember {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] WorkingSetMember {
 public:
     enum MemberState {
         // Initial state.
@@ -326,7 +326,7 @@ private:
  *
  * TODO SERVER-112968: Remove uses of this class outside of the the 'query' module.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT WorkingSet {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] WorkingSet {
     WorkingSet(const WorkingSet&) = delete;
     WorkingSet& operator=(const WorkingSet&) = delete;
 

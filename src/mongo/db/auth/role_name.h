@@ -32,7 +32,7 @@
 #include "mongo/db/auth/auth_name.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 using namespace std::literals::string_view_literals;
 
 /**
@@ -77,4 +77,4 @@ Container roleNameIteratorToContainer(RoleNameIterator it) {
     return container;
 }
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

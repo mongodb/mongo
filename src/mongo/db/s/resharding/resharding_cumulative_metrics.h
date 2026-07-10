@@ -46,7 +46,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_NEEDS_REPLACEMENT ReshardingCumulativeMetrics {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ReshardingCumulativeMetrics {
 public:
     using Role = ReshardingMetricsCommon::Role;
     using StateTracker =

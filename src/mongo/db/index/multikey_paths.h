@@ -42,7 +42,7 @@
 #include <boost/container/flat_set.hpp>
 #include <boost/container/small_vector.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 namespace mongo {
 
 // If non-empty, a vector with size equal to the number of elements in the index key pattern. Each

@@ -47,7 +47,7 @@ namespace mongo {
  * Registry for storing mock servers and can create mock connections to these
  * servers.
  */
-class MONGO_MOD_PUBLIC MockConnRegistry {
+class [[MONGO_MOD_PUBLIC]] MockConnRegistry {
 public:
     /**
      * Initializes the static instance.

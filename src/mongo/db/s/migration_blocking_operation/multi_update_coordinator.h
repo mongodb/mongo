@@ -42,14 +42,14 @@ using namespace std::literals::string_view_literals;
 
 class MultiUpdateCoordinatorInstance;
 
-class MONGO_MOD_PUBLIC MultiUpdateCoordinatorService : public repl::PrimaryOnlyService {
+class [[MONGO_MOD_PUBLIC]] MultiUpdateCoordinatorService : public repl::PrimaryOnlyService {
 public:
     static constexpr std::string_view kServiceName = "MultiUpdateCoordinatorService"sv;
 
     friend MultiUpdateCoordinatorInstance;
 
-    MONGO_MOD_NEEDS_REPLACEMENT static void abortAndWaitForAllInstances(OperationContext* opCtx,
-                                                                        Status reason);
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] static void abortAndWaitForAllInstances(OperationContext* opCtx,
+                                                                            Status reason);
 
     MultiUpdateCoordinatorService(ServiceContext* serviceContext);
 
@@ -57,25 +57,25 @@ public:
         ServiceContext* serviceContext,
         std::unique_ptr<MultiUpdateCoordinatorExternalStateFactory> factory);
 
-    MONGO_MOD_PRIVATE std::string_view getServiceName() const override;
+    [[MONGO_MOD_PRIVATE]] std::string_view getServiceName() const override;
 
-    MONGO_MOD_PRIVATE NamespaceString getStateDocumentsNS() const override;
+    [[MONGO_MOD_PRIVATE]] NamespaceString getStateDocumentsNS() const override;
 
-    MONGO_MOD_PRIVATE ThreadPoolLimits getThreadPoolLimits() const override;
+    [[MONGO_MOD_PRIVATE]] ThreadPoolLimits getThreadPoolLimits() const override;
 
-    MONGO_MOD_PRIVATE void checkIfConflictsWithOtherInstances(
+    [[MONGO_MOD_PRIVATE]] void checkIfConflictsWithOtherInstances(
         OperationContext* opCtx,
         BSONObj initialState,
         const std::vector<const Instance*>& existingInstances) override;
 
-    MONGO_MOD_PRIVATE std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(
+    [[MONGO_MOD_PRIVATE]] std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(
         BSONObj initialState) override;
 
 private:
     std::unique_ptr<MultiUpdateCoordinatorExternalStateFactory> _externalStateFactory;
 };
 
-class MONGO_MOD_PRIVATE MultiUpdateCoordinatorInstance
+class [[MONGO_MOD_PRIVATE]] MultiUpdateCoordinatorInstance
     : public repl::PrimaryOnlyService::TypedInstance<MultiUpdateCoordinatorInstance> {
 public:
     MultiUpdateCoordinatorInstance(const MultiUpdateCoordinatorService* service,

@@ -34,7 +34,7 @@
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/modules.h"
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 

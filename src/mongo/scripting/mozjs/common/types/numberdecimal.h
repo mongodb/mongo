@@ -48,7 +48,7 @@ namespace mozjs {
  * Wraps a 'Decimal128' as its private member
  */
 
-struct MONGO_MOD_PUB NumberDecimalInfo : public BaseInfo {
+struct [[MONGO_MOD_PUBLIC]] NumberDecimalInfo : public BaseInfo {
     enum Slots { Decimal128Slot, NumberDecimalInfoSlotCount };
 
     static void construct(JSContext* cx, JS::CallArgs args);

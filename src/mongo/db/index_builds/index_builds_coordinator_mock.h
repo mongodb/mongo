@@ -34,7 +34,7 @@
 
 #include <string_view>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class IndexBuildsCoordinatorMock : public IndexBuildsCoordinator {
 public:
@@ -92,4 +92,4 @@ private:
                                                std::shared_ptr<ReplIndexBuildState> replState,
                                                const IndexBuildOptions& indexBuildOptions) override;
 };
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

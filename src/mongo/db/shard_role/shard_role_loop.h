@@ -42,7 +42,7 @@ namespace shard_role_loop {
  * runaway behavior.
  */
 
-class MONGO_MOD_PUBLIC RetryContext {
+class [[MONGO_MOD_PUBLIC]] RetryContext {
 public:
     RetryContext() = default;
 
@@ -60,23 +60,23 @@ private:
     stdx::unordered_map<NamespaceString, int> _catalogCacheRefreshCountMap;
 };
 
-enum class MONGO_MOD_PUBLIC CanRetry { NO, NO_BECAUSE_EXHAUSTED_RETRIES, YES };
+enum class [[MONGO_MOD_PUBLIC]] CanRetry { NO, NO_BECAUSE_EXHAUSTED_RETRIES, YES };
 
 /**
  * Determines if the provided Status 'error' corresponds to a stale shard error. If so, handles it
  * by recovering the metadata. Returns a value indicating whether the error was due to the shard
  * being stale and can now be retried.
  */
-MONGO_MOD_PUBLIC CanRetry handleStaleError(OperationContext* opCtx,
-                                           const Status& error,
-                                           RetryContext& retryCtx);
+[[MONGO_MOD_PUBLIC]] CanRetry handleStaleError(OperationContext* opCtx,
+                                               const Status& error,
+                                               RetryContext& retryCtx);
 
 /**
  * Runs the provided function 'fn', automatically handling and retrying stale shard metadata errors
  * in the event that the shard is stale and needs to recover its metadata.
  */
 template <typename F>
-MONGO_MOD_PUBLIC decltype(auto) withStaleShardRetry(OperationContext* opCtx, F&& fn) {
+[[MONGO_MOD_PUBLIC]] decltype(auto) withStaleShardRetry(OperationContext* opCtx, F&& fn) {
     RetryContext retryCtx;
     while (true) {
         try {

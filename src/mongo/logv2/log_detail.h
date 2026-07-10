@@ -53,25 +53,25 @@
 namespace mongo::logv2 {
 
 // Whether there is a doLogImpl call currently on this thread's stack.
-MONGO_MOD_PUBLIC bool loggingInProgress();
+[[MONGO_MOD_PUBLIC]] bool loggingInProgress();
 
 // Write message to stderr in a signal-safe manner.
-MONGO_MOD_PUBLIC void signalSafeWriteToStderr(std::string_view message);
+[[MONGO_MOD_PUBLIC]] void signalSafeWriteToStderr(std::string_view message);
 namespace detail {
 
 using GetTenantIDFn = std::function<std::string()>;
-MONGO_MOD_NEEDS_REPLACEMENT void setGetTenantIDCallback(GetTenantIDFn&& fn);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void setGetTenantIDCallback(GetTenantIDFn&& fn);
 
 using LogCounterCallback = std::function<void()>;
 // Must be called before other threads start logging
 void setLogCounterCallback(LogCounterCallback);
 
-MONGO_MOD_NEEDS_REPLACEMENT void doLogImpl(int32_t id,
-                                           LogSeverity const& severity,
-                                           LogOptions const& options,
-                                           std::string_view message,
-                                           TypeErasedAttributeStorage const& attrs,
-                                           bool devStacktraces = false);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void doLogImpl(int32_t id,
+                                               LogSeverity const& severity,
+                                               LogOptions const& options,
+                                               std::string_view message,
+                                               TypeErasedAttributeStorage const& attrs,
+                                               bool devStacktraces = false);
 
 void doUnstructuredLogImpl(LogSeverity const& severity,  // NOLINT
                            LogOptions const& options,
@@ -104,11 +104,11 @@ void doLogUnpacked(int32_t id,
 // into just raw attributes for doLogUnpacked. We do this building flat tuples for every argument,
 // concatenating them into a single tuple that we can expand again using apply.
 template <size_t N, typename... Args>
-MONGO_MOD_PUBLIC void doLog(int32_t id,
-                            LogSeverity const& severity,
-                            LogOptions const& options,
-                            const char (&msg)[N],
-                            const Args&... args) {
+[[MONGO_MOD_PUBLIC]] void doLog(int32_t id,
+                                LogSeverity const& severity,
+                                LogOptions const& options,
+                                const char (&msg)[N],
+                                const Args&... args) {
     std::apply([&](auto&&... tup) { doLogUnpacked(id, severity, options, msg, tup...); },
                std::tuple_cat(toFlatAttributesTupleRef(args)...));
 }

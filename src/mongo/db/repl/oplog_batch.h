@@ -42,7 +42,7 @@ namespace repl {
  * The batch can be either BSONObj or OplogEntry.
  */
 template <class T>
-class MONGO_MOD_PUB OplogBatch {
+class [[MONGO_MOD_PUBLIC]] OplogBatch {
 public:
     OplogBatch() : _batch(), _byteSize(0) {}
 
@@ -109,7 +109,7 @@ private:
 /**
  * Stores a batch of oplog entries for oplog application.
  */
-class MONGO_MOD_PARENT_PRIVATE OplogApplierBatch : public OplogBatch<OplogEntry> {
+class [[MONGO_MOD_PARENT_PRIVATE]] OplogApplierBatch : public OplogBatch<OplogEntry> {
 public:
     OplogApplierBatch() : OplogBatch<OplogEntry>() {}
 

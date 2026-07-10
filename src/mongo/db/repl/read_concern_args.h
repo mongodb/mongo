@@ -55,7 +55,7 @@ namespace mongo {
 namespace repl {
 using namespace std::literals::string_view_literals;
 
-class MONGO_MOD_PUB ReadConcernArgs {
+class [[MONGO_MOD_PUBLIC]] ReadConcernArgs {
 public:
     static constexpr std::string_view kReadConcernFieldName = "readConcern"sv;
     static constexpr std::string_view kAfterOpTimeFieldName = ReadConcernIdl::kAfterOpTimeFieldName;

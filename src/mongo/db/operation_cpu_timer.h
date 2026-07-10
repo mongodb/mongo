@@ -37,7 +37,7 @@
 #include <list>
 #include <memory>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class OperationContext;
 
@@ -142,4 +142,4 @@ private:
     Nanoseconds _elapsedAdjustment;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

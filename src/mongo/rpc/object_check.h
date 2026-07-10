@@ -38,7 +38,7 @@
 #include <string>
 #include <utility>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 namespace rpc {

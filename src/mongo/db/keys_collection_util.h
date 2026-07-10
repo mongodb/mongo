@@ -48,14 +48,14 @@ namespace keys_collection_util {
  * Creates an ExternalKeysCollectionDocument representing an config.external_validation_keys
  * document created based on the given the admin.system.keys document BSONObj.
  */
-MONGO_MOD_PARENT_PRIVATE ExternalKeysCollectionDocument
-makeExternalClusterTimeKeyDoc(BSONObj keyDoc, boost::optional<Date_t> expireAt);
+[[MONGO_MOD_PARENT_PRIVATE]] ExternalKeysCollectionDocument makeExternalClusterTimeKeyDoc(
+    BSONObj keyDoc, boost::optional<Date_t> expireAt);
 
 /*
  * Upserts the given ExternalKeysCollectionDocuments into the
  * config.external_validation_keys collection, and returns the optime for the upserts.
  */
-MONGO_MOD_PARENT_PRIVATE repl::OpTime storeExternalClusterTimeKeyDocs(
+[[MONGO_MOD_PARENT_PRIVATE]] repl::OpTime storeExternalClusterTimeKeyDocs(
     OperationContext* opCtx, std::vector<ExternalKeysCollectionDocument> keyDocs);
 
 }  // namespace keys_collection_util

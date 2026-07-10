@@ -107,7 +107,7 @@ Status readRawFile(const std::string& filename,
  *      // We have overridden port here, otherwise it stays as the default.
  *  }
  */
-class MONGO_MOD_OPEN OptionsParser {
+class [[MONGO_MOD_OPEN]] OptionsParser {
 public:
     /** Indicates if unknown config options are allowed or not.
      *

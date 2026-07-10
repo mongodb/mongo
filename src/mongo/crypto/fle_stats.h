@@ -43,7 +43,7 @@
 
 #include <mutex>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 namespace FLEStatsUtil {
 static void accumulateStats(ECStats& left, const ECStats& right) {
@@ -209,4 +209,4 @@ private:
     FLEPerCollectionStats _deletedCollStats;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

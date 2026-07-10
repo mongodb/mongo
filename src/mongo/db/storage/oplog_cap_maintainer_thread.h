@@ -35,7 +35,7 @@
 #include "mongo/util/background.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 void startOplogCapMaintainerThread(ServiceContext* serviceContext,
                                    bool isReplSet,
                                    bool shouldSkipOplogSampling);
@@ -45,7 +45,7 @@ void stopOplogCapMaintainerThread(ServiceContext* serviceContext, const Status& 
 /**
  * Responsible for deleting oplog truncate markers once their max capacity has been reached.
  */
-class MONGO_MOD_OPEN OplogCapMaintainerThread : public BackgroundJob {
+class [[MONGO_MOD_OPEN]] OplogCapMaintainerThread : public BackgroundJob {
 public:
     OplogCapMaintainerThread() : BackgroundJob(false /* deleteSelf */) {}
 
@@ -112,4 +112,4 @@ private:
         toStringForLogging(NamespaceString::kRsOplogNamespace);
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

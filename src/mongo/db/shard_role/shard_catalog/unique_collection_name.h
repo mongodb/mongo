@@ -51,7 +51,7 @@ namespace mongo {
  *
  * The database must be locked in MODE_IX when calling this function.
  */
-MONGO_MOD_PRIVATE StatusWith<NamespaceString> makeUniqueCollectionName(
+[[MONGO_MOD_PRIVATE]] StatusWith<NamespaceString> makeUniqueCollectionName(
     OperationContext* opCtx, const DatabaseName& dbName, std::string_view collectionNameModel);
 
 /**
@@ -63,7 +63,7 @@ MONGO_MOD_PRIVATE StatusWith<NamespaceString> makeUniqueCollectionName(
  *
  * Throws FailedToParse if 'collectionNameModel' does not contain any percent signs.
  */
-MONGO_MOD_NEEDS_REPLACEMENT StatusWith<NamespaceString> generateRandomCollectionName(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] StatusWith<NamespaceString> generateRandomCollectionName(
     OperationContext* opCtx, const DatabaseName& dbName, std::string_view collectionNameModel);
 
 }  // namespace mongo

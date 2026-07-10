@@ -50,7 +50,7 @@ class OperationContext;
  * AuthorizationManager to throw out its in-memory cache of User objects (which contains the
  * users' credentials, roles, privileges, etc).
  */
-class MONGO_MOD_PUBLIC UserCacheInvalidator {
+class [[MONGO_MOD_PUBLIC]] UserCacheInvalidator {
 public:
     using OIDorTimestamp = std::variant<OID, Timestamp>;
 

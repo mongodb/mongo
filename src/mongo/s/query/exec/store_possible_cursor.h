@@ -48,7 +48,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class BSONObj;
 class ClusterCursorManager;
@@ -148,4 +148,4 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         TailableModeEnum tailableMode = TailableModeEnum::kNormal,
                                         boost::optional<BSONObj> routerSort = boost::none);
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

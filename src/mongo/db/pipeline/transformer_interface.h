@@ -51,7 +51,7 @@ namespace mongo {
  * implementations for optimizing and adding the expression context, even if those functions do
  * nothing.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT TransformerInterface {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] TransformerInterface {
 public:
     enum class TransformerType {
         kExclusionProjection,

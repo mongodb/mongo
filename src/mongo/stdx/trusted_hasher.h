@@ -46,7 +46,7 @@
  * }
  */
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 template <typename Key>
 using DefaultHasher = absl::container_internal::hash_default_hash<Key>;
 
@@ -65,4 +65,4 @@ template <typename Hasher, typename Key>
 using EnsureTrustedHasher =
     std::conditional_t<IsTrustedHasher<Hasher, Key>::value, Hasher, HashImprover<Hasher, Key>>;
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

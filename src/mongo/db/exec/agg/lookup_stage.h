@@ -61,7 +61,7 @@ namespace mongo::exec::agg {
  * optimization part.
  * TODO SERVER-112777: Remove the reference to LookUpStage in the 'atlas_streams' module.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT LookUpStage final : public Stage {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] LookUpStage final : public Stage {
 public:
     LookUpStage(std::string_view stageName,
                 const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
@@ -110,7 +110,7 @@ public:
      * TODO SERVER-112777: Remove the need for this function in order to resolve 'atlas_streams'
      * dependency on 'LookUpStage'.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT std::unique_ptr<mongo::Pipeline> buildStreamsPipeline(
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] std::unique_ptr<mongo::Pipeline> buildStreamsPipeline(
         const boost::intrusive_ptr<ExpressionContext>& fromExpCtx, const Document& inputDoc);
 
     /**

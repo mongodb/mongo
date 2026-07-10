@@ -39,7 +39,7 @@
 #include <string>
 #include <utility>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * This class represents the layout and content of the error that occurs while trying
@@ -98,4 +98,4 @@ std::unique_ptr<WriteConcernErrorDetail> getWriteConcernErrorDetailFromBSONObj(c
  */
 WriteConcernErrorDetail getWriteConcernErrorDetail(const BSONElement& wcErrorElem);
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -41,13 +41,13 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * For the description of t-digest algorithm see
  * https://github.com/tdunning/t-digest/blob/main/docs/t-digest-paper/histo.pdf
  */
-class MONGO_MOD_PUB TDigest : public PercentileAlgorithm {
+class [[MONGO_MOD_PUBLIC]] TDigest : public PercentileAlgorithm {
 public:
     typedef double (*ScalingFunction)(double /* q */, double /* delta */);
 
@@ -321,4 +321,4 @@ protected:
 std::ostream& operator<<(std::ostream& os, const TDigest& tdigest);
 std::ostream& operator<<(std::ostream& os, const TDigest::Centroid& centroid);
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

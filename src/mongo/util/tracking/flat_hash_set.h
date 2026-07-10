@@ -38,7 +38,7 @@
 #include <absl/container/flat_hash_set.h>
 #include <absl/container/internal/hash_function_defaults.h>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace tracking {
 
 
@@ -54,4 +54,4 @@ flat_hash_set<Key> make_flat_hash_set(Context& Context) {
 }
 
 }  // namespace tracking
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

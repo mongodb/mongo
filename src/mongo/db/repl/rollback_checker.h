@@ -63,7 +63,7 @@ namespace repl {
  * 4) Repeat steps 2 and 3 as needed.
  *
  */
-class MONGO_MOD_PUB RollbackChecker {
+class [[MONGO_MOD_PUBLIC]] RollbackChecker {
     RollbackChecker(const RollbackChecker&) = delete;
     RollbackChecker& operator=(const RollbackChecker&) = delete;
 

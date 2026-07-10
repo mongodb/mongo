@@ -42,7 +42,7 @@
 
 namespace mongo {
 
-enum class MONGO_MOD_PUBLIC ChangeStreamType {
+enum class [[MONGO_MOD_PUBLIC]] ChangeStreamType {
     // Collection-level change stream: change stream is opened on a single collection.
     kCollection,
 
@@ -59,7 +59,7 @@ enum class MONGO_MOD_PUBLIC ChangeStreamType {
 /**
  * Represents a change stream instance.
  */
-class MONGO_MOD_PUBLIC ChangeStream {
+class [[MONGO_MOD_PUBLIC]] ChangeStream {
 public:
     ChangeStream(ChangeStreamReadMode mode,
                  ChangeStreamType type,

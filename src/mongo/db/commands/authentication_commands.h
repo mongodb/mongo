@@ -38,8 +38,8 @@
 
 namespace mongo {
 
-MONGO_MOD_PUBLIC void doSpeculativeAuthenticate(OperationContext* opCtx,
-                                                BSONObj helloCmd,
-                                                BSONObjBuilder* result);
+[[MONGO_MOD_PUBLIC]] void doSpeculativeAuthenticate(OperationContext* opCtx,
+                                                    BSONObj helloCmd,
+                                                    BSONObjBuilder* result);
 
 }  // namespace mongo

@@ -45,7 +45,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-class MONGO_MOD_OPEN EncryptionHooks {
+class [[MONGO_MOD_OPEN]] EncryptionHooks {
 public:
     static void set(ServiceContext* service, std::unique_ptr<EncryptionHooks> custHooks);
 

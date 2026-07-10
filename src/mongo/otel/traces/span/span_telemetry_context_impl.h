@@ -52,7 +52,7 @@ using TextMapCarrier = opentelemetry::context::propagation::TextMapCarrier;
  * SpanTelemetryContextImpl is an implementation of TelemetryContext that wraps OpenTelemetry's
  * Context to allow for propagation of span state across OpenTelemetry functionality.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT SpanTelemetryContextImpl : public TelemetryContext {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] SpanTelemetryContextImpl : public TelemetryContext {
 public:
     explicit SpanTelemetryContextImpl(OtelContext ctx, PseudoRandom* prng = nullptr);
     SpanTelemetryContextImpl();

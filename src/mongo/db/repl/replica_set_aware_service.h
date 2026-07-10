@@ -134,7 +134,7 @@ namespace mongo {
 /**
  * Main API implemented by each ReplicaSetAwareService.
  */
-class MONGO_MOD_PRIVATE ReplicaSetAwareInterface {
+class [[MONGO_MOD_PRIVATE]] ReplicaSetAwareInterface {
 public:
     /**
      * Called once during ReplicationCoordinator startup. A place to put startup logic such as
@@ -243,7 +243,7 @@ public:
 /**
  * The registry of ReplicaSetAwareServices.
  */
-class MONGO_MOD_PUB ReplicaSetAwareServiceRegistry final : public ReplicaSetAwareInterface {
+class [[MONGO_MOD_PUBLIC]] ReplicaSetAwareServiceRegistry final : public ReplicaSetAwareInterface {
     ReplicaSetAwareServiceRegistry(const ReplicaSetAwareServiceRegistry&) = delete;
     ReplicaSetAwareServiceRegistry& operator=(const ReplicaSetAwareServiceRegistry&) = delete;
 
@@ -338,7 +338,7 @@ private:
  * start of this file for more detailed info.
  */
 template <class ActualService>
-class MONGO_MOD_OPEN ReplicaSetAwareService : private ReplicaSetAwareInterface {
+class [[MONGO_MOD_OPEN]] ReplicaSetAwareService : private ReplicaSetAwareInterface {
     ReplicaSetAwareService(const ReplicaSetAwareService&) = delete;
     ReplicaSetAwareService& operator=(const ReplicaSetAwareService&) = delete;
 
@@ -374,7 +374,7 @@ private:
  * Convenience version of ReplicaSetAwareService that is only active on config servers.
  */
 template <class ActualService>
-class MONGO_MOD_OPEN ReplicaSetAwareServiceConfigSvr
+class [[MONGO_MOD_OPEN]] ReplicaSetAwareServiceConfigSvr
     : public ReplicaSetAwareService<ActualService> {
 private:
     bool shouldRegisterReplicaSetAwareService() const final {
@@ -387,7 +387,8 @@ private:
  * Convenience version of ReplicaSetAwareService that is only active on shard servers.
  */
 template <class ActualService>
-class MONGO_MOD_OPEN ReplicaSetAwareServiceShardSvr : public ReplicaSetAwareService<ActualService> {
+class [[MONGO_MOD_OPEN]] ReplicaSetAwareServiceShardSvr
+    : public ReplicaSetAwareService<ActualService> {
 private:
     bool shouldRegisterReplicaSetAwareService() const final {
         return serverGlobalParams.clusterRole.has(ClusterRole::ShardServer);

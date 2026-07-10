@@ -46,7 +46,7 @@ namespace mongo {
  * then will abort the oldest transaction.
  * The job will run every cachePressureQueryPeriodMilliseconds (defaults to once per second).
  */
-class MONGO_MOD_PUBLIC PeriodicThreadToRollbackUnderCachePressure {
+class [[MONGO_MOD_PUBLIC]] PeriodicThreadToRollbackUnderCachePressure {
 public:
     static PeriodicThreadToRollbackUnderCachePressure& get(ServiceContext* serviceContext);
 

@@ -44,7 +44,7 @@
 
 #include <absl/container/node_hash_map.h>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 

@@ -46,7 +46,7 @@ class Status;
 
 namespace rpc {
 
-class MONGO_MOD_NEEDS_REPLACEMENT VectorClockMetadataHook : public EgressMetadataHook {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] VectorClockMetadataHook : public EgressMetadataHook {
 public:
     explicit VectorClockMetadataHook(ServiceContext* service);
 

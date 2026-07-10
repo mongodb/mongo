@@ -36,7 +36,7 @@
 #include <scoped_allocator>
 #include <set>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace tracking {
 
 template <class Key>
@@ -48,4 +48,4 @@ set<Key> make_set(Context& Context) {
 }
 
 }  // namespace tracking
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

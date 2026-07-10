@@ -50,7 +50,7 @@ namespace mongo {
  * The semantics for a const Database are that you can mutate individual collections but not add or
  * remove them.
  */
-class MONGO_MOD_PUBLIC Database : public Decorable<Database> {
+class [[MONGO_MOD_PUBLIC]] Database : public Decorable<Database> {
 public:
     /**
      * Creates the namespace 'ns' in the database 'db' according to 'options'. If

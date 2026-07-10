@@ -44,7 +44,7 @@
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class UpdateRequest;
 
@@ -64,7 +64,7 @@ PlanYieldPolicy::YieldPolicy getUpdateYieldPolicy(const UpdateRequest* request);
  *
  * ParsedUpdate is later consumed by CanonicalUpdate::make(), which constructs a CanonicalUpdate.
  */
-struct MONGO_MOD_PUBLIC ParsedUpdate {
+struct [[MONGO_MOD_PUBLIC]] ParsedUpdate {
     /**
      * Get the raw request.
      */
@@ -126,4 +126,4 @@ StatusWith<ParsedUpdate> parse(boost::intrusive_ptr<ExpressionContext> expCtx,
 
 }  // namespace parsed_update_command
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -40,7 +40,7 @@
 
 #include <boost/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class OperationContext;
 
@@ -112,9 +112,9 @@ private:
     std::shared_ptr<TaskExecutor> _executor;
 };
 
-MONGO_MOD_FILE_PRIVATE extern FailPoint ScopedTaskExecutorHangBeforeSchedule;
-MONGO_MOD_FILE_PRIVATE extern FailPoint ScopedTaskExecutorHangExitBeforeSchedule;
-MONGO_MOD_FILE_PRIVATE extern FailPoint ScopedTaskExecutorHangAfterSchedule;
+[[MONGO_MOD_FILE_PRIVATE]] extern FailPoint ScopedTaskExecutorHangBeforeSchedule;
+[[MONGO_MOD_FILE_PRIVATE]] extern FailPoint ScopedTaskExecutorHangExitBeforeSchedule;
+[[MONGO_MOD_FILE_PRIVATE]] extern FailPoint ScopedTaskExecutorHangAfterSchedule;
 
 }  // namespace executor
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

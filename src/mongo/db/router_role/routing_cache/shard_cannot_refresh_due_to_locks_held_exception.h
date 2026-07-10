@@ -51,7 +51,7 @@ namespace mongo {
  *
  * TODO (SPM-3971): Remove this exception once its last user has stopped relying on it.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ShardCannotRefreshDueToLocksHeldInfo final
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardCannotRefreshDueToLocksHeldInfo final
     : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::ShardCannotRefreshDueToLocksHeld;
@@ -74,7 +74,7 @@ private:
     const NamespaceString _nss;
 };
 
-using ShardCannotRefreshDueToLocksHeldException MONGO_MOD_NEEDS_REPLACEMENT =
+using ShardCannotRefreshDueToLocksHeldException [[MONGO_MOD_NEEDS_REPLACEMENT]] =
     ExceptionFor<ErrorCodes::ShardCannotRefreshDueToLocksHeld>;
 
 }  // namespace mongo

@@ -58,7 +58,7 @@ class VariablesParseState;
 /**
  * The state used as input and working space for Expressions.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT Variables final {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] Variables final {
 public:
     // Each unique variable is assigned a unique id of this type. Negative ids are reserved for
     // system variables and non-negative ids are allocated for user variables.
@@ -327,7 +327,7 @@ struct LetVariable {
  * and to propagate back to the original instance enough information to correctly construct a
  * Variables instance.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT VariablesParseState final {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] VariablesParseState final {
 public:
     explicit VariablesParseState(Variables::IdGenerator* variableIdGenerator)
         : _idGenerator(variableIdGenerator) {}

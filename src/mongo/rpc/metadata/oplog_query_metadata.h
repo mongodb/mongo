@@ -43,7 +43,7 @@ namespace mongo {
 class BSONObj;
 class BSONObjBuilder;
 
-namespace MONGO_MOD_PUBLIC rpc {
+namespace [[MONGO_MOD_PUBLIC]] rpc {
 
 extern const char kOplogQueryMetadataFieldName[];
 
@@ -155,5 +155,5 @@ private:
     std::string _currentSyncSourceHost;
 };
 
-}  // namespace MONGO_MOD_PUBLIC rpc
+}  // namespace rpc
 }  // namespace mongo

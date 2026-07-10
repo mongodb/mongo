@@ -41,7 +41,7 @@ namespace mongo {
  * Represents an error returned from the collMod command when an attempt to enforce the constraint
  * on an index fails because constraint violations exist.
  */
-class MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS CannotConvertIndexToUniqueInfo final
+class [[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] CannotConvertIndexToUniqueInfo final
     : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::CannotConvertIndexToUnique;

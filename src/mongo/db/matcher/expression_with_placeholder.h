@@ -52,7 +52,7 @@ namespace mongo {
  * Container for a parsed MatchExpression and top-level field name that it's over.
  * For example, {"i.a": 0, "i.b": 1} is a filter with a single top-level field name "i".
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ExpressionWithPlaceholder {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ExpressionWithPlaceholder {
 
 public:
     /**

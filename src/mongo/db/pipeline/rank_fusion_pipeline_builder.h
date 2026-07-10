@@ -47,7 +47,7 @@ using namespace std::literals::string_view_literals;
  * This RankFusionPipelineBuilder class stores the builder methods to build the desugared stages for
  * any given $rankFusion input pipeline and the final scoring and merging logic.
  */
-class MONGO_MOD_PRIVATE RankFusionPipelineBuilder final : public HybridSearchPipelineBuilder {
+class [[MONGO_MOD_PRIVATE]] RankFusionPipelineBuilder final : public HybridSearchPipelineBuilder {
     // DocumentSourceRankFusion::createFromBson() creates an instance of this class and calls its
     // inherited constructDesugaredOutput(...) method which calls the derived class' overriden
     // virtual methods to construct the final desugared output.

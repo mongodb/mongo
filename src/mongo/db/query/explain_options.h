@@ -42,7 +42,7 @@ using namespace std::literals::string_view_literals;
  * Represents options passed to the explain command (aside from the command which is being explained
  * and its parameters).
  */
-class MONGO_MOD_PUB ExplainOptions {
+class [[MONGO_MOD_PUBLIC]] ExplainOptions {
 public:
     /**
      * The various supported verbosity levels for explain. The order is significant: the enum values

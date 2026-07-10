@@ -64,7 +64,7 @@ namespace mongo {
  */
 
 
-MONGO_MOD_PUBLIC BSONObj fromjson(std::string_view str);
+[[MONGO_MOD_PUBLIC]] BSONObj fromjson(std::string_view str);
 
 /**
  * Convert a BSONArray to a JSON string.
@@ -73,9 +73,9 @@ MONGO_MOD_PUBLIC BSONObj fromjson(std::string_view str);
  * @param format The JSON format (TenGen, Strict).
  * @param pretty Enables pretty output.
  */
-MONGO_MOD_PUBLIC std::string tojson(const BSONArray& arr,
-                                    JsonStringFormat format = ExtendedCanonicalV2_0_0,
-                                    bool pretty = false);
+[[MONGO_MOD_PUBLIC]] std::string tojson(const BSONArray& arr,
+                                        JsonStringFormat format = ExtendedCanonicalV2_0_0,
+                                        bool pretty = false);
 
 /**
  * Convert a BSONObj to a JSON string.
@@ -84,9 +84,9 @@ MONGO_MOD_PUBLIC std::string tojson(const BSONArray& arr,
  * @param format The JSON format (JS, TenGen, Strict).
  * @param pretty Enables pretty output.
  */
-MONGO_MOD_PUBLIC std::string tojson(const BSONObj& obj,
-                                    JsonStringFormat format = ExtendedCanonicalV2_0_0,
-                                    bool pretty = false);
+[[MONGO_MOD_PUBLIC]] std::string tojson(const BSONObj& obj,
+                                        JsonStringFormat format = ExtendedCanonicalV2_0_0,
+                                        bool pretty = false);
 
 class JParseUtil;
 

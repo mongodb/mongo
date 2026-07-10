@@ -43,7 +43,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_NEEDS_REPLACEMENT ShardingRecoveryService
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardingRecoveryService
     : public ReplicaSetAwareServiceShardSvr<ShardingRecoveryService> {
 
 public:

@@ -55,7 +55,7 @@ namespace migrationutil {
  * Manages the migration commit/abort process, including updates to config.rangeDeletions on the
  * donor and the recipient, and updates to the routing table on the config server.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT MigrationCoordinator {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] MigrationCoordinator {
 public:
     MigrationCoordinator(UUID migrationId,
                          MigrationSessionId sessionId,

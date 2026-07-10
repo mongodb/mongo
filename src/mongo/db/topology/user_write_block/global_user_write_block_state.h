@@ -41,7 +41,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_NEEDS_REPLACEMENT GlobalUserWriteBlockState {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] GlobalUserWriteBlockState {
 public:
     GlobalUserWriteBlockState() = default;
 

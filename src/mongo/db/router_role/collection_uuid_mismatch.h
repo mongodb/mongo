@@ -43,7 +43,7 @@ namespace mongo {
  * With the introduction of the Router and Shard Roles, nobody outside of the catalog modules should
  * be concerned with collection UUID checking.
  */
-MONGO_MOD_NEEDS_REPLACEMENT
+[[MONGO_MOD_NEEDS_REPLACEMENT]]
 Status populateCollectionUUIDMismatch(OperationContext* opCtx,
                                       const Status& collectionUUIDMismatch);
 

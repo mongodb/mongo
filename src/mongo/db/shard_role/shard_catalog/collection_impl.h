@@ -75,7 +75,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PRIVATE CollectionImpl final : public Collection {
+class [[MONGO_MOD_PRIVATE]] CollectionImpl final : public Collection {
 public:
     // Uses the collator factory to convert the BSON representation of a collator to a
     // CollatorInterface. Returns null if the BSONObj is empty. We expect the stored collation to be
@@ -536,7 +536,7 @@ private:
     bool _initialized = false;
 };
 
-class MONGO_MOD_PUBLIC CollectionImplFactory : public Collection::Factory {
+class [[MONGO_MOD_PUBLIC]] CollectionImplFactory : public Collection::Factory {
 public:
     std::shared_ptr<Collection> make(
         OperationContext* opCtx,

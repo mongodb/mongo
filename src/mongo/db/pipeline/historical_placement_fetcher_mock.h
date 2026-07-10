@@ -39,7 +39,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_UNFORTUNATELY_OPEN HistoricalPlacementFetcherMock
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] HistoricalPlacementFetcherMock
     : public HistoricalPlacementFetcher {
 public:
     using TimestampOrNss = std::variant<Timestamp, boost::optional<NamespaceString>>;

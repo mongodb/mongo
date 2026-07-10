@@ -49,7 +49,7 @@ class Status;
  * appended to the end of the protected data.
  * The caller may then call finalizeTag() to get implementation defined metadata.
  */
-class MONGO_MOD_OPEN DataProtector {
+class [[MONGO_MOD_OPEN]] DataProtector {
 public:
     virtual ~DataProtector() = default;
 

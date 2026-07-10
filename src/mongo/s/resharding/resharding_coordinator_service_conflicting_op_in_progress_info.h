@@ -40,7 +40,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC ReshardingCoordinatorServiceConflictingOperationInProgressInfo final
+class [[MONGO_MOD_PUBLIC]] ReshardingCoordinatorServiceConflictingOperationInProgressInfo final
     : public ErrorExtraInfo {
 public:
     static constexpr auto code =

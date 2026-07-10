@@ -64,7 +64,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class AuthorizationSession;
 class OperationContext;
@@ -310,4 +310,4 @@ private:
     stdx::unordered_map<OperationKey, std::set<CursorId>, UUID::Hash> _opKeyMap;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

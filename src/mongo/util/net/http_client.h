@@ -49,7 +49,7 @@ constexpr Seconds kTotalRequestTimeout{120};
 /**
  * Interface used to upload and receive binary payloads to HTTP servers.
  */
-class MONGO_MOD_OPEN HttpClient {
+class [[MONGO_MOD_OPEN]] HttpClient {
 public:
     enum class HttpMethod { kGET, kPOST, kPUT, kPATCH, kDELETE };
 

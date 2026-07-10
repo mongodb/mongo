@@ -52,7 +52,7 @@ class NetworkingBaton;
 
 class Baton;
 
-using BatonHandle MONGO_MOD_PUBLIC = std::shared_ptr<Baton>;
+using BatonHandle [[MONGO_MOD_PUBLIC]] = std::shared_ptr<Baton>;
 
 /**
  * A Baton is lightweight executor, with parallel forward progress guarantees.  Rather than
@@ -61,9 +61,9 @@ using BatonHandle MONGO_MOD_PUBLIC = std::shared_ptr<Baton>;
  *
  * Note: This occurs automatically when opCtx waiting on a condition variable.
  */
-class MONGO_MOD_OPEN Baton : public Waitable,
-                             public OutOfLineExecutor,
-                             public std::enable_shared_from_this<Baton> {
+class [[MONGO_MOD_OPEN]] Baton : public Waitable,
+                                 public OutOfLineExecutor,
+                                 public std::enable_shared_from_this<Baton> {
 public:
     ~Baton() override = default;
 

@@ -103,7 +103,7 @@ private:
     bool _isTextQuery;
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceMatch : public DocumentSource {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DocumentSourceMatch : public DocumentSource {
 public:
     static bool containsTextOperator(const MatchExpression& expr);
 

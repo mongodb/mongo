@@ -32,7 +32,7 @@
 #if __has_include("mongo/util/modules.h")
 #include "mongo/util/modules.h"
 #else
-#define MONGO_MOD_PUB
+#define[[MONGO_MOD_PUBLIC]]
 #endif
 #endif  // __has_include
 

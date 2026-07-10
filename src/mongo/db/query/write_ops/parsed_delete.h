@@ -44,7 +44,7 @@
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class DeleteRequest;
 
@@ -64,7 +64,7 @@ PlanYieldPolicy::YieldPolicy getDeleteYieldPolicy(const DeleteRequest* request);
  * ParsedDelete is later consumed by CanonicalDelete::make(), which constructs a CanonicalDelete and
  * does timeseries transformations.
  */
-struct MONGO_MOD_PUBLIC ParsedDelete {
+struct [[MONGO_MOD_PUBLIC]] ParsedDelete {
     /**
      * Get the raw request.
      */
@@ -105,4 +105,4 @@ StatusWith<ParsedDelete> parse(boost::intrusive_ptr<ExpressionContext> expCtx,
 
 }  // namespace parsed_delete_command
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

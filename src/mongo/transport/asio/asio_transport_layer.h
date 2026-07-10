@@ -83,7 +83,7 @@ class WrappedEndpoint;
 /**
  * A TransportLayer implementation based on ASIO networking primitives.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT AsioTransportLayer final : public TransportLayer {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] AsioTransportLayer final : public TransportLayer {
     AsioTransportLayer(const AsioTransportLayer&) = delete;
     AsioTransportLayer& operator=(const AsioTransportLayer&) = delete;
 

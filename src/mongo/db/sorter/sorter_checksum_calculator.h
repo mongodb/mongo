@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-namespace MONGO_MOD_PUB sorter {
+namespace [[MONGO_MOD_PUBLIC]] sorter {
 static constexpr SorterChecksumVersion kLatestChecksumVersion = SorterChecksumVersion::v2;
 }
 

@@ -40,7 +40,7 @@
 #include <string>
 #include <vector>
 
-namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
+namespace [[MONGO_MOD_NEEDS_REPLACEMENT]] mongo {
 namespace optionenvironment {
 
 /**
@@ -292,4 +292,4 @@ struct OptionTypeMap<Switch> {
 };
 
 }  // namespace optionenvironment
-}  // namespace MONGO_MOD_NEEDS_REPLACEMENT mongo
+}  // namespace mongo

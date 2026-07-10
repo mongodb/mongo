@@ -47,7 +47,7 @@ class Waitable;
 /**
  * An interface for getting the current wall clock time.
  */
-class MONGO_MOD_OPEN ClockSource {
+class [[MONGO_MOD_OPEN]] ClockSource {
     // We need a type trait to differentiate waitable ptr args from predicates.
     //
     // This returns true for non-pointers and function pointers

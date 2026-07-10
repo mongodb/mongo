@@ -40,7 +40,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Returns whether the supplied BSON type is supported for FLE2 equality indexed encryption.
@@ -264,4 +264,4 @@ bool visitQueryTypeConfigs(const EncryptedFieldConfig& efc,
  */
 boost::optional<QueryTypeEnum> findStringSearchQueryType(const EncryptedField& field);
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

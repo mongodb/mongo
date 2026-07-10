@@ -37,7 +37,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Factory class for generating the correct authorization manager for the
@@ -63,4 +63,4 @@ public:
 
 extern std::unique_ptr<AuthorizationManagerFactory> globalAuthzManagerFactory;
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -39,12 +39,12 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUB TransactionCoordinatorWorkerCurOpRepository {
+class [[MONGO_MOD_PUBLIC]] TransactionCoordinatorWorkerCurOpRepository {
 public:
     TransactionCoordinatorWorkerCurOpRepository() {}
     virtual ~TransactionCoordinatorWorkerCurOpRepository() {}
 
-    enum class MONGO_MOD_PRIVATE CoordinatorAction {
+    enum class [[MONGO_MOD_PRIVATE]] CoordinatorAction {
         kWritingParticipantList,
         kSendingPrepare,
         kWritingDecision,
@@ -71,7 +71,7 @@ public:
     virtual void reportState(OperationContext* opCtx, BSONObjBuilder* parent) const = 0;
 };
 
-MONGO_MOD_PUB std::shared_ptr<TransactionCoordinatorWorkerCurOpRepository>
+[[MONGO_MOD_PUBLIC]] std::shared_ptr<TransactionCoordinatorWorkerCurOpRepository>
 getTransactionCoordinatorWorkerCurOpRepository();
 
 }  // namespace mongo

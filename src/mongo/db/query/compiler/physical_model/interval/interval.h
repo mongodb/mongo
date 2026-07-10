@@ -41,7 +41,7 @@
 namespace mongo {
 
 /** A range of values for one field. */
-struct MONGO_MOD_NEEDS_REPLACEMENT Interval {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] Interval {
     // No BSONValue means we have to keep a BSONObj and pointers (BSONElement) into it.
     // 'start' may not point at the first field in _intervalData.
     // 'end' may not point at the last field in _intervalData.

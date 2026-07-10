@@ -38,7 +38,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_UNFORTUNATELY_OPEN HistoricalPlacementFetcher {
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] HistoricalPlacementFetcher {
 public:
     virtual ~HistoricalPlacementFetcher() = default;
 

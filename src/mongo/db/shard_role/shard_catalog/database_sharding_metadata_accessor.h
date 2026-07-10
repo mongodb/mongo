@@ -40,7 +40,7 @@ namespace mongo {
  * Represents the in-memory metadata for a database in a sharded cluster. It contains information
  * about the database's primary shard, database version, and access type to the metadata.
  */
-class MONGO_MOD_PRIVATE DatabaseShardingMetadataAccessor {
+class [[MONGO_MOD_PRIVATE]] DatabaseShardingMetadataAccessor {
 public:
     DatabaseShardingMetadataAccessor(DatabaseName dbName);
 
@@ -148,7 +148,7 @@ private:
  *
  * Use BypassDatabaseMetadataAccess (with justification) to temporarily modify those values.
  */
-class MONGO_MOD_PRIVATE OperationDatabaseMetadata {
+class [[MONGO_MOD_PRIVATE]] OperationDatabaseMetadata {
     OperationDatabaseMetadata(const OperationDatabaseMetadata&) = delete;
     OperationDatabaseMetadata& operator=(const OperationDatabaseMetadata&) = delete;
 

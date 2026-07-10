@@ -50,7 +50,7 @@
 #define MONGO_HAS_SIGALTSTACK 0
 #endif
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace stdx {
 namespace support {
 
@@ -220,4 +220,4 @@ inline void swap(thread& lhs, thread& rhs) noexcept {
 
 static_assert(std::is_move_constructible_v<stdx::thread>);
 static_assert(std::is_move_assignable_v<stdx::thread>);
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

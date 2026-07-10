@@ -58,8 +58,8 @@
 
 namespace mongo {
 
-MONGO_MOD_NEEDS_REPLACEMENT ConfigsvrCoordinatorMetadata
-extractConfigsvrCoordinatorMetadata(const BSONObj& stateDoc);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] ConfigsvrCoordinatorMetadata extractConfigsvrCoordinatorMetadata(
+    const BSONObj& stateDoc);
 
 /**
  * ConfigsvrCoordinators are POS instances that run on the configsvr and represent cluster
@@ -67,7 +67,7 @@ extractConfigsvrCoordinatorMetadata(const BSONObj& stateDoc);
  * such operations. Concrete operations extend ConfigsvrCoordinator and implement their specific
  * bussiness logic on '_runImpl'
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ConfigsvrCoordinator
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ConfigsvrCoordinator
     : public repl::PrimaryOnlyService::TypedInstance<ConfigsvrCoordinator> {
 public:
     explicit ConfigsvrCoordinator(const BSONObj& stateDoc);
@@ -118,8 +118,9 @@ private:
 };
 
 template <class StateDoc, class Phase>
-class MONGO_MOD_UNFORTUNATELY_OPEN ConfigsvrCoordinatorImpl : public ConfigsvrCoordinator,
-                                                              public OperationSessionPersistence {
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] ConfigsvrCoordinatorImpl
+    : public ConfigsvrCoordinator,
+      public OperationSessionPersistence {
 public:
     ConfigsvrCoordinatorImpl(const BSONObj& stateDoc)
         : ConfigsvrCoordinator(stateDoc),

@@ -37,7 +37,7 @@
 
 #include <memory>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Contains information about an Incremental Feature Rollout (IFR) flag that was disabled
@@ -63,4 +63,4 @@ private:
     std::string _disabledFlagName;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

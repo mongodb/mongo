@@ -56,7 +56,7 @@ class ClientLock;
  * operations for now. Our plans are to expand this to more operations in a future project
  * (SPM-4227).
  */
-class MONGO_MOD_NEEDS_REPLACEMENT VersionContext {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] VersionContext {
 public:
     using FCV = multiversion::FeatureCompatibilityVersion;
     using FCVSnapshot = ServerGlobalParams::FCVSnapshot;
@@ -199,7 +199,7 @@ private:
 /**
  * Use this when running outside of an operation (for example, during startup, or in unit tests).
  */
-MONGO_MOD_NEEDS_REPLACEMENT inline const VersionContext kNoVersionContext{
+[[MONGO_MOD_NEEDS_REPLACEMENT]] inline const VersionContext kNoVersionContext{
     VersionContext::OutsideOperationTag{}};
 
 /**
@@ -207,7 +207,7 @@ MONGO_MOD_NEEDS_REPLACEMENT inline const VersionContext kNoVersionContext{
  * the node's local FCV only. This should be used with a lot of care, only if you can ensure none
  * of your current or future callers acts incorrectly due to ignoring their Operation FCV.
  */
-MONGO_MOD_NEEDS_REPLACEMENT inline const VersionContext kVersionContextIgnored_UNSAFE{
+[[MONGO_MOD_NEEDS_REPLACEMENT]] inline const VersionContext kVersionContextIgnored_UNSAFE{
     VersionContext::IgnoreOFCVTag{}};
 
 /**
@@ -221,7 +221,7 @@ MONGO_MOD_NEEDS_REPLACEMENT inline const VersionContext kVersionContextIgnored_U
  * - Associated with a stale version context, but that have been already killed
  *
  */
-MONGO_MOD_NEEDS_REPLACEMENT void waitForOperationsNotMatchingVersionContextToComplete(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void waitForOperationsNotMatchingVersionContextToComplete(
     OperationContext* opCtx, const VersionContext& vCtx, Date_t deadline = Date_t::max());
 
 }  // namespace mongo

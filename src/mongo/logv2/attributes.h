@@ -34,7 +34,7 @@
 #include <boost/log/attributes/attribute_name.hpp>
 
 namespace mongo::logv2 {
-namespace MONGO_MOD_PUBLIC attributes {
+namespace [[MONGO_MOD_PUBLIC]] attributes {
 
 // Reusable attribute names, so they only need to be constructed once.
 const boost::log::attribute_name& domain();
@@ -52,5 +52,5 @@ const boost::log::attribute_name& truncation();
 const boost::log::attribute_name& userassert();
 const boost::log::attribute_name& devStacktrace();
 
-}  // namespace MONGO_MOD_PUBLIC attributes
+}  // namespace attributes
 }  // namespace mongo::logv2

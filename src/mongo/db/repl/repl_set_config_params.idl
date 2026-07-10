@@ -28,7 +28,7 @@
 
 global:
     cpp_namespace: "mongo"
-    mod_visibility: pub
+    mod_visibility: public
 
 server_parameters:
     skipShardingConfigurationChecks:

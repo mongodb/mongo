@@ -56,7 +56,7 @@
 
 #include <boost/optional.hpp>
 
-MONGO_MOD_PUB;
+[[MONGO_MOD_PUBLIC]];
 namespace mongo::sorter {
 
 template <typename Key, typename Value>

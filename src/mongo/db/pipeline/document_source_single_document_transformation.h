@@ -67,7 +67,7 @@ namespace mongo {
  * a ParsedSingleDocumentTransformation. It is not a registered DocumentSource, and it cannot be
  * created from BSON.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceSingleDocumentTransformation final
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DocumentSourceSingleDocumentTransformation final
     : public DocumentSource {
 public:
     DocumentSourceSingleDocumentTransformation(

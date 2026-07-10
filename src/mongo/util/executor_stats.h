@@ -39,7 +39,7 @@
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/tick_source.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * A utility to collect stats for tasks scheduled on an executor (e.g., the reactor thread).
@@ -90,4 +90,4 @@ private:
         Seconds{10}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

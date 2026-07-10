@@ -44,7 +44,7 @@
 #include <boost/container/small_vector.hpp>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC logv2 {
+namespace [[MONGO_MOD_PUBLIC]] logv2 {
 
 class TypeErasedAttributeStorage;
 
@@ -388,7 +388,7 @@ CustomAttributeValue mapValue(const T& val) {
 }
 
 template <typename It>
-class MONGO_MOD_NEEDS_REPLACEMENT SequenceContainerLogger {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] SequenceContainerLogger {
 public:
     SequenceContainerLogger(It begin, It end) : _begin(begin), _end(end) {}
 
@@ -621,7 +621,7 @@ private:
 };
 
 // Named attribute, storage for a name-value attribute.
-class MONGO_MOD_NEEDS_REPLACEMENT NamedAttribute {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] NamedAttribute {
 public:
     NamedAttribute() = default;
     NamedAttribute(const char* n, long double val) = delete;
@@ -839,5 +839,5 @@ auto mapLog(It begin, It end) {
     return detail::AssociativeContainerLogger(begin, end);
 }
 
-}  // namespace MONGO_MOD_PUBLIC logv2
+}  // namespace logv2
 }  // namespace mongo

@@ -77,7 +77,7 @@ class LogicalTime;
  * and should avoid doing any caching of their own. The caching is delegated to a parallel
  * read-only view of the catalog, which is maintained by a higher level code.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ShardingCatalogClient {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardingCatalogClient {
     ShardingCatalogClient(const ShardingCatalogClient&) = delete;
     ShardingCatalogClient& operator=(const ShardingCatalogClient&) = delete;
 

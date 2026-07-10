@@ -40,11 +40,11 @@ namespace repl {
  * True when oplogApplicationEnforcesSteadyStateConstraints has not been explicitly set by the user
  * via --setParameter or setParameter command.
  */
-MONGO_MOD_PUBLIC extern AtomicWord<bool>
+[[MONGO_MOD_PUBLIC]] extern AtomicWord<bool>
     oplogApplicationEnforcesSteadyStateConstraintsInitializedUsingDefault;
 
-MONGO_MOD_PARENT_PRIVATE Status
-onOplogApplicationEnforcesSteadyStateConstraintsUpdate(bool newValue);
+[[MONGO_MOD_PARENT_PRIVATE]] Status onOplogApplicationEnforcesSteadyStateConstraintsUpdate(
+    bool newValue);
 
 }  // namespace repl
 }  // namespace mongo

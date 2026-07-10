@@ -72,9 +72,9 @@ namespace mongo::replicated_fast_count {
  * and `fast_count_metadata_timestamps_store`, are used to recover the correct collection size and
  * counts.
  */
-class MONGO_MOD_PUBLIC ReplicatedFastCountManager : public FlushAllFilesObserver {
+class [[MONGO_MOD_PUBLIC]] ReplicatedFastCountManager : public FlushAllFilesObserver {
 public:
-    MONGO_MOD_PRIVATE ReplicatedFastCountManager(
+    [[MONGO_MOD_PRIVATE]] ReplicatedFastCountManager(
         std::unique_ptr<SizeCountStore> sizeCountStore,
         std::unique_ptr<SizeCountTimestampStore> timestampStore)
         : _sizeCountStore(std::move(sizeCountStore)), _timestampStore(std::move(timestampStore)) {

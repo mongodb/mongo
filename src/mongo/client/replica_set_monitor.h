@@ -53,7 +53,7 @@ namespace mongo {
  * A ReplicaSetMonitor holds a state about the replica set and provides a means to refresh the local
  * view. All methods perform the required synchronization to allow callers from multiple threads.
  */
-class MONGO_MOD_PUBLIC ReplicaSetMonitor : public ReplicaSetMonitorInterface {
+class [[MONGO_MOD_PUBLIC]] ReplicaSetMonitor : public ReplicaSetMonitorInterface {
 public:
     ~ReplicaSetMonitor() override;
 

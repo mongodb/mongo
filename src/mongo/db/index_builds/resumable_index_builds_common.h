@@ -44,7 +44,7 @@ namespace mongo::index_builds {
  * Read and parse the index build resume state from the table at `ident`. Returns boost::none if the
  * table is missing, empty, or any record fails to parse.
  */
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 boost::optional<ResumeIndexInfo> readAndParseResumeIndexInfo(StorageEngine* engine,
                                                              OperationContext* opCtx,
                                                              const std::string& ident);

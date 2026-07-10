@@ -45,7 +45,7 @@ using namespace std::literals::string_view_literals;
  * The registry keeps track of all registered instances of `ObservableMutex` and provides an
  * interface to collect contention stats.
  */
-class MONGO_MOD_PUBLIC ObservableMutexRegistry {
+class [[MONGO_MOD_PUBLIC]] ObservableMutexRegistry {
 public:
     static constexpr auto kTotalAcquisitionsFieldName = "total"sv;
     static constexpr auto kTotalContentionsFieldName = "contentions"sv;

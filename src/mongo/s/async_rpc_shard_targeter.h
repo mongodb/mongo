@@ -62,7 +62,7 @@
 namespace mongo {
 namespace async_rpc {
 
-class MONGO_MOD_OPEN ShardIdTargeter : public Targeter {
+class [[MONGO_MOD_OPEN]] ShardIdTargeter : public Targeter {
 public:
     ShardIdTargeter(ExecutorPtr executor,
                     OperationContext* opCtx,

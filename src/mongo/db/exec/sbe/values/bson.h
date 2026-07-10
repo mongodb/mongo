@@ -37,20 +37,20 @@
 #include <cstddef>
 #include <string_view>
 
-// TODO(SERVER-114140): Remove all MONGO_MOD_NEEDS_REPLACEMENT annotations
+// TODO(SERVER-114140): Remove all [[MONGO_MOD_NEEDS_REPLACEMENT]] annotations
 
 namespace mongo {
 namespace sbe {
 namespace bson {
-MONGO_MOD_NEEDS_REPLACEMENT value::TagValueView convertToView(const char* be,
-                                                              const char* end,
-                                                              size_t fieldNameSize);
-MONGO_MOD_NEEDS_REPLACEMENT value::TagValueView convertToView(const BSONElement& elem);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] value::TagValueView convertToView(const char* be,
+                                                                  const char* end,
+                                                                  size_t fieldNameSize);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] value::TagValueView convertToView(const BSONElement& elem);
 
-MONGO_MOD_NEEDS_REPLACEMENT value::TagValueOwned convertToOwned(const char* be,
-                                                                const char* end,
-                                                                size_t fieldNameSize);
-MONGO_MOD_NEEDS_REPLACEMENT value::TagValueOwned convertToOwned(const BSONElement& elem);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] value::TagValueOwned convertToOwned(const char* be,
+                                                                    const char* end,
+                                                                    size_t fieldNameSize);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] value::TagValueOwned convertToOwned(const BSONElement& elem);
 
 /**
  * Advance table specifies how to change the pointer to skip current BSON value (so that pointer

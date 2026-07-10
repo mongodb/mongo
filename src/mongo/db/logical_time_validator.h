@@ -52,7 +52,7 @@ class KeysCollectionManager;
  * This is responsible for signing cluster times that can be used to sent to other servers and
  * verifying signatures of signed cluster times.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT LogicalTimeValidator {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] LogicalTimeValidator {
 public:
     // Decorate ServiceContext with LogicalTimeValidator instance.
     static std::shared_ptr<LogicalTimeValidator> get(ServiceContext* service);

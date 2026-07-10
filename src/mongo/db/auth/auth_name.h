@@ -61,7 +61,7 @@ namespace mongo {
  * Consists of a general "name" part, and a "database name" part.
  */
 template <typename T>
-class MONGO_MOD_PUBLIC AuthName {
+class [[MONGO_MOD_PUBLIC]] AuthName {
 public:
     AuthName() = default;
 
@@ -201,7 +201,7 @@ static inline Stream& operator<<(Stream& os, const AuthName<T>& name) {
  * Iterator over an unspecified container of AuthName objects.
  */
 template <typename T>
-class MONGO_MOD_PUBLIC AuthNameIterator {
+class [[MONGO_MOD_PUBLIC]] AuthNameIterator {
 public:
     class Impl {
     public:

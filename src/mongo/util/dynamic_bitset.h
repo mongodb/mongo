@@ -39,7 +39,7 @@
 #include <string_view>
 #include <type_traits>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace bitset_details {
 template <typename T>
 T maskbit(size_t bitIndex) {
@@ -610,4 +610,4 @@ DynamicBitsetPopulationView<T, nBlocks, Storage> makePopulationView(
     const DynamicBitset<T, nBlocks, Storage>& bitset) {
     return DynamicBitsetPopulationView<T, nBlocks, Storage>(bitset);
 }
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

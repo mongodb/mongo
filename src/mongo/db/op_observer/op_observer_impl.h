@@ -59,7 +59,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace repl {
 
 class ReplOperation;
@@ -327,4 +327,4 @@ private:
     std::unique_ptr<OperationLogger> _operationLogger;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

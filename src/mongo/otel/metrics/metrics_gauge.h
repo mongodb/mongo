@@ -37,7 +37,7 @@ namespace mongo::otel::metrics {
 
 /** Gauge interface with typed attributes. set() stores the current value (replaces, not adds). */
 template <typename T, AttributeType... AttributeTs>
-class MONGO_MOD_PUBLIC Gauge {
+class [[MONGO_MOD_PUBLIC]] Gauge {
 public:
     using Attributes = std::tuple<AttributeTs...>;
     virtual ~Gauge() = default;
@@ -54,7 +54,7 @@ public:
 
 /** Specialization when there are no attributes, adding a convenience set(T) overload. */
 template <typename T>
-class MONGO_MOD_PUBLIC Gauge<T> {
+class [[MONGO_MOD_PUBLIC]] Gauge<T> {
 public:
     using Attributes = std::tuple<>;
     virtual ~Gauge() = default;
@@ -76,7 +76,7 @@ protected:
  * nodes). Initialized to numeric_limits<T>::max() so the first observation always wins.
  */
 template <typename T, AttributeType... AttributeTs>
-class MONGO_MOD_PUBLIC MinGauge : public virtual Gauge<T, AttributeTs...> {
+class [[MONGO_MOD_PUBLIC]] MinGauge : public virtual Gauge<T, AttributeTs...> {
 public:
     using Attributes = std::tuple<AttributeTs...>;
     virtual void setIfLess(T value, const Attributes& attributes) = 0;
@@ -85,7 +85,7 @@ public:
 
 /** Specialization when there are no attributes, adding a convenience setIfLess(T) overload. */
 template <typename T>
-class MONGO_MOD_PUBLIC MinGauge<T> : public virtual Gauge<T> {
+class [[MONGO_MOD_PUBLIC]] MinGauge<T> : public virtual Gauge<T> {
 public:
     using Attributes = std::tuple<>;
     void setIfLess(T value) {
@@ -103,7 +103,7 @@ protected:
  * numeric_limits<T>::lowest() so the first observation always wins.
  */
 template <typename T, AttributeType... AttributeTs>
-class MONGO_MOD_PUBLIC MaxGauge : public virtual Gauge<T, AttributeTs...> {
+class [[MONGO_MOD_PUBLIC]] MaxGauge : public virtual Gauge<T, AttributeTs...> {
 public:
     using Attributes = std::tuple<AttributeTs...>;
     virtual void setIfGreater(T value, const Attributes& attributes) = 0;
@@ -112,7 +112,7 @@ public:
 
 /** Specialization when there are no attributes, adding a convenience setIfGreater(T) overload. */
 template <typename T>
-class MONGO_MOD_PUBLIC MaxGauge<T> : public virtual Gauge<T> {
+class [[MONGO_MOD_PUBLIC]] MaxGauge<T> : public virtual Gauge<T> {
 public:
     using Attributes = std::tuple<>;
     void setIfGreater(T value) {

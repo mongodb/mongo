@@ -165,7 +165,7 @@ std::pair<BSONObj, bool> transformDocument(OperationContext* opCtx,
 // Returns the UpdateResult paired with the byte size of the post-image document. The size is read
 // directly from the already-live buffer (zero allocation) and is always the size of the document
 // after the update regardless of the ReturnDocOption set on the request.
-MONGO_MOD_PUBLIC std::pair<UpdateResult, int> parseAndTransformOplogUpdate(
+[[MONGO_MOD_PUBLIC]] std::pair<UpdateResult, int> parseAndTransformOplogUpdate(
     OperationContext* opCtx,
     const CollectionAcquisition& coll,
     const Snapshotted<BSONObj>& oldObj,

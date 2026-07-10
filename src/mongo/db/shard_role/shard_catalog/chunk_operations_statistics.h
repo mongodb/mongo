@@ -39,7 +39,7 @@ namespace mongo {
  * mergeAllChunks and moveRange), including their lifecycle outcomes, the volume of chunks they
  * affect, and the local shard-catalog commits they produce.
  */
-class MONGO_MOD_PUBLIC ChunkOperationsStatistics {
+class [[MONGO_MOD_PUBLIC]] ChunkOperationsStatistics {
 public:
     // Identifies which chunk-operation coordinator a lifecycle event belongs to.
     enum class ChunkOperationType { kSplitChunk, kMergeChunks, kMergeAllChunks, kMoveRange };

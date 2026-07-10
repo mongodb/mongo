@@ -40,7 +40,7 @@ namespace mongo::unittest {
 /**
  * Represents data about a single unit test.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT TestInfo {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] TestInfo {
 public:
     constexpr TestInfo(std::string_view suiteName,
                        std::string_view testName,

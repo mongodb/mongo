@@ -51,7 +51,7 @@
 
 namespace mongo::logv2 {
 
-class MONGO_MOD_OPEN JSONFormatter {
+class [[MONGO_MOD_OPEN]] JSONFormatter {
 public:
     JSONFormatter(const AtomicWord<int32_t>* maxAttributeSizeKB = nullptr,
                   LogTimestampFormat timestampFormat = LogTimestampFormat::kISO8601UTC)

@@ -41,7 +41,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 enum class IncludeDuplicateRecordId { kOff, kOn };
 
@@ -109,4 +109,4 @@ private:
     boost::optional<RecordId> _duplicateRid;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

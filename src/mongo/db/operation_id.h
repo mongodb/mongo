@@ -36,7 +36,7 @@
 #include <cstdint>
 #include <mutex>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 class ServiceContext;
 class Client;
 class ClientLock;
@@ -100,4 +100,4 @@ private:
     size_t _leaseStartBitMask = ~(kDefaultLeaseSize - 1);
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

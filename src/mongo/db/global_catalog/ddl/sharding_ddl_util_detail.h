@@ -48,7 +48,7 @@
 #include <vector>
 
 namespace mongo {
-namespace MONGO_MOD_PRIVATE sharding_ddl_util_detail {
+namespace [[MONGO_MOD_PRIVATE]] sharding_ddl_util_detail {
 
 template <typename CommandType>
 void preprocessCommand(OperationContext* opCtx, CommandType& cmd) {
@@ -280,5 +280,5 @@ sendAuthenticatedCommandToShards<ShardsvrCommitDropDatabaseMetadata>(
     ReadPreferenceSetting readPref,
     bool throwOnError);
 
-}  // namespace MONGO_MOD_PRIVATE sharding_ddl_util_detail
+}  // namespace sharding_ddl_util_detail
 }  // namespace mongo

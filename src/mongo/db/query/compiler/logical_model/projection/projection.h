@@ -91,7 +91,7 @@ public:
      * Returns true if the projection requires match details from the query,
      * and false otherwise.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT bool requiresMatchDetails() const {
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] bool requiresMatchDetails() const {
         return _deps.requiresMatchDetails;
     }
 
@@ -117,7 +117,7 @@ public:
         return *_deps.paths;
     }
 
-    MONGO_MOD_NEEDS_REPLACEMENT const QueryMetadataBitSet& metadataDeps() const {
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] const QueryMetadataBitSet& metadataDeps() const {
         return _deps.metadataRequested;
     }
 

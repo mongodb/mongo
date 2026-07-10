@@ -55,7 +55,7 @@
 #include <boost/optional.hpp>
 
 namespace mongo::transport {
-namespace MONGO_MOD_PARENT_PRIVATE grpc {
+namespace [[MONGO_MOD_PARENT_PRIVATE]] grpc {
 
 /**
  * Captures the common semantics for ingress and egress gRPC sessions.
@@ -518,5 +518,5 @@ private:
     boost::optional<SSLConfiguration> _sslConfig;
 };
 
-}  // namespace MONGO_MOD_PARENT_PRIVATE grpc
+}  // namespace grpc
 }  // namespace mongo::transport

@@ -32,7 +32,7 @@
 #include "mongo/db/storage/container_base.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class StubIntegerKeyedContainer final : public IntegerKeyedContainerBase {
 public:
@@ -74,4 +74,4 @@ public:
     }
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -54,7 +54,7 @@
 
 #include <boost/optional/optional.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 namespace mongo {
 
 class SortKeyGenerator {

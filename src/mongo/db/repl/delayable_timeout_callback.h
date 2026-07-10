@@ -41,7 +41,7 @@
 #include <string>
 #include <utility>
 
-namespace MONGO_MOD_PARENT_PRIVATE mongo {
+namespace [[MONGO_MOD_PARENT_PRIVATE]] mongo {
 namespace repl {
 
 /**
@@ -154,4 +154,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace MONGO_MOD_PARENT_PRIVATE mongo
+}  // namespace mongo

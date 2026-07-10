@@ -58,7 +58,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 // Indicates which protocol an index build is using.
 enum class IndexBuildProtocol {
@@ -755,4 +755,4 @@ private:
     IndexBuildMetrics _metrics;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

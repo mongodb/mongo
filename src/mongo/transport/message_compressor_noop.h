@@ -33,7 +33,7 @@
 #include "mongo/util/modules.h"
 namespace mongo {
 
-class MONGO_MOD_PUBLIC NoopMessageCompressor final : public MessageCompressorBase {
+class [[MONGO_MOD_PUBLIC]] NoopMessageCompressor final : public MessageCompressorBase {
 public:
     NoopMessageCompressor() : MessageCompressorBase(MessageCompressor::kNoop) {}
 

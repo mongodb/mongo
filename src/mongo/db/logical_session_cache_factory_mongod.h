@@ -36,14 +36,14 @@
 
 namespace mongo {
 
-enum class MONGO_MOD_PUB LogicalSessionCacheServer {
+enum class [[MONGO_MOD_PUBLIC]] LogicalSessionCacheServer {
     kSharded,
     kConfigServer,
     kReplicaSet,
     kStandalone
 };
 
-MONGO_MOD_PUB std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheD(
+[[MONGO_MOD_PUBLIC]] std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheD(
     LogicalSessionCacheServer state);
 
 }  // namespace mongo

@@ -41,7 +41,7 @@
 #include <string>
 #include <thread>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * A configurable thread pool, for general use.
@@ -175,4 +175,4 @@ private:
     std::unique_ptr<Impl> _impl;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

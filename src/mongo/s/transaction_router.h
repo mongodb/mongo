@@ -70,7 +70,7 @@ namespace mongo {
 /**
  * Keeps track of the transaction state. A session is in use when it is being used by a request.
  */
-class MONGO_MOD_PUB TransactionRouter {
+class [[MONGO_MOD_PUBLIC]] TransactionRouter {
     struct PrivateState;
     struct ObservableState;
 
@@ -105,7 +105,7 @@ public:
      * cannot be changed without restarting the transactions that may have already been begun on
      * every participant, i.e. clearing the current participant list.
      */
-    struct MONGO_MOD_PRIVATE SharedTransactionOptions {
+    struct [[MONGO_MOD_PRIVATE]] SharedTransactionOptions {
         // Set for all distributed transactions.
         TxnNumberAndRetryCounter txnNumberAndRetryCounter;
         APIParameters apiParameters;
@@ -187,7 +187,7 @@ public:
 
     // Container for timing stats for the current transaction. Includes helpers for calculating some
     // metrics like transaction duration.
-    struct MONGO_MOD_PRIVATE TimingStats {
+    struct [[MONGO_MOD_PRIVATE]] TimingStats {
         /**
          * Returns the duration of the transaction. The transaction start time must have been set
          * before this can be called.

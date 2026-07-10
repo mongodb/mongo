@@ -42,7 +42,7 @@ namespace mongo {
 
 class ServiceContext;
 
-struct MONGO_MOD_PUB ProfileSettings {
+struct [[MONGO_MOD_PUBLIC]] ProfileSettings {
     int level{0};
     std::shared_ptr<const ProfileFilter> filter;  // nullable
     Milliseconds slowOpInProgressThreshold{0};
@@ -71,7 +71,7 @@ struct MONGO_MOD_PUB ProfileSettings {
  * All functions that modify the profile settings are assumed to be called very infrequently, and
  * thus enable performance optimizations for calls to read-only functions.
  */
-class MONGO_MOD_PUB DatabaseProfileSettings {
+class [[MONGO_MOD_PUBLIC]] DatabaseProfileSettings {
 public:
     static DatabaseProfileSettings& get(ServiceContext* svcCtx);
 

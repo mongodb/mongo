@@ -42,7 +42,7 @@
 #include <boost/log/sinks.hpp>
 
 namespace mongo::logv2 {
-class MONGO_MOD_NEEDS_REPLACEMENT UserAssertSink
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] UserAssertSink
     : public boost::log::sinks::
           basic_formatted_sink_backend<char, boost::log::sinks::concurrent_feeding> {
 public:

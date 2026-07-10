@@ -200,7 +200,7 @@ void registerVisitFuncs(DocumentSourceVisitorRegistry* reg) {
 }
 
 // Declare visitor registry as a decoration on the service context.
-MONGO_MOD_PUBLIC inline const auto getDocumentSourceVisitorRegistry =
+[[MONGO_MOD_PUBLIC]] inline const auto getDocumentSourceVisitorRegistry =
     ServiceContext::declareDecoration<DocumentSourceVisitorRegistry>();
 
 }  // namespace mongo

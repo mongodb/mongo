@@ -51,7 +51,7 @@ FieldRef decodeWildcardMultikeyMetadataPath(const BSONObj& keyBson);
  * Decodes the set of multikey path FieldRefs from a `KeyStringSet` of wildcard index metadata
  * keys. Each key follows the format documented for `makeMultikeyMetadataKey`.
  */
-MONGO_MOD_PUBLIC std::set<FieldRef> extractWildcardMultikeyPathsFromMetadataKeys(
+[[MONGO_MOD_PUBLIC]] std::set<FieldRef> extractWildcardMultikeyPathsFromMetadataKeys(
     const KeyStringSet& metadataKeys, const Ordering& ordering);
 
 }  // namespace mongo

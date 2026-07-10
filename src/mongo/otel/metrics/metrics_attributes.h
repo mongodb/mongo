@@ -103,7 +103,7 @@ concept AttributeType = IsInList<T, AttributeTypes>::value;
  * The definition of an attribute.
  */
 template <AttributeType T>
-struct MONGO_MOD_PUBLIC AttributeDefinition {
+struct [[MONGO_MOD_PUBLIC]] AttributeDefinition {
     std::string name;
     /**
      * All of the possible values this attribute can take.
@@ -331,7 +331,7 @@ template <typename T>
 inline constexpr bool is_std_span_v = is_std_span<std::decay_t<T>>::value;
 /** Wraps a single attribute value for use with absl::HashOf, converting std::span to absl::Span. */
 template <AttributeType T>
-MONGO_MOD_FILE_PRIVATE auto wrapForAbslHash(const T& v) {
+[[MONGO_MOD_FILE_PRIVATE]] auto wrapForAbslHash(const T& v) {
     if constexpr (is_std_span_v<T>) {
         return absl::Span(v.data(), v.size());
     } else {
@@ -400,11 +400,11 @@ std::string formatAttributeValue(const T& v) {
  *   {"b", 2, true}
  *   {"b", 2, false}
  */
-MONGO_MOD_FILE_PRIVATE inline std::vector<std::tuple<>> cartesianProduct() {
+[[MONGO_MOD_FILE_PRIVATE]] inline std::vector<std::tuple<>> cartesianProduct() {
     return {{}};
 }
 template <typename T, typename... Ts>
-MONGO_MOD_FILE_PRIVATE std::vector<std::tuple<T, Ts...>> cartesianProduct(
+[[MONGO_MOD_FILE_PRIVATE]] std::vector<std::tuple<T, Ts...>> cartesianProduct(
     const std::vector<T>& values, const std::vector<Ts>&... rest) {
     std::vector<std::tuple<Ts...>> currentProduct = cartesianProduct(rest...);
 
@@ -448,30 +448,30 @@ ComparableAttributeDefinition makeComparableAttributeDefinition(const AttributeD
 
 /** Converts an owned attribute value back to its view type. */
 template <AttributeType T>
-MONGO_MOD_FILE_PRIVATE T toView(const T& owned) {
+[[MONGO_MOD_FILE_PRIVATE]] T toView(const T& owned) {
     return owned;
 }
-MONGO_MOD_FILE_PRIVATE inline std::string_view toView(const std::string& owned) {
+[[MONGO_MOD_FILE_PRIVATE]] inline std::string_view toView(const std::string& owned) {
     return owned;
 }
 // const_cast is safe: the data is owned and non-const; const is an artifact of the parameter.
-MONGO_MOD_FILE_PRIVATE inline std::span<std::string_view> toView(
+[[MONGO_MOD_FILE_PRIVATE]] inline std::span<std::string_view> toView(
     const AttributeOwnership<std::span<std::string_view>>::OwnedType& owned) {
     return {const_cast<std::string_view*>(owned.stringDatas.data()), owned.stringDatas.size()};
 }
 // const_cast is safe: the data is owned and non-const; const is an artifact of map iteration.
 template <typename T>
-MONGO_MOD_FILE_PRIVATE std::span<T> toView(const std::vector<T>& owned) {
+[[MONGO_MOD_FILE_PRIVATE]] std::span<T> toView(const std::vector<T>& owned) {
     return {const_cast<T*>(owned.data()), owned.size()};
 }
-MONGO_MOD_FILE_PRIVATE inline std::span<bool> toView(
+[[MONGO_MOD_FILE_PRIVATE]] inline std::span<bool> toView(
     const AttributeOwnership<std::span<bool>>::OwnedType& owned) {
     return {owned.storage.get(), owned.size};
 }
 
 /** Converts a list of heap-allocated owned values to a vector of their view types. */
 template <AttributeType ViewT>
-MONGO_MOD_FILE_PRIVATE std::vector<ViewT> viewsOf(
+[[MONGO_MOD_FILE_PRIVATE]] std::vector<ViewT> viewsOf(
     const std::vector<std::unique_ptr<typename AttributeOwnership<ViewT>::OwnedType>>& owned) {
     std::vector<ViewT> views;
     views.reserve(owned.size());
@@ -482,25 +482,25 @@ MONGO_MOD_FILE_PRIVATE std::vector<ViewT> viewsOf(
 
 /** Converts a view attribute value to its owned equivalent. */
 template <AttributeType T>
-MONGO_MOD_FILE_PRIVATE T toOwned(const T& val) {
+[[MONGO_MOD_FILE_PRIVATE]] T toOwned(const T& val) {
     return val;
 }
-MONGO_MOD_FILE_PRIVATE inline std::string toOwned(std::string_view val) {
+[[MONGO_MOD_FILE_PRIVATE]] inline std::string toOwned(std::string_view val) {
     return std::string(val);
 }
 template <typename T>
-MONGO_MOD_FILE_PRIVATE std::vector<T> toOwned(std::span<T> val) {
+[[MONGO_MOD_FILE_PRIVATE]] std::vector<T> toOwned(std::span<T> val) {
     return {val.begin(), val.end()};
 }
-MONGO_MOD_FILE_PRIVATE inline AttributeOwnership<std::span<std::string_view>>::OwnedType toOwned(
-    const std::span<std::string_view>& val) {
+[[MONGO_MOD_FILE_PRIVATE]] inline AttributeOwnership<std::span<std::string_view>>::OwnedType
+toOwned(const std::span<std::string_view>& val) {
     AttributeOwnership<std::span<std::string_view>>::OwnedType result{
         .strings = std::vector<std::string>(val.begin(), val.end())};
     result.stringDatas =
         std::vector<std::string_view>(result.strings.begin(), result.strings.end());
     return result;
 }
-MONGO_MOD_FILE_PRIVATE inline AttributeOwnership<std::span<bool>>::OwnedType toOwned(
+[[MONGO_MOD_FILE_PRIVATE]] inline AttributeOwnership<std::span<bool>>::OwnedType toOwned(
     std::span<bool> val) {
     auto storage = std::make_unique<bool[]>(val.size());
     std::copy(val.begin(), val.end(), storage.get());

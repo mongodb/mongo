@@ -46,7 +46,7 @@ using namespace std::literals::string_view_literals;
 /**
  * Indicates if and how the change event fetching can proceed.
  */
-enum class MONGO_MOD_PUBLIC ShardTargeterDecision {
+enum class [[MONGO_MOD_PUBLIC]] ShardTargeterDecision {
     // Fetching of change stream events can continue.
     kContinue,
 
@@ -54,7 +54,7 @@ enum class MONGO_MOD_PUBLIC ShardTargeterDecision {
     kSwitchToV1,
 };
 
-MONGO_MOD_NEEDS_REPLACEMENT inline std::string_view toString(ShardTargeterDecision decision) {
+[[MONGO_MOD_NEEDS_REPLACEMENT]] inline std::string_view toString(ShardTargeterDecision decision) {
     switch (decision) {
         case ShardTargeterDecision::kContinue:
             return "continue"sv;
@@ -64,7 +64,7 @@ MONGO_MOD_NEEDS_REPLACEMENT inline std::string_view toString(ShardTargeterDecisi
     MONGO_UNREACHABLE_TASSERT(10657560);
 }
 
-class MONGO_MOD_OPEN ChangeStreamShardTargeter {
+class [[MONGO_MOD_OPEN]] ChangeStreamShardTargeter {
 public:
     virtual ~ChangeStreamShardTargeter() = default;
 

@@ -34,7 +34,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/util/modules.h"
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 
@@ -58,7 +58,7 @@ typedef std::multiset<BSONElement, BSONElementCmpWithoutField> BSONElementMultiS
  *
  * All methods are thread-safe.
  */
-class MONGO_MOD_OPEN BSONElement::ComparatorInterface
+class [[MONGO_MOD_OPEN]] BSONElement::ComparatorInterface
     : public BSONComparatorInterfaceBase<BSONElement> {
 public:
     /**

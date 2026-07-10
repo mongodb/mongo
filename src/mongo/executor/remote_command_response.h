@@ -53,7 +53,7 @@ namespace rpc {
 class ReplyInterface;
 }  // namespace rpc
 
-namespace MONGO_MOD_PUBLIC executor {
+namespace [[MONGO_MOD_PUBLIC]] executor {
 
 std::vector<std::string> extractErrorLabels(BSONObj data);
 
@@ -85,11 +85,11 @@ struct RemoteCommandResponse {
 
     bool isOK() const;
 
-    MONGO_MOD_PUBLIC static RemoteCommandResponse make_forTest(Status s);
-    MONGO_MOD_PUBLIC static RemoteCommandResponse make_forTest(Status s, Microseconds elapsed);
-    MONGO_MOD_PUBLIC static RemoteCommandResponse make_forTest(BSONObj dataObj,
-                                                               Microseconds elapsed,
-                                                               bool moreToCome = false);
+    [[MONGO_MOD_PUBLIC]] static RemoteCommandResponse make_forTest(Status s);
+    [[MONGO_MOD_PUBLIC]] static RemoteCommandResponse make_forTest(Status s, Microseconds elapsed);
+    [[MONGO_MOD_PUBLIC]] static RemoteCommandResponse make_forTest(BSONObj dataObj,
+                                                                   Microseconds elapsed,
+                                                                   bool moreToCome = false);
 
     BSONObj data;  ///< Always owned. May point into message.
     boost::optional<Microseconds> elapsed;
@@ -110,5 +110,5 @@ private:
     RemoteCommandResponse(Status s, Microseconds elapsed);
     RemoteCommandResponse(BSONObj dataObj, Microseconds elapsed, bool moreToCome);
 };
-}  // namespace MONGO_MOD_PUBLIC executor
+}  // namespace executor
 }  // namespace mongo

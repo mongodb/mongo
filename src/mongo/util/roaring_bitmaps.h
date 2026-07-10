@@ -42,7 +42,7 @@
 #include <absl/container/btree_map.h>
 #include <absl/container/flat_hash_set.h>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 /**

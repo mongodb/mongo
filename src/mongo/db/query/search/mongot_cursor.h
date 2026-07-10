@@ -37,7 +37,7 @@
 #include <string_view>
 
 namespace mongo {
-namespace MONGO_MOD_PUB mongot_cursor {
+namespace [[MONGO_MOD_PUBLIC]] mongot_cursor {
 using namespace std::literals::string_view_literals;
 inline auto makeRetryOnNetworkErrorPolicy() {
     return [retried = false](const Status& st) mutable {
@@ -190,5 +190,5 @@ void throwIfNotRunningWithMongotHostConfigured(
  * in TaskExecutorCursor.
  */
 bool shouldPinConnection();
-}  // namespace MONGO_MOD_PUB mongot_cursor
+}  // namespace mongot_cursor
 }  // namespace mongo

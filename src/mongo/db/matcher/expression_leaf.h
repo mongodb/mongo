@@ -191,7 +191,7 @@ public:
      */
     virtual std::string_view name() const = 0;
 
-    MONGO_MOD_NEEDS_REPLACEMENT const BSONElement& getData() const {
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] const BSONElement& getData() const {
         return _rhs;
     }
 
@@ -307,7 +307,8 @@ public:
     ~ComparisonMatchExpression() override = default;
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT EqualityMatchExpression final : public ComparisonMatchExpression {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] EqualityMatchExpression final
+    : public ComparisonMatchExpression {
 public:
     static constexpr std::string_view kName = "$eq"sv;
 
@@ -353,7 +354,7 @@ public:
     }
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT LTEMatchExpression final : public ComparisonMatchExpression {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] LTEMatchExpression final : public ComparisonMatchExpression {
 public:
     static constexpr std::string_view kName = "$lte"sv;
 
@@ -738,7 +739,7 @@ public:
 /**
  * query operator: $in
  */
-class MONGO_MOD_NEEDS_REPLACEMENT InMatchExpression : public LeafMatchExpression {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] InMatchExpression : public LeafMatchExpression {
 public:
     explicit InMatchExpression(boost::optional<std::string_view> path,
                                clonable_ptr<ErrorAnnotation> annotation = nullptr);

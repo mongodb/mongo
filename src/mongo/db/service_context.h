@@ -66,7 +66,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 
@@ -153,7 +153,7 @@ auto makeLockHandleForObjectLock(T* object) {
  * destroyed.
  */
 template <typename T, typename MutexType = T>
-class MONGO_MOD_PUBLIC ObjectLock {
+class [[MONGO_MOD_PUBLIC]] ObjectLock {
 public:
     ObjectLock() = default;
     explicit ObjectLock(T* obj) : _lk(makeLockHandleForObjectLock(obj)), _object(obj) {}
@@ -200,7 +200,7 @@ using ServiceContextLock =
  * See registerKillOpListener() for more information,
  * including limitations on the lifetime of registered listeners.
  */
-class MONGO_MOD_OPEN KillOpListenerInterface {
+class [[MONGO_MOD_OPEN]] KillOpListenerInterface {
 public:
     KillOpListenerInterface(const KillOpListenerInterface&) = delete;
     KillOpListenerInterface& operator=(const KillOpListenerInterface&) = delete;
@@ -376,7 +376,7 @@ public:
      * Observer interface implemented to hook client and operation context creation and
      * destruction.
      */
-    class MONGO_MOD_OPEN ClientObserver {
+    class [[MONGO_MOD_OPEN]] ClientObserver {
     public:
         virtual ~ClientObserver() = default;
 

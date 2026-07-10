@@ -34,7 +34,7 @@
 
 #include <string>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Background job which regularly performs cleanup tasks on the ClusterCursorManager owned by the
@@ -52,4 +52,4 @@ public:
 
 extern ClusterCursorCleanupJob clusterCursorCleanupJob;
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

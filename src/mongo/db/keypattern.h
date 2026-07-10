@@ -57,7 +57,7 @@ namespace mongo {
  *    { a : 1 , b  : -1 }
  *    { a : "hashed" }
  */
-class MONGO_MOD_PUBLIC KeyPattern {
+class [[MONGO_MOD_PUBLIC]] KeyPattern {
 public:
     /**
      * Is the provided key pattern ordered increasing or decreasing or not?

@@ -43,7 +43,7 @@ namespace mongo {
  * updates from config.replicaSetWritesCriticalSections.
  */
 // TODO (SERVER-125476): Change the class modularity to PRIVATE
-class MONGO_MOD_NEEDS_REPLACEMENT ReplicaSetWriteBlockOpObserver final : public OpObserverNoop {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ReplicaSetWriteBlockOpObserver final : public OpObserverNoop {
     ReplicaSetWriteBlockOpObserver(const ReplicaSetWriteBlockOpObserver&) = delete;
     ReplicaSetWriteBlockOpObserver& operator=(const ReplicaSetWriteBlockOpObserver&) = delete;
 

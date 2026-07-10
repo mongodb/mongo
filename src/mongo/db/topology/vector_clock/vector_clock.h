@@ -55,7 +55,7 @@ namespace mongo {
  * The VectorClock service provides a collection of cluster-wide logical clocks (including the
  * clusterTime), that are used to provide causal-consistency to various other services.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT VectorClock {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] VectorClock {
 protected:
     enum class Component : uint8_t {
         ClusterTime = 0,

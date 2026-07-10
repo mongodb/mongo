@@ -64,7 +64,7 @@ namespace mongo {
  *
  * See ShardServerOpObserver.
  */
-class MONGO_MOD_PUBLIC MigrationChunkClonerSourceOpObserver final : public OpObserverNoop {
+class [[MONGO_MOD_PUBLIC]] MigrationChunkClonerSourceOpObserver final : public OpObserverNoop {
 public:
     /**
      * Write operations do shard version checking, but if an update operation runs as part of a

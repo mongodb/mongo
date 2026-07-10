@@ -35,7 +35,7 @@
 #include <string>
 #include <string_view>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 /**
  * This library collects Mongo-specific PCRE conventions which are useful

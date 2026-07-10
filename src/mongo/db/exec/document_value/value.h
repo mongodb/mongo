@@ -61,7 +61,7 @@
 #include <utility>
 #include <vector>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 class BSONElement;
 
 /** A variant type that can hold any type of data representable in BSON
@@ -508,7 +508,7 @@ public:
         return values;
     }
 };
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo
 
 /* ======================= INLINED IMPLEMENTATIONS ========================== */
 

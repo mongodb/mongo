@@ -56,7 +56,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * This class wraps the different kinds of command requests into a generically usable write command
@@ -263,4 +263,4 @@ BatchedCommandRequest::BatchType convertOpType(BulkWriteCRUDOp::OpType opType);
  */
 void checkIsTimeseriesNamespace(const write_ops::WriteCommandRequestBase& wcb);
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

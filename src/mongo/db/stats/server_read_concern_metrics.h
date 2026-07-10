@@ -41,7 +41,7 @@ namespace mongo {
 /**
  * Container for server-wide statistics on readConcern levels used by operations.
  */
-class MONGO_MOD_PUB ServerReadConcernMetrics {
+class [[MONGO_MOD_PUBLIC]] ServerReadConcernMetrics {
     ServerReadConcernMetrics(const ServerReadConcernMetrics&) = delete;
     ServerReadConcernMetrics& operator=(const ServerReadConcernMetrics&) = delete;
 

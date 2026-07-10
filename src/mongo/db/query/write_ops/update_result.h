@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-struct MONGO_MOD_PUBLIC UpdateResult {
+struct [[MONGO_MOD_PUBLIC]] UpdateResult {
     UpdateResult(bool existing,
                  bool modifiers,
                  unsigned long long numDocsModified,

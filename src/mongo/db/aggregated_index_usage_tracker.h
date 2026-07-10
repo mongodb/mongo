@@ -37,7 +37,7 @@
 #include <functional>
 #include <string>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 class IndexDescriptor;
 class ServiceContext;
 
@@ -69,14 +69,14 @@ struct IndexFeatures {
  * IndexFeatureStats holds statistics about a specific index feature. Its data members are mutable
  * atomics to allow itself to be used in a const map safely.
  */
-struct MONGO_MOD_PRIVATE IndexFeatureStats {
+struct [[MONGO_MOD_PRIVATE]] IndexFeatureStats {
     // Number of indexes that have this feature.
     mutable AtomicWord<long long> count{0};
     // Number of operations that have used indexes with this feature.
     mutable AtomicWord<long long> accesses{0};
 };
 
-enum class MONGO_MOD_PRIVATE FeatureStatType {
+enum class [[MONGO_MOD_PRIVATE]] FeatureStatType {
     kCollation,
     kCompound,
     kId,
@@ -144,4 +144,4 @@ private:
     // Total number of indexes being tracked.
     mutable AtomicWord<long long> _count;
 };
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

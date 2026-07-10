@@ -35,7 +35,7 @@
 
 #include <kms_message/kms_message.h>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 namespace kms_message_support_detail {

@@ -35,7 +35,7 @@
 
 #include <boost/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 /**
  * Contains information extracted from the peer certificate which is consumed by subsystems
  * outside of the networking stack.
@@ -109,4 +109,4 @@ private:
     stdx::unordered_set<RoleName> _roles;
     boost::optional<std::string> _clusterMembership;
 };
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

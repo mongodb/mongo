@@ -47,7 +47,7 @@ Status addBaseServerOptions(optionenvironment::OptionSection*);
 /**
  * General server options for most standalone applications. Includes addBaseServerOptions.
  */
-MONGO_MOD_PUB Status addGeneralServerOptions(optionenvironment::OptionSection*);
+[[MONGO_MOD_PUBLIC]] Status addGeneralServerOptions(optionenvironment::OptionSection*);
 
 Status validateSystemLogDestinationSetting(const std::string&);
 

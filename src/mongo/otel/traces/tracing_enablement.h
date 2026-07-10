@@ -35,6 +35,6 @@
 
 namespace mongo::otel::traces {
 
-MONGO_MOD_PUBLIC bool isTracingEnabled(OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] bool isTracingEnabled(OperationContext* opCtx);
 
 }

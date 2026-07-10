@@ -62,7 +62,7 @@ extern FailPoint hangAfterLoggingApplyOpsForTransaction;
  * Provides methods for exporting ReplOperations in one or more applyOps oplog entries.
  * Concurrency control for this class is maintained by the TransactionParticipant.
  */
-class MONGO_MOD_PUB TransactionOperations {
+class [[MONGO_MOD_PUBLIC]] TransactionOperations {
 public:
     using TransactionOperation = repl::ReplOperation;
     using CollectionUUIDs = stdx::unordered_set<UUID, UUID::Hash>;

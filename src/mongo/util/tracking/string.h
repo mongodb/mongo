@@ -36,7 +36,7 @@
 #include <scoped_allocator>
 #include <string>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace tracking {
 
 using string = std::basic_string<char, std::char_traits<char>, Allocator<char>>;
@@ -47,4 +47,4 @@ string make_string(Context& Context, Args... args) {
 }
 
 }  // namespace tracking
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

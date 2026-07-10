@@ -62,7 +62,7 @@ namespace repl {
  * Response structure for the hello command. Only handles responses from nodes
  * that are in replset mode.
  */
-class MONGO_MOD_PUB HelloResponse {
+class [[MONGO_MOD_PUBLIC]] HelloResponse {
 public:
     HelloResponse();
 

@@ -40,7 +40,7 @@
 
 #include <memory>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 /**
  * db helpers are helper functions and classes that let us easily manipulate the local
  * database instance in-proc.
@@ -214,4 +214,4 @@ struct Helpers {
                                       BSONObj& result);
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

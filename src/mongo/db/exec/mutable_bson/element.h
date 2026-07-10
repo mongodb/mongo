@@ -124,7 +124,7 @@ class Document;
  *    be removed.
  */
 
-class MONGO_MUTABLE_BSON_API MONGO_MOD_PUBLIC Element {
+class MONGO_MUTABLE_BSON_API [[MONGO_MOD_PUBLIC]] Element {
 public:
     typedef uint32_t RepIdx;
 

@@ -40,7 +40,7 @@
 #include <typeinfo>
 #include <vector>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo::optionenvironment {
 

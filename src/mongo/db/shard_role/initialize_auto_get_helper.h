@@ -57,7 +57,7 @@ namespace mongo {
  * receiving shard can detect a placement change against the transaction's read snapshot. Outside a
  * transaction it is boost::none and nothing is stamped.
  */
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 std::pair<ShardVersion, boost::optional<DatabaseVersion>> resolveShardRoleVersions(
     OperationContext* opCtx,
     const CollectionRoutingInfo& cri,
@@ -68,7 +68,7 @@ std::pair<ShardVersion, boost::optional<DatabaseVersion>> resolveShardRoleVersio
  * Function which produces an vector of 'ScopedShardRole' objects for the namespaces in 'nssList'
  * using the routing information in 'criMap'.
  */
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 std::vector<ScopedSetShardRole> createScopedShardRoles(
     OperationContext* opCtx,
     const stdx::unordered_map<NamespaceString, CollectionRoutingInfo>& criMap,
@@ -81,7 +81,7 @@ std::vector<ScopedSetShardRole> createScopedShardRoles(
  * Returns whether any namespaces in 'secondaryExecNssList' are non local.
  */
 template <typename F>
-MONGO_MOD_PUBLIC bool initializeAutoGet(
+[[MONGO_MOD_PUBLIC]] bool initializeAutoGet(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const std::vector<NamespaceStringOrUUID>& secondaryExecNssList,

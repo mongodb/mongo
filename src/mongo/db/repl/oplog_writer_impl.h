@@ -37,10 +37,10 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace repl {
 
-class MONGO_MOD_PRIVATE OplogWriterStats {
+class [[MONGO_MOD_PRIVATE]] OplogWriterStats {
 public:
     void incrementBatchSize(uint64_t n);
     TimerStats& getBatches();
@@ -158,4 +158,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

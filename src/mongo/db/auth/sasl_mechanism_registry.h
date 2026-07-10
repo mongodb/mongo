@@ -373,7 +373,7 @@ public:
  * mechanism from. Also capable of producing a list of mechanisms which would be valid for a
  * particular user.
  */
-class MONGO_MOD_PUBLIC SASLServerMechanismRegistry {
+class [[MONGO_MOD_PUBLIC]] SASLServerMechanismRegistry {
 public:
     static SASLServerMechanismRegistry& get(Service* service);
     static void set(Service* service, std::unique_ptr<SASLServerMechanismRegistry> registry);

@@ -41,7 +41,7 @@
 // This file has utilities for usage by the generated IDL parsers which are
 // considered part of the module with the .idl file, rather than the core.idl
 // module. These utilities are not for general consumption outside of this module.
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS;
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]];
 
 namespace mongo::idl {
 

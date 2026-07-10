@@ -51,8 +51,8 @@ namespace mongo::catalog_helper_ddl {
  * system.views collection.
  */
 
-// TODO (SERVER-120463) remove MONGO_MOD_UNFORTUNATELY_OPEN
-class MONGO_MOD_UNFORTUNATELY_OPEN AcquisitionsForCatalogWrites {
+// TODO (SERVER-120463) remove [[MONGO_MOD_UNFORTUNATELY_OPEN]]
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] AcquisitionsForCatalogWrites {
 public:
     AcquisitionsForCatalogWrites(const CollectionOrViewAcquisitionMap& acquisitions)
         : _acquisitions(acquisitions) {
@@ -81,8 +81,9 @@ private:
     boost::optional<CollectionAcquisition> _systemViewsAcquisition;
 };
 
-// TODO (SERVER-120463) remove MONGO_MOD_UNFORTUNATELY_OPEN
-MONGO_MOD_UNFORTUNATELY_OPEN AcquisitionsForCatalogWrites acquireCollectionOrViewForCatalogWrites(
-    OperationContext* opCtx, const CollectionOrViewAcquisitionRequests& requests);
+// TODO (SERVER-120463) remove [[MONGO_MOD_UNFORTUNATELY_OPEN]]
+[[MONGO_MOD_UNFORTUNATELY_OPEN]] AcquisitionsForCatalogWrites
+acquireCollectionOrViewForCatalogWrites(OperationContext* opCtx,
+                                        const CollectionOrViewAcquisitionRequests& requests);
 
 }  // namespace mongo::catalog_helper_ddl

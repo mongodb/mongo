@@ -41,7 +41,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class CurOpFailpointHelpers {
 public:
@@ -74,4 +74,4 @@ public:
                                           const std::function<void()>& whileWaiting = nullptr,
                                           const NamespaceString& nss = {});
 };
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

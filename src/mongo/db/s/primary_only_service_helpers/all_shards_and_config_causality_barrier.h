@@ -38,7 +38,7 @@ namespace mongo {
  * CausalityBarrier implementation that performs a noop retryable write on all shards and the
  * config server.
  */
-class MONGO_MOD_PUBLIC AllShardsAndConfigCausalityBarrier : public CausalityBarrier {
+class [[MONGO_MOD_PUBLIC]] AllShardsAndConfigCausalityBarrier : public CausalityBarrier {
 public:
     AllShardsAndConfigCausalityBarrier(std::shared_ptr<executor::TaskExecutor> executor,
                                        CancellationToken token);

@@ -71,12 +71,12 @@
 #include <array>
 #include <cstdint>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace ctype {
 namespace detail {
 
 /** Define a bit position for each character class queryable with this API. */
-enum MONGO_MOD_FILE_PRIVATE ClassBit : uint16_t {
+enum [[MONGO_MOD_FILE_PRIVATE]] ClassBit : uint16_t {
     kUpper = 1 << 0,   //< [upper] UPPERCASE
     kLower = 1 << 1,   //< [lower] lowercase
     kAlpha = 1 << 2,   //< [alpha] Alphabetic (upper case or lower case)
@@ -92,7 +92,7 @@ enum MONGO_MOD_FILE_PRIVATE ClassBit : uint16_t {
 };
 
 /** Returns the bitwise-or of all `ClassBit` pertinent to character `c`.  */
-MONGO_MOD_FILE_PRIVATE constexpr uint16_t calculateClassBits(unsigned char c) {
+[[MONGO_MOD_FILE_PRIVATE]] constexpr uint16_t calculateClassBits(unsigned char c) {
     if (c >= 0x80)
         return 0;
     uint16_t r = 0;
@@ -124,19 +124,19 @@ MONGO_MOD_FILE_PRIVATE constexpr uint16_t calculateClassBits(unsigned char c) {
 }
 
 /** The character class memberships for each char. */
-MONGO_MOD_FILE_PRIVATE constexpr auto chClassTable = [] {
+[[MONGO_MOD_FILE_PRIVATE]] constexpr auto chClassTable = [] {
     std::array<uint16_t, 256> arr{};
     for (size_t i = 0; i < arr.size(); ++i)
         arr[i] = calculateClassBits(i);
     return arr;
 }();
 
-MONGO_MOD_FILE_PRIVATE constexpr bool isMember(char c, uint16_t mask) {
+[[MONGO_MOD_FILE_PRIVATE]] constexpr bool isMember(char c, uint16_t mask) {
     return chClassTable[static_cast<unsigned char>(c)] & mask;
 }
 
 /** Lookup table for `toUpper`. */
-MONGO_MOD_FILE_PRIVATE constexpr auto chUpperTable = [] {
+[[MONGO_MOD_FILE_PRIVATE]] constexpr auto chUpperTable = [] {
     std::array<char, 256> arr{};
     for (size_t i = 0; i < arr.size(); ++i)
         arr[i] = isMember(i, kLower) ? 'A' + (i - 'a') : i;
@@ -144,7 +144,7 @@ MONGO_MOD_FILE_PRIVATE constexpr auto chUpperTable = [] {
 }();
 
 /** Lookup table for `toLower`. */
-MONGO_MOD_FILE_PRIVATE constexpr auto chLowerTable = [] {
+[[MONGO_MOD_FILE_PRIVATE]] constexpr auto chLowerTable = [] {
     std::array<char, 256> arr{};
     for (size_t i = 0; i < arr.size(); ++i)
         arr[i] = isMember(i, kUpper) ? 'a' + (i - 'A') : i;
@@ -214,4 +214,4 @@ constexpr char toLower(char c) noexcept {
 }
 
 }  // namespace ctype
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

@@ -44,7 +44,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 using namespace std::literals::string_view_literals;
 
 class Client;
@@ -383,4 +383,4 @@ private:
     Deferred<size_t (*)(const BSONObj&)> _hashWithoutMongos{simpleHash};
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -44,7 +44,7 @@ namespace mongo {
  *
  * NOTE: Not thread-safe, so it should not be used from more than one thread at a time.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT RouterUptimeReporter {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] RouterUptimeReporter {
     RouterUptimeReporter(const RouterUptimeReporter&) = delete;
     RouterUptimeReporter& operator=(const RouterUptimeReporter&) = delete;
 

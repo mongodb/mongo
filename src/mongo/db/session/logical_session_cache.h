@@ -49,7 +49,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * The interface for the logical session cache
@@ -160,4 +160,4 @@ private:
     LogicalSessionId _lsid;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

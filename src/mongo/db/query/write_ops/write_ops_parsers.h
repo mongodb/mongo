@@ -59,9 +59,9 @@ using namespace std::literals::string_view_literals;
 // Conservative per array element overhead. This value was calculated as 1 byte (element type) + 5
 // bytes (max string encoding of the array index encoded as string and the maximum key is 99999) + 1
 // byte (zero terminator) = 7 bytes
-MONGO_MOD_PUBLIC constexpr int kWriteCommandBSONArrayPerElementOverheadBytes = 7;
+[[MONGO_MOD_PUBLIC]] constexpr int kWriteCommandBSONArrayPerElementOverheadBytes = 7;
 
-MONGO_MOD_PUBLIC constexpr int kRetryableAndTxnBatchWriteBSONSizeOverhead =
+[[MONGO_MOD_PUBLIC]] constexpr int kRetryableAndTxnBatchWriteBSONSizeOverhead =
     kWriteCommandBSONArrayPerElementOverheadBytes * 2;
 
 /**
@@ -95,7 +95,7 @@ void opTimeSerializerWithTermCheck(repl::OpTime opTime,
  */
 repl::OpTime opTimeParser(BSONElement elem);
 
-class MONGO_MOD_PUBLIC UpdateModification {
+class [[MONGO_MOD_PUBLIC]] UpdateModification {
 public:
     enum class Type { kReplacement, kModifier, kPipeline, kDelta, kTransform };
     using TransformFunc = std::function<boost::optional<BSONObj>(const BSONObj&)>;
@@ -245,7 +245,7 @@ private:
  * model doesn't fit with IDL, which does not have support for placing fields at the same level as
  * the owning object.
  */
-class MONGO_MOD_PUBLIC WriteError {
+class [[MONGO_MOD_PUBLIC]] WriteError {
 public:
     static constexpr auto kIndexFieldName = "index"sv;
     static constexpr auto kCodeFieldName = "code"sv;

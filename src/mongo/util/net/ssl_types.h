@@ -39,7 +39,7 @@
 #include <string>
 #include <string_view>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 using namespace std::literals::string_view_literals;
 
 constexpr std::string_view kOID_CommonName = "2.5.4.3"sv;
@@ -189,4 +189,4 @@ private:
     ClusterAuthX509Config _clusterAuthX509Config;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

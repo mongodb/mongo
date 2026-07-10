@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-namespace MONGO_MOD_FILE_PRIVATE periodic_runner_detail {
+namespace [[MONGO_MOD_FILE_PRIVATE]] periodic_runner_detail {
 
 class MockPeriodicJob : public PeriodicRunner::ControllableJob {
 public:
@@ -54,9 +54,9 @@ private:
     PeriodicRunner::PeriodicJob _job;
 };
 
-}  // namespace MONGO_MOD_FILE_PRIVATE periodic_runner_detail
+}  // namespace periodic_runner_detail
 
-class MONGO_MOD_PUBLIC MockPeriodicRunner : public PeriodicRunner {
+class [[MONGO_MOD_PUBLIC]] MockPeriodicRunner : public PeriodicRunner {
 public:
     JobAnchor makeJob(PeriodicJob job) override;
 

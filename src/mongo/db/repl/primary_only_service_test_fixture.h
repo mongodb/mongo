@@ -55,10 +55,11 @@ namespace repl {
 class PrimaryOnlyService;
 class PrimaryOnlyServiceRegistry;
 
-MONGO_MOD_PUB extern FailPoint primaryOnlyServiceTestStepUpWaitForRebuildComplete;
+[[MONGO_MOD_PUBLIC]] extern FailPoint primaryOnlyServiceTestStepUpWaitForRebuildComplete;
 
-class MONGO_MOD_OPEN PrimaryOnlyServiceMongoDTest : service_context_test::WithSetupTransportLayer,
-                                                    public ServiceContextMongoDTest {
+class [[MONGO_MOD_OPEN]] PrimaryOnlyServiceMongoDTest
+    : service_context_test::WithSetupTransportLayer,
+      public ServiceContextMongoDTest {
 public:
     void setUp() override;
     void tearDown() override;

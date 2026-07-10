@@ -42,7 +42,7 @@ using namespace std::literals::string_view_literals;
 /**
  * Metadata for external data source.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT ExternalDataSourceMetadata {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] ExternalDataSourceMetadata {
     static constexpr auto kUrlProtocolFile = "file://"sv;
 
     ExternalDataSourceMetadata(std::string_view urlStr,
@@ -80,7 +80,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT ExternalDataSourceMetadata {
 /**
  * Options for virtual collection.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT VirtualCollectionOptions {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] VirtualCollectionOptions {
     VirtualCollectionOptions() : dataSources() {}
     VirtualCollectionOptions(std::vector<ExternalDataSourceMetadata> dataSources)
         : dataSources(std::move(dataSources)) {}

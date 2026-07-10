@@ -67,7 +67,7 @@ extern FailPoint stopReplProducer;
 
 };
 
-namespace MONGO_MOD_PARENT_PRIVATE repl {
+namespace [[MONGO_MOD_PARENT_PRIVATE]] repl {
 
 /**
  * The oplog fetcher, once started, reads operations from a remote oplog using a tailable,
@@ -148,7 +148,7 @@ public:
     using EnqueueDocumentsFn = std::function<Status(
         Documents::const_iterator begin, Documents::const_iterator end, const DocumentsInfo& info)>;
 
-    class MONGO_MOD_OPEN OplogFetcherRestartDecision {
+    class [[MONGO_MOD_OPEN]] OplogFetcherRestartDecision {
     public:
         OplogFetcherRestartDecision() {};
 
@@ -530,5 +530,5 @@ public:
 
 typedef OplogFetcherFactoryImpl<OplogFetcher> CreateOplogFetcherFn;
 
-}  // namespace MONGO_MOD_PARENT_PRIVATE repl
+}  // namespace repl
 }  // namespace mongo

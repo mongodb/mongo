@@ -38,7 +38,7 @@
 #include <memory>
 #include <utility>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Mock clock source that returns a fixed time until explicitly advanced.
@@ -110,4 +110,4 @@ private:
     const std::shared_ptr<ClockSource> _source;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

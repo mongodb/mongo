@@ -48,7 +48,7 @@
 #include <vector>
 
 namespace mongo::timeseries {
-class MONGO_MOD_OPEN TimeseriesTestFixture : public CatalogTestFixture {
+class [[MONGO_MOD_OPEN]] TimeseriesTestFixture : public CatalogTestFixture {
 public:
     static constexpr uint64_t kDefaultStorageCacheSizeBytes = 1024 * 1024 * 1024;
     static constexpr uint64_t kLimitedStorageCacheSizeBytes = 1024;

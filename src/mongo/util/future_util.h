@@ -56,7 +56,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/smart_ptr.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Returns a future which will be fulfilled at the given date.
@@ -69,7 +69,7 @@ ExecutorFuture<void> sleepUntil(std::shared_ptr<executor::TaskExecutor> executor
 ExecutorFuture<void> sleepFor(std::shared_ptr<executor::TaskExecutor> executor,
                               Milliseconds duration);
 
-namespace MONGO_MOD_FILE_PRIVATE future_util_details {
+namespace [[MONGO_MOD_FILE_PRIVATE]] future_util_details {
 
 /**
  * Error status to use if any AsyncTry loop has been canceled.
@@ -169,7 +169,7 @@ public:
      * that readies the returned future when the given duration has elapsed or token cancelled.
      */
     template <typename SleepableExecutor>
-    MONGO_MOD_PUBLIC auto on(SleepableExecutor executor, CancellationToken cancelToken) && {
+    [[MONGO_MOD_PUBLIC]] auto on(SleepableExecutor executor, CancellationToken cancelToken) && {
         auto loop =
             std::make_shared<TryUntilLoopWithDelay<SleepableExecutor>>(std::move(executor),
                                                                        std::move(_body),
@@ -316,7 +316,7 @@ public:
      * loop body.
      */
     template <typename DurationType>
-    MONGO_MOD_PUBLIC auto withDelayBetweenIterations(DurationType delay) && {
+    [[MONGO_MOD_PUBLIC]] auto withDelayBetweenIterations(DurationType delay) && {
         return AsyncTryUntilWithDelay(
             std::move(_body), std::move(_condition), ConstDelay<DurationType>(std::move(delay)));
     }
@@ -331,7 +331,7 @@ public:
      * backoff has been performed such as accumulating metrics.
      */
     template <typename BackoffType>
-    MONGO_MOD_PUBLIC auto withBackoffBetweenIterations(BackoffType backoff) && {
+    [[MONGO_MOD_PUBLIC]] auto withBackoffBetweenIterations(BackoffType backoff) && {
         return AsyncTryUntilWithDelay(
             std::move(_body), std::move(_condition), BackoffDelay<BackoffType>(std::move(backoff)));
     }
@@ -346,7 +346,7 @@ public:
      * iteration of the loop body threw an exception or otherwise returned an error status, the
      * returned ExecutorFuture will contain that error.
      */
-    MONGO_MOD_PUBLIC auto on(ExecutorPtr executor, CancellationToken cancelToken) && {
+    [[MONGO_MOD_PUBLIC]] auto on(ExecutorPtr executor, CancellationToken cancelToken) && {
         auto loop = std::make_shared<TryUntilLoop>(
             std::move(executor), std::move(_body), std::move(_condition), std::move(cancelToken));
         // Launch the recursive chain using the helper class.
@@ -559,7 +559,7 @@ std::vector<T> variadicArgsToVector(U&&... elems) {
     (vector.push_back(std::forward<U>(elems)), ...);
     return vector;
 }
-}  // namespace MONGO_MOD_FILE_PRIVATE future_util_details
+}  // namespace future_util_details
 
 /**
  * A fluent-style API for executing asynchronous, future-returning try-until loops.
@@ -964,4 +964,4 @@ SemiFuture<Value> withCancellation(FutureT&& inputFuture, const CancellationToke
 }
 
 }  // namespace future_util
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

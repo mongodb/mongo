@@ -41,7 +41,7 @@ namespace mongo::logv2 {
 // Boost::log filter that enables logging if domain match. Using CRTP, users should inherit from
 // this and provide the concrete type as the template argument to this class.
 template <class Filter>
-class MONGO_MOD_PUBLIC DomainFilter {
+class [[MONGO_MOD_PUBLIC]] DomainFilter {
 public:
     explicit DomainFilter(const LogDomain& domain) : DomainFilter(domain.internal()) {}
     explicit DomainFilter(const LogDomain::Internal& domain) : _domain(&domain) {}
@@ -57,7 +57,7 @@ private:
     const LogDomain::Internal* _domain;
 };
 
-class MONGO_MOD_PUBLIC AllLogsFilter : public DomainFilter<AllLogsFilter> {
+class [[MONGO_MOD_PUBLIC]] AllLogsFilter : public DomainFilter<AllLogsFilter> {
 public:
     using DomainFilter::DomainFilter;
 

@@ -32,7 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/util/modules.h"
 
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS;
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]];
 
 namespace mongo {
 

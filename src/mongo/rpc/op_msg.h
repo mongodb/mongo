@@ -58,7 +58,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * OpMsg packets are made up of the following sequence of possible fields.
@@ -313,7 +313,7 @@ public:
      * the server handles them. Is false by default, although the check only happens in debug
      * builds.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT static AtomicWord<bool> disableDupeFieldCheck_forTest;
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] static AtomicWord<bool> disableDupeFieldCheck_forTest;
 
     /**
      * Similar to finish, any calls on this object after are illegal.
@@ -444,4 +444,4 @@ public:
                                const BSONObj& extraFields = {});
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

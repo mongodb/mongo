@@ -43,7 +43,7 @@ namespace mongo {
  * Base class of all GroupProcessor implementations. This class is used by the aggregation framework
  * and streams enterprise module to perform the document processing needed for $group.
  */
-class MONGO_MOD_OPEN GroupProcessorBase {
+class [[MONGO_MOD_OPEN]] GroupProcessorBase {
 public:
     using Accumulators = std::vector<boost::intrusive_ptr<AccumulatorState>>;
     using GroupsMap = ValueUnorderedMap<Accumulators>;

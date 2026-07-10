@@ -34,7 +34,7 @@
 
 #include <string_view>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace repl {
 
 using ReadConcernLevel = ReadConcernLevelEnum;
@@ -46,4 +46,4 @@ std::string_view toString(ReadConcernLevel level);
 }  // namespace readConcernLevels
 
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

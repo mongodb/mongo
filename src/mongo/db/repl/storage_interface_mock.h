@@ -97,7 +97,7 @@ public:
     };
 };
 
-class MONGO_MOD_PUB StorageInterfaceMock : public StorageInterface {
+class [[MONGO_MOD_PUBLIC]] StorageInterfaceMock : public StorageInterface {
     StorageInterfaceMock(const StorageInterfaceMock&) = delete;
     StorageInterfaceMock& operator=(const StorageInterfaceMock&) = delete;
 

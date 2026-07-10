@@ -39,7 +39,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC RecordIdRange {
+class [[MONGO_MOD_PUBLIC]] RecordIdRange {
 public:
     /**
      * If the provided value @p newMin is greater than the existing min,

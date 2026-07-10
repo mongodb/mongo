@@ -44,7 +44,7 @@
 
 namespace mongo {
 // TODO SERVER-115201: Break up the utils not to cross modules
-namespace MONGO_MOD_NEEDS_REPLACEMENT change_stream_pre_image_id_util {
+namespace [[MONGO_MOD_NEEDS_REPLACEMENT]] change_stream_pre_image_id_util {
 
 /**
  * Parses the 'ts' field from the 'ChangeStreamPreImageId' associated with the 'rid'. The 'rid' MUST
@@ -121,5 +121,5 @@ UUID getPreImageNsUUID(const BSONObj& preImageObj);
  * Returns the maximum 'ts' a pre-image is allowed to have in order to be safely truncated.
  */
 Timestamp getMaxTSEligibleForTruncate(OperationContext* opCtx);
-}  // namespace MONGO_MOD_NEEDS_REPLACEMENT change_stream_pre_image_id_util
+}  // namespace change_stream_pre_image_id_util
 }  // namespace mongo

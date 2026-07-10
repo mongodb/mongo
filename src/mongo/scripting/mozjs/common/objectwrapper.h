@@ -83,7 +83,7 @@ class ValueWriter;
  * This wraps a RootedObject, so should only be allocated on the stack and is
  * not movable or copyable
  */
-class MONGO_MOD_PUB ObjectWrapper {
+class [[MONGO_MOD_PUBLIC]] ObjectWrapper {
     friend class ValueWriter;
 
 public:

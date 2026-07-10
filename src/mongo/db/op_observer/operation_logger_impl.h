@@ -45,7 +45,7 @@
 #include <cstddef>
 #include <vector>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class OperationLoggerImpl : public OperationLogger {
     OperationLoggerImpl(const OperationLoggerImpl&) = delete;
@@ -75,4 +75,4 @@ public:
                                           std::size_t opTimeOffset = 0) override;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

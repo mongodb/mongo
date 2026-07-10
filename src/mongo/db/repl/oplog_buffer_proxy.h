@@ -51,7 +51,7 @@ class StorageInterface;
  * Oplog buffer proxy that caches front and back (most recently pushed) oplog entries in the target
  * oplog buffer.
  */
-class MONGO_MOD_PARENT_PRIVATE OplogBufferProxy : public OplogBuffer {
+class [[MONGO_MOD_PARENT_PRIVATE]] OplogBufferProxy : public OplogBuffer {
     OplogBufferProxy(const OplogBufferProxy&) = delete;
     OplogBufferProxy& operator=(const OplogBufferProxy&) = delete;
 

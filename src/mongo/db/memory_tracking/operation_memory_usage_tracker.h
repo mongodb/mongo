@@ -60,7 +60,8 @@ namespace mongo {
  * - RunAggregateTest: TransferOperationMemoryUsageTracker
  * - ClusterAggregateMemoryTrackingTest: MemoryTrackingWorksOnRouter
  */
-class MONGO_MOD_NEEDS_REPLACEMENT OperationMemoryUsageTracker : public SimpleMemoryUsageTracker {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] OperationMemoryUsageTracker
+    : public SimpleMemoryUsageTracker {
     OperationMemoryUsageTracker() = delete;
 
 public:

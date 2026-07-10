@@ -47,7 +47,7 @@ class ServiceContext;
 /**
  * Encapsulates per-process statistics for the sharding subsystem.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT ShardingStatistics {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardingStatistics {
     // Counts how many times threads hit stale config exception (which is what triggers metadata
     // refreshes).
     AtomicWord<long long> countStaleConfigErrors{0};

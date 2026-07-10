@@ -41,7 +41,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUB TxnRetryCounterTooOldInfo final : public ErrorExtraInfo {
+class [[MONGO_MOD_PUBLIC]] TxnRetryCounterTooOldInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::TxnRetryCounterTooOld;
 

@@ -43,7 +43,7 @@
 
 #include <fmt/format.h>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 using namespace std::literals::string_view_literals;
 
 constexpr auto kSafeContent = "__safeContent__"sv;
@@ -126,4 +126,4 @@ struct FLEEdgeCountInfo {
     boost::optional<EDCDerivedFromDataTokenAndContentionFactorToken> edc;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

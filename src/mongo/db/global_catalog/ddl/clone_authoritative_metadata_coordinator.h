@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_NEEDS_REPLACEMENT CloneAuthoritativeMetadataCoordinator final
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] CloneAuthoritativeMetadataCoordinator final
     : public RecoverableShardingDDLCoordinator<CloneAuthoritativeMetadataCoordinatorDocument> {
 public:
     CloneAuthoritativeMetadataCoordinator(ShardingCoordinatorService* service,

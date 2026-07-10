@@ -49,7 +49,7 @@ class ReplicationConsistencyMarkers;
  * This class is used by the replication system to recover after an unclean shutdown, a rollback or
  * during initial sync.
  */
-class MONGO_MOD_PARENT_PRIVATE ReplicationRecovery {
+class [[MONGO_MOD_PARENT_PRIVATE]] ReplicationRecovery {
 public:
     ReplicationRecovery() = default;
     virtual ~ReplicationRecovery() = default;
@@ -92,7 +92,7 @@ public:
                                              Timestamp stableTimestamp) = 0;
 };
 
-class MONGO_MOD_PUB ReplicationRecoveryImpl : public ReplicationRecovery {
+class [[MONGO_MOD_PUBLIC]] ReplicationRecoveryImpl : public ReplicationRecovery {
     ReplicationRecoveryImpl(const ReplicationRecoveryImpl&) = delete;
     ReplicationRecoveryImpl& operator=(const ReplicationRecoveryImpl&) = delete;
 

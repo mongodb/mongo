@@ -41,7 +41,7 @@ struct ResumeScanPoint {
     bool tolerateKeyNotFound = false;
 };
 
-struct MONGO_MOD_PUBLIC CollectionScanParams {
+struct [[MONGO_MOD_PUBLIC]] CollectionScanParams {
     enum Direction {
         FORWARD = 1,
         BACKWARD = -1,

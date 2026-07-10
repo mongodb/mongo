@@ -57,6 +57,6 @@ private:
  * Starts a periodic job (1 Hz) that samples the snapshots and updates OpenTelemetry metrics for
  * index build operations. Intended to be called once at startup from mongod_main.
  */
-MONGO_MOD_PUBLIC void installIndexBuildOtelMetrics(ServiceContext* svcCtx);
+[[MONGO_MOD_PUBLIC]] void installIndexBuildOtelMetrics(ServiceContext* svcCtx);
 
 }  // namespace mongo

@@ -46,7 +46,7 @@ namespace mongo {
 class BSONObj;
 class BSONObjBuilder;
 
-namespace MONGO_MOD_PUBLIC rpc {
+namespace [[MONGO_MOD_PUBLIC]] rpc {
 
 extern const char kReplSetMetadataFieldName[];
 
@@ -177,5 +177,5 @@ private:
     bool _isPrimary = false;
 };
 
-}  // namespace MONGO_MOD_PUBLIC rpc
+}  // namespace rpc
 }  // namespace mongo

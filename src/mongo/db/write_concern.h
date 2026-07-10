@@ -46,7 +46,7 @@
 #include <string_view>
 #include <vector>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class OperationContext;
 template <typename T>
@@ -138,4 +138,4 @@ _tryGetWCFailureFromFailPoint_ForTest(const repl::OpTime& replOpTime,
                                       const WriteConcernOptions& writeConcern);
 
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

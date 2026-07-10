@@ -41,7 +41,7 @@ namespace mongo {
  * Default implementation for restoring a CollectionPtr after yield. Requires at least the necessary
  * corresponding MODE_IS lock.
  */
-class MONGO_MOD_USE_REPLACEMENT(TransactionResourcesStasher) LockedCollectionYieldRestore {
+class [[MONGO_MOD_USE_REPLACEMENT(TransactionResourcesStasher)]] LockedCollectionYieldRestore {
 public:
     explicit LockedCollectionYieldRestore(OperationContext* opCtx, const CollectionPtr& coll);
     ConsistentCollection operator()(OperationContext* opCtx, boost::optional<UUID> optUuid) const;

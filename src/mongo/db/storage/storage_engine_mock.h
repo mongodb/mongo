@@ -41,7 +41,7 @@ namespace mongo {
 /**
  * Mock storage engine.
  */
-class MONGO_MOD_OPEN StorageEngineMock : public StorageEngine {
+class [[MONGO_MOD_OPEN]] StorageEngineMock : public StorageEngine {
 public:
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
         return nullptr;

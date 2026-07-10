@@ -42,7 +42,7 @@ namespace rpc {
 /**
  * Hook for attaching client, auth, and time-out metadata for requests made on behalf of a user.
  */
-class MONGO_MOD_PUBLIC ClientMetadataPropagationEgressHook : public rpc::EgressMetadataHook {
+class [[MONGO_MOD_PUBLIC]] ClientMetadataPropagationEgressHook : public rpc::EgressMetadataHook {
 public:
     ~ClientMetadataPropagationEgressHook() override = default;
 

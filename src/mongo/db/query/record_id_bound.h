@@ -46,7 +46,7 @@ namespace mongo {
 /**
  * A RecordId bound for a collection scan, with an optional BSON representation for pretty printing.
  */
-class MONGO_MOD_PUBLIC RecordIdBound {
+class [[MONGO_MOD_PUBLIC]] RecordIdBound {
 public:
     RecordIdBound() = default;
 

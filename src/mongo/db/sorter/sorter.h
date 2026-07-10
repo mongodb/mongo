@@ -99,7 +99,7 @@
  * };
  */
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Runtime options that control the Sorter's behavior
@@ -409,7 +409,7 @@ private:
  * Data iterator over an Input stream used in the MergeIterator.
  */
 template <typename Key, typename Value>
-class MONGO_MOD_PRIVATE Stream {
+class [[MONGO_MOD_PRIVATE]] Stream {
 public:
     typedef sorter::Iterator<Key, Value> Input;
     Stream(size_t sourceId, std::shared_ptr<Input> iter)
@@ -449,7 +449,7 @@ private:
 //
 // Used for the BoundedSorter and spillWithHeap in the sorter::Spiller class.
 template <typename Key, typename Value, typename Comparator>
-struct MONGO_MOD_PRIVATE Greater {
+struct [[MONGO_MOD_PRIVATE]] Greater {
 
     // Prevent default construction.
     explicit Greater(Comparator const* compare) : compare(compare) {}
@@ -858,4 +858,4 @@ private:
     boost::optional<Key> _min;
     bool _done = false;
 };
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

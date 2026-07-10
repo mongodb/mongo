@@ -84,7 +84,7 @@
  * response-type provided. See the function comments below for details.
  */
 namespace mongo {
-namespace MONGO_MOD_PUBLIC async_rpc {
+namespace [[MONGO_MOD_PUBLIC]] async_rpc {
 using executor::TaskExecutor;
 
 /**
@@ -153,7 +153,7 @@ struct AsyncRPCInternalResponse {
  * async_rpc::sendCommand free-function/public API below instead, which contains
  * additional functionality and type checking.
  */
-class MONGO_MOD_USE_REPLACEMENT(async_rpc::sendCommand()) AsyncRPCRunner {
+class [[MONGO_MOD_USE_REPLACEMENT(async_rpc::sendCommand())]] AsyncRPCRunner {
 public:
     virtual ~AsyncRPCRunner() = default;
     virtual ExecutorFuture<AsyncRPCInternalResponse> _sendCommand(
@@ -450,5 +450,5 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommand(
     return sendCommand(options, opCtx, cstr);
 }
 
-}  // namespace MONGO_MOD_PUBLIC async_rpc
+}  // namespace async_rpc
 }  // namespace mongo

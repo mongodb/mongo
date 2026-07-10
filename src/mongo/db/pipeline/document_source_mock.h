@@ -57,7 +57,7 @@ using namespace std::literals::string_view_literals;
  * A mock DocumentSource which is useful for testing. In addition to re-spooling documents like
  * DocumentSourceQueue, it tracks some state about which methods have been called.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceMock : public DocumentSource {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DocumentSourceMock : public DocumentSource {
 public:
     static constexpr std::string_view kStageName = "$mock"sv;
 

@@ -44,7 +44,7 @@ namespace mongo {
 /**
  * Facade around the TransactionParticipant class in the db/transaction library.
  */
-class MONGO_MOD_PUB MongoDSessionCatalogTransactionInterfaceImpl
+class [[MONGO_MOD_PUBLIC]] MongoDSessionCatalogTransactionInterfaceImpl
     : public MongoDSessionCatalogTransactionInterface {
     MongoDSessionCatalogTransactionInterfaceImpl(
         const MongoDSessionCatalogTransactionInterfaceImpl&) = delete;

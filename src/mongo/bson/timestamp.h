@@ -52,7 +52,7 @@ class BSONObj;
 /**
  * Timestamp: A combination of a count of seconds since the POSIX epoch plus an ordinal value.
  */
-class MONGO_MOD_PUBLIC Timestamp {
+class [[MONGO_MOD_PUBLIC]] Timestamp {
 public:
     // Timestamp to signal that the storage engine should take unstable checkpoints.
     static const Timestamp kAllowUnstableCheckpointsSentinel;

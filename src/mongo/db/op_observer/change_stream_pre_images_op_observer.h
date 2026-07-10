@@ -40,7 +40,7 @@ namespace mongo {
  *
  * Delegates config.system.preimages inserts to ChangeStreamPreImagesCollectionManager.
  */
-class MONGO_MOD_PUBLIC ChangeStreamPreImagesOpObserver final : public OpObserverNoop {
+class [[MONGO_MOD_PUBLIC]] ChangeStreamPreImagesOpObserver final : public OpObserverNoop {
     ChangeStreamPreImagesOpObserver(const ChangeStreamPreImagesOpObserver&) = delete;
     ChangeStreamPreImagesOpObserver& operator=(const ChangeStreamPreImagesOpObserver&) = delete;
 

@@ -91,7 +91,7 @@
 #include <boost/optional.hpp>
 #include <fmt/format.h>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 using namespace std::literals::string_view_literals;
@@ -129,7 +129,7 @@ bool prepareForFLERewrite(OperationContext* opCtx,
  * These hooks will only run on external requests that form CommandInvocations (a.k.a. OP_MSG
  * requests). They are not applied for runCommandDirectly() or raw CommandInvocation::run() calls.
  */
-class MONGO_MOD_OPEN CommandInvocationHooks {
+class [[MONGO_MOD_OPEN]] CommandInvocationHooks {
 public:
     /**
      * Set `hooks` as the `CommandInvocationHooks` decoration of `serviceContext`
@@ -408,7 +408,7 @@ private:
 /**
  * Serves as a base for server commands. See the constructor for more details.
  */
-class MONGO_MOD_OPEN Command {
+class [[MONGO_MOD_OPEN]] Command {
 public:
     enum class AllowedOnSecondary { kAlways, kNever, kOptIn };
     enum class HandshakeRole { kNone, kHello, kAuth };
@@ -804,7 +804,7 @@ private:
 /**
  * Represents a single invocation of a given command.
  */
-class MONGO_MOD_OPEN CommandInvocation {
+class [[MONGO_MOD_OPEN]] CommandInvocation {
 public:
     CommandInvocation(const Command* definition) : _definition(definition) {}
 
@@ -1042,7 +1042,7 @@ private:
  * sequences. Commands should implement this class if they require access to the
  * ReplyBuilderInterface (e.g. to set the next invocation for an exhaust command).
  */
-class MONGO_MOD_OPEN BasicCommandWithReplyBuilderInterface : public Command {
+class [[MONGO_MOD_OPEN]] BasicCommandWithReplyBuilderInterface : public Command {
 private:
     class Invocation;
 
@@ -1179,7 +1179,7 @@ private:
 /**
  * Commands should implement this class if they do not require access to the ReplyBuilderInterface.
  */
-class MONGO_MOD_OPEN BasicCommand : public BasicCommandWithReplyBuilderInterface {
+class [[MONGO_MOD_OPEN]] BasicCommand : public BasicCommandWithReplyBuilderInterface {
 public:
     using BasicCommandWithReplyBuilderInterface::BasicCommandWithReplyBuilderInterface;
 
@@ -1230,7 +1230,8 @@ public:
  *
  */
 template <typename Derived>
-class MONGO_MOD_OPEN BasicCommandWithRequestParser : public BasicCommandWithReplyBuilderInterface {
+class [[MONGO_MOD_OPEN]] BasicCommandWithRequestParser
+    : public BasicCommandWithReplyBuilderInterface {
 private:
     static constexpr std::string_view _commandAlias() {
         using T = typename Derived::Request;
@@ -1340,7 +1341,7 @@ private:
 /**
  * Deprecated. Do not add new subclasses.
  */
-class MONGO_MOD_OPEN ErrmsgCommandDeprecated : public BasicCommand {
+class [[MONGO_MOD_OPEN]] ErrmsgCommandDeprecated : public BasicCommand {
     using BasicCommand::BasicCommand;
     bool run(OperationContext* opCtx,
              const DatabaseName& dbName,
@@ -1383,7 +1384,7 @@ class MONGO_MOD_OPEN ErrmsgCommandDeprecated : public BasicCommand {
  *     base classes provided: InvocationBase or MinimalInvocationBase.
  */
 template <typename Derived>
-class MONGO_MOD_OPEN TypedCommand : public Command {
+class [[MONGO_MOD_OPEN]] TypedCommand : public Command {
 public:
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& opMsgRequest) final;
@@ -1404,7 +1405,7 @@ private:
 };
 
 template <typename Derived>
-class MONGO_MOD_OPEN TypedCommand<Derived>::InvocationBaseInternal : public CommandInvocation {
+class [[MONGO_MOD_OPEN]] TypedCommand<Derived>::InvocationBaseInternal : public CommandInvocation {
 public:
     using RequestType = typename Derived::Request;
 
@@ -1466,7 +1467,8 @@ private:
 };
 
 template <typename Derived>
-class MONGO_MOD_OPEN TypedCommand<Derived>::MinimalInvocationBase : public InvocationBaseInternal {
+class [[MONGO_MOD_OPEN]] TypedCommand<Derived>::MinimalInvocationBase
+    : public InvocationBaseInternal {
     // Implemented as just a strong typedef for InvocationBaseInternal.
     using InvocationBaseInternal::InvocationBaseInternal;
 };
@@ -1475,7 +1477,7 @@ class MONGO_MOD_OPEN TypedCommand<Derived>::MinimalInvocationBase : public Invoc
  * Mix-in base for requests containing a `GenericArguments`.
  * Fills some of the requirements for use as a `TypedCommand`'s `Request` type.
  */
-class MONGO_MOD_OPEN GenericArgumentsTypedRequest {
+class [[MONGO_MOD_OPEN]] GenericArgumentsTypedRequest {
 public:
     explicit GenericArgumentsTypedRequest(const OpMsgRequest& req) : _args{_parseArgs(req)} {}
 
@@ -1505,7 +1507,7 @@ private:
  * Mix-in base for Requests containing a DatabaseName.
  * Fills some of the requirements for use as a `TypedCommand`'s `Request` type.
  */
-class MONGO_MOD_OPEN DbNameTypedRequest {
+class [[MONGO_MOD_OPEN]] DbNameTypedRequest {
 public:
     explicit DbNameTypedRequest(const OpMsgRequest& req) : _dbName{req.parseDbName()} {}
 
@@ -1521,8 +1523,8 @@ private:
  * Base for Requests having a `GenericArguments` and a `DatabaseName`.
  * Fills the `TypedCommand` `Request` requirements.
  */
-class MONGO_MOD_OPEN BasicTypedRequest : public GenericArgumentsTypedRequest,
-                                         public DbNameTypedRequest {
+class [[MONGO_MOD_OPEN]] BasicTypedRequest : public GenericArgumentsTypedRequest,
+                                             public DbNameTypedRequest {
 public:
     explicit BasicTypedRequest(const OpMsgRequest& req)
         : GenericArgumentsTypedRequest{req}, DbNameTypedRequest{req} {}
@@ -1555,7 +1557,7 @@ public:
  *     }
  */
 template <typename Derived>
-class MONGO_MOD_OPEN TypedCommand<Derived>::InvocationBase : public InvocationBaseInternal {
+class [[MONGO_MOD_OPEN]] TypedCommand<Derived>::InvocationBase : public InvocationBaseInternal {
 public:
     using InvocationBaseInternal::InvocationBaseInternal;
 

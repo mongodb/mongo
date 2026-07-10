@@ -44,7 +44,7 @@ namespace mongo {
  * being added as a result of the execution of other tasks, but multiple threads are not actually
  * needed.
  */
-class MONGO_MOD_USE_REPLACEMENT(other OutOfLineExecutors) InlineQueuedCountingExecutor
+class [[MONGO_MOD_USE_REPLACEMENT("other OutOfLineExecutors")]] InlineQueuedCountingExecutor
     : public OutOfLineExecutor {
 public:
     void schedule(Task task) override {

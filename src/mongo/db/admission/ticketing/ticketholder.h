@@ -58,7 +58,7 @@ class Ticket;
  * Additionally, it tracks queue and processing statistics (wait times, queue depth, cancellations,
  * peak usage) and fires observer callbacks on acquisition, release, and delinquent operations.
  */
-class MONGO_MOD_PUBLIC TicketHolder {
+class [[MONGO_MOD_PUBLIC]] TicketHolder {
     friend class Ticket;
 
 public:
@@ -196,9 +196,9 @@ public:
      */
     int64_t numFinishedProcessing() const;
 
-    MONGO_MOD_PRIVATE void setNumFinishedProcessing_forTest(int64_t numFinishedProcessing);
+    [[MONGO_MOD_PRIVATE]] void setNumFinishedProcessing_forTest(int64_t numFinishedProcessing);
 
-    MONGO_MOD_PRIVATE void setPeakUsed_forTest(int used);
+    [[MONGO_MOD_PRIVATE]] void setPeakUsed_forTest(int used);
 
     /**
      * Appends all queue and delinquency stats.
@@ -313,7 +313,7 @@ private:
  * RAII-style movable token that gets generated when a ticket is acquired and is automatically
  * released when going out of scope.
  */
-class MONGO_MOD_PUBLIC Ticket {
+class [[MONGO_MOD_PUBLIC]] Ticket {
     Ticket(const Ticket&) = delete;
     Ticket& operator=(const Ticket&) = delete;
 

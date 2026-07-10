@@ -83,7 +83,7 @@ namespace mongo {
  *
  * TODO SERVER-111290 Remove external dependencies on this method.
  */
-MONGO_MOD_NEEDS_REPLACEMENT std::vector<RemoteCursor> establishCursors(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] std::vector<RemoteCursor> establishCursors(
     OperationContext* opCtx,
     std::shared_ptr<executor::TaskExecutor> executor,
     const NamespaceString& nss,
@@ -130,7 +130,8 @@ void killRemoteCursor(OperationContext* opCtx,
 /**
  * Appends the given operation key to the given request.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void appendOpKey(const OperationKey& opKey, BSONObjBuilder* cmdBuilder);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void appendOpKey(const OperationKey& opKey,
+                                                 BSONObjBuilder* cmdBuilder);
 
 /**
  * Resets the log severity suppressor to use the given clock source (pass nullptr to restore the

@@ -55,7 +55,7 @@ class ThreadPoolTaskExecutor;
  * Implementation of a TaskExecutor that uses ThreadPoolTaskExecutor to submit tasks and allows to
  * override methods if needed.
  */
-class MONGO_MOD_PUBLIC ShardingTaskExecutor final : public TaskExecutor {
+class [[MONGO_MOD_PUBLIC]] ShardingTaskExecutor final : public TaskExecutor {
     struct Passkey {
         explicit Passkey() = default;
     };

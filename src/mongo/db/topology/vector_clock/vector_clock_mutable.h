@@ -45,7 +45,7 @@ namespace mongo {
  *
  * Only linked in contexts where ticking is allowed, ie. mongod, embedded, mongod-based unittests.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT VectorClockMutable : public VectorClock {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] VectorClockMutable : public VectorClock {
 public:
     // Decorate ServiceContext with VectorClockMutable*, that will resolve to the mutable vector
     // clock implementation.

@@ -69,7 +69,7 @@ namespace mongo {
  *
  * Also check out sample usage in dbtests/mock_dbclient_conn_test.cpp
  */
-class MONGO_MOD_PUBLIC MockDBClientConnection : public mongo::DBClientConnection {
+class [[MONGO_MOD_PUBLIC]] MockDBClientConnection : public mongo::DBClientConnection {
 public:
     /**
      * An OP_MSG response to a 'find' command.

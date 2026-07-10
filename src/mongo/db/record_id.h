@@ -62,8 +62,8 @@
 #include <boost/optional.hpp>
 #include <fmt/format.h>
 
-namespace MONGO_MOD_PUBLIC mongo {
-namespace MONGO_MOD_FILE_PRIVATE record_id_details {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
+namespace [[MONGO_MOD_FILE_PRIVATE]] record_id_details {
 class RecordIdChecks;
 }
 
@@ -619,4 +619,4 @@ inline std::ostream& operator<<(std::ostream& stream, const RecordId& id) {
     return stream << "RecordId(" << id.toString() << ')';
 }
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

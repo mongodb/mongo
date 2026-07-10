@@ -231,7 +231,7 @@ private:
 
 }  // namespace detail
 
-class MONGO_MOD_OPEN BenchmarkWithProfiler : public detail::ThreadBenchmarkFixture {
+class [[MONGO_MOD_OPEN]] BenchmarkWithProfiler : public detail::ThreadBenchmarkFixture {
 public:
     void setUpSharedResources(benchmark::State& state) override {
         detail::ThreadBenchmarkFixture::setUpSharedResources(state);

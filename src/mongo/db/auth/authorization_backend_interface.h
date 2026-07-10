@@ -36,7 +36,7 @@
 
 namespace mongo::auth {
 
-class MONGO_MOD_PUBLIC AuthorizationBackendInterface {
+class [[MONGO_MOD_PUBLIC]] AuthorizationBackendInterface {
 public:
     class CmdUMCPassthrough;
 

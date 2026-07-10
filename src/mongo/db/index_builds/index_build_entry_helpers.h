@@ -59,7 +59,7 @@ namespace mongo::indexbuildentryhelpers {
  * The collection should exist before calling any other helper functions to prevent them from
  * failing.
  */
-MONGO_MOD_PUBLIC void ensureIndexBuildEntriesNamespaceExists(OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] void ensureIndexBuildEntriesNamespaceExists(OperationContext* opCtx);
 
 /**
  * Persist the host and port information about the replica set members that have voted to commit an

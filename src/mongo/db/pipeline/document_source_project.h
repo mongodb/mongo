@@ -58,7 +58,7 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Project);
  * fields, using the expression language. Note you can not mix an exclusion-style projection with
  * adding or including any other fields.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceProject final {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DocumentSourceProject final {
 public:
     static constexpr std::string_view kStageName = "$project"sv;
     static constexpr std::string_view kAliasNameUnset = "$unset"sv;

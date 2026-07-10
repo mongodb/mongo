@@ -46,15 +46,15 @@ namespace mongo {
  * exists and is non-empty. Since the metadata and timestamp containers are always written to in the
  * same transaction, such a state is indicative of some form of data corruption.
  */
-MONGO_MOD_PUBLIC void setUpReplicatedFastCount(OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] void setUpReplicatedFastCount(OperationContext* opCtx);
 
-MONGO_MOD_PUBLIC Status createInternalFastCountContainers(OperationContext* opCtx,
-                                                          const NamespaceString& nss,
-                                                          std::string_view metadataIdent,
-                                                          KeyFormat metadataKeyFormat,
-                                                          std::string_view timestampsIdent,
-                                                          KeyFormat timestampsKeyFormat,
-                                                          bool writeToOplog);
+[[MONGO_MOD_PUBLIC]] Status createInternalFastCountContainers(OperationContext* opCtx,
+                                                              const NamespaceString& nss,
+                                                              std::string_view metadataIdent,
+                                                              KeyFormat metadataKeyFormat,
+                                                              std::string_view timestampsIdent,
+                                                              KeyFormat timestampsKeyFormat,
+                                                              bool writeToOplog);
 
 /**
  * Handles an ident with the provided `existingIdentFormat` existing in the storage engine.
@@ -68,7 +68,7 @@ MONGO_MOD_PUBLIC Status createInternalFastCountContainers(OperationContext* opCt
  * a new table with that same ident. In that case, the ident can be treated as newly created iff
  * it is empty.
  */
-MONGO_MOD_PUBLIC std::pair<Status, std::string> handleExistingFastCountIdent(
+[[MONGO_MOD_PUBLIC]] std::pair<Status, std::string> handleExistingFastCountIdent(
     OperationContext* opCtx,
     const NamespaceString& nss,
     std::string_view existingIdent,

@@ -38,7 +38,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC DBClientMockCursor : public DBClientCursor {
+class [[MONGO_MOD_PUBLIC]] DBClientMockCursor : public DBClientCursor {
 public:
     DBClientMockCursor(mongo::DBClientBase* client,
                        const BSONArray& mockCollection,

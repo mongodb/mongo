@@ -38,7 +38,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC MockHttpClient : public HttpClient {
+class [[MONGO_MOD_PUBLIC]] MockHttpClient : public HttpClient {
 public:
     MockHttpClient() = default;
 

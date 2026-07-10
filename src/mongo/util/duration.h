@@ -50,7 +50,7 @@
 
 #include <fmt/format.h>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 using namespace std::literals::string_view_literals;
 
 class BSONObj;
@@ -195,7 +195,7 @@ public:
      * OtherDuration. That is, if OtherDuration::period > period.
      */
     template <typename OtherDuration>
-    struct MONGO_MOD_FILE_PRIVATE IsHigherPrecisionThan {
+    struct [[MONGO_MOD_FILE_PRIVATE]] IsHigherPrecisionThan {
         using OtherOverThis = std::ratio_divide<typename OtherDuration::period, period>;
         MONGO_STATIC_ASSERT_MSG(
             OtherOverThis::den == 1 || OtherOverThis::num == 1,
@@ -209,7 +209,7 @@ public:
      * OtherDuration. That is, if OtherDuration::period > period.
      */
     template <typename OtherDuration>
-    struct MONGO_MOD_FILE_PRIVATE IsLowerPrecisionThan {
+    struct [[MONGO_MOD_FILE_PRIVATE]] IsLowerPrecisionThan {
         using OtherOverThis = std::ratio_divide<typename OtherDuration::period, period>;
         MONGO_STATIC_ASSERT_MSG(
             OtherOverThis::den == 1 || OtherOverThis::num == 1,
@@ -545,4 +545,4 @@ constexpr auto deduceChronoDuration(const Rep& count) {
     return std::chrono::duration<Rep, Per>{count};
 }
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

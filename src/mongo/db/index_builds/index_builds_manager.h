@@ -56,7 +56,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 enum IndexBuildRecoveryState { Building, Verifying, Committing };
 
 /**
@@ -239,4 +239,4 @@ private:
     std::map<UUID, std::unique_ptr<MultiIndexBlock>> _builders;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -54,7 +54,7 @@ enum DoExecutorFuture : bool {
     kDoExecutorFuture = true,
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT DummyInterruptible final : public Interruptible {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DummyInterruptible final : public Interruptible {
     StatusWith<stdx::cv_status> waitForConditionOrInterruptNoAssertUntil(
         stdx::condition_variable& cv, BasicLockableAdapter m, Date_t deadline) noexcept override {
         return Status(ErrorCodes::Interrupted, "");

@@ -38,7 +38,7 @@ namespace mongo {
 
 class AuthorizationManager;
 class AuthzSessionExternalState;
-class MONGO_MOD_PUBLIC AuthorizationRouter {
+class [[MONGO_MOD_PUBLIC]] AuthorizationRouter {
 public:
     AuthorizationRouter(const AuthorizationRouter&) = delete;
     AuthorizationRouter& operator=(const AuthorizationRouter&) = delete;

@@ -33,7 +33,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/util/modules.h"
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 /**
  * Helpers to facilitate unit test debugging in the case of test failure.

@@ -50,7 +50,7 @@ namespace mongo {
  * - Consumers: any component that needs to wait until all reclaimed prepared transactions have
  *   exited prepare can call onAllReclaimedPreparedTxnsResolved() after discoveryComplete().
  */
-class MONGO_MOD_OPEN ReclaimedPreparedTxnTracker {
+class [[MONGO_MOD_OPEN]] ReclaimedPreparedTxnTracker {
     ReclaimedPreparedTxnTracker(const ReclaimedPreparedTxnTracker&) = delete;
     ReclaimedPreparedTxnTracker& operator=(const ReclaimedPreparedTxnTracker&) = delete;
 

@@ -55,7 +55,7 @@ struct BSONArray;
  * No type checking is performed on the access methods and it is the callers responsibility to
  * interpret the value as the correct type.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT BSONElementValue {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] BSONElementValue {
 public:
     BSONElementValue() = default;
     explicit BSONElementValue(const char* value) : _value(value) {}

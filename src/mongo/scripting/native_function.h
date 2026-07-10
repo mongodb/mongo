@@ -39,6 +39,6 @@ namespace mongo {
  *
  * This must remain engine-agnostic (usable by mozjs, wasm, etc).
  */
-using NativeFunction MONGO_MOD_PUBLIC = BSONObj (*)(const BSONObj& args, void* data);
+using NativeFunction [[MONGO_MOD_PUBLIC]] = BSONObj (*)(const BSONObj& args, void* data);
 
 }  // namespace mongo

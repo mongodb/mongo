@@ -46,7 +46,7 @@ namespace mozjs {
  * Holds a bson Code or CodeWScope
  */
 
-struct MONGO_MOD_PUB CodeInfo : public BaseInfo {
+struct [[MONGO_MOD_PUBLIC]] CodeInfo : public BaseInfo {
     static void construct(JSContext* cx, JS::CallArgs args);
 
     struct Functions {

@@ -45,7 +45,7 @@ namespace mongo {
  *
  * All state objects are created on demand and retained until explicitly deleted.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ShardSharedStateCache {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardSharedStateCache {
 public:
     struct Stats {
         /**

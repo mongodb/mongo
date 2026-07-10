@@ -33,6 +33,6 @@
 
 namespace mongo {
 
-MONGO_MOD_PUBLIC void installMongoDBBuildInfoMetrics();
+[[MONGO_MOD_PUBLIC]] void installMongoDBBuildInfoMetrics();
 
 }  // namespace mongo

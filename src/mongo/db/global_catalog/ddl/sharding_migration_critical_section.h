@@ -51,7 +51,7 @@ namespace mongo {
  * Currently, only collections stay in the catch-up phase while the last batch of mods is
  * transferred to the recipient shard. Databases effectively only support the commit phase.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ShardingMigrationCriticalSection {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardingMigrationCriticalSection {
     ShardingMigrationCriticalSection(const ShardingMigrationCriticalSection&) = delete;
     ShardingMigrationCriticalSection& operator=(const ShardingMigrationCriticalSection&) = delete;
 

@@ -56,7 +56,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC PlacementConcern {
+class [[MONGO_MOD_PUBLIC]] PlacementConcern {
 public:
     PlacementConcern(boost::optional<DatabaseVersion> dbVersion,
                      boost::optional<ShardVersion> shardVersion)
@@ -89,7 +89,7 @@ private:
     bool _pretendUnsharded = false;
 };
 
-struct MONGO_MOD_PUBLIC AcquisitionPrerequisites {
+struct [[MONGO_MOD_PUBLIC]] AcquisitionPrerequisites {
     enum PlacementConcernPlaceholder {
         /**
          * Special PlacementConcern which mimics direct connection to a shard, causing the
@@ -144,7 +144,7 @@ struct MONGO_MOD_PUBLIC AcquisitionPrerequisites {
 
 namespace shard_role_details {
 
-struct MONGO_MOD_PRIVATE AcquisitionLocks {
+struct [[MONGO_MOD_PRIVATE]] AcquisitionLocks {
     // TODO SERVER-77213: This should mostly go away once the Locker resides inside
     // TransactionResources and the underlying locks point to it instead of the opCtx.
     LockMode globalLock = MODE_NONE;
@@ -157,7 +157,7 @@ struct MONGO_MOD_PRIVATE AcquisitionLocks {
     LockMode collLock = MODE_NONE;
 };
 
-struct MONGO_MOD_PRIVATE AcquiredBase {
+struct [[MONGO_MOD_PRIVATE]] AcquiredBase {
     AcquiredBase(int acquireCollectionCallNum,
                  AcquisitionPrerequisites prerequisites,
                  std::shared_ptr<Lock::DBLock> dbLock,
@@ -194,7 +194,7 @@ struct MONGO_MOD_PRIVATE AcquiredBase {
     mutable int64_t refCount = 0;
 };
 
-struct MONGO_MOD_PRIVATE AcquiredCollection : AcquiredBase {
+struct [[MONGO_MOD_PRIVATE]] AcquiredCollection : AcquiredBase {
     AcquiredCollection(int acquireCollectionCallNum,
                        AcquisitionPrerequisites prerequisites,
                        std::shared_ptr<Lock::DBLock> dbLock,
@@ -256,7 +256,7 @@ struct MONGO_MOD_PRIVATE AcquiredCollection : AcquiredBase {
     bool invalidated;
 };
 
-struct MONGO_MOD_PRIVATE AcquiredView : AcquiredBase {
+struct [[MONGO_MOD_PRIVATE]] AcquiredView : AcquiredBase {
     std::shared_ptr<const ViewDefinition> viewDefinition;
 };
 
@@ -264,12 +264,12 @@ struct MONGO_MOD_PRIVATE AcquiredView : AcquiredBase {
  * Interface for locking. Caller DOES NOT own pointer.
  */
 // TODO (SERVER-77213): Move implementation to .cpp file
-MONGO_MOD_NEEDS_REPLACEMENT
+[[MONGO_MOD_NEEDS_REPLACEMENT]]
 inline Locker* getLocker(OperationContext* opCtx) {
     return opCtx->lockState_DO_NOT_USE();
 }
 
-MONGO_MOD_NEEDS_REPLACEMENT
+[[MONGO_MOD_NEEDS_REPLACEMENT]]
 inline const Locker* getLocker(const OperationContext* opCtx) {
     return opCtx->lockState_DO_NOT_USE();
 }
@@ -278,27 +278,26 @@ inline const Locker* getLocker(const OperationContext* opCtx) {
  * Sets the locker for use by this OperationContext. Call during OperationContext initialization,
  * only.
  */
-MONGO_MOD_PRIVATE void makeLockerOnOperationContext(OperationContext* opCtx);
+[[MONGO_MOD_PRIVATE]] void makeLockerOnOperationContext(OperationContext* opCtx);
 
 /**
  * Swaps the locker, releasing the old locker to the caller.
  * The client lock is going to be acquired by this function.
  */
-MONGO_MOD_NEEDS_REPLACEMENT std::unique_ptr<Locker> swapLocker(OperationContext* opCtx,
-                                                               std::unique_ptr<Locker> newLocker);
-MONGO_MOD_NEEDS_REPLACEMENT std::unique_ptr<Locker> swapLocker(OperationContext* opCtx,
-                                                               std::unique_ptr<Locker> newLocker,
-                                                               ClientLock& clientLock);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] std::unique_ptr<Locker> swapLocker(
+    OperationContext* opCtx, std::unique_ptr<Locker> newLocker);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] std::unique_ptr<Locker> swapLocker(
+    OperationContext* opCtx, std::unique_ptr<Locker> newLocker, ClientLock& clientLock);
 
 /**
  * Get the RecoveryUnit for the given opCtx. Caller DOES NOT own pointer.
  */
 // TODO (SERVER-77213): Move implementation to .cpp file
-MONGO_MOD_NEEDS_REPLACEMENT inline RecoveryUnit* getRecoveryUnit(OperationContext* opCtx) {
+[[MONGO_MOD_NEEDS_REPLACEMENT]] inline RecoveryUnit* getRecoveryUnit(OperationContext* opCtx) {
     return opCtx->recoveryUnit_DO_NOT_USE();
 }
 
-MONGO_MOD_NEEDS_REPLACEMENT inline const RecoveryUnit* getRecoveryUnit(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] inline const RecoveryUnit* getRecoveryUnit(
     const OperationContext* opCtx) {
     return opCtx->recoveryUnit_DO_NOT_USE();
 }
@@ -308,9 +307,9 @@ MONGO_MOD_NEEDS_REPLACEMENT inline const RecoveryUnit* getRecoveryUnit(
  * ownership of the returned RecoveryUnit, and the OperationContext instance relinquishes
  * ownership. Sets the RecoveryUnit to NULL. Requires holding the client lock.
  */
-MONGO_MOD_NEEDS_REPLACEMENT std::unique_ptr<RecoveryUnit> releaseRecoveryUnit(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] std::unique_ptr<RecoveryUnit> releaseRecoveryUnit(
     OperationContext* opCtx);
-MONGO_MOD_NEEDS_REPLACEMENT std::unique_ptr<RecoveryUnit> releaseRecoveryUnit(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] std::unique_ptr<RecoveryUnit> releaseRecoveryUnit(
     OperationContext* opCtx, ClientLock& clientLock);
 
 /*
@@ -318,7 +317,7 @@ MONGO_MOD_NEEDS_REPLACEMENT std::unique_ptr<RecoveryUnit> releaseRecoveryUnit(
  * unit and executes its rollback handlers.
  */
 // TODO (SERVER-77213): Move implementation to .cpp file
-MONGO_MOD_NEEDS_REPLACEMENT inline void replaceRecoveryUnit(OperationContext* opCtx) {
+[[MONGO_MOD_NEEDS_REPLACEMENT]] inline void replaceRecoveryUnit(OperationContext* opCtx) {
     ClientLock lk(opCtx->getClient());
     opCtx->replaceRecoveryUnit_DO_NOT_USE(lk);
 }
@@ -327,7 +326,7 @@ MONGO_MOD_NEEDS_REPLACEMENT inline void replaceRecoveryUnit(OperationContext* op
  * Similar to replaceRecoveryUnit(), but returns the previous recovery unit like
  * releaseRecoveryUnit(). Requires holding the client lock.
  */
-MONGO_MOD_NEEDS_REPLACEMENT std::unique_ptr<RecoveryUnit> releaseAndReplaceRecoveryUnit(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] std::unique_ptr<RecoveryUnit> releaseAndReplaceRecoveryUnit(
     OperationContext* opCtx, ClientLock& clientLock);
 
 /**
@@ -337,19 +336,19 @@ MONGO_MOD_NEEDS_REPLACEMENT std::unique_ptr<RecoveryUnit> releaseAndReplaceRecov
  * as it is managed by the OperationContext. The client lock is going to be acquired by this
  * function.
  */
-MONGO_MOD_NEEDS_REPLACEMENT WriteUnitOfWork::RecoveryUnitState setRecoveryUnit(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] WriteUnitOfWork::RecoveryUnitState setRecoveryUnit(
     OperationContext* opCtx,
     std::unique_ptr<RecoveryUnit> unit,
     WriteUnitOfWork::RecoveryUnitState state);
-MONGO_MOD_NEEDS_REPLACEMENT WriteUnitOfWork::RecoveryUnitState setRecoveryUnit(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] WriteUnitOfWork::RecoveryUnitState setRecoveryUnit(
     OperationContext* opCtx,
     std::unique_ptr<RecoveryUnit> unit,
     WriteUnitOfWork::RecoveryUnitState state,
     ClientLock& clientLock);
 
-MONGO_MOD_NEEDS_REPLACEMENT WriteUnitOfWork* getWriteUnitOfWork(OperationContext* opCtx);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] WriteUnitOfWork* getWriteUnitOfWork(OperationContext* opCtx);
 
-MONGO_MOD_NEEDS_REPLACEMENT void setWriteUnitOfWork(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void setWriteUnitOfWork(
     OperationContext* opCtx, std::unique_ptr<WriteUnitOfWork> writeUnitOfWork);
 
 /**
@@ -388,7 +387,7 @@ MONGO_MOD_NEEDS_REPLACEMENT void setWriteUnitOfWork(
  * Restoring *all* transaction resources only performs locking and snapshotting (in accordance with
  * the read concern of the operation).
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT TransactionResources {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] TransactionResources {
     TransactionResources();
 
     TransactionResources(TransactionResources&&) = delete;

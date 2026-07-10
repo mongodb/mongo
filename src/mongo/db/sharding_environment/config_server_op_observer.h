@@ -51,7 +51,7 @@ namespace mongo {
  * OpObserver which is installed on the op observers chain when the server is running as a config
  * server (--configsvr).
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ConfigServerOpObserver final : public OpObserverNoop {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ConfigServerOpObserver final : public OpObserverNoop {
     ConfigServerOpObserver(const ConfigServerOpObserver&) = delete;
     ConfigServerOpObserver& operator=(const ConfigServerOpObserver&) = delete;
 

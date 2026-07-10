@@ -39,7 +39,7 @@
 #include <string_view>
 #include <utility>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class ProgressMeter {
     ProgressMeter(const ProgressMeter&) = delete;
@@ -173,4 +173,4 @@ private:
     ProgressMeter* _pm;
     OperationContext* _opCtx;
 };
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

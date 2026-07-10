@@ -126,7 +126,7 @@ class UpdatePositionArgs;
  * with the rest of the system.  The public methods on ReplicationCoordinator are the public
  * API that the replication subsystem presents to the rest of the codebase.
  */
-class MONGO_MOD_PUB ReplicationCoordinator : public SyncSourceSelector {
+class [[MONGO_MOD_PUBLIC]] ReplicationCoordinator : public SyncSourceSelector {
     ReplicationCoordinator(const ReplicationCoordinator&) = delete;
     ReplicationCoordinator& operator=(const ReplicationCoordinator&) = delete;
 
@@ -232,7 +232,7 @@ public:
      * Version which does not check for the RSTL. Without the RSTL, the return value may be
      * inaccurate by the time the function returns.
      */
-    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::isInPrimaryOrSecondaryState)
+    [[MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::isInPrimaryOrSecondaryState)]]
     virtual bool isInPrimaryOrSecondaryState_UNSAFE() const = 0;
 
     /**
@@ -308,7 +308,7 @@ public:
      * Version which does not check for the RSTL.  Do not use in new code. Without the RSTL, the
      * return value may be inaccurate by the time the function returns.
      */
-    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::canAcceptWritesForDatabase)
+    [[MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::canAcceptWritesForDatabase)]]
     virtual bool canAcceptWritesForDatabase_UNSAFE(OperationContext* opCtx,
                                                    const DatabaseName& dbName) = 0;
 
@@ -325,7 +325,7 @@ public:
      * Version which does not check for the RSTL.  Do not use in new code. Without the RSTL held,
      * the return value may be inaccurate by the time the function returns.
      */
-    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::canAcceptWritesFor)
+    [[MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::canAcceptWritesFor)]]
     virtual bool canAcceptWritesFor_UNSAFE(OperationContext* opCtx,
                                            const NamespaceStringOrUUID& nsOrUUID) = 0;
 
@@ -370,7 +370,7 @@ public:
      * Version which does not check for the RSTL.  Do not use in new code. Without the RSTL held,
      * the return value may be inaccurate by the time the function returns.
      */
-    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::checkCanServeReadsFor)
+    [[MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::checkCanServeReadsFor)]]
     virtual Status checkCanServeReadsFor_UNSAFE(OperationContext* opCtx,
                                                 const NamespaceString& ns,
                                                 bool secondaryOk) = 0;
@@ -553,7 +553,7 @@ public:
      * Retrieves and returns the current election id, which is a unique id that is local to
      * this node and changes every time we become primary.
      */
-    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::getTerm) virtual OID getElectionId() = 0;
+    [[MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::getTerm)]] virtual OID getElectionId() = 0;
 
     /**
      * Returns the id for this node as specified in the current replica set configuration.
@@ -776,7 +776,7 @@ public:
      * internal structure that could change at any time, and getting member information is
      * inherently racy; member configuration can change at any time.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT virtual boost::optional<MemberConfig>
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] virtual boost::optional<MemberConfig>
     findConfigMemberByHostAndPort_deprecated(const HostAndPort& hap) const = 0;
 
     /**
@@ -1238,7 +1238,7 @@ public:
     /**
      * A testing only function that cancels and reschedules replication heartbeats immediately.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT virtual void restartScheduledHeartbeats_forTest() = 0;
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] virtual void restartScheduledHeartbeats_forTest() = 0;
 
     /**
      * Records if the cluster-wide write concern is set during sharding initialization.
@@ -1256,7 +1256,7 @@ public:
      * Use [reserve|release]ConfigWriteConcernTagChanges when executing a reconfig that
      * could potentially change read/write concern tags.
      */
-    class MONGO_MOD_PUB WriteConcernTagChanges {
+    class [[MONGO_MOD_PUBLIC]] WriteConcernTagChanges {
     public:
         WriteConcernTagChanges() = default;
         virtual ~WriteConcernTagChanges() = default;

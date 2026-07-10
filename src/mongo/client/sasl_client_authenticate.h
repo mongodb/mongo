@@ -46,7 +46,7 @@
 
 #include <boost/move/utility_core.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 class BSONObj;
 class SaslClientSession;
 
@@ -108,4 +108,4 @@ Future<void> asyncSaslConversation(auth::RunCommandHook runCommand,
                                    const BSONObj& inputObj,
                                    std::string targetDatabase,
                                    int saslLogLevel);
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

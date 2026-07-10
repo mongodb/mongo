@@ -51,7 +51,7 @@ namespace unicode {
  * Need for replacement: It's being used in fle_crud_test.cpp in a single unit test, and the only
  * member being called are the constructor, .size() and .substrToBuf().
  */
-class MONGO_MOD_NEEDS_REPLACEMENT String {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] String {
 public:
     String() = default;
 

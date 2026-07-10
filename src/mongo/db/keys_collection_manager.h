@@ -76,7 +76,7 @@ Milliseconds howMuchSleepNeedFor(const LogicalTime& currentTime,
  * refresh the local key cache against the keys collection stored on the config servers.
  */
 // TODO This class should be parent_private ideally
-class MONGO_MOD_NEEDS_REPLACEMENT KeysCollectionManager {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] KeysCollectionManager {
 public:
     static const unsigned kReadConcernMajorityNotAvailableYetMaxTries;
     static const Milliseconds kRefreshIntervalIfErrored;

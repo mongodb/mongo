@@ -46,7 +46,7 @@ namespace mongo {
  * and can reset its own values to 0.
  */
 template <typename CounterType>
-struct MONGO_MOD_PUBLIC LockStatCounters {
+struct [[MONGO_MOD_PUBLIC]] LockStatCounters {
     template <typename OtherType>
     void set(const LockStatCounters<OtherType>& other) {
         counter_ops::set(numAcquisitions, other.numAcquisitions);
@@ -87,7 +87,7 @@ struct MONGO_MOD_PUBLIC LockStatCounters {
  * CounterType allows the code to operate on both int64_t and AtomicWord<long long>
  */
 template <typename CounterType>
-class MONGO_MOD_PUBLIC LockStats {
+class [[MONGO_MOD_PUBLIC]] LockStats {
 public:
     // Declare the type for the lock counters bundle
     typedef LockStatCounters<CounterType> LockStatCountersType;
@@ -249,16 +249,16 @@ private:
     PerModeLockStatCounters _oplogStats;
 };
 
-typedef LockStats<int64_t> SingleThreadedLockStats MONGO_MOD_PUBLIC;
+typedef LockStats<int64_t> SingleThreadedLockStats [[MONGO_MOD_PUBLIC]];
 
 /**
  * Reports instance-wide locking statistics, which can then be converted to BSON or logged.
  */
-MONGO_MOD_PUBLIC void reportGlobalLockingStats(SingleThreadedLockStats* outStats);
+[[MONGO_MOD_PUBLIC]] void reportGlobalLockingStats(SingleThreadedLockStats* outStats);
 
 /**
  * Zeroes out all the global locking statistics, for testing purposes.
  */
-MONGO_MOD_PUBLIC void resetGlobalLockStats_forTest();
+[[MONGO_MOD_PUBLIC]] void resetGlobalLockStats_forTest();
 
 }  // namespace mongo

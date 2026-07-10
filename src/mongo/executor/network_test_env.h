@@ -81,7 +81,7 @@ namespace executor {
  *
  * checkResult(future.timed_get(...));
  */
-class MONGO_MOD_PUBLIC NetworkTestEnv {
+class [[MONGO_MOD_PUBLIC]] NetworkTestEnv {
 public:
     // Common timeout for tests to use for any work scheduled through launchAsync to complete.
     static constexpr Minutes kDefaultLaunchAsyncFutureTimeout{5};

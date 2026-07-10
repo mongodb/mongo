@@ -39,7 +39,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_OPEN ResourceYielderFactory {
+class [[MONGO_MOD_OPEN]] ResourceYielderFactory {
 public:
     virtual ~ResourceYielderFactory() = default;
 
@@ -52,7 +52,7 @@ public:
                                                   std::string_view cmdName) const = 0;
 };
 
-class MONGO_MOD_FILE_PRIVATE ShardResourceYielderFactory : public ResourceYielderFactory {
+class [[MONGO_MOD_FILE_PRIVATE]] ShardResourceYielderFactory : public ResourceYielderFactory {
 public:
     std::unique_ptr<ResourceYielder> make(OperationContext* opCtx,
                                           std::string_view cmdName) const override {
@@ -64,7 +64,7 @@ public:
     }
 };
 
-class MONGO_MOD_PUBLIC RouterResourceYielderFactory : public ResourceYielderFactory {
+class [[MONGO_MOD_PUBLIC]] RouterResourceYielderFactory : public ResourceYielderFactory {
 public:
     std::unique_ptr<ResourceYielder> make(OperationContext* opCtx,
                                           std::string_view cmdName) const override {
@@ -72,7 +72,7 @@ public:
     }
 };
 
-MONGO_MOD_PUBLIC inline void ResourceYielderFactory::initialize(ServiceContext* svcCtx) {
+[[MONGO_MOD_PUBLIC]] inline void ResourceYielderFactory::initialize(ServiceContext* svcCtx) {
     if (auto svc = svcCtx->getService(); svc && svc->role().has(ClusterRole::ShardServer)) {
         ResourceYielderFactory::set(*svc, std::make_unique<ShardResourceYielderFactory>());
     }

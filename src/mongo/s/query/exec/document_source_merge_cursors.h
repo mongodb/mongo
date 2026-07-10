@@ -58,7 +58,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 // TODO SERVER-111290: Remove 'CheckMetadataConsistencyCmd' dependency on this header.
-namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
+namespace [[MONGO_MOD_NEEDS_REPLACEMENT]] mongo {
 using namespace std::literals::string_view_literals;
 
 DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(MergeCursors);
@@ -193,4 +193,4 @@ private:
     bool _ownCursors = true;
 };
 
-}  // namespace MONGO_MOD_NEEDS_REPLACEMENT mongo
+}  // namespace mongo

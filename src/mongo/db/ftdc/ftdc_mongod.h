@@ -46,17 +46,17 @@ namespace mongo {
  * Start Full Time Data Capture
  * Starts 1 thread.
  */
-MONGO_MOD_PUB void startMongoDFTDC(ServiceContext* serviceContext);
+[[MONGO_MOD_PUBLIC]] void startMongoDFTDC(ServiceContext* serviceContext);
 
 /**
  * Stop Full Time Data Capture
  */
-MONGO_MOD_PUB void stopMongoDFTDC();
+[[MONGO_MOD_PUBLIC]] void stopMongoDFTDC();
 
 /**
  * Validation callback for setParameter
  */
-MONGO_MOD_PUB Status validateCollectionStatsNamespaces(std::vector<std::string> value,
-                                                       const boost::optional<TenantId>& tenantId);
+[[MONGO_MOD_PUBLIC]] Status validateCollectionStatsNamespaces(
+    std::vector<std::string> value, const boost::optional<TenantId>& tenantId);
 
 }  // namespace mongo

@@ -41,7 +41,7 @@
 #include <string_view>
 #include <vector>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * List describing the ActionTypes that should be created.
@@ -57,4 +57,4 @@ std::string_view toStringData(ActionType a);
 std::string toString(ActionType a);
 std::ostream& operator<<(std::ostream& os, const ActionType& a);
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -51,7 +51,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Tracks metrics for a single multi-document transaction.
@@ -356,4 +356,4 @@ private:
     bool _recoveredFromPreciseCheckpoint{false};
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

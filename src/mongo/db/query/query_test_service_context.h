@@ -42,7 +42,7 @@ namespace mongo {
  * single ServiceContext for their execution context. The owned ServiceContext is decorated with a
  * CollatorFactoryMock.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT QueryTestServiceContext {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] QueryTestServiceContext {
 public:
     QueryTestServiceContext(std::unique_ptr<TickSourceMock<Nanoseconds>> tickSource =
                                 std::make_unique<TickSourceMock<Nanoseconds>>());

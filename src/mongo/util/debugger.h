@@ -39,7 +39,7 @@ void setupSIGTRAPforDebugger();
 
 void waitForDebugger();
 
-MONGO_MOD_PUBLIC void breakpoint();
+[[MONGO_MOD_PUBLIC]] void breakpoint();
 
 bool isDebuggerActive();
 

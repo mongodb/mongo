@@ -39,7 +39,7 @@
 
 #include <memory>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 
@@ -54,7 +54,7 @@ class Command;
  * Any access from a client thread that does not own the `opCtx`, or after the `opCtx` is
  * released is strictly forbidden.
  */
-class MONGO_MOD_OPEN RequestExecutionContext {
+class [[MONGO_MOD_OPEN]] RequestExecutionContext {
 public:
     RequestExecutionContext() = delete;
     RequestExecutionContext(const RequestExecutionContext&) = delete;

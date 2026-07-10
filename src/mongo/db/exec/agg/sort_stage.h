@@ -110,10 +110,10 @@ public:
     }
 
     /**
-     * TODO SERVER-112710 Remove 'MONGO_MOD_PRIVATE' once document_source_sort_test.cpp is split
+     * TODO SERVER-112710 Remove '[[MONGO_MOD_PRIVATE]]' once document_source_sort_test.cpp is split
      * into two parts.
      */
-    MONGO_MOD_PRIVATE const SimpleMemoryUsageTracker& getMemoryTracker_forTest() const {
+    [[MONGO_MOD_PRIVATE]] const SimpleMemoryUsageTracker& getMemoryTracker_forTest() const {
         return _memoryTracker;
     }
 

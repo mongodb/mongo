@@ -55,7 +55,7 @@ struct InternalModuleRegistration {
 
 std::vector<InternalModuleRegistration> listRegisteredInternalModules();
 
-class MONGO_MOD_PUB InternalModuleRegistrar {
+class [[MONGO_MOD_PUBLIC]] InternalModuleRegistrar {
 public:
     InternalModuleRegistrar(std::string_view moduleName,
                             InternalModuleInitializer initialize,

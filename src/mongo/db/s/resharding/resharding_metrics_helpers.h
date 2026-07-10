@@ -79,7 +79,8 @@ inline constexpr ReshardingMetricsCommon::Role getRoleForStateDocument() {
     MONGO_UNREACHABLE;
 }
 
-MONGO_MOD_PUBLIC void onCriticalSectionError(OperationContext* opCtx, const StaleConfigInfo& info);
+[[MONGO_MOD_PUBLIC]] void onCriticalSectionError(OperationContext* opCtx,
+                                                 const StaleConfigInfo& info);
 
 template <typename T>
 std::string getMetricsPrefix() {

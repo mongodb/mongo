@@ -50,7 +50,8 @@ namespace mongo {
 /**
  * Update in-memory cluster server parameters on insert/update/remove.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ClusterServerParameterOpObserver final : public OpObserverNoop {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ClusterServerParameterOpObserver final
+    : public OpObserverNoop {
 public:
     NamespaceFilters getNamespaceFilters() const final {
         return {NamespaceFilter::kConfig, NamespaceFilter::kConfig};

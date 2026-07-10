@@ -109,7 +109,7 @@ struct UnionWithSharedState {
 };
 
 
-class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceUnionWith final : public DocumentSource {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DocumentSourceUnionWith final : public DocumentSource {
 public:
     static constexpr std::string_view kStageName = "$unionWith"sv;
 

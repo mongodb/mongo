@@ -42,7 +42,7 @@ namespace mongo::executor {
 /**
  * Similar to assertConnectionStatsSoon but asserts on the values immediately.
  */
-MONGO_MOD_PUBLIC void assertConnectionStats(
+[[MONGO_MOD_PUBLIC]] void assertConnectionStats(
     const AsyncClientFactory& factory,
     const HostAndPort& remote,
     std::function<bool(const ConnectionStatsPer&)> connectionPoolTest,
@@ -57,7 +57,7 @@ MONGO_MOD_PUBLIC void assertConnectionStats(
  * failure, a stringified version of the stats will be added to the errMsg.
  * TODO: SERVER-66126 Some callsites can switched to use assertConnectionStats.
  */
-MONGO_MOD_PUBLIC void assertConnectionStatsSoon(
+[[MONGO_MOD_PUBLIC]] void assertConnectionStatsSoon(
     const AsyncClientFactory& factory,
     const HostAndPort& remote,
     std::function<bool(const ConnectionStatsPer&)> connectionPoolTest,

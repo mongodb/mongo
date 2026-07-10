@@ -41,7 +41,7 @@ namespace mongo {
  * An RAII object which owns a ClusterClientCursor and kills the cursor if it is not explicitly
  * released.
  */
-class MONGO_MOD_PUBLIC ClusterClientCursorGuard final {
+class [[MONGO_MOD_PUBLIC]] ClusterClientCursorGuard final {
     ClusterClientCursorGuard(const ClusterClientCursorGuard&) = delete;
     ClusterClientCursorGuard& operator=(const ClusterClientCursorGuard&) = delete;
 

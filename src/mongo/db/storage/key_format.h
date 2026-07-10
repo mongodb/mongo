@@ -31,7 +31,7 @@
 
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * The data format of a RecordStore's RecordId keys.
@@ -42,4 +42,4 @@ enum class KeyFormat {
     /** Variable-length binary comparable data */
     String,
 };
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

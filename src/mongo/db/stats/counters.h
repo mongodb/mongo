@@ -60,7 +60,7 @@
 #include <absl/meta/type_traits.h>
 #include <fmt/format.h>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class NetworkCounter {
 public:
@@ -1009,4 +1009,4 @@ struct ServerStatusMetricPolicySelection<DurationCounter64<D>> {
     using type = Policy;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -46,7 +46,7 @@ struct URIInfo;
  * Shell-specific prototype accessors for JS types that only exist in the
  * full mongo shell (cursors, connections, sessions, URIs).
  */
-class MONGO_MOD_PUB MozJSShellRuntimeInterface {
+class [[MONGO_MOD_PUBLIC]] MozJSShellRuntimeInterface {
 public:
     virtual ~MozJSShellRuntimeInterface() = default;
 

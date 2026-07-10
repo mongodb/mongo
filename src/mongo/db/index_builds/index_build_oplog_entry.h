@@ -43,7 +43,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class IndexBuildOplogEntry {
 public:
@@ -66,4 +66,4 @@ public:
     boost::optional<std::string> indexBuildIdent;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

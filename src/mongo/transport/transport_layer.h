@@ -65,7 +65,7 @@ namespace mongo {
 
 class OperationContext;
 
-namespace MONGO_MOD_PUBLIC transport {
+namespace [[MONGO_MOD_PUBLIC]] transport {
 using namespace std::literals::string_view_literals;
 
 enum ConnectSSLMode { kGlobalSSLMode, kEnableSSL, kDisableSSL };
@@ -363,5 +363,5 @@ protected:
 };
 
 
-}  // namespace MONGO_MOD_PUBLIC transport
+}  // namespace transport
 }  // namespace mongo

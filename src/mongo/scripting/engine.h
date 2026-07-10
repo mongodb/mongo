@@ -58,14 +58,14 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-using ScriptingFunction MONGO_MOD_PUBLIC = unsigned long long;
-using NativeFunction MONGO_MOD_PUBLIC = BSONObj (*)(const BSONObj& args, void* data);
+using ScriptingFunction [[MONGO_MOD_PUBLIC]] = unsigned long long;
+using NativeFunction [[MONGO_MOD_PUBLIC]] = BSONObj (*)(const BSONObj& args, void* data);
 typedef std::map<std::string, ScriptingFunction> FunctionCacheMap;
 
 class DBClientBase;
 class OperationContext;
 
-class MONGO_MOD_OPEN Scope {
+class [[MONGO_MOD_OPEN]] Scope {
     Scope(const Scope&) = delete;
     Scope& operator=(const Scope&) = delete;
 
@@ -227,9 +227,9 @@ protected:
     bool _lastRetIsNativeCode;  // v8 only: set to true if eval'd script returns a native func
 };
 
-enum class MONGO_MOD_PUB ExecutionEnvironment { Server, TestRunner };
+enum class [[MONGO_MOD_PUBLIC]] ExecutionEnvironment { Server, TestRunner };
 
-class MONGO_MOD_OPEN ScriptEngine : public KillOpListenerInterface {
+class [[MONGO_MOD_OPEN]] ScriptEngine : public KillOpListenerInterface {
     ScriptEngine(const ScriptEngine&) = delete;
     ScriptEngine& operator=(const ScriptEngine&) = delete;
 
@@ -319,8 +319,8 @@ void installGlobalUtils(Scope& scope);
 bool hasJSReturn(const std::string& s);
 const char* jsSkipWhiteSpace(const char* raw);
 
-MONGO_MOD_PUB ScriptEngine* getGlobalScriptEngine();
-MONGO_MOD_PUB void setGlobalScriptEngine(ScriptEngine* impl);
+[[MONGO_MOD_PUBLIC]] ScriptEngine* getGlobalScriptEngine();
+[[MONGO_MOD_PUBLIC]] void setGlobalScriptEngine(ScriptEngine* impl);
 
 /**
  * Registers a stable kill-op proxy with the given ServiceContext. The proxy delegates interrupt

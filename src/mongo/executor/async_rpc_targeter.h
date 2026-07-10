@@ -44,7 +44,7 @@
 #include <vector>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC async_rpc {
+namespace [[MONGO_MOD_PUBLIC]] async_rpc {
 
 class Targeter {
 public:
@@ -103,5 +103,5 @@ private:
     HostAndPort _host;
 };
 
-}  // namespace MONGO_MOD_PUBLIC async_rpc
+}  // namespace async_rpc
 }  // namespace mongo

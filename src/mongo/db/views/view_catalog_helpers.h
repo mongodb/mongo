@@ -45,7 +45,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC view_catalog_helpers {
+namespace [[MONGO_MOD_PUBLIC]] view_catalog_helpers {
 
 /**
  * Returns Status::OK with the set of involved namespaces if the given pipeline is eligible to
@@ -69,5 +69,5 @@ StatusWith<ResolvedNamespace> resolveView(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           boost::optional<BSONObj> timeseriesCollator);
 
-}  // namespace MONGO_MOD_PUBLIC view_catalog_helpers
+}  // namespace view_catalog_helpers
 }  // namespace mongo

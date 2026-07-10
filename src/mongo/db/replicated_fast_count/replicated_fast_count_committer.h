@@ -37,7 +37,7 @@
 #include <boost/container/flat_map.hpp>
 #include <boost/optional/optional.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 namespace mongo {
 /**
  * Function that gets registered as an onCommit callback for a collection the first time we write to

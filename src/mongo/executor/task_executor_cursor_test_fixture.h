@@ -56,12 +56,12 @@
  * implementation, which is why we want to run all the behavioral tests against both
  * implementations.
  */
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace executor {
-MONGO_MOD_FILE_PRIVATE inline BSONObj buildCursorResponse(std::string_view fieldName,
-                                                          size_t start,
-                                                          size_t end,
-                                                          size_t cursorId) {
+[[MONGO_MOD_FILE_PRIVATE]] inline BSONObj buildCursorResponse(std::string_view fieldName,
+                                                              size_t start,
+                                                              size_t end,
+                                                              size_t cursorId) {
     BSONObjBuilder bob;
     {
         BSONObjBuilder cursor(bob.subobjStart("cursor"));
@@ -80,10 +80,10 @@ MONGO_MOD_FILE_PRIVATE inline BSONObj buildCursorResponse(std::string_view field
     return bob.obj();
 }
 
-MONGO_MOD_FILE_PRIVATE inline BSONObj buildMultiCursorResponse(std::string_view fieldName,
-                                                               size_t start,
-                                                               size_t end,
-                                                               std::vector<size_t> cursorIds) {
+[[MONGO_MOD_FILE_PRIVATE]] inline BSONObj buildMultiCursorResponse(std::string_view fieldName,
+                                                                   size_t start,
+                                                                   size_t end,
+                                                                   std::vector<size_t> cursorIds) {
     BSONObjBuilder bob;
     {
         BSONArrayBuilder cursors;
@@ -281,4 +281,4 @@ public:
     }
 };
 }  // namespace executor
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

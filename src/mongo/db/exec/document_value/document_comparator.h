@@ -40,7 +40,7 @@
 #include <set>
 
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class DocumentComparator {
 public:
@@ -203,4 +203,4 @@ template <typename T>
 using DocumentUnorderedMap =
     stdx::unordered_map<Document, T, DocumentComparator::Hasher, DocumentComparator::EqualTo>;
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

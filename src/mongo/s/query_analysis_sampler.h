@@ -70,7 +70,7 @@ namespace analyze_shard_key {
  * standalone replica set, a sampler is any mongod in the set and the coordinator is the primary
  * mongod.
  */
-class MONGO_MOD_PUBLIC QueryAnalysisSampler final {
+class [[MONGO_MOD_PUBLIC]] QueryAnalysisSampler final {
     QueryAnalysisSampler(const QueryAnalysisSampler&) = delete;
     QueryAnalysisSampler& operator=(const QueryAnalysisSampler&) = delete;
 
@@ -136,7 +136,7 @@ public:
      * Controls the per-second rate at which queries against a collection are sampled on this
      * sampler. Uses token bucket.
      */
-    class MONGO_MOD_PRIVATE SampleRateLimiter {
+    class [[MONGO_MOD_PRIVATE]] SampleRateLimiter {
     public:
         static constexpr double kEpsilon = 0.001;
 

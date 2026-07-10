@@ -45,7 +45,7 @@
 
 #include <boost/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 using namespace std::literals::string_view_literals;
 
 #if (MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS) || \
@@ -236,4 +236,4 @@ Status parseCertificateSelector(SSLParams::CertificateSelector* selector,
                                 std::string_view name,
                                 std::string_view value);
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -50,6 +50,7 @@ class StatusWith;
  *
  *
  */
-MONGO_MOD_PUBLIC StatusWith<std::vector<std::string>> readSecurityFile(const std::string& filename);
+[[MONGO_MOD_PUBLIC]] StatusWith<std::vector<std::string>> readSecurityFile(
+    const std::string& filename);
 
 }  // namespace mongo

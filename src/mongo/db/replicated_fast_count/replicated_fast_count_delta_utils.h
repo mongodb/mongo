@@ -57,10 +57,10 @@ boost::optional<CollectionSizeCount> extractSizeCountDeltaForOp(const repl::Oplo
  * `MultiOpSizeMetadata` entry per collection UUID touched. Operations without size metadata
  * (`m` field) are skipped.
  */
-MONGO_MOD_PUBLIC std::vector<MultiOpSizeMetadata> aggregateMultiOpSizeMetadata(
+[[MONGO_MOD_PUBLIC]] std::vector<MultiOpSizeMetadata> aggregateMultiOpSizeMetadata(
     const std::vector<repl::ReplOperation>& ops);
 
-MONGO_MOD_PUBLIC std::vector<MultiOpSizeMetadata> aggregateMultiOpSizeMetadata(
+[[MONGO_MOD_PUBLIC]] std::vector<MultiOpSizeMetadata> aggregateMultiOpSizeMetadata(
     const std::vector<repl::OplogEntry>& ops);
 
 /**

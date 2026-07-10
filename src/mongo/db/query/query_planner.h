@@ -60,7 +60,7 @@ class CollectionPtr;
  * QueryPlanner's job is to provide an entry point to the query planning and optimization
  * process.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT QueryPlanner {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] QueryPlanner {
 public:
     /**
      * Holds the result of subqueries planning for rooted $or queries.

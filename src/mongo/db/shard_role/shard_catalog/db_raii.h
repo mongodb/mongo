@@ -56,7 +56,7 @@ namespace mongo {
  * the operation via Top upon destruction. Can be configured to only update the Top counters if
  * desired.
  */
-class MONGO_MOD_PUBLIC AutoStatsTracker {
+class [[MONGO_MOD_PUBLIC]] AutoStatsTracker {
     AutoStatsTracker(const AutoStatsTracker&) = delete;
     AutoStatsTracker& operator=(const AutoStatsTracker&) = delete;
 
@@ -109,7 +109,7 @@ private:
  * Acquires the global MODE_IS lock and establishes a consistent CollectionCatalog and storage
  * snapshot.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT AutoReadLockFree {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] AutoReadLockFree {
 public:
     AutoReadLockFree(OperationContext* opCtx, Date_t deadline = Date_t::max());
 
@@ -130,7 +130,7 @@ private:
  * Should only be used to read catalog metadata for a particular Db and not for reading from
  * Collection(s).
  */
-class MONGO_MOD_PRIVATE AutoGetDbForReadLockFree {
+class [[MONGO_MOD_PRIVATE]] AutoGetDbForReadLockFree {
 public:
     AutoGetDbForReadLockFree(OperationContext* opCtx,
                              const DatabaseName& dbName,
@@ -147,7 +147,7 @@ private:
  * Creates either an AutoGetDb or AutoGetDbForReadLockFree depending on whether a lock-free read is
  * supported in the situation per the results of supportsLockFreeRead().
  */
-class MONGO_MOD_NEEDS_REPLACEMENT AutoGetDbForReadMaybeLockFree {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] AutoGetDbForReadMaybeLockFree {
 public:
     AutoGetDbForReadMaybeLockFree(OperationContext* opCtx,
                                   const DatabaseName& dbName,
@@ -163,7 +163,7 @@ private:
  * will block on accessing an already updated document which is in prepared state. And they will
  * unblock after the prepared transaction that performed the update commits/aborts.
  */
-class MONGO_MOD_PUBLIC EnforcePrepareConflictsBlock {
+class [[MONGO_MOD_PUBLIC]] EnforcePrepareConflictsBlock {
 public:
     explicit EnforcePrepareConflictsBlock(OperationContext* opCtx)
         : _opCtx(opCtx),

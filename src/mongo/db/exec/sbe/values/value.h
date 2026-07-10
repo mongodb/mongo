@@ -80,7 +80,7 @@
 #include <utility>
 #include <vector>
 
-// TODO(SERVER-114140): Remove all MONGO_MOD_NEEDS_REPLACEMENT annotations
+// TODO(SERVER-114140): Remove all [[MONGO_MOD_NEEDS_REPLACEMENT]] annotations
 
 namespace mongo {
 /**
@@ -141,7 +141,7 @@ static constexpr size_t kNewUUIDLength = 16;
  * SBE type 'tag', if 'value::tagToType(tag) != EOO' is true then 'tag' must be a native type.
  * Likewise, if 'tag' is an extended type then 'value::tagToType(tag) == EOO' must be true.
  */
-enum class MONGO_MOD_NEEDS_REPLACEMENT TypeTags : uint8_t {
+enum class [[MONGO_MOD_NEEDS_REPLACEMENT]] TypeTags : uint8_t {
     // The value does not exist, aka Nothing in the Maybe monad.
     Nothing = 0,
 
@@ -476,7 +476,7 @@ inline std::pair<TypeTags, Value> compare3way(TypeTags lhsTag,
     return compareValue(lhsTag, lhsValue, rhsTag, rhsValue, comparator);
 }
 
-MONGO_MOD_NEEDS_REPLACEMENT bool isNaN(TypeTags tag, Value val) noexcept;
+[[MONGO_MOD_NEEDS_REPLACEMENT]] bool isNaN(TypeTags tag, Value val) noexcept;
 
 bool isInfinity(TypeTags tag, Value val) noexcept;
 
@@ -853,7 +853,7 @@ private:
     std::vector<Value>& _values;
 };
 
-MONGO_MOD_NEEDS_REPLACEMENT inline char* getRawPointerView(Value val) noexcept {
+[[MONGO_MOD_NEEDS_REPLACEMENT]] inline char* getRawPointerView(Value val) noexcept {
     return reinterpret_cast<char*>(val);
 }
 
@@ -980,8 +980,8 @@ inline TagValueMaybeOwned TagValueMaybeOwned::timestamp(uint64_t v) noexcept {
 }
 
 template <typename T>
-MONGO_MOD_NEEDS_REPLACEMENT T
-bitcastTo(const Value in) noexcept {  // NOLINT(readability-avoid-const-params-in-decls)
+[[MONGO_MOD_NEEDS_REPLACEMENT]] T bitcastTo(
+    const Value in) noexcept {  // NOLINT(readability-avoid-const-params-in-decls)
     static_assert(std::is_pointer_v<T> || std::is_integral_v<T> || std::is_floating_point_v<T> ||
                   std::is_same_v<Decimal128, T>);
 
@@ -1827,7 +1827,7 @@ bool operator==(const MultiMap& lhs, const MultiMap& rhs);
 bool operator!=(const MultiMap& lhs, const MultiMap& rhs);
 
 constexpr size_t kSmallStringMaxLength = 7;
-using ObjectIdType MONGO_MOD_NEEDS_REPLACEMENT = std::array<uint8_t, 12>;
+using ObjectIdType [[MONGO_MOD_NEEDS_REPLACEMENT]] = std::array<uint8_t, 12>;
 static_assert(sizeof(ObjectIdType) == 12);
 
 /**
@@ -1938,8 +1938,8 @@ struct TinyStrHelpers {
 /**
  * getStringView() should be preferred over getRawStringView() where possible.
  */
-MONGO_MOD_NEEDS_REPLACEMENT inline std::string_view getStringView(TypeTags tag,
-                                                                  const Value& val) noexcept {
+[[MONGO_MOD_NEEDS_REPLACEMENT]] inline std::string_view getStringView(TypeTags tag,
+                                                                      const Value& val) noexcept {
     return {getRawStringView(tag, val), getStringLength(tag, val)};
 }
 
@@ -1948,7 +1948,7 @@ inline std::string_view getStringOrSymbolView(TypeTags tag, const Value& val) no
     return {getRawStringView(tag, val), getStringLength(tag, val)};
 }
 
-MONGO_MOD_NEEDS_REPLACEMENT inline size_t getBSONBinDataSize(TypeTags tag, Value val) {
+[[MONGO_MOD_NEEDS_REPLACEMENT]] inline size_t getBSONBinDataSize(TypeTags tag, Value val) {
     invariant(tag == TypeTags::bsonBinData);
     return static_cast<size_t>(
         ConstDataView(getRawPointerView(val)).read<LittleEndian<uint32_t>>());
@@ -2246,7 +2246,7 @@ inline TimeZone* getTimeZoneView(Value val) noexcept {
  *
  *   <pattern> <NULL> <flags> <NULL>
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT BsonRegex {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] BsonRegex {
     explicit BsonRegex(const char* rawValue) {
         pattern = rawValue;
         // Add one to account for the NULL byte after 'pattern'.
@@ -2272,7 +2272,7 @@ inline std::pair<TypeTags, Value> makeCopyBsonRegex(const BsonRegex& regex) {
     return makeNewBsonRegex(regex.pattern, regex.flags);
 }
 
-MONGO_MOD_NEEDS_REPLACEMENT inline std::string_view getBsonJavascriptView(Value val) noexcept {
+[[MONGO_MOD_NEEDS_REPLACEMENT]] inline std::string_view getBsonJavascriptView(Value val) noexcept {
     return getStringView(TypeTags::StringBig, val);
 }
 
@@ -2286,7 +2286,7 @@ std::pair<TypeTags, Value> makeCopyBsonJavascript(std::string_view code);
  *
  * In BSON, a DBRef is encoded as a bsonString ('ns') followed by an ObjectId ('id').
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT BsonDBPointer {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] BsonDBPointer {
     explicit BsonDBPointer(const char* rawValue) {
         uint32_t lenWithNull = ConstDataView(rawValue).read<LittleEndian<uint32_t>>();
         ns = {rawValue + sizeof(uint32_t), lenWithNull - sizeof(char)};

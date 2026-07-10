@@ -76,7 +76,7 @@ struct HealthObserverLivenessStats {
 /**
  * Interface to conduct periodic health checks.
  */
-class MONGO_MOD_PUBLIC HealthObserver {
+class [[MONGO_MOD_PUBLIC]] HealthObserver {
 public:
     virtual ~HealthObserver() = default;
 

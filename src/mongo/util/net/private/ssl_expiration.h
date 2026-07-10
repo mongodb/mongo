@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC CertificateExpirationMonitor {
+class [[MONGO_MOD_PUBLIC]] CertificateExpirationMonitor {
 public:
     /**
      * Get the singleton instance of the monitor.

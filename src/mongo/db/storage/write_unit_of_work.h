@@ -34,7 +34,7 @@
 #include <iosfwd>
 #include <memory>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class OperationContext;
 
@@ -132,4 +132,4 @@ private:
 
 std::ostream& operator<<(std::ostream& os, WriteUnitOfWork::RecoveryUnitState state);
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

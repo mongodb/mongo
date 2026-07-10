@@ -42,7 +42,7 @@ namespace auth {
  * that user will be authenticated against the client until this guard dies.
  * This is used in ServiceEntryPoint to scope authentication to a single operation.
  */
-class MONGO_MOD_PUBLIC SecurityTokenAuthenticationGuard {
+class [[MONGO_MOD_PUBLIC]] SecurityTokenAuthenticationGuard {
 public:
     SecurityTokenAuthenticationGuard() = delete;
     SecurityTokenAuthenticationGuard(OperationContext*, const ValidatedTenancyScope&);

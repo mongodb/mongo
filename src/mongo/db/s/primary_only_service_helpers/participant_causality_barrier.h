@@ -38,7 +38,7 @@ namespace mongo {
  * CausalityBarrier implementation that performs a no-op retryable write on a specified set of
  * shards.
  */
-class MONGO_MOD_PUBLIC ParticipantCausalityBarrier : public CausalityBarrier {
+class [[MONGO_MOD_PUBLIC]] ParticipantCausalityBarrier : public CausalityBarrier {
 public:
     ParticipantCausalityBarrier(std::vector<ShardId> participants,
                                 std::shared_ptr<executor::TaskExecutor> executor,

@@ -56,7 +56,7 @@ namespace mongo {
  * 'stateDocumentNs'.
  */
 template <typename StateDocumentType>
-class MONGO_MOD_OPEN PrimaryOnlyServiceStateStore {
+class [[MONGO_MOD_OPEN]] PrimaryOnlyServiceStateStore {
 public:
     explicit PrimaryOnlyServiceStateStore(const NamespaceString& stateDocumentNs)
         : _stateDocumentNs{stateDocumentNs} {}
@@ -109,7 +109,7 @@ private:
  * A helper that provides a default implementation for the set of methods to create the
  * 'PrimaryOnlyService::Instance'.
  */
-class MONGO_MOD_PRIVATE DefaultPrimaryOnlyServiceInstance
+class [[MONGO_MOD_PRIVATE]] DefaultPrimaryOnlyServiceInstance
     : public repl::PrimaryOnlyService::TypedInstance<DefaultPrimaryOnlyServiceInstance> {
 public:
     ~DefaultPrimaryOnlyServiceInstance() override;

@@ -35,7 +35,7 @@
 
 #include <string_view>
 
-namespace MONGO_MOD_PRIVATE mongo {
+namespace [[MONGO_MOD_PRIVATE]] mongo {
 namespace key_string_test {
 class KeyStringBuilderTest : public testing::TestWithParam<key_string::Version> {
 public:
@@ -169,4 +169,4 @@ void perfTest(key_string::Version version, const Numbers& numbers);
 #define COMPARE_HELPER(LHS, RHS) (((LHS) < (RHS)) ? -1 : (((LHS) == (RHS)) ? 0 : 1))
 
 }  // namespace key_string_test
-}  // namespace MONGO_MOD_PRIVATE mongo
+}  // namespace mongo

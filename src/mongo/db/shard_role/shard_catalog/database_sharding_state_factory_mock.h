@@ -37,7 +37,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC DatabaseShardingStateFactoryMock final
+class [[MONGO_MOD_PUBLIC]] DatabaseShardingStateFactoryMock final
     : public DatabaseShardingStateFactory {
 public:
     DatabaseShardingStateFactoryMock() = default;

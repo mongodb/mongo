@@ -73,7 +73,7 @@ namespace repl {
  *
  * This can be used to compare two ReplSetConfig objects to determine which is logically newer.
  */
-class MONGO_MOD_PUB ConfigVersionAndTerm {
+class [[MONGO_MOD_PUBLIC]] ConfigVersionAndTerm {
 public:
     ConfigVersionAndTerm() : _version(0), _term(OpTime::kUninitializedTerm) {}
     ConfigVersionAndTerm(long long version, long long term) : _version(version), _term(term) {}
@@ -136,7 +136,7 @@ using ReplSetConfigPtr = std::shared_ptr<ReplSetConfig>;
  * to get a mutable copy, mutate it, and use the ReplSetConfig(MutableReplSetConfig&&) constructor
  * to get a usable immutable config from it.
  */
-class MONGO_MOD_PUB MutableReplSetConfig : public ReplSetConfigBase {
+class [[MONGO_MOD_PUBLIC]] MutableReplSetConfig : public ReplSetConfigBase {
 public:
     ReplSetConfigSettings& getMutableSettings() {
         invariant(ReplSetConfigBase::getSettings());
@@ -171,7 +171,7 @@ protected:
 /**
  * Representation of the configuration information about a particular replica set.
  */
-class MONGO_MOD_PUB ReplSetConfig : private MutableReplSetConfig {
+class [[MONGO_MOD_PUBLIC]] ReplSetConfig : private MutableReplSetConfig {
 public:
     typedef std::vector<MemberConfig>::const_iterator MemberIterator;
 

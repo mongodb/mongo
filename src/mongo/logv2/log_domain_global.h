@@ -46,7 +46,7 @@
 #include <string_view>
 
 namespace mongo::logv2 {
-class MONGO_MOD_PUBLIC LogDomainGlobal : public LogDomain::Internal {
+class [[MONGO_MOD_PUBLIC]] LogDomainGlobal : public LogDomain::Internal {
 public:
     struct ConfigurationOptions {
         enum class RotationMode { kRename, kReopen };

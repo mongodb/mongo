@@ -41,7 +41,7 @@ namespace mongo {
 /**
  * This class comprises a mock Collection for use by CollectionCatalog unit tests.
  */
-class MONGO_MOD_PUBLIC CollectionMock : public Collection {
+class [[MONGO_MOD_PUBLIC]] CollectionMock : public Collection {
 public:
     explicit CollectionMock(const NamespaceString& nss)
         : CollectionMock(UUID::gen(), nss, std::unique_ptr<IndexCatalog>()) {}

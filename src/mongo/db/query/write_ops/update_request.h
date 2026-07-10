@@ -64,7 +64,7 @@ void appendArrayToString(const T& arr, StringBuilder* builder) {
 
 class FieldRef;
 
-class MONGO_MOD_PUBLIC UpdateRequest {
+class [[MONGO_MOD_PUBLIC]] UpdateRequest {
 public:
     enum ReturnDocOption {
         // Return no document.

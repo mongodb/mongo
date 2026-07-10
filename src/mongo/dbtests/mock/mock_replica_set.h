@@ -44,7 +44,7 @@
 #include <string>
 #include <vector>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class ClockSource;
 
@@ -169,4 +169,4 @@ private:
 
     std::string _primaryHost;
 };
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

@@ -34,7 +34,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 

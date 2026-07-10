@@ -38,7 +38,7 @@
 /**
  * Mongod local kill session / transaction functionality library.
  */
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Kills all cursors, ops, and transactions on mongod for sessions matching 'matcher'.
@@ -106,4 +106,4 @@ void yieldLocksForPreparedTransactions(OperationContext* opCtx);
  */
 void invalidateSessionsForStepdown(OperationContext* opCtx);
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

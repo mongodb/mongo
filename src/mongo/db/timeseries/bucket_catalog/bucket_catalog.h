@@ -63,7 +63,7 @@
 
 #include <boost/optional/optional.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 namespace mongo::timeseries::bucket_catalog {
 
 using StripeNumber = std::uint8_t;

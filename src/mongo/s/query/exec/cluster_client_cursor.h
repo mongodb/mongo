@@ -61,7 +61,7 @@ class StatusWith;
  *
  * Does not throw exceptions.
  */
-class MONGO_MOD_PUBLIC ClusterClientCursor {
+class [[MONGO_MOD_PUBLIC]] ClusterClientCursor {
     ClusterClientCursor(const ClusterClientCursor&) = delete;
     ClusterClientCursor& operator=(const ClusterClientCursor&) = delete;
 

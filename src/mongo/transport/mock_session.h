@@ -46,7 +46,7 @@
 namespace mongo {
 namespace transport {
 
-class MONGO_MOD_UNFORTUNATELY_OPEN MockSessionBase : public Session {
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] MockSessionBase : public Session {
 public:
     MockSessionBase() : Session(/*ingress=*/true) {}  // Not always true but good enough for now.
 
@@ -125,7 +125,7 @@ private:
     boost::optional<SSLConfiguration> _sslConfig;
 };
 
-class MONGO_MOD_OPEN MockSession : public MockSessionBase {
+class [[MONGO_MOD_OPEN]] MockSession : public MockSessionBase {
     MockSession(const MockSession&) = delete;
     MockSession& operator=(const MockSession&) = delete;
 

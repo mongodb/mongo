@@ -38,7 +38,7 @@ class OperationContext;
 /**
  * Stores state and statistics related to ingress admission for a given transactional context.
  */
-class MONGO_MOD_PUBLIC IngressAdmissionContext : public AdmissionContext {
+class [[MONGO_MOD_PUBLIC]] IngressAdmissionContext : public AdmissionContext {
 public:
     IngressAdmissionContext() = default;
 

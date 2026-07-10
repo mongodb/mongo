@@ -50,7 +50,7 @@ namespace repl {
 class BackgroundSync;
 class Reporter;
 
-class MONGO_MOD_PARENT_PRIVATE SyncSourceFeedback {
+class [[MONGO_MOD_PARENT_PRIVATE]] SyncSourceFeedback {
     SyncSourceFeedback(const SyncSourceFeedback&) = delete;
     SyncSourceFeedback& operator=(const SyncSourceFeedback&) = delete;
 

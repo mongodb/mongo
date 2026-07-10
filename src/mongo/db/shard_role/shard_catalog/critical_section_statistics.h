@@ -62,7 +62,7 @@ private:
  * amount of time spent waiting/with the critical section.
  */
 template <typename Key>
-class MONGO_MOD_PARENT_PRIVATE CriticalSectionStatistics {
+class [[MONGO_MOD_PARENT_PRIVATE]] CriticalSectionStatistics {
 public:
     void report(BSONObjBuilder& builder) const {
         Microseconds totalTimeActiveCatchup{0};

@@ -42,8 +42,8 @@ namespace direct_connection_util {
  * Throws ErrorCodes::Unauthorized if the command is a direct connection and the user does not have
  * sufficient permissions.
  */
-MONGO_MOD_PUBLIC void checkDirectShardDDLAllowed(OperationContext* opCtx,
-                                                 const NamespaceString& nss);
+[[MONGO_MOD_PUBLIC]] void checkDirectShardDDLAllowed(OperationContext* opCtx,
+                                                     const NamespaceString& nss);
 
 /*
  * Checks if the operation is coming from a direct connection and whether the user has the correct
@@ -52,8 +52,8 @@ MONGO_MOD_PUBLIC void checkDirectShardDDLAllowed(OperationContext* opCtx,
  * Throws ErrorCodes::Unauthorized if the command is a direct connection and the user does not have
  * sufficient permissions.
  */
-MONGO_MOD_PUBLIC void checkDirectShardOperationAllowed(OperationContext* opCtx,
-                                                       const NamespaceString& nss);
+[[MONGO_MOD_PUBLIC]] void checkDirectShardOperationAllowed(OperationContext* opCtx,
+                                                           const NamespaceString& nss);
 
 }  // namespace direct_connection_util
 }  // namespace mongo

@@ -50,7 +50,7 @@ namespace mongo {
  * Note that every Waitable should be level-triggered like its base class, Notifiable. See
  * mongo/stdx/condition_variable.h for more details.
  */
-class MONGO_MOD_OPEN Waitable : public Notifiable {
+class [[MONGO_MOD_OPEN]] Waitable : public Notifiable {
 public:
     template <typename LockT>
     static void wait(Waitable* waitable,

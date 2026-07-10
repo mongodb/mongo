@@ -40,13 +40,13 @@
 
 namespace mongo {
 
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 void checkCollectionUUIDMismatch(OperationContext* opCtx,
                                  const NamespaceString& ns,
                                  const Collection* coll,
                                  const boost::optional<UUID>& uuid);
 
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 void checkCollectionUUIDMismatch(OperationContext* opCtx,
                                  const NamespaceString& ns,
                                  const CollectionPtr& coll,
@@ -55,7 +55,7 @@ void checkCollectionUUIDMismatch(OperationContext* opCtx,
 /**
  * Same as above, but with the catalog passed explicitly.
  */
-MONGO_MOD_PRIVATE
+[[MONGO_MOD_PRIVATE]]
 void checkCollectionUUIDMismatch(OperationContext* opCtx,
                                  const CollectionCatalog& catalog,
                                  const NamespaceString& ns,
@@ -63,7 +63,7 @@ void checkCollectionUUIDMismatch(OperationContext* opCtx,
                                  const boost::optional<UUID>& uuid);
 
 
-MONGO_MOD_PRIVATE
+[[MONGO_MOD_PRIVATE]]
 void checkCollectionUUIDMismatch(OperationContext* opCtx,
                                  const CollectionCatalog& catalog,
                                  const NamespaceString& ns,

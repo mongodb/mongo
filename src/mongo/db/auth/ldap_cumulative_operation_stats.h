@@ -47,7 +47,7 @@ class LDAPOperationStats;
  * Class used to track statistics associated with LDAP operations for a specfic
  * UserAcquisitionStats object.
  */
-class MONGO_MOD_PUBLIC LDAPCumulativeOperationStats {
+class [[MONGO_MOD_PUBLIC]] LDAPCumulativeOperationStats {
 public:
     LDAPCumulativeOperationStats() = default;
     ~LDAPCumulativeOperationStats() = default;

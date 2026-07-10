@@ -34,7 +34,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace primary_only_service_helpers {
 
 /**
@@ -79,4 +79,4 @@ private:
 };
 
 }  // namespace primary_only_service_helpers
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

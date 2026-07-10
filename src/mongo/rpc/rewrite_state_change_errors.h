@@ -40,7 +40,7 @@
 
 namespace mongo::rpc {
 
-class MONGO_MOD_PUBLIC RewriteStateChangeErrors {
+class [[MONGO_MOD_PUBLIC]] RewriteStateChangeErrors {
 public:
     /**
      * Enable/disable for an entire server.

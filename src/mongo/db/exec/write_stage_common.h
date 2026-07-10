@@ -61,7 +61,7 @@ class Document;
 
 namespace write_stage_common {
 
-class MONGO_MOD_PUBLIC PreWriteFilter {
+class [[MONGO_MOD_PUBLIC]] PreWriteFilter {
 public:
     /**
      * This class represents the different kind of actions we can take when handling a write

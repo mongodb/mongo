@@ -58,7 +58,7 @@ class DatabaseClonerTest;
 
 struct InitialSyncSummaryStats;
 
-class MONGO_MOD_PUB DatabaseCloner final : public InitialSyncBaseCloner {
+class [[MONGO_MOD_PUBLIC]] DatabaseCloner final : public InitialSyncBaseCloner {
 public:
     struct Stats {
         DatabaseName dbname;

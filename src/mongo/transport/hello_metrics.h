@@ -52,7 +52,7 @@ class HelloMetrics;
  * support both commands. This allows us insight into which command is being
  * used until we decide to remove support for isMaster completely.
  */
-class MONGO_MOD_PUBLIC InExhaustHello {
+class [[MONGO_MOD_PUBLIC]] InExhaustHello {
 public:
     enum class Command {
         kHello,
@@ -95,7 +95,7 @@ private:
  * both commands. This allows us insight into which command is being used
  * until we decide to remove support for isMaster completely.
  */
-class MONGO_MOD_PUBLIC HelloMetrics {
+class [[MONGO_MOD_PUBLIC]] HelloMetrics {
     HelloMetrics(const HelloMetrics&) = delete;
     HelloMetrics& operator=(const HelloMetrics&) = delete;
     HelloMetrics(HelloMetrics&&) = delete;

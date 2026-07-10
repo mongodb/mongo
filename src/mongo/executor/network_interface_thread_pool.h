@@ -54,7 +54,8 @@ class NetworkInterface;
  * from on the network interface thread, and queueing them up to be drained by
  * a setAlarm if not.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT NetworkInterfaceThreadPool final : public ThreadPoolInterface {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] NetworkInterfaceThreadPool final
+    : public ThreadPoolInterface {
 public:
     NetworkInterfaceThreadPool(NetworkInterface* net);
     ~NetworkInterfaceThreadPool() override;

@@ -52,7 +52,7 @@ namespace mongo {
  * Use ServerStatusSectionBuilder below to build your ServerStatusSection and register it with the
  * command. Make sure to perform the registration before the server can run commands.
  */
-class MONGO_MOD_OPEN ServerStatusSection {
+class [[MONGO_MOD_OPEN]] ServerStatusSection {
 public:
     ServerStatusSection(std::string sectionName, ClusterRole role)
         : _sectionName(std::move(sectionName)), _role(role) {}
@@ -195,7 +195,7 @@ private:
  * all sections are registered before serverStatus can be run.
  */
 template <typename Section>
-class MONGO_MOD_PUBLIC ServerStatusSectionBuilder {
+class [[MONGO_MOD_PUBLIC]] ServerStatusSectionBuilder {
 public:
     explicit ServerStatusSectionBuilder(std::string name) : _name(std::move(name)) {}
 
@@ -248,7 +248,7 @@ private:
 };
 
 
-class MONGO_MOD_PUBLIC OpCounterServerStatusSection : public ServerStatusSection {
+class [[MONGO_MOD_PUBLIC]] OpCounterServerStatusSection : public ServerStatusSection {
 public:
     OpCounterServerStatusSection(const std::string& sectionName,
                                  ClusterRole role,
@@ -271,7 +271,7 @@ private:
 /**
  * Publishes an infrequently-changing BSON object as a server status section.
  */
-class MONGO_MOD_PUBLIC BSONObjectStatusSection : public ServerStatusSection {
+class [[MONGO_MOD_PUBLIC]] BSONObjectStatusSection : public ServerStatusSection {
 public:
     using ServerStatusSection::ServerStatusSection;
 

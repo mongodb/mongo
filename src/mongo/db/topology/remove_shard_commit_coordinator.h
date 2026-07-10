@@ -37,7 +37,7 @@
 #include "mongo/util/modules.h"
 
 namespace mongo {
-class MONGO_MOD_PARENT_PRIVATE RemoveShardCommitCoordinator final
+class [[MONGO_MOD_PARENT_PRIVATE]] RemoveShardCommitCoordinator final
     : public RecoverableShardingDDLCoordinator<RemoveShardCommitCoordinatorDocument> {
 public:
     RemoveShardCommitCoordinator(ShardingCoordinatorService* service, const BSONObj& initialState)

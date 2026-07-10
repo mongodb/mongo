@@ -71,7 +71,8 @@ int32_t getStatementId(const BulkWriteCommandRequest& req, size_t currentOpIdx);
  * From a serialized BulkWriteCommandRequest containing a single NamespaceInfoEntry,
  * extract that NamespaceInfoEntry. For bulkWrite with queryable encryption.
  */
-MONGO_MOD_NEEDS_REPLACEMENT NamespaceInfoEntry getFLENamespaceInfoEntry(const BSONObj& bulkWrite);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] NamespaceInfoEntry getFLENamespaceInfoEntry(
+    const BSONObj& bulkWrite);
 
 
 /**

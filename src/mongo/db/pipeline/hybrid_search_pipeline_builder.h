@@ -56,7 +56,7 @@ using namespace std::literals::string_view_literals;
  * structure, and then exposes the main constructDesugaredOutput() method that produces the total
  * list of desugared stages agnostically.
  */
-class MONGO_MOD_PRIVATE HybridSearchPipelineBuilder {
+class [[MONGO_MOD_PRIVATE]] HybridSearchPipelineBuilder {
 public:
     /**
      * Returns a list of stages that represent the final desugared state of a hybrid search stage.

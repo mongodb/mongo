@@ -40,7 +40,7 @@
 
 #include <fmt/format.h>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class Status;
 class DBException;
@@ -163,7 +163,7 @@ template <>
 constexpr inline bool isNamedCode<ErrorCodes::$ec.name> = true;
 //#end for
 
-MONGO_MOD_NEEDS_REPLACEMENT MONGO_COMPILER_NORETURN void throwExceptionForStatus(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] MONGO_COMPILER_NORETURN void throwExceptionForStatus(
     const Status& status);
 
 //
@@ -217,18 +217,18 @@ using ErrorExtraInfoFor = typename ErrorExtraInfoForImpl<code>::type;
 
 }  // namespace error_details
 
-MONGO_MOD_PUBLIC std::span<const ErrorCodes::Error> allErrorCodes_forTest();
+[[MONGO_MOD_PUBLIC]] std::span<const ErrorCodes::Error> allErrorCodes_forTest();
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo
 
-template<>
+template <>
 struct fmt::formatter<mongo::ErrorCodes::Error> : fmt::formatter<std::string> {
     auto format(const mongo::ErrorCodes::Error& err, fmt::format_context& ctx) const {
         return fmt::formatter<std::string>::format(mongo::ErrorCodes::errorString(err), ctx);
     }
 };
 
-template<>
+template <>
 struct fmt::formatter<mongo::ErrorCategory> : fmt::formatter<std::string> {
     auto format(const mongo::ErrorCategory& cat, fmt::format_context& ctx) const {
         return fmt::formatter<std::string>::format(mongo::toString(cat), ctx);

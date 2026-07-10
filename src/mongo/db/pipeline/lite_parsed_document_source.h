@@ -60,7 +60,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_UNFORTUNATELY_OPEN mongo {
+namespace [[MONGO_MOD_UNFORTUNATELY_OPEN]] mongo {
 
 class LiteParsedPipeline;
 class OwnedLiteParsedPipeline;
@@ -137,7 +137,7 @@ enum class FirstStageViewApplicationPolicy {
  * - Owned: The instance owns BSON data via '_ownedBson'. Call makeOwned() to transition from
  * unowned to owned when the source BSON lifetime cannot be guaranteed.
  */
-class MONGO_MOD_UNFORTUNATELY_OPEN LiteParsedDocumentSource {
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] LiteParsedDocumentSource {
 public:
     /*
      * This is the type of parser you should register using REGISTER_DOCUMENT_SOURCE. It need not
@@ -778,7 +778,7 @@ private:
  *   class MyLiteParsed final : public LiteParsedDocumentSourceDefault<MyLiteParsed> { ... };
  */
 template <typename Derived>
-class MONGO_MOD_OPEN LiteParsedDocumentSourceDefault : public LiteParsedDocumentSource {
+class [[MONGO_MOD_OPEN]] LiteParsedDocumentSourceDefault : public LiteParsedDocumentSource {
 public:
     LiteParsedDocumentSourceDefault(const BSONElement& originalBson)
         : LiteParsedDocumentSource(originalBson) {}
@@ -823,7 +823,7 @@ private:
  *   class MyLiteParsed final : public LiteParsedDocumentSourceInternal<MyLiteParsed> { ... };
  */
 template <typename Derived>
-class MONGO_MOD_OPEN LiteParsedDocumentSourceInternal
+class [[MONGO_MOD_OPEN]] LiteParsedDocumentSourceInternal
     : public LiteParsedDocumentSourceDefault<Derived> {
 public:
     LiteParsedDocumentSourceInternal(const BSONElement& originalBson)
@@ -984,4 +984,4 @@ public:
         mongo::LiteParsedDocumentSource::Constraints constraints() \
             const override { return {.canRunOnTimeseries = false}; })
 
-}  // namespace MONGO_MOD_UNFORTUNATELY_OPEN mongo
+}  // namespace mongo

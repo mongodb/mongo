@@ -66,7 +66,7 @@ namespace mongo::admission::execution_control {
  *
  * Uses a monotonic TickSource so durations are unaffected by wall-clock adjustments.
  */
-class MONGO_MOD_PUBLIC InProgressTimeAccumulator {
+class [[MONGO_MOD_PUBLIC]] InProgressTimeAccumulator {
 public:
     explicit InProgressTimeAccumulator(TickSource* tickSource = globalSystemTickSource())
         : _tickSource(tickSource), _lastUpdate(tickSource->getTicks()) {}

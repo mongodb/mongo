@@ -33,7 +33,7 @@
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 namespace kill_sessions {
 
@@ -49,4 +49,4 @@ inline Status validateLsid(const LogicalSessionId& lsid) {
 
 }  // namespace kill_sessions
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

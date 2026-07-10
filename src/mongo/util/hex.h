@@ -39,7 +39,7 @@
 
 #include <fmt/format.h>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * A hex blob is a data interchange format, not meant to be
@@ -156,4 +156,4 @@ private:
 // Template removed as it could lead to unexpected behavior with reference types
 // Users should construct StreamableHexdump directly with appropriate data and size
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

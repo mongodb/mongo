@@ -119,15 +119,15 @@ void stitchStage(Stage& stage, Stage* prior);
  * TODO SERVER-112777: Remove 'atlas_streams' dependency on the 'REGISTER_AGG_STAGE_MAPPING' macro
  * that references this function.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void registerDocumentSourceToStageFn(DocumentSource::Id dsid,
-                                                                 DocumentSourceToStageFn fn);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void registerDocumentSourceToStageFn(DocumentSource::Id dsid,
+                                                                     DocumentSourceToStageFn fn);
 
 /**
  * Create the corresponding 'Stage' object for the given instance of 'DocumentSource'.
  * TODO SERVER-112775: Remove 'server_backup_restore' dependency on this function.
  * TODO SERVER-112777: Remove 'atlas_streams' dependency on this function.
  */
-MONGO_MOD_NEEDS_REPLACEMENT StagePtr buildStage(const boost::intrusive_ptr<DocumentSource>& ds);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] StagePtr buildStage(const boost::intrusive_ptr<DocumentSource>& ds);
 
 /**
  * Create the corresponding 'Stage' object for the given instance of 'DocumentSource'. Attach the

@@ -35,7 +35,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class ServiceContext;
 
@@ -135,4 +135,4 @@ StatusWith<int> validateConfigForHeartbeatReconfig(
     boost::optional<int> ownPriorityPort,
     ServiceContext* ctx);
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

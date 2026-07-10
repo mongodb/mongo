@@ -46,7 +46,7 @@ namespace repl {
  * This object handles acquiring the RSTL for replication state transitions, as well as any actions
  * that need to happen in between enqueuing the RSTL request and waiting for it to be granted.
  */
-class MONGO_MOD_PUB ReplicationStateTransitionLockGuard {
+class [[MONGO_MOD_PUBLIC]] ReplicationStateTransitionLockGuard {
     ReplicationStateTransitionLockGuard(const ReplicationStateTransitionLockGuard&) = delete;
     ReplicationStateTransitionLockGuard& operator=(const ReplicationStateTransitionLockGuard&) =
         delete;

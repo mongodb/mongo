@@ -64,7 +64,7 @@ concept HistogramValueType = std::same_as<T, int64_t> || std::same_as<T, double>
  * so MetricsService can access it without knowing the attribute types.
  */
 template <HistogramValueType T>
-class MONGO_MOD_PUBLIC HistogramBase : public Metric {
+class [[MONGO_MOD_PUBLIC]] HistogramBase : public Metric {
 public:
     explicit HistogramBase(boost::optional<std::vector<double>> boundaries = boost::none)
         : explicitBucketBoundaries(std::move(boundaries)) {}
@@ -78,7 +78,7 @@ public:
  * General case: histogram with one or more attributes.
  */
 template <HistogramValueType T, AttributeType... AttributeTs>
-class MONGO_MOD_PUBLIC Histogram : public HistogramBase<T> {
+class [[MONGO_MOD_PUBLIC]] Histogram : public HistogramBase<T> {
 public:
     using Attributes = std::tuple<AttributeTs...>;
 
@@ -100,7 +100,7 @@ public:
  * callers don't need to pass an empty tuple.
  */
 template <HistogramValueType T>
-class MONGO_MOD_PUBLIC Histogram<T> : public HistogramBase<T> {
+class [[MONGO_MOD_PUBLIC]] Histogram<T> : public HistogramBase<T> {
 public:
     using Attributes = std::tuple<>;
 

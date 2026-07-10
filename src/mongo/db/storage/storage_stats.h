@@ -38,7 +38,7 @@ namespace mongo {
  * Manages statistics from the storage engine, allowing addition of statistics, serialization to
  * BSON, and access to certain metrics.
  */
-class MONGO_MOD_OPEN StorageStats {
+class [[MONGO_MOD_OPEN]] StorageStats {
 public:
     virtual ~StorageStats() = default;
 

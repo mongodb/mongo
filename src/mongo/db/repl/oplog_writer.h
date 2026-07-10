@@ -38,12 +38,12 @@
 #include "mongo/util/observable_mutex.h"
 
 namespace mongo {
-namespace MONGO_MOD_PUB repl {
+namespace [[MONGO_MOD_PUBLIC]] repl {
 
 /**
  * Writes oplog entries to the oplog.
  */
-class MONGO_MOD_PUB OplogWriter {
+class [[MONGO_MOD_PUBLIC]] OplogWriter {
     OplogWriter(const OplogWriter&) = delete;
     OplogWriter& operator=(const OplogWriter&) = delete;
 
@@ -163,5 +163,5 @@ private:
     // Configures this OplogWriter.
     const Options _options;
 };
-}  // namespace MONGO_MOD_PUB repl
+}  // namespace repl
 }  // namespace mongo

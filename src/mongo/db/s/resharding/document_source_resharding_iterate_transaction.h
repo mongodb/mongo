@@ -69,7 +69,7 @@ DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(ReshardingIterateTransaction);
  * {clusterTime: <transaction commit timestamp>, ts: <applyOps optime.ts>}. For all other documents,
  * this will be {clusterTime: <optime.ts>, ts: <optime.ts>}.
  */
-class MONGO_MOD_PUBLIC DocumentSourceReshardingIterateTransaction : public DocumentSource {
+class [[MONGO_MOD_PUBLIC]] DocumentSourceReshardingIterateTransaction : public DocumentSource {
 public:
     static constexpr std::string_view kStageName = "$_internalReshardingIterateTransaction"sv;
     static constexpr std::string_view kIncludeCommitTransactionTimestampFieldName =

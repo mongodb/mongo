@@ -1009,7 +1009,7 @@ private:
  * TODO SERVER-111488: This class (and the others in this file) should be private to the query
  * module.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT WriteCommandRef {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] WriteCommandRef {
 public:
     class OpRef;
     class InsertOpRef;
@@ -1219,7 +1219,7 @@ private:
  * Because OpRef contains a WriteCommandRef that refers to a request object, code that uses the
  * OpRef class must ensure that a WriteOpRef does not outlive the referred-to request object.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT WriteCommandRef::OpRef {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] WriteCommandRef::OpRef {
 public:
     explicit OpRef(WriteCommandRef cmdRef, int index) : _cmdRef(std::move(cmdRef)), _index(index) {
         tassert(10778512,
@@ -1501,7 +1501,7 @@ public:
     }
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT WriteCommandRef::UpdateOpRef : public WriteCommandRef::OpRef {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] WriteCommandRef::UpdateOpRef : public WriteCommandRef::OpRef {
 public:
     explicit UpdateOpRef(WriteCommandRef cmdRef, int index) : OpRef(std::move(cmdRef), index) {
         tassert(10778514, "Expected update op", _cmdRef.getOp(index).isUpdateOp());
@@ -1555,7 +1555,7 @@ public:
     }
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT WriteCommandRef::DeleteOpRef : public WriteCommandRef::OpRef {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] WriteCommandRef::DeleteOpRef : public WriteCommandRef::OpRef {
 public:
     explicit DeleteOpRef(WriteCommandRef cmdRef, int index) : OpRef(std::move(cmdRef), index) {
         tassert(10778515, "Expected delete op", _cmdRef.getOp(index).isDeleteOp());
@@ -1609,12 +1609,12 @@ inline WriteCommandRef::DeleteOpRef WriteCommandRef::OpRef::getDeleteOp() const 
  */
 using WriteOpRef = WriteCommandRef::OpRef;
 using InsertOpRef = WriteCommandRef::InsertOpRef;
-using UpdateOpRef MONGO_MOD_NEEDS_REPLACEMENT = WriteCommandRef::UpdateOpRef;
-using DeleteOpRef MONGO_MOD_NEEDS_REPLACEMENT = WriteCommandRef::DeleteOpRef;
+using UpdateOpRef [[MONGO_MOD_NEEDS_REPLACEMENT]] = WriteCommandRef::UpdateOpRef;
+using DeleteOpRef [[MONGO_MOD_NEEDS_REPLACEMENT]] = WriteCommandRef::DeleteOpRef;
 
 /**
  * Legacy 'BatchItemRef' type alias.
  */
-using BatchItemRef MONGO_MOD_NEEDS_REPLACEMENT = WriteOpRef;
+using BatchItemRef [[MONGO_MOD_NEEDS_REPLACEMENT]] = WriteOpRef;
 
 }  // namespace mongo

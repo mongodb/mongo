@@ -43,7 +43,7 @@ namespace mongo {
 /**
  * A class which handles looking up RWConcernDefault values from an in-memory location.
  */
-class MONGO_MOD_PUB ReadWriteConcernDefaultsLookupMock {
+class [[MONGO_MOD_PUBLIC]] ReadWriteConcernDefaultsLookupMock {
 public:
     ReadWriteConcernDefaults::FetchDefaultsFn getFetchDefaultsFn();
 

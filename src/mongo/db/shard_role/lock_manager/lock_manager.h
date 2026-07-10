@@ -48,7 +48,7 @@ namespace mongo {
  * Entry point for the lock manager scheduling functionality. Don't use it directly, but
  * instead go through the Locker interface.
  */
-class MONGO_MOD_PRIVATE LockManager {
+class [[MONGO_MOD_PRIVATE]] LockManager {
     LockManager(const LockManager&) = delete;
     LockManager& operator=(const LockManager&) = delete;
 

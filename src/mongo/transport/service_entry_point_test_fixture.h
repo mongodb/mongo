@@ -47,9 +47,9 @@
 
 #include <string_view>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
-class MONGO_MOD_OPEN ServiceEntryPointTestFixture : public ServiceContextTest {
+class [[MONGO_MOD_OPEN]] ServiceEntryPointTestFixture : public ServiceContextTest {
 public:
     ServiceEntryPointTestFixture()
         : ServiceContextTest(std::make_unique<ScopedGlobalServiceContextForTest>(
@@ -349,4 +349,4 @@ public:
     }
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

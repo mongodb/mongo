@@ -85,7 +85,7 @@ Status validateResumeInput(OperationContext* opCtx,
  * value) or if there is a bad combination of options (e.g. awaitData is illegal without
  * tailable).
  */
-MONGO_MOD_PUBLIC Status validateFindCommandRequest(const FindCommandRequest& findCommand);
+[[MONGO_MOD_PUBLIC]] Status validateFindCommandRequest(const FindCommandRequest& findCommand);
 
 /**
  * Parses a find command object, 'cmdObj'. Caller must indicate whether or not this lite
@@ -95,7 +95,7 @@ MONGO_MOD_PUBLIC Status validateFindCommandRequest(const FindCommandRequest& fin
  * Returns a heap allocated FindCommandRequest on success or an error if 'cmdObj' is not well
  * formed.
  */
-MONGO_MOD_PUBLIC std::unique_ptr<FindCommandRequest> makeFromFindCommand(
+[[MONGO_MOD_PUBLIC]] std::unique_ptr<FindCommandRequest> makeFromFindCommand(
     const BSONObj& cmdObj,
     const boost::optional<auth::ValidatedTenancyScope>& vts,
     const boost::optional<TenantId>& tenantId,
@@ -105,10 +105,10 @@ MONGO_MOD_PUBLIC std::unique_ptr<FindCommandRequest> makeFromFindCommand(
  * Copies an already-parsed FindCommandRequest and applies post-parse normalization and
  * validation (meta projection, skip/limit normalization, option validation).
  */
-MONGO_MOD_PUBLIC std::unique_ptr<FindCommandRequest> makeFromFindCommand(
+[[MONGO_MOD_PUBLIC]] std::unique_ptr<FindCommandRequest> makeFromFindCommand(
     const FindCommandRequest& findCommand);
 
-MONGO_MOD_PUBLIC std::unique_ptr<FindCommandRequest> makeFromFindCommandForTests(
+[[MONGO_MOD_PUBLIC]] std::unique_ptr<FindCommandRequest> makeFromFindCommandForTests(
     const BSONObj& cmdObj, boost::optional<NamespaceString> nss = boost::none);
 
 /**
@@ -129,8 +129,9 @@ static constexpr auto kUnwrappedReadPrefField = "$queryOptions";
 
 // Names of the maxTimeMS command and query option.
 // Char arrays because they are used in static initialization.
-MONGO_MOD_PUBLIC static constexpr auto cmdOptionMaxTimeMS = GenericArguments::kMaxTimeMSFieldName;
-MONGO_MOD_PUBLIC static constexpr auto queryOptionMaxTimeMS = "$maxTimeMS";
+[[MONGO_MOD_PUBLIC]] static constexpr auto cmdOptionMaxTimeMS =
+    GenericArguments::kMaxTimeMSFieldName;
+[[MONGO_MOD_PUBLIC]] static constexpr auto queryOptionMaxTimeMS = "$maxTimeMS";
 
 // Names of the $meta projection values.
 static constexpr auto metaGeoNearDistance = "geoNearDistance";
@@ -165,7 +166,7 @@ void addShowRecordIdMetaProj(FindCommandRequest* findCommand);
  */
 bool hasInvalidNaturalParam(const BSONObj& obj);
 
-MONGO_MOD_PUBLIC long long getDefaultBatchSize();
+[[MONGO_MOD_PUBLIC]] long long getDefaultBatchSize();
 
 }  // namespace query_request_helper
 }  // namespace mongo

@@ -33,7 +33,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class OperationContext;
 
@@ -41,7 +41,7 @@ class OperationContext;
  * An iterator class that traverses backwards through a transaction's oplog entries by following the
  * "prevOpTime" link in each entry.
  */
-class MONGO_MOD_OPEN TransactionHistoryIteratorBase {
+class [[MONGO_MOD_OPEN]] TransactionHistoryIteratorBase {
 public:
     virtual ~TransactionHistoryIteratorBase() = default;
 
@@ -105,4 +105,4 @@ private:
     Timestamp _commitTimestamp;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

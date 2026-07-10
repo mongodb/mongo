@@ -41,7 +41,7 @@ class ServiceContext;
 
 // NEEDS_REPLACEMENT: extentions are hard-coded config strings we shouldn't allow other modules to
 // control/modify (prefer something higher level).
-class MONGO_MOD_NEEDS_REPLACEMENT WiredTigerExtensions {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] WiredTigerExtensions {
 public:
     static WiredTigerExtensions& get(ServiceContext* service);
 

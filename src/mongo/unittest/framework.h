@@ -90,7 +90,7 @@ namespace mongo::unittest {
  * Test fixture base class. Defined to translate old mongo-style setUp/tearDown methods to their
  * gtest counterparts, SetUp/TearDown.
  */
-class MONGO_MOD_OPEN Test : public testing::Test {
+class [[MONGO_MOD_OPEN]] Test : public testing::Test {
 public:
     virtual void setUp() {}
     virtual void tearDown() {}
@@ -120,7 +120,7 @@ public:
  *     };
  *     OldStyleSuiteInitializer<All> all;
  */
-class MONGO_MOD_OPEN OldStyleSuiteSpecification {
+class [[MONGO_MOD_OPEN]] OldStyleSuiteSpecification {
 public:
     explicit OldStyleSuiteSpecification(std::string name) : _name(std::move(name)) {}
     virtual ~OldStyleSuiteSpecification() = default;

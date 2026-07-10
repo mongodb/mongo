@@ -69,7 +69,7 @@ namespace mongo {
 /**
  * A dummy implementation of ShardingCatalogClient for testing purposes.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ShardingCatalogClientMock : public ShardingCatalogClient {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardingCatalogClientMock : public ShardingCatalogClient {
 public:
     ShardingCatalogClientMock();
     ~ShardingCatalogClientMock() override;

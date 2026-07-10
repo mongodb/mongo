@@ -31,7 +31,7 @@
 
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Marks a thread as idle while in scope. Prefer to use the macro below.
@@ -68,4 +68,4 @@ public:
     IdleThreadBlock markIdle(__FILE__ ":" MONGO_IDLE_THREAD_BLOCK_STR_(__LINE__))
 
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

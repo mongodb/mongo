@@ -54,7 +54,7 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Group);
  * This class represents hash based group implementation that stores all groups until source is
  * depleted and only then starts outputing documents.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceGroup final : public DocumentSourceGroupBase {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DocumentSourceGroup final : public DocumentSourceGroupBase {
 public:
     static constexpr std::string_view kStageName = "$group"sv;
 

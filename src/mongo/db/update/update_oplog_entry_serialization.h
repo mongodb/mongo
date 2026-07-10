@@ -43,7 +43,7 @@
 /**
  * This provides helpers for creating oplog entries.
  */
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 namespace mongo::update_oplog_entry {
 using namespace std::literals::string_view_literals;
 static inline constexpr std::string_view kDiffObjectFieldName = "diff"sv;

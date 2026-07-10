@@ -48,7 +48,7 @@ namespace mongo {
 /**
  * Methods used by several parts of the planning process.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerCommon {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] QueryPlannerCommon {
 public:
     /**
      * Does the tree rooted at 'root' have a node with matchType 'type'?

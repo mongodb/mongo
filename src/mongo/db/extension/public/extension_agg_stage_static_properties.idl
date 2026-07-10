@@ -27,7 +27,7 @@
 #
 
 global:
-    mod_visibility: pub
+    mod_visibility: public
     cpp_namespace: "mongo::extension"
     cpp_includes:
         - "mongo/db/extension/public/api.h"

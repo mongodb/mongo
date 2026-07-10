@@ -54,7 +54,7 @@
 /**
  * This file contains the interface for rewriting filters within CRUD commands for FLE2.
  */
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 class FLETagQueryInterface;
 
 namespace fle {
@@ -123,4 +123,4 @@ BSONObj rewriteEncryptedFilterInsideTxn(
     BSONObj filter,
     EncryptedCollScanModeAllowed mode = EncryptedCollScanModeAllowed::kDisallow);
 }  // namespace fle
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

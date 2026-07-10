@@ -68,7 +68,7 @@ class RouterStageMock;
 /**
  * TODO SERVER-111290 Remove external dependencies on this class.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ClusterClientCursorImpl final : public ClusterClientCursor {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ClusterClientCursorImpl final : public ClusterClientCursor {
     ClusterClientCursorImpl(const ClusterClientCursorImpl&) = delete;
     ClusterClientCursorImpl& operator=(const ClusterClientCursorImpl&) = delete;
 

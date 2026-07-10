@@ -41,7 +41,7 @@ namespace mongo::replicated_fast_count {
  * The entry may be a top-level container op, or a container op nested inside the 'applyOps' array
  * of an applyOps command oplog entry.
  */
-MONGO_MOD_PUBLIC Timestamp getTimestampStoreValidAsOfFromOplogEntry(const BSONObj& oplogEntry);
+[[MONGO_MOD_PUBLIC]] Timestamp getTimestampStoreValidAsOfFromOplogEntry(const BSONObj& oplogEntry);
 
 /**
  * Returns the find query filter that selects oplog entries writing to the replicated fast count
@@ -50,6 +50,6 @@ MONGO_MOD_PUBLIC Timestamp getTimestampStoreValidAsOfFromOplogEntry(const BSONOb
  * deletes to the timestamp store, so we don't need to filter on specific opType. Used during
  * initial sync.
  */
-MONGO_MOD_PUBLIC BSONObj fastCountValidAsOfScanFilter();
+[[MONGO_MOD_PUBLIC]] BSONObj fastCountValidAsOfScanFilter();
 
 }  // namespace mongo::replicated_fast_count

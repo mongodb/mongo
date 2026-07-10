@@ -50,7 +50,7 @@ class StorageInterfaceMock;
  * This is a basic fixture that is backed by a real storage engine and a mock replication
  * coordinator that is running as primary.
  */
-class MONGO_MOD_OPEN MockReplCoordServerFixture : public ServiceContextMongoDTest {
+class [[MONGO_MOD_OPEN]] MockReplCoordServerFixture : public ServiceContextMongoDTest {
 public:
     void setUp() override;
 

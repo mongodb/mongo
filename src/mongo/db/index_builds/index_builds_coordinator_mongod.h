@@ -53,7 +53,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * This implementation of the IndexBuildsCoordinator is for replica set member and standalone nodes.
@@ -180,4 +180,4 @@ private:
     stdx::condition_variable _indexBuildFinished;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

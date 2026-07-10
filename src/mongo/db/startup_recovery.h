@@ -32,7 +32,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/modules.h"
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 namespace startup_recovery {

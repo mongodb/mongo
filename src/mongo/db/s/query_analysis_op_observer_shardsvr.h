@@ -47,7 +47,7 @@ namespace analyze_shard_key {
 /**
  * OpObserver for query analysis in a shard svr.
  */
-class MONGO_MOD_PUBLIC QueryAnalysisOpObserverShardSvr final : public QueryAnalysisOpObserver {
+class [[MONGO_MOD_PUBLIC]] QueryAnalysisOpObserverShardSvr final : public QueryAnalysisOpObserver {
     QueryAnalysisOpObserverShardSvr(const QueryAnalysisOpObserverShardSvr&) = delete;
     QueryAnalysisOpObserverShardSvr& operator=(const QueryAnalysisOpObserverShardSvr&) = delete;
 

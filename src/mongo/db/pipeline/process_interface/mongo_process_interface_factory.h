@@ -36,13 +36,13 @@ namespace mongo {
 
 class OperationContext;
 
-class MONGO_MOD_OPEN MongoProcessInterfaceFactory {
+class [[MONGO_MOD_OPEN]] MongoProcessInterfaceFactory {
 public:
     virtual ~MongoProcessInterfaceFactory() = default;
     virtual std::shared_ptr<MongoProcessInterface> create(OperationContext* opCtx) = 0;
 };
 
-class MONGO_MOD_OPEN MongoProcessInterfaceFactoryImpl : public MongoProcessInterfaceFactory {
+class [[MONGO_MOD_OPEN]] MongoProcessInterfaceFactoryImpl : public MongoProcessInterfaceFactory {
 public:
     std::shared_ptr<MongoProcessInterface> create(OperationContext* opCtx) override;
 };

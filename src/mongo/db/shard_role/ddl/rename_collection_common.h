@@ -38,8 +38,8 @@
 namespace mongo {
 namespace rename_collection {
 
-MONGO_MOD_PARENT_PRIVATE Status
-checkAuthForRenameCollectionCommand(Client* client, const RenameCollectionCommand& request);
+[[MONGO_MOD_PARENT_PRIVATE]] Status checkAuthForRenameCollectionCommand(
+    Client* client, const RenameCollectionCommand& request);
 
 }  // namespace rename_collection
 }  // namespace mongo

@@ -77,7 +77,7 @@ namespace mongo::plan_executor_factory {
  * Note that the PlanExecutor will use the ExpressionContext associated with 'cq' and the
  * OperationContext associated with that ExpressionContext.
  */
-MONGO_MOD_PUBLIC std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
+[[MONGO_MOD_PUBLIC]] std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     std::unique_ptr<CanonicalQuery> cq,
     std::unique_ptr<WorkingSet> ws,
     std::unique_ptr<PlanStage> rootStage,
@@ -96,7 +96,7 @@ MONGO_MOD_PUBLIC std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
  * Note that the PlanExecutor will use the OperationContext associated with the 'expCtx'
  * ExpressionContext.
  */
-MONGO_MOD_PUBLIC std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
+[[MONGO_MOD_PUBLIC]] std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<WorkingSet> ws,
     std::unique_ptr<PlanStage> rootStage,
@@ -106,7 +106,7 @@ MONGO_MOD_PUBLIC std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     NamespaceString nss = NamespaceString::kEmpty,
     std::unique_ptr<QuerySolution> qs = nullptr);
 
-MONGO_MOD_PUBLIC std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
+[[MONGO_MOD_PUBLIC]] std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     OperationContext* opCtx,
     std::unique_ptr<WorkingSet> ws,
     std::unique_ptr<PlanStage> rootStage,
@@ -166,7 +166,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
 /**
  * Constructs a plan executor for executing the given 'pipeline'.
  */
-MONGO_MOD_PUBLIC std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
+[[MONGO_MOD_PUBLIC]] std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     std::unique_ptr<Pipeline> pipeline,
     PlanExecutorPipeline::ResumableScanType resumableScanType =

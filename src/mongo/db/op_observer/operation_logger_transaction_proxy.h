@@ -46,7 +46,7 @@
 #include <memory>
 #include <vector>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Accumulates replicated operations for multi-document transactions and batched WUOW writes.
@@ -84,4 +84,4 @@ private:
     std::unique_ptr<OperationLogger> _targetOperationLogger;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

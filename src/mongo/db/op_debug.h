@@ -63,7 +63,7 @@ class CurOp;
 
 
 /* lifespan is different than CurOp because of recursives with DBDirectClient */
-class MONGO_MOD_PUB OpDebug {
+class [[MONGO_MOD_PUBLIC]] OpDebug {
 public:
     /**
      * Holds counters for execution statistics that can be accumulated by one or more operations.
@@ -274,7 +274,7 @@ public:
         boost::optional<uint64_t> clusterPeakTrackedMemBytes;
     };
 
-    MONGO_MOD_PRIVATE OpDebug() = default;
+    [[MONGO_MOD_PRIVATE]] OpDebug() = default;
 
     /**
      * Adds information about the current operation to "pAttrs". Since this information will end up
@@ -308,13 +308,13 @@ public:
      * Generally, the metrics/fields reported here should be a superset of what is reported in
      * report(). The profiler is meant to be more verbose than the slow query log.
      */
-    MONGO_MOD_PRIVATE void append(OperationContext* opCtx,
-                                  const SingleThreadedLockStats& lockStats,
-                                  FlowControlTicketholder::CurOp flowControlStats,
-                                  const SingleThreadedStorageMetrics& storageMetrics,
-                                  long long prepareReadConflicts,
-                                  bool omitCommand,
-                                  BSONObjBuilder& builder) const;
+    [[MONGO_MOD_PRIVATE]] void append(OperationContext* opCtx,
+                                      const SingleThreadedLockStats& lockStats,
+                                      FlowControlTicketholder::CurOp flowControlStats,
+                                      const SingleThreadedStorageMetrics& storageMetrics,
+                                      long long prepareReadConflicts,
+                                      bool omitCommand,
+                                      BSONObjBuilder& builder) const;
 
     /**
      * Bundles the three objects needed to build a profile/slow-query log document from a snapshot
@@ -329,42 +329,42 @@ public:
         const CurOp& curop;
     };
 
-    MONGO_MOD_PRIVATE static std::function<BSONObj(AppendArgs args)> appendStaged(
+    [[MONGO_MOD_PRIVATE]] static std::function<BSONObj(AppendArgs args)> appendStaged(
         OperationContext* opCtx, StringSet requestedFields, bool needWholeDocument);
-    MONGO_MOD_PRIVATE static void appendUserInfo(const CurOp&,
-                                                 BSONObjBuilder&,
-                                                 AuthorizationSession*);
+    [[MONGO_MOD_PRIVATE]] static void appendUserInfo(const CurOp&,
+                                                     BSONObjBuilder&,
+                                                     AuthorizationSession*);
 
-    MONGO_MOD_PRIVATE static void appendDelinquentInfo(OperationContext* opCtx,
-                                                       BSONObjBuilder&,
-                                                       bool reportAcquisitions = true);
+    [[MONGO_MOD_PRIVATE]] static void appendDelinquentInfo(OperationContext* opCtx,
+                                                           BSONObjBuilder&,
+                                                           bool reportAcquisitions = true);
 
     /**
      * Moves relevant plan summary metrics to this OpDebug instance.
      */
-    MONGO_MOD_PRIVATE void setPlanSummaryMetrics(PlanSummaryStats&& planSummaryStats);
+    [[MONGO_MOD_PRIVATE]] void setPlanSummaryMetrics(PlanSummaryStats&& planSummaryStats);
 
     /**
      * The resulting object has zeros omitted. As is typical in this file.
      */
-    MONGO_MOD_PRIVATE static BSONObj makeFlowControlObject(
+    [[MONGO_MOD_PRIVATE]] static BSONObj makeFlowControlObject(
         FlowControlTicketholder::CurOp flowControlStats);
 
     /**
      * Make object from $search stats with non-populated values omitted.
      */
-    MONGO_MOD_PRIVATE BSONObj makeMongotDebugStatsObject() const;
+    [[MONGO_MOD_PRIVATE]] BSONObj makeMongotDebugStatsObject() const;
 
     /**
      * Accumulate resolved views.
      */
-    MONGO_MOD_PRIVATE void addResolvedViews(const std::vector<NamespaceString>& namespaces,
-                                            const std::vector<BSONObj>& pipeline);
+    [[MONGO_MOD_PRIVATE]] void addResolvedViews(const std::vector<NamespaceString>& namespaces,
+                                                const std::vector<BSONObj>& pipeline);
 
     /**
      * Get a snapshot of the cursor metrics suitable for inclusion in a command response.
      */
-    MONGO_MOD_PRIVATE CursorMetrics getCursorMetrics(size_t opIndex = kCurrentOpIndex) const;
+    [[MONGO_MOD_PRIVATE]] CursorMetrics getCursorMetrics(size_t opIndex = kCurrentOpIndex) const;
 
     /**
      * Convenience method that computes QueryShapeHash if '_queryShapeHash' has not been previously
@@ -373,7 +373,7 @@ public:
      * QueryShapeHash is recorded in CurOp::OpDebug.
      */
     template <typename Fn>
-    MONGO_MOD_PRIVATE boost::optional<query_shape::QueryShapeHash> ensureQueryShapeHash(
+    [[MONGO_MOD_PRIVATE]] boost::optional<query_shape::QueryShapeHash> ensureQueryShapeHash(
         OperationContext* opCtx, Fn&& queryShapeHashFn) {
         // QueryShapeHash may be accessed by other thread running $currentOp and therefore needs to
         // be synchronized.
@@ -391,13 +391,13 @@ public:
     /**
      * Returns '_queryShapeHash' value without acquiring the lock.
      */
-    MONGO_MOD_PRIVATE boost::optional<query_shape::QueryShapeHash> getQueryShapeHash() const;
+    [[MONGO_MOD_PRIVATE]] boost::optional<query_shape::QueryShapeHash> getQueryShapeHash() const;
 
     /**
      * Sets '_queryShapeHash' value to the new  'hash'. Acquires Client lock prior to setting the
      * hash.
      */
-    MONGO_MOD_PRIVATE void setQueryShapeHash(
+    [[MONGO_MOD_PRIVATE]] void setQueryShapeHash(
         OperationContext* opCtx, const boost::optional<query_shape::QueryShapeHash>& hash);
 
     // -------------------
@@ -568,7 +568,7 @@ public:
      *      - It seemed odd to have ClientCursor and ClusterClientCursorImpl using the struct but
      *        never needing other fields.
      */
-    struct MONGO_MOD_PRIVATE QueryStatsInfo {
+    struct [[MONGO_MOD_PRIVATE]] QueryStatsInfo {
         // Uniquely identifies one query stats entry.
         // `key` may be a nullptr during a subquery execution, but will
         // be non-null at the highest-level operation as long as query stats are
@@ -591,12 +591,12 @@ public:
     };
 
     // Return true if the query stats info for batch writes has been created.
-    MONGO_MOD_PRIVATE bool queryStatsInfoForBatchWritesExists() const {
+    [[MONGO_MOD_PRIVATE]] bool queryStatsInfoForBatchWritesExists() const {
         return _queryStatsInfoForBatchWrites != nullptr;
     }
 
     // Initialize the query stats info map for batch writes if it does not exist.
-    MONGO_MOD_PRIVATE void ensureQueryStatsInfoForBatchWrites() const {
+    [[MONGO_MOD_PRIVATE]] void ensureQueryStatsInfoForBatchWrites() const {
         if (!_queryStatsInfoForBatchWrites) {
             _queryStatsInfoForBatchWrites =
                 std::make_unique<absl::flat_hash_map<size_t, QueryStatsInfo>>();
@@ -604,7 +604,7 @@ public:
     }
 
     // Return true if the entry for 'opIndex' has been created.
-    MONGO_MOD_PRIVATE bool hasQueryStatsInfo(size_t opIndex = kCurrentOpIndex) const {
+    [[MONGO_MOD_PRIVATE]] bool hasQueryStatsInfo(size_t opIndex = kCurrentOpIndex) const {
         if (opIndex == kCurrentOpIndex) {
             return true;
         }
@@ -614,27 +614,27 @@ public:
 
 
     // Return the QueryStatsInfo for the given operation. By default, return the current operation.
-    MONGO_MOD_PRIVATE QueryStatsInfo& getQueryStatsInfo(size_t opIndex = kCurrentOpIndex) {
+    [[MONGO_MOD_PRIVATE]] QueryStatsInfo& getQueryStatsInfo(size_t opIndex = kCurrentOpIndex) {
         return _getQueryStatsInfoHelper(this, opIndex);
     }
 
     // Return the QueryStatsInfo for the given operation. By default, return the current main
     // operation. Const version.
-    MONGO_MOD_PRIVATE const QueryStatsInfo& getQueryStatsInfo(
+    [[MONGO_MOD_PRIVATE]] const QueryStatsInfo& getQueryStatsInfo(
         size_t opIndex = kCurrentOpIndex) const {
         return _getQueryStatsInfoHelper(this, opIndex);
     }
 
     // Returns true if there are any QueryStatsInfo entries for writes statements being processed on
     // the router.
-    MONGO_MOD_PRIVATE bool hasBatchWriteMetrics() const {
+    [[MONGO_MOD_PRIVATE]] bool hasBatchWriteMetrics() const {
         return _queryStatsInfoForBatchWrites && !_queryStatsInfoForBatchWrites->empty();
     }
 
     // Create a new default-constructed QueryStatsInfo for the given opIndex, and return a reference
     // to it.
-    MONGO_MOD_PRIVATE void setQueryStatsInfoAtOpIndex(size_t opIndex,
-                                                      QueryStatsInfo queryStatsInfo) {
+    [[MONGO_MOD_PRIVATE]] void setQueryStatsInfoAtOpIndex(size_t opIndex,
+                                                          QueryStatsInfo queryStatsInfo) {
         uassert(11487700,
                 "cannot create QueryStatsInfo for current operation",
                 opIndex != kCurrentOpIndex);
@@ -650,7 +650,7 @@ public:
     // If we have any write statements for which query stats are being collected in the router
     // role, then execute the function passed in for each QueryStatsInfo instance.
     template <typename Func>
-    MONGO_MOD_PRIVATE void forEachQueryStatsInfoForBatchWrites(Func&& fn) {
+    [[MONGO_MOD_PRIVATE]] void forEachQueryStatsInfoForBatchWrites(Func&& fn) {
         if (!_queryStatsInfoForBatchWrites) {
             return;
         }
@@ -660,7 +660,7 @@ public:
     }
 
     // Gathers and returns a vector of all queryStatsMetrics for registered batch write operations.
-    MONGO_MOD_PRIVATE std::vector<write_ops::QueryStatsMetrics>
+    [[MONGO_MOD_PRIVATE]] std::vector<write_ops::QueryStatsMetrics>
     gatherQueryStatsMetricsForBatchWrites() const {
         std::vector<write_ops::QueryStatsMetrics> queryStatsMetrics;
         if (_queryStatsInfoForBatchWrites) {

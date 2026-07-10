@@ -27,7 +27,7 @@
 
 global:
     cpp_namespace: "mongo::repl"
-    mod_visibility: pub
+    mod_visibility: public
     cpp_includes:
         - "mongo/db/repl/container_oplog_entry_serialization.h"
 

@@ -51,13 +51,13 @@
 #include <boost/optional.hpp>
 
 namespace mongo {
-namespace MONGO_MOD_PUB repl {
+namespace [[MONGO_MOD_PUBLIC]] repl {
 
 /**
  * Applies oplog entries.
  * Reads from an OplogBuffer batches of operations that may be applied in parallel.
  */
-class MONGO_MOD_OPEN OplogApplier {
+class [[MONGO_MOD_OPEN]] OplogApplier {
     OplogApplier(const OplogApplier&) = delete;
     OplogApplier& operator=(const OplogApplier&) = delete;
 
@@ -241,7 +241,7 @@ protected:
 /**
  * The OplogApplier reports its progress using the Observer interface.
  */
-class MONGO_MOD_OPEN OplogApplier::Observer {
+class [[MONGO_MOD_OPEN]] OplogApplier::Observer {
 public:
     virtual ~Observer() = default;
 
@@ -260,7 +260,7 @@ public:
                             const std::vector<OplogEntry>& operations) = 0;
 };
 
-class MONGO_MOD_PRIVATE NoopOplogApplierObserver : public repl::OplogApplier::Observer {
+class [[MONGO_MOD_PRIVATE]] NoopOplogApplierObserver : public repl::OplogApplier::Observer {
 public:
     void onBatchBegin(const std::vector<OplogEntry>&) final {}
     void onBatchEnd(const StatusWith<repl::OpTime>&, const std::vector<OplogEntry>&) final {}
@@ -274,5 +274,5 @@ extern NoopOplogApplierObserver noopOplogApplierObserver;
 std::unique_ptr<ThreadPool> makeReplWorkerPool();
 std::unique_ptr<ThreadPool> makeReplWorkerPool(size_t threadCount);
 
-}  // namespace MONGO_MOD_PUB repl
+}  // namespace repl
 }  // namespace mongo

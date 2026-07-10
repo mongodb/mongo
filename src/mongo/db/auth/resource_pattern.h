@@ -60,7 +60,7 @@ using namespace std::literals::string_view_literals;
  * part of the access control system.  See buildResourceSearchList() in
  * authorization_session.cpp for details.
  */
-class MONGO_MOD_PUBLIC ResourcePattern {
+class [[MONGO_MOD_PUBLIC]] ResourcePattern {
     friend class AuthorizationContract;
 
 public:
@@ -306,6 +306,7 @@ private:
     NamespaceString _ns;
 };
 
-MONGO_MOD_FILE_PRIVATE std::ostream& operator<<(std::ostream& os, const ResourcePattern& pattern);
+[[MONGO_MOD_FILE_PRIVATE]] std::ostream& operator<<(std::ostream& os,
+                                                    const ResourcePattern& pattern);
 
 }  // namespace mongo

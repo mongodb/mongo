@@ -57,7 +57,7 @@ using namespace std::literals::string_view_literals;
  * network requests and the shard versioning protocol.
  *
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ShardVersion {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardVersion {
 public:
     /**
      * The name for the shard version information field, which shard-aware commands should include

@@ -43,7 +43,7 @@ namespace mongo::logv2 {
  * kDefault always has a log severity defined but it is not necessary to
  * provide log severities for the other components (up to but not including kNumLogComponents).
  */
-class MONGO_MOD_PUBLIC LogComponentSettings {
+class [[MONGO_MOD_PUBLIC]] LogComponentSettings {
     LogComponentSettings(const LogComponentSettings&) = delete;
     LogComponentSettings& operator=(const LogComponentSettings&) = delete;
 

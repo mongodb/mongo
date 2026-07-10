@@ -31,13 +31,13 @@
 
 #include "mongo/db/session/session_txn_record_gen.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * A view over a transaction table record that validates all the necessary fields are present upon
  * construction and presents a non-optional interface for those fields.
  */
-class MONGO_MOD_PUB SessionTxnRecordForPrepareRecovery : private SessionTxnRecord {
+class [[MONGO_MOD_PUBLIC]] SessionTxnRecordForPrepareRecovery : private SessionTxnRecord {
 public:
     using SessionTxnRecord::getLastWriteOpTime;
     using SessionTxnRecord::getSessionId;
@@ -60,4 +60,4 @@ public:
     const std::vector<NamespaceString>& getAffectedNamespaces() const;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

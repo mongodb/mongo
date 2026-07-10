@@ -59,7 +59,7 @@ namespace mongo::transport {
  *
  * - featureFlagRateLimitIngressConnectionEstablishment
  */
-class MONGO_MOD_PUBLIC SessionEstablishmentRateLimiter {
+class [[MONGO_MOD_PUBLIC]] SessionEstablishmentRateLimiter {
 public:
     SessionEstablishmentRateLimiter();
 

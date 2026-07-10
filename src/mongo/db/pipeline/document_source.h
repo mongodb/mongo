@@ -153,9 +153,9 @@ namespace mongo {
     const DocumentSource::Id& constName = _dsid_##name;
 
 class DocumentSource;
-using DocumentSourceContainer MONGO_MOD_UNFORTUNATELY_OPEN =
+using DocumentSourceContainer [[MONGO_MOD_UNFORTUNATELY_OPEN]] =
     std::list<boost::intrusive_ptr<DocumentSource>>;
-using ConstDocumentSourceContainer MONGO_MOD_PRIVATE =
+using ConstDocumentSourceContainer [[MONGO_MOD_PRIVATE]] =
     std::list<boost::intrusive_ptr<const DocumentSource>>;
 
 class Pipeline;
@@ -164,7 +164,7 @@ namespace exec::agg {
 class ListMqlEntitiesStage;
 }  // namespace exec::agg
 
-class MONGO_MOD_UNFORTUNATELY_OPEN DocumentSource : public RefCountable {
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] DocumentSource : public RefCountable {
 public:
     // In general a parser returns a list of DocumentSources, to accommodate "multi-stage aliases"
     // like $bucket.

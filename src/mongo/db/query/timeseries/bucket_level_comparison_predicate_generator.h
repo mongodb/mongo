@@ -84,7 +84,7 @@ protected:
  * The predicate generator class to be used for creating loose predicates for match expressions with
  * buckets that do not use extended range nor are fixed.
  */
-class MONGO_MOD_FILE_PRIVATE DefaultBucketLevelComparisonPredicateGenerator final
+class [[MONGO_MOD_FILE_PRIVATE]] DefaultBucketLevelComparisonPredicateGenerator final
     : public BucketLevelComparisonPredicateGeneratorBase {
 public:
     DefaultBucketLevelComparisonPredicateGenerator(Params params)
@@ -103,7 +103,7 @@ public:
  * The predicate generator class to be used to be used for creating loose predicates for match
  * expressions for fixed buckets.
  */
-class MONGO_MOD_FILE_PRIVATE FixedBucketsLevelComparisonPredicateGenerator final
+class [[MONGO_MOD_FILE_PRIVATE]] FixedBucketsLevelComparisonPredicateGenerator final
     : public BucketLevelComparisonPredicateGeneratorBase {
 public:
     FixedBucketsLevelComparisonPredicateGenerator(Params params)

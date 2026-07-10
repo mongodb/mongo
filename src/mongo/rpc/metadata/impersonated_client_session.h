@@ -38,7 +38,7 @@ namespace mongo::rpc {
 /**
  * RAII class to optionally set impersonated client attributes .
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ImpersonatedClientSessionGuard {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ImpersonatedClientSessionGuard {
 public:
     ImpersonatedClientSessionGuard(Client* client,
                                    const ImpersonatedClientMetadata& parsedClientMetadata);

@@ -63,7 +63,7 @@ using namespace std::literals::string_view_literals;
  *
  * TODO SERVER-113179: Remove external dependencies on this class.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ProjectionExecutor : public TransformerInterface {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ProjectionExecutor : public TransformerInterface {
 public:
     /**
      * The name of an internal variable to bind a projection post image to, which is used by the

@@ -39,7 +39,7 @@
 namespace mongo {
 
 // The allowed fields have to be in sync with those defined in 'src/mongo/db/list_indexes.idl'.
-MONGO_MOD_PUBLIC inline static std::map<std::string_view, std::set<IndexType>>
+[[MONGO_MOD_PUBLIC]] inline static std::map<std::string_view, std::set<IndexType>>
     kAllowedListIndexesFieldNames = {
         {ListIndexesReplyItem::k2dsphereIndexVersionFieldName,
          {IndexType::INDEX_2DSPHERE, IndexType::INDEX_2DSPHERE_BUCKET}},

@@ -42,7 +42,7 @@
 namespace mongo::logv2 {
 
 // Boost::log filter that enables logging if Component+Severity match current settings
-class MONGO_MOD_NEEDS_REPLACEMENT ComponentSettingsFilter
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ComponentSettingsFilter
     : public DomainFilter<ComponentSettingsFilter> {
 public:
     ComponentSettingsFilter(const LogDomain& domain, const LogComponentSettings& settings)

@@ -44,11 +44,11 @@ constexpr size_t kNumStaticAttrs = 16;
 
 // Field names used in the JSON and BSON formatter
 constexpr std::string_view kTimestampFieldName = "t"sv;
-MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kSeverityFieldName = "s"sv;
+[[MONGO_MOD_NEEDS_REPLACEMENT]] constexpr std::string_view kSeverityFieldName = "s"sv;
 constexpr std::string_view kComponentFieldName = "c"sv;
 constexpr std::string_view kServiceFieldName = "svc"sv;
 constexpr std::string_view kContextFieldName = "ctx"sv;
-MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kIdFieldName = "id"sv;
+[[MONGO_MOD_NEEDS_REPLACEMENT]] constexpr std::string_view kIdFieldName = "id"sv;
 constexpr std::string_view kMessageFieldName = "msg"sv;
 constexpr std::string_view kAttributesFieldName = "attr"sv;
 constexpr std::string_view kTruncatedFieldName = "truncated"sv;
@@ -61,7 +61,7 @@ constexpr std::string_view kTenantFieldName = "tenant"sv;
 constexpr std::string_view kNullOptionalString = "(nothing)"sv;
 
 constexpr LogTruncation kDefaultTruncation = LogTruncation::Enabled;
-MONGO_MOD_NEEDS_REPLACEMENT constexpr int32_t kDefaultMaxAttributeOutputSizeKB = 10;
+[[MONGO_MOD_NEEDS_REPLACEMENT]] constexpr int32_t kDefaultMaxAttributeOutputSizeKB = 10;
 
 constexpr int32_t kUserAssertWithLogID = -1;
 

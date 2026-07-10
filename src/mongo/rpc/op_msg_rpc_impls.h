@@ -37,7 +37,7 @@
 #include <string_view>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC rpc {
+namespace [[MONGO_MOD_PUBLIC]] rpc {
 
 class OpMsgReply final : public rpc::ReplyInterface {
 public:
@@ -89,5 +89,5 @@ private:
     OpMsgBuilder _builder;
 };
 
-}  // namespace MONGO_MOD_PUBLIC rpc
+}  // namespace rpc
 }  // namespace mongo

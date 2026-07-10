@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC DatabaseShardingStateFactoryShard final
+class [[MONGO_MOD_PUBLIC]] DatabaseShardingStateFactoryShard final
     : public DatabaseShardingStateFactory {
 public:
     DatabaseShardingStateFactoryShard() = default;

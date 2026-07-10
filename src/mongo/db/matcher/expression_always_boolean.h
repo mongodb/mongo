@@ -100,7 +100,7 @@ public:
     }
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT AlwaysFalseMatchExpression final
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] AlwaysFalseMatchExpression final
     : public AlwaysBooleanMatchExpression {
 public:
     static constexpr std::string_view kName = "$alwaysFalse"sv;
@@ -133,7 +133,7 @@ public:
     }
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT AlwaysTrueMatchExpression final
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] AlwaysTrueMatchExpression final
     : public AlwaysBooleanMatchExpression {
 public:
     static constexpr std::string_view kName = "$alwaysTrue"sv;

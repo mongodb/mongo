@@ -70,7 +70,7 @@ class ReplicationCoordinatorExternalState;
 class ReplicationProcess;
 class StorageInterface;
 
-class MONGO_MOD_PARENT_PRIVATE BackgroundSync {
+class [[MONGO_MOD_PARENT_PRIVATE]] BackgroundSync {
     BackgroundSync(const BackgroundSync&) = delete;
     BackgroundSync& operator=(const BackgroundSync&) = delete;
 

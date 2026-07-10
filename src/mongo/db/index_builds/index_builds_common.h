@@ -37,7 +37,7 @@
 #include <string_view>
 #include <vector>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Encapsulates metadata fields associated with an index build.
@@ -115,4 +115,4 @@ std::vector<std::string> toIndexNames(const std::vector<IndexBuildInfo>& indexes
  */
 std::vector<BSONObj> toIndexSpecs(const std::vector<IndexBuildInfo>& indexes);
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

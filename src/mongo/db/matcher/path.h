@@ -46,7 +46,7 @@
 /**
  * TODO SERVER-114832 Break audit dependency on this class.
  */
-namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
+namespace [[MONGO_MOD_NEEDS_REPLACEMENT]] mongo {
 
 class ElementPath {
 public:
@@ -305,4 +305,4 @@ struct BSONElementSubIterator {
     BSONElementIterator cursor;
 };
 
-}  // namespace MONGO_MOD_NEEDS_REPLACEMENT mongo
+}  // namespace mongo

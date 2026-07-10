@@ -50,7 +50,7 @@
 #include <utility>
 #include <vector>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 namespace interruptible_detail {
 // Helper to release a lock, call a callable, and then reacquire the lock.
@@ -69,7 +69,7 @@ auto doWithoutLock(BasicLockableAdapter m, Callable&& callable) {
  * call), _all_ subsequent calls to waitForConditionXXX will fail. Interrupts must unblock all
  * callers of waitForConditionXXX.
  */
-class MONGO_MOD_OPEN Interruptible {
+class [[MONGO_MOD_OPEN]] Interruptible {
 public:
     /**
      * Returns true if currently waiting for a condition/interrupt.
@@ -328,18 +328,18 @@ public:
      *
      * Returns state needed to pop the deadline.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT virtual DeadlineState pushArtificialDeadline(
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] virtual DeadlineState pushArtificialDeadline(
         Date_t deadline, ErrorCodes::Error error) = 0;
 
     /**
      * Pops the subsidiary deadline introduced by push.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT virtual void popArtificialDeadline(DeadlineState) = 0;
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] virtual void popArtificialDeadline(DeadlineState) = 0;
 
     /**
      * Returns the equivalent of Date_t::now() + waitFor for the Interruptible's clock
      */
-    MONGO_MOD_FILE_PRIVATE virtual Date_t getExpirationDateForWaitForValue(
+    [[MONGO_MOD_FILE_PRIVATE]] virtual Date_t getExpirationDateForWaitForValue(
         Milliseconds waitFor) = 0;
 
 
@@ -403,4 +403,4 @@ inline Interruptible* Interruptible::notInterruptible() {
     return &notInterruptible;
 }
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

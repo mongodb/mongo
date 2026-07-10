@@ -34,7 +34,7 @@
 
 namespace mongo::catalog_stats {
 
-MONGO_MOD_PRIVATE
+[[MONGO_MOD_PRIVATE]]
 extern AtomicWord<int> requiresTimeseriesExtendedRangeSupport;
 
 }  // namespace mongo::catalog_stats

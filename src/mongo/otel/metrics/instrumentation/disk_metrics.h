@@ -71,6 +71,6 @@ private:
  * Registers OpenTelemetry disk I/O counters and starts a periodic job that samples
  * once per second. No-op on unsupported platforms.
  */
-MONGO_MOD_PUBLIC void installDiskOtelMetrics(ServiceContext* svcCtx);
+[[MONGO_MOD_PUBLIC]] void installDiskOtelMetrics(ServiceContext* svcCtx);
 
 }  // namespace mongo

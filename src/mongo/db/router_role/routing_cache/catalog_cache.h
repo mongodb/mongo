@@ -64,15 +64,15 @@ using namespace std::literals::string_view_literals;
 
 class ComparableDatabaseVersion;
 
-using DatabaseTypeCache MONGO_MOD_PRIVATE = ReadThroughCache<DatabaseName,
-                                                             DatabaseType,
-                                                             ComparableDatabaseVersion,
-                                                             ObservableMutex<std::mutex>>;
-using DatabaseTypeValueHandle MONGO_MOD_USE_REPLACEMENT(CachedDatabaseInfo) =
+using DatabaseTypeCache [[MONGO_MOD_PRIVATE]] = ReadThroughCache<DatabaseName,
+                                                                 DatabaseType,
+                                                                 ComparableDatabaseVersion,
+                                                                 ObservableMutex<std::mutex>>;
+using DatabaseTypeValueHandle [[MONGO_MOD_USE_REPLACEMENT(CachedDatabaseInfo)]] =
     DatabaseTypeCache::ValueHandle;
-using CachedDatabaseInfo MONGO_MOD_PUBLIC = DatabaseTypeValueHandle;
+using CachedDatabaseInfo [[MONGO_MOD_PUBLIC]] = DatabaseTypeValueHandle;
 
-class MONGO_MOD_PUBLIC CollectionRoutingInfo {
+class [[MONGO_MOD_PUBLIC]] CollectionRoutingInfo {
 public:
     CollectionRoutingInfo(CurrentChunkManager&& chunkManager, CachedDatabaseInfo&& dbInfo)
         : _dbInfo(std::move(dbInfo)), _cm(std::move(chunkManager)) {}
@@ -260,7 +260,7 @@ private:
  *  - a sequence number to allow for forced catalog cache refreshes
  *  - a sequence number to disambiguate scenarios in which the DatabaseVersion isn't valid
  */
-class MONGO_MOD_PARENT_PRIVATE ComparableDatabaseVersion {
+class [[MONGO_MOD_PARENT_PRIVATE]] ComparableDatabaseVersion {
 public:
     /**
      * Creates a ComparableDatabaseVersion that wraps the given DatabaseVersion.
@@ -337,7 +337,7 @@ private:
  * in the sense that it only reads from the persistent store, but never writes to it. Instead
  * writes happen through the ShardingCatalogManager and the cache hierarchy needs to be invalidated.
  */
-class MONGO_MOD_PUBLIC CatalogCache {
+class [[MONGO_MOD_PUBLIC]] CatalogCache {
     CatalogCache(const CatalogCache&) = delete;
     CatalogCache& operator=(const CatalogCache&) = delete;
 
@@ -658,7 +658,7 @@ private:
  *
  * This is only meant to be used for inconsistency-recovery situations.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT RouterRelaxCollectionUUIDConsistencyCheckBlock {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] RouterRelaxCollectionUUIDConsistencyCheckBlock {
 public:
     RouterRelaxCollectionUUIDConsistencyCheckBlock(OperationContext* opCtx);
     RouterRelaxCollectionUUIDConsistencyCheckBlock(

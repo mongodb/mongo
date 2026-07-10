@@ -48,7 +48,7 @@ namespace mongo {
 /**
  * Parses the array filters portion of the update request.
  */
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 StatusWith<std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>>>
 parsedUpdateArrayFilters(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                          const std::vector<BSONObj>& rawArrayFiltersIn,

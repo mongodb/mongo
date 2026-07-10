@@ -42,7 +42,7 @@
 
 namespace mongo::logv2 {
 
-class MONGO_MOD_NEEDS_REPLACEMENT BSONFormatter {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] BSONFormatter {
 public:
     BSONFormatter(const AtomicWord<int32_t>* maxAttributeSizeKB = nullptr) {}
 

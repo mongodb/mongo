@@ -42,7 +42,7 @@ namespace mongo {
  * Diagnostics function which obtains a mapping of lock to client info. Used by the lockInfo command
  * and any other code which needs to generate a global view of what operations hold what resources.
  */
-MONGO_MOD_PRIVATE std::map<LockerId, BSONObj> getLockerIdToClientMap(
+[[MONGO_MOD_PRIVATE]] std::map<LockerId, BSONObj> getLockerIdToClientMap(
     ServiceContext* serviceContext);
 
 }  // namespace mongo

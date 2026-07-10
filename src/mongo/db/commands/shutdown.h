@@ -49,9 +49,9 @@
 
 
 namespace mongo {
-MONGO_MOD_PUBLIC Status stepDownForShutdown(OperationContext* opCtx,
-                                            const Milliseconds& waitTime,
-                                            bool forceShutdown) noexcept;
+[[MONGO_MOD_PUBLIC]] Status stepDownForShutdown(OperationContext* opCtx,
+                                                const Milliseconds& waitTime,
+                                                bool forceShutdown) noexcept;
 
 namespace shutdown_detail {
 /**

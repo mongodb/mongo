@@ -44,7 +44,7 @@
 #include <string_view>
 #include <vector>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 namespace optionenvironment {
 class OptionSection;
@@ -124,4 +124,4 @@ private:
 
 Status storeMessageCompressionOptions(const std::string& compressors);
 void appendMessageCompressionStats(BSONObjBuilder* b);
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

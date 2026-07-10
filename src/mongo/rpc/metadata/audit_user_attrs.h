@@ -46,7 +46,7 @@ namespace mongo::rpc {
  * authenticated user or currently impersonated user. This is used to audit correct user
  * information for an operation.
  */
-class MONGO_MOD_PUBLIC AuditUserAttrs : public AuditUserAttrsBase {
+class [[MONGO_MOD_PUBLIC]] AuditUserAttrs : public AuditUserAttrsBase {
 public:
     AuditUserAttrs(UserName userName, std::vector<RoleName> roleNames, bool isImpersonating)
         : AuditUserAttrsBase(std::move(userName), std::move(roleNames), isImpersonating) {}

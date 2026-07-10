@@ -66,7 +66,7 @@ namespace mongo::exec::agg {
  * TODO SERVER-112777: Remove 'atlas_streams' dependency on 'BatchObject'.
  */
 template <typename B>
-class MONGO_MOD_NEEDS_REPLACEMENT WriterStage : public Stage {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] WriterStage : public Stage {
 
 public:
     using BatchObject = B;

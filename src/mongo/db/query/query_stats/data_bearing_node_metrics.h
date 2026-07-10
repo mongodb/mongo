@@ -42,7 +42,7 @@ namespace mongo::query_stats {
  * are optionally rolled up from the data-bearing nodes to routers, and are aggregated into cursors
  * and OpDebug. This structure represents those metrics and can be used to store and aggregate them.
  */
-struct MONGO_MOD_PUB DataBearingNodeMetrics {
+struct [[MONGO_MOD_PUBLIC]] DataBearingNodeMetrics {
     uint64_t keysExamined = 0;
     uint64_t docsExamined = 0;
     uint64_t bytesRead = 0;

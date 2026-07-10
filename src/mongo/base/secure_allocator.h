@@ -50,7 +50,7 @@
 #include <utility>
 #include <vector>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 using namespace std::literals::string_view_literals;

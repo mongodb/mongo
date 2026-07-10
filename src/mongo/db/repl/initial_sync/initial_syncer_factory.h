@@ -44,7 +44,7 @@
 #include <string>
 #include <vector>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace repl {
 
 /**
@@ -111,4 +111,4 @@ private:
     std::vector<InitialSyncCrashRecoveryFunction> _crashRecoveryFunctions;
 };
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

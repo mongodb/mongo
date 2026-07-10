@@ -36,7 +36,7 @@
 
 namespace mongo {
 // TODO (SERVER-125476): Change the class modularity to PRIVATE
-class MONGO_MOD_NEEDS_REPLACEMENT ReplicaSetWriteBlockBypass {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ReplicaSetWriteBlockBypass {
 public:
     static ReplicaSetWriteBlockBypass& get(OperationContext* opCtx);
 

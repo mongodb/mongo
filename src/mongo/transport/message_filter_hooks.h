@@ -86,6 +86,6 @@ public:
 /**
  * Starts message filter hooks service for a given process kind.
  */
-MONGO_MOD_PUBLIC void initMessageFilterPluginLoader(const char* processKind);
+[[MONGO_MOD_PUBLIC]] void initMessageFilterPluginLoader(const char* processKind);
 
 }  // namespace mongo::transport

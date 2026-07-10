@@ -39,7 +39,7 @@
 
 #include <string_view>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 /**
  * Creates an index if it does not already exist.
  */
@@ -68,4 +68,4 @@ Status initializeMultiIndexBlock(OperationContext* opCtx,
                                  MultiIndexBlock& indexer,
                                  const BSONObj& spec,
                                  MultiIndexBlock::OnInitFn onInit = MultiIndexBlock::kNoopOnInitFn);
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

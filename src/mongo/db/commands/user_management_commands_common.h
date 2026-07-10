@@ -51,7 +51,7 @@ class BSONObj;
 class Client;
 class OperationContext;
 
-namespace MONGO_MOD_PUBLIC auth {
+namespace [[MONGO_MOD_PUBLIC]] auth {
 
 /**
  * User management commands accept rolenames as either `{ role: 'x', db: 'y' }`
@@ -103,5 +103,5 @@ void checkAuthForTypedCommand(OperationContext*, const InvalidateUserCacheComman
 void checkAuthForTypedCommand(OperationContext*, const GetUserCacheGenerationCommand&);
 void checkAuthForTypedCommand(OperationContext*, const MergeAuthzCollectionsCommand&);
 
-}  // namespace MONGO_MOD_PUBLIC auth
+}  // namespace auth
 }  // namespace mongo

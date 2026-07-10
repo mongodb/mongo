@@ -57,7 +57,7 @@ inline Status validateUpdateReturn(const std::string& value) {
 /**
  * A single item in a batch of results in a 'bulkWrite' command response.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT BulkWriteReplyItem {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] BulkWriteReplyItem {
 public:
     static constexpr auto kCodeFieldName = "code"sv;
     static constexpr auto kErrmsgFieldName = "errmsg"sv;
@@ -168,7 +168,7 @@ public:
      * The status associated with the reply potentially containing error data for why the
      * operation failed.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT const Status& getStatus() const {
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] const Status& getStatus() const {
         return _status;
     }
 

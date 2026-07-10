@@ -40,7 +40,7 @@ namespace mongo {
 /**
  * Container for retryable writes statistics.
  */
-class MONGO_MOD_PUB RetryableWritesStats {
+class [[MONGO_MOD_PUBLIC]] RetryableWritesStats {
     RetryableWritesStats(const RetryableWritesStats&) = delete;
     RetryableWritesStats& operator=(const RetryableWritesStats&) = delete;
 

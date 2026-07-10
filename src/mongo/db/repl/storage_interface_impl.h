@@ -59,7 +59,7 @@
 namespace mongo {
 namespace repl {
 
-class MONGO_MOD_OPEN StorageInterfaceImpl : public StorageInterface {
+class [[MONGO_MOD_OPEN]] StorageInterfaceImpl : public StorageInterface {
     StorageInterfaceImpl(const StorageInterfaceImpl&) = delete;
     StorageInterfaceImpl& operator=(const StorageInterfaceImpl&) = delete;
 

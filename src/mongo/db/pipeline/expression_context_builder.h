@@ -33,7 +33,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 class AggregateCommandRequest;
 class DistinctCommandRequest;
 class FindCommandRequest;
@@ -181,4 +181,4 @@ boost::intrusive_ptr<ExpressionContext> makeCopyForSubPipelineFromExpressionCont
     NamespaceString nss,
     boost::optional<UUID> uuid = boost::none,
     boost::optional<NamespaceString> userNs = boost::none);
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

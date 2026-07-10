@@ -46,7 +46,7 @@
 #include <string_view>
 #include <utility>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 /**
  * All-thread backtrace is only implemented on Linux. Even on Linux, it's only AS-safe

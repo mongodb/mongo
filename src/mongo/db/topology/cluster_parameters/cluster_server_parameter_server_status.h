@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PARENT_PRIVATE ClusterServerParameterServerStatus {
+class [[MONGO_MOD_PARENT_PRIVATE]] ClusterServerParameterServerStatus {
 public:
     static constexpr auto kClusterParameterFieldName = "clusterParameters";
 

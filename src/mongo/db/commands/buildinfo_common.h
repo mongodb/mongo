@@ -56,7 +56,7 @@ namespace mongo {
  * The default implementation available here provide every field except 'storageEngines'
  * which is only provided by the CmdBuildInfoShard specialization.
  */
-class MONGO_MOD_OPEN CmdBuildInfoCommon : public TypedCommand<CmdBuildInfoCommon> {
+class [[MONGO_MOD_OPEN]] CmdBuildInfoCommon : public TypedCommand<CmdBuildInfoCommon> {
 public:
     using Request = BuildInfoCommand;
     using Reply = typename BuildInfoCommand::Reply;

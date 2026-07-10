@@ -54,7 +54,7 @@ namespace mongo {
  * Interface through which the sharding catalog cache requests the set of changed chunks to be
  * retrieved from the persisted metadata store.
  */
-class MONGO_MOD_PARENT_PRIVATE CatalogCacheLoader {
+class [[MONGO_MOD_PARENT_PRIVATE]] CatalogCacheLoader {
 public:
     virtual ~CatalogCacheLoader();
 

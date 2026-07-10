@@ -57,7 +57,7 @@
 
 #include <boost/move/utility_core.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo::executor {
 
@@ -81,8 +81,8 @@ struct ConnectionPoolStats;
  * If an event is unsignaled when shutdown is called, the executor will ensure that any threads
  * blocked in waitForEvent() eventually return.
  */
-class MONGO_MOD_OPEN TaskExecutor : public OutOfLineExecutor,
-                                    public std::enable_shared_from_this<TaskExecutor> {
+class [[MONGO_MOD_OPEN]] TaskExecutor : public OutOfLineExecutor,
+                                        public std::enable_shared_from_this<TaskExecutor> {
     TaskExecutor(const TaskExecutor&) = delete;
     TaskExecutor& operator=(const TaskExecutor&) = delete;
 
@@ -447,7 +447,7 @@ protected:
 /**
  * Class representing a scheduled callback and providing methods for interacting with it.
  */
-class MONGO_MOD_OPEN TaskExecutor::CallbackState {
+class [[MONGO_MOD_OPEN]] TaskExecutor::CallbackState {
     CallbackState(const CallbackState&) = delete;
     CallbackState& operator=(const CallbackState&) = delete;
 

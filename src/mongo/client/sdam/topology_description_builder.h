@@ -43,7 +43,7 @@ namespace mongo::sdam {
  * This class is used in the unit tests to construct TopologyDescription instances. For production
  * code, TopologyDescription instances should be constructed using its constructors.
  */
-class MONGO_MOD_PUBLIC TopologyDescriptionBuilder {
+class [[MONGO_MOD_PUBLIC]] TopologyDescriptionBuilder {
 public:
     TopologyDescriptionBuilder() = default;
 

@@ -65,10 +65,10 @@
 
 namespace mongo {
 
-MONGO_MOD_PUB constexpr inline int DEFAULT_UNIX_PERMS = 0700;
-MONGO_MOD_PUB constexpr inline size_t DEFAULT_MAX_CONN = 1000000;
+[[MONGO_MOD_PUBLIC]] constexpr inline int DEFAULT_UNIX_PERMS = 0700;
+[[MONGO_MOD_PUBLIC]] constexpr inline size_t DEFAULT_MAX_CONN = 1000000;
 
-struct MONGO_MOD_PUB ServerGlobalParams {
+struct [[MONGO_MOD_PUBLIC]] ServerGlobalParams {
     std::string binaryName;  // mongod or mongos
     std::string cwd;         // cwd of when process started
 
@@ -359,6 +359,6 @@ struct MONGO_MOD_PUB ServerGlobalParams {
     std::string extensionsConfigPath;
 };
 
-MONGO_MOD_PUB extern ServerGlobalParams serverGlobalParams;
+[[MONGO_MOD_PUBLIC]] extern ServerGlobalParams serverGlobalParams;
 
 }  // namespace mongo

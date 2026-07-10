@@ -81,14 +81,14 @@
 
 namespace mongo {
 
-namespace MONGO_MOD_PUB repl {
+namespace [[MONGO_MOD_PUBLIC]] repl {
 // Failpoint which causes the initial sync function to hang before copying databases.
 extern FailPoint initialSyncHangBeforeCopyingDatabases;
 
 // Failpoint which stops the applier.
 extern FailPoint rsSyncApplyStop;
 
-}  // namespace MONGO_MOD_PUB repl
+}  // namespace repl
 
 namespace repl {
 
@@ -138,7 +138,7 @@ struct InitialSyncSummaryStats {
  * Entry Points:
  *      -- startup: Start initial sync.
  */
-class MONGO_MOD_PRIVATE InitialSyncer : public InitialSyncerInterface {
+class [[MONGO_MOD_PRIVATE]] InitialSyncer : public InitialSyncerInterface {
     InitialSyncer(const InitialSyncer&) = delete;
     InitialSyncer& operator=(const InitialSyncer&) = delete;
 
@@ -186,7 +186,7 @@ public:
         void append(BSONObjBuilder* builder) const;
     };
 
-    class MONGO_MOD_PRIVATE OplogFetcherRestartDecisionInitialSyncer
+    class [[MONGO_MOD_PRIVATE]] OplogFetcherRestartDecisionInitialSyncer
         : public OplogFetcher::OplogFetcherRestartDecision {
 
     public:

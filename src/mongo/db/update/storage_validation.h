@@ -53,11 +53,11 @@ namespace storage_validation {
  * 'containsDotsAndDollarsField' is set to true if there exists any field name containing '.'/'$'
  * during validation.
  */
-MONGO_MOD_PUBLIC void scanDocument(const mutablebson::Document& doc,
-                                   bool allowTopLevelDollarPrefixes,
-                                   bool shouldValidate,
-                                   bool* containsDotsAndDollarsField,
-                                   bool fromOplogApplication);
+[[MONGO_MOD_PUBLIC]] void scanDocument(const mutablebson::Document& doc,
+                                       bool allowTopLevelDollarPrefixes,
+                                       bool shouldValidate,
+                                       bool* containsDotsAndDollarsField,
+                                       bool fromOplogApplication);
 
 /**
  * Validates that the MutableBSON element 'elem' is acceptable for storage in a collection and

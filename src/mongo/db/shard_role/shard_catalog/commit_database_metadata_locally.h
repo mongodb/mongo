@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-namespace MONGO_MOD_PARENT_PRIVATE shard_catalog_commit {
+namespace [[MONGO_MOD_PARENT_PRIVATE]] shard_catalog_commit {
 
 /**
  * Persists the database metadata into the shard catalog (config.shard.catalog.databases), writes an
@@ -55,5 +55,5 @@ void commitCreateDatabaseMetadataLocally(OperationContext* opCtx,
  */
 void commitDropDatabaseMetadataLocally(OperationContext* opCtx, const DatabaseName& dbName);
 
-}  // namespace MONGO_MOD_PARENT_PRIVATE shard_catalog_commit
+}  // namespace shard_catalog_commit
 }  // namespace mongo

@@ -65,7 +65,7 @@ namespace mongo {
  *   O(N), but due to drop-in replacement of elements, guaranteed to equal amount of active elements
  */
 template <class KeyType, class ValueType>
-class MONGO_MOD_PRIVATE FastMapNoAlloc {
+class [[MONGO_MOD_PRIVATE]] FastMapNoAlloc {
 private:
     /**
      * Map entry through which we avoid releasing memory: we mark it as inUse or not.

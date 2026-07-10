@@ -47,7 +47,7 @@ namespace mongo::query_settings {
  * settings have not been installed yet, so reading them would observe stale values and asserts
  * instead.
  */
-MONGO_MOD_PUBLIC const QuerySettings& forOp(OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] const QuerySettings& forOp(OperationContext* opCtx);
 
 /**
  * Outcome of 'tryOverrideQueryKnobValues'. Distinguishes the two "retry later" phases because they
@@ -70,8 +70,8 @@ enum class KnobOverrideResult { kApplied, kNotStarted, kPending };
  * 'snapshot' unchanged and returns 'kNotStarted' or 'kPending' (see 'KnobOverrideResult'); the
  * caller must retry later.
  */
-MONGO_MOD_PUBLIC KnobOverrideResult tryOverrideQueryKnobValues(OperationContext* opCtx,
-                                                               QueryKnobSnapshot& snapshot);
+[[MONGO_MOD_PUBLIC]] KnobOverrideResult tryOverrideQueryKnobValues(OperationContext* opCtx,
+                                                                   QueryKnobSnapshot& snapshot);
 
 /**
  * Attaches the operation's resolved query settings to 'request' via 'request.setQuerySettings'. A
@@ -95,7 +95,7 @@ void addQuerySettingsToRequest(OperationContext* opCtx, Request& request) {
  * safe to call from log formatting for operations that began dispatch (hooks set 'Pending') but
  * never completed settings resolution.
  */
-MONGO_MOD_PUBLIC void addQuerySettingsToSlowLog(OperationContext* opCtx,
-                                                logv2::DynamicAttributes& attrs);
+[[MONGO_MOD_PUBLIC]] void addQuerySettingsToSlowLog(OperationContext* opCtx,
+                                                    logv2::DynamicAttributes& attrs);
 
 }  // namespace mongo::query_settings

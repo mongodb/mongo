@@ -57,7 +57,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 // TODO SERVER-116044: Remove external dependencies on this header.
-namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
+namespace [[MONGO_MOD_NEEDS_REPLACEMENT]] mongo {
 using namespace std::literals::string_view_literals;
 
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Unwind);
@@ -172,4 +172,4 @@ private:
     SbeCompatibility _sbeCompatibility{SbeCompatibility::requiresSbeFull};
 };  // class DocumentSourceUnwind
 
-}  // namespace MONGO_MOD_NEEDS_REPLACEMENT mongo
+}  // namespace mongo

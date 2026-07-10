@@ -47,7 +47,7 @@ namespace mongo::repl {
  *
  * `bytes` must be non-negative; both helpers are thread-safe.
  */
-MONGO_MOD_PUBLIC void recordOplogBytesReceived(int64_t bytes);
-MONGO_MOD_PUBLIC void recordOplogBytesSent(int64_t bytes);
+[[MONGO_MOD_PUBLIC]] void recordOplogBytesReceived(int64_t bytes);
+[[MONGO_MOD_PUBLIC]] void recordOplogBytesSent(int64_t bytes);
 
 }  // namespace mongo::repl

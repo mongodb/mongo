@@ -49,8 +49,8 @@ class OperationContext;
  * and throws if the validation fails.
  */
 void validateAPIParameters(const CommandInvocation& invocation);
-MONGO_MOD_PUBLIC APIParametersFromClient
-parseAndValidateAPIParameters(const CommandInvocation& invocation);
+[[MONGO_MOD_PUBLIC]] APIParametersFromClient parseAndValidateAPIParameters(
+    const CommandInvocation& invocation);
 
 template <typename StringType>
 int getAPIVersion(StringType apiVersion, bool allowTestVersion) {
@@ -68,7 +68,7 @@ int getAPIVersion(StringType apiVersion, bool allowTestVersion) {
  * If the server parameter "requireApiVersion" is set, enforce it. This check is bypassed for
  * "hello" commands from internal clients.
  */
-MONGO_MOD_PUBLIC void enforceRequireAPIVersion(OperationContext* opCtx,
-                                               Command* command,
-                                               const OpMsgRequest& request);
+[[MONGO_MOD_PUBLIC]] void enforceRequireAPIVersion(OperationContext* opCtx,
+                                                   Command* command,
+                                                   const OpMsgRequest& request);
 }  // namespace mongo

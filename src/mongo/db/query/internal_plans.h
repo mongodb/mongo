@@ -73,7 +73,7 @@ struct UpdateStageParams;
  * The internal planner is a one-stop shop for "off-the-shelf" plans.  Most internal procedures
  * that do not require advanced queries could be served by plans already in here.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT InternalPlanner {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] InternalPlanner {
 public:
     enum Direction {
         FORWARD = 1,

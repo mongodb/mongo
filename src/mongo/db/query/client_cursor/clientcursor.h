@@ -73,7 +73,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class CursorManager;
 class RecoveryUnit;
@@ -725,4 +725,4 @@ private:
 void incrementCursorLifespanMetric(Date_t birth, Date_t death);
 CursorStats& cursorStats();
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

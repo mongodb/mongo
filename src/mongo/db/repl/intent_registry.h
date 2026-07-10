@@ -47,7 +47,7 @@
 #include <vector>
 
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace rss {
 namespace consensus {
 
@@ -121,7 +121,7 @@ public:
     /**
      * Class used to represent a unique Intent for a specific operation.
      */
-    class MONGO_MOD_PRIVATE IntentToken {
+    class [[MONGO_MOD_PRIVATE]] IntentToken {
         friend class IntentRegistry;
         using idType = uint64_t;
 
@@ -328,4 +328,4 @@ private:
 };
 }  // namespace consensus
 }  // namespace rss
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

@@ -48,7 +48,7 @@
 #include <boost/container/small_vector.hpp>
 #include <boost/optional/optional.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 namespace mongo::timeseries::bucket_catalog {
 using UserBatchIndex = size_t;
 

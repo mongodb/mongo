@@ -37,7 +37,7 @@
 #include <string_view>
 #include <variant>
 
-namespace MONGO_MOD_PARENT_PRIVATE mongo {
+namespace [[MONGO_MOD_PARENT_PRIVATE]] mongo {
 
 using WTags = StringMap<std::int64_t>;
 using WriteConcernW = std::variant<std::string, std::int64_t, WTags>;
@@ -50,4 +50,4 @@ void serializeWriteConcernW(const WriteConcernW& w,
 std::int64_t parseWTimeoutFromBSON(BSONElement element);
 void serializeWTimeout(std::int64_t wTimeout, std::string_view fieldName, BSONObjBuilder* builder);
 
-}  // namespace MONGO_MOD_PARENT_PRIVATE mongo
+}  // namespace mongo

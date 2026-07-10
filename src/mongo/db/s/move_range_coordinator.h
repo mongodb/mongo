@@ -48,7 +48,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC MoveRangeCoordinator final
+class [[MONGO_MOD_PUBLIC]] MoveRangeCoordinator final
     : public ChunkOperationShardingCoordinator<MoveRangeCoordinatorDocument> {
 public:
     MoveRangeCoordinator(ShardingCoordinatorService* service, const BSONObj& initialStateDoc);

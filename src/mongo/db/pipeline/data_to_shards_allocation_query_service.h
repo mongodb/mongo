@@ -42,7 +42,7 @@ namespace mongo {
  * Expresses the status/confidence of collection/database(s) allocation to data shards at a given
  * cluster time.
  */
-enum class MONGO_MOD_OPEN AllocationToShardsStatus {
+enum class [[MONGO_MOD_OPEN]] AllocationToShardsStatus {
     // Allocation to shards is not available for the given cluster time, because the system has not
     // been tracking the allocations at that time, or because the information may not be accurate.
     kNotAvailable,
@@ -61,7 +61,7 @@ enum class MONGO_MOD_OPEN AllocationToShardsStatus {
  * to precisely target only the shards actually required for the change stream, instead of targeting
  * all shards in the cluster.
  */
-class MONGO_MOD_OPEN DataToShardsAllocationQueryService {
+class [[MONGO_MOD_OPEN]] DataToShardsAllocationQueryService {
 public:
     virtual ~DataToShardsAllocationQueryService() = default;
 

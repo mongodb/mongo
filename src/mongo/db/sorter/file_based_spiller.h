@@ -49,7 +49,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace sorter {
 
 constexpr inline std::size_t kSortedFileBufferSize = size_t{64} << 10;
@@ -627,5 +627,5 @@ boost::filesystem::path FileBasedSpiller<Key, Value, Comparator>::getSpillDir() 
 }
 
 }  // namespace sorter
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo
 #undef MONGO_LOGV2_DEFAULT_COMPONENT

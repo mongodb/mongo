@@ -54,7 +54,7 @@
 namespace mongo {
 namespace executor {
 
-struct MONGO_MOD_PUBLIC RemoteCommandRequest {
+struct [[MONGO_MOD_PUBLIC]] RemoteCommandRequest {
 
     // Indicates that there is no timeout for the request to complete
     static constexpr Milliseconds kNoTimeout{-1};
@@ -135,8 +135,8 @@ struct MONGO_MOD_PUBLIC RemoteCommandRequest {
     bool operator==(const RemoteCommandRequest& rhs) const;
     bool operator!=(const RemoteCommandRequest& rhs) const;
 
-    MONGO_MOD_PUBLIC friend std::ostream& operator<<(std::ostream& os,
-                                                     const RemoteCommandRequest& response) {
+    [[MONGO_MOD_PUBLIC]] friend std::ostream& operator<<(std::ostream& os,
+                                                         const RemoteCommandRequest& response) {
         return (os << response.toString());
     }
 

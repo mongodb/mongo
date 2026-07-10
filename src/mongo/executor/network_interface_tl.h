@@ -74,7 +74,7 @@ namespace mongo {
 namespace executor {
 using namespace std::literals::string_view_literals;
 
-class MONGO_MOD_NEEDS_REPLACEMENT NetworkInterfaceTL : public NetworkInterface {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] NetworkInterfaceTL : public NetworkInterface {
 public:
     NetworkInterfaceTL(std::string instanceName,
                        std::shared_ptr<AsyncClientFactory> factory,
@@ -125,7 +125,7 @@ public:
                     Milliseconds timeout,
                     Status status) override;
 
-    MONGO_MOD_NEEDS_REPLACEMENT const AsyncClientFactory& getClientFactory_forTest() const {
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] const AsyncClientFactory& getClientFactory_forTest() const {
         return *_clientFactory;
     }
 

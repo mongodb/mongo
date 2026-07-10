@@ -44,7 +44,7 @@
 namespace mongo {
 namespace rpc {
 
-class MONGO_MOD_PUBLIC LegacyReplyBuilder final : public ReplyBuilderInterface {
+class [[MONGO_MOD_PUBLIC]] LegacyReplyBuilder final : public ReplyBuilderInterface {
 public:
     static const char kCursorTag[];
     static const char kFirstBatchTag[];

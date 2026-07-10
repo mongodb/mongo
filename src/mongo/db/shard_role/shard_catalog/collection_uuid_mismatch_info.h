@@ -46,7 +46,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC CollectionUUIDMismatchInfo final : public ErrorExtraInfo {
+class [[MONGO_MOD_PUBLIC]] CollectionUUIDMismatchInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::CollectionUUIDMismatch;
 

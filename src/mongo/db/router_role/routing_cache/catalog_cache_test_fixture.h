@@ -59,7 +59,7 @@ namespace mongo {
  * The ServerRole-independent core of `RouterCatalogCacheTestFixture` and its
  * `ShardCatalogCacheTestFixture` counterpart.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT CoreCatalogCacheTestFixture : public ShardingTestFixture {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] CoreCatalogCacheTestFixture : public ShardingTestFixture {
 protected:
     CoreCatalogCacheTestFixture()
         : ShardingTestFixture(false,  // No mock catalog cache
@@ -183,13 +183,13 @@ protected:
     const HostAndPort kConfigHostAndPort{"DummyConfig", 1234};
 };
 
-class MONGO_MOD_OPEN RouterCatalogCacheTestFixture
+class [[MONGO_MOD_OPEN]] RouterCatalogCacheTestFixture
     : public virtual service_context_test::RouterRoleOverride,
       public CoreCatalogCacheTestFixture {
     using CoreCatalogCacheTestFixture::CoreCatalogCacheTestFixture;
 };
 
-class MONGO_MOD_OPEN ShardCatalogCacheTestFixture
+class [[MONGO_MOD_OPEN]] ShardCatalogCacheTestFixture
     : public virtual service_context_test::ShardRoleOverride,
       public CoreCatalogCacheTestFixture {
     using CoreCatalogCacheTestFixture::CoreCatalogCacheTestFixture;

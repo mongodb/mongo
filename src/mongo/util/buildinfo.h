@@ -32,7 +32,7 @@
 #include "mongo/util/buildinfo_gen.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Populate standard buildInfo content.
@@ -45,4 +45,4 @@ BuildInfo getBuildInfo();
  */
 BuildInfo getBuildInfoVersionOnly();
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

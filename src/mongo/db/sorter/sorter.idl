@@ -40,7 +40,7 @@ structs:
                 description: "The version of checksum that dictates what hash was used to calculate it."
                 type: SorterChecksumVersion
                 optional: true
-        mod_visibility: pub
+        mod_visibility: public
 
 server_parameters:
     maxIteratorsMemoryUsagePercentage:

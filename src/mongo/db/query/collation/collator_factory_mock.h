@@ -37,7 +37,7 @@
 
 #include <memory>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class CollatorFactoryMock : public CollatorFactoryInterface {
 public:
@@ -48,4 +48,4 @@ public:
     StatusWith<std::unique_ptr<CollatorInterface>> makeFromBSON(const BSONObj& spec) final;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -45,7 +45,7 @@ class DBClientBase;
  * Intercepts creation of sharded connections and transparently performs the internal
  * authentication on them.
  */
-class MONGO_MOD_PUBLIC ShardingConnectionHook : public DBConnectionHook {
+class [[MONGO_MOD_PUBLIC]] ShardingConnectionHook : public DBConnectionHook {
 public:
     ShardingConnectionHook(std::unique_ptr<rpc::EgressMetadataHook> egressHook);
 

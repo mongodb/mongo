@@ -36,7 +36,7 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/util/modules.h"
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 /**

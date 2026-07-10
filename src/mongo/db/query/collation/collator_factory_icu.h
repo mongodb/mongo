@@ -37,7 +37,7 @@
 
 #include <memory>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Creates CollatorInterface instances backed by the ICU library's collation implementation.
@@ -53,4 +53,4 @@ public:
     StatusWith<std::unique_ptr<CollatorInterface>> makeFromBSON(const BSONObj& spec) final;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

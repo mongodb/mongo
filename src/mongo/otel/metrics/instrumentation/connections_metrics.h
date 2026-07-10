@@ -60,6 +60,6 @@ private:
  * periodic job (1 Hz) that samples the AsioSessionManager and pushes the
  * latest values. Intended to be called once at startup from mongod_main.
  */
-MONGO_MOD_PUBLIC void installConnectionsOtelMetrics(ServiceContext* svcCtx);
+[[MONGO_MOD_PUBLIC]] void installConnectionsOtelMetrics(ServiceContext* svcCtx);
 
 }  // namespace mongo

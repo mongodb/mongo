@@ -32,7 +32,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo::otel::traces {
 

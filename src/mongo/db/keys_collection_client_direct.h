@@ -58,7 +58,7 @@ class OperationContext;
 class LogicalTime;
 class BSONObj;
 
-class MONGO_MOD_NEEDS_REPLACEMENT KeysCollectionClientDirect : public KeysCollectionClient {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] KeysCollectionClientDirect : public KeysCollectionClient {
 public:
     KeysCollectionClientDirect(bool mustUseLocalReads);
 
@@ -66,7 +66,7 @@ public:
      * Returns internal keys for the given purpose and have an expiresAt value greater than
      * newerThanThis. Uses readConcern level majority if possible.
      */
-    MONGO_MOD_PRIVATE StatusWith<std::vector<KeysCollectionDocument>> getNewInternalKeys(
+    [[MONGO_MOD_PRIVATE]] StatusWith<std::vector<KeysCollectionDocument>> getNewInternalKeys(
         OperationContext* opCtx,
         std::string_view purpose,
         const LogicalTime& newerThanThis,
@@ -75,19 +75,19 @@ public:
     /**
      * Returns all external (i.e. validation-only) keys for the given purpose.
      */
-    MONGO_MOD_PRIVATE StatusWith<std::vector<ExternalKeysCollectionDocument>> getAllExternalKeys(
-        OperationContext* opCtx, std::string_view purpose) override;
+    [[MONGO_MOD_PRIVATE]] StatusWith<std::vector<ExternalKeysCollectionDocument>>
+    getAllExternalKeys(OperationContext* opCtx, std::string_view purpose) override;
 
     /**
      * Directly inserts a key document to the storage
      */
-    MONGO_MOD_PRIVATE Status insertNewKey(OperationContext* opCtx, const BSONObj& doc) override;
+    [[MONGO_MOD_PRIVATE]] Status insertNewKey(OperationContext* opCtx, const BSONObj& doc) override;
 
     /**
      * Returns true if getNewKeys always uses readConcern level:local, so the documents returned can
      * be rolled back.
      */
-    MONGO_MOD_PRIVATE bool mustUseLocalReads() const final {
+    [[MONGO_MOD_PRIVATE]] bool mustUseLocalReads() const final {
         return _mustUseLocalReads;
     }
 

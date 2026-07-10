@@ -59,7 +59,7 @@ namespace shardkeyutil {
  * existing indexes for a collection when sharding a collection or refining its shard key.
  * Subclasses provide the implementation details specific to either case.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ShardKeyValidationBehaviors {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardKeyValidationBehaviors {
 public:
     virtual ~ShardKeyValidationBehaviors() {}
 
@@ -88,7 +88,7 @@ public:
 /**
  * Implementation of steps for validating a shard key for shardCollection.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ValidationBehaviorsShardCollection final
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ValidationBehaviorsShardCollection final
     : public ShardKeyValidationBehaviors {
 public:
     ValidationBehaviorsShardCollection(OperationContext* opCtx, const ShardId& dataShard)
@@ -120,7 +120,7 @@ private:
 /**
  * Implementation of steps for validating a shard key for refineCollectionShardKey locally.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ValidationBehaviorsLocalRefineShardKey final
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ValidationBehaviorsLocalRefineShardKey final
     : public ShardKeyValidationBehaviors {
 public:
     ValidationBehaviorsLocalRefineShardKey(OperationContext* opCtx, const CollectionPtr& coll);
@@ -148,7 +148,7 @@ private:
 /**
  * Implementation of steps for validating a shard key for resharding building indexes after cloning.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ValidationBehaviorsReshardingBulkIndex final
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ValidationBehaviorsReshardingBulkIndex final
     : public ShardKeyValidationBehaviors {
 public:
     class RecipientStateMachineExternalState;
@@ -216,7 +216,7 @@ private:
  *
  * Returns true if the index has been created, false otherwise.
  */
-MONGO_MOD_NEEDS_REPLACEMENT bool validateShardKeyIndexExistsOrCreateIfPossible(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] bool validateShardKeyIndexExistsOrCreateIfPossible(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ShardKeyPattern& shardKeyPattern,
@@ -235,7 +235,7 @@ MONGO_MOD_NEEDS_REPLACEMENT bool validateShardKeyIndexExistsOrCreateIfPossible(
  * It throws an exception if a valid shard key index doesn't exist and it's not possible to create
  * one.
  */
-MONGO_MOD_NEEDS_REPLACEMENT bool validShardKeyIndexExists(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] bool validShardKeyIndexExists(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ShardKeyPattern& shardKeyPattern,
@@ -244,7 +244,7 @@ MONGO_MOD_NEEDS_REPLACEMENT bool validShardKeyIndexExists(
     const ShardKeyValidationBehaviors& behaviors,
     std::string* errMsg = nullptr);
 
-MONGO_MOD_NEEDS_REPLACEMENT void validateShardKeyIsNotEncrypted(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void validateShardKeyIsNotEncrypted(
     OperationContext* opCtx, const NamespaceString& nss, const ShardKeyPattern& shardKeyPattern);
 
 /**
@@ -253,7 +253,7 @@ MONGO_MOD_NEEDS_REPLACEMENT void validateShardKeyIsNotEncrypted(
  * - If meta field is present, it can be ranged or hashed.
  * - If time field is present, it must be ranged and at the end of the key pattern.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void validateTimeseriesShardKey(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void validateTimeseriesShardKey(
     std::string_view timeFieldName,
     boost::optional<std::string_view> metaFieldName,
     const BSONObj& shardKeyPattern);
@@ -263,7 +263,7 @@ MONGO_MOD_NEEDS_REPLACEMENT void validateTimeseriesShardKey(
  * metaField), then translates it to the internal buckets collection format.
  * Throws if the shard key contains fields other than the defined timeField or metaField.
  */
-MONGO_MOD_NEEDS_REPLACEMENT BSONObj validateAndTranslateTimeseriesShardKey(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] BSONObj validateAndTranslateTimeseriesShardKey(
     const TimeseriesOptions& tsOptions, const BSONObj& tsShardKey);
 
 /**
@@ -271,15 +271,15 @@ MONGO_MOD_NEEDS_REPLACEMENT BSONObj validateAndTranslateTimeseriesShardKey(
  * raw key format. Returns false if the key uses user-facing field names (requiring translation)
  * or if the key is not a recognized timeseries shard key.
  */
-MONGO_MOD_NEEDS_REPLACEMENT bool isRawTimeseriesShardKey(const TimeseriesOptions& tsOptions,
-                                                         const BSONObj& tsShardKey);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] bool isRawTimeseriesShardKey(const TimeseriesOptions& tsOptions,
+                                                             const BSONObj& tsShardKey);
 
 /**
  * Returns a chunk range with extended or truncated boundaries to match the number of fields in
  * the given metadata's shard key pattern.
  */
-MONGO_MOD_NEEDS_REPLACEMENT ChunkRange
-extendOrTruncateBoundsForMetadata(const CollectionMetadata& metadata, const ChunkRange& range);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] ChunkRange extendOrTruncateBoundsForMetadata(
+    const CollectionMetadata& metadata, const ChunkRange& range);
 
 }  // namespace shardkeyutil
 }  // namespace mongo

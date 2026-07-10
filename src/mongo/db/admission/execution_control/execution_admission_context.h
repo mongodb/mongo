@@ -45,7 +45,7 @@ namespace mongo {
 class OperationContext;
 
 namespace admission::execution_control {
-enum class MONGO_MOD_PUBLIC OperationType { kRead = 0, kWrite, kNumOperationTypes };
+enum class [[MONGO_MOD_PUBLIC]] OperationType { kRead = 0, kWrite, kNumOperationTypes };
 class ScopedTaskTypeModifierBase;
 class ScopedTicketAdmissionStatsRecorder;
 };  // namespace admission::execution_control
@@ -55,7 +55,7 @@ namespace ec = admission::execution_control;
 /**
  * Stores state and statistics related to execution control for a given transactional context.
  */
-class MONGO_MOD_PUBLIC ExecutionAdmissionContext : public AdmissionContext {
+class [[MONGO_MOD_PUBLIC]] ExecutionAdmissionContext : public AdmissionContext {
 public:
     /**
      * Task type to fine tune the deprioritization
@@ -445,7 +445,7 @@ namespace admission::execution_control {
  * forwarding callbacks that mirror these fields into global counters (ttl_monitor.cpp,
  * index_builds_coordinator.cpp, ready_range_deletions_processor.cpp).
  */
-struct MONGO_MOD_PUBLIC TicketAdmissionStats {
+struct [[MONGO_MOD_PUBLIC]] TicketAdmissionStats {
     // Number of times the operation started, respectively finished, waiting in a ticket queue.
     // 'startedQueueing - finishedQueueing' is 1 while the operation is waiting for a ticket and 0
     // otherwise, which tasks can expose as a "currently queued" gauge.
@@ -491,7 +491,7 @@ struct MONGO_MOD_PUBLIC TicketAdmissionStats {
  * Events for exempt admissions are not recorded. At most one recorder may be registered per
  * operation at a time, and it must only be used from the operation's own thread.
  */
-class MONGO_MOD_PUBLIC ScopedTicketAdmissionStatsRecorder {
+class [[MONGO_MOD_PUBLIC]] ScopedTicketAdmissionStatsRecorder {
 public:
     /**
      * Invoked on every event with a delta where only the affected fields are nonzero, so
@@ -539,7 +539,7 @@ private:
  * attached to the operation context. Being a RAII-like, on the destructor it sets back the Normal
  * task mode.
  */
-class MONGO_MOD_PRIVATE ScopedTaskTypeModifierBase {
+class [[MONGO_MOD_PRIVATE]] ScopedTaskTypeModifierBase {
 public:
     ~ScopedTaskTypeModifierBase();
 
@@ -557,7 +557,7 @@ private:
 /**
  * RAII-like object to set the task type to 'Background'
  */
-class MONGO_MOD_PUBLIC ScopedTaskTypeBackground : private ScopedTaskTypeModifierBase {
+class [[MONGO_MOD_PUBLIC]] ScopedTaskTypeBackground : private ScopedTaskTypeModifierBase {
 public:
     ScopedTaskTypeBackground(OperationContext* opCtx);
 };
@@ -565,7 +565,7 @@ public:
 /**
  * RAII-like object to set the task type to 'NonDeprioritizable'
  */
-class MONGO_MOD_PUBLIC ScopedTaskTypeNonDeprioritizable : private ScopedTaskTypeModifierBase {
+class [[MONGO_MOD_PUBLIC]] ScopedTaskTypeNonDeprioritizable : private ScopedTaskTypeModifierBase {
 public:
     ScopedTaskTypeNonDeprioritizable(OperationContext* opCtx);
 };

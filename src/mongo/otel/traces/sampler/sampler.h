@@ -48,7 +48,7 @@
 #include <utility>
 
 namespace mongo::otel::traces {
-struct MONGO_MOD_PUBLIC RateLimiterStats {
+struct [[MONGO_MOD_PUBLIC]] RateLimiterStats {
     int64_t admitted = 0;
     int64_t rejected = 0;
 };
@@ -56,13 +56,13 @@ struct MONGO_MOD_PUBLIC RateLimiterStats {
 /** A snapshot of the tracing sampler's admission stats. For simplicity in reporting, the stats for
  * each internal span are aggregated under `internalSpans`.
  */
-struct MONGO_MOD_PUBLIC TracingSamplerStats {
+struct [[MONGO_MOD_PUBLIC]] TracingSamplerStats {
     RateLimiterStats internalSpans;
     RateLimiterStats externalSpan;
 };
 
 /** Decides whether a span should initiate a trace. */
-class MONGO_MOD_PUBLIC TracingSampler {
+class [[MONGO_MOD_PUBLIC]] TracingSampler {
 public:
     /** Returns the global sampler instance. */
     static TracingSampler& get();
@@ -108,7 +108,7 @@ public:
 };
 
 /** Stores the current state of a sampler. */
-struct MONGO_MOD_PUBLIC SamplerState {
+struct [[MONGO_MOD_PUBLIC]] SamplerState {
     using RateLimiter = std::shared_ptr<admission::RateLimiter>;
 
     /** Maps span name to its sampling factor. Absence is equivalent to a factor of 0.0. */
@@ -129,7 +129,7 @@ struct MONGO_MOD_PUBLIC SamplerState {
  * Production `TracingSampler` implementation. This is designed to be a thread-safe singleton, and
  * having multiple instances at once may not work correctly.
  */
-class MONGO_MOD_PUBLIC TracingSamplerImpl : public TracingSampler {
+class [[MONGO_MOD_PUBLIC]] TracingSamplerImpl : public TracingSampler {
 public:
     explicit TracingSamplerImpl(TickSource* tickSource = globalSystemTickSource());
 
@@ -172,13 +172,13 @@ class SamplerOverride {
 public:
     virtual ~SamplerOverride() = default;
 };
-using ScopedSamplerOverride MONGO_MOD_PUBLIC = std::unique_ptr<SamplerOverride>;
+using ScopedSamplerOverride [[MONGO_MOD_PUBLIC]] = std::unique_ptr<SamplerOverride>;
 
 /**
  * Replaces the global sampler with one that calls fn for `shouldSample`, for testing purposes.
  * Returns a guard that restores the previous sampler on destruction. This is not thread-safe.
  */
-[[nodiscard]] MONGO_MOD_PUBLIC ScopedSamplerOverride
-setTraceSamplingFnForTest(unique_function<bool(std::string_view, double)> fn);
+[[nodiscard]] [[MONGO_MOD_PUBLIC]] ScopedSamplerOverride setTraceSamplingFnForTest(
+    unique_function<bool(std::string_view, double)> fn);
 
 }  // namespace mongo::otel::traces

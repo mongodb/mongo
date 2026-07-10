@@ -33,7 +33,7 @@
 
 #include <string_view>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * This is the "overload pattern" for use with variant visit calls.
@@ -53,4 +53,4 @@ struct OverloadedVisitor : Ts... {
 template <typename... Ts>
 OverloadedVisitor(Ts...) -> OverloadedVisitor<Ts...>;
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

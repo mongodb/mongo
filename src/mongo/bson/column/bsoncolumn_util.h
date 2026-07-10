@@ -36,7 +36,7 @@
 #include "mongo/stdx/utility.h"
 #include "mongo/util/modules.h"
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo::bsoncolumn {
 inline constexpr char kInterleavedStartControlByteLegacy = (char)0xF0;

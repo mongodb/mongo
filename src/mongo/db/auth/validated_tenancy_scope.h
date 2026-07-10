@@ -41,12 +41,12 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class Client;
 class OperationContext;
 
-namespace MONGO_MOD_PUBLIC auth {
+namespace [[MONGO_MOD_PUBLIC]] auth {
 
 class ValidatedTenancyScope {
 public:
@@ -187,5 +187,5 @@ private:
     TenantProtocol _tenantProtocol{TenantProtocol::kDefault};
 };
 
-}  // namespace MONGO_MOD_PUBLIC auth
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace auth
+}  // namespace mongo

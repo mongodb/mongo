@@ -46,7 +46,7 @@
 
 namespace mongo {
 
-struct MONGO_MOD_PUBLIC TimeseriesViewMetadata {
+struct [[MONGO_MOD_PUBLIC]] TimeseriesViewMetadata {
     boost::optional<TimeseriesOptions> options;
     boost::optional<bool> mayContainMixedData;
     boost::optional<bool> usesExtendedRange;
@@ -67,7 +67,7 @@ class LiteParsedPipeline;
 struct LiteParserOptions;
 class OwnedLiteParsedPipeline;
 
-struct MONGO_MOD_PUBLIC ResolvedNamespaceViewOptions {
+struct [[MONGO_MOD_PUBLIC]] ResolvedNamespaceViewOptions {
     boost::optional<UUID> collUUID = boost::none;
     bool involvedNamespaceIsAView = true;
     boost::optional<TimeseriesViewMetadata> timeseriesMetadata = boost::none;
@@ -84,7 +84,7 @@ extern const ResolvedNamespaceViewOptions kSimpleViewOptions;
  * the view pipeline (raw BSON and optionally parsed), collation, and timeseries
  * metadata. Supports BSON serialization for the ErrorExtraInfo API.
  */
-class MONGO_MOD_PUBLIC ResolvedNamespace final : public ErrorExtraInfo {
+class [[MONGO_MOD_PUBLIC]] ResolvedNamespace final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::CommandOnShardedViewNotSupportedOnMongod;
     // Callback type for desugaring a parsed view pipeline. This indirection exists because
@@ -266,7 +266,7 @@ private:
 /**
  * Map from view to resolved namespace.
  */
-using ResolvedNamespaceMap MONGO_MOD_PUBLIC =
+using ResolvedNamespaceMap [[MONGO_MOD_PUBLIC]] =
     absl::flat_hash_map<NamespaceString, ResolvedNamespace>;
 
 }  // namespace mongo

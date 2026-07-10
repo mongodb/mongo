@@ -53,7 +53,7 @@ namespace transport {
  * also provides facilities for terminating sessions and attaching handlers that are invoked during
  * different stages of the Sessions' lifecycles.
  */
-class MONGO_MOD_PUBLIC SessionManager {
+class [[MONGO_MOD_PUBLIC]] SessionManager {
 private:
     SessionManager(const SessionManager&) = delete;
     SessionManager& operator=(const SessionManager&) = delete;

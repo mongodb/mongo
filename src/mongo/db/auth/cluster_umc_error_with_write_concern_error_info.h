@@ -36,7 +36,7 @@
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class ClusterUMCErrorWithWriteConcernErrorInfo final : public ErrorExtraInfo {
 public:
@@ -54,4 +54,4 @@ private:
     WriteConcernErrorDetail _wcError;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

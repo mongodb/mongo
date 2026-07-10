@@ -34,7 +34,7 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/util/modules.h"
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo::timeseries {
 

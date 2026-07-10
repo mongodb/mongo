@@ -55,7 +55,7 @@ namespace executor {
 /**
  * An async harness for scatter/gathering a command across an arbitrary number of specific hosts
  */
-class MONGO_MOD_PUBLIC AsyncMulticaster {
+class [[MONGO_MOD_PUBLIC]] AsyncMulticaster {
 public:
     using Reply = std::tuple<HostAndPort, executor::RemoteCommandResponse>;
     static constexpr size_t kMaxConcurrency = 100;

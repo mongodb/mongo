@@ -42,7 +42,7 @@
 #include <functional>
 #include <memory>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace executor {
 
 /**
@@ -62,7 +62,7 @@ public:
     /**
      * Maintains the shared state between producers and the consumer.
      */
-    struct MONGO_MOD_FILE_PRIVATE State {
+    struct [[MONGO_MOD_FILE_PRIVATE]] State {
         MultiProducerSingleConsumerQueue<OutOfLineExecutor::Task> tasks;
     };
 
@@ -114,4 +114,4 @@ private:
 };
 
 }  // namespace executor
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

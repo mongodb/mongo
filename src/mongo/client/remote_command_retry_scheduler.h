@@ -159,6 +159,6 @@ private:
     CancellationSource _cancellationSource;
 };
 
-MONGO_MOD_PUBLIC bool isMongosRetriableError(const ErrorCodes::Error& code);
+[[MONGO_MOD_PUBLIC]] bool isMongosRetriableError(const ErrorCodes::Error& code);
 
 }  // namespace mongo

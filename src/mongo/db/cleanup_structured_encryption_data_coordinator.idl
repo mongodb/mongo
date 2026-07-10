@@ -52,7 +52,7 @@ structs:
             "Represents the state of the cleanupStructuredEncryptionData pipeline
             for protocol version 2"
         strict: false
-        mod_visibility: pub
+        mod_visibility: public
         chained_structs:
             ShardingCoordinatorMetadata: ShardingCoordinatorMetadata
         fields:

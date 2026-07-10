@@ -43,7 +43,7 @@
 
 #include <memory>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 namespace mongo::doc_validation_error {
 // The default maximum allowed size for a single doc validation error.
 constexpr static int kDefaultMaxDocValidationErrorSize = 12 * 1024 * 1024;

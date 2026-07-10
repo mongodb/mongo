@@ -47,7 +47,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class OperationContext;
 
@@ -462,4 +462,4 @@ struct DbResponse {
  * Helper to build an error DbResponse for OP_QUERY and OP_GET_MORE.
  */
 DbResponse makeErrorResponseToUnsupportedOpQuery(std::string_view errorMsg);
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

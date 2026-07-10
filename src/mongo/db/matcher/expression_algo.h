@@ -43,7 +43,7 @@
 #include <variant>
 #include <vector>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class PathMatchExpression;
 
@@ -355,4 +355,4 @@ std::unique_ptr<MatchExpression> copyExpressionAndApplyRenames(
 std::string filterMapToString(const StringMap<std::unique_ptr<MatchExpression>>&);
 
 }  // namespace expression
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

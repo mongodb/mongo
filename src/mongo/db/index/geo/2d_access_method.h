@@ -53,7 +53,7 @@ class IndexDescriptor;
 struct TwoDIndexingParams;
 
 // Public: instantiated in index_access_method.cpp (index_builds module)
-class MONGO_MOD_PUBLIC TwoDAccessMethod : public SortedDataIndexAccessMethod {
+class [[MONGO_MOD_PUBLIC]] TwoDAccessMethod : public SortedDataIndexAccessMethod {
 public:
     TwoDAccessMethod(IndexCatalogEntry* btreeState, std::unique_ptr<SortedDataInterface> btree);
 

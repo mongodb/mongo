@@ -51,7 +51,7 @@
 
 namespace mongo {
 
-struct MONGO_MOD_PUBLIC ParsedFindCommandParams {
+struct [[MONGO_MOD_PUBLIC]] ParsedFindCommandParams {
     std::unique_ptr<FindCommandRequest> findCommand;
     const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop();
     MatchExpressionParser::AllowedFeatureSet allowedFeatures =
@@ -63,7 +63,7 @@ struct MONGO_MOD_PUBLIC ParsedFindCommandParams {
  * Represents a find command request, but with more fully parsed ASTs for some fields which are
  * still raw BSONObj on the FindCommandRequest type.
  */
-struct MONGO_MOD_PUBLIC ParsedFindCommand {
+struct [[MONGO_MOD_PUBLIC]] ParsedFindCommand {
     ParsedFindCommand() = default;
 
     /**

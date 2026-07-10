@@ -43,7 +43,7 @@ namespace mongo {
  * operations (for transactions) or serialized and outputed to the user. Statistics are outputted
  * in slow query and slow transaction logging.
  */
-class MONGO_MOD_PUBLIC TicketHolderQueueStats {
+class [[MONGO_MOD_PUBLIC]] TicketHolderQueueStats {
 public:
     enum class QueueType { Ingress, Execution };
 

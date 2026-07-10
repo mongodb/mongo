@@ -516,7 +516,7 @@ private:
         i.e. given the same length and seed on any platform, we will produce the
         same string.
 */
-MONGO_MOD_NEEDS_REPLACEMENT std::string genString(size_t len, size_t seed);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] std::string genString(size_t len, size_t seed);
 
 /**
     Generate a set of elements consisting of strings and ints in the

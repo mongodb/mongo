@@ -94,7 +94,7 @@ public:
 
     std::unique_ptr<PlanStageStats> getStats() final;
 
-    MONGO_MOD_PRIVATE const SimpleMemoryUsageTracker& getMemoryUsageTracker_forTest() const {
+    [[MONGO_MOD_PRIVATE]] const SimpleMemoryUsageTracker& getMemoryUsageTracker_forTest() const {
         return _memoryTracker;
     }
 

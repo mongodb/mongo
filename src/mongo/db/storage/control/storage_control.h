@@ -36,7 +36,7 @@
 
 #include <memory>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 /**
  * Helper functions to manipulate independent processes that perform actions against the storage

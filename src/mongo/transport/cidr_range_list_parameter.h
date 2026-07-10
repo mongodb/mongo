@@ -40,7 +40,7 @@
 #include <vector>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC transport {
+namespace [[MONGO_MOD_PUBLIC]] transport {
 
 /**
  * Appends a CIDR range list to a bson object. The array will be appended as a subobject using a key
@@ -58,5 +58,5 @@ Status setCIDRRangeListParameter(VersionedValue<CIDRList>& value, BSONObj obj);
 
 // TODO: SERVER-106468 Define CIDRRangeListParameter here instead of generating the code.
 
-}  // namespace MONGO_MOD_PUBLIC transport
+}  // namespace transport
 }  // namespace mongo

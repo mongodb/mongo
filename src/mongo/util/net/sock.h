@@ -59,7 +59,7 @@
 #include <utility>
 #include <vector>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 #ifdef MONGO_CONFIG_SSL
 class SSLManagerInterface;
@@ -248,4 +248,4 @@ private:
     bool _awaitingHandshake;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

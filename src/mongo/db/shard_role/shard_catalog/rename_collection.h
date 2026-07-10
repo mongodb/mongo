@@ -62,7 +62,7 @@ class OpTime;
  * temporariness. "newTargetCollectionUUID" is the UUID set to the final collection when renaming
  * across DBs (if not present, a random UUID will be assigned).
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT RenameCollectionOptions {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] RenameCollectionOptions {
     bool dropTarget = false;
     bool stayTemp = false;
     bool markFromMigrate = false;
@@ -73,7 +73,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT RenameCollectionOptions {
     boost::optional<BSONObj> expectedCollectionOptions;
 };
 
-MONGO_MOD_NEEDS_REPLACEMENT void doLocalRenameIfOptionsAndIndexesHaveNotChanged(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void doLocalRenameIfOptionsAndIndexesHaveNotChanged(
     OperationContext* opCtx,
     const NamespaceString& sourceNs,
     const NamespaceString& targetNs,
@@ -85,9 +85,10 @@ MONGO_MOD_NEEDS_REPLACEMENT void doLocalRenameIfOptionsAndIndexesHaveNotChanged(
  * To be used by doLocalRenameIfOptionsAndIndexesHaveNotChanged and also its sharding-aware
  * equivalent in RenameCollectionCoordinator.
  */
-MONGO_MOD_PARENT_PRIVATE Status checkTargetCollectionOptionsMatch(const NamespaceString& targetNss,
-                                                                  const BSONObj& expectedOptions,
-                                                                  const BSONObj& currentOptions);
+[[MONGO_MOD_PARENT_PRIVATE]] Status checkTargetCollectionOptionsMatch(
+    const NamespaceString& targetNss,
+    const BSONObj& expectedOptions,
+    const BSONObj& currentOptions);
 
 /**
  * Checks that the lists of index specs 'expectedIndexes' and 'currentIndexes' are equal.
@@ -95,15 +96,15 @@ MONGO_MOD_PARENT_PRIVATE Status checkTargetCollectionOptionsMatch(const Namespac
  * equivalent in RenameCollectionCoordinator. Returns a CommandFailed status if indexes do not
  * match.
  */
-MONGO_MOD_PARENT_PRIVATE Status
-checkTargetCollectionIndexesMatch(const NamespaceString& targetNss,
-                                  const std::vector<BSONObj>& expectedIndexes,
-                                  const std::vector<BSONObj>& currentIndexes);
+[[MONGO_MOD_PARENT_PRIVATE]] Status checkTargetCollectionIndexesMatch(
+    const NamespaceString& targetNss,
+    const std::vector<BSONObj>& expectedIndexes,
+    const std::vector<BSONObj>& currentIndexes);
 
-MONGO_MOD_NEEDS_REPLACEMENT Status renameCollection(OperationContext* opCtx,
-                                                    const NamespaceString& source,
-                                                    const NamespaceString& target,
-                                                    const RenameCollectionOptions& options);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] Status renameCollection(OperationContext* opCtx,
+                                                        const NamespaceString& source,
+                                                        const NamespaceString& target,
+                                                        const RenameCollectionOptions& options);
 
 /**
  * As above, but may only be called from applyCommand_inlock. This allows creating a collection
@@ -112,12 +113,12 @@ MONGO_MOD_NEEDS_REPLACEMENT Status renameCollection(OperationContext* opCtx,
  * When 'cmd' contains dropTarget=true, 'renameOpTime' is used to rename the target collection to a
  * drop-pending collection.
  */
-MONGO_MOD_NEEDS_REPLACEMENT Status
-renameCollectionForApplyOps(OperationContext* opCtx,
-                            const boost::optional<UUID>& uuidToRename,
-                            const boost::optional<TenantId>& tid,
-                            const BSONObj& cmd,
-                            const repl::OpTime& renameOpTime);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] Status renameCollectionForApplyOps(
+    OperationContext* opCtx,
+    const boost::optional<UUID>& uuidToRename,
+    const boost::optional<TenantId>& tid,
+    const BSONObj& cmd,
+    const repl::OpTime& renameOpTime);
 
 /**
  * Same as renameCollection(), but used for rolling back renameCollection operations only.
@@ -125,14 +126,14 @@ renameCollectionForApplyOps(OperationContext* opCtx,
  * 'uuid' is used to look up the source namespace.
  * The 'target' namespace must refer to the same database as the source.
  */
-MONGO_MOD_PARENT_PRIVATE Status renameCollectionForRollback(OperationContext* opCtx,
-                                                            const NamespaceString& target,
-                                                            const UUID& uuid);
+[[MONGO_MOD_PARENT_PRIVATE]] Status renameCollectionForRollback(OperationContext* opCtx,
+                                                                const NamespaceString& target,
+                                                                const UUID& uuid);
 
 /**
  * Performs validation checks to ensure source and target namespaces are eligible for rename.
  */
-MONGO_MOD_PARENT_PRIVATE void validateNamespacesForRenameCollection(
+[[MONGO_MOD_PARENT_PRIVATE]] void validateNamespacesForRenameCollection(
     OperationContext* opCtx,
     const NamespaceString& source,
     const NamespaceString& target,
@@ -142,7 +143,7 @@ MONGO_MOD_PARENT_PRIVATE void validateNamespacesForRenameCollection(
  * Runs renameCollection() with preliminary validation checks to ensure source
  * and target namespaces are eligible for rename.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void validateAndRunRenameCollection(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void validateAndRunRenameCollection(
     OperationContext* opCtx,
     const NamespaceString& source,
     const NamespaceString& target,
@@ -153,7 +154,7 @@ MONGO_MOD_NEEDS_REPLACEMENT void validateAndRunRenameCollection(
  * them to be missed by the viewless-to-viewful conversion (see SERVER-123066).
  * TODO(SERVER-123292): Remove once 9.0 becomes last LTS.
  */
-MONGO_MOD_PARENT_PRIVATE void uassertCannotRenameViewlessTimeseriesAcrossDBsDuringDowngrade(
+[[MONGO_MOD_PARENT_PRIVATE]] void uassertCannotRenameViewlessTimeseriesAcrossDBsDuringDowngrade(
     OperationContext* opCtx, const CollectionPtr& sourceColl, const NamespaceString& target);
 
 /**

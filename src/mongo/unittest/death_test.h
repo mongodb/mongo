@@ -137,7 +137,7 @@
 
 namespace mongo::unittest {
 
-class MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS DeathTestBase : public Test {
+class [[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] DeathTestBase : public Test {
 public:
     /**
      * A test can use this to opt-out of exec behavior.
@@ -168,7 +168,7 @@ private:
 };
 
 template <typename T>
-class MONGO_MOD_PUBLIC DeathTest : public DeathTestBase {
+class [[MONGO_MOD_PUBLIC]] DeathTest : public DeathTestBase {
 public:
     template <typename... Args>
     explicit DeathTest(Args&&... args)

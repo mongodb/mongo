@@ -35,7 +35,7 @@
 
 #include <concepts>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace clang_checked {
 
 /**
@@ -69,4 +69,4 @@ private:
 };
 
 }  // namespace clang_checked
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

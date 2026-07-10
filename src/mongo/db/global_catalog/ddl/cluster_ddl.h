@@ -46,22 +46,22 @@ namespace cluster {
  * Creates (or ensures that it is created) a database `dbName`, with `suggestedPrimaryId` as the
  * primary node.
  */
-MONGO_MOD_NEEDS_REPLACEMENT CachedDatabaseInfo
-createDatabase(OperationContext* opCtx,
-               const DatabaseName& dbName,
-               const boost::optional<ShardId>& suggestedPrimaryId = boost::none);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] CachedDatabaseInfo createDatabase(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    const boost::optional<ShardId>& suggestedPrimaryId = boost::none);
 
 /**
  * Creates the specified collection.
  */
-MONGO_MOD_NEEDS_REPLACEMENT CreateCollectionResponse
-createCollection(OperationContext* opCtx, ShardsvrCreateCollection request);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] CreateCollectionResponse createCollection(
+    OperationContext* opCtx, ShardsvrCreateCollection request);
 
 /**
  * Creates a collection with the options specified in `request`. Calls the above createCollection
  * function within a router loop.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void createCollectionWithRouterLoop(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void createCollectionWithRouterLoop(
     OperationContext* opCtx, const ShardsvrCreateCollection& request);
 
 
@@ -69,13 +69,13 @@ MONGO_MOD_NEEDS_REPLACEMENT void createCollectionWithRouterLoop(
  * Creates the specified nss as an unsharded collection. Calls the above
  * createCollectionWithRouterLoop function.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void createCollectionWithRouterLoop(OperationContext* opCtx,
-                                                                const NamespaceString& nss);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void createCollectionWithRouterLoop(OperationContext* opCtx,
+                                                                    const NamespaceString& nss);
 
 /**
  * Returns the only allowed `shardCollection` request for `config.system.sessions`
  */
-MONGO_MOD_NEEDS_REPLACEMENT ShardsvrCreateCollection shardLogicalSessionsCollectionRequest();
+[[MONGO_MOD_NEEDS_REPLACEMENT]] ShardsvrCreateCollection shardLogicalSessionsCollectionRequest();
 
 }  // namespace cluster
 }  // namespace mongo

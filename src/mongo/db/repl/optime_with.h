@@ -36,7 +36,7 @@
 #include <iosfwd>
 #include <string>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace repl {
 
 /**
@@ -70,4 +70,4 @@ std::string OpTimeWith<T>::toString() const {
 }
 
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

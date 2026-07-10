@@ -84,7 +84,7 @@ enum class ContainerWriteBehavior { kDoNotReplicate, kReplicate };
  * We assume the caller has whatever locks required.  This interface is not thread safe.
  *
  */
-class MONGO_MOD_OPEN IndexAccessMethod {
+class [[MONGO_MOD_OPEN]] IndexAccessMethod {
     IndexAccessMethod(const IndexAccessMethod&) = delete;
     IndexAccessMethod& operator=(const IndexAccessMethod&) = delete;
 
@@ -246,7 +246,7 @@ public:
 
     using OnNKeysLoadedFn = std::function<void()>;
 
-    class MONGO_MOD_OPEN BulkBuilder {
+    class [[MONGO_MOD_OPEN]] BulkBuilder {
     public:
         virtual ~BulkBuilder() = default;
 
@@ -382,7 +382,7 @@ struct UpdateTicket {
 /**
  * Flags we can set for inserts and deletes (and updates, which are kind of both).
  */
-struct MONGO_MOD_PUBLIC InsertDeleteOptions {
+struct [[MONGO_MOD_PUBLIC]] InsertDeleteOptions {
     // Are duplicate keys allowed in the index?
     bool dupsAllowed = false;
 
@@ -413,7 +413,7 @@ struct MONGO_MOD_PUBLIC InsertDeleteOptions {
  * for the initialization and core functionality of this abstract class. To avoid any circular
  * dependencies, it is important that IndexAccessMethod remain an interface.
  */
-class MONGO_MOD_OPEN SortedDataIndexAccessMethod : public IndexAccessMethod {
+class [[MONGO_MOD_OPEN]] SortedDataIndexAccessMethod : public IndexAccessMethod {
     SortedDataIndexAccessMethod(const SortedDataIndexAccessMethod&) = delete;
     SortedDataIndexAccessMethod& operator=(const SortedDataIndexAccessMethod&) = delete;
 

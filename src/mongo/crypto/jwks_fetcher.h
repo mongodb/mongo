@@ -38,7 +38,7 @@ namespace crypto {
 
 /** Interface for objects which acquire JWKSes.
  */
-class MONGO_MOD_PUBLIC JWKSFetcher {
+class [[MONGO_MOD_PUBLIC]] JWKSFetcher {
 public:
     JWKSFetcher() = default;
     virtual ~JWKSFetcher() = default;

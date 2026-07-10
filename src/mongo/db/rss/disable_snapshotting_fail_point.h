@@ -34,6 +34,6 @@
 
 namespace mongo {
 
-MONGO_MOD_PUBLIC extern FailPoint disableSnapshotting;
+[[MONGO_MOD_PUBLIC]] extern FailPoint disableSnapshotting;
 
 }  // namespace mongo

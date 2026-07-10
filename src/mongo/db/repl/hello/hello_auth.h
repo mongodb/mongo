@@ -35,7 +35,7 @@
 #include "mongo/db/repl/hello/hello_gen.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Check a hello request for "saslSupportedMechs" or "speculativeAuthenticate".
@@ -49,4 +49,4 @@ void handleHelloAuth(OperationContext* opCtx,
                      bool isInitialHandshake,
                      BSONObjBuilder* result);
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

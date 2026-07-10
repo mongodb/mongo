@@ -34,7 +34,7 @@
 
 #include <cstdint>
 
-MONGO_MOD_PUB;
+[[MONGO_MOD_PUBLIC]];
 namespace mongo {
 
 /**

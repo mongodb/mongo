@@ -41,7 +41,7 @@
 
 namespace mongo {
 namespace otel {
-namespace MONGO_MOD_PUBLIC traces {
+namespace [[MONGO_MOD_PUBLIC]] traces {
 
 #ifdef MONGO_CONFIG_OTEL
 
@@ -149,6 +149,6 @@ public:
 
 #endif
 
-}  // namespace MONGO_MOD_PUBLIC traces
+}  // namespace traces
 }  // namespace otel
 }  // namespace mongo

@@ -61,7 +61,7 @@ public:
      * empty path as well as no path cases. optPath() should be preferred in order to
      * distinguish between the two.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT std::string_view path() const final {
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] std::string_view path() const final {
         return _elementPath ? _elementPath->fieldRef().dottedField() : "";
     }
 

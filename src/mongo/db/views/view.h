@@ -44,7 +44,7 @@ namespace mongo {
 /**
  * Represents a "view": a virtual collection defined by a query on a collection or another view.
  */
-class MONGO_MOD_PUBLIC ViewDefinition {
+class [[MONGO_MOD_PUBLIC]] ViewDefinition {
 public:
     /**
      * In the database 'dbName', create a new view 'viewName' on the view or collection

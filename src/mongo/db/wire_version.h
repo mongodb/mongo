@@ -44,7 +44,7 @@
 
 #include <boost/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 using namespace std::literals::string_view_literals;
 
 /**
@@ -254,4 +254,4 @@ Status validateWireVersion(WireVersionInfo client, WireVersionInfo server);
 StatusWith<WireVersionInfo> parseWireVersionFromHelloReply(const BSONObj& helloReply);
 
 }  // namespace wire_version
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

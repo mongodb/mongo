@@ -101,7 +101,7 @@ extern const OperationContext::Decoration<PlanExecutorShardingState> planExecuto
  * Executes a plan. Calls work() on a plan until a result is produced. Stops when the plan is
  * EOF or if the plan errors.
  */
-class MONGO_MOD_PUBLIC PlanExecutor {
+class [[MONGO_MOD_PUBLIC]] PlanExecutor {
 public:
     enum ExecState {
         // Successfully returned the next document and/or record id.

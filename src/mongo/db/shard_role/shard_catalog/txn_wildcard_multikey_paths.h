@@ -57,7 +57,7 @@ namespace mongo {
  *   - Survives statement boundaries via TxnResources RU stash/unstash.
  *   - Is cleaned up when the parent RU is destroyed on transaction commit or abort.
  */
-class MONGO_MOD_PUBLIC TxnWildcardMultikeyPaths {
+class [[MONGO_MOD_PUBLIC]] TxnWildcardMultikeyPaths {
 public:
     /**
      * Returns the cache attached to the transaction's RecoveryUnit Snapshot for the given

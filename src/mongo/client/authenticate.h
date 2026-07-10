@@ -56,7 +56,7 @@ namespace mongo {
 class BSONObj;
 class MongoURI;
 
-namespace MONGO_MOD_PUBLIC auth {
+namespace [[MONGO_MOD_PUBLIC]] auth {
 using namespace std::literals::string_view_literals;
 
 using RunCommandHook = std::function<Future<BSONObj>(OpMsgRequest request)>;
@@ -191,5 +191,5 @@ SpeculativeAuthType speculateInternalAuth(const HostAndPort& remoteHost,
                                           std::shared_ptr<SaslClientSession>* saslClientSession);
 
 
-}  // namespace MONGO_MOD_PUBLIC auth
+}  // namespace auth
 }  // namespace mongo

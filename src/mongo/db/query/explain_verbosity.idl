@@ -28,7 +28,7 @@
 
 global:
     cpp_namespace: "mongo::explain"
-    mod_visibility: pub
+    mod_visibility: public
 
 enums:
     Verbosity:

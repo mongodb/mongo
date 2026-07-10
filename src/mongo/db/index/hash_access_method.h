@@ -55,7 +55,7 @@ class CollatorInterface;
 /**
  * This is the access method for "hashed" indices.
  */
-class MONGO_MOD_PUBLIC HashAccessMethod : public SortedDataIndexAccessMethod {
+class [[MONGO_MOD_PUBLIC]] HashAccessMethod : public SortedDataIndexAccessMethod {
 public:
     HashAccessMethod(IndexCatalogEntry* btreeState, std::unique_ptr<SortedDataInterface> btree);
 

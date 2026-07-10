@@ -38,7 +38,7 @@
 
 #include <boost/filesystem/path.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 namespace mongo::sorter {
 
 /**

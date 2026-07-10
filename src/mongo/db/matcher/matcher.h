@@ -54,7 +54,7 @@ class CollatorInterface;
  *
  * TODO SERVER-113198: Remove external dependencies on this class.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT Matcher {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] Matcher {
     Matcher(const Matcher&) = delete;
     Matcher& operator=(const Matcher&) = delete;
 

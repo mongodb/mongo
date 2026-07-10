@@ -39,7 +39,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_NEEDS_REPLACEMENT ConfigServerCatalogCacheLoaderImpl
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ConfigServerCatalogCacheLoaderImpl
     : public ConfigServerCatalogCacheLoader {
 public:
     ConfigServerCatalogCacheLoaderImpl();

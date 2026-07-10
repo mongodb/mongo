@@ -41,7 +41,7 @@
 #include <string_view>
 #include <utility>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * An interface for ordering and matching according to a collation. Instances should be retrieved
@@ -190,4 +190,4 @@ private:
     const Collation _spec;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -34,7 +34,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/modules.h"
 
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS;
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]];
 
 namespace mongo {
 namespace idl {
@@ -44,7 +44,7 @@ namespace idl {
  * thrown.
  */
 template <typename T>
-MONGO_MOD_PUBLIC T parseCommandDocument(const BSONObj& cmdObj, const IDLParserContext& ctx) {
+[[MONGO_MOD_PUBLIC]] T parseCommandDocument(const BSONObj& cmdObj, const IDLParserContext& ctx) {
     DeserializationContext dctx;
     auto cmd = T::parse(cmdObj, ctx, &dctx);
     if (cmd.getGenericArguments().getApiStrict().value_or(false)) {
@@ -59,7 +59,7 @@ MONGO_MOD_PUBLIC T parseCommandDocument(const BSONObj& cmdObj, const IDLParserCo
  * thrown.
  */
 template <typename T>
-MONGO_MOD_PUBLIC T parseCommandRequest(const OpMsgRequest& req, const IDLParserContext& ctx) {
+[[MONGO_MOD_PUBLIC]] T parseCommandRequest(const OpMsgRequest& req, const IDLParserContext& ctx) {
     DeserializationContext dctx;
     auto cmd = T::parse(req, ctx, &dctx);
     if (cmd.getGenericArguments().getApiStrict().value_or(false)) {

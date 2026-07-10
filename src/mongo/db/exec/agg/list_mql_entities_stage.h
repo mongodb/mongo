@@ -47,10 +47,10 @@ public:
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                          MqlEntityTypeEnum type);
     /**
-     * TODO SERVER-112711: Remove 'MONGO_MOD_PRIVATE' once
+     * TODO SERVER-112711: Remove '[[MONGO_MOD_PRIVATE]]' once
      * 'document_source_list_mql_entities_test.cpp' is split in two.
      */
-    MONGO_MOD_PRIVATE static boost::intrusive_ptr<Stage> create_forTest(
+    [[MONGO_MOD_PRIVATE]] static boost::intrusive_ptr<Stage> create_forTest(
         std::string_view stageName,
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         MqlEntityTypeEnum type,

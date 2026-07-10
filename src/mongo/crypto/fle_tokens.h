@@ -123,7 +123,7 @@
  * ServerTextPrefixDerivedFromDataToken = HMAC(ServerTextPrefixToken, v)
  */
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 // Forward declare to avoid including the header file.
 class MongoCryptBuffer;
 
@@ -142,7 +142,7 @@ public:
     virtual ConstDataRange toCDR() const = 0;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo
 
 #define FLE_TOKEN_TYPE_MC(TokenType) mc_##TokenType##_t
 #define FLE_CRYPTO_TOKEN_FWD(TokenType) \
@@ -153,7 +153,7 @@ public:
     /* Forward declare the type name */                                        \
     FLE_CRYPTO_TOKEN_FWD(TokenType)                                            \
     namespace mongo {                                                          \
-    class MONGO_MOD_PUBLIC TokenType : public FLEToken {                       \
+    class [[MONGO_MOD_PUBLIC]] TokenType : public FLEToken {                   \
     public:                                                                    \
         /* Default constructor */                                              \
         TokenType();                                                           \
@@ -330,7 +330,7 @@ FLE_TOKEN_DECL_CLASS(ServerTextPrefixDerivedFromDataToken,
 #undef FLE_CRYPTO_TOKEN_FWD
 #undef FLE_TOKEN_DECL_CLASS
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 // Some keys have slightly different names in the server repo compared to libmongocrypt.
 using EDCDerivedFromDataTokenAndContentionFactorToken = EDCDerivedFromDataTokenAndContentionFactor;
 using ESCDerivedFromDataTokenAndContentionFactorToken = ESCDerivedFromDataTokenAndContentionFactor;
@@ -500,4 +500,4 @@ private:
     boost::optional<uint32_t> _msize;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

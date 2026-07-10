@@ -39,11 +39,11 @@
 namespace mongo {
 namespace catalog {
 
-using MinVisibleTimestamp MONGO_MOD_PRIVATE = Timestamp;
-using MinVisibleTimestampMap MONGO_MOD_PRIVATE = std::map<UUID, MinVisibleTimestamp>;
-using RequiresTimestampExtendedRangeSupportMap MONGO_MOD_PRIVATE = std::map<UUID, bool>;
+using MinVisibleTimestamp [[MONGO_MOD_PRIVATE]] = Timestamp;
+using MinVisibleTimestampMap [[MONGO_MOD_PRIVATE]] = std::map<UUID, MinVisibleTimestamp>;
+using RequiresTimestampExtendedRangeSupportMap [[MONGO_MOD_PRIVATE]] = std::map<UUID, bool>;
 
-struct MONGO_MOD_PRIVATE PreviousCatalogState {
+struct [[MONGO_MOD_PRIVATE]] PreviousCatalogState {
     MinVisibleTimestampMap minValidTimestampMap;
     RequiresTimestampExtendedRangeSupportMap requiresTimestampExtendedRangeSupportMap;
 };
@@ -54,16 +54,16 @@ struct MONGO_MOD_PRIVATE PreviousCatalogState {
  *
  * Must be called with the global lock acquired in exclusive mode.
  */
-MONGO_MOD_NEEDS_REPLACEMENT PreviousCatalogState closeCatalog(OperationContext* opCtx);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] PreviousCatalogState closeCatalog(OperationContext* opCtx);
 
 /**
  * Restores the catalog and all in-memory state after a call to closeCatalog(). Used by replication
  * after it recovers to the stable timestamp, whereas initial sync goes through a different sequence
  * that reinitializes storage engine and restores the catalog, and so does not use this function.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void openCatalog(OperationContext* opCtx,
-                                             const PreviousCatalogState& catalogState,
-                                             Timestamp stableTimestamp);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void openCatalog(OperationContext* opCtx,
+                                                 const PreviousCatalogState& catalogState,
+                                                 Timestamp stableTimestamp);
 
 /**
  * Restores the catalog and all in-memory state after a call to
@@ -71,7 +71,7 @@ MONGO_MOD_NEEDS_REPLACEMENT void openCatalog(OperationContext* opCtx,
  *
  * Must be called with the global lock acquired in exclusive mode.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void openCatalogAfterStorageChange(OperationContext* opCtx);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void openCatalogAfterStorageChange(OperationContext* opCtx);
 
 }  // namespace catalog
 }  // namespace mongo

@@ -60,7 +60,7 @@ namespace mongo {
 
 class OperationContext;
 
-struct MONGO_MOD_NEEDS_REPLACEMENT CanonicalQueryParams {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] CanonicalQueryParams {
     boost::intrusive_ptr<ExpressionContext> expCtx;
     std::variant<std::unique_ptr<ParsedFindCommand>, ParsedFindCommandParams> parsedFind;
     std::vector<boost::intrusive_ptr<DocumentSource>> pipeline = {};
@@ -70,7 +70,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT CanonicalQueryParams {
     bool aggWithNonEmptyPipeline = false;
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT CanonicalQuery {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] CanonicalQuery {
 public:
     // A type that encodes the notion of query shape suitable for use with the plan cache. Encodes
     // the query's match, projection, sort, etc. potentially with some constants removed or replaced

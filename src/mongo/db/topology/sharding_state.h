@@ -57,7 +57,7 @@ namespace mongo {
  * synchronisation. Initialisation is driven from outside (specifically
  * ShardingInitializationMongoD, which should be its only caller).
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ShardingState {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardingState {
     ShardingState(const ShardingState&) = delete;
     ShardingState& operator=(const ShardingState&) = delete;
 

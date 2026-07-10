@@ -41,7 +41,7 @@
 #include <memory>
 #include <vector>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 namespace analyze_shard_key {

@@ -41,7 +41,7 @@
 #include <mutex>
 #include <string>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 class Checkpointer final : public BackgroundJob {
 public:
     explicit Checkpointer(std::unique_ptr<CheckpointSchedulePolicy> policy)
@@ -136,4 +136,4 @@ private:
     std::unique_ptr<CheckpointSchedulePolicy> _policy;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

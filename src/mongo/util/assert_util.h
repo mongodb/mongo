@@ -57,20 +57,20 @@
 
 #include <fmt/format.h>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Sets the appropriate state to enable/disable diagnostic logging based on `newVal`.
  */
-MONGO_MOD_PRIVATE void setDiagnosticLoggingInAssertUtil(bool newVal);
+[[MONGO_MOD_PRIVATE]] void setDiagnosticLoggingInAssertUtil(bool newVal);
 
 /**
  * Whether ScopedDebugInfoStack is ever accessed by ScopedDebugInfo.
  */
-MONGO_MOD_PRIVATE void setScopedDebugInfoStackEnabled(bool newVal);
-MONGO_MOD_PRIVATE bool getScopedDebugInfoStackEnabled();
+[[MONGO_MOD_PRIVATE]] void setScopedDebugInfoStackEnabled(bool newVal);
+[[MONGO_MOD_PRIVATE]] bool getScopedDebugInfoStackEnabled();
 
-class MONGO_MOD_NEEDS_REPLACEMENT AssertionCount {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] AssertionCount {
 public:
     AssertionCount();
     void rollover();
@@ -84,7 +84,7 @@ public:
     AtomicWord<int> rollovers;
 };
 
-MONGO_MOD_NEEDS_REPLACEMENT extern AssertionCount assertionCount;
+[[MONGO_MOD_NEEDS_REPLACEMENT]] extern AssertionCount assertionCount;
 
 /**
  * Kinds of assertion failures tracked by AssertionCount. Excludes `warning` (never incremented)
@@ -120,7 +120,7 @@ void setAssertionIncrementObserver(AssertionIncrementObserver observer) noexcept
 class DBException;
 
 /** Most mongo exceptions inherit from this; this is commonly caught in most threads */
-class MONGO_MOD_UNFORTUNATELY_OPEN DBException : public std::exception {
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] DBException : public std::exception {
 public:
     const char* what() const noexcept final {
         return reason().c_str();
@@ -180,14 +180,14 @@ public:
         return _status.extraInfo<ErrorDetail>();
     }
 
-    MONGO_MOD_NEEDS_REPLACEMENT static inline AtomicWord<bool> traceExceptions{false};
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] static inline AtomicWord<bool> traceExceptions{false};
 
     /**
      * Allows handling `ErrorCodes::WriteConflict` as a special case and if true, will call
      * `printStackTrace` on every `WriteConflict` error. Can be set via the
      * `traceWriteConflictExceptions` server parameter.
      */
-    MONGO_MOD_PRIVATE static inline AtomicWord<bool> traceWriteConflictExceptions{false};
+    [[MONGO_MOD_PRIVATE]] static inline AtomicWord<bool> traceWriteConflictExceptions{false};
 
 protected:
     DBException(const Status& status) : _status(status) {
@@ -284,18 +284,18 @@ protected:
  * Only has public visibility to allow copying for throw ex; Use ExceptionFor<code> instead.
  */
 template <ErrorCodes::Error kCode, typename... Bases>
-class MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS ExceptionForCode final : public Bases... {
+class [[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] ExceptionForCode final : public Bases... {
 public:
     MONGO_STATIC_ASSERT(isNamedCode<kCode>);
 
-    MONGO_MOD_PRIVATE ExceptionForCode(const Status& status) : AssertionException(status) {
+    [[MONGO_MOD_PRIVATE]] ExceptionForCode(const Status& status) : AssertionException(status) {
         invariant(status.code() == kCode);
     }
 
     // This is only a template to enable SFINAE. It will only be instantiated with the default
     // value.
     template <ErrorCodes::Error code_copy = kCode>
-    MONGO_MOD_PUBLIC std::shared_ptr<const ErrorExtraInfoFor<code_copy>> operator->() const {
+    [[MONGO_MOD_PUBLIC]] std::shared_ptr<const ErrorExtraInfoFor<code_copy>> operator->() const {
         MONGO_STATIC_ASSERT(code_copy == kCode);
         return this->template extraInfo<ErrorExtraInfoFor<kCode>>();
     }
@@ -358,7 +358,7 @@ requires std::is_same_v<decltype(codeOrCatagory), ErrorCodes::Error> ||
 using ExceptionFor = typename error_details::ExceptionForDispatcher<codeOrCatagory>::type;
 
 namespace error_details {
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS MONGO_COMPILER_NORETURN void verifyFailed(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void verifyFailed(
     const char* expr, SourceLocation loc = MONGO_SOURCE_LOCATION());
 }
 
@@ -367,7 +367,7 @@ namespace fassert_detail {
 /** Convertible from exactly `int`, but not from bool or other types that convert to int. */
 struct MsgId {
     /** Allow exactly int */
-    MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr explicit(false) MsgId(int id) : id{id} {}
+    [[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr explicit(false) MsgId(int id) : id{id} {}
 
     /** Allow copy */
     constexpr MsgId(const MsgId&) = default;
@@ -380,27 +380,27 @@ struct MsgId {
     int id;
 };
 
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS MONGO_COMPILER_NORETURN void failed(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void failed(
     MsgId msgid, SourceLocation loc = MONGO_SOURCE_LOCATION()) noexcept;
 
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS MONGO_COMPILER_NORETURN void failed(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void failed(
     MsgId msgid, const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION()) noexcept;
 
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS MONGO_COMPILER_NORETURN void failedNoTrace(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void failedNoTrace(
     MsgId msgid, SourceLocation loc = MONGO_SOURCE_LOCATION()) noexcept;
 
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS MONGO_COMPILER_NORETURN void failedNoTrace(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void failedNoTrace(
     MsgId msgid, const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION()) noexcept;
 
 /** Aborts if `cond` is false. */
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void check(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr void check(
     MsgId msgid, bool cond, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!cond)) {
         failed(msgid, loc);
     }
 }
 
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void check(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr void check(
     MsgId msgid, const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!status.isOK())) {
         failed(msgid, status, loc);
@@ -408,7 +408,7 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void check(
 }
 
 template <typename T>
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr T check(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr T check(
     MsgId msgid, StatusWith<T> sw, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!sw.isOK())) {
         failed(msgid, sw.getStatus(), loc);
@@ -420,7 +420,7 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr T check(
 template <typename T, std::enable_if_t<std::is_convertible_v<T, std::string_view>, int> = 0>
 void check(MsgId msgid, T&& cond, SourceLocation loc = MONGO_SOURCE_LOCATION()) = delete;
 
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void checkNoTrace(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr void checkNoTrace(
     MsgId msgid, bool cond, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!cond)) {
         failedNoTrace(msgid, loc);
@@ -431,7 +431,7 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void checkNoTrace(
 template <typename T, std::enable_if_t<std::is_convertible_v<T, std::string_view>, int> = 0>
 void checkNoTrace(MsgId msgid, T&& cond, SourceLocation loc = MONGO_SOURCE_LOCATION()) = delete;
 
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void checkNoTrace(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr void checkNoTrace(
     MsgId msgid, const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!status.isOK())) {
         failedNoTrace(msgid, status, loc);
@@ -439,7 +439,7 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void checkNoTrace(
 }
 
 template <typename T>
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr T checkNoTrace(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr T checkNoTrace(
     MsgId msgid, StatusWith<T> sw, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!sw.isOK())) {
         failedNoTrace(msgid, sw.getStatus(), loc);
@@ -528,19 +528,19 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr T checkNoTrace(
 
 namespace error_details {
 
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS inline const Status& makeStatus(const Status& s) {
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] inline const Status& makeStatus(const Status& s) {
     return s;
 }
 
 template <typename T>
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS const Status& makeStatus(const StatusWith<T>& sw) {
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] const Status& makeStatus(const StatusWith<T>& sw) {
     return sw.getStatus();
 }
 
 // This function exists so that uassert/massert can take plain int literals rather than requiring
 // ErrorCodes::Error wrapping.
 template <typename StringLike>
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS Status makeStatus(int code, StringLike&& message) {
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] Status makeStatus(int code, StringLike&& message) {
     return Status(ErrorCodes::Error(code), std::forward<StringLike>(message));
 }
 
@@ -548,8 +548,8 @@ template <typename ErrorDetail,
           typename StringLike,
           typename = std::enable_if_t<
               std::is_base_of<ErrorExtraInfo, std::remove_reference_t<ErrorDetail>>::value>>
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS Status makeStatus(ErrorDetail&& detail,
-                                                         StringLike&& message) {
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] Status makeStatus(ErrorDetail&& detail,
+                                                             StringLike&& message) {
     return Status(std::forward<ErrorDetail>(detail), std::forward<StringLike>(message));
 }
 
@@ -582,10 +582,10 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS Status makeStatus(ErrorDetail&& detail,
     } while (false)
 
 namespace error_details {
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS MONGO_COMPILER_NORETURN void uassertedWithLocation(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void uassertedWithLocation(
     const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION());
 
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void uassertStatusOKWithLocation(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr void uassertStatusOKWithLocation(
     const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!status.isOK())) {
         uassertedWithLocation(status, loc);
@@ -593,14 +593,14 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void uassertStatusOKWithLocatio
 }
 
 template <typename T>
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr T uassertStatusOKWithLocation(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr T uassertStatusOKWithLocation(
     StatusWith<T> sw, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     uassertStatusOKWithLocation(sw.getStatus(), loc);
     return std::move(sw.getValue());
 }
 
 template <typename ContextExpr>
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void uassertStatusOKWithContextAndLocation(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr void uassertStatusOKWithContextAndLocation(
     const Status& status, ContextExpr&& contextExpr, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!status.isOK())) {
         uassertedWithLocation(status.withContext(std::forward<ContextExpr>(contextExpr)()), loc);
@@ -608,7 +608,7 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void uassertStatusOKWithContext
 }
 
 template <typename T, typename ContextExpr>
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr T uassertStatusOKWithContextAndLocation(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr T uassertStatusOKWithContextAndLocation(
     StatusWith<T> sw, ContextExpr&& contextExpr, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     uassertStatusOKWithContextAndLocation(
         sw.getStatus(), std::forward<ContextExpr>(contextExpr), loc);
@@ -638,10 +638,10 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr T uassertStatusOKWithContextAnd
         status, [&]() -> std::string { return (contextExpr); }, MONGO_SOURCE_LOCATION())
 
 namespace error_details {
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS MONGO_COMPILER_NORETURN void massertedWithLocation(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void massertedWithLocation(
     const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION());
 
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void massertStatusOKWithLocation(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr void massertStatusOKWithLocation(
     const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!status.isOK())) {
         massertedWithLocation(status, loc);
@@ -649,7 +649,7 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void massertStatusOKWithLocatio
 }
 
 template <typename T>
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr T massertStatusOKWithLocation(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr T massertStatusOKWithLocation(
     StatusWith<T> sw, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     massertStatusOKWithLocation(sw.getStatus(), loc);
     return std::move(sw.getValue());
@@ -690,7 +690,7 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr T massertStatusOKWithLocation(
                                                           MONGO_BASE_ASSERT_VA_1)(__VA_ARGS__))
 
 namespace error_details {
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS MONGO_COMPILER_NORETURN void iassertFailed(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void iassertFailed(
     const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION());
 }
 
@@ -707,7 +707,7 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS MONGO_COMPILER_NORETURN void iassertFaile
 #define iasserted(...) MONGO_BASE_ASSERT_FAILED(::mongo::error_details::iassertFailed, __VA_ARGS__)
 
 namespace error_details {
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS MONGO_COMPILER_NORETURN void tassertFailed(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void tassertFailed(
     const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION());
 }
 
@@ -742,16 +742,16 @@ void warnIfTripwireAssertionsOccurred();
     } while (false)
 
 namespace error_details {
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS MONGO_COMPILER_NORETURN void invariantOKFailed(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void invariantOKFailed(
     const char* expr, const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION()) noexcept;
 
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS MONGO_COMPILER_NORETURN void invariantOKFailedWithMsg(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void invariantOKFailedWithMsg(
     const char* expr,
     const Status& status,
     const std::string& msg,
     SourceLocation loc = MONGO_SOURCE_LOCATION()) noexcept;
 
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void invariantWithLocation(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr void invariantWithLocation(
     const Status& status, const char* expr, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!status.isOK())) {
         ::mongo::error_details::invariantOKFailed(expr, status, loc);
@@ -759,7 +759,7 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void invariantWithLocation(
 }
 
 template <typename T>
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr T invariantWithLocation(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr T invariantWithLocation(
     StatusWith<T> sw, const char* expr, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!sw.isOK())) {
         ::mongo::error_details::invariantOKFailed(expr, sw.getStatus(), loc);
@@ -768,7 +768,7 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr T invariantWithLocation(
 }
 
 template <typename ContextExpr>
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void invariantWithContextAndLocation(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr void invariantWithContextAndLocation(
     const Status& status,
     const char* expr,
     ContextExpr&& contextExpr,
@@ -780,7 +780,7 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void invariantWithContextAndLoc
 }
 
 template <typename T, typename ContextExpr>
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr T invariantWithContextAndLocation(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr T invariantWithContextAndLocation(
     StatusWith<T> sw,
     const char* expr,
     ContextExpr&& contextExpr,
@@ -791,10 +791,10 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr T invariantWithContextAndLocati
     return std::move(sw.getValue());
 }
 
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS MONGO_COMPILER_NORETURN void invariantStatusOKFailed(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void invariantStatusOKFailed(
     const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION()) noexcept;
 
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void invariantStatusOKWithLocation(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr void invariantStatusOKWithLocation(
     const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!status.isOK())) {
         invariantStatusOKFailed(status, loc);
@@ -802,14 +802,14 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void invariantStatusOKWithLocat
 }
 
 template <typename T>
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr T invariantStatusOKWithLocation(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr T invariantStatusOKWithLocation(
     StatusWith<T> sw, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     invariantStatusOKWithLocation(sw.getStatus(), loc);
     return std::move(sw.getValue());
 }
 
 template <typename ContextExpr>
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void invariantStatusOKWithContextAndLocation(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr void invariantStatusOKWithContextAndLocation(
     const Status& status, ContextExpr&& contextExpr, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!status.isOK())) {
         invariantStatusOKFailed(status.withContext(std::forward<ContextExpr>(contextExpr)()), loc);
@@ -817,7 +817,7 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void invariantStatusOKWithConte
 }
 
 template <typename T, typename ContextExpr>
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr T invariantStatusOKWithContextAndLocation(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr T invariantStatusOKWithContextAndLocation(
     StatusWith<T> sw, ContextExpr&& contextExpr, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     invariantStatusOKWithContextAndLocation(
         sw.getStatus(), std::forward<ContextExpr>(contextExpr), loc);
@@ -1068,4 +1068,4 @@ inline std::string causedBy(const Status& e) {
  */
 void reportFailedDestructor(SourceLocation loc = MONGO_SOURCE_LOCATION());
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

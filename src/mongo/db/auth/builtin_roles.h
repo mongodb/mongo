@@ -48,24 +48,25 @@ namespace auth {
  * "privileges".  Addition of new privileges is done as with
  * Privilege::addPrivilegeToPrivilegeVector.
  */
-MONGO_MOD_PUBLIC bool addPrivilegesForBuiltinRole(const RoleName& role,
-                                                  PrivilegeVector* privileges);
+[[MONGO_MOD_PUBLIC]] bool addPrivilegesForBuiltinRole(const RoleName& role,
+                                                      PrivilegeVector* privileges);
 
 /**
  * Ennumerate all builtin RoleNames for the given database.
  */
-MONGO_MOD_PUBLIC stdx::unordered_set<RoleName> getBuiltinRoleNamesForDB(const DatabaseName& dbname);
+[[MONGO_MOD_PUBLIC]] stdx::unordered_set<RoleName> getBuiltinRoleNamesForDB(
+    const DatabaseName& dbname);
 
 /**
  * Adds to "privileges" the necessary privileges to do absolutely anything on the system.
  */
-MONGO_MOD_PUBLIC void generateUniversalPrivileges(PrivilegeVector* privileges,
-                                                  const boost::optional<TenantId>&);
+[[MONGO_MOD_PUBLIC]] void generateUniversalPrivileges(PrivilegeVector* privileges,
+                                                      const boost::optional<TenantId>&);
 
 /**
  * Returns whether the given role corresponds to a built-in role.
  */
-MONGO_MOD_PUBLIC bool isBuiltinRole(const RoleName& role);
+[[MONGO_MOD_PUBLIC]] bool isBuiltinRole(const RoleName& role);
 
 }  // namespace auth
 }  // namespace mongo

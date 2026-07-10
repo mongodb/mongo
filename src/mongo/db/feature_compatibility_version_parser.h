@@ -44,7 +44,7 @@ namespace mongo {
  *
  * Also, act as helpers to serialize and deserialize "fcv_string" and "ofcv_string" idl types.
  */
-struct MONGO_MOD_PUB FeatureCompatibilityVersionParser {
+struct [[MONGO_MOD_PUBLIC]] FeatureCompatibilityVersionParser {
     using GenericFCV = multiversion::GenericFCV;
     using FCV = multiversion::FeatureCompatibilityVersion;
 

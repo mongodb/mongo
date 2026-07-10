@@ -38,13 +38,13 @@
 #include "mongo/util/system_tick_source.h"
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC admission {
+namespace [[MONGO_MOD_PUBLIC]] admission {
 
 /**
  * The RateLimiter offers a thin wrapper around the folly::TokenBucket augmented with
  * interruptibility, maximum queue depth, and metrics.
  */
-class MONGO_MOD_PUBLIC RateLimiter {
+class [[MONGO_MOD_PUBLIC]] RateLimiter {
     class RateLimiterPrivate;
 
 public:
@@ -56,7 +56,7 @@ public:
      * A DeferredToken must be consumed exactly once via get() before it is destroyed, unless
      * recordExemption() is called first to mark the request as not subject to admission control.
      */
-    class MONGO_MOD_PUBLIC DeferredToken {
+    class [[MONGO_MOD_PUBLIC]] DeferredToken {
     public:
         DeferredToken(const DeferredToken&) = delete;
         DeferredToken& operator=(const DeferredToken&) = delete;
@@ -220,5 +220,5 @@ public:
 private:
     std::unique_ptr<RateLimiterPrivate> _impl;
 };
-}  // namespace MONGO_MOD_PUBLIC admission
+}  // namespace admission
 }  // namespace mongo

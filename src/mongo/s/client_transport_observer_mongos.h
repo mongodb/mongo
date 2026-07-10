@@ -39,7 +39,7 @@ namespace mongo {
  * Cleans up open cursors and in-progress transactions upon disconnect for clients that
  * are considered bound to the operation state.
  */
-class MONGO_MOD_PUB ClientTransportObserverMongos final
+class [[MONGO_MOD_PUBLIC]] ClientTransportObserverMongos final
     : public transport::ClientTransportObserver {
     void onClientDisconnect(Client* client) final;
 };

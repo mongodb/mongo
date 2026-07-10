@@ -34,7 +34,7 @@
 #include <cstddef>
 #include <vector>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 // Represents one modification from a source to a target. Specifies a change of 'targetSize' bytes
 // starting at 'targetOffset', with the replacement data being 'sourceSize' bytes from
@@ -57,4 +57,4 @@ struct DamageEvent {
 
 using DamageVector = std::vector<DamageEvent>;
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

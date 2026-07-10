@@ -36,7 +36,7 @@
 
 namespace mongo::stats {
 
-class MONGO_MOD_PUB StatsCacheLoaderImpl : public StatsCacheLoader {
+class [[MONGO_MOD_PUBLIC]] StatsCacheLoaderImpl : public StatsCacheLoader {
 public:
     SemiFuture<StatsCacheVal> getStats(OperationContext* opCtx,
                                        const StatsPathString& statsPath) override;

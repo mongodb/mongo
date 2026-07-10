@@ -65,7 +65,7 @@ namespace mongo {
 /**
  * Serves as a container of the non-templatised parts of the ReadThroughCache class below.
  */
-class MONGO_MOD_PRIVATE ReadThroughCacheBase {
+class [[MONGO_MOD_PRIVATE]] ReadThroughCacheBase {
     ReadThroughCacheBase(const ReadThroughCacheBase&) = delete;
     ReadThroughCacheBase& operator=(const ReadThroughCacheBase&) = delete;
 
@@ -120,7 +120,7 @@ private:
 };
 
 template <typename Result, typename Key, typename Value, typename Time, typename... LookupArgs>
-struct MONGO_MOD_PUBLIC ReadThroughCacheLookup {
+struct [[MONGO_MOD_PUBLIC]] ReadThroughCacheLookup {
     using Fn = unique_function<Result(OperationContext*,
                                       const Key&,
                                       const Value& cachedValue,
@@ -129,8 +129,11 @@ struct MONGO_MOD_PUBLIC ReadThroughCacheLookup {
 };
 
 template <typename Result, typename Key, typename Value, typename... LookupArgs>
-struct MONGO_MOD_PUBLIC
-    ReadThroughCacheLookup<Result, Key, Value, CacheNotCausallyConsistent, LookupArgs...> {
+struct [[MONGO_MOD_PUBLIC]] ReadThroughCacheLookup<Result,
+                                                   Key,
+                                                   Value,
+                                                   CacheNotCausallyConsistent,
+                                                   LookupArgs...> {
     using Fn = unique_function<Result(
         OperationContext*, const Key&, const Value& cachedValue, const LookupArgs... lookupArgs)>;
 };
@@ -152,7 +155,7 @@ template <typename Key,
           typename Time = CacheNotCausallyConsistent,
           typename MutexType = std::mutex,
           typename... LookupArgs>
-class MONGO_MOD_OPEN ReadThroughCache : public ReadThroughCacheBase {
+class [[MONGO_MOD_OPEN]] ReadThroughCache : public ReadThroughCacheBase {
     /**
      * Data structure wrapping and expanding on the values stored in the cache.
      */

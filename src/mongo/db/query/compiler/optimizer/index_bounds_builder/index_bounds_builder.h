@@ -51,7 +51,7 @@ class CollatorInterface;
 /**
  * Translates expressions over fields into bounds on an index.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT IndexBoundsBuilder {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] IndexBoundsBuilder {
 public:
     static const Interval kUndefinedPointInterval;
     static const Interval kNullPointInterval;

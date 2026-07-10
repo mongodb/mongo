@@ -42,7 +42,7 @@ using namespace std::literals::string_view_literals;
 /**
  * Tracks the number of external clients on the shard port of a mongod.
  */
-class MONGO_MOD_PUBLIC DirectShardClientTracker {
+class [[MONGO_MOD_PUBLIC]] DirectShardClientTracker {
     DirectShardClientTracker(const DirectShardClientTracker&) = delete;
     DirectShardClientTracker& operator=(const DirectShardClientTracker&) = delete;
 

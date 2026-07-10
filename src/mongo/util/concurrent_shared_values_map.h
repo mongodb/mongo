@@ -52,7 +52,7 @@ namespace mongo {
  * shape.
  */
 template <typename Key, typename Value, typename... ExtraAbslArgs>
-class MONGO_MOD_NEEDS_REPLACEMENT ConcurrentSharedValuesMap {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ConcurrentSharedValuesMap {
 public:
     using Map = absl::flat_hash_map<Key, std::shared_ptr<Value>, ExtraAbslArgs...>;
 

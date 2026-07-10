@@ -61,7 +61,7 @@ class ShardId;
 /**
  * Methods for running aggregation across a sharded cluster.
  */
-class MONGO_MOD_PUBLIC ClusterAggregate {
+class [[MONGO_MOD_PUBLIC]] ClusterAggregate {
 public:
     /**
      * Max number of retries to resolve the underlying namespace of a view.

@@ -157,7 +157,7 @@ public:
     /**
      * Returns a short string, suitable for the logs, which summarizes the execution plan.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT virtual std::string getPlanSummary() const = 0;
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] virtual std::string getPlanSummary() const = 0;
 
     /**
      * Fills out 'statsOut' with summary stats collected during the execution of the underlying
@@ -167,7 +167,8 @@ public:
      * The summary stats are consumed by debug mechanisms such as the profiler and the slow query
      * log.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT virtual void getSummaryStats(PlanSummaryStats* statsOut) const = 0;
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] virtual void getSummaryStats(
+        PlanSummaryStats* statsOut) const = 0;
 
     /**
      * Fills out 'statsOut' for the secondary collection 'secondaryColl'. Subclasses may
@@ -183,7 +184,7 @@ public:
      *
      * The 'verbosity' level parameter determines the amount of information to be returned.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT virtual PlanStatsDetails getWinningPlanStats(
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] virtual PlanStatsDetails getWinningPlanStats(
         ExplainOptions::Verbosity verbosity) const = 0;
 
     virtual PlanStatsDetails getWinningPlanStatsQueryPlanner(bool /*printBytecode*/) const {

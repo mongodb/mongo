@@ -46,7 +46,7 @@ namespace mongo {
  *
  * TODO SERVER-113197: Remove streams dependency on this class.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT SimpleMemoryUsageTracker {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] SimpleMemoryUsageTracker {
 public:
     SimpleMemoryUsageTracker(const SimpleMemoryUsageTracker&) = delete;
     SimpleMemoryUsageTracker operator=(const SimpleMemoryUsageTracker&) = delete;
@@ -158,7 +158,7 @@ private:
  *
  * TODO SERVER-113197: Remove streams dependency on this class.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT MemoryUsageTracker {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] MemoryUsageTracker {
 public:
     MemoryUsageTracker(const MemoryUsageTracker&) = delete;
     MemoryUsageTracker operator=(const MemoryUsageTracker&) = delete;
@@ -249,7 +249,7 @@ private:
  * arbitrary operators. Optionally, it can be used to report the metrics to the serverStatus
  * command.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT DeduplicatorReporter {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DeduplicatorReporter {
 public:
     DeduplicatorReporter(const DeduplicatorReporter&) = delete;
     DeduplicatorReporter& operator=(const DeduplicatorReporter&) = delete;
@@ -284,7 +284,7 @@ private:
  * TODO SERVER-113197: Remove streams dependency on this class.
  */
 template <typename Tracker>
-class MONGO_MOD_OPEN MemoryUsageTokenImpl : private boost::noncopyable {
+class [[MONGO_MOD_OPEN]] MemoryUsageTokenImpl : private boost::noncopyable {
 public:
     // Default constructor is only present to support ease of use for some containers.
     MemoryUsageTokenImpl() {}

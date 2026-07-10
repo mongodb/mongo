@@ -51,7 +51,7 @@ namespace mongo {
  * config.mongos collection. All manipulation of documents coming from that
  * collection should be done with this class.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT MongosType {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] MongosType {
 public:
     // Name of the mongos collection in the config server.
     static const NamespaceString ConfigNS;

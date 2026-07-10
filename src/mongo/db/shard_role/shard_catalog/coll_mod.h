@@ -43,7 +43,7 @@ namespace mongo {
 /**
  * Checks if the collMod request is converting an index to unique.
  */
-MONGO_MOD_PARENT_PRIVATE
+[[MONGO_MOD_PARENT_PRIVATE]]
 bool isCollModIndexUniqueConversion(const CollModRequest& request);
 
 /**
@@ -51,7 +51,7 @@ bool isCollModIndexUniqueConversion(const CollModRequest& request);
  * The 'dryRun' option can only be used with the index 'unique' option, so we assume 'request' must
  * have the 'unique' option. The function will also remove other options from the original request.
  */
-MONGO_MOD_PARENT_PRIVATE
+[[MONGO_MOD_PARENT_PRIVATE]]
 CollModRequest makeCollModDryRunRequest(const CollModRequest& request);
 
 /**
@@ -60,7 +60,7 @@ CollModRequest makeCollModDryRunRequest(const CollModRequest& request);
  * been acquired with the necessary X lock. If omitted, the collection will be looked up and locked
  * appropriately.
  */
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 Status processCollModCommand(OperationContext* opCtx,
                              const NamespaceStringOrUUID& nsOrUUID,
                              const CollMod& cmd,
@@ -70,7 +70,7 @@ Status processCollModCommand(OperationContext* opCtx,
 /**
  * Returns true if the given collmod @request contains options related to timeseries collections
  */
-MONGO_MOD_PARENT_PRIVATE
+[[MONGO_MOD_PARENT_PRIVATE]]
 bool hasTimeseriesOptions(const CollModRequest& request);
 
 /**
@@ -79,7 +79,7 @@ bool hasTimeseriesOptions(const CollModRequest& request);
  * Static checks are the ones perfomed exclusively on the request itself without accessing the
  * catalog.
  */
-MONGO_MOD_PARENT_PRIVATE
+[[MONGO_MOD_PARENT_PRIVATE]]
 void staticValidateCollMod(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const CollModRequest& request);
@@ -88,7 +88,7 @@ void staticValidateCollMod(OperationContext* opCtx,
  * Performs the collection modification described in "cmd" on the collection "ns". Only checks for
  * duplicates for the 'applyOps' command.
  */
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 Status processCollModCommandForApplyOps(OperationContext* opCtx,
                                         const NamespaceStringOrUUID& nsOrUUID,
                                         const CollMod& cmd,

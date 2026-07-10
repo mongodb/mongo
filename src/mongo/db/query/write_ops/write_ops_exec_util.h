@@ -44,7 +44,7 @@ namespace mongo::write_ops_exec {
  * when the last write was a no-op (which will not advance the client opTime).
  * TODO SERVER-115820 remove external dependencies on this class.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT LastOpFixer {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] LastOpFixer {
 public:
     LastOpFixer(OperationContext* opCtx);
 

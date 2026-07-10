@@ -41,7 +41,7 @@ class OperationContext;
 /**
  * Accesses the sessions collection for config servers.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT SessionsCollectionConfigServer
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] SessionsCollectionConfigServer
     : public SessionsCollectionSharded {
 public:
     /**

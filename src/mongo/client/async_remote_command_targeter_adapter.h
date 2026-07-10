@@ -47,7 +47,7 @@
 #include <boost/smart_ptr.hpp>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC async_rpc {
+namespace [[MONGO_MOD_PUBLIC]] async_rpc {
 
 /**
  * This class serves as an adaptor that allows a mongo::RemoteCommandTargeter
@@ -76,5 +76,5 @@ private:
     std::shared_ptr<RemoteCommandTargeter> _targeter;
 };
 
-}  // namespace MONGO_MOD_PUBLIC async_rpc
+}  // namespace async_rpc
 }  // namespace mongo

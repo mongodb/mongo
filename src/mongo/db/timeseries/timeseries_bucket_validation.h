@@ -33,7 +33,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo::timeseries {
 /**

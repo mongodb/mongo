@@ -71,7 +71,7 @@ class AggregateCommandRequest;
  * - The last command (find, aggregate or getMore) returned an error that indicated the cursor is no
  *   longer open on the server side.
  */
-class MONGO_MOD_PUBLIC DBClientCursor {
+class [[MONGO_MOD_PUBLIC]] DBClientCursor {
     DBClientCursor(const DBClientCursor&) = delete;
     DBClientCursor& operator=(const DBClientCursor&) = delete;
 

@@ -40,7 +40,7 @@ namespace mongo {
  * to check in its session before waiting on the network so that a sub-operation may check it out
  * and use it. This is important for preventing deadlocks.
  */
-class MONGO_MOD_OPEN ResourceYielder {
+class [[MONGO_MOD_OPEN]] ResourceYielder {
 public:
     virtual ~ResourceYielder() = default;
 
@@ -72,9 +72,9 @@ public:
  * error will be thrown.
  */
 template <typename Func>
-MONGO_MOD_PUBLIC std::invoke_result_t<Func> runWithYielding(OperationContext* opCtx,
-                                                            ResourceYielder* yielder,
-                                                            Func fn) {
+[[MONGO_MOD_PUBLIC]] std::invoke_result_t<Func> runWithYielding(OperationContext* opCtx,
+                                                                ResourceYielder* yielder,
+                                                                Func fn) {
     if (yielder) {
         yielder->yield(opCtx);
     }

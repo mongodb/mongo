@@ -55,7 +55,7 @@ using namespace std::literals::string_view_literals;
  * completed. If egress mode is enabled, this entails waiting for all sessions to be destructed. If
  * ingress mode is enabled, this entails waiting for all RPC handlers to return.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT GRPCTransportLayer : public TransportLayer {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] GRPCTransportLayer : public TransportLayer {
 protected:
     GRPCTransportLayer() = default;
 

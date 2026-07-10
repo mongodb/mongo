@@ -120,7 +120,7 @@ private:
  * two types share no code, but do share enough shape to re-use some boilerplate.
  */
 template <typename Eraser>
-class MONGO_MOD_PUB KillCursorsBySessionAdaptor {
+class [[MONGO_MOD_PUBLIC]] KillCursorsBySessionAdaptor {
 public:
     KillCursorsBySessionAdaptor(OperationContext* opCtx,
                                 const SessionKiller::Matcher& matcher,
@@ -194,9 +194,9 @@ private:
 };
 
 template <typename Eraser>
-MONGO_MOD_PUB auto makeKillCursorsBySessionAdaptor(OperationContext* opCtx,
-                                                   const SessionKiller::Matcher& matcher,
-                                                   Eraser&& eraser) {
+[[MONGO_MOD_PUBLIC]] auto makeKillCursorsBySessionAdaptor(OperationContext* opCtx,
+                                                          const SessionKiller::Matcher& matcher,
+                                                          Eraser&& eraser) {
     return KillCursorsBySessionAdaptor<std::decay_t<Eraser>>{
         opCtx, matcher, std::forward<Eraser>(eraser)};
 }

@@ -36,9 +36,9 @@
 
 #include <boost/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
-namespace MONGO_MOD_PRIVATE detail {
+namespace [[MONGO_MOD_PRIVATE]] detail {
 
 /**
  * Appends an element with an operator* to the end of a data structure. If the operator* produces
@@ -82,7 +82,7 @@ struct vecTypeHelper<void, Args...> {
 template <typename T, typename... Args>
 using vecTypeHelperT = typename vecTypeHelper<T, Args...>::type;
 
-}  // namespace MONGO_MOD_PRIVATE detail
+}  // namespace detail
 
 /**
  * Create a vector. Unlike an initializer list, this function will allow passing elements by Rvalue
@@ -126,4 +126,4 @@ auto makeFlattenedList(Args&&... args) {
     return l;
 }
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

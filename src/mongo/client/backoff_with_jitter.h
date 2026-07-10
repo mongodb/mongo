@@ -35,7 +35,7 @@
 
 #include <cstdint>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Generic implementation of a retry with full jitter and exponential backoff.
@@ -88,4 +88,4 @@ private:
     static XorShift128& _randomEngine();
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -83,7 +83,7 @@ namespace mongo {
  * accessible via the ServiceContext. It owns an IndexBuildsManager that manages all MultiIndexBlock
  * index builder instances.
  */
-class MONGO_MOD_PUBLIC IndexBuildsCoordinator {
+class [[MONGO_MOD_PUBLIC]] IndexBuildsCoordinator {
 public:
     /**
      * Represents the set of different application modes used around building indexes that differ

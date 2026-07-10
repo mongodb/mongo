@@ -64,7 +64,7 @@ class TransientSSLParams;
  * std::string errmsg;
  * DBClientBase * conn = cs.connect( errmsg );
  */
-class MONGO_MOD_PUBLIC ConnectionString {
+class [[MONGO_MOD_PUBLIC]] ConnectionString {
 public:
     enum class ConnectionType { kInvalid = 0, kStandalone, kReplicaSet, kCustom, kLocal };
 

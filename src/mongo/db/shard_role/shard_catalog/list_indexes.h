@@ -43,7 +43,11 @@ namespace mongo {
  * Corresponds to flags passed to listIndexes which specify additional information to be returned
  * for each index. BuildUUID = includeBuildUUIDs flag IndexBuildInfo = includeIndexBuildInfo flag
  */
-enum class MONGO_MOD_NEEDS_REPLACEMENT ListIndexesInclude { kNothing, kBuildUUID, kIndexBuildInfo };
+enum class [[MONGO_MOD_NEEDS_REPLACEMENT]] ListIndexesInclude {
+    kNothing,
+    kBuildUUID,
+    kIndexBuildInfo
+};
 
 /**
  * Returns the list of indexes for the given collection.
@@ -58,7 +62,7 @@ enum class MONGO_MOD_NEEDS_REPLACEMENT ListIndexesInclude { kNothing, kBuildUUID
  * indexes (i.e. using internal bucket field names such as {control.min.x: 1, control.max.x: 1})
  * rather than being translated to their user-visible timeseries form (e.g. {x: 1}).
  */
-MONGO_MOD_PRIVATE std::vector<BSONObj> listIndexesInLock(
+[[MONGO_MOD_PRIVATE]] std::vector<BSONObj> listIndexesInLock(
     OperationContext* opCtx,
     const CollectionAcquisition& collectionAcquisition,
     ListIndexesInclude additionalInclude,
@@ -80,7 +84,7 @@ MONGO_MOD_PRIVATE std::vector<BSONObj> listIndexesInLock(
  * indexes (i.e. using internal bucket field names such as {control.min.x: 1, control.max.x: 1})
  * rather than being translated to their user-visible timeseries form (e.g. {x: 1}).
  */
-MONGO_MOD_NEEDS_REPLACEMENT std::vector<BSONObj> listIndexesEmptyListIfMissing(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] std::vector<BSONObj> listIndexesEmptyListIfMissing(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nss,
     ListIndexesInclude additionalInclude,

@@ -41,7 +41,7 @@ namespace mongo {
  * TODO (SERVER-97261): Delete this file and replace usages with the dedicated CatalogCache for
  * routing information.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT RoutingInformationCache : public CatalogCache {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] RoutingInformationCache : public CatalogCache {
 public:
     RoutingInformationCache(ServiceContext* serviceCtx);
 

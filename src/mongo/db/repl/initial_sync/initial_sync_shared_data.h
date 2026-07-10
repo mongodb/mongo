@@ -115,8 +115,8 @@ public:
         return _allowedOutageDuration;
     }
 
-    MONGO_MOD_PRIVATE void setAllowedOutageDuration_forTest(WithLock,
-                                                            Milliseconds allowedOutageDuration) {
+    [[MONGO_MOD_PRIVATE]] void setAllowedOutageDuration_forTest(
+        WithLock, Milliseconds allowedOutageDuration) {
         _allowedOutageDuration = allowedOutageDuration;
     }
 

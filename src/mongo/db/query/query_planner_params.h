@@ -114,7 +114,7 @@ struct TraversalPreference {
     std::string clusterField;
 };
 
-struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] QueryPlannerParams {
     enum Options {
         // You probably want to set this.
         DEFAULT = 0,

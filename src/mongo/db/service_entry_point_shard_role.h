@@ -40,7 +40,7 @@ namespace mongo {
 /**
  * Shard-role specific service entry point.
  */
-class MONGO_MOD_PUBLIC ServiceEntryPointShardRole final : public ServiceEntryPoint {
+class [[MONGO_MOD_PUBLIC]] ServiceEntryPointShardRole final : public ServiceEntryPoint {
 public:
     Future<DbResponse> handleRequest(OperationContext* opCtx,
                                      const Message& request,

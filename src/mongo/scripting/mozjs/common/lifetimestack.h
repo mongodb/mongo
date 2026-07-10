@@ -52,7 +52,7 @@ namespace mozjs {
  * We need this to store GC Rooting types from spidermonkey safely.
  */
 template <typename T, std::size_t N>
-class MONGO_MOD_PUB LifetimeStack {
+class [[MONGO_MOD_PUBLIC]] LifetimeStack {
 public:
     // Boiler plate typedefs
     using value_type = T;

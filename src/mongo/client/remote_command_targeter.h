@@ -43,7 +43,7 @@ namespace mongo {
 /**
  * Interface encapsulating the targeting logic for a given replica set or a standalone host.
  */
-class MONGO_MOD_PUBLIC RemoteCommandTargeter {
+class [[MONGO_MOD_PUBLIC]] RemoteCommandTargeter {
     RemoteCommandTargeter(const RemoteCommandTargeter&) = delete;
     RemoteCommandTargeter& operator=(const RemoteCommandTargeter&) = delete;
 

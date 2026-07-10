@@ -51,7 +51,7 @@ namespace mongo {
  * config.actionlog collections. All manipulation of documents coming from that collection should be
  * done with this class.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ChangeLogType {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ChangeLogType {
 public:
     // Field names and types in the changelog collection type.
     static const BSONField<std::string> changeId;

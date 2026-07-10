@@ -46,7 +46,7 @@ namespace mongo::repl {
  * Non-owning view of a container key. Either an int64_t or a span into the source BSONObj's
  * binData. The source BSONObj must outlive this object.
  */
-class MONGO_MOD_PUBLIC ContainerKey {
+class [[MONGO_MOD_PUBLIC]] ContainerKey {
 public:
     ContainerKey() : _key(int64_t{0}) {}
     explicit ContainerKey(int64_t key) : _key(key) {}
@@ -109,7 +109,7 @@ private:
  * Non-owning view of a container value (bindata) from a BSONObj. The source BSONObj must outlive
  * this object.
  */
-class MONGO_MOD_PUBLIC ContainerVal {
+class [[MONGO_MOD_PUBLIC]] ContainerVal {
 public:
     ContainerVal() : _data() {}
     explicit ContainerVal(std::span<const char> data) : _data(data) {}

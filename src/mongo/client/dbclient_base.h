@@ -76,7 +76,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 namespace executor {
 struct RemoteCommandResponse;
@@ -104,7 +104,7 @@ enum class ExhaustMode { kOn, kOff };
 /**
  * Abstract class that implements the core db operations.
  */
-class MONGO_MOD_OPEN DBClientBase {
+class [[MONGO_MOD_OPEN]] DBClientBase {
     DBClientBase(const DBClientBase&) = delete;
     DBClientBase& operator=(const DBClientBase&) = delete;
 
@@ -803,4 +803,4 @@ private:
     rpc::ReplyMetadataReader _oldReader;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

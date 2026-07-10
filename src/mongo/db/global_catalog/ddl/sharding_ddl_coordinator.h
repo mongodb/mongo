@@ -37,7 +37,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 namespace mongo {
 
-class MONGO_MOD_PRIVATE ShardingDDLCoordinatorMixin {
+class [[MONGO_MOD_PRIVATE]] ShardingDDLCoordinatorMixin {
 protected:
     explicit ShardingDDLCoordinatorMixin(const BSONObj& coorDoc);
     virtual ~ShardingDDLCoordinatorMixin() = default;
@@ -81,7 +81,7 @@ private:
 };
 
 template <typename StateDoc>
-class MONGO_MOD_NEEDS_REPLACEMENT NonRecoverableShardingDDLCoordinator
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] NonRecoverableShardingDDLCoordinator
     : public ShardingCoordinator,
       protected NonRecoverableTypedDocMixin<StateDoc>,
       protected ShardingDDLCoordinatorMixin {
@@ -131,7 +131,7 @@ private:
 };
 
 template <typename StateDoc>
-class MONGO_MOD_UNFORTUNATELY_OPEN RecoverableShardingDDLCoordinator
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] RecoverableShardingDDLCoordinator
     : public RecoverableShardingCoordinator,
       protected RecoverableTypedDocMixin<RecoverableShardingDDLCoordinator<StateDoc>, StateDoc>,
       protected ShardingDDLCoordinatorMixin {

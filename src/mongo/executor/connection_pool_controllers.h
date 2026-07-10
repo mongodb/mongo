@@ -61,7 +61,8 @@ namespace mongo::executor {
  * simply taken from the Optoins the relevant ConnectionPool was started with. However, this
  * type is intended to be easily extensible to add these features in the future if needed.
  */
-class MONGO_MOD_PUBLIC DynamicLimitController final : public ConnectionPool::ControllerInterface {
+class [[MONGO_MOD_PUBLIC]] DynamicLimitController final
+    : public ConnectionPool::ControllerInterface {
 public:
     DynamicLimitController(std::function<size_t()> minLoader,
                            std::function<size_t()> maxLoader,

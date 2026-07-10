@@ -44,7 +44,8 @@ namespace mongo::txn_api::details {
 /**
  * Behaviors for running cluster commands from a non-router process, ie mongod.
  */
-class MONGO_MOD_PUB ClusterSEPTransactionClientBehaviors : public SEPTransactionClientBehaviors {
+class [[MONGO_MOD_PUBLIC]] ClusterSEPTransactionClientBehaviors
+    : public SEPTransactionClientBehaviors {
 public:
     ClusterSEPTransactionClientBehaviors(ServiceContext* service) {}
 

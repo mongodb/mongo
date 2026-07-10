@@ -31,7 +31,7 @@
 
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class ServiceContext;
 
@@ -51,4 +51,4 @@ bool getReplSetMemberInStandaloneMode(ServiceContext* serviceCtx);
 void setReplSetMemberInStandaloneMode(ServiceContext* serviceCtx,
                                       bool isReplSetMemberInStandaloneMode);
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

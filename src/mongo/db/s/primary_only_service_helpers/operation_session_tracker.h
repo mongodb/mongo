@@ -40,7 +40,7 @@ namespace mongo {
  * delegates to this interface for all storage of session information, allowing different backends
  * (e.g., the DDL coordinator persists session info in its coordinator state document).
  */
-class MONGO_MOD_OPEN OperationSessionPersistence {
+class [[MONGO_MOD_OPEN]] OperationSessionPersistence {
 public:
     virtual ~OperationSessionPersistence() = default;
 
@@ -70,7 +70,7 @@ public:
  * brain scenario to have their operations rejected, as they will be performed with a lower
  * txnNumber.
  */
-class MONGO_MOD_OPEN CausalityBarrier {
+class [[MONGO_MOD_OPEN]] CausalityBarrier {
 public:
     virtual ~CausalityBarrier() = default;
 
@@ -87,7 +87,7 @@ public:
  * is persisted and retrieved via the provided OperationSessionPersistence, allowing the tracker
  * to resume from the persisted session after failover.
  */
-class MONGO_MOD_PUBLIC OperationSessionTracker {
+class [[MONGO_MOD_PUBLIC]] OperationSessionTracker {
 public:
     OperationSessionTracker(OperationSessionPersistence* persistence);
 

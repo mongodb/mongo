@@ -57,7 +57,7 @@ DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(ReshardingAddResumeId);
  * transaction, this will be {clusterTime: <transaction commit timestamp>, ts: <applyOps
  * optime.ts>}. For all other documents, this will be {clusterTime: <optime.ts>, ts: <optime.ts>}.
  */
-class MONGO_MOD_PUBLIC DocumentSourceReshardingAddResumeId : public DocumentSource {
+class [[MONGO_MOD_PUBLIC]] DocumentSourceReshardingAddResumeId : public DocumentSource {
 public:
     static constexpr std::string_view kStageName = "$_addReshardingResumeId"sv;
 

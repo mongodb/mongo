@@ -79,7 +79,7 @@ class LockOrderingsSet;
 // are required because of cyclic dependency between the service_context and write_unit_of_work
 // libraries, due to Locker being currently owned by the OperationContext. This will go away once
 // SERVER-77213 is done which will move locker entirely under TransactionResources (shard_role_api).
-class MONGO_MOD_USE_REPLACEMENT("Lock Acquisition RAII Classes") Locker {
+class [[MONGO_MOD_USE_REPLACEMENT("Lock Acquisition RAII Classes")]] Locker {
 public:
     Locker(ServiceContext* serviceContext);
     virtual ~Locker();
@@ -878,7 +878,7 @@ protected:
  * Lock with ResourceLock, SharedLock or ExclusiveLock. Uses same fairness as other LockManager
  * locks.
  */
-class MONGO_MOD_PUBLIC ResourceMutex {
+class [[MONGO_MOD_PUBLIC]] ResourceMutex {
 public:
     ResourceMutex(std::string resourceLabel);
 
@@ -906,7 +906,7 @@ private:
  * incredibly conservative in using this. The presence of this class implies that a deadlock may
  * occur in that part of the codebase.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT DisableLockerRuntimeOrderingChecks {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DisableLockerRuntimeOrderingChecks {
     // We only do things in debug builds, release builds are essentially no-ops
 #ifdef MONGO_CONFIG_DEBUG_BUILD
 public:
@@ -934,7 +934,7 @@ public:
  * Op 2: Holds the exclusive lock Op 1 is waiting for, while this operation is waiting for some
  *       operation beyond Timestamp(5) to become visible in the oplog.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT AllowLockAcquisitionOnTimestampedUnitOfWork {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] AllowLockAcquisitionOnTimestampedUnitOfWork {
 public:
     explicit AllowLockAcquisitionOnTimestampedUnitOfWork(Locker* locker)
         : _locker(locker), _originalValue(_locker->getAssertOnLockAttempt()) {

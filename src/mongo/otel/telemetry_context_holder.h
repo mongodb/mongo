@@ -45,7 +45,7 @@ namespace otel {
  * propagate parent / child relationships between Spans as well as hold metadata to correlate
  * various telemetry data.
  */
-class MONGO_MOD_PUBLIC TelemetryContextHolder {
+class [[MONGO_MOD_PUBLIC]] TelemetryContextHolder {
 public:
     static TelemetryContextHolder& getDecoration(OperationContext* opCtx);
 

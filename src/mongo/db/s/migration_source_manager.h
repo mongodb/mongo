@@ -86,7 +86,7 @@ struct ShardingStatistics;
  * case the desctructor will take care of clean up based on how far we have advanced. One exception
  * is the commitDonateChunk and its comments explain the reasoning.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT MigrationSourceManager {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] MigrationSourceManager {
     MigrationSourceManager(const MigrationSourceManager&) = delete;
     MigrationSourceManager& operator=(const MigrationSourceManager&) = delete;
 
@@ -229,7 +229,7 @@ public:
      * Aborts the migration after observing a concurrent index operation by marking its operation
      * context as killed.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT SharedSemiFuture<void> abort();
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] SharedSemiFuture<void> abort();
 
     /**
      * Returns a report on the active migration.

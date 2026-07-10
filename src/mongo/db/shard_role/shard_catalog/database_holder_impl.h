@@ -43,7 +43,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_USE_REPLACEMENT(DatabaseHolder) DatabaseHolderImpl : public DatabaseHolder {
+class [[MONGO_MOD_USE_REPLACEMENT(DatabaseHolder)]] DatabaseHolderImpl : public DatabaseHolder {
 public:
     DatabaseHolderImpl() = default;
 

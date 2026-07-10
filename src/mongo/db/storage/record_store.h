@@ -76,7 +76,7 @@ class ValidationOptions;
 /**
  * The data items stored in a RecordStore.
  */
-struct MONGO_MOD_PUBLIC Record {
+struct [[MONGO_MOD_PUBLIC]] Record {
     RecordId id;
     RecordData data;
 };
@@ -124,7 +124,7 @@ struct MONGO_MOD_PUBLIC Record {
  * TODO SERVER-18934 Handle this above the storage engine layer so storage engines don't have to
  * deal with capped visibility.
  */
-class MONGO_MOD_OPEN RecordCursor {
+class [[MONGO_MOD_OPEN]] RecordCursor {
 public:
     virtual ~RecordCursor() = default;
 
@@ -195,7 +195,7 @@ public:
  * some cursors are not required to support seeking. All storage engines must support detecting the
  * existence of Records.
  */
-class MONGO_MOD_OPEN SeekableRecordCursor : public RecordCursor {
+class [[MONGO_MOD_OPEN]] SeekableRecordCursor : public RecordCursor {
 public:
     /**
      * Tells bounded 'seek' whether the bound excludes or includes the bound 'start'.
@@ -246,7 +246,7 @@ public:
  * Queries with the awaitData option use this notifier object to wait for more data to be
  * inserted into the capped collection.
  */
-class MONGO_MOD_PUBLIC CappedInsertNotifier {
+class [[MONGO_MOD_PUBLIC]] CappedInsertNotifier {
 public:
     /**
      * Wakes up all threads waiting.
@@ -306,7 +306,7 @@ private:
  * This class must be thread-safe. In addition, for storage engines implementing the KVEngine some
  * methods must be thread safe, see MDBCatalog.
  */
-class MONGO_MOD_OPEN RecordStore {
+class [[MONGO_MOD_OPEN]] RecordStore {
 public:
     class Capped;
     class Oplog;
@@ -412,7 +412,7 @@ public:
      * Adopt `source`'s size-tracking state so this RecordStore and `source` share counters. Both
      * must refer to the same ident. Test-only: only valid when the testing proctor is enabled.
      */
-    MONGO_MOD_PUBLIC virtual void adoptSharedSizeState_forTest(const RecordStore& source) {}
+    [[MONGO_MOD_PUBLIC]] virtual void adoptSharedSizeState_forTest(const RecordStore& source) {}
 
     /**
      * Override the size of the collection (number of records and data size), required when
@@ -688,7 +688,7 @@ public:
     virtual RecordStoreContainer getContainer() = 0;
 };
 
-class MONGO_MOD_OPEN RecordStore::Capped {
+class [[MONGO_MOD_OPEN]] RecordStore::Capped {
 public:
     struct TruncateAfterResult {
         int64_t recordsRemoved = 0;
@@ -730,7 +730,7 @@ public:
                                               bool inclusive) = 0;
 };
 
-class MONGO_MOD_OPEN RecordStore::Oplog {
+class [[MONGO_MOD_OPEN]] RecordStore::Oplog {
 public:
     /**
      * Storage engines can choose whether to support changing the oplog size online.

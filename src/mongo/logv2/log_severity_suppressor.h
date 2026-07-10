@@ -63,7 +63,7 @@ namespace bmi = boost::multi_index;
  * `quiet` severity for key `k` until the suppression expires.
  */
 template <typename K, typename H = absl::Hash<K>, typename Eq = std::equal_to<K>>
-class MONGO_MOD_PUBLIC KeyedSeveritySuppressor {
+class [[MONGO_MOD_PUBLIC]] KeyedSeveritySuppressor {
 public:
     using key_type = K;
     using hasher = H;
@@ -121,7 +121,7 @@ private:
     Suppressions _suppressions;
 };
 
-class MONGO_MOD_PUBLIC SeveritySuppressor {
+class [[MONGO_MOD_PUBLIC]] SeveritySuppressor {
 public:
     SeveritySuppressor(ClockSource* cs, Milliseconds period, LogSeverity normal, LogSeverity quiet)
         : _stopWatch(cs ? cs : SystemClockSource::get()),
@@ -155,7 +155,7 @@ public:
      * normal (unsuppressed) severity regardless of elapsed time.
      * Not thread-safe, so use only for testing purposes.
      */
-    MONGO_MOD_PUBLIC void resetWithClockSource_forTest(ClockSource* cs) {
+    [[MONGO_MOD_PUBLIC]] void resetWithClockSource_forTest(ClockSource* cs) {
         _stopWatch = ClockSource::StopWatch{cs ? cs : SystemClockSource::get()};
         _periodStartedAtMillis.store(std::numeric_limits<int64_t>::min());
     }

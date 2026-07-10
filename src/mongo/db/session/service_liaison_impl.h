@@ -59,7 +59,7 @@ namespace mongo {
  * periodic runner for this mongos. The time will be returned from the
  * system clock.
  */
-class MONGO_MOD_PUB ServiceLiaisonImpl : public ServiceLiaison {
+class [[MONGO_MOD_PUBLIC]] ServiceLiaisonImpl : public ServiceLiaison {
 public:
     using GetOpenCursorsFn = unique_function<LogicalSessionIdSet(OperationContext*)>;
 

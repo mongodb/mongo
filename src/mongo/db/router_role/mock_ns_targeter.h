@@ -49,7 +49,7 @@ namespace mongo {
  * A MockRange represents a range with endpoint that a MockNSTargeter uses to direct writes to
  * a particular endpoint.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT MockRange {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] MockRange {
     MockRange(const ShardEndpoint& endpoint, const BSONObj& minKey, const BSONObj& maxKey)
         : endpoint(endpoint), range(minKey, maxKey) {}
 
@@ -63,7 +63,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT MockRange {
  *
  * No refreshing behavior is currently supported.
  */
-class MONGO_MOD_OPEN MockNSTargeter : public NSTargeter {
+class [[MONGO_MOD_OPEN]] MockNSTargeter : public NSTargeter {
 public:
     MockNSTargeter(const NamespaceString& nss, std::vector<MockRange> mockRanges);
 
@@ -193,7 +193,7 @@ private:
     bool _isTrackedTimeSeriesNamespace = false;
 };
 
-MONGO_MOD_NEEDS_REPLACEMENT void assertEndpointsEqual(const ShardEndpoint& endpointA,
-                                                      const ShardEndpoint& endpointB);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void assertEndpointsEqual(const ShardEndpoint& endpointA,
+                                                          const ShardEndpoint& endpointB);
 
 }  // namespace mongo

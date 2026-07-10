@@ -37,7 +37,7 @@
 #include <string>
 #include <vector>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 namespace optionenvironment {
 class OptionSection;
@@ -96,8 +96,8 @@ struct SASLGlobalParams {
     Atomic<int> numTimesScramSHA256IterationCountSet;
 };
 
-MONGO_MOD_PRIVATE Status addSASLOptions(moe::OptionSection* options);
+[[MONGO_MOD_PRIVATE]] Status addSASLOptions(moe::OptionSection* options);
 
-MONGO_MOD_PRIVATE Status storeSASLOptions(const moe::Environment& params);
+[[MONGO_MOD_PRIVATE]] Status storeSASLOptions(const moe::Environment& params);
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

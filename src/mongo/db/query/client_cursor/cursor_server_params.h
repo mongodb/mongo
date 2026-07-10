@@ -32,7 +32,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 int getClientCursorMonitorFrequencySecs();
 
@@ -42,4 +42,4 @@ long long getCursorTimeoutMillis();
 
 Milliseconds getDefaultCursorTimeoutMillis();
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

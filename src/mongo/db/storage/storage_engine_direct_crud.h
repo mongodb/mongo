@@ -39,7 +39,7 @@
 
 #include <string_view>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 /**
  * An API for performing writes directly to the 'StorageEngine.'

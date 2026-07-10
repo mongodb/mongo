@@ -46,7 +46,7 @@ namespace rpc {
  * Metadata hook that gossips-in sharding collection routing table versions from the metadata
  * reported on shard responses.
  */
-class MONGO_MOD_PARENT_PRIVATE RoutingTableCacheGossipMetadataHook : public EgressMetadataHook {
+class [[MONGO_MOD_PARENT_PRIVATE]] RoutingTableCacheGossipMetadataHook : public EgressMetadataHook {
 public:
     RoutingTableCacheGossipMetadataHook(ServiceContext* serviceContext);
     ~RoutingTableCacheGossipMetadataHook() override = default;

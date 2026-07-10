@@ -41,7 +41,7 @@ namespace durable_catalog {
 /**
  * Parsed catalog entry of a single `_mdb_catalog` document.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT CatalogEntry {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] CatalogEntry {
     RecordId catalogId;
     std::string ident;
     const BSONObj indexIdents;

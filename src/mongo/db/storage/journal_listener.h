@@ -46,9 +46,9 @@ namespace mongo {
  * The second method, onDurable(), takes this token as an argument and relays to the rest of the
  * system that writes through that point have been journaled.
  */
-class MONGO_MOD_OPEN JournalListener {
+class [[MONGO_MOD_OPEN]] JournalListener {
 public:
-    class MONGO_MOD_OPEN Token {
+    class [[MONGO_MOD_OPEN]] Token {
     public:
         virtual ~Token() = default;
     };

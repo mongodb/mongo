@@ -49,7 +49,7 @@ namespace repl {
  * are persisted and/or sent over the network, so their values are reserved forever. Do not change
  * or delete them, except to update RS_MAX when introducing new states.
  */
-struct MONGO_MOD_PUB MemberState {
+struct [[MONGO_MOD_PUBLIC]] MemberState {
     enum MS {
         // Server is still starting-up or the replica set is still being initiated
         RS_STARTUP = 0,
@@ -199,7 +199,7 @@ inline std::string MemberState::toString() const {
  * Insertion operator for MemberState. Formats member state for output stream.
  * For testing only.
  */
-MONGO_MOD_PUB inline std::ostream& operator<<(std::ostream& os, const MemberState& state) {
+[[MONGO_MOD_PUBLIC]] inline std::ostream& operator<<(std::ostream& os, const MemberState& state) {
     return os << state.toString();
 }
 

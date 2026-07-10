@@ -43,7 +43,7 @@ class StatusWith;
 /**
  * One parsed LogComponent and desired log level
  */
-struct MONGO_MOD_PUBLIC LogComponentSetting {
+struct [[MONGO_MOD_PUBLIC]] LogComponentSetting {
     LogComponentSetting(logv2::LogComponent c, int lvl) : component(c), level(lvl) {}
 
     logv2::LogComponent component;
@@ -56,7 +56,7 @@ struct MONGO_MOD_PUBLIC LogComponentSetting {
  * Returns an error status describing why parsing failed, or a vector of LogComponentSettings,
  * each describing how to change a particular log components verbosity level.
  */
-MONGO_MOD_PUBLIC StatusWith<std::vector<LogComponentSetting>> parseLogComponentSettings(
+[[MONGO_MOD_PUBLIC]] StatusWith<std::vector<LogComponentSetting>> parseLogComponentSettings(
     const BSONObj& settings);
 
 }  // namespace mongo

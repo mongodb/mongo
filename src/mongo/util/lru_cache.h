@@ -43,7 +43,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * A caching structure with a least recently used (LRU) replacement policy.
@@ -86,7 +86,7 @@ private:
 
 public:
     template <typename T>
-    MONGO_MOD_FILE_PRIVATE static constexpr bool IsComparable =
+    [[MONGO_MOD_FILE_PRIVATE]] static constexpr bool IsComparable =
         IsComparableWith<Hash, KeyEqual, K, T>;
 
     using ListEntry = std::pair<K, V>;
@@ -323,4 +323,4 @@ private:
     Map _map;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

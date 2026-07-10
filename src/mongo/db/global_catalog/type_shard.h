@@ -58,7 +58,7 @@ class StatusWith;
  * config.shards collection. All manipulation of documents coming from that
  * collection should be done with this class.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ShardType {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardType {
 public:
     enum class ShardState : int {
         kNotShardAware = 0,

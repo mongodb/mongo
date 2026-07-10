@@ -54,7 +54,7 @@ struct FilterOptions {
 };
 
 /** Config for `testMain`. */
-struct MONGO_MOD_PUBLIC MainOptions {
+struct [[MONGO_MOD_PUBLIC]] MainOptions {
     bool startSignalProcessingThread = true;
     bool suppressGlobalInitializers = false;
     bool enhancedReporter = false;
@@ -67,7 +67,7 @@ struct MONGO_MOD_PUBLIC MainOptions {
 /**
  * Tracks the state that must be carried among unit test program execution steps.
  */
-class MONGO_MOD_PUBLIC MainProgress {
+class [[MONGO_MOD_PUBLIC]] MainProgress {
 public:
     MainProgress(MainOptions options, std::vector<std::string> argVec)
         : _options{std::move(options)}, _argVec{std::move(argVec)} {}

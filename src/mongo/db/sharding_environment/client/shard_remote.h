@@ -59,7 +59,7 @@ namespace mongo {
  * Maintains the targeting and command execution logic for a single shard. Performs polling of
  * the shard (if replica set).
  */
-class MONGO_MOD_PUBLIC ShardRemote : public Shard {
+class [[MONGO_MOD_PUBLIC]] ShardRemote : public Shard {
     ShardRemote(const ShardRemote&) = delete;
     ShardRemote& operator=(const ShardRemote&) = delete;
 

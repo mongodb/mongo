@@ -36,7 +36,7 @@
 #include <mutex>
 #include <string_view>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 /**
  * This class is for use with storage engines that track record store sizes in catalog metadata.
  *
@@ -132,4 +132,4 @@ public:
      */
     static bool isSet(ServiceContext*);
 };
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -54,12 +54,12 @@ namespace mongo::bsoncolumn {
  * BSONColumn decompression.
  */
 template <class T>
-concept Appendable MONGO_MOD_PUBLIC = requires(T& t,
-                                               std::string_view strVal,
-                                               BSONBinData binVal,
-                                               BSONCode codeVal,
-                                               BSONElement bsonVal,
-                                               int32_t n) {
+concept Appendable [[MONGO_MOD_PUBLIC]] = requires(T& t,
+                                                   std::string_view strVal,
+                                                   BSONBinData binVal,
+                                                   BSONCode codeVal,
+                                                   BSONElement bsonVal,
+                                                   int32_t n) {
     t.append(true);
     t.append((int32_t)1);
     t.append((int64_t)1);
@@ -122,12 +122,12 @@ concept Appendable MONGO_MOD_PUBLIC = requires(T& t,
  * materializePreallocated() instead of materialize().
  */
 template <class T>
-concept Materializer MONGO_MOD_PUBLIC = requires(T& t,
-                                                 BSONElementStorage& alloc,
-                                                 std::string_view strVal,
-                                                 BSONBinData binVal,
-                                                 BSONCode codeVal,
-                                                 BSONElement bsonVal) {
+concept Materializer [[MONGO_MOD_PUBLIC]] = requires(T& t,
+                                                     BSONElementStorage& alloc,
+                                                     std::string_view strVal,
+                                                     BSONBinData binVal,
+                                                     BSONCode codeVal,
+                                                     BSONElement bsonVal) {
     typename T::Element;
 
     { T::materialize(alloc, true) } -> std::same_as<typename T::Element>;
@@ -177,7 +177,7 @@ concept Materializer MONGO_MOD_PUBLIC = requires(T& t,
  * to collect the position information of values within documents.
  */
 template <typename T>
-concept PositionInfoAppender MONGO_MOD_PUBLIC = requires(T& t, int32_t n) {
+concept PositionInfoAppender [[MONGO_MOD_PUBLIC]] = requires(T& t, int32_t n) {
     { t.appendPositionInfo(n) } -> std::same_as<void>;
 };
 
@@ -747,7 +747,7 @@ public:
 /**
  * Implements the "materializer" concept such that the output elements are BSONElements.
  */
-class MONGO_MOD_PUBLIC BSONElementMaterializer {
+class [[MONGO_MOD_PUBLIC]] BSONElementMaterializer {
 public:
     using Element = BSONElement;
 

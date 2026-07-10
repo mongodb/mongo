@@ -41,7 +41,7 @@ class IndexDescriptor;
 /**
  * This class comprises a mock IndexCatalogEntry for use in unit tests.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT IndexCatalogEntryMock : public IndexCatalogEntry {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] IndexCatalogEntryMock : public IndexCatalogEntry {
 public:
     IndexCatalogEntryMock(OperationContext*,
                           const CollectionPtr&,

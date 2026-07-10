@@ -59,7 +59,7 @@ class NetworkInterface;
 /**
  * Contains the sharding context for a running server. Exists on both MongoD and MongoS.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT Grid {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] Grid {
 public:
     Grid();
     ~Grid();

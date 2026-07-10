@@ -102,7 +102,7 @@ private:
  * destroy these without destroying the underlying AsyncTimerMockImpl objects
  * accessed by tests and introducing races.
  */
-class MONGO_MOD_PUBLIC AsyncTimerMock : public AsyncTimerInterface {
+class [[MONGO_MOD_PUBLIC]] AsyncTimerMock : public AsyncTimerInterface {
 public:
     AsyncTimerMock(std::shared_ptr<AsyncTimerMockImpl> timer);
 
@@ -123,7 +123,7 @@ private:
  * Shared pointers to timer impls are kept in a set here for access by tests,
  * and these are also passed into the returned AsyncTimerMock objects.
  */
-class MONGO_MOD_PUBLIC AsyncTimerFactoryMock : public AsyncTimerFactoryInterface {
+class [[MONGO_MOD_PUBLIC]] AsyncTimerFactoryMock : public AsyncTimerFactoryInterface {
 public:
     AsyncTimerFactoryMock() = default;
 

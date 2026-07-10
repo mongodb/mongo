@@ -38,7 +38,7 @@
 #include <string>
 #include <vector>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 /**
  * Helpers shared between the primary-side serializer (index_catalog_entry_impl.cpp) and the

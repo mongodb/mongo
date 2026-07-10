@@ -51,7 +51,7 @@
 
 namespace mongo {
 namespace repl {
-class MONGO_MOD_PARENT_PRIVATE OplogFetcherMock : public OplogFetcher {
+class [[MONGO_MOD_PARENT_PRIVATE]] OplogFetcherMock : public OplogFetcher {
 public:
     explicit OplogFetcherMock(
         executor::TaskExecutor* executor,
@@ -153,7 +153,7 @@ private:
     bool _first = true;
 };
 
-MONGO_MOD_PUB typedef OplogFetcherFactoryImpl<OplogFetcherMock> CreateOplogFetcherMockFn;
+[[MONGO_MOD_PUBLIC]] typedef OplogFetcherFactoryImpl<OplogFetcherMock> CreateOplogFetcherMockFn;
 
 }  // namespace repl
 }  // namespace mongo

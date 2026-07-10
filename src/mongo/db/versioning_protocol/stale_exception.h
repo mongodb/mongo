@@ -50,7 +50,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_NEEDS_REPLACEMENT StaleConfigInfo final : public ErrorExtraInfo {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] StaleConfigInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::StaleConfig;
     enum class OperationType { kRead, kWrite };
@@ -110,7 +110,7 @@ private:
 
 // TODO (SERVER-75888): Rename the StaleEpoch code to StaleUpstreamRouter and the info to
 // StaleUpstreamRouterInfo
-class MONGO_MOD_NEEDS_REPLACEMENT StaleEpochInfo final : public ErrorExtraInfo {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] StaleEpochInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::StaleEpoch;
 
@@ -141,7 +141,7 @@ private:
     boost::optional<ShardVersion> _wanted;
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT StaleDbRoutingVersion final : public ErrorExtraInfo {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] StaleDbRoutingVersion final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::StaleDbVersion;
 
@@ -186,6 +186,6 @@ private:
 /*
  * Returns true if 'errorCode' corresponds to an error related to stale sharding metadata.
  */
-MONGO_MOD_NEEDS_REPLACEMENT bool isStaleShardingMetadataError(ErrorCodes::Error errorCode);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] bool isStaleShardingMetadataError(ErrorCodes::Error errorCode);
 
 }  // namespace mongo

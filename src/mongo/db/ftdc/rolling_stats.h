@@ -41,7 +41,7 @@
 
 namespace mongo {
 // Basic statistics from the RollingStats class.
-struct MONGO_MOD_PUBLIC RollingStatsResult {
+struct [[MONGO_MOD_PUBLIC]] RollingStatsResult {
     int64_t count = 0;
     // The average value, based on the bucketed results.
     float mean = 0;
@@ -60,7 +60,7 @@ struct MONGO_MOD_PUBLIC RollingStatsResult {
  * smaller (25% at most) then the actual values, and from the fact that we group values 1s time
  * windows rather than record exact times. This is thread safe.
  */
-class MONGO_MOD_PUBLIC RollingStats {
+class [[MONGO_MOD_PUBLIC]] RollingStats {
 public:
     struct Options {
         // Specifies how recent recorded values need to be to be included in stats.

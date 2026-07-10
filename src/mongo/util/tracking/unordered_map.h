@@ -36,7 +36,7 @@
 
 #include <scoped_allocator>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace tracking {
 
 template <class Key,
@@ -59,4 +59,4 @@ unordered_map<Key, Value, Hasher> make_unordered_map(Context& Context) {
 }
 
 }  // namespace tracking
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

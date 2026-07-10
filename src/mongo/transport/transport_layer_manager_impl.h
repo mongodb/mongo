@@ -51,7 +51,8 @@
 namespace mongo::transport {
 class ClientTransportObserver;
 
-class MONGO_MOD_NEEDS_REPLACEMENT TransportLayerManagerImpl final : public TransportLayerManager {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] TransportLayerManagerImpl final
+    : public TransportLayerManager {
     TransportLayerManagerImpl(const TransportLayerManagerImpl&) = delete;
     TransportLayerManagerImpl& operator=(const TransportLayerManagerImpl&) = delete;
 

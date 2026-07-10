@@ -82,7 +82,7 @@ namespace mutablebson {
 class Document;
 }  // namespace mutablebson
 
-namespace MONGO_MOD_PUBLIC audit {
+namespace [[MONGO_MOD_PUBLIC]] audit {
 
 // AuditManager hooks.
 extern std::function<void(OperationContext*)> initializeManager;
@@ -93,7 +93,7 @@ extern std::function<void()> shutdownSynchronizeJob;
 /**
  * Narrow API for the parts of mongo::Command used by the audit library.
  */
-class MONGO_MOD_OPEN CommandInterface {
+class [[MONGO_MOD_OPEN]] CommandInterface {
 public:
     virtual ~CommandInterface() = default;
     virtual std::set<std::string_view> sensitiveFieldNames() const = 0;
@@ -453,5 +453,5 @@ void logRotateLog(Client* client,
                   const std::vector<Status>& errors,
                   const std::string& suffix);
 
-}  // namespace MONGO_MOD_PUBLIC audit
+}  // namespace audit
 }  // namespace mongo

@@ -48,7 +48,7 @@ namespace traces {
  * Test fixture for tests that require OpenTelemetry TracerProvider to be initialized.
  * Sets up a TracerProvider with MockExporter so tests can create and inspect spans.
  */
-class MONGO_MOD_OPEN OtelTestFixture : public ServiceContextTest {
+class [[MONGO_MOD_OPEN]] OtelTestFixture : public ServiceContextTest {
 public:
     void setUp() override {
         ServiceContextTest::setUp();

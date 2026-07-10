@@ -152,7 +152,7 @@ HistogramData<T>::HistogramData(opentelemetry::sdk::metrics::HistogramPointData 
  * OtelMetricsCapturer, otherwise the values will vary depending on the platform. On
  * non-OpenTelemetry platforms, it is only possible to read metrics via serverStatus.
  */
-class MONGO_MOD_PUBLIC OtelMetricsCapturer {
+class [[MONGO_MOD_PUBLIC]] OtelMetricsCapturer {
 public:
     /**
      * Default constructor which uses the static MetricsService object.
@@ -166,7 +166,7 @@ public:
      * constructor allows unit testing the MetricsService, but tests in server code should use the
      * static instance.
      */
-    MONGO_MOD_PRIVATE OtelMetricsCapturer(MetricsService& metricsService);
+    [[MONGO_MOD_PRIVATE]] OtelMetricsCapturer(MetricsService& metricsService);
 
 #ifdef MONGO_CONFIG_OTEL
     ~OtelMetricsCapturer();

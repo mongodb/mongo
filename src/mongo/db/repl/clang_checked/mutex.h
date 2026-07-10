@@ -36,7 +36,7 @@
 
 #include <system_error>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace clang_checked {
 
 struct adopt_lock_t {
@@ -194,4 +194,4 @@ private:
 };
 
 }  // namespace clang_checked
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

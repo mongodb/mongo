@@ -50,7 +50,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
-class MONGO_MOD_NEEDS_REPLACEMENT SortPattern {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] SortPattern {
 public:
     enum class SortKeySerialization {
         kForExplain,

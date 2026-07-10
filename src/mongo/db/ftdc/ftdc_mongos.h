@@ -40,11 +40,11 @@ namespace mongo {
 /**
  * Start Full Time Data Capture
  */
-MONGO_MOD_PUB void startMongoSFTDC(ServiceContext* serviceContext);
+[[MONGO_MOD_PUBLIC]] void startMongoSFTDC(ServiceContext* serviceContext);
 
 /**
  * Stop Full Time Data Capture
  */
-MONGO_MOD_PUB void stopMongoSFTDC();
+[[MONGO_MOD_PUBLIC]] void stopMongoSFTDC();
 
 }  // namespace mongo

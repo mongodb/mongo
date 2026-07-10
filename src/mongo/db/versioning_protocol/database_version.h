@@ -55,7 +55,7 @@ using namespace std::literals::string_view_literals;
  * since they are not comparable.
  *
  */
-class MONGO_MOD_NEEDS_REPLACEMENT DatabaseVersion : public DatabaseVersionBase {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DatabaseVersion : public DatabaseVersionBase {
 public:
     /**
      * The name for the database version information field, which shard-aware commands should

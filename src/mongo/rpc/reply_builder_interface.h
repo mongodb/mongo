@@ -57,7 +57,7 @@ namespace rpc {
 /**
  * Constructs an RPC Reply.
  */
-class MONGO_MOD_OPEN ReplyBuilderInterface {
+class [[MONGO_MOD_OPEN]] ReplyBuilderInterface {
     ReplyBuilderInterface(const ReplyBuilderInterface&) = delete;
     ReplyBuilderInterface& operator=(const ReplyBuilderInterface&) = delete;
 

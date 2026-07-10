@@ -35,7 +35,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_NEEDS_REPLACEMENT PeriodicReplicaSetConfigShardMaintenanceModeChecker {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] PeriodicReplicaSetConfigShardMaintenanceModeChecker {
 public:
     static PeriodicReplicaSetConfigShardMaintenanceModeChecker& get(ServiceContext* serviceContext);
 

@@ -43,7 +43,7 @@
 namespace mongo::logv2 {
 
 // Text formatter without metadata. Just contains the formatted message.
-class MONGO_MOD_OPEN PlainFormatter {
+class [[MONGO_MOD_OPEN]] PlainFormatter {
 public:
     PlainFormatter(const AtomicWord<int32_t>* maxAttributeSizeKB = nullptr)
         : _maxAttributeSizeKB(maxAttributeSizeKB) {}

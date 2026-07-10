@@ -52,7 +52,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 using namespace std::literals::string_view_literals;
 
 /**
@@ -284,4 +284,4 @@ Status buildDupKeyErrorStatus(const key_string::Value& keyString,
                               const BSONObj& indexCollation,
                               const Ordering& ordering);
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

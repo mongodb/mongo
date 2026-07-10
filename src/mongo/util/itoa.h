@@ -37,7 +37,7 @@
 #include <string>
 #include <string_view>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * A utility class for performing itoa style integer formatting. This class is highly optimized
@@ -69,4 +69,4 @@ private:
     char _buf[kBufSize];
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

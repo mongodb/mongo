@@ -44,7 +44,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class Privilege;
 class TenantId;
@@ -138,4 +138,4 @@ inline bool operator==(const Privilege& lhs, const Privilege& rhs) {
         lhs.getActions() == rhs.getActions();
 }
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

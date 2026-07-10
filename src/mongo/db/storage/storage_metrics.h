@@ -33,7 +33,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Statistics that are accumulated and tracked within mongodb as opposed to retrieved directly from
@@ -146,4 +146,4 @@ bool operator==(const StorageMetrics<LhsType>& lhs, const StorageMetrics<RhsType
             counter_ops::get(lhs.temporarilyUnavailableErrors) ==
                 counter_ops::get(rhs.temporarilyUnavailableErrors));
 }
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

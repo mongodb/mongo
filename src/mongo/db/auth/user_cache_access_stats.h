@@ -47,7 +47,7 @@ namespace mongo {
  * Tracks and stores statistics related to user cache access on a per-operation
  * basis. These statistics are tracked and reported from within CurOp.
  */
-class MONGO_MOD_PUBLIC UserCacheAccessStats {
+class [[MONGO_MOD_PUBLIC]] UserCacheAccessStats {
     using AccessInterval = std::pair<Microseconds, Microseconds>;
 
 public:

@@ -43,7 +43,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * OpObserver for time-series collections. Notify the Bucket Catalog of events so it can update its
@@ -91,4 +91,4 @@ public:
     void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -36,7 +36,7 @@
 
 #include <boost/filesystem.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /*
  * Represents the file blocks returned by the KVEngine during both full and incremental
@@ -99,4 +99,4 @@ private:
     const std::uint64_t _fileSize;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

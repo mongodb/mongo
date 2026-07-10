@@ -33,14 +33,14 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class Status;
 
 /**
  * Interface for a thread pool.
  */
-class MONGO_MOD_OPEN ThreadPoolInterface : public OutOfLineExecutor {
+class [[MONGO_MOD_OPEN]] ThreadPoolInterface : public OutOfLineExecutor {
     ThreadPoolInterface(const ThreadPoolInterface&) = delete;
     ThreadPoolInterface& operator=(const ThreadPoolInterface&) = delete;
 
@@ -78,4 +78,4 @@ protected:
     ThreadPoolInterface() = default;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

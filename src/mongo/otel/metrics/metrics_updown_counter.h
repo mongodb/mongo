@@ -37,7 +37,7 @@ namespace mongo::otel::metrics {
 
 /** UpDownCounter interface with typed attributes. add() accepts any delta, including negative. */
 template <typename T, AttributeType... AttributeTs>
-class MONGO_MOD_PUBLIC UpDownCounter {
+class [[MONGO_MOD_PUBLIC]] UpDownCounter {
 public:
     using Attributes = std::tuple<AttributeTs...>;
     virtual ~UpDownCounter() = default;
@@ -54,7 +54,7 @@ public:
 
 /** Specialization when there are no attributes, adding a convenience add(T) overload. */
 template <typename T>
-class MONGO_MOD_PUBLIC UpDownCounter<T> {
+class [[MONGO_MOD_PUBLIC]] UpDownCounter<T> {
 public:
     using Attributes = std::tuple<>;
     virtual ~UpDownCounter() = default;

@@ -76,7 +76,7 @@ std::ostream& operator<<(std::ostream& os, const FaultState& state);
 /**
  * Types of health observers available.
  */
-enum class MONGO_MOD_PUBLIC FaultFacetType {
+enum class [[MONGO_MOD_PUBLIC]] FaultFacetType {
     kSystem,
     kMock1,
     kMock2,
@@ -106,7 +106,7 @@ inline std::ostream& operator<<(std::ostream& os, const FaultFacetType& type) {
     return os;
 }
 
-class MONGO_MOD_PUBLIC FaultManagerConfig {
+class [[MONGO_MOD_PUBLIC]] FaultManagerConfig {
 public:
     /* Maximum possible jitter added to the time between health checks */
     static auto inline constexpr kPeriodicHealthCheckMaxJitter{Milliseconds{100}};

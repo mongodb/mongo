@@ -46,7 +46,7 @@
 
 namespace mongo::crypto {
 
-class MONGO_MOD_PUBLIC JWKManager {
+class [[MONGO_MOD_PUBLIC]] JWKManager {
 public:
     using SharedValidator = std::shared_ptr<JWSValidator>;
     using KeyMap = std::map<std::string, BSONObj>;

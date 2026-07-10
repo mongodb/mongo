@@ -54,7 +54,7 @@ namespace mongo {
 /**
  * Holds all data for the views associated with a particular database.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ViewsForDatabase {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ViewsForDatabase {
 public:
     using PipelineValidatorFn = std::function<StatusWith<stdx::unordered_set<NamespaceString>>(
         OperationContext*, const ViewDefinition&)>;

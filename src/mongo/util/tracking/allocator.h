@@ -39,7 +39,7 @@
 #include <thread>
 #include <type_traits>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace tracking {
 
 /**
@@ -143,4 +143,4 @@ bool operator==(const Allocator<T>& lhs, const Allocator<U>& rhs) {
 }
 
 }  // namespace tracking
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

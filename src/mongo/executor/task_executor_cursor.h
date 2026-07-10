@@ -62,7 +62,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 namespace executor {
 class PinnedExecutorRegistryToken;
@@ -314,4 +314,4 @@ inline std::unique_ptr<TaskExecutorCursor> makeTaskExecutorCursor(
 }
 
 }  // namespace executor
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

@@ -33,5 +33,5 @@
 #include "mongo/util/modules.h"
 
 namespace mongo {
-MONGO_MOD_NEEDS_REPLACEMENT extern FailPoint shuffleListCommandResults;
+[[MONGO_MOD_NEEDS_REPLACEMENT]] extern FailPoint shuffleListCommandResults;
 }

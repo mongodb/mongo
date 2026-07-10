@@ -62,7 +62,7 @@
 
 #include <fmt/format.h>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 class BSONObj;
@@ -258,26 +258,27 @@ public:
                              fmt::memory_buffer& buffer,
                              size_t writeLimit = 0) const;
 
-    MONGO_MOD_PRIVATE BSONObj jsonStringGenerator(ExtendedCanonicalV200Generator const& generator,
-                                                  bool includeSeparator,
-                                                  bool includeFieldNames,
-                                                  int pretty,
-                                                  fmt::memory_buffer& buffer,
-                                                  size_t writeLimit = 0) const;
-    MONGO_MOD_PRIVATE BSONObj jsonStringGenerator(ExtendedRelaxedV200Generator const& generator,
-                                                  bool includeSeparator,
-                                                  bool includeFieldNames,
-                                                  int pretty,
-                                                  fmt::memory_buffer& buffer,
-                                                  size_t writeLimit = 0) const;
-    MONGO_MOD_PRIVATE BSONObj jsonStringGenerator(LegacyStrictGenerator const& generator,
-                                                  bool includeSeparator,
-                                                  bool includeFieldNames,
-                                                  int pretty,
-                                                  fmt::memory_buffer& buffer,
-                                                  size_t writeLimit = 0) const;
+    [[MONGO_MOD_PRIVATE]] BSONObj jsonStringGenerator(
+        ExtendedCanonicalV200Generator const& generator,
+        bool includeSeparator,
+        bool includeFieldNames,
+        int pretty,
+        fmt::memory_buffer& buffer,
+        size_t writeLimit = 0) const;
+    [[MONGO_MOD_PRIVATE]] BSONObj jsonStringGenerator(ExtendedRelaxedV200Generator const& generator,
+                                                      bool includeSeparator,
+                                                      bool includeFieldNames,
+                                                      int pretty,
+                                                      fmt::memory_buffer& buffer,
+                                                      size_t writeLimit = 0) const;
+    [[MONGO_MOD_PRIVATE]] BSONObj jsonStringGenerator(LegacyStrictGenerator const& generator,
+                                                      bool includeSeparator,
+                                                      bool includeFieldNames,
+                                                      int pretty,
+                                                      fmt::memory_buffer& buffer,
+                                                      size_t writeLimit = 0) const;
 
-    MONGO_MOD_USE_REPLACEMENT(toString()) operator std::string() const {
+    [[MONGO_MOD_USE_REPLACEMENT(toString())]] operator std::string() const {
         return toString();
     }
 

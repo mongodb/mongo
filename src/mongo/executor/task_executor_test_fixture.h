@@ -39,7 +39,7 @@
 #include <memory>
 #include <string_view>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace executor {
 
 class TaskExecutor;
@@ -108,4 +108,4 @@ private:
 };
 
 }  // namespace executor
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

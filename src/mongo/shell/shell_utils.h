@@ -123,7 +123,7 @@ std::string getURIFromArgs(const std::string& arg,
 }  // namespace shell_utils
 
 // Specifically scoped namespace for usages that are "unfortunately public"
-namespace MONGO_MOD_NEEDS_REPLACEMENT shell_utils {
+namespace [[MONGO_MOD_NEEDS_REPLACEMENT]] shell_utils {
 
 enum class NormalizationOpts : uint32_t {
     kResults = 0,
@@ -176,5 +176,5 @@ BSONObj normalizeBSONObj(const BSONObj& input,
                          NormalizationOptsSet opts = NormalizationOpts::kResults);
 
 
-}  // namespace MONGO_MOD_NEEDS_REPLACEMENT shell_utils
+}  // namespace shell_utils
 }  // namespace mongo

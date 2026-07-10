@@ -80,7 +80,7 @@ namespace write_ops_exec {
 /**
  * The result of performing a single write, possibly within a batch.
  */
-struct MONGO_MOD_PUBLIC WriteResult {
+struct [[MONGO_MOD_PUBLIC]] WriteResult {
     /**
      * Maps 1-to-1 to single ops in request. May be shorter than input if there are errors.
      */
@@ -154,7 +154,7 @@ long long performDelete(OperationContext* opCtx,
  * Generates a WriteError for a given Status.
  * TODO SERVER-115819 remove external dependencies on this function.
  */
-MONGO_MOD_NEEDS_REPLACEMENT boost::optional<write_ops::WriteError> generateError(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] boost::optional<write_ops::WriteError> generateError(
     OperationContext* opCtx, const Status& status, int index, size_t numErrors);
 
 /**
@@ -191,17 +191,17 @@ void logOperationAndProfileIfNeeded(OperationContext* opCtx, CurOp* curOp);
  * object is not passed in, a CollectionPreCondition object will still be constructed, but it will
  * be assumed that we are not performing a logical time-series operation.
  */
-MONGO_MOD_PUBLIC WriteResult performInserts(
+[[MONGO_MOD_PUBLIC]] WriteResult performInserts(
     OperationContext* opCtx,
     const write_ops::InsertCommandRequest& op,
     boost::optional<const timeseries::CollectionPreConditions&> preConditions = boost::none,
     OperationSource source = OperationSource::kStandard);
-MONGO_MOD_PUBLIC WriteResult performUpdates(
+[[MONGO_MOD_PUBLIC]] WriteResult performUpdates(
     OperationContext* opCtx,
     const write_ops::UpdateCommandRequest& op,
     boost::optional<const timeseries::CollectionPreConditions&> preConditions = boost::none,
     OperationSource source = OperationSource::kStandard);
-MONGO_MOD_PUBLIC WriteResult performDeletes(
+[[MONGO_MOD_PUBLIC]] WriteResult performDeletes(
     OperationContext* opCtx,
     const write_ops::DeleteCommandRequest& op,
     boost::optional<const timeseries::CollectionPreConditions&> preConditions = boost::none,

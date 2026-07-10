@@ -59,7 +59,7 @@ namespace process_health {
  * Every instance of health observer is wired internally to update the state of the FaultManager
  * when a problem is detected.
  */
-class MONGO_MOD_OPEN HealthObserverBase : public HealthObserver {
+class [[MONGO_MOD_OPEN]] HealthObserverBase : public HealthObserver {
 public:
     explicit HealthObserverBase(ServiceContext* svcCtx);
     ~HealthObserverBase() override = default;

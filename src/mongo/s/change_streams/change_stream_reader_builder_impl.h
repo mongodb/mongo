@@ -34,7 +34,8 @@
 
 namespace mongo {
 
-class MONGO_MOD_NEEDS_REPLACEMENT ChangeStreamReaderBuilderImpl : public ChangeStreamReaderBuilder {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ChangeStreamReaderBuilderImpl
+    : public ChangeStreamReaderBuilder {
 public:
     /**
      * Builds CollectionChangeStreamShardTargeterImpl, DatabaseChangeStreamShardTargeterImpl or

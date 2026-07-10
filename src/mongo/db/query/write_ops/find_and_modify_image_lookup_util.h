@@ -50,7 +50,7 @@ using FindOneLocallyFunc = std::function<boost::optional<BSONObj>(
  * snapshot read against the collection wrote to. If the operation was executed in a transaction,
  * the oplog entry must have the commit timestamp.
  */
-MONGO_MOD_PUBLIC boost::optional<BSONObj> fetchPreOrPostImageFromSnapshot(
+[[MONGO_MOD_PUBLIC]] boost::optional<BSONObj> fetchPreOrPostImageFromSnapshot(
     const repl::OplogEntry& oplogEntry, FindOneLocallyFunc findOneLocallyFunc);
 
 /**
@@ -58,7 +58,7 @@ MONGO_MOD_PUBLIC boost::optional<BSONObj> fetchPreOrPostImageFromSnapshot(
  * collection or by performing a snapshot read against the collection the findAndModify wrote to.
  * Returns a forged noop oplog entry containing the image. Returns none if no image is found.
  */
-MONGO_MOD_PUBLIC boost::optional<repl::OplogEntry> forgeNoopImageOplogEntry(
+[[MONGO_MOD_PUBLIC]] boost::optional<repl::OplogEntry> forgeNoopImageOplogEntry(
     OperationContext* opCtx,
     const repl::OplogEntry& oplogEntry,
     FindOneLocallyFunc findOneLocallyFunc);

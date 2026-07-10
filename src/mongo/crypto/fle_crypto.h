@@ -71,7 +71,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * ESC Collection schema
@@ -183,7 +183,7 @@ struct ESCDocument {
 /**
  * Basic set of functions to read/query data from state collections to perform EmuBinary.
  */
-class MONGO_MOD_OPEN FLETagQueryInterface {
+class [[MONGO_MOD_OPEN]] FLETagQueryInterface {
 public:
     enum class TagQueryType { kInsert, kQuery, kCompact, kCleanup, kPadding };
 
@@ -213,7 +213,7 @@ public:
 /**
  * Interface for reading from a collection for the "EmuBinary" algorithm
  */
-class MONGO_MOD_OPEN FLEStateCollectionReader {
+class [[MONGO_MOD_OPEN]] FLEStateCollectionReader {
 public:
     virtual ~FLEStateCollectionReader() = default;
 
@@ -447,7 +447,7 @@ public:
  *
  * Keys are identified by UUID in the key vault.
  */
-class MONGO_MOD_OPEN FLEKeyVault {
+class [[MONGO_MOD_OPEN]] FLEKeyVault {
 public:
     virtual ~FLEKeyVault();
 
@@ -1412,4 +1412,4 @@ QueryTypeConfig getQueryType(const EncryptedField& field, QueryTypeEnum queryTyp
  * sparsity
  */
 std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t sparsity);
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

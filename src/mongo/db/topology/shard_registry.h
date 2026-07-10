@@ -70,11 +70,11 @@ namespace mongo {
 
 namespace shard_registry_stats {
 
-MONGO_MOD_PRIVATE extern Counter64& blockedOpsGauge;
+[[MONGO_MOD_PRIVATE]] extern Counter64& blockedOpsGauge;
 
 }  // namespace shard_registry_stats
 
-class MONGO_MOD_PRIVATE ShardRegistryData {
+class [[MONGO_MOD_PRIVATE]] ShardRegistryData {
 public:
     using ShardMap = stdx::unordered_map<ShardId, std::shared_ptr<Shard>, ShardId::Hasher>;
     using ShardUUIDMap = stdx::unordered_map<UUID, std::shared_ptr<Shard>, UUID::Hash>;
@@ -216,7 +216,7 @@ private:
  * registry discovers an updated connection string for another shard via a replica set topology
  * change, it will persist that update to `config.shards`.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ShardRegistry {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardRegistry {
     ShardRegistry(const ShardRegistry&) = delete;
     ShardRegistry& operator=(const ShardRegistry&) = delete;
 

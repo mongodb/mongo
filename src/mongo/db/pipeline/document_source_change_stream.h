@@ -77,7 +77,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ChangeStream);
  * The $changeStream stage is an alias for a cursor on oplog followed by a $match stage and a
  * transform stage on mongod.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceChangeStream final {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DocumentSourceChangeStream final {
 public:
     class LiteParsed : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:

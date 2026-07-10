@@ -45,7 +45,7 @@
 #include <mutex>
 #include <string>
 
-namespace MONGO_MOD_PRIVATE mongo {
+namespace [[MONGO_MOD_PRIVATE]] mongo {
 class TTLMonitor : public BackgroundJob {
 public:
     TTLMonitor();
@@ -69,14 +69,14 @@ public:
 
     void updateSleepSeconds(Seconds newSeconds);
 
-    MONGO_MOD_PRIVATE long long getTTLPasses_forTest();
-    MONGO_MOD_PRIVATE long long getTTLSubPasses_forTest();
-    MONGO_MOD_PRIVATE long long getTTLDurationMicros_forTest();
-    MONGO_MOD_PRIVATE long long getTTLDeletedDocuments_forTest();
-    MONGO_MOD_PRIVATE long long getTTLDeletedKeys_forTest();
-    MONGO_MOD_PRIVATE long long getTTLExaminedDocuments_forTest();
-    MONGO_MOD_PRIVATE long long getTTLExaminedKeys_forTest();
-    MONGO_MOD_PRIVATE long long getInvalidTTLIndexSkips_forTest();
+    [[MONGO_MOD_PRIVATE]] long long getTTLPasses_forTest();
+    [[MONGO_MOD_PRIVATE]] long long getTTLSubPasses_forTest();
+    [[MONGO_MOD_PRIVATE]] long long getTTLDurationMicros_forTest();
+    [[MONGO_MOD_PRIVATE]] long long getTTLDeletedDocuments_forTest();
+    [[MONGO_MOD_PRIVATE]] long long getTTLDeletedKeys_forTest();
+    [[MONGO_MOD_PRIVATE]] long long getTTLExaminedDocuments_forTest();
+    [[MONGO_MOD_PRIVATE]] long long getTTLExaminedKeys_forTest();
+    [[MONGO_MOD_PRIVATE]] long long getInvalidTTLIndexSkips_forTest();
 
 private:
     friend class TTLTest;
@@ -220,4 +220,4 @@ private:
     std::shared_ptr<executor::TaskExecutor> _metadataRefreshTaskExecutor;
 };
 
-}  // namespace MONGO_MOD_PRIVATE mongo
+}  // namespace mongo

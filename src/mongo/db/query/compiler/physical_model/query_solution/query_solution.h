@@ -163,7 +163,7 @@ inline const static ProvidedSortSet kEmptySet;
  * This is an abstract representation of a query plan.  It can be transcribed into a tree of
  * PlanStages, which can then be handed to a PlanRunner for execution.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT QuerySolutionNode {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] QuerySolutionNode {
     QuerySolutionNode() = default;
 
     /**
@@ -448,10 +448,10 @@ public:
 
     std::string summaryString() const;
 
-    MONGO_MOD_NEEDS_REPLACEMENT const QuerySolutionNode* root() const {
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] const QuerySolutionNode* root() const {
         return _root.get();
     }
-    MONGO_MOD_NEEDS_REPLACEMENT QuerySolutionNode* root() {
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] QuerySolutionNode* root() {
         return _root.get();
     }
 
@@ -850,7 +850,7 @@ struct FetchNode : public QuerySolutionNode {
     NamespaceString nss;
 };
 
-struct MONGO_MOD_NEEDS_REPLACEMENT IndexScanNode : public QuerySolutionNodeWithSortSet {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] IndexScanNode : public QuerySolutionNodeWithSortSet {
     IndexScanNode(NamespaceString nss, IndexEntry index);
     ~IndexScanNode() override {}
 

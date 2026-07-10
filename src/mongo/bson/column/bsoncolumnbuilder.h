@@ -288,7 +288,7 @@ struct EncodingState {
  * Class to build BSON Subtype 7 (Column) binaries.
  */
 template <class Allocator = std::allocator<void>>
-class MONGO_MOD_PUBLIC BSONColumnBuilder {
+class [[MONGO_MOD_PUBLIC]] BSONColumnBuilder {
 public:
     template <typename A = Allocator>
     BSONColumnBuilder() : BSONColumnBuilder{A{}} {}
@@ -438,14 +438,14 @@ private:
      * Internal state of the BSONColumnBuilder. Can be copied to restore a previous state after
      * finalize.
      */
-    struct MONGO_MOD_FILE_PRIVATE InternalState {
+    struct [[MONGO_MOD_FILE_PRIVATE]] InternalState {
         explicit InternalState(const Allocator&);
 
         MONGO_COMPILER_NO_UNIQUE_ADDRESS Allocator allocator;
 
         using Regular = bsoncolumn::EncodingState<Allocator>;
 
-        struct MONGO_MOD_FILE_PRIVATE SubObjState {
+        struct [[MONGO_MOD_FILE_PRIVATE]] SubObjState {
             using ControlBlock = std::pair<ptrdiff_t, size_t>;
             using ControlBlockAllocator =
                 typename std::allocator_traits<Allocator>::template rebind_alloc<ControlBlock>;
@@ -478,7 +478,7 @@ private:
             InterleavedControlBlockWriter controlBlockWriter();
         };
 
-        struct MONGO_MOD_FILE_PRIVATE Interleaved {
+        struct [[MONGO_MOD_FILE_PRIVATE]] Interleaved {
             enum class Mode {
                 // The reference object is being determined. New sub fields are attempted to be
                 // merged in to the existing reference object candidate.

@@ -46,7 +46,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Wrapper class for the MongoDB Decimal128 data type. Sample usage:
@@ -651,4 +651,4 @@ struct DataType::Handler<Decimal128> {
     static constexpr size_t kSizeOfDecimal = 2 * sizeof(uint64_t);
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

@@ -48,7 +48,7 @@
 #include <string_view>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC transport {
+namespace [[MONGO_MOD_PUBLIC]] transport {
 
 /*
  * This is the interface for all ServiceExecutors.
@@ -207,5 +207,5 @@ public:
     AtomicWord<std::size_t> limitExempt{0};
 };
 
-}  // namespace MONGO_MOD_PUBLIC transport
+}  // namespace transport
 }  // namespace mongo

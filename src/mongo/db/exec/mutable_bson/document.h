@@ -243,7 +243,7 @@ namespace mutablebson {
  *  ConstElement for the root. ConstElement is much like Element, but does not permit
  *  mutations. See the class comment for ConstElement for more information.
  */
-class MONGO_MUTABLE_BSON_API MONGO_MOD_PUBLIC Document {
+class MONGO_MUTABLE_BSON_API [[MONGO_MOD_PUBLIC]] Document {
     // TODO: In principle there is nothing that prevents implementing a deep copy for
     // Document, but for now it is not permitted.
     Document(const Document&) = delete;

@@ -53,7 +53,7 @@ class UpdateRequest;
 
 template <typename T, typename... Ts>
 requires std::is_same_v<T, ExtensionsCallbackNoop> || std::is_same_v<T, ExtensionsCallbackReal>
-MONGO_MOD_PUBLIC std::unique_ptr<ExtensionsCallback> makeExtensionsCallback(Ts&&... args) {
+[[MONGO_MOD_PUBLIC]] std::unique_ptr<ExtensionsCallback> makeExtensionsCallback(Ts&&... args) {
     return std::make_unique<T>(std::forward<Ts>(args)...);
 }
 
@@ -62,7 +62,7 @@ MONGO_MOD_PUBLIC std::unique_ptr<ExtensionsCallback> makeExtensionsCallback(Ts&&
  * residual expression. The bucket expression is used to find the buckets and the residual
  * expression is used to filter the documents in the buckets.
  */
-struct MONGO_MOD_PUBLIC TimeseriesWritesQueryExprs {
+struct [[MONGO_MOD_PUBLIC]] TimeseriesWritesQueryExprs {
     // The bucket-level match expression.
     std::unique_ptr<MatchExpression> _bucketExpr = nullptr;
 

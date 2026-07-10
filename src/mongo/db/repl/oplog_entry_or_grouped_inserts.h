@@ -59,7 +59,7 @@ enum class ApplicationInstruction {
     applyTopLevelPreparedTxnOp,
 };
 
-struct MONGO_MOD_PUB ApplierOperation {
+struct [[MONGO_MOD_PUBLIC]] ApplierOperation {
     const OplogEntry* op;
     ApplicationInstruction instruction;
     boost::optional<const InternalSessionPool::Session&> subSession;
@@ -101,7 +101,7 @@ struct MONGO_MOD_PUB ApplierOperation {
  * applyOplogEntryOrGroupedInserts. This class is immutable and can only be initialized using
  * either a single oplog entry or a range of grouped inserts.
  */
-class MONGO_MOD_PUB OplogEntryOrGroupedInserts {
+class [[MONGO_MOD_PUBLIC]] OplogEntryOrGroupedInserts {
 public:
     using ConstIterator = std::vector<ApplierOperation>::const_iterator;
 

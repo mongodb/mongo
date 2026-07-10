@@ -43,7 +43,7 @@ namespace process_health {
  * Registration mechanism for all health observers.
  * This is static class not requiring an instance to work.
  */
-class MONGO_MOD_PUBLIC HealthObserverRegistration {
+class [[MONGO_MOD_PUBLIC]] HealthObserverRegistration {
 public:
     /**
      * Registers a factory method, which will be invoked later to instantiate the observer.

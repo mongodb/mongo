@@ -1062,7 +1062,7 @@ private:
 /**
  * Generates config string for wiredtiger_open() from the given config options.
  */
-MONGO_MOD_USE_REPLACEMENT(jstest)
+[[MONGO_MOD_USE_REPLACEMENT(jstest)]]
 std::string generateWTOpenConfigString(const WiredTigerKVEngineBase::WiredTigerConfig& wtConfig,
                                        std::string_view extensionsConfig,
                                        std::string_view providerConfig);
@@ -1071,7 +1071,7 @@ std::string generateWTOpenConfigString(const WiredTigerKVEngineBase::WiredTigerC
  * Returns a WiredTigerKVEngineBase::WiredTigerConfig populated with config values provided at
  * startup.
  */
-MONGO_MOD_USE_REPLACEMENT(jstest)
+[[MONGO_MOD_USE_REPLACEMENT(jstest)]]
 WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions(
     const rss::PersistenceProvider&);
 

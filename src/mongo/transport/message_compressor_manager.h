@@ -51,7 +51,7 @@ class Message;
 
 class MessageCompressorRegistry;
 
-class MONGO_MOD_PUBLIC MessageCompressorManager {
+class [[MONGO_MOD_PUBLIC]] MessageCompressorManager {
     MessageCompressorManager(const MessageCompressorManager&) = delete;
     MessageCompressorManager& operator=(const MessageCompressorManager&) = delete;
 

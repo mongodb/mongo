@@ -40,13 +40,13 @@
 #include <utility>
 #include <vector>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /*
  * This is a runner for alarm schedulers that waits for and processes alarms in a single
  * background thread.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT AlarmRunnerBackgroundThread {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] AlarmRunnerBackgroundThread {
 public:
     using AlarmSchedulerHandle = std::shared_ptr<AlarmScheduler>;
     // Construct an alarm runner from a vector of shared_ptr<AlarmScheduler>'s.
@@ -78,4 +78,4 @@ private:
     stdx::thread _thread;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

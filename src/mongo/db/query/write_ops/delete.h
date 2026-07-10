@@ -37,7 +37,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class Database;
 class OperationContext;
@@ -64,4 +64,4 @@ DeleteResult deleteObject(OperationContext* opCtx,
                           const CollectionAcquisition& collection,
                           const DeleteRequest& request);
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

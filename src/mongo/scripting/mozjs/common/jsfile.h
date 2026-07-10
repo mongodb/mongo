@@ -35,7 +35,7 @@
 
 namespace mongo {
 
-struct MONGO_MOD_NEEDS_REPLACEMENT JSFile {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] JSFile {
     const char* name;
     const std::string_view source;
 };

@@ -47,7 +47,7 @@ class ServiceContext;
  * the derived 'ecoc.lock' namespace. This mutex intentionally lives outside the locker/transaction
  * resource machinery so it remains effective across the internal transaction stash/restore flow.
  */
-class MONGO_MOD_PUB ScopedFLECompactCleanupMutex {
+class [[MONGO_MOD_PUBLIC]] ScopedFLECompactCleanupMutex {
 public:
     ScopedFLECompactCleanupMutex(OperationContext* opCtx, const NamespaceString& ecocLockNss);
     ~ScopedFLECompactCleanupMutex();
@@ -61,11 +61,12 @@ private:
     std::shared_ptr<FLECompactCleanupMutex> _mutex;
 };
 
-MONGO_MOD_PUB size_t getFLECompactCleanupMutexRegistrySizeForTest(ServiceContext* serviceContext);
+[[MONGO_MOD_PUBLIC]] size_t getFLECompactCleanupMutexRegistrySizeForTest(
+    ServiceContext* serviceContext);
 
 template <typename GetNamespaces>
-MONGO_MOD_PUB auto acquireFLECompactCleanupMutexWithStableNamespaces(OperationContext* opCtx,
-                                                                     GetNamespaces getNamespaces) {
+[[MONGO_MOD_PUBLIC]] auto acquireFLECompactCleanupMutexWithStableNamespaces(
+    OperationContext* opCtx, GetNamespaces getNamespaces) {
     auto namespaces = getNamespaces();
     while (true) {
         auto scopedMutex =

@@ -42,7 +42,7 @@
 #include <cstdint>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC crypto {
+namespace [[MONGO_MOD_PUBLIC]] crypto {
 
 /**
  * Constants used in the AEAD function
@@ -142,5 +142,5 @@ StatusWith<std::size_t> aeadDecryptLocalKMS(const SymmetricKey& key,
                                             ConstDataRange cipher,
                                             DataRange out);
 
-}  // namespace MONGO_MOD_PUBLIC crypto
+}  // namespace crypto
 }  // namespace mongo

@@ -62,7 +62,7 @@ using namespace std::literals::string_view_literals;
 
 class ShardingCoordinator;
 
-class MONGO_MOD_NEEDS_REPLACEMENT ShardingCoordinatorService final
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardingCoordinatorService final
     : public repl::PrimaryOnlyService,
       public DDLLockManager::Recoverable,
       public ActiveMigrationsRegistry::Recoverable {

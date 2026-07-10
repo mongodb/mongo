@@ -80,15 +80,15 @@
 namespace mongo {
 using namespace std::literals::string_view_literals;
 
-MONGO_MOD_NEEDS_REPLACEMENT ShardingCoordinatorMetadata
-extractShardingCoordinatorMetadata(const BSONObj& coorDoc);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] ShardingCoordinatorMetadata extractShardingCoordinatorMetadata(
+    const BSONObj& coorDoc);
 
 /**
  * Generic coordinator phase enum.
  * It may be converted to any enum used by coordinator implementations, provided that it has the
  * same underlying type and that it has a kUnset member with the value `0`.
  */
-enum class MONGO_MOD_PRIVATE CoordinatorGenericPhase : std::int32_t {
+enum class [[MONGO_MOD_PRIVATE]] CoordinatorGenericPhase : std::int32_t {
     kUnset = 0,
 };
 
@@ -96,7 +96,7 @@ enum class MONGO_MOD_PRIVATE CoordinatorGenericPhase : std::int32_t {
  * Represents a "generic" coordinator StateDoc.
  * This interface is implemented by the template class `CoordinatorStateDocImpl` defined below.
  */
-class MONGO_MOD_PRIVATE CoordinatorStateDoc {
+class [[MONGO_MOD_PRIVATE]] CoordinatorStateDoc {
 public:
     static constexpr auto kIdFieldName = "_id"sv;
 
@@ -110,7 +110,7 @@ public:
     virtual std::unique_ptr<CoordinatorStateDoc> clone() const = 0;
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT ShardingCoordinator
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardingCoordinator
     : public repl::PrimaryOnlyService::TypedInstance<ShardingCoordinator> {
 public:
     static inline const auto kExponentialBackoff = Backoff(Seconds(1), Milliseconds::max());
@@ -362,7 +362,7 @@ private:
     friend class ShardingDDLCoordinatorTest;
 };
 
-class MONGO_MOD_UNFORTUNATELY_OPEN RecoverableShardingCoordinator
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] RecoverableShardingCoordinator
     : public ShardingCoordinator,
       public OperationSessionPersistence {
 protected:
@@ -467,7 +467,7 @@ private:
 };
 
 template <typename StateDoc>
-class MONGO_MOD_PRIVATE CoordinatorStateDocImpl : public CoordinatorStateDoc {
+class [[MONGO_MOD_PRIVATE]] CoordinatorStateDocImpl : public CoordinatorStateDoc {
     constexpr static bool kDocHasPhase = requires(StateDoc doc) { doc.getPhase(); };
 
     consteval static auto getPhaseTypeHelper() {
@@ -566,7 +566,7 @@ public:
  * Provide a typed StateDoc _doc for coordinator implementations.
  */
 template <typename TStateDoc>
-class MONGO_MOD_UNFORTUNATELY_OPEN NonRecoverableTypedDocMixin {
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] NonRecoverableTypedDocMixin {
 protected:
     using StateDoc = TStateDoc;
     using Phase = CoordinatorStateDocImpl<TStateDoc>::DocPhase;
@@ -592,7 +592,7 @@ protected:
  * Provide typed protected functions for recoverable coordinators.
  */
 template <typename Base, typename TStateDoc>
-class MONGO_MOD_UNFORTUNATELY_OPEN RecoverableTypedDocMixin
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] RecoverableTypedDocMixin
     : protected NonRecoverableTypedDocMixin<TStateDoc> {
 
 protected:

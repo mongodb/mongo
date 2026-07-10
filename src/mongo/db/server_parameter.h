@@ -75,7 +75,7 @@ namespace mongo {
 /**
  * How and when a given Server Parameter may be set/modified.
  */
-enum class MONGO_MOD_PUB ServerParameterType {
+enum class [[MONGO_MOD_PUBLIC]] ServerParameterType {
     /**
      * May not be set at any time.
      * Used as a means to read out current state, similar to ServerStatus.
@@ -109,9 +109,9 @@ enum class MONGO_MOD_PUB ServerParameterType {
     kClusterWide,
 };
 
-class MONGO_MOD_PUB OperationContext;
+class [[MONGO_MOD_PUBLIC]] OperationContext;
 
-class MONGO_MOD_OPEN ServerParameter {
+class [[MONGO_MOD_OPEN]] ServerParameter {
 private:
     enum class EnableState {
         enabled,
@@ -429,7 +429,7 @@ private:
     Atomic<EnableState> _state = EnableState::enabled;
 };
 
-class MONGO_MOD_PUB ServerParameterSet {
+class [[MONGO_MOD_PUBLIC]] ServerParameterSet {
 public:
     using Map = ServerParameter::Map;
 
@@ -483,12 +483,12 @@ private:
     Map _map;
 };
 
-MONGO_MOD_PUB void registerServerParameter(std::unique_ptr<ServerParameter>);
+[[MONGO_MOD_PUBLIC]] void registerServerParameter(std::unique_ptr<ServerParameter>);
 
 /**
  * Proxy instance for deprecated aliases of set parameters.
  */
-class MONGO_MOD_PUB IDLServerParameterDeprecatedAlias : public ServerParameter {
+class [[MONGO_MOD_PUBLIC]] IDLServerParameterDeprecatedAlias : public ServerParameter {
 public:
     IDLServerParameterDeprecatedAlias(std::string_view name, ServerParameter* sp);
 
@@ -512,7 +512,7 @@ private:
 };
 
 template <typename T>
-MONGO_MOD_PUB inline StatusWith<T> coerceFromString(std::string_view str) {
+[[MONGO_MOD_PUBLIC]] inline StatusWith<T> coerceFromString(std::string_view str) {
     T value;
     Status status = NumberParser{}(str, &value);
     if (!status.isOK()) {
@@ -522,7 +522,7 @@ MONGO_MOD_PUB inline StatusWith<T> coerceFromString(std::string_view str) {
 }
 
 template <>
-MONGO_MOD_PUB inline StatusWith<bool> coerceFromString<bool>(std::string_view str) {
+[[MONGO_MOD_PUBLIC]] inline StatusWith<bool> coerceFromString<bool>(std::string_view str) {
     if ((str == "1") || (str == "true")) {
         return true;
     }
@@ -533,12 +533,13 @@ MONGO_MOD_PUB inline StatusWith<bool> coerceFromString<bool>(std::string_view st
 }
 
 template <>
-MONGO_MOD_PUB inline StatusWith<std::string> coerceFromString<std::string>(std::string_view str) {
+[[MONGO_MOD_PUBLIC]] inline StatusWith<std::string> coerceFromString<std::string>(
+    std::string_view str) {
     return std::string{str};
 }
 
 template <>
-MONGO_MOD_PUB inline StatusWith<std::vector<std::string>>
+[[MONGO_MOD_PUBLIC]] inline StatusWith<std::vector<std::string>>
 coerceFromString<std::vector<std::string>>(std::string_view str) {
     std::vector<std::string> v;
     str::splitStringDelim(std::string{str}, &v, ',');
@@ -546,5 +547,5 @@ coerceFromString<std::vector<std::string>>(std::string_view str) {
 }
 
 template <typename U>
-using TenantIdMap MONGO_MOD_PUB = std::map<boost::optional<TenantId>, U>;
+using TenantIdMap [[MONGO_MOD_PUBLIC]] = std::map<boost::optional<TenantId>, U>;
 }  // namespace mongo

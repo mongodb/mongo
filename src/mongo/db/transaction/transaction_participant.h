@@ -108,7 +108,7 @@ enum class TerminationCause {
  * Active transactions are protected by the locking subsystem, so we must hold at least a
  * Global intent lock before calling this function to start a transaction.
  */
-MONGO_MOD_PUB void allocateSnapshotWithConsistentCatalog(
+[[MONGO_MOD_PUBLIC]] void allocateSnapshotWithConsistentCatalog(
     OperationContext* opCtx, const RecoveryUnit::OpenSnapshotOptions& openSnapshotOptions);
 
 /**
@@ -119,7 +119,7 @@ MONGO_MOD_PUB void allocateSnapshotWithConsistentCatalog(
  * Its methods are split in two groups with distinct read/write and concurrency control rules. See
  * the comments below for more information.
  */
-class MONGO_MOD_PUB TransactionParticipant {
+class [[MONGO_MOD_PUBLIC]] TransactionParticipant {
     struct PrivateState;
     struct ObservableState;
 
@@ -225,7 +225,12 @@ public:
 
     ~TransactionParticipant();
 
-    enum class MONGO_MOD_PUB TransactionActions { kNone, kStart, kContinue, kStartOrContinue };
+    enum class [[MONGO_MOD_PUBLIC]] TransactionActions {
+        kNone,
+        kStart,
+        kContinue,
+        kStartOrContinue
+    };
 
     // Forward-declare so that TxnResources::friend resolves to the sibling nested class.
     class Participant;
@@ -234,7 +239,7 @@ public:
      * Holds state for a snapshot read or multi-statement transaction in between network
      * operations.
      */
-    class MONGO_MOD_PRIVATE TxnResources {
+    class [[MONGO_MOD_PRIVATE]] TxnResources {
     public:
         enum class StashStyle { kPrimary, kSecondary };
 
@@ -311,7 +316,7 @@ public:
      *  recovery unit back onto the `opCtx` and restoring the locker state relevant to the original
      *  WUOW.
      */
-    class MONGO_MOD_PUB SideTransactionBlock {
+    class [[MONGO_MOD_PUBLIC]] SideTransactionBlock {
     public:
         SideTransactionBlock(OperationContext* opCtx);
         ~SideTransactionBlock();
@@ -323,7 +328,7 @@ public:
         OperationContext* _opCtx;
     };  // class SideTransactionBlock
 
-    using CommittedStatementTimestampMap MONGO_MOD_PRIVATE =
+    using CommittedStatementTimestampMap [[MONGO_MOD_PRIVATE]] =
         absl::flat_hash_map<StmtId, repl::OpTime>;
 
     static const BSONObj kDeadEndSentinel;
@@ -331,7 +336,7 @@ public:
     /**
      * Class used by observers to examine the state of a TransactionParticipant.
      */
-    class MONGO_MOD_PUB Observer {
+    class [[MONGO_MOD_PUBLIC]] Observer {
     public:
         explicit Observer(const ObservableSession& session);
 
@@ -521,7 +526,7 @@ public:
      * Class used by a thread that has checked out the TransactionParticipant's session to observe
      * and modify the transaction participant.
      */
-    class MONGO_MOD_PUB Participant : public Observer {
+    class [[MONGO_MOD_PUBLIC]] Participant : public Observer {
     public:
         // Indicates whether the future lock requests should have timeouts.
         enum class MaxLockTimeout { kNotAllowed, kAllowed };
@@ -1465,7 +1470,7 @@ private:
  * The catalog can only exist as a decoration on the Session object and can only be accessed and
  * modified by the thread which has the session checked-out.
  */
-class MONGO_MOD_PRIVATE RetryableWriteTransactionParticipantCatalog {
+class [[MONGO_MOD_PRIVATE]] RetryableWriteTransactionParticipantCatalog {
 public:
     RetryableWriteTransactionParticipantCatalog() = default;
     ~RetryableWriteTransactionParticipantCatalog() = default;
@@ -1557,7 +1562,7 @@ private:
  * it, as a single max-length operation should be able to be packed into an "applyOps"
  * entry.
  */
-MONGO_MOD_PUB std::size_t getMaxNumberOfTransactionOperationsInSingleOplogEntry();
+[[MONGO_MOD_PUBLIC]] std::size_t getMaxNumberOfTransactionOperationsInSingleOplogEntry();
 
 /**
  * Returns maximum size (bytes) of operations to pack into a single oplog entry,
@@ -1566,6 +1571,6 @@ MONGO_MOD_PUB std::size_t getMaxNumberOfTransactionOperationsInSingleOplogEntry(
  * Refer to getMaxNumberOfTransactionOperationsInSingleOplogEntry() comments for a
  * description on packing transaction operations into "applyOps" entries.
  */
-MONGO_MOD_PUB std::size_t getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes();
+[[MONGO_MOD_PUBLIC]] std::size_t getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes();
 
 }  // namespace mongo

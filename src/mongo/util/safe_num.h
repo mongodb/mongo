@@ -74,7 +74,7 @@ class Value;
  *      newValue.toBSON(fieldName, &bsonObjBuilder);
  *
  */
-class MONGO_MOD_PUBLIC SafeNum {
+class [[MONGO_MOD_PUBLIC]] SafeNum {
 public:
     SafeNum();
     ~SafeNum();
@@ -190,7 +190,7 @@ private:
     BSONType _type;
 
     // Value of the safe num. Indeterminate if _type is EOO.
-    MONGO_MOD_NEEDS_REPLACEMENT union {
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] union {
         int32_t int32Val;
         int64_t int64Val;
         double doubleVal;

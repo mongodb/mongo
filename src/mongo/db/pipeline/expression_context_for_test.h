@@ -51,7 +51,7 @@ using namespace std::literals::string_view_literals;
  * the resolved namespaces to be provided on construction and does not allow them to be subsequently
  * mutated.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ExpressionContextForTest : public ExpressionContext {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ExpressionContextForTest : public ExpressionContext {
 public:
     static constexpr TimeZoneDatabase* kNullTimeZoneDatabase = nullptr;
 

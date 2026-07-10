@@ -46,7 +46,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PARENT_PRIVATE mongo {
+namespace [[MONGO_MOD_PARENT_PRIVATE]] mongo {
 namespace repl {
 
 /**
@@ -135,7 +135,7 @@ public:
     void clearParticipantNewTermDates();
 
 
-    class MONGO_MOD_PRIVATE ElectionMetricsSSS;
+    class [[MONGO_MOD_PRIVATE]] ElectionMetricsSSS;
 
 private:
     void _updateAverageCatchUpOps(WithLock lk);
@@ -154,4 +154,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace MONGO_MOD_PARENT_PRIVATE mongo
+}  // namespace mongo

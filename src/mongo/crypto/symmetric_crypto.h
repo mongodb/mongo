@@ -42,7 +42,7 @@
 #include <string>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC crypto {
+namespace [[MONGO_MOD_PUBLIC]] crypto {
 
 /**
  * Encryption algorithm identifiers and block sizes
@@ -193,5 +193,5 @@ std::set<std::string> getSupportedSymmetricAlgorithms();
  */
 Status engineRandBytes(DataRange buffer);
 
-}  // namespace MONGO_MOD_PUBLIC crypto
+}  // namespace crypto
 }  // namespace mongo

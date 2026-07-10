@@ -41,7 +41,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_OPEN ChangeStreamReaderBuilder {
+class [[MONGO_MOD_OPEN]] ChangeStreamReaderBuilder {
 public:
     virtual ~ChangeStreamReaderBuilder() = default;
 

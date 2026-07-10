@@ -34,7 +34,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/tick_source.h"
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * The PrepareConflictTracker tracks if a read operation encounters a prepare conflict. If it
@@ -103,4 +103,4 @@ private:
     AtomicWord<int64_t> _thisOpPrepareConflictDuration{0};
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

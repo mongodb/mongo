@@ -85,11 +85,11 @@ namespace mongo {
  *
  * @return BSONElement identified element, or eoo() if none.
  */
-MONGO_MOD_PUBLIC BSONElement
-getFirstFieldWithIncompatibleCollation(const BSONObj& shardKey,
-                                       const ShardKeyPattern& shardKeyPattern,
-                                       bool queryHasSimpleCollation,
-                                       bool permitHashedFields);
+[[MONGO_MOD_PUBLIC]] BSONElement getFirstFieldWithIncompatibleCollation(
+    const BSONObj& shardKey,
+    const ShardKeyPattern& shardKeyPattern,
+    bool queryHasSimpleCollation,
+    bool permitHashedFields);
 
 
 /**

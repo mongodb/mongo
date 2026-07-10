@@ -41,7 +41,7 @@ namespace mongo {
 /**
  * A function which handles looking up RWConcernDefault values from config servers.
  */
-MONGO_MOD_NEEDS_REPLACEMENT boost::optional<RWConcernDefault>
+[[MONGO_MOD_NEEDS_REPLACEMENT]] boost::optional<RWConcernDefault>
 readWriteConcernDefaultsCacheLookupMongoS(OperationContext* opCtx);
 
 }  // namespace mongo

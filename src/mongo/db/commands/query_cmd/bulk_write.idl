@@ -34,7 +34,7 @@ global:
         - "mongo/db/repl/optime.h"
         - "mongo/db/versioning_protocol/database_version.h"
         - "mongo/db/versioning_protocol/shard_version.h"
-    mod_visibility: pub
+    mod_visibility: public
 
 imports:
     - "mongo/client/read_preference_setting.idl"

@@ -38,7 +38,7 @@
 
 #include <memory>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace executor {
 
 /**
@@ -51,7 +51,7 @@ std::shared_ptr<ThreadPoolTaskExecutor> makeThreadPoolTestExecutor(
 /**
  * Useful fixture class for tests that use a ThreadPoolTaskExecutor.
  */
-class MONGO_MOD_OPEN ThreadPoolExecutorTest : public TaskExecutorTest {
+class [[MONGO_MOD_OPEN]] ThreadPoolExecutorTest : public TaskExecutorTest {
 public:
     /**
      * This default constructor supports the use of this class as a base class for a test fixture.
@@ -75,4 +75,4 @@ private:
 };
 
 }  // namespace executor
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

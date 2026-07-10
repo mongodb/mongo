@@ -83,7 +83,7 @@ static const ::MongoExtensionAPIVersionVector MONGO_EXTENSION_API_VERSIONS_SUPPO
  * Load all extensions in the provided array. Returns true if loading is successful, otherwise
  * false.
  */
-MONGO_MOD_PUB bool loadExtensions(const std::vector<std::string>& extensionNames);
+[[MONGO_MOD_PUBLIC]] bool loadExtensions(const std::vector<std::string>& extensionNames);
 
 class ExtensionLoader {
 public:

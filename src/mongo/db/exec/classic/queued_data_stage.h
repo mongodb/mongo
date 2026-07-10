@@ -55,7 +55,7 @@ class RecordId;
  *
  * TODO SERVER-112968: Remove uses of this stage outside of the 'query' module.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT QueuedDataStage final : public PlanStage {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] QueuedDataStage final : public PlanStage {
 public:
     QueuedDataStage(ExpressionContext* expCtx, WorkingSet* ws);
 

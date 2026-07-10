@@ -41,7 +41,7 @@
 
 #include <mutex>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 #if defined(_WIN32)
 class SpinLock {
@@ -140,4 +140,4 @@ private:
 
 using scoped_spinlock = std::lock_guard<SpinLock>;
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

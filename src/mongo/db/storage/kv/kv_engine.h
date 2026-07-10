@@ -65,7 +65,7 @@ enum class BlindWritePolicy {
     blind,
 };
 
-class MONGO_MOD_OPEN KVEngine {
+class [[MONGO_MOD_OPEN]] KVEngine {
 public:
     using IdentKey = std::variant<std::span<const char>, int64_t>;
 

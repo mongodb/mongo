@@ -68,7 +68,7 @@ namespace mongo {
  *    suggested that they consider also setting the refresh interval accordingly.
  *      --setParameter logicalSessionRefreshMillis=X.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT LogicalSessionCacheImpl final : public LogicalSessionCache {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] LogicalSessionCacheImpl final : public LogicalSessionCache {
 public:
     using ReapSessionsOlderThanFn =
         unique_function<int(OperationContext*, SessionsCollection&, Date_t)>;

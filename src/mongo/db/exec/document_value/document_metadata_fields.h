@@ -47,7 +47,7 @@
 #include <string_view>
 #include <utility>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 /**
  * This class represents the metadata that the query execution engine can associate with a
  * particular intermediate result (either index key or document) passing between execution stages.
@@ -571,4 +571,4 @@ using QueryMetadataBitSet = std::bitset<DocumentMetadataFields::MetaType::kNumFi
 // Prints the metadata's name to the given stream.
 std::ostream& operator<<(std::ostream& stream, DocumentMetadataFields::MetaType type);
 StringBuilder& operator<<(StringBuilder& sb, DocumentMetadataFields::MetaType type);
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

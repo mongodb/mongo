@@ -37,8 +37,8 @@
 
 namespace mongo {
 
-MONGO_MOD_PUB void reportCurrentOpsForTransactionCoordinators(OperationContext* opCtx,
-                                                              bool includeIdle,
-                                                              std::vector<BSONObj>* ops);
+[[MONGO_MOD_PUBLIC]] void reportCurrentOpsForTransactionCoordinators(OperationContext* opCtx,
+                                                                     bool includeIdle,
+                                                                     std::vector<BSONObj>* ops);
 
 }  // namespace mongo

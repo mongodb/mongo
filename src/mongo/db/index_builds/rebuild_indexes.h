@@ -33,7 +33,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 /**
  * Rebuilds the indexes on the given collection.
  * One example usage is when a 'dropIndex' command is rolled back. The dropped index must be remade.
@@ -41,4 +41,4 @@ namespace MONGO_MOD_PUBLIC mongo {
  */
 Status rebuildIndexesOnCollection(OperationContext* opCtx, CollectionWriter& collWriter);
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

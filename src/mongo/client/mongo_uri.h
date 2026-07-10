@@ -53,7 +53,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class ClientAPIVersionParameters;
 
@@ -377,4 +377,4 @@ inline std::ostream& operator<<(std::ostream& ss, const MongoURI& uri) {
 inline StringBuilder& operator<<(StringBuilder& sb, const MongoURI& uri) {
     return sb << uri._connectString;
 }
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

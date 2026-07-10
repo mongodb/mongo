@@ -39,7 +39,7 @@
 #include <string_view>
 #include <type_traits>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 /**
  * Stores unsigned counter as well as its decimal ASCII representation, avoiding the need for
  * separate binary to decimal conversions. This speeds up code that needs string representations
@@ -109,4 +109,4 @@ private:
     uint8_t _lastDigitIndex;         // Indicates the last digit in _digits.
     T _counter;
 };
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

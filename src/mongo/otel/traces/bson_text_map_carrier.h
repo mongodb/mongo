@@ -49,7 +49,7 @@ using opentelemetry::nostd::function_ref;
  * providing interoperability between BSONObj and OpenTelemetry TextMap Propagators
  * (https://opentelemetry.io/docs/specs/otel/context/api-propagators/#textmap-propagator).
  */
-class MONGO_MOD_PARENT_PRIVATE BSONTextMapCarrier : public TextMapCarrier {
+class [[MONGO_MOD_PARENT_PRIVATE]] BSONTextMapCarrier : public TextMapCarrier {
 public:
     /**
      * Default constructor with an empty initial BSONObj. Intended to be used when using a

@@ -43,7 +43,7 @@ namespace mongo {
  * Provides resources for opening/closing of cursors on data shards and the config server, and
  * inquiring the current state of the change stream.
  */
-class MONGO_MOD_PUBLIC ChangeStreamReaderContext {
+class [[MONGO_MOD_PUBLIC]] ChangeStreamReaderContext {
 public:
     virtual ~ChangeStreamReaderContext() = default;
 

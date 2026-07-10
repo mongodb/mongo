@@ -41,7 +41,7 @@
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Certain match clauses (the "extension" clauses, namely $text and $where) require context in
@@ -86,4 +86,4 @@ protected:
         BSONElement where);
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

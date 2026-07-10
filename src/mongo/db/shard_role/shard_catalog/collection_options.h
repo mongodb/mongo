@@ -55,7 +55,7 @@ namespace mongo {
 class CollatorFactoryInterface;
 class CreateCommand;
 
-struct MONGO_MOD_PUBLIC CollectionOptions {
+struct [[MONGO_MOD_PUBLIC]] CollectionOptions {
     /**
      * Returns true if the options indicate the namespace is a view.
      */
@@ -178,7 +178,7 @@ struct MONGO_MOD_PUBLIC CollectionOptions {
     boost::optional<EncryptedFieldConfig> encryptedFieldConfig;
 };
 
-MONGO_MOD_PRIVATE
+[[MONGO_MOD_PRIVATE]]
 Status validateChangeStreamPreAndPostImagesOptionIsPermitted(const NamespaceString& ns);
 
 }  // namespace mongo

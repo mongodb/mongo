@@ -40,7 +40,7 @@
 #include <boost/optional.hpp>
 #include <fmt/format.h>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class Status;
 template <typename T>
@@ -197,7 +197,7 @@ void HostAndPort::_appendToPolymorphicFunc(F f) const {
     _appendToVisitor(visitor);
 }
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo
 
 namespace fmt {
 template <>

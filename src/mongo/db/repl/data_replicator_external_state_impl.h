@@ -64,7 +64,7 @@ class ReplicationCoordinatorExternalState;
  * Data replicator external state implementation using a replication coordinator.
  */
 
-class MONGO_MOD_OPEN DataReplicatorExternalStateImpl : public DataReplicatorExternalState {
+class [[MONGO_MOD_OPEN]] DataReplicatorExternalStateImpl : public DataReplicatorExternalState {
 public:
     DataReplicatorExternalStateImpl(
         ReplicationCoordinator* replicationCoordinator,

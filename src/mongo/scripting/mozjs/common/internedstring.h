@@ -48,7 +48,7 @@ namespace mozjs {
  * can be used with InteredStringId to get a handle to an id that matches that
  * identifier, or directly in ObjectWrapper.
  */
-enum class MONGO_MOD_PUB InternedString {
+enum class [[MONGO_MOD_PUBLIC]] InternedString {
 #define MONGO_MOZJS_INTERNED_STRING(name, str) name,
 #include "mongo/scripting/mozjs/common/internedstring.defs"
 

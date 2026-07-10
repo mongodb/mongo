@@ -40,7 +40,7 @@
 
 #include <boost/optional.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 /**
@@ -67,7 +67,7 @@ void setupSynchronousSignalHandlers();
  * Registers a user-defined callback to be invoked on any signal handler. Clobbers the
  * previously-registered callback.
  */
-MONGO_MOD_PUBLIC void setSynchronousSignalHandlerCallback_forTest(std::function<void()> cb);
+[[MONGO_MOD_PUBLIC]] void setSynchronousSignalHandlerCallback_forTest(std::function<void()> cb);
 
 /**
  * Report out of memory error with a stack trace and exit.

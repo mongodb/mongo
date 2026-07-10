@@ -55,7 +55,7 @@ namespace mongo {
  * and direction +1, one valid BoundList is: (1, 2); (4, 6).  The same BoundList
  * would be valid for index {i:-1} with direction -1.
  */
-MONGO_MOD_NEEDS_REPLACEMENT typedef std::vector<std::pair<BSONObj, BSONObj>> BoundList;
+[[MONGO_MOD_NEEDS_REPLACEMENT]] typedef std::vector<std::pair<BSONObj, BSONObj>> BoundList;
 
 /**
  * A ShardKeyPattern represents the key pattern used to partition data in a collection between
@@ -65,7 +65,7 @@ MONGO_MOD_NEEDS_REPLACEMENT typedef std::vector<std::pair<BSONObj, BSONObj>> Bou
  * Shard key pattern paths may be nested, but are not traversable through arrays - this means
  * a shard key pattern path always yields a single value.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ShardKeyPattern {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardKeyPattern {
 public:
     /**
      * A struct to represent the index key data. The 'data' field represents the actual key data and

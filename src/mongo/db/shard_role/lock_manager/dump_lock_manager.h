@@ -36,6 +36,6 @@ namespace mongo {
 /**
  * Dumps the contents of all locks to the log.
  */
-MONGO_MOD_PUBLIC void dumpLockManager();
+[[MONGO_MOD_PUBLIC]] void dumpLockManager();
 
 }  // namespace mongo

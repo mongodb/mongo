@@ -58,7 +58,7 @@
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 
@@ -127,7 +127,7 @@ public:
      *
      * MUST only be used for tests.
      */
-    MONGO_MOD_PUBLIC static DatabaseName createDatabaseName_forTest(
+    [[MONGO_MOD_PUBLIC]] static DatabaseName createDatabaseName_forTest(
         boost::optional<TenantId> tenantId, std::string_view dbString) {
         return DatabaseName(tenantId, dbString);
     }
@@ -247,7 +247,7 @@ public:
      *
      * MUST only be used for tests.
      */
-    MONGO_MOD_PUBLIC std::string toStringWithTenantId_forTest() const {
+    [[MONGO_MOD_PUBLIC]] std::string toStringWithTenantId_forTest() const {
         return toStringWithTenantId();
     }
 
@@ -256,7 +256,7 @@ public:
      *
      * MUST only be used for tests.
      */
-    MONGO_MOD_PUBLIC std::string toString_forTest() const {
+    [[MONGO_MOD_PUBLIC]] std::string toString_forTest() const {
         return toString();
     }
 
@@ -742,7 +742,7 @@ protected:
         std::min(sizeof(Storage) - sizeof(char), size_t(63));
 };
 
-MONGO_MOD_PUBLIC inline std::string stringify_forTest(const DatabaseName& dbName) {
+[[MONGO_MOD_PUBLIC]] inline std::string stringify_forTest(const DatabaseName& dbName) {
     return toStringForLogging(dbName);
 }
 

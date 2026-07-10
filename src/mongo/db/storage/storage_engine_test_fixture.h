@@ -56,7 +56,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_OPEN StorageEngineTest : public ServiceContextMongoDTest {
+class [[MONGO_MOD_OPEN]] StorageEngineTest : public ServiceContextMongoDTest {
 public:
     // Storage engine tests cover spill table creation and management, requiring the spill
     // WiredTiger instance.
@@ -251,7 +251,7 @@ public:
     StorageEngine* _storageEngine;
 };
 
-class MONGO_MOD_OPEN StorageEngineRepairTest : public StorageEngineTest {
+class [[MONGO_MOD_OPEN]] StorageEngineRepairTest : public StorageEngineTest {
 public:
     StorageEngineRepairTest() : StorageEngineTest(Options{}.enableRepair().inMemory(false)) {
         repl::StorageInterface::set(getServiceContext(),
@@ -274,7 +274,7 @@ public:
     }
 };
 
-class MONGO_MOD_OPEN StorageEngineTestNotEphemeral : public StorageEngineTest {
+class [[MONGO_MOD_OPEN]] StorageEngineTestNotEphemeral : public StorageEngineTest {
 public:
     StorageEngineTestNotEphemeral() : StorageEngineTest(Options{}.inMemory(false)) {}
 };

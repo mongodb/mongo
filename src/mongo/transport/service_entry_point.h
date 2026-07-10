@@ -43,7 +43,7 @@ struct DbResponse;
 /**
  * This is the entrypoint from the transport layer into mongod or mongos.
  */
-class MONGO_MOD_OPEN ServiceEntryPoint {
+class [[MONGO_MOD_OPEN]] ServiceEntryPoint {
 private:
     ServiceEntryPoint(const ServiceEntryPoint&) = delete;
     ServiceEntryPoint& operator=(const ServiceEntryPoint&) = delete;

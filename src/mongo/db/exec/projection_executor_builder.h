@@ -92,7 +92,7 @@ using BuilderParamsBitSet = std::bitset<BuilderParams::kNumParams>;
  *
  * TODO SERVER-113179: Remove external dependencies on this constant.
  */
-MONGO_MOD_NEEDS_REPLACEMENT static constexpr auto kDefaultBuilderParams =
+[[MONGO_MOD_NEEDS_REPLACEMENT]] static constexpr auto kDefaultBuilderParams =
     BuilderParamsBitSet(~(1 << BuilderParams::kNumParams));
 
 /**
@@ -103,7 +103,7 @@ MONGO_MOD_NEEDS_REPLACEMENT static constexpr auto kDefaultBuilderParams =
  *
  * TODO SERVER-113179: Remove external dependencies on this constant.
  */
-MONGO_MOD_NEEDS_REPLACEMENT std::unique_ptr<ProjectionExecutor> buildProjectionExecutor(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] std::unique_ptr<ProjectionExecutor> buildProjectionExecutor(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const projection_ast::Projection* projection,
     ProjectionPolicies policies,

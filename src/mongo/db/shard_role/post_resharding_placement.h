@@ -40,7 +40,7 @@ namespace mongo {
  * time. It is based on the given temporary resharding collection chunk manager, which cannot change
  * and therefore it cannot be stale.
  */
-class MONGO_MOD_PUBLIC PostReshardingCollectionPlacement {
+class [[MONGO_MOD_PUBLIC]] PostReshardingCollectionPlacement {
 public:
     PostReshardingCollectionPlacement(OperationContext* opCtx,
                                       const ScopedCollectionDescription& collectionDescription);

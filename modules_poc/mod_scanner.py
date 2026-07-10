@@ -305,6 +305,8 @@ def get_visibility(
                     pretty_location(child.location)
                     + ": MONGO_MOD_USE_REPLACEMENT() must specify the replacement API"
                 )
+            if len(alt) >= 2 and alt.startswith('"') and alt.endswith('"'):
+                alt = alt[1:-1]
         else:
             alt = None
             assert attr in (

@@ -38,7 +38,7 @@ namespace mongo {
  * Constructs RemoteCommandTargeters based on the specific type of the target (standalone,
  * replica set, etc).
  */
-class MONGO_MOD_PUBLIC RemoteCommandTargeterFactory {
+class [[MONGO_MOD_PUBLIC]] RemoteCommandTargeterFactory {
     RemoteCommandTargeterFactory(const RemoteCommandTargeterFactory&) = delete;
     RemoteCommandTargeterFactory& operator=(const RemoteCommandTargeterFactory&) = delete;
 

@@ -38,7 +38,7 @@
 #include <memory>
 #include <mutex>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace repl {
 
 
@@ -46,7 +46,7 @@ namespace repl {
  * Once scheduled, the NoopWriter will periodically write a noop to the oplog if the replication
  * coordinator's optime has not changed since the last time it did a write.
  */
-class MONGO_MOD_PARENT_PRIVATE NoopWriter {
+class [[MONGO_MOD_PARENT_PRIVATE]] NoopWriter {
     NoopWriter(const NoopWriter&) = delete;
     NoopWriter& operator=(const NoopWriter&) = delete;
 
@@ -84,4 +84,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

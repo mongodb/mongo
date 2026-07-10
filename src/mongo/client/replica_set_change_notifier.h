@@ -52,7 +52,7 @@ namespace mongo {
 /**
  * A stateful notifier for events from a set of ReplicaSetMonitors
  */
-class MONGO_MOD_PUBLIC ReplicaSetChangeNotifier {
+class [[MONGO_MOD_PUBLIC]] ReplicaSetChangeNotifier {
 public:
     using Key = std::string;
     class Listener;
@@ -122,7 +122,7 @@ private:
  * if your implementation would block or seriously delay execution,
  * please schedule the majority of the work to complete asynchronously.
  */
-class MONGO_MOD_OPEN ReplicaSetChangeNotifier::Listener {
+class [[MONGO_MOD_OPEN]] ReplicaSetChangeNotifier::Listener {
 public:
     using Notifier = ReplicaSetChangeNotifier;
     using Key = typename Notifier::Key;

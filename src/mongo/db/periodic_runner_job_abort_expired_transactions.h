@@ -46,7 +46,7 @@ namespace mongo {
  * The job will run every (transactionLifetimeLimitSeconds/2) seconds, or at most once per second
  * and at least once per minute.
  */
-class MONGO_MOD_PUB PeriodicThreadToAbortExpiredTransactions {
+class [[MONGO_MOD_PUBLIC]] PeriodicThreadToAbortExpiredTransactions {
 public:
     static PeriodicThreadToAbortExpiredTransactions& get(ServiceContext* serviceContext);
 

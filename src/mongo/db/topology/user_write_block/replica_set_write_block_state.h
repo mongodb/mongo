@@ -49,10 +49,10 @@ namespace mongo {
 // can be incremented. Deletes are not included since they are validated separately by
 // checkReplicaSetDeletionsAllowed and tracked through their own counter.
 // TODO (SERVER-125476): Change the enum modularity to PRIVATE
-enum class MONGO_MOD_NEEDS_REPLACEMENT ReplicaSetWriteBlockRejectedWriteOp { kInsert, kUpdate };
+enum class [[MONGO_MOD_NEEDS_REPLACEMENT]] ReplicaSetWriteBlockRejectedWriteOp { kInsert, kUpdate };
 
 // TODO (SERVER-125476): Change the class modularity to PRIVATE
-class MONGO_MOD_NEEDS_REPLACEMENT ReplicaSetWriteBlockState {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ReplicaSetWriteBlockState {
 public:
     ReplicaSetWriteBlockState() = default;
 
@@ -127,7 +127,7 @@ public:
      * Returns whether replica set deletions blocking is enabled, disregarding a specific namespace
      * and the state of WriteBlockBypass. Used for serverStatus.
      */
-    MONGO_MOD_FILE_PRIVATE bool isReplicaSetDeletionsBlockingEnabled_forTest() const;
+    [[MONGO_MOD_FILE_PRIVATE]] bool isReplicaSetDeletionsBlockingEnabled_forTest() const;
 
     /**
      * Reports replica set write blocking counters, specifying one counter per blocking reason.

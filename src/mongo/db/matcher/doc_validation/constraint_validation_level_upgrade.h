@@ -56,13 +56,13 @@ using ValidatorScanFn =
  * Returns a ValidatorScanFn that runs the aggregate locally via runAggregate.
  * Use on standalone nodes and shard-local collMod execution.
  */
-MONGO_MOD_PUBLIC ValidatorScanFn makeLocalValidatorScanFn(OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] ValidatorScanFn makeLocalValidatorScanFn(OperationContext* opCtx);
 
 /**
  * Returns a ValidatorScanFn that runs the aggregate via ClusterAggregate, fanning out to all
  * shards. Use on the DDL coordinator for sharded collections.
  */
-MONGO_MOD_PUBLIC ValidatorScanFn makeClusterValidatorScanFn(OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] ValidatorScanFn makeClusterValidatorScanFn(OperationContext* opCtx);
 
 /**
  * Reads the collection validator from the local catalog, builds a violation-scan aggregate, and
@@ -73,9 +73,9 @@ MONGO_MOD_PUBLIC ValidatorScanFn makeClusterValidatorScanFn(OperationContext* op
  * 'runAgg' is responsible only for dispatching the aggregate and returning the raw response;
  * the caller supplies the appropriate executor (local runAggregate or ClusterAggregate).
  */
-MONGO_MOD_PUBLIC Status noDocumentsViolatingValidator(OperationContext* opCtx,
-                                                      const NamespaceString& nss,
-                                                      PlacementConcern placementConcern,
-                                                      ValidatorScanFn runAgg);
+[[MONGO_MOD_PUBLIC]] Status noDocumentsViolatingValidator(OperationContext* opCtx,
+                                                          const NamespaceString& nss,
+                                                          PlacementConcern placementConcern,
+                                                          ValidatorScanFn runAgg);
 
 }  // namespace mongo

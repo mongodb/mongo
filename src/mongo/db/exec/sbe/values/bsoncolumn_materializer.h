@@ -39,7 +39,7 @@
 
 #include <string_view>
 
-// TODO(SERVER-114140): Remove all MONGO_MOD_NEEDS_REPLACEMENT annotations
+// TODO(SERVER-114140): Remove all [[MONGO_MOD_NEEDS_REPLACEMENT]] annotations
 
 namespace mongo::sbe {
 namespace bsoncolumn {
@@ -52,7 +52,7 @@ namespace bsoncolumn {
  * instance doing the decompressing will be responsible for freeing any heap-allocated memory
  * referenced by the produced SBE values.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT SBEColumnMaterializer {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] SBEColumnMaterializer {
     using Element = std::pair<value::TypeTags, value::Value>;
 
     static inline Element materialize(BSONElementStorage& allocator, bool val) {

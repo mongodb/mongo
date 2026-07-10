@@ -46,7 +46,7 @@ namespace mongo {
 /**
  * Anything under the shard_role_mock is meant to be used in testing.
  */
-namespace MONGO_MOD_PUBLIC shard_role_mock {
+namespace [[MONGO_MOD_PUBLIC]] shard_role_mock {
 
 /**
  * Given an already acquired Collection instance from the catalog, register the collection as
@@ -63,5 +63,5 @@ CollectionAcquisition acquireCollectionMocked(OperationContext* opCtx,
 CollectionAcquisition acquireCollectionMocked(OperationContext* opCtx,
                                               const NamespaceString& nss,
                                               ConsistentCollection collection);
-}  // namespace MONGO_MOD_PUBLIC shard_role_mock
+}  // namespace shard_role_mock
 }  // namespace mongo

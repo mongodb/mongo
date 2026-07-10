@@ -39,13 +39,13 @@ namespace mongo {
  * context.
  */
 // TODO(SERVER-119896): Delete this function and rename library.
-MONGO_MOD_PUBLIC bool isReplicatedFastCountEnabled(OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] bool isReplicatedFastCountEnabled(OperationContext* opCtx);
 
 /**
  * Returns whether the provided namespace string can be tracked by the replicated fast count
  * collection.
  */
-MONGO_MOD_PUBLIC bool isReplicatedFastCountEligible(const NamespaceString& nss);
+[[MONGO_MOD_PUBLIC]] bool isReplicatedFastCountEligible(const NamespaceString& nss);
 
 /**
  * Returns true if we should get the size and count for the specified 'nss' from the replicated fast
@@ -61,22 +61,22 @@ MONGO_MOD_PUBLIC bool isReplicatedFastCountEligible(const NamespaceString& nss);
  * replicated fast count, excluding the oplog collection, as long as the collection is a replica
  * set.
  */
-MONGO_MOD_PUBLIC bool shouldReadFromReplicatedFastCount(OperationContext* opCtx,
-                                                        const NamespaceString& nss);
+[[MONGO_MOD_PUBLIC]] bool shouldReadFromReplicatedFastCount(OperationContext* opCtx,
+                                                            const NamespaceString& nss);
 
 /**
  * Returns true if size metadata and timestamps are persisted in containers instead of collections.
  */
-MONGO_MOD_PUBLIC bool shouldUseReplicatedFastCountContainers(OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] bool shouldUseReplicatedFastCountContainers(OperationContext* opCtx);
 
 /**
  * Returns true if replicated fast count metadata should be emitted in listCollections output.
  */
-MONGO_MOD_PUBLIC bool isReplicatedFastCountListCollectionsEnabled(OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] bool isReplicatedFastCountListCollectionsEnabled(OperationContext* opCtx);
 
 /**
  * Returns true if initial sync should fetch the replicated fast count timestamp store timestamp.
  */
-MONGO_MOD_PUBLIC bool isReplicatedFastCountInitialSyncEnabled(OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] bool isReplicatedFastCountInitialSyncEnabled(OperationContext* opCtx);
 
 }  // namespace mongo

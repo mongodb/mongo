@@ -65,7 +65,7 @@
 
 namespace mongo {
 
-MONGO_MOD_FILE_PRIVATE
+[[MONGO_MOD_FILE_PRIVATE]]
 extern const SharedCollectionDecorations::Decoration<AtomicWord<bool>>
     historicalIDTrackerAllowsMixedModeWrites;
 
@@ -79,18 +79,18 @@ class CatalogControlUtils;
 /**
  * Must be called after MDBCatalog is loaded.
  */
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 void initializeCollectionCatalog(OperationContext* opCtx,
                                  StorageEngine* engine,
                                  boost::optional<Timestamp> stableTs);
 
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 void initializeCollectionCatalog(OperationContext* opCtx, StorageEngine* engine);
 
 /**
  * Creates a Collection object and registers it in the CollectionCatalog.
  */
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 void initCollectionObject(OperationContext* opCtx,
                           StorageEngine* engine,
                           RecordId catalogId,
@@ -103,12 +103,12 @@ void initCollectionObject(OperationContext* opCtx,
  * This function doesn't return databases whose creation has committed durably but hasn't been
  * published yet in the CollectionCatalog.
  */
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 std::vector<DatabaseName> listDatabases(boost::optional<TenantId> tenantId = boost::none);
 
 }  // namespace catalog
 
-class MONGO_MOD_USE_REPLACEMENT(acquireCollection) CollectionCatalog {
+class [[MONGO_MOD_USE_REPLACEMENT(acquireCollection)]] CollectionCatalog {
     friend class iterator;
     using OrderedCollectionMap =
         immutable::map<std::pair<DatabaseName, UUID>, std::shared_ptr<Collection>>;
@@ -1023,7 +1023,7 @@ private:
  * there and why we had to temporarily disable this. The owning team's task should be to therefore
  * fix the code in order to remove the exception.
  */
-class MONGO_MOD_PUBLIC ExcludeTestOnlyCollectionInstantiation {
+class [[MONGO_MOD_PUBLIC]] ExcludeTestOnlyCollectionInstantiation {
 public:
     ExcludeTestOnlyCollectionInstantiation(OperationContext* opCtx);
     ~ExcludeTestOnlyCollectionInstantiation();

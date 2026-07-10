@@ -50,7 +50,7 @@ namespace exec::agg {
  * TODO SERVER-112776: Remove 'data_movement' dependency on this function.
  * TODO SERVER-112777: Remove 'atlas_streams' dependency on this function.
  */
-MONGO_MOD_NEEDS_REPLACEMENT std::unique_ptr<exec::agg::Pipeline> buildPipeline(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] std::unique_ptr<exec::agg::Pipeline> buildPipeline(
     const mongo::Pipeline& pipeline);
 
 }  // namespace exec::agg

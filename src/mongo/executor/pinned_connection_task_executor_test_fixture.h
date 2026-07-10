@@ -51,7 +51,7 @@
 namespace mongo::executor {
 
 
-class MONGO_MOD_OPEN PinnedConnectionTaskExecutorTest : public ThreadPoolExecutorTest {
+class [[MONGO_MOD_OPEN]] PinnedConnectionTaskExecutorTest : public ThreadPoolExecutorTest {
     using SinkMessageCbT = std::function<Status(Message)>;
     using SourceMessageCbT = std::function<StatusWith<Message>()>;
 

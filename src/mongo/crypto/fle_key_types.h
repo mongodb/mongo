@@ -38,7 +38,7 @@
 
 #include <fmt/format.h>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 using KeyMaterial = SecureVector<std::uint8_t>;
 
@@ -108,4 +108,4 @@ struct FLEKeyAndId {
 using FLEIndexKeyAndId = FLEKeyAndId<FLEKeyType::Index>;
 using FLEUserKeyAndId = FLEKeyAndId<FLEKeyType::User>;
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

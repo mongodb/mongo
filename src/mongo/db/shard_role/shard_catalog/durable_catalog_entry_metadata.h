@@ -54,7 +54,7 @@ namespace durable_catalog {
  * Collection metadata persisted in an '_mdb_catalog' entry. Includes metadata details for each
  * 'index' in the collection.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT CatalogEntryMetaData {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] CatalogEntryMetaData {
     /*
      * Metadata for a given index.
      */

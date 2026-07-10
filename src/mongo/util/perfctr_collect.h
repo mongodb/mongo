@@ -43,7 +43,7 @@
 #include <pdh.h>
 #include <pdhmsg.h>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class BSONObjBuilder;
 
@@ -292,4 +292,4 @@ private:
     const CounterInfo* _timeBaseTicksCounter{nullptr};
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

@@ -45,7 +45,7 @@ namespace mongo::async_rpc {
  * shardId.
  */
 template <typename CommandType>
-MONGO_MOD_PUBLIC ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendTxnCommand(
+[[MONGO_MOD_PUBLIC]] ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendTxnCommand(
     std::shared_ptr<AsyncRPCOptions<CommandType>> options,
     OperationContext* opCtx,
     std::unique_ptr<ShardIdTargeter> targeter) {

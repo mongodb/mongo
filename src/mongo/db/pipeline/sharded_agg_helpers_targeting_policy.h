@@ -32,7 +32,7 @@
 #include "mongo/util/modules.h"
 
 namespace mongo {
-enum class MONGO_MOD_PUBLIC ShardTargetingPolicy {
+enum class [[MONGO_MOD_PUBLIC]] ShardTargetingPolicy {
     kNotAllowed,
     kAllowed,
     kForceTargetingWithSimpleCollation,

@@ -109,7 +109,7 @@ class NetworkConnectionHook;
  * be waiting for a response to become available, or for the network thread to move forward and
  * process that response.
  */
-class MONGO_MOD_PUBLIC NetworkInterfaceMock : public NetworkInterface {
+class [[MONGO_MOD_PUBLIC]] NetworkInterfaceMock : public NetworkInterface {
 public:
     class NetworkOperation;
     using NetworkOperationList = std::list<NetworkOperation>;

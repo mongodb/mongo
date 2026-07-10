@@ -36,11 +36,11 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Extract the active TenantId for this OperationContext.
  */
 boost::optional<TenantId> getActiveTenant(OperationContext* opCtx);
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

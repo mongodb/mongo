@@ -35,7 +35,7 @@
  * Mongo exit codes.
  */
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 enum class ExitCode {
     clean = 0,
@@ -72,4 +72,4 @@ enum class ExitCode {
     auditRotateError = 102  // The startup rotation of audit logs failed
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

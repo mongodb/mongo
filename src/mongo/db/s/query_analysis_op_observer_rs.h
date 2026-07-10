@@ -46,7 +46,7 @@ namespace analyze_shard_key {
 /**
  * OpObserver for query analysis in a replica set.
  */
-class MONGO_MOD_PUBLIC QueryAnalysisOpObserverRS final : public QueryAnalysisOpObserver {
+class [[MONGO_MOD_PUBLIC]] QueryAnalysisOpObserverRS final : public QueryAnalysisOpObserver {
     QueryAnalysisOpObserverRS(const QueryAnalysisOpObserverRS&) = delete;
     QueryAnalysisOpObserverRS& operator=(const QueryAnalysisOpObserverRS&) = delete;
 

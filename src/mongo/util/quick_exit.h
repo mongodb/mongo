@@ -35,7 +35,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/testing_proctor.h"
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 

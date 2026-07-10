@@ -58,7 +58,7 @@ namespace repl {
  * _getMutex()).
  */
 template <typename Mutex = std::mutex>
-class MONGO_MOD_OPEN AbstractAsyncComponent {
+class [[MONGO_MOD_OPEN]] AbstractAsyncComponent {
     AbstractAsyncComponent(const AbstractAsyncComponent&) = delete;
     AbstractAsyncComponent& operator=(const AbstractAsyncComponent&) = delete;
 

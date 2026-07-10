@@ -71,7 +71,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class ClockSource;
 class OperationContext;
@@ -702,4 +702,4 @@ struct ClusterCursorManager::AuthzCheckPolicy<ReleaseMemoryAuthzCheckFnInputType
     }
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

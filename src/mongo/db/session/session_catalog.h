@@ -66,7 +66,7 @@ class ObservableSession;
  * Keeps track of the transaction runtime state for every active transaction session on this
  * instance.
  */
-class MONGO_MOD_PUB SessionCatalog {
+class [[MONGO_MOD_PUBLIC]] SessionCatalog {
     SessionCatalog(const SessionCatalog&) = delete;
     SessionCatalog& operator=(const SessionCatalog&) = delete;
 
@@ -115,7 +115,7 @@ public:
      * Resets the transaction table to an uninitialized state.
      * Meant only for testing.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT void reset_forTest();
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] void reset_forTest();
 
     /**
      * See the description of 'ObservableSession::kill' for more information on the session kill
@@ -432,7 +432,7 @@ using SessionToKill = SessionCatalog::SessionToKill;
  * have locked the whole catalog and, if the observed session is bound to an operation context,
  * you hold that operation context's client's mutex, as well.
  */
-class MONGO_MOD_PUB ObservableSession {
+class [[MONGO_MOD_PUBLIC]] ObservableSession {
 public:
     ObservableSession(const ObservableSession&) = delete;
     ObservableSession(ObservableSession&&) = delete;
@@ -501,8 +501,8 @@ public:
      * being reaped. However, reaping will still obey the specified reap mode. See the comment for
      * '_shouldBeReaped' for more info.
      */
-    enum class MONGO_MOD_PRIVATE ReapMode { kExclusive, kNonExclusive };
-    MONGO_MOD_PRIVATE void markForReap(ReapMode reapMode);
+    enum class [[MONGO_MOD_PRIVATE]] ReapMode { kExclusive, kNonExclusive };
+    [[MONGO_MOD_PRIVATE]] void markForReap(ReapMode reapMode);
 
     /**
      * Returns the OperationContext that currently has this session checked out, or nullptr if the
@@ -567,7 +567,7 @@ private:
  * it for later access by the command. The session is installed at construction time and is removed
  * at destruction.
  */
-class MONGO_MOD_PUB OperationContextSession {
+class [[MONGO_MOD_PUBLIC]] OperationContextSession {
     OperationContextSession(const OperationContextSession&) = delete;
     OperationContextSession& operator=(const OperationContextSession&) = delete;
 

@@ -39,9 +39,9 @@ namespace mongo::view_util {
 /**
  * Throws if the specified document is not a valid view definition.
  */
-MONGO_MOD_PUBLIC void validateViewDefinitionBSON(OperationContext* opCtx,
-                                                 const BSONObj& viewDefinition,
-                                                 const DatabaseName& dbName);
+[[MONGO_MOD_PUBLIC]] void validateViewDefinitionBSON(OperationContext* opCtx,
+                                                     const BSONObj& viewDefinition,
+                                                     const DatabaseName& dbName);
 
 
 /**
@@ -50,12 +50,12 @@ MONGO_MOD_PUBLIC void validateViewDefinitionBSON(OperationContext* opCtx,
  * * Invalid view with valid namespace  : viewName != boost::none, viewDefinition == non-OK status
  * * Valid view                         : viewName != boost::none, viewDefinition == OK value
  */
-struct MONGO_MOD_PUBLIC ParsedViewDefinition {
+struct [[MONGO_MOD_PUBLIC]] ParsedViewDefinition {
     boost::optional<NamespaceString> viewName;
     StatusWith<std::shared_ptr<ViewDefinition>> viewDefinition;
 };
-MONGO_MOD_PUBLIC ParsedViewDefinition parseViewDefinitionBSON(OperationContext* opCtx,
-                                                              const DatabaseName& dbName,
-                                                              const BSONObj& view);
+[[MONGO_MOD_PUBLIC]] ParsedViewDefinition parseViewDefinitionBSON(OperationContext* opCtx,
+                                                                  const DatabaseName& dbName,
+                                                                  const BSONObj& view);
 
 }  // namespace mongo::view_util

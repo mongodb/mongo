@@ -51,7 +51,7 @@ namespace sharding_util {
  * Sends _flushRoutingTableCacheUpdatesWithWriteConcern to a list of shards. Throws if one of the
  * shards fails to refresh.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void tellShardsToRefreshCollection(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void tellShardsToRefreshCollection(
     OperationContext* opCtx,
     const std::vector<ShardId>& shardIds,
     const NamespaceString& nss,
@@ -61,14 +61,14 @@ MONGO_MOD_NEEDS_REPLACEMENT void tellShardsToRefreshCollection(
  * Sends _flushRoutingTableCacheUpdatesWithWriteConcern to a list of shards. Does not wait for or
  * check the responses from the shards.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void triggerFireAndForgetShardRefreshes(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void triggerFireAndForgetShardRefreshes(
     OperationContext* opCtx, const std::vector<ShardId>& shardIds, const NamespaceString& nss);
 
 /**
  * Process the responses received from a set of requests sent to the shards. If `throwOnError=true`,
  * throws in case one of the commands fails.
  */
-MONGO_MOD_NEEDS_REPLACEMENT std::vector<AsyncRequestsSender::Response> processShardResponses(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] std::vector<AsyncRequestsSender::Response> processShardResponses(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     const BSONObj& command,
@@ -80,7 +80,7 @@ MONGO_MOD_NEEDS_REPLACEMENT std::vector<AsyncRequestsSender::Response> processSh
  * Generic utility to send a command to a list of shards. If `throwOnError=true`, throws in case one
  * of the commands fails.
  */
-MONGO_MOD_NEEDS_REPLACEMENT std::vector<AsyncRequestsSender::Response> sendCommandToShards(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] std::vector<AsyncRequestsSender::Response> sendCommandToShards(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     const BSONObj& command,
@@ -91,14 +91,14 @@ MONGO_MOD_NEEDS_REPLACEMENT std::vector<AsyncRequestsSender::Response> sendComma
 /**
  * Helper function to create an index on a collection locally.
  */
-MONGO_MOD_NEEDS_REPLACEMENT Status createIndexOnCollection(OperationContext* opCtx,
-                                                           const NamespaceString& ns,
-                                                           const BSONObj& keys,
-                                                           bool unique);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] Status createIndexOnCollection(OperationContext* opCtx,
+                                                               const NamespaceString& ns,
+                                                               const BSONObj& keys,
+                                                               bool unique);
 /**
  * Helper function to send a command to one shard
  */
-MONGO_MOD_NEEDS_REPLACEMENT void invokeCommandOnShardWithIdempotentRetryPolicy(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void invokeCommandOnShardWithIdempotentRetryPolicy(
     OperationContext* opCtx,
     const ShardId& recipientId,
     const DatabaseName& dbName,
@@ -115,7 +115,7 @@ MONGO_MOD_NEEDS_REPLACEMENT void invokeCommandOnShardWithIdempotentRetryPolicy(
  * Requirements:
  * - doWork must be idempotent.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
     OperationContext* opCtx,
     std::string_view taskDescription,
     std::function<void(OperationContext*)> doWork,
@@ -126,13 +126,13 @@ MONGO_MOD_NEEDS_REPLACEMENT void retryIdempotentWorkAsPrimaryUntilSuccessOrStepd
  * shard registry. Considers only shards that are not currently draining. Will return ShardNotFound
  * if no shard is found.
  */
-MONGO_MOD_NEEDS_REPLACEMENT ShardId selectLeastLoadedNonDrainingShard(OperationContext* opCtx);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] ShardId selectLeastLoadedNonDrainingShard(OperationContext* opCtx);
 
 /**
  * Returns true if 'bucketNss' is a tracked timeseries buckets collection, i.e. it has a sharding
  * catalog entry with timeseries fields. Returns false if the namespace is not tracked.
  */
-MONGO_MOD_PUBLIC bool isTrackedTimeseries(OperationContext* opCtx,
-                                          const NamespaceString& bucketNss);
+[[MONGO_MOD_PUBLIC]] bool isTrackedTimeseries(OperationContext* opCtx,
+                                              const NamespaceString& bucketNss);
 }  // namespace sharding_util
 }  // namespace mongo

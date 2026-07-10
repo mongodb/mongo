@@ -41,7 +41,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_NEEDS_REPLACEMENT CannotImplicitlyCreateCollectionInfo final
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] CannotImplicitlyCreateCollectionInfo final
     : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::CannotImplicitlyCreateCollection;

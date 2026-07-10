@@ -50,7 +50,7 @@ namespace mongo {
  * Since the tick points represent non-majority committed changes, this class has to handle what
  * happens on rollback.
  */
-class MONGO_MOD_PARENT_PRIVATE TopologyTimeTicker {
+class [[MONGO_MOD_PARENT_PRIVATE]] TopologyTimeTicker {
 public:
     TopologyTimeTicker() = default;
 

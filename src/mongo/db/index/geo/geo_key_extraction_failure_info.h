@@ -40,7 +40,7 @@
 #include <string_view>
 #include <utility>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 template <class Derived, ErrorCodes::Error Code>
 class GeoKeyExtractionFailureInfoBase : public ErrorExtraInfo {
@@ -87,4 +87,4 @@ public:
     using GeoKeyExtractionFailureInfoBase::GeoKeyExtractionFailureInfoBase;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

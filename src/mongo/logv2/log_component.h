@@ -37,7 +37,7 @@
 #include <string_view>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC logv2 {
+namespace [[MONGO_MOD_PUBLIC]] logv2 {
 
 // clang-format off
 /**
@@ -181,5 +181,5 @@ private:
 
 std::ostream& operator<<(std::ostream& os, LogComponent component);
 
-}  // namespace MONGO_MOD_PUBLIC logv2
+}  // namespace logv2
 }  // namespace mongo

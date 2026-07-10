@@ -40,7 +40,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 template <typename T>
 inline constexpr bool isBoostOptional = false;
@@ -59,7 +59,7 @@ inline constexpr bool isStdOptional<std::optional<Ts...>> = true;  // NOLINT
 namespace optional_io {
 
 template <typename T>
-using CanStreamOp MONGO_MOD_FILE_PRIVATE =
+using CanStreamOp [[MONGO_MOD_FILE_PRIVATE]] =
     decltype(std::declval<std::ostream&>() << std::declval<const T&>());
 template <typename T>
 inline constexpr bool canStream = stdx::is_detected_v<CanStreamOp, T>;
@@ -144,4 +144,4 @@ template <typename T, std::enable_if_t<canStreamWithExtension<T>, int> = 0>
 Extension(const T& t) -> Extension<T>;
 
 }  // namespace optional_io
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

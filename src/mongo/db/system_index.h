@@ -42,9 +42,9 @@ class Status;
  * Creates the appropriate indexes on _new_ system collections for authentication,
  * authorization, and sessions.
  */
-MONGO_MOD_PUBLIC void createSystemIndexes(OperationContext* opCtx,
-                                          CollectionWriter& collection,
-                                          bool fromMigrate);
+[[MONGO_MOD_PUBLIC]] void createSystemIndexes(OperationContext* opCtx,
+                                              CollectionWriter& collection,
+                                              bool fromMigrate);
 
 /**
  * Verifies that only the appropriate indexes to support authentication, authorization, and
@@ -53,7 +53,7 @@ MONGO_MOD_PUBLIC void createSystemIndexes(OperationContext* opCtx,
  * this function into one single builder that records the time elapsed during startup. Its default
  * value is nullptr because we only want to time this function when it is called during startup.
  */
-MONGO_MOD_PUBLIC Status verifySystemIndexes(OperationContext* opCtx,
-                                            BSONObjBuilder* startupTimeElapsedBuilder = nullptr);
+[[MONGO_MOD_PUBLIC]] Status verifySystemIndexes(
+    OperationContext* opCtx, BSONObjBuilder* startupTimeElapsedBuilder = nullptr);
 
 }  // namespace mongo

@@ -36,7 +36,7 @@
 #include <string>
 
 namespace mongo::otel {
-namespace MONGO_MOD_PUBLIC traces {
+namespace [[MONGO_MOD_PUBLIC]] traces {
 
 #ifdef MONGO_CONFIG_OTEL
 
@@ -53,5 +53,5 @@ inline void shutdown() {}
 
 #endif
 
-}  // namespace MONGO_MOD_PUBLIC traces
+}  // namespace traces
 }  // namespace mongo::otel

@@ -34,11 +34,11 @@
 
 #include <absl/container/node_hash_set.h>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace stdx {
 
 template <class Key, class Hasher = DefaultHasher<Key>, typename... Args>
 using unordered_set = absl::node_hash_set<Key, EnsureTrustedHasher<Hasher, Key>, Args...>;
 
 }  // namespace stdx
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

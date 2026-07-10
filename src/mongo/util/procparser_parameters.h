@@ -37,9 +37,9 @@
 #include <boost/optional.hpp>
 
 namespace mongo {
-namespace MONGO_MOD_PUB procparser {
+namespace [[MONGO_MOD_PUBLIC]] procparser {
 
 Status onUpdateProcFileSizeLimit(const long long& limit);
 
-}  // namespace MONGO_MOD_PUB procparser
+}  // namespace procparser
 }  // namespace mongo

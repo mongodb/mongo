@@ -33,9 +33,9 @@
 #include "mongo/util/modules.h"
 
 namespace mongo {
-namespace MONGO_MOD_PUB query_shape {
+namespace [[MONGO_MOD_PUBLIC]] query_shape {
 
 using QueryShapeHash = SHA256Block;
 
-}  // namespace MONGO_MOD_PUB query_shape
+}  // namespace query_shape
 }  // namespace mongo

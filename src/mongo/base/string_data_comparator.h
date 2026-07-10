@@ -33,7 +33,7 @@
 
 #include <string_view>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 
@@ -43,7 +43,7 @@ namespace mongo {
  * associative containers. These closely related operations are bundled into
  * this one interface.
  */
-class MONGO_MOD_OPEN StringDataComparator {
+class [[MONGO_MOD_OPEN]] StringDataComparator {
 public:
     virtual ~StringDataComparator() = default;
 

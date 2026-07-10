@@ -39,7 +39,7 @@ namespace mongo {
  * This class is used by the aggregation framework and streams enterprise module to perform the
  * document processing needed for stages that do 1:1 document transformation.
  */
-class MONGO_MOD_PUBLIC SingleDocumentTransformationProcessor {
+class [[MONGO_MOD_PUBLIC]] SingleDocumentTransformationProcessor {
 public:
     SingleDocumentTransformationProcessor(std::unique_ptr<TransformerInterface> parsedTransform);
 

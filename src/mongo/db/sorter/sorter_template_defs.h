@@ -93,7 +93,7 @@ inline void checkNoExternalSortOnMongos(bool spillerConfigured) {
               spillerConfigured));
 }
 
-MONGO_MOD_PUB inline SharedBufferFragmentBuilder makeMemPool() {
+[[MONGO_MOD_PUBLIC]] inline SharedBufferFragmentBuilder makeMemPool() {
     return SharedBufferFragmentBuilder(
         gOperationMemoryPoolBlockInitialSizeKB.loadRelaxed() * static_cast<size_t>(1024),
         SharedBufferFragmentBuilder::DoubleGrowStrategy(

@@ -39,7 +39,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC auth {
+namespace [[MONGO_MOD_PUBLIC]] auth {
 
 /** Typed representation of client authentication credentials. */
 struct Credential {
@@ -64,5 +64,5 @@ struct Credential {
     static StatusWith<Credential> fromBSON(const BSONObj& params);
 };
 
-}  // namespace MONGO_MOD_PUBLIC auth
+}  // namespace auth
 }  // namespace mongo

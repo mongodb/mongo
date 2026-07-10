@@ -56,7 +56,7 @@ public:
                           ThreadPool* dbPool);
     ~InitialSyncBaseCloner() override = default;
 
-    MONGO_MOD_PRIVATE int getRetryableOperationCount_forTest();
+    [[MONGO_MOD_PRIVATE]] int getRetryableOperationCount_forTest();
 
 protected:
     InitialSyncSharedData* getSharedData() const final {

@@ -50,7 +50,7 @@ class OperationContext;
  * ExtensionsCallbackReal uses the provided OperationContext and namespace to capture context
  * necessary for parsing $text and $where clauses.
  */
-class MONGO_MOD_PUB ExtensionsCallbackReal : public ExtensionsCallback {
+class [[MONGO_MOD_PUBLIC]] ExtensionsCallbackReal : public ExtensionsCallback {
 public:
     /**
      * Does not take ownership of 'nss' or 'opCtx'.

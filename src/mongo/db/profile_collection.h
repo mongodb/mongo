@@ -46,7 +46,7 @@ namespace profile_collection {
 /**
  * Invoked when database profile is enabled.
  */
-MONGO_MOD_PUB void profile(OperationContext* opCtx, NetworkOp op);
+[[MONGO_MOD_PUBLIC]] void profile(OperationContext* opCtx, NetworkOp op);
 
 /**
  * Pre-creates the profile collection for the specified database.

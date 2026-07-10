@@ -64,7 +64,7 @@ class ServiceContext;
 
 namespace repl {
 
-class MONGO_MOD_PUB ReplicationCoordinatorExternalStateMock
+class [[MONGO_MOD_PUBLIC]] ReplicationCoordinatorExternalStateMock
     : public ReplicationCoordinatorExternalState {
     ReplicationCoordinatorExternalStateMock(const ReplicationCoordinatorExternalStateMock&) =
         delete;

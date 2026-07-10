@@ -32,7 +32,7 @@
 
 #include <string_view>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 // Forward declarations needed for DynamicMetricNameMaker to declare Passkey friends
@@ -50,14 +50,14 @@ class DynamicMetricNameTestPasskeyMaker;
 
 /** Helper to implement the passkey idiom. */
 template <typename T>
-class MONGO_MOD_PUBLIC Passkey {
+class [[MONGO_MOD_PUBLIC]] Passkey {
 private:
     friend T;
     constexpr Passkey() = default;
 };
 
 /** Wrapper class around a string to ensure `MetricName`s are only constructed in certain places. */
-class MONGO_MOD_PUBLIC MetricName {
+class [[MONGO_MOD_PUBLIC]] MetricName {
 public:
     /**
      * Note that this can only be constructed by code allowed to access the passkey. N&O must have
@@ -80,9 +80,11 @@ private:
 };
 
 /** Helper to create MetricName instances. */
-class MONGO_MOD_FILE_PRIVATE MetricNameMaker{public : static constexpr MetricName make(
-    std::string_view name){return MetricName(name, Passkey<MetricNameMaker>{});
-}  // namespace otel::metrics
+class [[MONGO_MOD_FILE_PRIVATE]] MetricNameMaker {
+public:
+    static constexpr MetricName make(std::string_view name) {
+        return MetricName(name, Passkey<MetricNameMaker>{});
+    }  // namespace otel::metrics
 };  // namespace mongo
 
 /**
@@ -90,7 +92,7 @@ class MONGO_MOD_FILE_PRIVATE MetricNameMaker{public : static constexpr MetricNam
  * device names or mount paths discovered at startup). Requires N&O review since dynamic names
  * cannot be audited at compile time.
  */
-class MONGO_MOD_PUBLIC DynamicMetricNameMaker {
+class [[MONGO_MOD_PUBLIC]] DynamicMetricNameMaker {
 public:
     /**
      * Classes that need to create dynamic metric names should be added as a

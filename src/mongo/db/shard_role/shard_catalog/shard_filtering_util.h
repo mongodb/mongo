@@ -43,8 +43,8 @@ namespace refresh_util {
  * All waits on refreshes in a shard should go through this code path, because it also accounts for
  * transactions and locking.
  */
-MONGO_MOD_PRIVATE void waitForRefreshToComplete(OperationContext* opCtx,
-                                                const SharedSemiFuture<void>& refresh);
+[[MONGO_MOD_PRIVATE]] void waitForRefreshToComplete(OperationContext* opCtx,
+                                                    const SharedSemiFuture<void>& refresh);
 
 /**
  * This method implements a best-effort attempt to wait for the critical section to complete
@@ -54,7 +54,7 @@ MONGO_MOD_PRIVATE void waitForRefreshToComplete(OperationContext* opCtx,
  * All waits for migration critical section should go through this code path, because it also
  * accounts for transactions and locking.
  */
-MONGO_MOD_NEEDS_REPLACEMENT Status waitForCriticalSectionToComplete(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] Status waitForCriticalSectionToComplete(
     OperationContext* opCtx, const CriticalSectionSignal& critSecSignal) noexcept;
 
 }  // namespace refresh_util

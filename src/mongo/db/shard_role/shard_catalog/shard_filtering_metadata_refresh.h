@@ -55,7 +55,7 @@ namespace mongo {
  * sharding metadata for a given database or collection, and provides the functionality to refresh
  * it when necessary.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT FilteringMetadataCache {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] FilteringMetadataCache {
 public:
     FilteringMetadataCache() = default;
 
@@ -287,9 +287,9 @@ private:
     std::shared_ptr<ShardServerCatalogCacheLoader> _loader;
 };
 
-MONGO_MOD_NEEDS_REPLACEMENT extern FailPoint
+[[MONGO_MOD_NEEDS_REPLACEMENT]] extern FailPoint
     hangInRefreshFilteringMetadataUntilSuccessInterruptible;
-MONGO_MOD_NEEDS_REPLACEMENT extern FailPoint
+[[MONGO_MOD_NEEDS_REPLACEMENT]] extern FailPoint
     hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible;
 
 enum class FilteringMetadataRefreshKind { kNonAuthoritative, kAuthoritative };
@@ -298,7 +298,7 @@ enum class FilteringMetadataRefreshKind { kNonAuthoritative, kAuthoritative };
  * The `FilteringMetadataRefreshTracker` is responsible for tracking in-flight filtering metadata
  * refreshes and offering the possibility to interrupt them.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT FilteringMetadataRefreshTracker {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] FilteringMetadataRefreshTracker {
 public:
     static FilteringMetadataRefreshTracker* get(OperationContext* opCtx);
 

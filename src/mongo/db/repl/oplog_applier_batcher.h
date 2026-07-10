@@ -61,7 +61,7 @@ class OplogApplier;
  * Consumes batches of oplog entries from the OplogBuffer to give to the oplog applier, freeing
  * up space for more operations to be fetched from a sync source and allocated onto the OplogBuffer.
  */
-class MONGO_MOD_PARENT_PRIVATE OplogApplierBatcher {
+class [[MONGO_MOD_PARENT_PRIVATE]] OplogApplierBatcher {
     OplogApplierBatcher(const OplogApplierBatcher&) = delete;
     OplogApplierBatcher& operator=(const OplogApplierBatcher&) = delete;
 
@@ -70,7 +70,7 @@ public:
      * Controls what can popped from the oplog buffer into a single batch of operations that can be
      * applied using OplogApplier::applyOplogBatch().
      */
-    class MONGO_MOD_PARENT_PRIVATE BatchLimits {
+    class [[MONGO_MOD_PARENT_PRIVATE]] BatchLimits {
     public:
         size_t bytes = 0;
         size_t ops = 0;
@@ -184,15 +184,15 @@ private:
  * Returns maximum number of operations in each batch that can be applied using
  * applyOplogBatch().
  */
-MONGO_MOD_PUB std::size_t getBatchLimitOplogEntries();
+[[MONGO_MOD_PUBLIC]] std::size_t getBatchLimitOplogEntries();
 
 /**
  * Calculates batch limit size (in bytes) using the maximum capped collection size of the oplog
  * size.  Must not be called from within a WriteUnitOfWork.
  * Batches are limited to 10% of the oplog.
  */
-MONGO_MOD_PUB std::size_t getBatchLimitOplogBytes(OperationContext* opCtx,
-                                                  StorageInterface* storageInterface);
+[[MONGO_MOD_PUBLIC]] std::size_t getBatchLimitOplogBytes(OperationContext* opCtx,
+                                                         StorageInterface* storageInterface);
 
 }  // namespace repl
 }  // namespace mongo

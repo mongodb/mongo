@@ -72,7 +72,7 @@ namespace mongo {
  * ScopedSharedCollectionShardingRuntime and ScopedExclusiveCollectionShardingRuntime helper
  * classes.
  */
-class MONGO_MOD_USE_REPLACEMENT(CollectionShardingState) CollectionShardingRuntime final
+class [[MONGO_MOD_USE_REPLACEMENT(CollectionShardingState)]] CollectionShardingRuntime final
     : public CollectionShardingState,
       public Decorable<CollectionShardingRuntime> {
     CollectionShardingRuntime(const CollectionShardingRuntime&) = delete;
@@ -436,7 +436,7 @@ private:
  * Entering the critical section doesn't serialise with concurrent recovery/refresh, because
  * causally such refreshes would have happened *before* the critical section was entered.
  */
-class MONGO_MOD_USE_REPLACEMENT(ShardingMigrationCriticalSection) CollectionCriticalSection {
+class [[MONGO_MOD_USE_REPLACEMENT(ShardingMigrationCriticalSection)]] CollectionCriticalSection {
     CollectionCriticalSection(const CollectionCriticalSection&) = delete;
     CollectionCriticalSection& operator=(const CollectionCriticalSection&) = delete;
 

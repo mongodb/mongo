@@ -43,7 +43,7 @@ namespace mongo {
 
 // Public: instantiated in index_access_method.cpp (index_builds module) and fixSpec() called from
 // index_catalog_impl.cpp (catalog_and_routing.shard_role module)
-class MONGO_MOD_PUBLIC S2BucketAccessMethod : public S2AccessMethod {
+class [[MONGO_MOD_PUBLIC]] S2BucketAccessMethod : public S2AccessMethod {
 public:
     S2BucketAccessMethod(IndexCatalogEntry* btreeState, std::unique_ptr<SortedDataInterface> btree)
         : S2AccessMethod(btreeState, std::move(btree), IndexNames::GEO_2DSPHERE_BUCKET) {}

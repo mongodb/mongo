@@ -44,7 +44,7 @@ namespace mongo {
 /**
  * An object factory for creating Shard instances via calling registered builders.
  */
-class MONGO_MOD_PUBLIC ShardFactory {
+class [[MONGO_MOD_PUBLIC]] ShardFactory {
     ShardFactory(const ShardFactory&) = delete;
     ShardFactory& operator=(const ShardFactory&) = delete;
 

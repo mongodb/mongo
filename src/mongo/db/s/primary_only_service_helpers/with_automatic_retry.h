@@ -34,7 +34,7 @@
 #include "mongo/util/future_util.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace primary_only_service_helpers {
 
 const auto kDefaultRetryabilityPredicate = [](const Status& status) {
@@ -187,4 +187,4 @@ private:
 };
 
 }  // namespace primary_only_service_helpers
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

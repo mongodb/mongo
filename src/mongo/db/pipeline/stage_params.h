@@ -71,7 +71,7 @@ namespace mongo {
  *   2. Use the ALLOCATE_STAGE_PARAMS_ID macro to assign a unique ID
  *   3. Implement getId() to return the allocated ID
  */
-class MONGO_MOD_OPEN StageParams {
+class [[MONGO_MOD_OPEN]] StageParams {
 public:
     virtual ~StageParams() = default;
 
@@ -107,7 +107,7 @@ using StageParamsPipeline = std::vector<std::unique_ptr<StageParams>>;
  * Note: This class does NOT own the backing BSON object. The BSONElement is a view into a larger
  * BSON object that must remain valid for the lifetime of this DefaultStageParams instance.
  */
-class MONGO_MOD_OPEN DefaultStageParams : public StageParams {
+class [[MONGO_MOD_OPEN]] DefaultStageParams : public StageParams {
 public:
     /**
      * Constructs a DefaultStageParams from the original BSON specification element.

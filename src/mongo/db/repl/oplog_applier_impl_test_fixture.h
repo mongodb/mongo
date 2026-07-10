@@ -105,7 +105,7 @@ public:
 /**
  * OpObserver for OplogApplierImpl test fixture.
  */
-class MONGO_MOD_PUB OplogApplierImplOpObserver : public OpObserverNoop {
+class [[MONGO_MOD_PUBLIC]] OplogApplierImplOpObserver : public OpObserverNoop {
 public:
     /**
      * This function is called whenever OplogApplierImpl inserts documents into a collection.
@@ -248,7 +248,7 @@ public:
         onCollModFn;
 };
 
-class MONGO_MOD_OPEN OplogApplierImplTest : public ServiceContextMongoDTest {
+class [[MONGO_MOD_OPEN]] OplogApplierImplTest : public ServiceContextMongoDTest {
 protected:
     explicit OplogApplierImplTest(Options options = {})
         : ServiceContextMongoDTest(options.useReplSettings(true)) {}
@@ -321,7 +321,7 @@ protected:
 
 // Utility class to allow easily scanning a collection.  Scans in forward order, returns
 // Status::CollectionIsEmpty when scan is exhausted.
-class MONGO_MOD_PARENT_PRIVATE CollectionReader {
+class [[MONGO_MOD_PARENT_PRIVATE]] CollectionReader {
 public:
     CollectionReader(OperationContext* opCtx, const NamespaceString& nss);
 
@@ -334,7 +334,7 @@ private:
 
 }  // namespace repl
 
-namespace MONGO_MOD_PUB repl {
+namespace [[MONGO_MOD_PUBLIC]] repl {
 
 void checkTxnTable(OperationContext* opCtx,
                    const LogicalSessionId& lsid,
@@ -444,5 +444,5 @@ CreateCollCatalogIdentifier newCatalogIdentifier(OperationContext* opCtx,
                                                  bool includeIdIndexIdent);
 
 
-}  // namespace MONGO_MOD_PUB repl
+}  // namespace repl
 }  // namespace mongo

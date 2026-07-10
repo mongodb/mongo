@@ -47,7 +47,7 @@ namespace mongo::unittest {
  * Only one of these can be active at a time, as the logs
  * of all such guards are captured into a single static object.
  */
-class MONGO_MOD_PUBLIC LogCaptureGuard {
+class [[MONGO_MOD_PUBLIC]] LogCaptureGuard {
 public:
     /** The object is automatically started. */
     LogCaptureGuard() : LogCaptureGuard{true} {}

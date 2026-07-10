@@ -43,7 +43,7 @@
 #include <absl/hash/hash.h>
 #include <absl/strings/string_view.h>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 

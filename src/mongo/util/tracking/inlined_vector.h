@@ -37,7 +37,7 @@
 
 #include <absl/container/inlined_vector.h>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace tracking {
 
 template <class T, std::size_t N>
@@ -49,4 +49,4 @@ inlined_vector<T, N> make_inlined_vector(Context& Context) {
 }
 
 }  // namespace tracking
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

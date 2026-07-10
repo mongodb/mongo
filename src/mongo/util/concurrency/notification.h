@@ -46,7 +46,7 @@ namespace mongo {
  * Allows waiting for a result returned from an asynchronous operation.
  */
 template <class T>
-class MONGO_MOD_USE_REPLACEMENT(Promise and Future) Notification {
+class [[MONGO_MOD_USE_REPLACEMENT(Promise and Future)]] Notification {
 public:
     Notification() = default;
 
@@ -120,7 +120,7 @@ private:
 };
 
 template <>
-class MONGO_MOD_USE_REPLACEMENT(Promise and Future) Notification<void> {
+class [[MONGO_MOD_USE_REPLACEMENT(Promise and Future)]] Notification<void> {
 public:
     explicit operator bool() const {
         return _notification.operator bool();

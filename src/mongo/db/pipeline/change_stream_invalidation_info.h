@@ -44,7 +44,7 @@ class BSONObjBuilder;
  * Contains information to augment the 'ChangeStreamInvalidated' error code. In particular, this
  * class holds the resume token of the "invalidate" event which gave rise to the exception.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ChangeStreamInvalidationInfo final : public ErrorExtraInfo {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ChangeStreamInvalidationInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::ChangeStreamInvalidated;
 

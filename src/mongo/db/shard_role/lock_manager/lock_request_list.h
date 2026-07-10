@@ -45,7 +45,7 @@ namespace mongo {
  * NOTE: This class should not be used for generic purposes and should not be used outside of
  * the Lock Manager library.
  */
-class MONGO_MOD_PRIVATE LockRequestList {
+class [[MONGO_MOD_PRIVATE]] LockRequestList {
 public:
     void push_front(LockRequest* request) {
         // Sanity check that we do not reuse entries without cleaning them up

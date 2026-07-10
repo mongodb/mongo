@@ -46,7 +46,7 @@ namespace mongo {
  * placeholder MongoProcessInterface is required by an interface but will not be called. To
  * guarantee the latter, method implementations in this class are marked MONGO_UNREACHABLE.
  */
-class MONGO_MOD_OPEN StubMongoProcessInterface : public MongoProcessInterface {
+class [[MONGO_MOD_OPEN]] StubMongoProcessInterface : public MongoProcessInterface {
 public:
     StubMongoProcessInterface() : MongoProcessInterface(nullptr) {}
     using MongoProcessInterface::MongoProcessInterface;

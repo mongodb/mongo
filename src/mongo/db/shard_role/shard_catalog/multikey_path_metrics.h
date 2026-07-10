@@ -39,7 +39,7 @@ class OperationContext;
 
 namespace catalog_metrics {
 
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 void appendMultikeyPathStatsToIndexStats(BSONObjBuilder* indexStatsBuilder);
 
 void recordOrdinaryMultikeyPathChanges(OperationContext* opCtx, int64_t count);

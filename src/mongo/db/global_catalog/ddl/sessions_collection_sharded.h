@@ -45,7 +45,7 @@ class OperationContext;
 /**
  * Accesses the sessions collection for mongos and shard servers.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT SessionsCollectionSharded : public SessionsCollection {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] SessionsCollectionSharded : public SessionsCollection {
 public:
     /**
      * Only ensures that the sessions collection exists, is sharded and has the proper indexes, but

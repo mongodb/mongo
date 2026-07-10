@@ -38,7 +38,7 @@
 #include <utility>
 #include <vector>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 namespace aligned_detail {
 template <size_t step>
@@ -207,4 +207,4 @@ using CacheCombinedExclusive = Aligned<T,
                                        std::hardware_destructive_interference_size,
                                        std::hardware_constructive_interference_size>;
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

@@ -36,7 +36,7 @@
 #include <string>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC logv2 {
+namespace [[MONGO_MOD_PUBLIC]] logv2 {
 
 class LogTag {
 public:
@@ -82,5 +82,5 @@ private:
     uint64_t _value;
 };
 
-}  // namespace MONGO_MOD_PUBLIC logv2
+}  // namespace logv2
 }  // namespace mongo

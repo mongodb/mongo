@@ -53,7 +53,7 @@ namespace repl {
 /**
  * Arguments to the replSetHeartbeat command.
  */
-class MONGO_MOD_PARENT_PRIVATE ReplSetHeartbeatArgsV1 {
+class [[MONGO_MOD_PARENT_PRIVATE]] ReplSetHeartbeatArgsV1 {
 public:
     /**
      * Initializes this ReplSetHeartbeatArgsV1 from the contents of args.

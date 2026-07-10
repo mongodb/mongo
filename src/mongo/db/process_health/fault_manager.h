@@ -69,7 +69,7 @@ namespace process_health {
  *
  * If an active fault state persists, FaultManager will terminate the server process.
  */
-class MONGO_MOD_PUBLIC FaultManager : protected StateMachine<HealthCheckStatus, FaultState> {
+class [[MONGO_MOD_PUBLIC]] FaultManager : protected StateMachine<HealthCheckStatus, FaultState> {
     FaultManager(const FaultManager&) = delete;
     FaultManager& operator=(const FaultManager&) = delete;
 

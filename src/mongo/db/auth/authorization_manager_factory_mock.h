@@ -45,7 +45,7 @@ namespace mongo {
  * based on the arguments provided.
  */
 
-class MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS AuthorizationManagerFactoryMock
+class [[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] AuthorizationManagerFactoryMock
     : public AuthorizationManagerFactory {
 
 public:

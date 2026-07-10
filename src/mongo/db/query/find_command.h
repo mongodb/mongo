@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUB FindCommandRequest : public FindCommandRequestBase {
+class [[MONGO_MOD_PUBLIC]] FindCommandRequest : public FindCommandRequestBase {
 public:
     explicit FindCommandRequest(
         NamespaceStringOrUUID nssOrUUID,

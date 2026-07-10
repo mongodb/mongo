@@ -46,7 +46,7 @@
 #include <boost/optional/optional.hpp>
 
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 // Stores the total time an operation spends with an uncommitted oplog slot held open. Indicator
 // that an operation is holding back replication by causing oplog holes to remain open for
@@ -178,4 +178,4 @@ private:
     StorageOplogManager* _oplogManager = nullptr;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

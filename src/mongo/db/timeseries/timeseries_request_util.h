@@ -54,7 +54,7 @@ template <typename T>
 concept HasGetIsTimeseriesNamespace = requires(const T& t) { t.getIsTimeseriesNamespace(); };
 
 template <typename T>
-concept IsRequestableOnTimeseries MONGO_MOD_PUBLIC =
+concept IsRequestableOnTimeseries [[MONGO_MOD_PUBLIC]] =
     HasGetNs<T> || HasGetNamespace<T> || HasGetNsString<T> || HasGetNamespaceOrUUID<T>;
 
 
@@ -113,7 +113,7 @@ mongo::NamespaceStringOrUUID getNamespaceOrUUID(const T& request) {
  */
 template <typename T>
 requires IsRequestableOnTimeseries<T>
-MONGO_MOD_PUBLIC bool isRawDataRequest(OperationContext* opCtx, const T& request) {
+[[MONGO_MOD_PUBLIC]] bool isRawDataRequest(OperationContext* opCtx, const T& request) {
     if (isRawDataOperation(opCtx)) {
         // Explicitly requested raw data
         return true;
@@ -154,7 +154,7 @@ MONGO_MOD_PUBLIC bool isRawDataRequest(OperationContext* opCtx, const T& request
  */
 template <typename T>
 requires IsRequestableOnTimeseries<T>
-MONGO_MOD_PUBLIC bool isTimeseriesRequest(OperationContext* opCtx, const T& request) {
+[[MONGO_MOD_PUBLIC]] bool isTimeseriesRequest(OperationContext* opCtx, const T& request) {
     if (isRawDataRequest(opCtx, request)) {
         return false;
     }
@@ -179,8 +179,8 @@ MONGO_MOD_PUBLIC bool isTimeseriesRequest(OperationContext* opCtx, const T& requ
  */
 template <typename T>
 requires IsRequestableOnTimeseries<T>
-MONGO_MOD_PUBLIC std::pair<bool, NamespaceString> isTimeseriesViewRequest(OperationContext* opCtx,
-                                                                          const T& request) {
+[[MONGO_MOD_PUBLIC]] std::pair<bool, NamespaceString> isTimeseriesViewRequest(
+    OperationContext* opCtx, const T& request) {
     auto nssOrUUID = getNamespaceOrUUID(request);
     auto isTimeseriesNamespaceFlag = getIsTimeseriesNamespaceFlag(request, nssOrUUID);
     auto lookupTimeseriesInfo =
@@ -207,7 +207,7 @@ MONGO_MOD_PUBLIC std::pair<bool, NamespaceString> isTimeseriesViewRequest(Operat
  */
 template <typename T>
 requires IsRequestableOnTimeseries<T>
-MONGO_MOD_PUBLIC std::pair<CollectionPreConditions, bool>
+[[MONGO_MOD_PUBLIC]] std::pair<CollectionPreConditions, bool>
 getCollectionPreConditionsAndIsTimeseriesLogicalRequest(OperationContext* opCtx,
                                                         const NamespaceString& nss,
                                                         const T& request,

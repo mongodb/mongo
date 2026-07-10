@@ -36,7 +36,7 @@
 #include <fmt/format.h>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC rpc {
+namespace [[MONGO_MOD_PUBLIC]] rpc {
 
 /**
  * Bit flags representing support for a particular RPC protocol. This is just an internal
@@ -76,5 +76,5 @@ inline Protocol protocolForMessage(const Message& message) {
     return protocolForOperation(message.operation());
 }
 
-}  // namespace MONGO_MOD_PUBLIC rpc
+}  // namespace rpc
 }  // namespace mongo

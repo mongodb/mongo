@@ -48,7 +48,7 @@ namespace mongo {
 /**
  * Manages the conditions under which periodic pre-image removal runs on a node.
  */
-class MONGO_MOD_PUBLIC ChangeStreamExpiredPreImagesRemoverService
+class [[MONGO_MOD_PUBLIC]] ChangeStreamExpiredPreImagesRemoverService
     : public ReplicaSetAwareService<ChangeStreamExpiredPreImagesRemoverService> {
 public:
     ChangeStreamExpiredPreImagesRemoverService() = default;

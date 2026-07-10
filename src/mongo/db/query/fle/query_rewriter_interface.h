@@ -37,7 +37,7 @@
 
 #include <boost/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class EncryptedField;
 class FLETagQueryInterface;
@@ -84,4 +84,4 @@ public:
     }
 };
 }  // namespace fle
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

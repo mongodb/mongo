@@ -34,7 +34,7 @@
 #include <string>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC awsIam {
+namespace [[MONGO_MOD_PUBLIC]] awsIam {
 /**
  * SASL AWS Client parameters
  */
@@ -56,5 +56,5 @@ struct SASLAwsClientGlobalParams {
 };
 
 extern SASLAwsClientGlobalParams saslAwsClientGlobalParams;
-}  // namespace MONGO_MOD_PUBLIC awsIam
+}  // namespace awsIam
 }  // namespace mongo

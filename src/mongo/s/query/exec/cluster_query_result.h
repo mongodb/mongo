@@ -44,7 +44,7 @@ namespace mongo {
  *
  * TODO SERVER-111290 Remove external dependencies on this class.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ClusterQueryResult {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ClusterQueryResult {
 public:
     ClusterQueryResult() = default;
 

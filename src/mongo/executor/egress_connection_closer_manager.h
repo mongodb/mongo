@@ -52,7 +52,7 @@ namespace executor {
  * EgressConnectionClosers (which register themselves with it) and then interact exclusively with
  * the manager.
  */
-class MONGO_MOD_PUBLIC EgressConnectionCloserManager {
+class [[MONGO_MOD_PUBLIC]] EgressConnectionCloserManager {
 public:
     EgressConnectionCloserManager() = default;
 

@@ -38,7 +38,7 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class BSONObj;
 class BSONObjBuilder;
@@ -52,7 +52,7 @@ class BSONObjBuilder;
  * You must call the MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(type) macro in the cpp file that contains
  * the implementation for your subtype.
  */
-class MONGO_MOD_OPEN ErrorExtraInfo {
+class [[MONGO_MOD_OPEN]] ErrorExtraInfo {
 public:
     using Parser = std::shared_ptr<const ErrorExtraInfo>(const BSONObj&);
 
@@ -203,4 +203,4 @@ private:
 
 }  // namespace nested::twice
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

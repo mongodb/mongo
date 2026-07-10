@@ -39,7 +39,7 @@
 #include <initializer_list>
 #include <string_view>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 using namespace std::literals::string_view_literals;
 
 /**
@@ -66,4 +66,4 @@ struct SHA1BlockTraits {
 
 using SHA1Block = HashBlock<SHA1BlockTraits>;
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

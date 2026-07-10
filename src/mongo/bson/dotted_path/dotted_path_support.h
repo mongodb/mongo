@@ -37,7 +37,7 @@
 #include <cstddef>
 #include <string_view>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 namespace bson {

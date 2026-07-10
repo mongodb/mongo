@@ -39,7 +39,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace overflow {
 
 /**
@@ -98,4 +98,4 @@ constexpr T safeMod(T dividend, T divisor) {
 }
 
 }  // namespace overflow
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

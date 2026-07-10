@@ -44,7 +44,7 @@
 #include <string_view>
 #include <variant>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 using namespace std::literals::string_view_literals;
 
 struct WriteConcernOptions {
@@ -241,16 +241,16 @@ public:
     //          - without (w) value set, for example ({writeConcern: {j: true}}).
     //      - Client-supplied WC without (w) value set, for example ({writeConcern: {j: true}}).
     //      - Internal commands set empty WC ({writeConcern: {}}).
-    MONGO_MOD_PRIVATE bool notExplicitWValue{true};
+    [[MONGO_MOD_PRIVATE]] bool notExplicitWValue{true};
 
     // Used only for tracking opWriteConcernCounters metric.
     // True if the "w" value of the write concern used is "majority" and the "j" value is true,
     // but "j" was originally false.
-    MONGO_MOD_PRIVATE bool majorityJFalseOverridden{false};
+    [[MONGO_MOD_PRIVATE]] bool majorityJFalseOverridden{false};
 
     CheckCondition checkCondition{CheckCondition::OpTime};
 
 private:
     ReadWriteConcernProvenance _provenance;
 };
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

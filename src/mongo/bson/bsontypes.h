@@ -48,7 +48,7 @@
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 
@@ -316,7 +316,7 @@ struct BSONObjAppendFormat;
  * Returns whether conversion to JSON should format the Date type as local timezone.
  * This is a global setting set by the systemLog.timeStampFormat server option.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void setDateFormatIsLocalTimezone(bool localTimeZone);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void setDateFormatIsLocalTimezone(bool localTimeZone);
 bool dateFormatIsLocalTimezone();
 
 namespace bsontype_detail {

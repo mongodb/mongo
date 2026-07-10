@@ -36,7 +36,7 @@
 #include <scoped_allocator>
 #include <vector>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace tracking {
 template <class T>
 using vector = std::vector<T, std::scoped_allocator_adaptor<Allocator<T>>>;
@@ -47,4 +47,4 @@ vector<T> make_vector(Context& Context, Args... args) {
 }
 
 }  // namespace tracking
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

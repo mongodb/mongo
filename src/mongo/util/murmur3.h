@@ -38,7 +38,7 @@
 
 #include <MurmurHash3.h>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 

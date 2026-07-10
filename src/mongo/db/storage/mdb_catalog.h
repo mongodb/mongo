@@ -41,7 +41,7 @@
 #include <string_view>
 
 namespace mongo {
-class MONGO_MOD_FILE_PRIVATE MDBCatalogTest;
+class [[MONGO_MOD_FILE_PRIVATE]] MDBCatalogTest;
 
 /**
  * A wrapper around the '_mdb_catalog' storage table. Each row in the table is indexed with a
@@ -70,7 +70,7 @@ class MONGO_MOD_FILE_PRIVATE MDBCatalogTest;
  *      'ns': <std::string>
  *    }
  */
-class MONGO_MOD_PUBLIC MDBCatalog final {
+class [[MONGO_MOD_PUBLIC]] MDBCatalog final {
 public:
     /**
      * `Entry` ties together the common identifiers of a single `_mdb_catalog` document.
@@ -167,7 +167,7 @@ public:
                                              const std::string& ident,
                                              bool isClustered);
 
-    MONGO_MOD_PUBLIC
+    [[MONGO_MOD_PUBLIC]]
     boost::optional<EntryIdentifier> getEntry_forTest(const RecordId& catalogId) const;
 
 private:

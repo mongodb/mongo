@@ -135,9 +135,9 @@ public:
      * Must be called under an exclusive collection lock in order to serialize calls to
      * registerIndex() and unregisterIndex().
      */
-    MONGO_MOD_PUBLIC void registerIndex(std::string_view indexName,
-                                        const BSONObj& indexKey,
-                                        const IndexFeatures& features);
+    [[MONGO_MOD_PUBLIC]] void registerIndex(std::string_view indexName,
+                                            const BSONObj& indexKey,
+                                            const IndexFeatures& features);
 
     /**
      * Erase statistics for index 'indexName'. Can be safely called even if indexName is not
@@ -146,7 +146,7 @@ public:
      * Must be called under an exclusive collection lock in order to serialize calls to
      * registerIndex() and unregisterIndex().
      */
-    MONGO_MOD_PUBLIC void unregisterIndex(std::string_view indexName);
+    [[MONGO_MOD_PUBLIC]] void unregisterIndex(std::string_view indexName);
 
     /**
      * Get the current state of the usage statistics map. This map will only include indexes that

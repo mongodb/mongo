@@ -41,7 +41,7 @@ namespace repl {
  *
  * Resets to original value when leaving scope so it is safe to nest.
  */
-class MONGO_MOD_PUB AllowNonLocalWritesBlock {
+class [[MONGO_MOD_PUBLIC]] AllowNonLocalWritesBlock {
     AllowNonLocalWritesBlock(const AllowNonLocalWritesBlock&) = delete;
     AllowNonLocalWritesBlock& operator=(const AllowNonLocalWritesBlock&) = delete;
 
@@ -54,7 +54,7 @@ private:
     const bool _initialState;
 };
 
-MONGO_MOD_PUB bool alwaysAllowNonLocalWrites(const OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] bool alwaysAllowNonLocalWrites(const OperationContext* opCtx);
 
 }  // namespace repl
 }  // namespace mongo

@@ -55,7 +55,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUB TransactionCoordinatorService {
+class [[MONGO_MOD_PUBLIC]] TransactionCoordinatorService {
     TransactionCoordinatorService(const TransactionCoordinatorService&) = delete;
     TransactionCoordinatorService& operator=(const TransactionCoordinatorService&) = delete;
 

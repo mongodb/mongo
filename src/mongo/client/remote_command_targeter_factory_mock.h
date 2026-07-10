@@ -44,7 +44,7 @@ namespace mongo {
  * Factory which instantiates mock remote command targeters. This class is not thread-safe and is
  * only used for unit-testing.
  */
-class MONGO_MOD_PUBLIC RemoteCommandTargeterFactoryMock final
+class [[MONGO_MOD_PUBLIC]] RemoteCommandTargeterFactoryMock final
     : public RemoteCommandTargeterFactory {
 public:
     RemoteCommandTargeterFactoryMock();

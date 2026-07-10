@@ -36,7 +36,7 @@
 namespace mongo {
 using namespace std::literals::string_view_literals;
 
-class MONGO_MOD_PUBLIC IndexConstants {
+class [[MONGO_MOD_PUBLIC]] IndexConstants {
 public:
     static constexpr std::string_view kIdIndexName = "_id_"sv;
 };

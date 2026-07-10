@@ -37,7 +37,7 @@
 #include <cstddef>
 #include <cstdint>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 namespace mongo::timeseries::bucket_catalog {
 
 /**

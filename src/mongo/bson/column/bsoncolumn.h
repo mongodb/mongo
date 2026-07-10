@@ -80,7 +80,7 @@ namespace mongo {
  * Thread safety: The BSONColumn class is generally NOT thread-safe, unless declared otherwise. This
  * also applies to functions declared 'const'.
  */
-class MONGO_MOD_PUBLIC BSONColumn {
+class [[MONGO_MOD_PUBLIC]] BSONColumn {
 public:
     BSONColumn(const char* buffer, size_t size);
     explicit BSONColumn(BSONElement bin);
@@ -174,13 +174,13 @@ public:
          * actual binary to allow interleaving where control bytes corresponds to separate decoding
          * states.
          */
-        struct MONGO_MOD_PRIVATE DecodingState {
+        struct [[MONGO_MOD_PRIVATE]] DecodingState {
             DecodingState();
 
             /**
              * Internal decoding state for types using 64bit arithmetic
              */
-            struct MONGO_MOD_PRIVATE Decoder64 {
+            struct [[MONGO_MOD_PRIVATE]] Decoder64 {
                 Decoder64();
 
                 BSONElement materialize(BSONElementStorage& allocator,
@@ -197,7 +197,7 @@ public:
             /**
              * Internal decoding state for types using 128bit arithmetic
              */
-            struct MONGO_MOD_PRIVATE Decoder128 {
+            struct [[MONGO_MOD_PRIVATE]] Decoder128 {
                 BSONElement materialize(BSONElementStorage& allocator,
                                         BSONElement last,
                                         std::string_view fieldName) const;
@@ -207,7 +207,7 @@ public:
                 int128_t lastEncodedValue = 0;
             };
 
-            struct MONGO_MOD_PRIVATE LoadControlResult {
+            struct [[MONGO_MOD_PRIVATE]] LoadControlResult {
                 BSONElement element;
                 int size;
             };
@@ -232,14 +232,14 @@ public:
         /**
          * Internal state for regular decoding mode (decoding of scalars)
          */
-        struct MONGO_MOD_FILE_PRIVATE Regular {
+        struct [[MONGO_MOD_FILE_PRIVATE]] Regular {
             DecodingState state;
         };
 
         /**
          * Internal state for interleaved decoding mode (decoding of objects/arrays)
          */
-        struct MONGO_MOD_FILE_PRIVATE Interleaved {
+        struct [[MONGO_MOD_FILE_PRIVATE]] Interleaved {
             Interleaved(BSONObj refObj, BSONType referenceObjType, bool interleavedArrays);
 
             std::vector<DecodingState> states;
@@ -372,7 +372,7 @@ namespace bsoncolumn {
  */
 template <class CMaterializer, class Container>
 requires Materializer<CMaterializer>
-class MONGO_MOD_PUBLIC Collector {
+class [[MONGO_MOD_PUBLIC]] Collector {
     using Element = typename CMaterializer::Element;
 
 public:
@@ -488,7 +488,7 @@ private:
     Element _last = CMaterializer::materializeMissing(*_allocator);
 };
 
-class MONGO_MOD_PUBLIC BSONColumnBlockBased {
+class [[MONGO_MOD_PUBLIC]] BSONColumnBlockBased {
 
 public:
     BSONColumnBlockBased(const char* buffer, size_t size);

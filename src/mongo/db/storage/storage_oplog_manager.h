@@ -68,7 +68,7 @@ namespace mongo {
  * TODO(SERVER-85788): If it's enabled without removing this class, update the comment to reflect
  * the new relationship.
  */
-class MONGO_MOD_PUBLIC StorageOplogManager {
+class [[MONGO_MOD_PUBLIC]] StorageOplogManager {
     StorageOplogManager(const StorageOplogManager&) = delete;
     StorageOplogManager& operator=(const StorageOplogManager&) = delete;
 

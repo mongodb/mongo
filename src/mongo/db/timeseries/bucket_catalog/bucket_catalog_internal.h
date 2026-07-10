@@ -63,7 +63,7 @@ namespace mongo::timeseries::bucket_catalog::internal {
 using BucketDocumentValidator =
     std::function<std::pair<Collection::DocumentValidationResult, Status>(const BSONObj&)>;
 
-enum class MONGO_MOD_PARENT_PRIVATE StageInsertBatchResult {
+enum class [[MONGO_MOD_PARENT_PRIVATE]] StageInsertBatchResult {
     Success,
     RolloverNeeded,
     NoMeasurementsStaged,
@@ -256,7 +256,7 @@ boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
  * buckets. Returns a pair of the effective value that respects the absolute bucket max and min
  * sizes and the raw value.
  */
-MONGO_MOD_PARENT_PRIVATE
+[[MONGO_MOD_PARENT_PRIVATE]]
 std::pair<int32_t, int32_t> getCacheDerivedBucketMaxSize(uint64_t storageCacheSizeBytes,
                                                          int64_t workloadCardinality);
 
@@ -346,7 +346,7 @@ void resetBucketOIDCounter();
 /**
  * Allocates a new bucket and adds it to the catalog.
  */
-MONGO_MOD_PARENT_PRIVATE
+[[MONGO_MOD_PARENT_PRIVATE]]
 Bucket& allocateBucket(BucketCatalog& catalog,
                        Stripe& stripe,
                        WithLock stripeLock,
@@ -361,7 +361,7 @@ Bucket& allocateBucket(BucketCatalog& catalog,
  * Will also update the bucket catalog stats incNumBucketsKeptOpenDueToLargeMeasurements as
  * appropriate.
  */
-MONGO_MOD_PARENT_PRIVATE
+[[MONGO_MOD_PARENT_PRIVATE]]
 RolloverReason determineRolloverReason(const BSONObj& doc,
                                        const TimeseriesOptions& timeseriesOptions,
                                        int64_t numberOfActiveBuckets,
@@ -428,7 +428,7 @@ void closeArchivedBucket(BucketCatalog& catalog,
  * inserted into the provided bucket, returns true. Otherwise, returns false.
  * Also increments `currentPosition` to one past the index of the last measurement inserted.
  */
-MONGO_MOD_PARENT_PRIVATE
+[[MONGO_MOD_PARENT_PRIVATE]]
 StageInsertBatchResult stageInsertBatchIntoEligibleBucket(BucketCatalog& catalog,
                                                           OperationId opId,
                                                           const StringDataComparator* comparator,

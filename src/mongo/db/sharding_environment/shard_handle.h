@@ -38,7 +38,7 @@
 
 #include <utility>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 
@@ -46,7 +46,7 @@ namespace mongo {
  * Data type that bundles a shard's ShardId with its UUID (if available),
  * supporting lookup operations through the ShardRegistry API.
  */
-class MONGO_MOD_PUBLIC ShardHandle {
+class [[MONGO_MOD_PUBLIC]] ShardHandle {
 public:
     ShardHandle() = default;
 

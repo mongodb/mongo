@@ -38,7 +38,7 @@
 #include <tuple>
 #include <vector>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Describes an index build on a collection.
@@ -58,4 +58,4 @@ struct IndexBuildsEntry {
  */
 using IndexBuilds = stdx::unordered_map<UUID, IndexBuildsEntry, UUID::Hash>;
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -54,7 +54,7 @@ class OperationContext;
  * RecordId scans on clustered collections — does not support oplog tracking, tailable cursors,
  * resume tokens, or initial-sync visibility waits.
  */
-struct MONGO_MOD_PUBLIC MultiRangeClusteredScanParams {
+struct [[MONGO_MOD_PUBLIC]] MultiRangeClusteredScanParams {
     // The set of RecordId ranges to scan, in value order. Each range encodes its own
     // inclusivity on min/max. A default-constructed list is unbounded.
     RecordIdRangeList rangeList;

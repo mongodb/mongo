@@ -47,7 +47,7 @@ class ServiceContext;
  * inconsistent indexes across shards. The job only runs on the primary node in the config server
  * replica set.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT PeriodicShardedIndexConsistencyChecker final {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] PeriodicShardedIndexConsistencyChecker final {
     PeriodicShardedIndexConsistencyChecker(const PeriodicShardedIndexConsistencyChecker&) = delete;
     PeriodicShardedIndexConsistencyChecker& operator=(
         const PeriodicShardedIndexConsistencyChecker&) = delete;

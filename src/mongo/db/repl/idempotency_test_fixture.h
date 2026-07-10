@@ -57,7 +57,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class Collection;
 class CollectionPtr;
@@ -97,7 +97,7 @@ bool operator==(const CollectionState& lhs, const CollectionState& rhs);
 std::ostream& operator<<(std::ostream& stream, const CollectionState& state);
 StringBuilder& operator<<(StringBuilder& sb, const CollectionState& state);
 
-class MONGO_MOD_OPEN IdempotencyTest : public OplogApplierImplTest {
+class [[MONGO_MOD_OPEN]] IdempotencyTest : public OplogApplierImplTest {
 public:
     IdempotencyTest()
         : _nss(NamespaceString::createNamespaceString_forTest(boost::none, "test.foo")) {
@@ -178,4 +178,4 @@ protected:
 };
 
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

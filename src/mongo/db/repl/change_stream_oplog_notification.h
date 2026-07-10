@@ -45,7 +45,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Writes a no-op oplog entry on shardCollection event.
@@ -167,4 +167,4 @@ void notifyChangeStreamsOnReshardCollectionStrictConsistency(OperationContext* o
                                                              const NamespaceString& tempNss,
                                                              const UUID& reshardingUUID);
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

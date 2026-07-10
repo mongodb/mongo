@@ -49,7 +49,7 @@ namespace mongo::otel::traces {
 enum class SampledByDefault : bool {};
 
 /** Wrapper class around a string to ensure `SpanName`s are only constructed in certain places. */
-class MONGO_MOD_PUBLIC SpanName {
+class [[MONGO_MOD_PUBLIC]] SpanName {
 private:
     class Passkey {
         friend class SpanName;
@@ -58,7 +58,7 @@ private:
 
 public:
     /** N&O team must own all uses of this passkey variable. */
-    MONGO_MOD_PRIVATE static constexpr Passkey passkeyForNetworkingAndObservabilityOnly{};
+    [[MONGO_MOD_PRIVATE]] static constexpr Passkey passkeyForNetworkingAndObservabilityOnly{};
 
     /**
      * Note that this requires a passkey for construction, which only N&O code is allowed to use.
@@ -92,8 +92,8 @@ private:
  */
 namespace span_names {
 
-#define SPAN_NAME_(id, name)                              \
-    MONGO_MOD_PUBLIC inline constexpr auto id = SpanName( \
+#define SPAN_NAME_(id, name)                                  \
+    [[MONGO_MOD_PUBLIC]] inline constexpr auto id = SpanName( \
         SpanName::passkeyForNetworkingAndObservabilityOnly, name, SampledByDefault{false})
 
 // Test-only
@@ -179,7 +179,7 @@ SPAN_NAME_(kReshardingRecipientNotifyCoordinatorAndAwaitDecision,
  * Do not add calls to this function anywhere else.
  * The returned reference is stable for the lifetime of the process.
  */
-MONGO_MOD_PUBLIC const SpanName& registerCommandSpanName(
+[[MONGO_MOD_PUBLIC]] const SpanName& registerCommandSpanName(
     std::string_view name, SampledByDefault sampledByDefault = SampledByDefault{false});
 
 }  // namespace mongo::otel::traces

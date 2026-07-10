@@ -35,7 +35,7 @@
 
 #include <string>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * This class represents the layout and content of an item inside the 'upserted' array of a write
@@ -96,4 +96,4 @@ private:
     bool _isUpsertedIDSet;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

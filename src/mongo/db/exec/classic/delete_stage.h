@@ -56,7 +56,7 @@ class OpDebug;
 class OperationContext;
 class PlanExecutor;
 
-struct MONGO_MOD_PUBLIC DeleteStageParams {
+struct [[MONGO_MOD_PUBLIC]] DeleteStageParams {
     using DocumentCounter = std::function<size_t(const BSONObj&)>;
 
     DeleteStageParams()

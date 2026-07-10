@@ -47,7 +47,7 @@ class BSONObj;
 class OperationContext;
 class Timestamp;
 
-namespace MONGO_MOD_PUB repl {
+namespace [[MONGO_MOD_PUBLIC]] repl {
 
 /**
  * A mock ReplicationConsistencyMarkers implementation that stores everything in memory.
@@ -101,5 +101,5 @@ private:
     BSONObj _initialSyncId;
 };
 
-}  // namespace MONGO_MOD_PUB repl
+}  // namespace repl
 }  // namespace mongo

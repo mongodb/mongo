@@ -36,14 +36,14 @@
 
 namespace mongo {
 
-class MONGO_MOD_PRIVATE ChunkOperationShardingCoordinatorMixin {
+class [[MONGO_MOD_PRIVATE]] ChunkOperationShardingCoordinatorMixin {
 protected:
     virtual ~ChunkOperationShardingCoordinatorMixin() = default;
     void _checkSetAllowChunkOperations(OperationContext* opCtx, const NamespaceString& nss);
 };
 
 template <typename StateDoc>
-class MONGO_MOD_UNFORTUNATELY_OPEN ChunkOperationShardingCoordinator
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] ChunkOperationShardingCoordinator
     : public RecoverableShardingCoordinator,
       protected RecoverableTypedDocMixin<ChunkOperationShardingCoordinator<StateDoc>, StateDoc>,
       protected ChunkOperationShardingCoordinatorMixin {

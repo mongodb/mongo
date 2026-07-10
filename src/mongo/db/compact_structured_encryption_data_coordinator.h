@@ -59,7 +59,7 @@
 namespace mongo {
 using namespace std::literals::string_view_literals;
 
-class MONGO_MOD_PUB CompactStructuredEncryptionDataCoordinator final
+class [[MONGO_MOD_PUBLIC]] CompactStructuredEncryptionDataCoordinator final
     : public RecoverableShardingDDLCoordinator<CompactStructuredEncryptionDataState> {
 public:
     static constexpr auto kStateContext = "CompactStructuredEncryptionDataState"sv;

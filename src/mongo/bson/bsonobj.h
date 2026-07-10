@@ -68,7 +68,7 @@
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 
@@ -336,21 +336,22 @@ public:
                              fmt::memory_buffer& buffer,
                              size_t writeLimit = 0) const;
 
-    MONGO_MOD_PRIVATE BSONObj jsonStringGenerator(ExtendedCanonicalV200Generator const& generator,
-                                                  int pretty,
-                                                  bool isArray,
-                                                  fmt::memory_buffer& buffer,
-                                                  size_t writeLimit = 0) const;
-    MONGO_MOD_PRIVATE BSONObj jsonStringGenerator(ExtendedRelaxedV200Generator const& generator,
-                                                  int pretty,
-                                                  bool isArray,
-                                                  fmt::memory_buffer& buffer,
-                                                  size_t writeLimit = 0) const;
-    MONGO_MOD_PRIVATE BSONObj jsonStringGenerator(LegacyStrictGenerator const& generator,
-                                                  int pretty,
-                                                  bool isArray,
-                                                  fmt::memory_buffer& buffer,
-                                                  size_t writeLimit = 0) const;
+    [[MONGO_MOD_PRIVATE]] BSONObj jsonStringGenerator(
+        ExtendedCanonicalV200Generator const& generator,
+        int pretty,
+        bool isArray,
+        fmt::memory_buffer& buffer,
+        size_t writeLimit = 0) const;
+    [[MONGO_MOD_PRIVATE]] BSONObj jsonStringGenerator(ExtendedRelaxedV200Generator const& generator,
+                                                      int pretty,
+                                                      bool isArray,
+                                                      fmt::memory_buffer& buffer,
+                                                      size_t writeLimit = 0) const;
+    [[MONGO_MOD_PRIVATE]] BSONObj jsonStringGenerator(LegacyStrictGenerator const& generator,
+                                                      int pretty,
+                                                      bool isArray,
+                                                      fmt::memory_buffer& buffer,
+                                                      size_t writeLimit = 0) const;
 
     /**
      * Add specific field to the end of the object if it did not exist, otherwise replace it
@@ -483,7 +484,7 @@ public:
      * arrays are bson objects with numeric and increasing field names
      * @return true if field names are numeric and increasing
      */
-    MONGO_MOD_USE_REPLACEMENT(this almost certainly is not what you want; contact us if it is)
+    [[MONGO_MOD_USE_REPLACEMENT("this almost certainly is not what you want; contact us if it is")]]
     bool couldBeArray() const;
 
     /**
@@ -645,7 +646,7 @@ public:
      * Return a version of this object where top level elements of
      * MinKey and MaxKey type are replaced with EJSON-like objects.
      */
-    MONGO_MOD_USE_REPLACEMENT(move this code to data_movement) BSONObj clientReadable() const;
+    [[MONGO_MOD_USE_REPLACEMENT("move this code to data_movement")]] BSONObj clientReadable() const;
 
     static BSONObj stripFieldNames(const BSONObj& obj);
 

@@ -37,7 +37,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC CollectionShardingStateFactoryShard final
+class [[MONGO_MOD_PUBLIC]] CollectionShardingStateFactoryShard final
     : public CollectionShardingStateFactory {
 public:
     CollectionShardingStateFactoryShard(ServiceContext* serviceContext);

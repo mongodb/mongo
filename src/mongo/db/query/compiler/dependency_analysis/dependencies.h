@@ -71,12 +71,12 @@ struct ThreeWayPathComparator {
  * Set of field paths strings.  When iterated over, a parent path is seen directly before its
  * children (or descendants, more generally).  Eg., "a", "a.a", "a.b", "a-plus", "b".
  */
-MONGO_MOD_NEEDS_REPLACEMENT typedef std::set<std::string, PathComparator> OrderedPathSet;
+[[MONGO_MOD_NEEDS_REPLACEMENT]] typedef std::set<std::string, PathComparator> OrderedPathSet;
 
 /**
  * This struct allows components in an agg pipeline to report what they need from their input.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT DepsTracker {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] DepsTracker {
     struct NoMetadataValidation {
         // Nothing.
     };

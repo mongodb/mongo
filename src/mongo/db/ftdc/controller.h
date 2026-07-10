@@ -309,7 +309,7 @@ private:
         Minutes{5}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
 };
 
-MONGO_MOD_NEEDS_REPLACEMENT inline BSONObj getMostRecentFTDCDocument(ServiceContext* svcCtx) {
+[[MONGO_MOD_NEEDS_REPLACEMENT]] inline BSONObj getMostRecentFTDCDocument(ServiceContext* svcCtx) {
     return FTDCController::get(svcCtx)->getMostRecentPeriodicDocument();
 }
 

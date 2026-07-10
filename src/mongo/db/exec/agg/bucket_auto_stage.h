@@ -68,10 +68,10 @@ public:
                                   query_shape::SerializationOptions{}) const final;
 
     /**
-     * TODO SERVER-112710: Remove 'MONGO_MOD_PRIVATE' once document_source_bucket_auto_test.cpp is
-     * split into two parts.
+     * TODO SERVER-112710: Remove '[[MONGO_MOD_PRIVATE]]' once document_source_bucket_auto_test.cpp
+     * is split into two parts.
      */
-    MONGO_MOD_PRIVATE const MemoryUsageTracker* getMemoryTracker_forTest() const {
+    [[MONGO_MOD_PRIVATE]] const MemoryUsageTracker* getMemoryTracker_forTest() const {
         return &_memoryTracker;
     }
 

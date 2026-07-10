@@ -38,13 +38,13 @@
 
 #include <fmt/format.h>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 /**
  * A faster alternative to `iasserted`, designed to throw exceptions for unexceptional events on the
  * critical execution path (e.g., `WriteConflict`).
  */
 template <ErrorCodes::Error ec>
-MONGO_MOD_FILE_PRIVATE [[noreturn]] void throwExceptionFor(std::string reason) {
+[[MONGO_MOD_FILE_PRIVATE]] [[noreturn]] void throwExceptionFor(std::string reason) {
     throw ExceptionFor<ec>({ec, std::move(reason)});
 }
 
@@ -89,4 +89,4 @@ MONGO_MOD_FILE_PRIVATE [[noreturn]] void throwExceptionFor(std::string reason) {
     throwExceptionFor<ErrorCodes::TransactionTooLargeForCache>(std::move(context));
 }
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -42,7 +42,7 @@ namespace mongo::rss {
  * 'NotImplemented' error. Tests can use this implementation as a base and only override the methods
  * that they need and want to specialize.
  */
-class MONGO_MOD_OPEN StubPersistenceProvider : public PersistenceProvider {
+class [[MONGO_MOD_OPEN]] StubPersistenceProvider : public PersistenceProvider {
 public:
     std::string name() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,

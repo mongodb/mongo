@@ -33,7 +33,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 extern AtomicWord<long long> gTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes;
 uint64_t getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes();
@@ -51,4 +51,4 @@ inline Status validateTimeAndMetaField(const std::string& str) {
     return Status::OK();
 }
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

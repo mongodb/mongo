@@ -51,7 +51,7 @@ namespace rss {
  * capabilities/behaviors, while this class instead represents a set of setup/teardown and related
  * routines.
  */
-class MONGO_MOD_OPEN ServiceLifecycle {
+class [[MONGO_MOD_OPEN]] ServiceLifecycle {
 public:
     virtual ~ServiceLifecycle() = default;
 

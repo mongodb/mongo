@@ -35,7 +35,7 @@
 
 #include <string_view>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 namespace mongo::timeseries {
 BSONObj generateTimeseriesValidator(int bucketVersion, std::string_view timeField);
 

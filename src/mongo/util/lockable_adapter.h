@@ -33,7 +33,7 @@
 
 #include <type_traits>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 // BasicLockableAdapter allows non-template functions to take any lockable type. This can be useful
 // when you have a custom lockable type and don't want to make the lockable parameter concrete for a
@@ -77,4 +77,4 @@ private:
     const VTable* _vtable;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

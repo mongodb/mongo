@@ -29,7 +29,7 @@
 
 global:
     cpp_namespace: "mongo::repl"
-    mod_visibility: pub
+    mod_visibility: public
 
 imports:
     - "mongo/db/basic_types.idl"

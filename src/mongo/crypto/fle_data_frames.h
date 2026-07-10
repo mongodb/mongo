@@ -35,7 +35,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 constexpr int kAssociatedDataLength = 18;
 constexpr size_t kHmacOutSize = 32;
 
@@ -224,4 +224,4 @@ private:
     std::vector<uint8_t> _plaintext;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

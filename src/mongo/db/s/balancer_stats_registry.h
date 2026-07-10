@@ -54,7 +54,7 @@ namespace mongo {
  * and terminated on stepDown.
  */
 
-class MONGO_MOD_NEEDS_REPLACEMENT BalancerStatsRegistry
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] BalancerStatsRegistry
     : public ReplicaSetAwareServiceShardSvr<BalancerStatsRegistry> {
 
     BalancerStatsRegistry(const BalancerStatsRegistry&) = delete;
@@ -75,11 +75,11 @@ public:
      *
      * If the registy is not initialized this function will be a noop.
      */
-    MONGO_MOD_PRIVATE void updateOrphansCount(const UUID& collectionUUID, long long delta);
+    [[MONGO_MOD_PRIVATE]] void updateOrphansCount(const UUID& collectionUUID, long long delta);
     void onRangeDeletionTaskInsertion(const UUID& collectionUUID, long long numOrphanDocs);
     void onRangeDeletionTaskDeletion(const UUID& collectionUUID, long long numOrphanDocs);
 
-    MONGO_MOD_PRIVATE long long getCollNumOrphanDocs(const UUID& collectionUUID) const;
+    [[MONGO_MOD_PRIVATE]] long long getCollNumOrphanDocs(const UUID& collectionUUID) const;
 
     /**
      * Retrieves the numOrphanDocs from the balancer stats registry if initialized or runs an

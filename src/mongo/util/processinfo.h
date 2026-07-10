@@ -47,7 +47,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC ProcessInfo {
+class [[MONGO_MOD_PUBLIC]] ProcessInfo {
 public:
     static auto constexpr kTranparentHugepageDirectory = "/sys/kernel/mm/transparent_hugepage";
     static auto constexpr kGlibcTunableEnvVar = "GLIBC_TUNABLES";

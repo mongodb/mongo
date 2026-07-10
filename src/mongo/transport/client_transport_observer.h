@@ -42,7 +42,7 @@ namespace transport {
 /**
  * ClientTransportObservers are notified during key events in a Client's lifecycle.
  */
-class MONGO_MOD_OPEN ClientTransportObserver {
+class [[MONGO_MOD_OPEN]] ClientTransportObserver {
 public:
     virtual ~ClientTransportObserver() = default;
 

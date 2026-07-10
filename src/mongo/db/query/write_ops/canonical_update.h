@@ -71,7 +71,7 @@ class UpdateRequest;
  * The query part of the update is parsed to a CanonicalQuery, which is originally a
  * ParsedFindCommand.
  */
-class MONGO_MOD_PUBLIC CanonicalUpdate {
+class [[MONGO_MOD_PUBLIC]] CanonicalUpdate {
     CanonicalUpdate(const CanonicalUpdate&) = delete;
     CanonicalUpdate& operator=(const CanonicalUpdate&) = delete;
 

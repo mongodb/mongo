@@ -98,8 +98,8 @@ namespace mongo {
  * data should be moved out of ShardingCatalogClient and into this class.
  */
 // TODO (SERVER-105531): Untag inner symbol declarations exceptionally tagged as
-// MONGO_MOD_UNFORTUNATELY_OPEN.
-class MONGO_MOD_NEEDS_REPLACEMENT ShardingCatalogManager {
+// [[MONGO_MOD_UNFORTUNATELY_OPEN]].
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardingCatalogManager {
     ShardingCatalogManager(const ShardingCatalogManager&) = delete;
     ShardingCatalogManager& operator=(const ShardingCatalogManager&) = delete;
 
@@ -849,7 +849,7 @@ private:
     /**
      * Drops the sessions collection on the specified host.
      */
-    MONGO_MOD_UNFORTUNATELY_OPEN Status _dropSessionsCollection(
+    [[MONGO_MOD_UNFORTUNATELY_OPEN]] Status _dropSessionsCollection(
         OperationContext* opCtx, std::shared_ptr<RemoteCommandTargeter> targeter);
 
     /**
@@ -857,7 +857,7 @@ private:
      * it returns excluding those named local, config and admin, since they serve administrative
      * purposes.
      */
-    MONGO_MOD_UNFORTUNATELY_OPEN StatusWith<std::vector<DatabaseName>> _getDBNamesListFromShard(
+    [[MONGO_MOD_UNFORTUNATELY_OPEN]] StatusWith<std::vector<DatabaseName>> _getDBNamesListFromShard(
         OperationContext* opCtx, std::shared_ptr<RemoteCommandTargeter> targeter);
 
 
@@ -865,7 +865,7 @@ private:
      * Runs a command against a "shard" that is not yet in the cluster and thus not present in the
      * ShardRegistry.
      */
-    MONGO_MOD_UNFORTUNATELY_OPEN StatusWith<Shard::CommandResponse> _runCommandForAddShard(
+    [[MONGO_MOD_UNFORTUNATELY_OPEN]] StatusWith<Shard::CommandResponse> _runCommandForAddShard(
         OperationContext* opCtx,
         RemoteCommandTargeter* targeter,
         const DatabaseName& dbName,
@@ -889,7 +889,7 @@ private:
      * Returns true if the zone with the given name has chunk ranges associated with it and the
      * shard with the given name is the only shard that it belongs to.
      */
-    MONGO_MOD_UNFORTUNATELY_OPEN StatusWith<bool> _isShardRequiredByZoneStillInUse(
+    [[MONGO_MOD_UNFORTUNATELY_OPEN]] StatusWith<bool> _isShardRequiredByZoneStillInUse(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
         const std::string& shardName,
@@ -900,7 +900,7 @@ private:
      * converting from a replica set to a sharded cluster) or set the cluster parameters stored on
      * the config server in the newly added shard.
      */
-    MONGO_MOD_UNFORTUNATELY_OPEN void _standardizeClusterParameters(
+    [[MONGO_MOD_UNFORTUNATELY_OPEN]] void _standardizeClusterParameters(
         OperationContext* opCtx, RemoteCommandTargeter& targeter);
 
     /**
@@ -1061,7 +1061,7 @@ private:
      * _kClusterCardinalityParameterLock lock in exclusive mode to avoid interleaving with other
      * add/remove shard operation and its set cluster cardinality parameter operation.
      */
-    MONGO_MOD_UNFORTUNATELY_OPEN Status _updateClusterCardinalityParameterAfterAddShardIfNeeded(
+    [[MONGO_MOD_UNFORTUNATELY_OPEN]] Status _updateClusterCardinalityParameterAfterAddShardIfNeeded(
         const Lock::ExclusiveLock&, OperationContext* opCtx);
 
     // The owning service context
@@ -1070,11 +1070,13 @@ private:
     // Executor specifically used for sending commands to servers that are in the process of being
     // added as shards. Does not have any connection hook set on it, thus it can be used to talk to
     // servers that are not yet in the ShardRegistry.
-    MONGO_MOD_UNFORTUNATELY_OPEN const std::shared_ptr<executor::TaskExecutor> _executorForAddShard;
+    [[MONGO_MOD_UNFORTUNATELY_OPEN]] const std::shared_ptr<executor::TaskExecutor>
+        _executorForAddShard;
 
     // A ShardLocal and ShardingCatalogClient with a ShardLocal used for local connections.
-    MONGO_MOD_UNFORTUNATELY_OPEN const std::shared_ptr<Shard> _localConfigShard;
-    MONGO_MOD_UNFORTUNATELY_OPEN const std::unique_ptr<ShardingCatalogClient> _localCatalogClient;
+    [[MONGO_MOD_UNFORTUNATELY_OPEN]] const std::shared_ptr<Shard> _localConfigShard;
+    [[MONGO_MOD_UNFORTUNATELY_OPEN]] const std::unique_ptr<ShardingCatalogClient>
+        _localCatalogClient;
 
     //
     // All member variables are labeled with one of the following codes indicating the
@@ -1100,12 +1102,12 @@ private:
     /**
      * Lock that is held in exclusive mode during the commit phase of an add/remove shard operation.
      */
-    MONGO_MOD_UNFORTUNATELY_OPEN ResourceMutex _kShardMembershipLock;
+    [[MONGO_MOD_UNFORTUNATELY_OPEN]] ResourceMutex _kShardMembershipLock;
 
     /**
      * Lock that guards changes to the cluster cardinality parameter.
      */
-    MONGO_MOD_UNFORTUNATELY_OPEN ResourceMutex _kClusterCardinalityParameterLock;
+    [[MONGO_MOD_UNFORTUNATELY_OPEN]] ResourceMutex _kClusterCardinalityParameterLock;
 
     /**
      * Lock for chunk split/merge/move operations. This should be acquired when doing split/merge/

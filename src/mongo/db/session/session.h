@@ -41,7 +41,7 @@ namespace mongo {
  * A decorable container for state associated with an active transaction session running on a MongoD
  * or MongoS server. Refer to SessionCatalog for more information on the semantics of sessions.
  */
-class MONGO_MOD_PUB Session : public Decorable<Session> {
+class [[MONGO_MOD_PUBLIC]] Session : public Decorable<Session> {
     Session(const Session&) = delete;
     Session& operator=(const Session&) = delete;
 

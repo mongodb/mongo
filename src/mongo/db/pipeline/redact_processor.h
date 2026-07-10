@@ -43,7 +43,7 @@ namespace mongo {
  * This class is used by the aggregation framework and streams enterprise module to perform the
  * document processing needed for $redact.
  */
-class MONGO_MOD_PUBLIC RedactProcessor final {
+class [[MONGO_MOD_PUBLIC]] RedactProcessor final {
 public:
     RedactProcessor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                     const boost::intrusive_ptr<Expression>& expression,

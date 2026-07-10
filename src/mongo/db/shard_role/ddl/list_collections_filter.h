@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC ListCollectionsFilter {
+class [[MONGO_MOD_PUBLIC]] ListCollectionsFilter {
     ListCollectionsFilter(const ListCollectionsFilter&) = delete;
     ListCollectionsFilter& operator=(const ListCollectionsFilter&) = delete;
 

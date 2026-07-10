@@ -45,7 +45,7 @@
 #include <utility>
 #include <vector>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Utility class which represents a field path with nested paths separated by dots.
@@ -291,4 +291,4 @@ H AbslHashValue(H h, const boost::optional<FieldPath>& fieldPath) {
         h = H::combine(std::move(h), *fieldPath);
     return H::combine(std::move(h), fieldPath.has_value());
 }
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

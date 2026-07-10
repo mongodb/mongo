@@ -44,11 +44,11 @@
 
 namespace mongo {
 
-MONGO_MOD_NEEDS_REPLACEMENT inline std::string_view bypassDocumentValidationCommandOption() {
+[[MONGO_MOD_NEEDS_REPLACEMENT]] inline std::string_view bypassDocumentValidationCommandOption() {
     return "bypassDocumentValidation";
 }
 
-MONGO_MOD_NEEDS_REPLACEMENT inline bool shouldBypassDocumentValidationForCommand(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] inline bool shouldBypassDocumentValidationForCommand(
     const BSONObj& cmdObj) {
     return cmdObj[bypassDocumentValidationCommandOption()].trueValue();
 }
@@ -59,7 +59,7 @@ MONGO_MOD_NEEDS_REPLACEMENT inline bool shouldBypassDocumentValidationForCommand
  * schema and internal) is enabled. DocumentValidationSettings objects are not thread-safe.
  *
  */
-class MONGO_MOD_NEEDS_REPLACEMENT DocumentValidationSettings {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DocumentValidationSettings {
 public:
     enum flag : std::uint8_t {
         /*
@@ -136,7 +136,7 @@ private:
  * Disables document validation on a single OperationContext while in scope.
  * Resets to original value when leaving scope so they are safe to nest.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT DisableDocumentValidation {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DisableDocumentValidation {
     DisableDocumentValidation(const DisableDocumentValidation&) = delete;
     DisableDocumentValidation& operator=(const DisableDocumentValidation&) = delete;
 
@@ -157,7 +157,7 @@ private:
     DocumentValidationSettings _initialState;
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT DisableDocumentValidationForInternalOp {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DisableDocumentValidationForInternalOp {
 public:
     DisableDocumentValidationForInternalOp(OperationContext* opCtx)
         : _documentSchemaValidationDisabler(
@@ -171,7 +171,7 @@ private:
  * Disables document schema validation for user requests while in scope if the constructor is passed
  * true.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT DisableDocumentSchemaValidationRequestedByUserIfTrue {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DisableDocumentSchemaValidationRequestedByUserIfTrue {
 public:
     DisableDocumentSchemaValidationRequestedByUserIfTrue(OperationContext* opCtx,
                                                          bool shouldDisableSchemaValidation) {
@@ -185,7 +185,7 @@ private:
     boost::optional<DisableDocumentValidation> _documentSchemaValidationDisabler;
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT DisableSafeContentValidationIfTrue {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DisableSafeContentValidationIfTrue {
 public:
     DisableSafeContentValidationIfTrue(OperationContext* opCtx,
                                        bool shouldDisableSchemaValidation,

@@ -67,7 +67,7 @@
 namespace mongo {
 using namespace std::literals::string_view_literals;
 
-namespace MONGO_MOD_PUB idl_server_parameter_bounds {
+namespace [[MONGO_MOD_PUBLIC]] idl_server_parameter_bounds {
 // Predicate rules for bounds conditions
 struct GT {
     static constexpr inline std::string_view kind = "gt";
@@ -104,7 +104,7 @@ struct LTE {
         return a <= b;
     }
 };
-}  // namespace MONGO_MOD_PUB idl_server_parameter_bounds
+}  // namespace idl_server_parameter_bounds
 
 namespace idl_server_parameter_detail {
 
@@ -280,7 +280,7 @@ private:
  * Specialization of ServerParameter used by IDL generator.
  */
 template <ServerParameterType paramType, typename T>
-class MONGO_MOD_PUB IDLServerParameterWithStorage : public ServerParameter {
+class [[MONGO_MOD_PUBLIC]] IDLServerParameterWithStorage : public ServerParameter {
 private:
     using SPT = ServerParameterType;
     using SW = idl_server_parameter_detail::storage_wrapper<T>;
@@ -533,6 +533,6 @@ private:
 };
 
 template <typename Storage>
-using ClusterParameterWithStorage MONGO_MOD_PUB =
+using ClusterParameterWithStorage [[MONGO_MOD_PUBLIC]] =
     IDLServerParameterWithStorage<ServerParameterType::kClusterWide, TenantIdMap<Storage>>;
 }  // namespace mongo

@@ -32,7 +32,7 @@
 #include "mongo/client/retry_strategy.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace primary_only_service_helpers {
 
 using RetryabilityPredicate = std::function<bool(const Status&)>;
@@ -61,4 +61,4 @@ private:
 };
 
 }  // namespace primary_only_service_helpers
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

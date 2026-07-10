@@ -58,8 +58,8 @@ struct TrafficReaderPacket {
 bool operator==(const TrafficReaderPacket& read, const TrafficRecordingPacket& recorded);
 
 // Method for testing, takes the recorded traffic and returns a BSONArray
-MONGO_MOD_PUBLIC BSONArray trafficRecordingFileToBSONArr(const std::string& inputFile,
-                                                         bool bodyAsNestedDoc = false);
+[[MONGO_MOD_PUBLIC]] BSONArray trafficRecordingFileToBSONArr(const std::string& inputFile,
+                                                             bool bodyAsNestedDoc = false);
 
 // This is the function that traffic_reader_main.cpp calls
 void trafficRecordingFileToMongoReplayFile(int inFile, std::ostream& outFile);

@@ -42,7 +42,7 @@
 #include <string_view>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC executor {
+namespace [[MONGO_MOD_PUBLIC]] executor {
 
 /**
  * Returns a new NetworkInterface that uses a connection pool with the default options.
@@ -79,5 +79,5 @@ std::unique_ptr<NetworkInterface> makeNetworkInterfaceWithClientFactory(
     std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
     bool trackRequestCounts = false);
 
-}  // namespace MONGO_MOD_PUBLIC executor
+}  // namespace executor
 }  // namespace mongo

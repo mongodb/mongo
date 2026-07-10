@@ -35,7 +35,7 @@
 
 namespace mongo::collection_options_validation {
 
-MONGO_MOD_PRIVATE
+[[MONGO_MOD_PRIVATE]]
 Status validateStorageEngineOptions(const BSONObj& storageEngine);
 
 }  // namespace mongo::collection_options_validation

@@ -33,12 +33,12 @@
 
 #include <string_view>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class Client;
 class OperationContext;
 
-namespace MONGO_MOD_PUBLIC auth {
+namespace [[MONGO_MOD_PUBLIC]] auth {
 
 class ValidatedTenancyScopeFactory {
 public:
@@ -129,5 +129,5 @@ private:
     boost::optional<auth::ValidatedTenancyScope::TenantProtocol> _tenantProtocol;
 };
 
-}  // namespace MONGO_MOD_PUBLIC auth
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace auth
+}  // namespace mongo

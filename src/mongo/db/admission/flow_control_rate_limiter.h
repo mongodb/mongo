@@ -46,7 +46,7 @@ namespace mongo {
  * semaphore approach. Unconditionally registered as a ServiceContext decoration by the
  * FlowControl constructor; gated at the call site by flowControlUseRateLimiter.
  */
-class MONGO_MOD_PUBLIC FlowControlRateLimiter {
+class [[MONGO_MOD_PUBLIC]] FlowControlRateLimiter {
 public:
     static constexpr int64_t kDefaultMaxQueueDepth = 1000000;
     static constexpr int kMaxRate = 1000 * 1000 * 1000;

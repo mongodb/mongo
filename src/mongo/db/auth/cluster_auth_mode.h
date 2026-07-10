@@ -41,7 +41,7 @@ class ServiceContext;
 /**
  * ClusterAuthMode is a thin wrapper around an enum for decorated storage and semantic utility.
  */
-class MONGO_MOD_PUBLIC ClusterAuthMode {
+class [[MONGO_MOD_PUBLIC]] ClusterAuthMode {
     enum class Value {
         kUndefined,
         /**

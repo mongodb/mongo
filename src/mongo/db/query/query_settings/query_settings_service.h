@@ -96,7 +96,7 @@ RepresentativeQueryInfo createRepresentativeInfo(OperationContext* opCtx,
                                                  const QueryInstance& queryInstance,
                                                  const boost::optional<TenantId>& tenantId);
 
-class MONGO_MOD_PUBLIC QuerySettingsService {
+class [[MONGO_MOD_PUBLIC]] QuerySettingsService {
 public:
     /**
      * Gets the instance of the class using the service context.

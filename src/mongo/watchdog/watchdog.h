@@ -46,7 +46,7 @@
 
 #include <boost/filesystem/path.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 using namespace std::literals::string_view_literals;
 
 class OperationContext;
@@ -119,7 +119,7 @@ private:
  * - sleep(period)
  * - callback
  */
-class MONGO_MOD_OPEN WatchdogPeriodicThread {
+class [[MONGO_MOD_OPEN]] WatchdogPeriodicThread {
 public:
     WatchdogPeriodicThread(Milliseconds period, std::string_view threadName);
     virtual ~WatchdogPeriodicThread() = default;
@@ -348,7 +348,7 @@ public:
     /**
      * Gets whether checks are paused or not. For testing purposes only.
      */
-    MONGO_MOD_PUBLIC virtual bool getShouldRunChecks_forTest() = 0;
+    [[MONGO_MOD_PUBLIC]] virtual bool getShouldRunChecks_forTest() = 0;
 };
 
 
@@ -447,4 +447,4 @@ private:
     WatchdogMonitorThread _watchdogMonitorThread;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

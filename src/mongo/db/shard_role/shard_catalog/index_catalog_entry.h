@@ -57,7 +57,7 @@ class MatchExpression;
 class OperationContext;
 class UpdateIndexData;
 
-class MONGO_MOD_NEEDS_REPLACEMENT IndexCatalogEntry
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] IndexCatalogEntry
     : public std::enable_shared_from_this<IndexCatalogEntry> {
 public:
     IndexCatalogEntry() = default;
@@ -180,7 +180,7 @@ public:
         IndexDescriptor descriptor) const = 0;
 };
 
-class MONGO_MOD_PRIVATE IndexCatalogEntryContainer {
+class [[MONGO_MOD_PRIVATE]] IndexCatalogEntryContainer {
 public:
     using const_iterator = std::vector<std::shared_ptr<const IndexCatalogEntry>>::const_iterator;
     using iterator = std::vector<std::shared_ptr<const IndexCatalogEntry>>::const_iterator;

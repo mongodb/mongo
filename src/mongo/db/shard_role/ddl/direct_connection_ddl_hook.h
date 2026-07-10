@@ -43,7 +43,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC DirectConnectionDDLHook : public ReplicaSetDDLHook {
+class [[MONGO_MOD_PUBLIC]] DirectConnectionDDLHook : public ReplicaSetDDLHook {
 public:
     inline static const std::string kDirectConnectionDDLHookName = "DirectConnectionDDLHook";
 

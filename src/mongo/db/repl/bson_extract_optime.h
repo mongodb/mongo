@@ -34,7 +34,7 @@
 
 #include <string_view>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class BSONObj;
 
@@ -55,4 +55,4 @@ class OpTime;
  */
 Status bsonExtractOpTimeField(const BSONObj& object, std::string_view fieldName, repl::OpTime* out);
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

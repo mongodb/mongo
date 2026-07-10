@@ -49,7 +49,7 @@
 
 namespace mongo {
 
-using ReshardingFields MONGO_MOD_NEEDS_REPLACEMENT = TypeCollectionReshardingFields;
+using ReshardingFields [[MONGO_MOD_NEEDS_REPLACEMENT]] = TypeCollectionReshardingFields;
 
 /**
  * This class represents the layout and contents of documents contained in the config server's
@@ -91,7 +91,7 @@ using ReshardingFields MONGO_MOD_NEEDS_REPLACEMENT = TypeCollectionReshardingFie
  *   }
  *
  */
-class MONGO_MOD_NEEDS_REPLACEMENT CollectionType : private GlobalCatalogCollectionTypeBase {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] CollectionType : private GlobalCatalogCollectionTypeBase {
 public:
     // Make field names accessible.
     static constexpr auto kEpochFieldName = kPre22CompatibleEpochFieldName;

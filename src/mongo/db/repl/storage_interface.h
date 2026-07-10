@@ -62,7 +62,7 @@
 namespace mongo {
 namespace repl {
 
-struct MONGO_MOD_PUB TimestampedBSONObj {
+struct [[MONGO_MOD_PUBLIC]] TimestampedBSONObj {
     BSONObj obj;
     Timestamp timestamp;
 };
@@ -79,7 +79,7 @@ struct MONGO_MOD_PUB TimestampedBSONObj {
  *      * Drop a collection
  *      * Insert documents into a collection
  */
-class MONGO_MOD_PUB StorageInterface {
+class [[MONGO_MOD_PUBLIC]] StorageInterface {
     StorageInterface(const StorageInterface&) = delete;
     StorageInterface& operator=(const StorageInterface&) = delete;
 

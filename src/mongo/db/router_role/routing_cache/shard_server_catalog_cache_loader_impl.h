@@ -68,7 +68,7 @@ namespace mongo {
  * copy of that chunk metadata so shard secondaries can access the metadata. If a shard secondary,
  * retrieves chunk metadata from the shard persisted chunk metadata.
  */
-class MONGO_MOD_PARENT_PRIVATE ShardServerCatalogCacheLoaderImpl
+class [[MONGO_MOD_PARENT_PRIVATE]] ShardServerCatalogCacheLoaderImpl
     : public ShardServerCatalogCacheLoader {
     ShardServerCatalogCacheLoaderImpl(const ShardServerCatalogCacheLoaderImpl&) = delete;
     ShardServerCatalogCacheLoaderImpl& operator=(const ShardServerCatalogCacheLoaderImpl&) = delete;

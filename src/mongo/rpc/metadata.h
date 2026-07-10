@@ -51,7 +51,7 @@ class OperationContext;
 /**
  * Utilities for dealing with what used to be called metadata.
  */
-namespace MONGO_MOD_PUBLIC rpc {
+namespace [[MONGO_MOD_PUBLIC]] rpc {
 class ImpersonatedClientSessionGuard;
 /**
  * Returns an empty metadata object.
@@ -101,5 +101,5 @@ using RequestMetadataWriter =
 using ReplyMetadataReader = std::function<Status(
     OperationContext* opCtx, const BSONObj& replyMetadata, std::string_view sourceHost)>;
 
-}  // namespace MONGO_MOD_PUBLIC rpc
+}  // namespace rpc
 }  // namespace mongo

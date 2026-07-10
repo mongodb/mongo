@@ -46,6 +46,6 @@ namespace mongo {
  * - The _isSelf/saslContinue/saslStart OP_QUERY commands are allowed for intra-cluster
  * communication in a mixed version cluster. V5.0 nodes may send those commands as OP_QUERY ones.
  */
-MONGO_MOD_PUBLIC void checkAllowedOpQueryCommand(Client& client, std::string_view cmd);
+[[MONGO_MOD_PUBLIC]] void checkAllowedOpQueryCommand(Client& client, std::string_view cmd);
 
 }  // namespace mongo

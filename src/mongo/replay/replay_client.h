@@ -34,7 +34,7 @@
 
 namespace mongo {
 class ServiceContext;
-class MONGO_MOD_PUBLIC ReplayClient {
+class [[MONGO_MOD_PUBLIC]] ReplayClient {
 public:
     void replayRecording(const ReplayConfigs&);
     void replayRecording(const std::string& recordingFileName, const std::string& uri);

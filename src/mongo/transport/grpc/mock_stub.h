@@ -41,7 +41,7 @@
 #include "mongo/util/producer_consumer_queue.h"
 
 namespace mongo::transport {
-namespace MONGO_MOD_PARENT_PRIVATE grpc {
+namespace [[MONGO_MOD_PARENT_PRIVATE]] grpc {
 
 class MockRPC {
 public:
@@ -233,5 +233,5 @@ private:
     std::shared_ptr<MockChannel> _channel;
 };
 
-}  // namespace MONGO_MOD_PARENT_PRIVATE grpc
+}  // namespace grpc
 }  // namespace mongo::transport

@@ -53,7 +53,7 @@ namespace mongo::exec::agg {
  *
  * TODO SERVER-112777: Remove 'atlas_streams' dependency on reference to 'BatchObject' type.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT MergeStage final
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] MergeStage final
     : public WriterStage<MongoProcessInterface::BatchObject> {
 public:
     MergeStage(std::string_view stageName,

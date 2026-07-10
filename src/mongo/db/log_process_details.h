@@ -33,7 +33,7 @@
 
 #include <iosfwd>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class ServiceContext;
 
@@ -49,4 +49,4 @@ void logProcessDetails(std::ostream* os);
  */
 void logProcessDetailsForLogRotate(ServiceContext* serviceContext);
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

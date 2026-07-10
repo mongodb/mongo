@@ -83,7 +83,7 @@ class ListCollections;
  * every operation looks at one consistent view of each user for every auth check required over
  * the lifetime of the operation.
  */
-class MONGO_MOD_PUBLIC AuthorizationSession {
+class [[MONGO_MOD_PUBLIC]] AuthorizationSession {
     AuthorizationSession(const AuthorizationSession&) = delete;
     AuthorizationSession& operator=(const AuthorizationSession&) = delete;
 
@@ -318,7 +318,7 @@ public:
 // access a cursor in the specified `cursorSessionId` parameter.  Returns `Status::OK()`, when the
 // session is accessible.  Returns a `mongo::Status` with information regarding the nature of
 // session inaccessibility when the session is not accessible.
-MONGO_MOD_PUBLIC inline Status checkCursorSessionPrivilege(
+[[MONGO_MOD_PUBLIC]] inline Status checkCursorSessionPrivilege(
     OperationContext* const opCtx, const boost::optional<LogicalSessionId> cursorSessionId) {
     if (!AuthorizationSession::exists(opCtx->getClient())) {
         return Status::OK();

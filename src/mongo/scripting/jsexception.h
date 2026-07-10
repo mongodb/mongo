@@ -49,7 +49,7 @@ namespace mongo {
  * This class wraps an existing error and serializes it in a lossless way, so any other metadata
  * about the JavaScript exception is also preserved.
  */
-class MONGO_MOD_PUB JSExceptionInfo final : public ErrorExtraInfo {
+class [[MONGO_MOD_PUBLIC]] JSExceptionInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::JSInterpreterFailureWithStack;
 

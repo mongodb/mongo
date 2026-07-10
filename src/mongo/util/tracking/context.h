@@ -33,7 +33,7 @@
 #include "mongo/util/processinfo.h"
 #include "mongo/util/tracking/allocator.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace tracking {
 
 /**
@@ -63,4 +63,4 @@ private:
 };
 
 }  // namespace tracking
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

@@ -54,7 +54,7 @@ struct OpMsgRequest;
  *
  * All public functions are thread-safe.
  */
-class MONGO_MOD_PUBLIC MirrorMaestro {
+class [[MONGO_MOD_PUBLIC]] MirrorMaestro {
 public:
     /**
      * Initialize the MirrorMaestro for serviceContext

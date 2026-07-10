@@ -61,7 +61,7 @@
 
 #include <sys/types.h>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 
@@ -678,7 +678,7 @@ public:
         return _b.len();
     }
 
-    MONGO_MOD_NEEDS_REPLACEMENT B& bb() {
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] B& bb() {
         return _b;
     }
 
@@ -1136,7 +1136,7 @@ public:
         return _fieldCount;
     }
 
-    MONGO_MOD_NEEDS_REPLACEMENT auto& bb() {
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] auto& bb() {
         return _b.bb();
     }
 

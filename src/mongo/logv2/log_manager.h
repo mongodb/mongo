@@ -46,7 +46,7 @@ class LogComponentSettings;
  *
  * Use this while setting up the logging system, before launching any threads.
  */
-class MONGO_MOD_PUBLIC LogManager {
+class [[MONGO_MOD_PUBLIC]] LogManager {
 public:
     LogManager(const LogManager&) = delete;
     LogManager& operator=(const LogManager&) = delete;

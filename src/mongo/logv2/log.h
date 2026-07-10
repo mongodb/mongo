@@ -299,7 +299,7 @@
         ##__VA_ARGS__)
 
 namespace mongo::logv2 {
-MONGO_MOD_PUBLIC inline bool shouldLog(LogComponent logComponent, LogSeverity severity) {
+[[MONGO_MOD_PUBLIC]] inline bool shouldLog(LogComponent logComponent, LogSeverity severity) {
     return LogManager::global().getGlobalSettings().shouldLog(logComponent, severity);
 }
 }  // namespace mongo::logv2

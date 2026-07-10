@@ -49,7 +49,7 @@ namespace mongo::logv2 {
  * TODO(schwerin): If no console is attached on Windows (services), should writes here go to the
  * event logger?
  */
-class MONGO_MOD_PUBLIC Console {
+class [[MONGO_MOD_PUBLIC]] Console {
 public:
     Console();
 

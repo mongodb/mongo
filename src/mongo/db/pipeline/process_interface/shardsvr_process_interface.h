@@ -68,7 +68,7 @@ namespace mongo {
 /**
  * Specialized version of the MongoDInterface when this node is a shard server.
  */
-class MONGO_MOD_PUBLIC ShardServerProcessInterface final : public CommonMongodProcessInterface {
+class [[MONGO_MOD_PUBLIC]] ShardServerProcessInterface final : public CommonMongodProcessInterface {
 public:
     using CommonMongodProcessInterface::CommonMongodProcessInterface;
 

@@ -43,7 +43,7 @@ class OperationContext;
  * Notfication callback, which stores the last notification result and signals a condition
  * variable, which can be waited on.
  */
-class MONGO_MOD_PRIVATE CondVarLockGrantNotification final : public LockGrantNotification {
+class [[MONGO_MOD_PRIVATE]] CondVarLockGrantNotification final : public LockGrantNotification {
 public:
     CondVarLockGrantNotification() = default;
 

@@ -38,7 +38,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace endian {
 
 /** Like `std::endian`. https://en.cppreference.com/w/cpp/types/endian */
@@ -143,4 +143,4 @@ T littleToNative(T t) {
 }
 
 }  // namespace endian
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

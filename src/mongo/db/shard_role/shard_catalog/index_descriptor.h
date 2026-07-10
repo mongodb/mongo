@@ -56,7 +56,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <boost/type_traits/decay.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 using namespace std::literals::string_view_literals;

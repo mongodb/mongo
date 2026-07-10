@@ -72,7 +72,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace MONGO_MOD_PUB txn_api {
+namespace [[MONGO_MOD_PUBLIC]] txn_api {
 
 namespace details {
 class TxnHooks;
@@ -276,7 +276,7 @@ private:
  * Contains implementation details for the above API. Classes in this namespace should not be used
  * directly.
  */
-namespace MONGO_MOD_PRIVATE details {
+namespace [[MONGO_MOD_PRIVATE]] details {
 
 /**
  * Customization point for behaviors different in the default SEPTransactionClient and the one for
@@ -328,7 +328,7 @@ public:
  * Default transaction client that runs given commands through the local process service entry
  * point.
  */
-class MONGO_MOD_PUB SEPTransactionClient : public TransactionClient {
+class [[MONGO_MOD_PUBLIC]] SEPTransactionClient : public TransactionClient {
 public:
     SEPTransactionClient(OperationContext* opCtx,
                          std::shared_ptr<executor::InlineExecutor> inlineExecutor,
@@ -698,6 +698,6 @@ private:
     CancellationToken _token;
 };
 
-}  // namespace MONGO_MOD_PRIVATE details
-}  // namespace MONGO_MOD_PUB txn_api
+}  // namespace details
+}  // namespace txn_api
 }  // namespace mongo

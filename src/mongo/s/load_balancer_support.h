@@ -39,7 +39,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC load_balancer_support {
+namespace [[MONGO_MOD_PUBLIC]] load_balancer_support {
 
 /**
  * Gets the load balancer port, if we are configured to enable one.
@@ -77,5 +77,5 @@ LogicalSessionId getMruSession(Client* client);
 void setMruSession(Client* client, LogicalSessionId id);
 
 
-}  // namespace MONGO_MOD_PUBLIC load_balancer_support
+}  // namespace load_balancer_support
 }  // namespace mongo

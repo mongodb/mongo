@@ -41,11 +41,11 @@
 
 #include <boost/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 // Keep "milestones" against the oplog to efficiently remove the old records when the collection
 // grows beyond its desired maximum size.
-class MONGO_MOD_OPEN OplogTruncateMarkers : public CollectionTruncateMarkers {
+class [[MONGO_MOD_OPEN]] OplogTruncateMarkers : public CollectionTruncateMarkers {
 public:
     OplogTruncateMarkers(std::deque<CollectionTruncateMarkers::Marker>&& markers,
                          int64_t partialMarkerRecords,
@@ -152,4 +152,4 @@ private:
     const RecordStore::Oplog& _oplog;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -83,7 +83,7 @@ protected:
     ServiceContext::UniqueClient _oldClient;
 
 private:
-    MONGO_MOD_FILE_PRIVATE unittest::MinimumLoggedSeverityGuard _verboseGuard{
+    [[MONGO_MOD_FILE_PRIVATE]] unittest::MinimumLoggedSeverityGuard _verboseGuard{
         logv2::LogComponent::kReplicationInitialSync, logv2::LogSeverity::Debug(1)};
 };
 

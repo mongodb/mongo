@@ -40,7 +40,7 @@
 
 namespace mongo {
 // TODO SERVER-115201: Break up the utils not to cross modules
-namespace MONGO_MOD_NEEDS_REPLACEMENT change_stream_pre_image_util {
+namespace [[MONGO_MOD_NEEDS_REPLACEMENT]] change_stream_pre_image_util {
 
 /**
  * Whether or not replicated truncates should be used for pre-images collection
@@ -103,5 +103,5 @@ stdx::unordered_set<UUID, UUID::Hash> getNsUUIDs(OperationContext* opCtx,
  * Returns the current time.
  */
 Date_t getCurrentTimeForPreImageRemoval(OperationContext* opCtx);
-}  // namespace MONGO_MOD_NEEDS_REPLACEMENT change_stream_pre_image_util
+}  // namespace change_stream_pre_image_util
 }  // namespace mongo

@@ -42,7 +42,7 @@ namespace mongo {
 /**
  * Stores the last committed size and count values for a collection.
  */
-struct MONGO_MOD_PUBLIC CollectionSizeCount {
+struct [[MONGO_MOD_PUBLIC]] CollectionSizeCount {
     int64_t size{0};
     int64_t count{0};
 

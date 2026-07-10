@@ -78,7 +78,7 @@ class RemoteCommandTargeter;
  * Presents an interface for talking to shards, regardless of whether that shard is remote or is
  * the current (local) shard.
  */
-class MONGO_MOD_PUBLIC Shard {
+class [[MONGO_MOD_PUBLIC]] Shard {
 public:
     struct CommandResponse {
         CommandResponse(boost::optional<HostAndPort> hostAndPort,

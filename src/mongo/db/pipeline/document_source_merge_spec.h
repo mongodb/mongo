@@ -45,7 +45,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 class BSONObjBuilder;
 class BSONElement;
 
@@ -87,4 +87,4 @@ void mergeWhenMatchedSerializeToBSON(const MergeWhenMatchedPolicy& policy,
                                      std::string_view fieldName,
                                      BSONObjBuilder* bob);
 MergeWhenMatchedPolicy mergeWhenMatchedParseFromBSON(const BSONElement& elem);
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

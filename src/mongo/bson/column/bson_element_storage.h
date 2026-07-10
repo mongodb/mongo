@@ -41,7 +41,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 /**
  * BSONElement storage, owns materialized BSONElement returned by BSONColumn.
  * Allocates memory in blocks which double in size as they grow.
@@ -175,4 +175,4 @@ private:
 
     bool _contiguousEnabled = false;
 };
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

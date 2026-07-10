@@ -42,7 +42,7 @@ class BSONObj;
 /**
  * We need to know what 'type' an index is in order to plan correctly.
  */
-enum MONGO_MOD_PUBLIC IndexType {
+enum [[MONGO_MOD_PUBLIC]] IndexType {
     INDEX_BTREE,
     INDEX_COLUMN,
     INDEX_2D,
@@ -68,7 +68,7 @@ std::string toString(IndexType indexType);
  * We use the std::string representation of index names all over the place, so we declare them all
  * once here.
  */
-class MONGO_MOD_PUBLIC IndexNames {
+class [[MONGO_MOD_PUBLIC]] IndexNames {
 public:
     static const std::string BTREE;
     static const std::string GEO_2D;
@@ -106,7 +106,7 @@ public:
 /**
  * Contain utilities to work with wildcard fields used for Wildcard indexes.
  */
-struct MONGO_MOD_PUBLIC WildcardNames {
+struct [[MONGO_MOD_PUBLIC]] WildcardNames {
     static constexpr std::string_view WILDCARD_FIELD_NAME = "$**"sv;
     static constexpr std::string_view WILDCARD_FIELD_NAME_SUFFIX = ".$**"sv;
 

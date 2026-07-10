@@ -67,7 +67,7 @@ namespace mongo {
  *
  * This class's chunk mapping is immutable once constructed.
  */
-class MONGO_MOD_PUBLIC CollectionMetadata {
+class [[MONGO_MOD_PUBLIC]] CollectionMetadata {
 public:
     /**
      * Instantiates a metadata object, which represents an unsharded collection. This 'isSharded'

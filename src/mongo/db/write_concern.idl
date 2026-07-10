@@ -27,7 +27,7 @@
 #
 global:
     cpp_namespace: "mongo"
-    mod_visibility: pub
+    mod_visibility: public
     cpp_includes:
         - "mongo/db/write_concern_idl.h"
 

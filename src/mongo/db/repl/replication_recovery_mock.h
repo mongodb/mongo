@@ -38,7 +38,7 @@ namespace mongo {
 class OperationContext;
 namespace repl {
 
-class MONGO_MOD_PUB ReplicationRecoveryMock : public ReplicationRecovery {
+class [[MONGO_MOD_PUBLIC]] ReplicationRecoveryMock : public ReplicationRecovery {
     ReplicationRecoveryMock(const ReplicationRecoveryMock&) = delete;
     ReplicationRecoveryMock& operator=(const ReplicationRecoveryMock&) = delete;
 

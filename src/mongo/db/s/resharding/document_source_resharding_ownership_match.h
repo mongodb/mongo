@@ -59,7 +59,7 @@ DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(ReshardingOwnershipMatch);
  * resharding pipelines which need to be able to answer this question very quickly. To do so, it
  * re-uses pieces of sharding infrastructure rather than applying a MatchExpression.
  */
-class MONGO_MOD_PUBLIC DocumentSourceReshardingOwnershipMatch final : public DocumentSource {
+class [[MONGO_MOD_PUBLIC]] DocumentSourceReshardingOwnershipMatch final : public DocumentSource {
 public:
     static constexpr std::string_view kStageName = "$_internalReshardingOwnershipMatch"sv;
 

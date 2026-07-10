@@ -41,7 +41,7 @@
 
 namespace mongo {
 
-enum class MONGO_MOD_NEEDS_REPLACEMENT BoundInclusion {
+enum class [[MONGO_MOD_NEEDS_REPLACEMENT]] BoundInclusion {
     kExcludeBothStartAndEndKeys,
     kIncludeStartKeyOnly,
     kIncludeEndKeyOnly,
@@ -51,7 +51,7 @@ enum class MONGO_MOD_NEEDS_REPLACEMENT BoundInclusion {
 /**
  * An ordered list of intervals for one field.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT OrderedIntervalList {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] OrderedIntervalList {
     OrderedIntervalList() {}
     OrderedIntervalList(const std::string& n) : name(n) {}
 
@@ -130,7 +130,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT OrderedIntervalList {
  * Tied to an index.  Permissible values for all fields in the index.  Requires the index to
  * interpret.  Previously known as FieldRangeVector.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT IndexBounds {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] IndexBounds {
     IndexBounds() : isSimpleRange(false), boundInclusion(BoundInclusion::kIncludeStartKeyOnly) {}
 
     // For each indexed field, the values that the field is allowed to take on.

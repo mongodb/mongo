@@ -30,7 +30,7 @@ global:
     cpp_includes:
         - "mongo/util/base64.h"
         - "mongo/crypto/unix_epoch.h"
-    mod_visibility: pub
+    mod_visibility: public
 
 imports:
     - "mongo/db/basic_types.idl"

@@ -58,7 +58,7 @@ namespace mongo {
  *
  * Provides an interface to collect BSONObjs from system providers
  */
-class MONGO_MOD_OPEN FTDCCollectorInterface {
+class [[MONGO_MOD_OPEN]] FTDCCollectorInterface {
     FTDCCollectorInterface(const FTDCCollectorInterface&) = delete;
     FTDCCollectorInterface& operator=(const FTDCCollectorInterface&) = delete;
 

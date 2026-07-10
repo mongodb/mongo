@@ -48,7 +48,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 struct IndexBuildInfo;
 namespace repl {
@@ -364,4 +364,4 @@ private:
     bool _constraintsEnabled;
 };
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

@@ -37,7 +37,7 @@
 #include <string_view>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC logv2 {
+namespace [[MONGO_MOD_PUBLIC]] logv2 {
 using namespace std::literals::string_view_literals;
 
 /** Describes the service (i.e. shard/router) a log line is associated with. */
@@ -107,5 +107,5 @@ inline std::string_view getNameForLog(LogService logService) {
 /** Appends the full name returned by toStringData(). */
 std::ostream& operator<<(std::ostream& os, LogService service);
 
-}  // namespace MONGO_MOD_PUBLIC logv2
+}  // namespace logv2
 }  // namespace mongo

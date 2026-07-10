@@ -42,7 +42,7 @@ namespace mongo {
 class OperationContext;
 class ServiceContext;
 
-class MONGO_MOD_PUB DBDirectClientFactory {
+class [[MONGO_MOD_PUBLIC]] DBDirectClientFactory {
 public:
     using Result = std::unique_ptr<DBClientBase>;
     using Impl = std::function<Result(OperationContext*)>;

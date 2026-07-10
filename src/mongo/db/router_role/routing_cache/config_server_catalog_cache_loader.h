@@ -34,6 +34,6 @@
 
 namespace mongo {
 
-class MONGO_MOD_PARENT_PRIVATE ConfigServerCatalogCacheLoader : public CatalogCacheLoader {};
+class [[MONGO_MOD_PARENT_PRIVATE]] ConfigServerCatalogCacheLoader : public CatalogCacheLoader {};
 
 }  // namespace mongo

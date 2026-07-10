@@ -43,7 +43,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class InsertOp {
 public:
@@ -205,4 +205,4 @@ T checkWriteErrors(T op) {
 }
 
 }  // namespace write_ops
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

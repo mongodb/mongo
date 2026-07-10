@@ -38,7 +38,7 @@ namespace mongo {
 /**
  * Legacy interface for processing client read/write/cmd requests.
  */
-class MONGO_MOD_PARENT_PRIVATE Strategy {
+class [[MONGO_MOD_PARENT_PRIVATE]] Strategy {
 public:
     /**
      * Executes a command from either OP_QUERY or OP_MSG wire protocols.

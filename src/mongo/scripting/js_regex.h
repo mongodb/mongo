@@ -34,7 +34,7 @@
 #include <string>
 #include <utility>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 struct JSRegEx {
     std::string pattern;
@@ -45,4 +45,4 @@ struct JSRegEx {
         : pattern(std::move(pattern)), flags(std::move(flags)) {}
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

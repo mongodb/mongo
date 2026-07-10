@@ -35,7 +35,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 using oidcIdPAuthCallbackT = void(std::string_view, std::string_view, std::string_view);
 
 /**
@@ -69,4 +69,4 @@ struct OIDCClientGlobalParams {
 };
 
 extern OIDCClientGlobalParams oidcClientGlobalParams;
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

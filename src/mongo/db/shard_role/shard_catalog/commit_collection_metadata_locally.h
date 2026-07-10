@@ -39,7 +39,7 @@
 
 namespace mongo {
 
-namespace MONGO_MOD_PARENT_PRIVATE shard_catalog_commit {
+namespace [[MONGO_MOD_PARENT_PRIVATE]] shard_catalog_commit {
 
 /**
  * Deletes the collection and chunk metadata from the shard catalog
@@ -130,7 +130,7 @@ void commitChunkOperationsMetadataLocally(OperationContext* opCtx,
                                           const std::vector<BSONObj>& newChunks,
                                           bool receivingFirstChunk = false);
 
-}  // namespace MONGO_MOD_PARENT_PRIVATE shard_catalog_commit
+}  // namespace shard_catalog_commit
 
 /**
  * The following family of methods are only meant to be used by the resharding module due to the way
@@ -138,7 +138,7 @@ void commitChunkOperationsMetadataLocally(OperationContext* opCtx,
  * coordinators into the ReshardingCoordinator, and as such has to access the necessary methods for
  * authoritative shard catalog changes.
  */
-namespace MONGO_MOD_PUBLIC shard_catalog_commit_for_resharding {
+namespace [[MONGO_MOD_PUBLIC]] shard_catalog_commit_for_resharding {
 void commitCreateCollection(OperationContext* opCtx,
                             const NamespaceString& tempReshardingNss,
                             bool isDbPrimaryShard);
@@ -155,5 +155,5 @@ void commitRenameOfTemporaryCollection(OperationContext* opCtx,
 void commitDropOfStaleChunksForRename(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       const UUID& oldUuid);
-}  // namespace MONGO_MOD_PUBLIC shard_catalog_commit_for_resharding
+}  // namespace shard_catalog_commit_for_resharding
 }  // namespace mongo

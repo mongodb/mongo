@@ -43,7 +43,7 @@ namespace mongo {
  * the TransactionResources before handing control over to the next stage in the pipeline.
  * Objects of this class are not thread-safe and therefore should not be shared across threads.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ShardRoleTransactionResourcesStasherForPipeline
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardRoleTransactionResourcesStasherForPipeline
     : public TransactionResourcesStasher,
       public RefCountable {
 public:

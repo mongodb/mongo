@@ -50,7 +50,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PARENT_PRIVATE SetUserWriteBlockModeCoordinator
+class [[MONGO_MOD_PARENT_PRIVATE]] SetUserWriteBlockModeCoordinator
     : public ConfigsvrCoordinatorImpl<SetUserWriteBlockModeCoordinatorDocument,
                                       SetUserWriteBlockModeCoordinatorPhaseEnum> {
 public:

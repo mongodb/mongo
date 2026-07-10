@@ -53,7 +53,7 @@
 #include <boost/optional.hpp>
 #include <fmt/format.h>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 using namespace std::literals::string_view_literals;
@@ -183,31 +183,31 @@ public:
      *
      * MUST only be used for tests.
      */
-    MONGO_MOD_PUBLIC static NamespaceString createNamespaceString_forTest(std::string_view ns) {
+    [[MONGO_MOD_PUBLIC]] static NamespaceString createNamespaceString_forTest(std::string_view ns) {
         return NamespaceString(boost::none, ns);
     }
 
-    MONGO_MOD_PUBLIC static NamespaceString createNamespaceString_forTest(
+    [[MONGO_MOD_PUBLIC]] static NamespaceString createNamespaceString_forTest(
         const DatabaseName& dbName) {
         return NamespaceString(dbName);
     }
 
-    MONGO_MOD_PUBLIC static NamespaceString createNamespaceString_forTest(std::string_view db,
-                                                                          std::string_view coll) {
+    [[MONGO_MOD_PUBLIC]] static NamespaceString createNamespaceString_forTest(
+        std::string_view db, std::string_view coll) {
         return NamespaceString(boost::none, db, coll);
     }
 
-    MONGO_MOD_PUBLIC static NamespaceString createNamespaceString_forTest(
+    [[MONGO_MOD_PUBLIC]] static NamespaceString createNamespaceString_forTest(
         const DatabaseName& dbName, std::string_view coll) {
         return NamespaceString(dbName, coll);
     }
 
-    MONGO_MOD_PUBLIC static NamespaceString createNamespaceString_forTest(
+    [[MONGO_MOD_PUBLIC]] static NamespaceString createNamespaceString_forTest(
         const boost::optional<TenantId>& tenantId, std::string_view ns) {
         return NamespaceString(tenantId, ns);
     }
 
-    MONGO_MOD_PUBLIC static NamespaceString createNamespaceString_forTest(
+    [[MONGO_MOD_PUBLIC]] static NamespaceString createNamespaceString_forTest(
         const boost::optional<TenantId>& tenantId, std::string_view db, std::string_view coll) {
         return NamespaceString(tenantId, db, coll);
     }
@@ -317,7 +317,7 @@ public:
     /**
      * This function must only be used in unit tests.
      */
-    MONGO_MOD_PUBLIC std::string_view db_forTest() const MONGO_COMPILER_LIFETIME_BOUND {
+    [[MONGO_MOD_PUBLIC]] std::string_view db_forTest() const MONGO_COMPILER_LIFETIME_BOUND {
         return db_deprecated();
     }
 
@@ -339,7 +339,7 @@ public:
         return ConstDataRange(nss.data(), nss.size());
     }
 
-    MONGO_MOD_PUBLIC std::string_view ns_forTest() const MONGO_COMPILER_LIFETIME_BOUND {
+    [[MONGO_MOD_PUBLIC]] std::string_view ns_forTest() const MONGO_COMPILER_LIFETIME_BOUND {
         return ns();
     }
 
@@ -348,7 +348,7 @@ public:
      *
      * MUST only be used for tests.
      */
-    MONGO_MOD_PUBLIC std::string toString_forTest() const {
+    [[MONGO_MOD_PUBLIC]] std::string toString_forTest() const {
         return toString();
     }
 
@@ -370,7 +370,7 @@ public:
      *
      * MUST only be used for tests.
      */
-    MONGO_MOD_PUBLIC std::string toStringWithTenantId_forTest() const {
+    [[MONGO_MOD_PUBLIC]] std::string toStringWithTenantId_forTest() const {
         return toStringWithTenantId();
     }
 
@@ -972,7 +972,7 @@ inline bool NamespaceString::validCollectionName(std::string_view coll) {
     return true;
 }
 
-MONGO_MOD_PUBLIC inline std::string stringify_forTest(const NamespaceString& nss) {
+[[MONGO_MOD_PUBLIC]] inline std::string stringify_forTest(const NamespaceString& nss) {
     return toStringForLogging(nss);
 }
 

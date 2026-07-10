@@ -35,7 +35,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_NEEDS_REPLACEMENT ShardDatabaseType : private ShardDatabaseTypeBase {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardDatabaseType : private ShardDatabaseTypeBase {
 public:
     // Make field names accessible.
     using ShardDatabaseTypeBase::kDbNameFieldName;

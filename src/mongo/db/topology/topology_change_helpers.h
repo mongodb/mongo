@@ -252,10 +252,11 @@ TenantIdMap<std::vector<BSONObj>> getClusterParametersLocally(OperationContext* 
  * Runs a count with the given query against the localConfigShard. Returns the result of that count
  * and throws any error that occurs while running this command.
  */
-MONGO_MOD_PARENT_PRIVATE long long runCountCommandOnConfig(OperationContext* opCtx,
-                                                           std::shared_ptr<Shard> localConfigShard,
-                                                           const NamespaceString& nss,
-                                                           BSONObj query);
+[[MONGO_MOD_PARENT_PRIVATE]] long long runCountCommandOnConfig(
+    OperationContext* opCtx,
+    std::shared_ptr<Shard> localConfigShard,
+    const NamespaceString& nss,
+    BSONObj query);
 
 struct DrainingShardUsage {
     bool isFullyDrained() const {

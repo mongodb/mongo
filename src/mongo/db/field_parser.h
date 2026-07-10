@@ -50,7 +50,7 @@
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 

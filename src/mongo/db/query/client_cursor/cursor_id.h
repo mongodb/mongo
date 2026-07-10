@@ -31,8 +31,8 @@
 
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 using CursorId = long long;
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

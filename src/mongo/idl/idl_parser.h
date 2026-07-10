@@ -75,7 +75,7 @@
 // clang-format off
 // jq '.[] | select((.loc | startswith("src/mongo/idl/idl_parser.h")) and (.display_name | startswith("IDLParserContext") | not)) | .used_from |= map((.locs |= map(select(test("^bazel-out/.*_gen\\.(h|cpp):") | not))) | select(.locs != [] and .mod != "core.idl")) | select(.used_from != [])' merged_decls.json
 // clang-format on
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS;
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]];
 
 namespace mongo {
 using namespace std::literals::string_view_literals;
@@ -195,7 +195,7 @@ inline auto idlPreparsedValue(std::type_identity<multiversion::FeatureCompatibil
  * `type_identity<T>` argument.
  */
 template <typename T, typename... A>
-MONGO_MOD_NEEDS_REPLACEMENT T preparsedValue(A&&... args) {
+[[MONGO_MOD_NEEDS_REPLACEMENT]] T preparsedValue(A&&... args) {
     using preparsed_value_adl_barrier::idlPreparsedValue;
     return idlPreparsedValue(std::type_identity<T>{}, std::forward<A>(args)...);
 }
@@ -351,7 +351,7 @@ struct BasicOrderOps<boost::optional<T>> {
  * TODO(SERVER-122446): Split this class into the parts that should be public and the parts that are
  * only for internal use by generated code.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT IDLParserContext {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] IDLParserContext {
     IDLParserContext(const IDLParserContext&) = delete;
     IDLParserContext& operator=(const IDLParserContext&) = delete;
 
@@ -563,7 +563,7 @@ private:
  * This class is used to record information about deserialization which a caller can later use to
  * perform extra parsing validation.
  */
-class MONGO_MOD_PUBLIC DeserializationContext {
+class [[MONGO_MOD_PUBLIC]] DeserializationContext {
 public:
     /**
      * Marks that an unstable struct field was parsed.
@@ -595,10 +595,10 @@ private:
  * Throw an error when a user calls a setter and it fails the comparison.
  */
 template <typename T>
-MONGO_MOD_NEEDS_REPLACEMENT void throwComparisonError(std::string_view fieldName,
-                                                      std::string_view op,
-                                                      T actualValue,
-                                                      T expectedValue) {
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void throwComparisonError(std::string_view fieldName,
+                                                          std::string_view op,
+                                                          T actualValue,
+                                                          T expectedValue) {
     uasserted(ErrorCodes::BadValue,
               str::stream() << "BSON field '" << fieldName << "' value must be " << op << " "
                             << expectedValue << ", actual value '" << actualValue << "'");
@@ -631,7 +631,7 @@ std::vector<std::vector<std::uint8_t>> transformVector(const std::vector<ConstDa
  * Generated enums specialize this with their element count.
  */
 template <typename E>
-MONGO_MOD_PUBLIC constexpr inline size_t idlEnumCount = 0;
+[[MONGO_MOD_PUBLIC]] constexpr inline size_t idlEnumCount = 0;
 
 namespace idl {
 template <typename E>
@@ -659,7 +659,7 @@ concept EnumWithIntDeserializer = requires(E e, std::int32_t i, const IDLParserC
  * Serialize an IDL-defined enum of type "string".
  */
 template <EnumWithStringSerializer E>
-MONGO_MOD_PUBLIC std::string_view serialize(E en) {
+[[MONGO_MOD_PUBLIC]] std::string_view serialize(E en) {
     return idlSerialize(en);
 }
 
@@ -667,7 +667,7 @@ MONGO_MOD_PUBLIC std::string_view serialize(E en) {
  * Serialize an IDL-defined enum of type "int".
  */
 template <EnumWithIntSerializer E>
-MONGO_MOD_PUBLIC std::int32_t serialize(E en) {
+[[MONGO_MOD_PUBLIC]] std::int32_t serialize(E en) {
     return idlSerialize(en);
 }
 
@@ -676,9 +676,9 @@ MONGO_MOD_PUBLIC std::int32_t serialize(E en) {
  * The default IDLParserContext is created with the type name of the enum as `fieldName`.
  */
 template <EnumWithStringDeserializer E>
-MONGO_MOD_PUBLIC E
-deserialize(std::string_view sd,
-            const IDLParserContext& ctxt = IDLParserContext(idlGetDefaultParserFieldName(E{}))) {
+[[MONGO_MOD_PUBLIC]] E deserialize(
+    std::string_view sd,
+    const IDLParserContext& ctxt = IDLParserContext(idlGetDefaultParserFieldName(E{}))) {
     E ret;
     idlDeserialize(ret, sd, ctxt);
     return ret;
@@ -689,9 +689,9 @@ deserialize(std::string_view sd,
  * The default IDLParserContext is created with the type name of the enum as `fieldName`.
  */
 template <EnumWithIntDeserializer E>
-MONGO_MOD_PUBLIC E
-deserialize(std::int32_t i,
-            const IDLParserContext& ctxt = IDLParserContext(idlGetDefaultParserFieldName(E{}))) {
+[[MONGO_MOD_PUBLIC]] E deserialize(
+    std::int32_t i,
+    const IDLParserContext& ctxt = IDLParserContext(idlGetDefaultParserFieldName(E{}))) {
     E ret;
     idlDeserialize(ret, i, ctxt);
     return ret;

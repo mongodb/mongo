@@ -60,7 +60,7 @@ class ReactorTimer;
  * minimizing context switches, as well as improving the readability of stack traces by grounding
  * async execution on top of a regular client call stack.
  */
-class MONGO_MOD_UNFORTUNATELY_OPEN NetworkingBaton : public Baton {
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] NetworkingBaton : public Baton {
 public:
     /**
      * Adds a session, returning a future which activates on read/write-ability of the session.

@@ -40,7 +40,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Appends to 'builder' storage related statistics for the collection represented by 'nss'. This
@@ -109,4 +109,4 @@ Status appendCollectionRecordCount(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    BSONObjBuilder* builder);
 
-};  // namespace MONGO_MOD_PUBLIC mongo
+};  // namespace mongo

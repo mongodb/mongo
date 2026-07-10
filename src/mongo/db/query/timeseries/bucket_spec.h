@@ -67,7 +67,7 @@ using Get2dsphereIndexVersionFn = std::function<boost::optional<S2IndexVersion>(
  *   2. Add fields from _computedMetaProjFields.
  *   3. Remove any fields in _fieldSet, since we are in exclude mode.
  */
-class MONGO_MOD_PUBLIC BucketSpec {
+class [[MONGO_MOD_PUBLIC]] BucketSpec {
 public:
     // When unpacking buckets with kInclude we must produce measurements that contain the
     // set of fields. Otherwise, if the kExclude option is used, the measurements will include the

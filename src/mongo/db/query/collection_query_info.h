@@ -54,7 +54,7 @@ class OperationContext;
  *
  * Decorates a Collection instance. Lifecycle is the same as the Collection instance.
  */
-class MONGO_MOD_PUBLIC CollectionQueryInfo {
+class [[MONGO_MOD_PUBLIC]] CollectionQueryInfo {
 public:
     CollectionQueryInfo();
 

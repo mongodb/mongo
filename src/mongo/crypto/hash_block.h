@@ -53,7 +53,7 @@
 #include <openssl/hmac.h>
 #endif
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 struct BSONBinData;
 class BSONObjBuilder;
@@ -430,4 +430,4 @@ std::ostream& operator<<(std::ostream& os, const HashBlock<Traits>& sha) {
     return os << sha.toString();
 }
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -44,7 +44,7 @@
 #include <sys/socket.h>
 #endif
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * CIDR (Classless Inter-Domain Routing)
@@ -168,4 +168,4 @@ StringBuilder& operator<<(StringBuilder& s, const CIDR& cidr);
  */
 using CIDRList = std::vector<std::variant<CIDR, std::string>>;
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

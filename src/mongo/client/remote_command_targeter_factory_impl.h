@@ -36,7 +36,7 @@
 
 #include <memory>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Targeter factory that instantiates remote command targeters based on the type of the
@@ -52,4 +52,4 @@ public:
     std::unique_ptr<RemoteCommandTargeter> create(const ConnectionString& connStr) override;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

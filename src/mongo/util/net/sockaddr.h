@@ -50,7 +50,7 @@
 #endif  // not _WIN32
 
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 class BSONObjBuilder;
 
 #if defined(_WIN32)
@@ -163,4 +163,4 @@ private:
     bool _isValid = false;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

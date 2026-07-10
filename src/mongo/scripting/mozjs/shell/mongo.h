@@ -57,7 +57,7 @@ using EncryptedDBClientFromExistingCallback = std::shared_ptr<DBClientBase>(
 
 using GetNestedConnectionCallback = DBClientBase*(DBClientBase*);
 
-MONGO_MOD_PUB void setEncryptedDBClientCallbacks(
+[[MONGO_MOD_PUBLIC]] void setEncryptedDBClientCallbacks(
     EncryptedDBClientCallback* encCallback,
     EncryptedDBClientFromExistingCallback* encFromExistingCallback,
     GetNestedConnectionCallback* getCallback);
@@ -134,7 +134,7 @@ struct MongoExternalInfo : public MongoBase {
     static const JSFunctionSpec freeFunctions[4];
 };
 
-class MONGO_MOD_OPEN EncryptionCallbacks {
+class [[MONGO_MOD_OPEN]] EncryptionCallbacks {
 public:
     virtual void generateDataKey(JSContext* cx, JS::CallArgs args) = 0;
     virtual void getDataKeyCollection(JSContext* cx, JS::CallArgs args) = 0;

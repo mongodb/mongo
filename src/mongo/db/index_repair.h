@@ -40,7 +40,7 @@
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/util/modules.h"
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 namespace mongo::index_repair {
 /**
  * Deletes the record containing a duplicate key and inserts it into a local lost and found

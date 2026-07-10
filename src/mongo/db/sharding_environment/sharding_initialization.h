@@ -67,16 +67,16 @@ using ShardingEgressMetadataHookBuilder = std::function<std::unique_ptr<EgressMe
 /**
  * Constructs a TaskExecutor which contains the required configuration for the sharding subsystem.
  */
-MONGO_MOD_NEEDS_REPLACEMENT std::shared_ptr<executor::TaskExecutor> makeShardingTaskExecutor(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] std::shared_ptr<executor::TaskExecutor> makeShardingTaskExecutor(
     std::unique_ptr<executor::NetworkInterface> net);
 
-MONGO_MOD_NEEDS_REPLACEMENT std::unique_ptr<rpc::EgressMetadataHookList>
+[[MONGO_MOD_NEEDS_REPLACEMENT]] std::unique_ptr<rpc::EgressMetadataHookList>
 makeShardingEgressHooksList(ServiceContext* service);
 
 /**
  * Initializes the global ShardingCatalogClient, ShardingCatalogManager, and Grid objects.
  */
-MONGO_MOD_NEEDS_REPLACEMENT Status initializeGlobalShardingState(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] Status initializeGlobalShardingState(
     OperationContext* opCtx,
     std::unique_ptr<CatalogCache> catalogCache,
     std::unique_ptr<ShardRegistry> shardRegistry,
@@ -88,19 +88,19 @@ MONGO_MOD_NEEDS_REPLACEMENT Status initializeGlobalShardingState(
  * Loads global settings from config server such as cluster ID and default write concern.
  */
 
-MONGO_MOD_NEEDS_REPLACEMENT Status
-loadGlobalSettingsFromConfigServer(OperationContext* opCtx, ShardingCatalogClient* catalogClient);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] Status loadGlobalSettingsFromConfigServer(
+    OperationContext* opCtx, ShardingCatalogClient* catalogClient);
 
 /**
  * Pre-caches mongod routing info for the calling process.
  */
 
-MONGO_MOD_NEEDS_REPLACEMENT void preCacheMongosRoutingInfo(OperationContext* opCtx);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void preCacheMongosRoutingInfo(OperationContext* opCtx);
 
 /**
  * Warms up connections to shards with best effort strategy.
  */
 
-MONGO_MOD_NEEDS_REPLACEMENT Status preWarmConnectionPool(OperationContext* opCtx);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] Status preWarmConnectionPool(OperationContext* opCtx);
 
 }  // namespace mongo

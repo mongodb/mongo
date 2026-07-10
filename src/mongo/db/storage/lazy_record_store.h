@@ -41,7 +41,7 @@ namespace mongo {
 /**
  * A wrapper around a record store which creates the table when required.
  */
-class MONGO_MOD_PUBLIC LazyRecordStore {
+class [[MONGO_MOD_PUBLIC]] LazyRecordStore {
 public:
     enum class CreateMode {
         /**

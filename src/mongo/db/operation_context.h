@@ -72,7 +72,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 
@@ -1088,7 +1088,7 @@ private:
     std::unique_ptr<RecoveryUnit> _recoveryUnit;
 
     // This is used directly by WriteUnitOfWork
-    MONGO_MOD_NEEDS_REPLACEMENT WriteUnitOfWork::RecoveryUnitState _ruState =
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] WriteUnitOfWork::RecoveryUnitState _ruState =
         WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork;
 
     // Operations run within a transaction will hold a WriteUnitOfWork for the duration in order

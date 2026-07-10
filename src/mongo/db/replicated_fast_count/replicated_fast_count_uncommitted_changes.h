@@ -37,7 +37,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC UncommittedFastCountChange {
+class [[MONGO_MOD_PUBLIC]] UncommittedFastCountChange {
 public:
     /**
      * Returns an immutable reference to the UncommittedFastCountChange instance associated with

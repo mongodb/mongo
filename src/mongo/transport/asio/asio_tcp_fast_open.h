@@ -88,7 +88,7 @@ Status ensureInitialized(bool returnUnfilteredError = false);
  * to normal operation. Returns `std::shared_ptr<void>` because the caller
  * only manages the lifetime of this object, and doesn't need its value.
  */
-MONGO_MOD_NEEDS_REPLACEMENT std::shared_ptr<void> setConfigForTest(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] std::shared_ptr<void> setConfigForTest(
     bool passive, bool client, bool server, int queueSize, Status initError);
 
 }  // namespace mongo::transport::tfo

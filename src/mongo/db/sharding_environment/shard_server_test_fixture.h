@@ -50,7 +50,7 @@ namespace mongo {
  * Test fixture for shard components, as opposed to config or mongos components. Provides a mock
  * network via ShardingMongoDTestFixture.
  */
-class MONGO_MOD_OPEN ShardServerTestFixture : public ShardingMongoDTestFixture {
+class [[MONGO_MOD_OPEN]] ShardServerTestFixture : public ShardingMongoDTestFixture {
 protected:
     ShardServerTestFixture(Options options = {}, bool setUpMajorityReads = true);
     ~ShardServerTestFixture() override;
@@ -98,7 +98,8 @@ protected:
     std::unique_ptr<CatalogCache> _catalogCache;
 };
 
-class MONGO_MOD_OPEN ShardServerTestFixtureWithCatalogCacheMock : public ShardServerTestFixture {
+class [[MONGO_MOD_OPEN]] ShardServerTestFixtureWithCatalogCacheMock
+    : public ShardServerTestFixture {
 public:
     ShardServerTestFixtureWithCatalogCacheMock() : ShardServerTestFixture() {}
     ShardServerTestFixtureWithCatalogCacheMock(Options options)
@@ -110,7 +111,7 @@ protected:
     std::shared_ptr<ConfigServerCatalogCacheLoaderMock> getConfigServerCatalogCacheLoaderMock();
 };
 
-class MONGO_MOD_OPEN ShardServerTestFixtureWithCatalogCacheLoaderMock
+class [[MONGO_MOD_OPEN]] ShardServerTestFixtureWithCatalogCacheLoaderMock
     : public ShardServerTestFixture {
 protected:
     void setUp() override;

@@ -61,7 +61,7 @@ constexpr inline auto kCurOpIsNullMsg = "the opCtx's curOp is null"sv;
  */
 boost::optional<std::string_view> isIneligibleForDiagnosticPrinting(OperationContext* opCtx);
 
-class MONGO_MOD_PUB CurOpPrinter {
+class [[MONGO_MOD_PUBLIC]] CurOpPrinter {
 public:
     explicit CurOpPrinter(OperationContext* opCtx) : _opCtx{opCtx} {}
 

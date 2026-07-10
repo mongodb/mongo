@@ -84,7 +84,7 @@ using PipelineValidatorCallback = std::function<void(const Pipeline&)>;
  * A Pipeline object represents a list of DocumentSources and is responsible for optimizing the
  * pipeline.
  */
-class MONGO_MOD_PUBLIC Pipeline {
+class [[MONGO_MOD_PUBLIC]] Pipeline {
 public:
     /**
      * The list of default supported match expression features.
@@ -490,5 +490,5 @@ private:
     bool _translatedForViewlessTimeseries{false};
 };
 
-using PipelinePtr MONGO_MOD_PUBLIC = std::unique_ptr<Pipeline>;
+using PipelinePtr [[MONGO_MOD_PUBLIC]] = std::unique_ptr<Pipeline>;
 }  // namespace mongo

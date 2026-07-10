@@ -48,7 +48,7 @@ namespace mongo {
  * query. The extra info here can be helpful for our test infrastructure to decide how seriously to
  * treat it.
  */
-class MONGO_MOD_PUB QueryStatsFailedToRecordInfo final : public ErrorExtraInfo {
+class [[MONGO_MOD_PUBLIC]] QueryStatsFailedToRecordInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::QueryStatsFailedToRecord;
 

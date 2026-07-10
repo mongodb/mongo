@@ -46,7 +46,7 @@ namespace mozjs {
  *
  * It offers some simple methods and a handful of specialized constructors
  */
-struct MONGO_MOD_PUB BinDataInfo : public BaseInfo {
+struct [[MONGO_MOD_PUBLIC]] BinDataInfo : public BaseInfo {
     enum Slots { BinDataStringSlot, BinDataSlotCount };
 
     static void construct(JSContext* cx, JS::CallArgs args);

@@ -42,7 +42,7 @@ namespace mongo {
  * Suitable base class of OpObserver implementations that do not need to implement most of the
  * OpObserver interface.
  */
-class MONGO_MOD_OPEN OpObserverNoop : public OpObserver {
+class [[MONGO_MOD_OPEN]] OpObserverNoop : public OpObserver {
 public:
     NamespaceFilters getNamespaceFilters() const override {
         return {NamespaceFilter::kAll, NamespaceFilter::kAll};

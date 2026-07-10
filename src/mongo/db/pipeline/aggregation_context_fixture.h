@@ -57,7 +57,7 @@ enum class Tracking { forwards, backwards };
 /**
  * Test fixture which provides an ExpressionContext for use in testing.
  */
-class MONGO_MOD_UNFORTUNATELY_OPEN AggregationContextFixture : public ServiceContextTest {
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] AggregationContextFixture : public ServiceContextTest {
 public:
     struct ExpressionContextOptionsStruct {
         bool inRouter = false;

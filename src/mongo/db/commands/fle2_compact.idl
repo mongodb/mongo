@@ -50,7 +50,7 @@ commands:
         api_version: ""
         namespace: concatenate_with_db
         strict: true
-        mod_visibility: pub
+        mod_visibility: public
         reply_type: CompactStructuredEncryptionDataCommandReply
         fields:
             compactionTokens:

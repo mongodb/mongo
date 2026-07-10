@@ -47,7 +47,7 @@ namespace mongo {
  * TODO (SPM-3971): Remove this class once resharding stops relying on the destinedRecipient oplog
  * field.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ShardingWriteRouter {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardingWriteRouter {
 public:
     ShardingWriteRouter(OperationContext* opCtx, const NamespaceString& nss);
 

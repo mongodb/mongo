@@ -65,7 +65,7 @@ namespace sbe {
  * sharding epoch is not updated on operations like chunk splits and moves but rather on sharding
  * and refine shard key operations.
  */
-struct MONGO_MOD_PUB PlanCacheKeyShardingEpoch {
+struct [[MONGO_MOD_PUBLIC]] PlanCacheKeyShardingEpoch {
     bool operator==(const PlanCacheKeyShardingEpoch& other) const {
         return epoch == other.epoch && ts == other.ts;
     }
@@ -74,7 +74,7 @@ struct MONGO_MOD_PUB PlanCacheKeyShardingEpoch {
     Timestamp ts;
 };
 
-struct MONGO_MOD_PUB PlanCacheKeyCollectionState {
+struct [[MONGO_MOD_PUBLIC]] PlanCacheKeyCollectionState {
     bool operator==(const PlanCacheKeyCollectionState& other) const {
         return other.uuid == uuid && other.version == version &&
             other.collectionGeneration == collectionGeneration;
@@ -112,7 +112,7 @@ struct MONGO_MOD_PUB PlanCacheKeyCollectionState {
 /**
  * Represents the "key" used in the PlanCache mapping from query shape -> query plan.
  */
-class MONGO_MOD_PUB PlanCacheKey {
+class [[MONGO_MOD_PUBLIC]] PlanCacheKey {
 public:
     PlanCacheKey(PlanCacheKeyInfo&& info,
                  PlanCacheKeyCollectionState mainCollectionState,
@@ -231,7 +231,7 @@ struct CachedSbePlan {
     size_t solutionHash;
 };
 
-using PlanCacheEntry MONGO_MOD_PUB =
+using PlanCacheEntry [[MONGO_MOD_PUBLIC]] =
     PlanCacheEntryBase<CachedSbePlan, plan_cache_debug_info::DebugInfoSBE>;
 using CachedPlanHolder =
     mongo::CachedPlanHolder<CachedSbePlan, plan_cache_debug_info::DebugInfoSBE>;
@@ -257,12 +257,12 @@ using PlanCache = PlanCacheBase<PlanCacheKey,
 /**
  * A helper method to get the global SBE plan cache decorated in 'serviceCtx'.
  */
-MONGO_MOD_PUB PlanCache& getPlanCache(ServiceContext* serviceCtx);
+[[MONGO_MOD_PUBLIC]] PlanCache& getPlanCache(ServiceContext* serviceCtx);
 
 /**
  * A wrapper for the helper above. 'opCtx' cannot be null.
  */
-MONGO_MOD_PUB PlanCache& getPlanCache(OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] PlanCache& getPlanCache(OperationContext* opCtx);
 
 /**
  * Removes cached plan entries with the given collection UUID and collection version number.

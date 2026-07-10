@@ -65,7 +65,7 @@
 
 namespace mongo {
 
-struct MONGO_MOD_PUBLIC ZoneRange {
+struct [[MONGO_MOD_PUBLIC]] ZoneRange {
     ZoneRange(const BSONObj& a_min, const BSONObj& a_max, const std::string& _zone);
 
     std::string toString() const;
@@ -257,7 +257,7 @@ ShardDataSizeMap getStatsForBalancing(
 /**
  * Keeps track of zones for a collection.
  */
-class MONGO_MOD_PUBLIC ZoneInfo {
+class [[MONGO_MOD_PUBLIC]] ZoneInfo {
 public:
     static const std::string kNoZoneName;
 

@@ -43,7 +43,7 @@ namespace mongo {
 /**
  * Contains all the information needed to make a mongod instance shard aware.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ShardIdentityType : public ShardIdentity {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardIdentityType : public ShardIdentity {
 public:
     // The _id value for this document type.
     static const std::string IdName;

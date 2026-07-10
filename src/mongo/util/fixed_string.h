@@ -42,7 +42,7 @@
 #include <type_traits>
 #include <utility>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 
@@ -161,7 +161,7 @@ public:
     }
 
     // Pseudo-private. Must be public as a requirement to be a structural type.
-    MONGO_MOD_FILE_PRIVATE std::array<char, N + 1> _data;
+    [[MONGO_MOD_FILE_PRIVATE]] std::array<char, N + 1> _data;
 };
 
 /** Deduce N from character argument pack count. */

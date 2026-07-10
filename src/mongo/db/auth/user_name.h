@@ -35,7 +35,7 @@
 namespace mongo {
 using namespace std::literals::string_view_literals;
 
-class MONGO_MOD_PUBLIC UserName : public AuthName<UserName> {
+class [[MONGO_MOD_PUBLIC]] UserName : public AuthName<UserName> {
 public:
     static constexpr auto kName = "UserName"sv;
     static constexpr auto kFieldName = "user"sv;

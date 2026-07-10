@@ -160,7 +160,7 @@ public:
      * removed entries.
      */
     template <typename UnaryPredicate>
-    MONGO_MOD_PUBLIC size_t removeIf(UnaryPredicate predicate) {
+    [[MONGO_MOD_PUBLIC]] size_t removeIf(UnaryPredicate predicate) {
         size_t nRemoved = 0;
         for (size_t partitionId = 0; partitionId < _numPartitions; ++partitionId) {
             auto lockedPartition = _partitionedCache->lockOnePartitionById(partitionId);

@@ -55,7 +55,7 @@ namespace mongo {
  * OpObserver for authentication. Observes all secondary replication traffic and filters down to
  * relevant entries for authentication.
  */
-class MONGO_MOD_PUBLIC AuthOpObserver final : public OpObserverNoop {
+class [[MONGO_MOD_PUBLIC]] AuthOpObserver final : public OpObserverNoop {
     AuthOpObserver(const AuthOpObserver&) = delete;
     AuthOpObserver& operator=(const AuthOpObserver&) = delete;
 

@@ -46,7 +46,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 class CollatorInterface;
 
 struct OpCounters;
@@ -57,7 +57,7 @@ namespace repl {
  * Caches per-collection properties which are relevant for oplog application, so that they don't
  * have to be retrieved repeatedly for each op.
  */
-class MONGO_MOD_PRIVATE CachedCollectionProperties {
+class [[MONGO_MOD_PRIVATE]] CachedCollectionProperties {
 public:
     struct CollectionProperties {
         bool isCapped = false;
@@ -75,7 +75,7 @@ private:
 /**
  * This class contains some static methods common to ordinary oplog application.
  */
-class MONGO_MOD_PARENT_PRIVATE OplogApplierUtils {
+class [[MONGO_MOD_PARENT_PRIVATE]] OplogApplierUtils {
 public:
     /*
      * Returns the hash of the oplog entry based on the namespace string (and document
@@ -257,4 +257,4 @@ public:
 };
 
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

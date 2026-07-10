@@ -39,7 +39,7 @@ namespace mongo {
 
 class OperationContext;
 
-class MONGO_MOD_OPEN RecoveryUnitNoop : public RecoveryUnit {
+class [[MONGO_MOD_OPEN]] RecoveryUnitNoop : public RecoveryUnit {
 public:
     bool isNoop() const final {
         return true;

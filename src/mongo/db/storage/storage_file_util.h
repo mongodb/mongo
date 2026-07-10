@@ -35,7 +35,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/path.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Perform an fsync on the file.
@@ -55,4 +55,4 @@ Status fsyncParentDirectory(const boost::filesystem::path& file);
  */
 Status fsyncRename(const boost::filesystem::path& source, const boost::filesystem::path& dest);
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

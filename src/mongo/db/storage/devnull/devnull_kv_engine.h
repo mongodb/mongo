@@ -55,7 +55,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 
@@ -274,7 +274,7 @@ public:
     }
 
     // This sets the results of the backup cursor for unit tests.
-    MONGO_MOD_PUBLIC void setBackupBlocks_forTest(std::deque<KVBackupBlock> newBackupBlocks) {
+    [[MONGO_MOD_PUBLIC]] void setBackupBlocks_forTest(std::deque<KVBackupBlock> newBackupBlocks) {
         _mockBackupBlocks = std::move(newBackupBlocks);
     }
 

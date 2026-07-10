@@ -37,7 +37,7 @@
 #include <utility>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC rpc {
+namespace [[MONGO_MOD_PUBLIC]] rpc {
 
 /**
  * A wrapper around an owned message that includes access to an associated ReplyInterface.
@@ -78,5 +78,5 @@ private:
 
 using UniqueReply = UniqueMessage<ReplyInterface>;
 
-}  // namespace MONGO_MOD_PUBLIC rpc
+}  // namespace rpc
 }  // namespace mongo

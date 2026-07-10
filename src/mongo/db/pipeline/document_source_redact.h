@@ -55,7 +55,7 @@ using namespace std::literals::string_view_literals;
 
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Redact);
 
-class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceRedact final : public DocumentSource {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DocumentSourceRedact final : public DocumentSource {
 public:
     static constexpr std::string_view kStageName = "$redact"sv;
     std::string_view getSourceName() const final;

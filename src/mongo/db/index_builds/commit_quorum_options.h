@@ -38,7 +38,7 @@
 #include <string>
 #include <string_view>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 /**
  * 'CommitQuorumOptions' is used to determine when a primary should commit an index build. When the
  * specified 'quorum' of replica set members is reached, then the primary proceeds to commit the
@@ -109,4 +109,4 @@ public:
     std::string mode = "";
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

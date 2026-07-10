@@ -48,7 +48,7 @@
 #include <string>
 #include <vector>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 /**
  * Macro to define an initializer function named "NAME" with the default

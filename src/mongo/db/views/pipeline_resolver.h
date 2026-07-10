@@ -48,7 +48,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC PipelineResolver {
+class [[MONGO_MOD_PUBLIC]] PipelineResolver {
 public:
     /**
      * Constructs a new aggregation request which targets the base collection of 'resolvedView'

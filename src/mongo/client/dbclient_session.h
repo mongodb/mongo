@@ -90,7 +90,7 @@ class DBClientCursor;
  * exception, it is legal to call shutdown() or shutdownAndDisallowReconnect() from any thread as a
  * way to interrupt the owning thread.
  */
-class MONGO_MOD_PUBLIC DBClientSession : public DBClientBase {
+class [[MONGO_MOD_PUBLIC]] DBClientSession : public DBClientBase {
 public:
     /**
      * A hook used to validate the reply of a "hello" command during connection. If the hook

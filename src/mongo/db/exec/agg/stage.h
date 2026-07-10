@@ -56,7 +56,7 @@ namespace agg {
  * TODO SERVER-112776: Remove 'data_movement' dependency on this class.
  * TODO SERVER-112777: Remove 'atlas_streams' dependency on this class.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT GetNextResult {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] GetNextResult {
 public:
     enum class ReturnStatus {
         // There is a result to be processed.
@@ -159,7 +159,7 @@ private:
  * TODO SERVER-112776: Resolve 'data_movement' dependency on this class.
  * TODO SERVER-112777: Resolve 'atlas_streams' dependency on this class.
  */
-class MONGO_MOD_OPEN Stage : public virtual RefCountable {
+class [[MONGO_MOD_OPEN]] Stage : public virtual RefCountable {
 public:
     Stage(std::string_view stageName, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
     ~Stage() override {}

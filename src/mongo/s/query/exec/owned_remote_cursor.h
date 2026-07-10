@@ -34,7 +34,7 @@
 #include "mongo/s/query/exec/establish_cursors.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * A RAII wrapper class for RemoteCursor which schedules a killCursors request upon destruction if
@@ -91,4 +91,4 @@ private:
     NamespaceString _nss;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

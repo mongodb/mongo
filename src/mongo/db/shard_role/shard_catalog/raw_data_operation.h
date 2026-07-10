@@ -39,7 +39,7 @@
 namespace mongo {
 using namespace std::literals::string_view_literals;
 
-MONGO_MOD_NEEDS_REPLACEMENT constexpr inline auto kRawDataFieldName = "rawData"sv;
+[[MONGO_MOD_NEEDS_REPLACEMENT]] constexpr inline auto kRawDataFieldName = "rawData"sv;
 
 /**
  * Returns a settable boolean indicating whether the given operation context is performing a "raw
@@ -47,14 +47,14 @@ MONGO_MOD_NEEDS_REPLACEMENT constexpr inline auto kRawDataFieldName = "rawData"s
  * from that in which users interact with, a "raw data" operation will operate directly on the
  * format in which it is stored.
  */
-MONGO_MOD_NEEDS_REPLACEMENT bool& isRawDataOperation(OperationContext*);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] bool& isRawDataOperation(OperationContext*);
 
 /**
  * Returns the rewritten command object, replacing the collection name with the one provided.
  */
 template <class CommandRequest>
-MONGO_MOD_NEEDS_REPLACEMENT BSONObj rewriteCommandForRawDataOperation(const BSONObj& cmd,
-                                                                      std::string_view coll) {
+[[MONGO_MOD_NEEDS_REPLACEMENT]] BSONObj rewriteCommandForRawDataOperation(const BSONObj& cmd,
+                                                                          std::string_view coll) {
     BSONObjBuilder builder{cmd.objsize()};
     for (auto&& [fieldName, elem] : cmd) {
         if (fieldName == CommandRequest::kCommandName) {

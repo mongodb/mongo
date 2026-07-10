@@ -38,7 +38,7 @@
 #include <functional>
 #include <vector>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class ConstFLE2TagAndEncryptedMetadataBlock;
 class EncryptedPredicateEvaluatorV2 {
@@ -65,4 +65,4 @@ private:
     std::vector<ServerZerosEncryptionToken> _zerosDecryptionTokens;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

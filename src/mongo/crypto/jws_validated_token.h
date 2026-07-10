@@ -40,7 +40,7 @@
 #include <string_view>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC crypto {
+namespace [[MONGO_MOD_PUBLIC]] crypto {
 
 struct IssuerAudiencePair {
     std::string issuer;
@@ -99,5 +99,5 @@ private:
     std::string _originalToken;
 };
 
-}  // namespace MONGO_MOD_PUBLIC crypto
+}  // namespace crypto
 }  // namespace mongo

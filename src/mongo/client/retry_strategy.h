@@ -50,7 +50,7 @@
 
 #include <boost/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 using namespace std::literals::string_view_literals;
 
 /**
@@ -77,7 +77,7 @@ using namespace std::literals::string_view_literals;
  *
  *  See 'runWithRetryStrategy' for a reference usage of retry strategies.
  */
-class MONGO_MOD_OPEN RetryStrategy {
+class [[MONGO_MOD_OPEN]] RetryStrategy {
 public:
     virtual ~RetryStrategy() = default;
 
@@ -499,7 +499,7 @@ public:
          */
         void updateRateParameters(double returnRate, double capacity);
 
-        MONGO_MOD_PUBLIC double getBalance_forTest() const;
+        [[MONGO_MOD_PUBLIC]] double getBalance_forTest() const;
 
         /**
          * Appends the stats for the retry budget metrics.
@@ -714,4 +714,4 @@ StatusWith<T> runWithRetryStrategy(Interruptible* interruptible,
     return result;
 }
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

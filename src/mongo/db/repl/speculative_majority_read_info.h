@@ -68,7 +68,7 @@ namespace repl {
  * be majority committed. This, for example, could be the timestamp of the read source chosen by the
  * storage engine.
  */
-class MONGO_MOD_PUB SpeculativeMajorityReadInfo {
+class [[MONGO_MOD_PUBLIC]] SpeculativeMajorityReadInfo {
 public:
     static SpeculativeMajorityReadInfo& get(OperationContext* opCtx);
 

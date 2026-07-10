@@ -60,7 +60,7 @@ using namespace std::literals::string_view_literals;
  * Then use getElements(dbname) for isExact() form to get list of T names.
  */
 template <typename T, bool enableForAllDBs>
-class MONGO_MOD_PUBLIC UMCInfoCommandArg {
+class [[MONGO_MOD_PUBLIC]] UMCInfoCommandArg {
 public:
     UMCInfoCommandArg() : UMCInfoCommandArg(AllOnCurrentDB{}) {}
     static_assert(std::is_same<UserName, T>::value || std::is_same<RoleName, T>::value,

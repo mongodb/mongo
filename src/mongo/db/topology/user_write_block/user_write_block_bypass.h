@@ -38,7 +38,7 @@
 
 namespace mongo {
 using namespace std::literals::string_view_literals;
-class MONGO_MOD_NEEDS_REPLACEMENT WriteBlockBypass {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] WriteBlockBypass {
 public:
     static WriteBlockBypass& get(OperationContext* opCtx);
 

@@ -53,7 +53,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace MONGO_MOD_PUB query_shape {
+namespace [[MONGO_MOD_PUBLIC]] query_shape {
 /**
  * A policy enum for how to serialize literal values.
  */
@@ -283,5 +283,5 @@ struct SerializationOptions {
     bool isSerializingForQueryStats() const;
 };
 
-}  // namespace MONGO_MOD_PUB query_shape
+}  // namespace query_shape
 }  // namespace mongo

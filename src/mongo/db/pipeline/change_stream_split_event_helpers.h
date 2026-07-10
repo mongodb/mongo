@@ -38,7 +38,7 @@
 #include <utility>
 
 namespace mongo {
-namespace MONGO_MOD_NEEDS_REPLACEMENT change_stream_split_event {
+namespace [[MONGO_MOD_NEEDS_REPLACEMENT]] change_stream_split_event {
 
 inline constexpr std::string_view kIdField{"_id"};
 inline constexpr std::string_view kSplitEventField{"splitEvent"};
@@ -68,5 +68,5 @@ std::queue<Document> splitChangeEvent(const Document& event,
                                       size_t maxFragmentBsonSize,
                                       size_t skipFirstFragments = 0);
 
-}  // namespace MONGO_MOD_NEEDS_REPLACEMENT change_stream_split_event
+}  // namespace change_stream_split_event
 }  // namespace mongo

@@ -39,7 +39,7 @@
 #include <utility>
 #include <vector>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Records samples, exposing the aggregate statistics in Server Status as a
@@ -104,4 +104,4 @@ struct ServerStatusMetricPolicySelection<HistogramServerStatusMetric> {
     using type = Policy;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

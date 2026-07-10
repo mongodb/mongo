@@ -41,7 +41,7 @@
 namespace mongo {
 namespace admission {
 
-class MONGO_MOD_PUBLIC IngressRequestRateLimiter {
+class [[MONGO_MOD_PUBLIC]] IngressRequestRateLimiter {
 public:
     IngressRequestRateLimiter();
     /**
@@ -86,19 +86,20 @@ public:
      * Called automatically when the value of the server parameter
      * ingressRequestAdmissionRatePerSec changes value.
      */
-    MONGO_MOD_PRIVATE static Status onUpdateAdmissionRatePerSec(std::int32_t refreshRatePerSec);
+    [[MONGO_MOD_PRIVATE]] static Status onUpdateAdmissionRatePerSec(std::int32_t refreshRatePerSec);
 
     /**
      * Called automatically when the value of the server parameter
      * ingressRequestAdmissionBurstCapacitySecs changes value.
      */
-    MONGO_MOD_PRIVATE static Status onUpdateAdmissionBurstCapacitySecs(double burstCapacitySecs);
+    [[MONGO_MOD_PRIVATE]] static Status onUpdateAdmissionBurstCapacitySecs(
+        double burstCapacitySecs);
 
     /**
      * Called automatically when the value of the server parameter
      * ingressRequestAdmissionMaxQueueDepth changes value.
      */
-    MONGO_MOD_PRIVATE static Status onUpdateAdmissionMaxQueueDepth(std::int64_t maxQueueDepth);
+    [[MONGO_MOD_PRIVATE]] static Status onUpdateAdmissionMaxQueueDepth(std::int64_t maxQueueDepth);
 
     /**
      * Reports the ingress admission rate limiter metrics.

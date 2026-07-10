@@ -51,7 +51,7 @@ namespace timeseries {
 
 // TODO SERVER-101169 remove this once 'assumeNoMixedSchemaData' and 'areTimeseriesBucketsFixed' are
 // in 'TimeseriesOptions'.
-struct MONGO_MOD_FILE_PRIVATE TimeseriesTranslationParams {
+struct [[MONGO_MOD_FILE_PRIVATE]] TimeseriesTranslationParams {
     const TimeseriesOptions& tsOptions;
     bool assumeNoMixedSchemaData = true;
     bool areTimeseriesBucketsFixed = false;
@@ -89,7 +89,7 @@ void translateIndexHintIfRequired(const boost::intrusive_ptr<ExpressionContext>&
                                   const CollectionRoutingInfo& cri,
                                   AggregateCommandRequest& request);
 
-MONGO_MOD_FILE_PRIVATE void prependUnpackStageToPipeline_forTest(
+[[MONGO_MOD_FILE_PRIVATE]] void prependUnpackStageToPipeline_forTest(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Pipeline& pipeline,
     const TimeseriesTranslationParams& params);

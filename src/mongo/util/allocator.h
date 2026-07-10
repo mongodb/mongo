@@ -34,7 +34,7 @@
 
 #include <cstddef>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Wrapper around std::malloc().
@@ -50,4 +50,4 @@ namespace MONGO_MOD_PUB mongo {
 [[nodiscard]] MONGO_COMPILER_RETURNS_NONNULL MONGO_COMPILER_ALLOC_SIZE(2) void* mongoRealloc(
     void* ptr, size_t size);
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

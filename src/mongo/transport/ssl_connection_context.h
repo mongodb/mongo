@@ -50,7 +50,7 @@ class SSLManagerInterface;
 namespace transport {
 
 #ifdef MONGO_CONFIG_SSL
-struct MONGO_MOD_PUBLIC SSLConnectionContext {
+struct [[MONGO_MOD_PUBLIC]] SSLConnectionContext {
     std::unique_ptr<asio::ssl::context> ingress;
     std::unique_ptr<asio::ssl::context> egress;
     std::shared_ptr<SSLManagerInterface> manager;

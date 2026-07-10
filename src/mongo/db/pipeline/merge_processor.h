@@ -43,9 +43,9 @@
 
 #include <vector>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
-struct MONGO_MOD_PRIVATE MergeStatistics {
+struct [[MONGO_MOD_PRIVATE]] MergeStatistics {
     size_t totalDocsProcessed = 0;
     size_t docsMatched = 0;
     const size_t minInsertAttempts =
@@ -235,4 +235,4 @@ const std::map<const MergeStrategyDescriptor::MergeMode, const MergeStrategyDesc
 getMergeStrategyDescriptors(
     MergeProcessor::AllowInsertWithUpdateBackupStrategies allowInsertWithUpdateBackupStrategies);
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

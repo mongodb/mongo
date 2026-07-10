@@ -45,7 +45,7 @@ class OperationContext;
 class ServiceContext;
 class StorageEngine;
 
-class MONGO_MOD_PUBLIC BackupCursorHooks {
+class [[MONGO_MOD_PUBLIC]] BackupCursorHooks {
 public:
     using InitializerFunction = std::function<std::unique_ptr<BackupCursorHooks>()>;
 

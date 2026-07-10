@@ -43,7 +43,7 @@ namespace crypto {
 
 /** JWKSFetcher implementation which acquires keys via HTTP.
  */
-class MONGO_MOD_PUBLIC JWKSFetcherImpl : public JWKSFetcher {
+class [[MONGO_MOD_PUBLIC]] JWKSFetcherImpl : public JWKSFetcher {
 public:
     JWKSFetcherImpl(ClockSource* clock, std::string_view issuer);
 

@@ -44,7 +44,7 @@ namespace mongo {
  * Contains the minimum representation of a chunk - its bounds in the format [min, max) along with
  * utilities for parsing and persistence.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ChunkRange : private ChunkRangeBase {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ChunkRange : private ChunkRangeBase {
 public:
     using ChunkRangeBase::kMaxFieldName;
     using ChunkRangeBase::kMinFieldName;
@@ -124,25 +124,25 @@ private:
  * Checks whether the specified key from the given BSON document is within the bounds of this given
  * range.
  */
-MONGO_MOD_UNFORTUNATELY_OPEN bool isDocumentKeyInRange(const BSONObj& obj,
-                                                       const BSONObj& min,
-                                                       const BSONObj& max,
-                                                       const ShardKeyPattern& shardKeyPattern);
+[[MONGO_MOD_UNFORTUNATELY_OPEN]] bool isDocumentKeyInRange(const BSONObj& obj,
+                                                           const BSONObj& min,
+                                                           const BSONObj& max,
+                                                           const ShardKeyPattern& shardKeyPattern);
 
 /**
  * Checks whether the specified key from the given BSON document is within the bounds of this given
  * range.
  */
-MONGO_MOD_UNFORTUNATELY_OPEN bool isDocumentKeyInRange(const BSONObj& obj,
-                                                       const BSONObj& min,
-                                                       const BSONObj& max,
-                                                       const BSONObj& shardKeyPattern);
+[[MONGO_MOD_UNFORTUNATELY_OPEN]] bool isDocumentKeyInRange(const BSONObj& obj,
+                                                           const BSONObj& min,
+                                                           const BSONObj& max,
+                                                           const BSONObj& shardKeyPattern);
 
 /**
  * Checks whether the specified key is within the bounds of this given range.
  */
-MONGO_MOD_UNFORTUNATELY_OPEN bool isKeyInRange(const BSONObj& key,
-                                               const BSONObj& rangeMin,
-                                               const BSONObj& rangeMax);
+[[MONGO_MOD_UNFORTUNATELY_OPEN]] bool isKeyInRange(const BSONObj& key,
+                                                   const BSONObj& rangeMin,
+                                                   const BSONObj& rangeMax);
 
 }  // namespace mongo

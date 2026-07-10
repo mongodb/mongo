@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC AuthorizationContractGuard {
+class [[MONGO_MOD_PUBLIC]] AuthorizationContractGuard {
 public:
     explicit AuthorizationContractGuard(AuthorizationSession* authSession)
         : _authSession(authSession) {

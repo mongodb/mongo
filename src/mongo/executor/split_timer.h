@@ -115,7 +115,7 @@ private:
  *  - nonstatic makeTimer to initialize Timer.
  */
 template <typename Policy>
-class MONGO_MOD_PUBLIC SplitTimer {
+class [[MONGO_MOD_PUBLIC]] SplitTimer {
 private:
     template <typename E>
     static constexpr size_t _idx(E e) {

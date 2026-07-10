@@ -43,7 +43,7 @@
 #endif
 #endif
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  *  Provides access to the current stack bounds and remaining
@@ -124,4 +124,4 @@ private:
     const void* _capturedStackPointer = nullptr;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

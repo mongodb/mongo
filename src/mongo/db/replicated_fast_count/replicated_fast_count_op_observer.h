@@ -34,7 +34,7 @@
 #include <span>
 #include <string_view>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class OperationContext;
 class ServiceContext;
@@ -58,4 +58,4 @@ void recordContainerWriteForFastCountTimestamp(OperationContext* opCtx,
                                                std::string_view ident,
                                                std::span<const char> valueBytes);
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

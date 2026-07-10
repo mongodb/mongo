@@ -78,8 +78,8 @@ struct KillAllSessionsByPatternItemHash {
 /**
  * Patterns are specifically equal if they differ only by impersonate data.
  */
-MONGO_MOD_PUB inline bool operator==(const KillAllSessionsByPatternItem& lhs,
-                                     const KillAllSessionsByPatternItem& rhs) {
+[[MONGO_MOD_PUBLIC]] inline bool operator==(const KillAllSessionsByPatternItem& lhs,
+                                            const KillAllSessionsByPatternItem& rhs) {
     auto makeEqualityLens = [](const auto& item) {
         return std::tie(item.pattern.getLsid(), item.pattern.getUid(), item.apiParameters);
     };
@@ -87,12 +87,12 @@ MONGO_MOD_PUB inline bool operator==(const KillAllSessionsByPatternItem& lhs,
     return makeEqualityLens(lhs) == makeEqualityLens(rhs);
 }
 
-MONGO_MOD_PUB inline bool operator!=(const KillAllSessionsByPatternItem& lhs,
-                                     const KillAllSessionsByPatternItem& rhs) {
+[[MONGO_MOD_PUBLIC]] inline bool operator!=(const KillAllSessionsByPatternItem& lhs,
+                                            const KillAllSessionsByPatternItem& rhs) {
     return !(lhs == rhs);
 }
 
-using KillAllSessionsByPatternSet MONGO_MOD_PUB =
+using KillAllSessionsByPatternSet [[MONGO_MOD_PUBLIC]] =
     stdx::unordered_set<KillAllSessionsByPatternItem, KillAllSessionsByPatternItemHash>;
 
 std::tuple<boost::optional<UserName>, std::vector<RoleName>>
@@ -106,25 +106,26 @@ getKillAllSessionsByPatternImpersonateData(const KillAllSessionsByPattern& patte
 /**
  * Constructs a kill sessions pattern which kills all sessions
  */
-MONGO_MOD_PUB KillAllSessionsByPatternItem makeKillAllSessionsByPattern(OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] KillAllSessionsByPatternItem makeKillAllSessionsByPattern(
+    OperationContext* opCtx);
 
 /**
  * Constructs a kill sessions pattern for a particular user
  */
-MONGO_MOD_PUB KillAllSessionsByPatternItem
-makeKillAllSessionsByPattern(OperationContext* opCtx, const KillAllSessionsUser& user);
+[[MONGO_MOD_PUBLIC]] KillAllSessionsByPatternItem makeKillAllSessionsByPattern(
+    OperationContext* opCtx, const KillAllSessionsUser& user);
 
 /**
  * Constructs a KillAllSessionsByPatternSet, each element of which matches the UID of a user that is
  * currently authenticated on the given connection.
  */
-MONGO_MOD_PUB KillAllSessionsByPatternSet
-makeSessionFilterForAuthenticatedUsers(OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] KillAllSessionsByPatternSet makeSessionFilterForAuthenticatedUsers(
+    OperationContext* opCtx);
 
 /**
  * Constructs a kill sessions pattern for a particular logical session
  */
-MONGO_MOD_PUB KillAllSessionsByPatternItem
-makeKillAllSessionsByPattern(OperationContext* opCtx, const LogicalSessionId& lsid);
+[[MONGO_MOD_PUBLIC]] KillAllSessionsByPatternItem makeKillAllSessionsByPattern(
+    OperationContext* opCtx, const LogicalSessionId& lsid);
 
 }  // namespace mongo

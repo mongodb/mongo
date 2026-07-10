@@ -56,7 +56,7 @@
 
 #include <fmt/format.h>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 /**
  * Fail unconditionally, reporting the given message.
@@ -236,10 +236,10 @@ MONGO_MOD_PUBLIC;
 namespace mongo::unittest {
 namespace assert_details {
 template <typename Exception>
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS inline boost::optional<std::string> evaluateExceptionMatcher(
-    std::invocable auto expression,
-    std::string_view expressionText,
-    testing::Matcher<Exception> matcher) {
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] inline boost::optional<std::string>
+evaluateExceptionMatcher(std::invocable auto expression,
+                         std::string_view expressionText,
+                         testing::Matcher<Exception> matcher) {
     if (testing::StringMatchResultListener listener;
         !testing::ExplainMatchResult(match::Throws<Exception>(matcher), expression, &listener)) {
         return fmt::format(

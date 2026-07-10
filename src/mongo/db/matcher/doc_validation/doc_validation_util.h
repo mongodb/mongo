@@ -39,7 +39,7 @@
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 namespace mongo::doc_validation_error {
 /**
  * Set of functions which create an ErrorAnnotation provided that a validator expression is being

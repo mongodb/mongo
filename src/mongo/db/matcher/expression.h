@@ -70,7 +70,7 @@ namespace mongo {
  */
 extern FailPoint disableMatchExpressionOptimization;
 
-class MONGO_MOD_PUBLIC MatchExpression {
+class [[MONGO_MOD_PUBLIC]] MatchExpression {
     MatchExpression(const MatchExpression&) = delete;
     MatchExpression& operator=(const MatchExpression&) = delete;
 
@@ -565,6 +565,6 @@ inline MatchExpression::ConstIterator end(const MatchExpression& expr) {
     return {&expr, expr.numChildren()};
 }
 
-using StatusWithMatchExpression MONGO_MOD_PUBLIC = StatusWith<std::unique_ptr<MatchExpression>>;
+using StatusWithMatchExpression [[MONGO_MOD_PUBLIC]] = StatusWith<std::unique_ptr<MatchExpression>>;
 
 }  // namespace mongo

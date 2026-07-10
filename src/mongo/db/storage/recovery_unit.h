@@ -49,7 +49,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 
@@ -672,7 +672,7 @@ public:
      * OperationContext and may not be the same as when the Change was registered on the
      * RecoveryUnit. See above for usage restrictions.
      */
-    class MONGO_MOD_OPEN Change {
+    class [[MONGO_MOD_OPEN]] Change {
     public:
         virtual ~Change() {}
 

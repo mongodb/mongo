@@ -43,7 +43,7 @@
 
 #include <boost/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 namespace observable_mutex_details {
 template <typename MutexType>
@@ -216,13 +216,14 @@ public:
         _mutex.unlock_shared();
     }
 
-    MONGO_MOD_NEEDS_REPLACEMENT void setExclusiveAcquisitions_forTest(MutexAcquisitionStats stat) {
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] void setExclusiveAcquisitions_forTest(
+        MutexAcquisitionStats stat) {
         _exclusiveAcquisitions.contentions.store(stat.contentions);
         _exclusiveAcquisitions.total.store(stat.total);
         _exclusiveAcquisitions.waitCycles.store(stat.waitCycles);
     }
 
-    MONGO_MOD_NEEDS_REPLACEMENT void setSharedAcquisitions_forTest(MutexAcquisitionStats stat) {
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] void setSharedAcquisitions_forTest(MutexAcquisitionStats stat) {
         _sharedAcquisitions.contentions.store(stat.contentions);
         _sharedAcquisitions.total.store(stat.total);
         _sharedAcquisitions.waitCycles.store(stat.waitCycles);
@@ -266,4 +267,4 @@ using ObservableMutex = MutexType;
 using ObservableExclusiveMutex = ObservableMutex<std::mutex>;
 using ObservableSharedMutex = ObservableMutex<std::shared_mutex>;  // NOLINT
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

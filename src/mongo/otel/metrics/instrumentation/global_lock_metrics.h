@@ -61,6 +61,6 @@ private:
  * job (1 Hz) that samples the snapshot utility and pushes the latest values.
  * Intended to be called once at startup from mongod_main.
  */
-MONGO_MOD_PUBLIC void installGlobalLockOtelMetrics(ServiceContext* svcCtx);
+[[MONGO_MOD_PUBLIC]] void installGlobalLockOtelMetrics(ServiceContext* svcCtx);
 
 }  // namespace mongo

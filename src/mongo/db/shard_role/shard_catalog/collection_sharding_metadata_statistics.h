@@ -37,7 +37,7 @@ namespace mongo {
 /**
  * Tracks statistics for work related to authoritative collection metadata recovery.
  */
-class MONGO_MOD_PARENT_PRIVATE CollectionShardingMetadataStatistics {
+class [[MONGO_MOD_PARENT_PRIVATE]] CollectionShardingMetadataStatistics {
 public:
     void report(BSONObjBuilder& builder) const {
         builder.append("countRecoverersCreated", _countRecoverersCreated.get());

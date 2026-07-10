@@ -41,7 +41,7 @@
 #include <utility>
 
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 template <typename Function>
 class function_ref;
 
@@ -250,7 +250,7 @@ private:
     std::unique_ptr<Impl> _impl;
 };
 
-namespace MONGO_MOD_FILE_PRIVATE functional_details {
+namespace [[MONGO_MOD_FILE_PRIVATE]] functional_details {
 /**
  * Helper to pattern-match the signatures for all combinations of const and l-value-qualifed member
  * function pointers. We don't currently support r-value-qualified call operators.
@@ -265,7 +265,7 @@ template <typename Class, typename Ret, typename... Args>
 struct UFDeductionHelper<Ret (Class::*)(Args...) const> : std::type_identity<Ret(Args...)> {};
 template <typename Class, typename Ret, typename... Args>
 struct UFDeductionHelper<Ret (Class::*)(Args...) const&> : std::type_identity<Ret(Args...)> {};
-}  // namespace MONGO_MOD_FILE_PRIVATE functional_details
+}  // namespace functional_details
 
 /**
  * Deduction guides for unique_function<Sig> that pluck the signature off of function pointers and
@@ -278,4 +278,4 @@ template <
     typename Sig = typename functional_details::UFDeductionHelper<decltype(&T::operator())>::type>
 unique_function(T) -> unique_function<Sig>;
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

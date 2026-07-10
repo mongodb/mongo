@@ -46,7 +46,7 @@ namespace catalog_repair {
  * unknown internal idents. If we started from a clean shutdown, the internal idents may contain
  * information for resuming index builds.
  */
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
     OperationContext* opCtx,
     StorageEngine* engine,

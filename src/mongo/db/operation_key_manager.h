@@ -52,7 +52,7 @@ namespace mongo {
  * - During a killop-like operation, it is used to find the OperationContext to kill.
  * - During OperationContext destruction, the OperationKey from the client application is removed.
  */
-class MONGO_MOD_PUBLIC OperationKeyManager {
+class [[MONGO_MOD_PUBLIC]] OperationKeyManager {
 public:
     static OperationKeyManager& get(ServiceContext* serviceContext = getCurrentServiceContext());
     static OperationKeyManager& get(Client* client) {

@@ -35,7 +35,7 @@
 #include <memory>
 #include <string>
 
-namespace MONGO_MOD_PRIVATE mongo {
+namespace [[MONGO_MOD_PRIVATE]] mongo {
 namespace executor {
 
 class NetworkInterfaceMock;
@@ -57,4 +57,4 @@ void addTestsForExecutor(
         makeExecutor);
 
 }  // namespace executor
-}  // namespace MONGO_MOD_PRIVATE mongo
+}  // namespace mongo

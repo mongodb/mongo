@@ -48,7 +48,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
+namespace [[MONGO_MOD_NEEDS_REPLACEMENT]] mongo {
 using namespace std::literals::string_view_literals;
 
 /**
@@ -149,4 +149,4 @@ private:
     boost::optional<long long> _maxDepth;
 };
 
-}  // namespace MONGO_MOD_NEEDS_REPLACEMENT mongo
+}  // namespace mongo

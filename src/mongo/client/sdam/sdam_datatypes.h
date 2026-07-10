@@ -59,7 +59,7 @@
  * for more information.
  */
 namespace mongo {
-namespace MONGO_MOD_PUBLIC sdam {
+namespace [[MONGO_MOD_PUBLIC]] sdam {
 enum class TopologyType {
     kSingle,
     kReplicaSetNoPrimary,
@@ -149,5 +149,5 @@ using TopologyManagerPtr = std::unique_ptr<TopologyManager>;
 
 class TopologyListener;
 using TopologyListenerPtr = std::weak_ptr<TopologyListener>;
-}  // namespace MONGO_MOD_PUBLIC sdam
+}  // namespace sdam
 }  // namespace mongo

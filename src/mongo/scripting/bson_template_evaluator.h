@@ -78,7 +78,7 @@ namespace mongo {
  * method.
  *
  */
-class MONGO_MOD_NEEDS_REPLACEMENT BsonTemplateEvaluator {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] BsonTemplateEvaluator {
     BsonTemplateEvaluator(const BsonTemplateEvaluator&) = delete;
     BsonTemplateEvaluator& operator=(const BsonTemplateEvaluator&) = delete;
 

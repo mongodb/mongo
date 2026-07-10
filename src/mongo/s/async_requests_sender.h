@@ -94,7 +94,7 @@ namespace mongo {
  *
  * Does not throw exceptions.
  */
-class MONGO_MOD_PUBLIC AsyncRequestsSender {
+class [[MONGO_MOD_PUBLIC]] AsyncRequestsSender {
     AsyncRequestsSender(const AsyncRequestsSender&) = delete;
     AsyncRequestsSender& operator=(const AsyncRequestsSender&) = delete;
 

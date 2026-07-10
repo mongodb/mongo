@@ -41,7 +41,7 @@
 
 #include <string_view>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Returns true if the given command name can run as a retryable write.
@@ -80,4 +80,4 @@ void validateSessionOptions(const OperationSessionInfoFromClient& sessionOptions
  */
 void doTransactionValidationForWrites(OperationContext* opCtx, const NamespaceString& ns);
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

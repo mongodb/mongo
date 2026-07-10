@@ -52,7 +52,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 using TxnNumber = std::int64_t;
 using StmtId = std::int32_t;
@@ -214,4 +214,4 @@ public:
         : OperationSessionInfoFromClientBase(std::move(other)) {}
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

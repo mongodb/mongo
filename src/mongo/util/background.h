@@ -36,7 +36,7 @@
 #include <string>
 #include <vector>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  *  Background thread dispatching.
@@ -54,7 +54,7 @@ namespace MONGO_MOD_PUB mongo {
  *  BackgroundJob object must exist for as long the background thread is running.
  */
 
-class MONGO_MOD_OPEN BackgroundJob {
+class [[MONGO_MOD_OPEN]] BackgroundJob {
     BackgroundJob(const BackgroundJob&) = delete;
     BackgroundJob& operator=(const BackgroundJob&) = delete;
 
@@ -141,7 +141,7 @@ private:
  *   virtual void doWork() { log() << "hi" << std::endl; }
  * } myTask;
  */
-class MONGO_MOD_OPEN PeriodicTask {
+class [[MONGO_MOD_OPEN]] PeriodicTask {
 public:
     PeriodicTask();
     virtual ~PeriodicTask();
@@ -171,4 +171,4 @@ public:
 };
 
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

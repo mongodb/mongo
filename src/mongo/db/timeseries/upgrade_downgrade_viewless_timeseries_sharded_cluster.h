@@ -31,7 +31,7 @@
 
 #include "mongo/db/operation_context.h"
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo::timeseries {
 

@@ -50,7 +50,7 @@ inline StringMap<std::string> clusterCommandTranslations = {
     {"insert", "clusterInsert"},
     {"update", "clusterUpdate"}};
 
-MONGO_MOD_PUB inline BSONObj replaceCommandNameWithClusterCommandName(BSONObj cmdObj) {
+[[MONGO_MOD_PUBLIC]] inline BSONObj replaceCommandNameWithClusterCommandName(BSONObj cmdObj) {
     auto cmdName = cmdObj.firstElement().fieldNameStringData();
     auto newNameIt = clusterCommandTranslations.find(cmdName);
     uassert(6349501,

@@ -39,7 +39,7 @@ namespace mongo {
  * A mock WatchdogMonitor for use in C++ unit tests.
  *
  */
-class MONGO_MOD_PUBLIC WatchdogMonitorMock final : public WatchdogMonitorInterface {
+class [[MONGO_MOD_PUBLIC]] WatchdogMonitorMock final : public WatchdogMonitorInterface {
 public:
     WatchdogMonitorMock() = default;
     ~WatchdogMonitorMock() override = default;

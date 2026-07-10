@@ -62,7 +62,7 @@ namespace mongo {
 class OpDebug;
 struct PlanSummaryStats;
 
-struct MONGO_MOD_PUBLIC UpdateStageParams {
+struct [[MONGO_MOD_PUBLIC]] UpdateStageParams {
     using DocumentCounter = std::function<size_t(const BSONObj&)>;
 
     UpdateStageParams(const UpdateRequest* r,

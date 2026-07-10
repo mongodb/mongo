@@ -45,7 +45,7 @@
 #include <memory>
 
 namespace mongo::transport {
-namespace MONGO_MOD_PARENT_PRIVATE grpc {
+namespace [[MONGO_MOD_PARENT_PRIVATE]] grpc {
 
 class Service;
 
@@ -217,5 +217,5 @@ private:
                                                               logv2::LogSeverity::Debug(4)};
 };
 
-}  // namespace MONGO_MOD_PARENT_PRIVATE grpc
+}  // namespace grpc
 }  // namespace mongo::transport

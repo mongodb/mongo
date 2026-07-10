@@ -42,7 +42,7 @@
 
 #include <vector>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 class BSONObjBuilder;
 class OperationContext;
 
@@ -73,4 +73,4 @@ Status applyApplyOpsOplogEntry(OperationContext* opCtx,
                                const OplogEntry& entry,
                                repl::OplogApplication::Mode oplogApplicationMode);
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

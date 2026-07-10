@@ -40,7 +40,7 @@
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /*
  * Generate a match expression from a list of encrypted fields.
@@ -55,4 +55,4 @@ StatusWithMatchExpression generateMatchExpressionFromEncryptedFields(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const std::vector<EncryptedField>& encryptedFields);
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

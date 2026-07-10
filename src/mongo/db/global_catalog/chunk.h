@@ -51,7 +51,7 @@ class BSONObj;
 /**
  * Represents a cache entry for a single Chunk. Owned by a RoutingTableHistory.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ChunkInfo {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ChunkInfo {
 public:
     explicit ChunkInfo(const ChunkType& from);
 
@@ -162,7 +162,7 @@ private:
     AtomicWord<bool> _jumbo;
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT Chunk {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] Chunk {
 public:
     Chunk(ChunkInfo& chunkInfo, const boost::optional<Timestamp>& atClusterTime)
         : _chunkInfo(chunkInfo), _atClusterTime(atClusterTime) {}

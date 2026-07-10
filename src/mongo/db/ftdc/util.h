@@ -50,7 +50,7 @@
 namespace mongo {
 using namespace std::literals::string_view_literals;
 
-MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kFTDCThreadName = "ftdc"sv;
+[[MONGO_MOD_NEEDS_REPLACEMENT]] constexpr std::string_view kFTDCThreadName = "ftdc"sv;
 
 /**
  * Utilities for inflating and deflating BSON documents and metric arrays

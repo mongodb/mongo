@@ -36,7 +36,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * A function which handles looking up RWConcernDefault values from where they are persisted in
@@ -47,4 +47,4 @@ boost::optional<RWConcernDefault> readWriteConcernDefaultsCacheLookupMongoD(
 
 void readWriteConcernDefaultsMongodStartupChecks(OperationContext* opCtx, bool isReplicaSet);
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

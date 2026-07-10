@@ -131,9 +131,9 @@ const std::string_view kUnknownError = "Unknown Failure from JSInterpreter";
  *
  * For more information about overriden fields, see mongo::Scope
  */
-class MONGO_MOD_PUB MozJSImplScope final : public Scope,
-                                           public MozJSShellRuntimeInterface,
-                                           public MozJSCommonRuntimeInterface {
+class [[MONGO_MOD_PUBLIC]] MozJSImplScope final : public Scope,
+                                                  public MozJSShellRuntimeInterface,
+                                                  public MozJSCommonRuntimeInterface {
     MozJSImplScope(const MozJSImplScope&) = delete;
     MozJSImplScope& operator=(const MozJSImplScope&) = delete;
 
@@ -680,7 +680,7 @@ private:
     WrapType<URIInfo> _uriProto;
 };
 
-MONGO_MOD_PUB inline MozJSImplScope* getScope(JSContext* cx) {
+[[MONGO_MOD_PUBLIC]] inline MozJSImplScope* getScope(JSContext* cx) {
     return static_cast<MozJSImplScope*>(getCommonRuntime(cx));
 }
 

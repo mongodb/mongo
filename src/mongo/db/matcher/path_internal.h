@@ -39,7 +39,7 @@
 /**
  * TODO SERVER-114832 Break audit dependency on this class.
  */
-namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
+namespace [[MONGO_MOD_NEEDS_REPLACEMENT]] mongo {
 
 /**
  * Finds the element at 'path' in 'doc', starting at 'startIndex' in 'path'. If none is found, an
@@ -51,4 +51,4 @@ BSONElement getFieldDottedOrArray(const BSONObj& doc,
                                   size_t* idxPath,
                                   size_t startIndex = 0);
 
-}  // namespace MONGO_MOD_NEEDS_REPLACEMENT mongo
+}  // namespace mongo

@@ -37,7 +37,7 @@
 #include <string_view>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC logv2 {
+namespace [[MONGO_MOD_PUBLIC]] logv2 {
 
 /**
  * Representation of the severity / priority of a log message.
@@ -176,7 +176,7 @@ public:
      * 'enableTestCommands'.  Not synchronized. Call in single threaded
      * mode only, i.e. startup or unit tests.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT static void suppressProdOnly_forTest(bool b) {
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] static void suppressProdOnly_forTest(bool b) {
         _suppressProdOnly = b;
     }
 
@@ -204,5 +204,5 @@ private:
     static inline bool _suppressProdOnly = false;
 };
 
-}  // namespace MONGO_MOD_PUBLIC logv2
+}  // namespace logv2
 }  // namespace mongo

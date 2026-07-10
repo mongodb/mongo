@@ -45,13 +45,13 @@ namespace mongo {
  * Sets up and provides a repl::StorageInterface and OperationContext. Database data are cleared
  * between test runs.
  */
-class MONGO_MOD_PUBLIC CatalogScopedGlobalServiceContextForTest
+class [[MONGO_MOD_PUBLIC]] CatalogScopedGlobalServiceContextForTest
     : public MongoDScopedGlobalServiceContextForTest {
 public:
     CatalogScopedGlobalServiceContextForTest(Options options, bool shouldSetupTL);
 };
 
-class MONGO_MOD_OPEN CatalogTestFixture : public ServiceContextTest {
+class [[MONGO_MOD_OPEN]] CatalogTestFixture : public ServiceContextTest {
 public:
     using Options = MongoDScopedGlobalServiceContextForTest::Options;
 

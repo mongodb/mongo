@@ -51,7 +51,7 @@ namespace mozjs {
  *     $db : String(),
  * }
  */
-struct MONGO_MOD_PUB DBRefInfo : public BaseInfo {
+struct [[MONGO_MOD_PUBLIC]] DBRefInfo : public BaseInfo {
     enum Slots { BSONHolderSlot, DBRefInfoSlotCount };
 
     static void construct(JSContext* cx, JS::CallArgs args);

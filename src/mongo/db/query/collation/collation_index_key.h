@@ -32,7 +32,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class BSONElement;
 class BSONObjBuilder;
@@ -61,4 +61,4 @@ public:
                                              BSONObjBuilder* out);
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -37,7 +37,7 @@
 
 #include <boost/smart_ptr/allocate_unique.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace tracking {
 
 template <class T>
@@ -120,4 +120,4 @@ unique_ptr<T> make_unique(Context& Context, Args&&... args) {
 }
 
 }  // namespace tracking
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

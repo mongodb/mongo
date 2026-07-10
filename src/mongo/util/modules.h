@@ -54,9 +54,6 @@
  */
 #define MONGO_MOD_PUBLIC MONGO_MOD_ATTR_(public)
 
-/// Deprecated alias for MONGO_MOD_PUBLIC. TODO: All usages will be converted soon.
-#define MONGO_MOD_PUB MONGO_MOD_PUBLIC
-
 /**
  * Marks a class as open and everything inside as public to other modules.
  * This is "more public than public" in that it also allows inheriting from the class.
@@ -93,6 +90,12 @@
  * module which haven't been cleaned up yet. Allows external usage
  * like MONGO_MOD_PUBLIC, but gives a warning to each caller for usage
  * outside the module.
+ *
+ * The replacement is free-form text. Usually you can just put an API in there,
+ * like Foo::bar(), but if you want to write a message to the reader, you can.
+ * Since [[FOO(space separated words)]] sometimes makes clang-format think the
+ * file is objective-c, you can also use [[FOO("space separated words")]]. The
+ * scanner will strip the quotes and treat them the same.
  */
 #define MONGO_MOD_USE_REPLACEMENT(replacement) MONGO_MOD_ATTR_(use_replacement::replacement)
 
@@ -138,7 +141,7 @@
 //
 
 #if MONGO_COMPILER_HAS_ATTRIBUTE(clang::annotate)
-#define MONGO_MOD_ATTR_(attr) [[clang::annotate("mongo::mod::" #attr)]]
+#define MONGO_MOD_ATTR_(attr) clang::annotate("mongo::mod::" #attr)
 #else
 #define MONGO_MOD_ATTR_(attr)
 #endif

@@ -72,7 +72,7 @@
 #include <grpcpp/support/sync_stream.h>
 
 namespace mongo::transport {
-namespace MONGO_MOD_PARENT_PRIVATE grpc {
+namespace [[MONGO_MOD_PARENT_PRIVATE]] grpc {
 
 #define ASSERT_EQ_MSG(a, b) ASSERT_EQ((a).opMsgDebugString(), (b).opMsgDebugString())
 #define ASSERT_GRPC_STUB_CONNECTED(stub) \
@@ -496,5 +496,5 @@ inline std::string makeGRPCUnixSockPath(int port, std::string_view label = "grpc
     return makeUnixSockPath(port, label);
 }
 
-}  // namespace MONGO_MOD_PARENT_PRIVATE grpc
+}  // namespace grpc
 }  // namespace mongo::transport

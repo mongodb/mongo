@@ -37,11 +37,11 @@ namespace mongo {
 /*
  * Validate wildcard index key pattern.
  */
-MONGO_MOD_PUBLIC Status validateWildcardIndex(const BSONObj& keyPattern);
+[[MONGO_MOD_PUBLIC]] Status validateWildcardIndex(const BSONObj& keyPattern);
 
 /*
  * Validate wildcardProjection field.
  */
-MONGO_MOD_PUBLIC Status validateWildcardProjection(const BSONObj& keyPattern,
-                                                   const BSONObj& pathProjection);
+[[MONGO_MOD_PUBLIC]] Status validateWildcardProjection(const BSONObj& keyPattern,
+                                                       const BSONObj& pathProjection);
 }  // namespace mongo

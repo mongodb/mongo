@@ -56,7 +56,7 @@ class CountRequest;
  * decisions. Eventually this will replace get_executor.h, which will be deleted.
  * TODO SERVER-119036 delete old get_executor
  */
-MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
+[[MONGO_MOD_PUBLIC]] StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
 getExecutorFindDeferredEngineChoice(OperationContext* opCtx,
                                     const MultipleCollectionAccessor& collections,
                                     std::unique_ptr<CanonicalQuery> canonicalQuery,

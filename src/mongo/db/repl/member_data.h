@@ -44,16 +44,16 @@
 
 #include <boost/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace repl {
 
 /**
  * This class contains the data from heartbeat responses and replSetUpdatePosition commands for one
  * member of a replica set.
  **/
-class MONGO_MOD_PUB MemberData {
+class [[MONGO_MOD_PUBLIC]] MemberData {
 public:
-    class MONGO_MOD_PARENT_PRIVATE HeartbeatChanges {
+    class [[MONGO_MOD_PARENT_PRIVATE]] HeartbeatChanges {
     public:
         HeartbeatChanges(bool opTimeAdvanced, bool configChanged, bool memberStateChanged)
             : _opTimeAdvanced(opTimeAdvanced),
@@ -406,4 +406,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

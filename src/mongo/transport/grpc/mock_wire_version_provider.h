@@ -38,7 +38,7 @@ namespace mongo::transport::grpc {
 /**
  * A WireVersionProvider whose clusterMaxWireVersion can be manually set to arbitrary values.
  */
-class MONGO_MOD_PARENT_PRIVATE MockWireVersionProvider : public WireVersionProvider {
+class [[MONGO_MOD_PARENT_PRIVATE]] MockWireVersionProvider : public WireVersionProvider {
 public:
     MockWireVersionProvider() = default;
 

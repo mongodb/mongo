@@ -39,7 +39,7 @@
 
 #include <boost/filesystem/operations.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * The DiskSpaceMonitor is a periodic job that observes at the remaining disk space for the database
@@ -102,4 +102,4 @@ private:
 
     int64_t _actionId = 0;
 };
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

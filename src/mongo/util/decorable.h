@@ -79,7 +79,7 @@
 #include <boost/optional.hpp>
 #include <fmt/format.h>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 namespace decorable_detail {
 
@@ -246,19 +246,19 @@ public:
      * Decoration `t` can also be given as a pointer, in which case a pointer to
      * its owner is returned.
      */
-    MONGO_MOD_PUBLIC const DecoratedType& owner(const DecorationType& t) const {
+    [[MONGO_MOD_PUBLIC]] const DecoratedType& owner(const DecorationType& t) const {
         // The decoration block starts with a backlink to the decorable.
         const void* p = &t;
         const void* block = static_cast<const char*>(p) - _offset;
         return *DecoratedType::downcastBackLink(*reinterpret_cast<const void* const*>(block));
     }
-    MONGO_MOD_PUBLIC DecoratedType& owner(DecorationType& t) const {
+    [[MONGO_MOD_PUBLIC]] DecoratedType& owner(DecorationType& t) const {
         return const_cast<DecoratedType&>(owner(std::as_const(t)));
     }
-    MONGO_MOD_PUBLIC const DecoratedType* owner(const DecorationType* t) const {
+    [[MONGO_MOD_PUBLIC]] const DecoratedType* owner(const DecorationType* t) const {
         return &owner(*t);
     }
-    MONGO_MOD_PUBLIC DecoratedType* owner(DecorationType* t) const {
+    [[MONGO_MOD_PUBLIC]] DecoratedType* owner(DecorationType* t) const {
         return &owner(*t);
     }
 
@@ -266,16 +266,16 @@ public:
      * Syntactic sugar, equivalent to decoration(d). As a convenience, overloads
      * are provided so that a pointer `&d` can be given instead.
      */
-    MONGO_MOD_PUBLIC const DecorationType& operator()(const DecoratedType& d) const {
+    [[MONGO_MOD_PUBLIC]] const DecorationType& operator()(const DecoratedType& d) const {
         return decoration(d);
     }
-    MONGO_MOD_PUBLIC DecorationType& operator()(DecoratedType& d) const {
+    [[MONGO_MOD_PUBLIC]] DecorationType& operator()(DecoratedType& d) const {
         return decoration(d);
     }
-    MONGO_MOD_PUBLIC const DecorationType& operator()(const DecoratedType* d) const {
+    [[MONGO_MOD_PUBLIC]] const DecorationType& operator()(const DecoratedType* d) const {
         return decoration(*d);
     }
-    MONGO_MOD_PUBLIC DecorationType& operator()(DecoratedType* d) const {
+    [[MONGO_MOD_PUBLIC]] DecorationType& operator()(DecoratedType* d) const {
         return decoration(*d);
     }
 
@@ -419,7 +419,7 @@ private:
 }  // namespace decorable_detail
 
 template <typename D>
-class MONGO_MOD_OPEN Decorable {
+class [[MONGO_MOD_OPEN]] Decorable {
 public:
     using DerivedType = D;  // CRTP
 
@@ -494,4 +494,4 @@ private:
     decorable_detail::DecorationBuffer<DerivedType> _decorations;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

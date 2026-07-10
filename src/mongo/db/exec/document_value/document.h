@@ -61,7 +61,7 @@
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 using namespace std::literals::string_view_literals;
 class BSONObj;
 
@@ -1034,4 +1034,4 @@ inline MutableValue MutableValue::getField(Position pos) {
 inline MutableValue MutableValue::getField(std::string_view key) {
     return MutableDocument(*this).getField(key);
 }
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

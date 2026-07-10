@@ -64,7 +64,8 @@ DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(FindAndModifyImageLookup);
  * the forged pre- or post-image oplog entry document for each 'applyOps' oplog entry document that
  * comes with a transaction commit timestamp will have the commit timestamp attached to it.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceFindAndModifyImageLookup : public DocumentSource {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DocumentSourceFindAndModifyImageLookup
+    : public DocumentSource {
 public:
     static constexpr std::string_view kStageName = "$_internalFindAndModifyImageLookup"sv;
     static constexpr std::string_view kIncludeCommitTransactionTimestampFieldName =

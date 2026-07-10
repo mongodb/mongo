@@ -34,7 +34,7 @@ global:
     cpp_includes:
         - "mongo/db/namespace_string.h"
         - "mongo/db/query/find_command_idl_utils.h"
-    mod_visibility: pub
+    mod_visibility: public
 
 imports:
     - "mongo/crypto/fle_field_schema.idl"

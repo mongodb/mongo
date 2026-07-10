@@ -54,7 +54,7 @@ struct ReadPreferenceSetting;
 /**
  * Methods for running find and getMore operations across a sharded cluster.
  */
-class MONGO_MOD_PUBLIC ClusterFind {
+class [[MONGO_MOD_PUBLIC]] ClusterFind {
 public:
     // The number of times we are willing to re-target and re-run the query after receiving a stale
     // config, snapshot, or shard not found error.

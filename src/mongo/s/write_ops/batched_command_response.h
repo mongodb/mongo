@@ -54,7 +54,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * This class represents the layout and content of a insert/update/delete runCommand,
@@ -222,4 +222,4 @@ private:
     BSONArray _arr;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

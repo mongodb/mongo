@@ -36,7 +36,7 @@
 #include <memory>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC executor {
+namespace [[MONGO_MOD_PUBLIC]] executor {
 
 struct ExecutorPair {
     std::weak_ptr<TaskExecutor> pinned;
@@ -63,5 +63,5 @@ private:
 // Shutdown and join all pinned executors that were built on top of 'underlying'.
 void shutdownPinnedExecutors(ServiceContext* svc, const std::shared_ptr<TaskExecutor>& underlying);
 
-}  // namespace MONGO_MOD_PUBLIC executor
+}  // namespace executor
 }  // namespace mongo

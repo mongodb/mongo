@@ -44,7 +44,7 @@
 #include <boost/optional/optional.hpp>
 #include <boost/serialization/strong_typedef.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 

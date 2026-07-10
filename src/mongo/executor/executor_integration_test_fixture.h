@@ -46,7 +46,7 @@ namespace mongo {
 
 namespace executor {
 
-class MONGO_MOD_OPEN ExecutorIntegrationTestFixture : public mongo::unittest::Test {
+class [[MONGO_MOD_OPEN]] ExecutorIntegrationTestFixture : public mongo::unittest::Test {
 public:
     virtual BSONObj runSetupCommandSync(const DatabaseName& db, BSONObj cmdObj) = 0;
 

@@ -69,6 +69,6 @@ private:
  * collects their metrics.
  * No-op on unsupported platforms.
  */
-MONGO_MOD_PUBLIC void installProcessHealthOtelMetrics(ServiceContext* svcCtx);
+[[MONGO_MOD_PUBLIC]] void installProcessHealthOtelMetrics(ServiceContext* svcCtx);
 
 }  // namespace mongo

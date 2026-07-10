@@ -57,7 +57,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 class IndexBuildInterceptor {
 public:
     using RetrySkippedRecordMode = SkippedRecordTracker::RetrySkippedRecordMode;
@@ -127,11 +127,11 @@ public:
                                 TrackDuplicates trackDups,
                                 DrainYieldPolicy drainYieldPolicy);
 
-    MONGO_MOD_PRIVATE SkippedRecordTracker& getSkippedRecordTracker() {
+    [[MONGO_MOD_PRIVATE]] SkippedRecordTracker& getSkippedRecordTracker() {
         return _skippedRecordTracker;
     }
 
-    MONGO_MOD_PRIVATE const SkippedRecordTracker& getSkippedRecordTracker() const {
+    [[MONGO_MOD_PRIVATE]] const SkippedRecordTracker& getSkippedRecordTracker() const {
         return _skippedRecordTracker;
     }
 
@@ -241,4 +241,4 @@ using OnTearableSideWriteRedoFn =
     std::function<void(OperationContext*, const UUID& collectionUUID)>;
 void setOnTearableSideWriteRedoHook(ServiceContext* svcCtx, OnTearableSideWriteRedoFn hook);
 const OnTearableSideWriteRedoFn& getOnTearableSideWriteRedoHook(ServiceContext* svcCtx);
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

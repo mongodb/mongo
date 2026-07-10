@@ -43,7 +43,7 @@ namespace mongo {
 /**
  * Uses RFC8414 to acquire Authorization Server metadata for an issuer.
  */
-class MONGO_MOD_PUBLIC OAuthDiscoveryFactory {
+class [[MONGO_MOD_PUBLIC]] OAuthDiscoveryFactory {
 public:
     OAuthDiscoveryFactory(std::unique_ptr<HttpClient> client) : _client(std::move(client)) {}
 

@@ -183,8 +183,8 @@ class SyncSourceFeedback;
 class StorageInterface;
 class TopologyCoordinator;
 
-class MONGO_MOD_PUB ReplicationCoordinatorImpl : public ReplicationCoordinator,
-                                                 public StepUpStepDownCoordinator {
+class [[MONGO_MOD_PUBLIC]] ReplicationCoordinatorImpl : public ReplicationCoordinator,
+                                                        public StepUpStepDownCoordinator {
     ReplicationCoordinatorImpl(const ReplicationCoordinatorImpl&) = delete;
     ReplicationCoordinatorImpl& operator=(const ReplicationCoordinatorImpl&) = delete;
 
@@ -528,7 +528,7 @@ public:
                                             OnRemoteCmdScheduledFn onRemoteCmdScheduled,
                                             OnRemoteCmdCompleteFn onRemoteCmdComplete) override;
 
-    MONGO_MOD_PRIVATE void restartScheduledHeartbeats_forTest() override;
+    [[MONGO_MOD_PRIVATE]] void restartScheduledHeartbeats_forTest() override;
 
     void recordIfCWWCIsSetOnConfigServerOnStartup(OperationContext* opCtx) final;
 
@@ -539,12 +539,12 @@ public:
 
     // ==================== Private API ===================
     // Called by AutoGetRstlForStepUpStepDown before taking RSTL when making stepdown transitions
-    MONGO_MOD_PRIVATE void autoGetRstlEnterStepDown() final;
+    [[MONGO_MOD_PRIVATE]] void autoGetRstlEnterStepDown() final;
 
     // Called by AutoGetRstlForStepUpStepDown before releasing RSTL when making stepdown
     // transitions.  Also called in case of failure to acquire RSTL.  There will be one call to this
     // method for each call to autoGetRSTLEnterStepDown.
-    MONGO_MOD_PRIVATE void autoGetRstlExitStepDown() final;
+    [[MONGO_MOD_PRIVATE]] void autoGetRstlExitStepDown() final;
 
     // ================== Test support API ===================
 
@@ -552,69 +552,69 @@ public:
      * If called after startReplication(), blocks until all asynchronous
      * activities associated with replication start-up complete.
      */
-    MONGO_MOD_PRIVATE void waitForStartUpComplete_forTest();
+    [[MONGO_MOD_PRIVATE]] void waitForStartUpComplete_forTest();
 
     /**
      * Gets the replica set configuration in use by the node.
      */
-    MONGO_MOD_PRIVATE ReplSetConfig getReplicaSetConfig_forTest();
+    [[MONGO_MOD_PRIVATE]] ReplSetConfig getReplicaSetConfig_forTest();
 
     /**
      * Returns scheduled time of election timeout callback.
      * Returns Date_t() if callback is not scheduled.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT Date_t getElectionTimeout_forTest() const;
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] Date_t getElectionTimeout_forTest() const;
 
     /*
      * Return a randomized offset amount that is scaled in proportion to the size of the
      * _electionTimeoutPeriod.
      */
-    MONGO_MOD_PRIVATE Milliseconds getRandomizedElectionOffset_forTest();
+    [[MONGO_MOD_PRIVATE]] Milliseconds getRandomizedElectionOffset_forTest();
 
     /**
      * Returns the scheduled time of the priority takeover callback. If a priority
      * takeover has not been scheduled, returns boost::none.
      */
-    MONGO_MOD_PRIVATE boost::optional<Date_t> getPriorityTakeover_forTest() const;
+    [[MONGO_MOD_PRIVATE]] boost::optional<Date_t> getPriorityTakeover_forTest() const;
 
     /**
      * Returns the scheduled time of the catchup takeover callback. If a catchup
      * takeover has not been scheduled, returns boost::none.
      */
-    MONGO_MOD_PRIVATE boost::optional<Date_t> getCatchupTakeover_forTest() const;
+    [[MONGO_MOD_PRIVATE]] boost::optional<Date_t> getCatchupTakeover_forTest() const;
 
     /**
      * Returns the catchup takeover CallbackHandle.
      */
-    MONGO_MOD_PRIVATE executor::TaskExecutor::CallbackHandle getCatchupTakeoverCbh_forTest() const;
+    [[MONGO_MOD_PRIVATE]] executor::TaskExecutor::CallbackHandle getCatchupTakeoverCbh_forTest()
+        const;
 
     /**
      * Returns the cached horizon topology version from most recent SplitHorizonChange.
      */
-    MONGO_MOD_PRIVATE int64_t getLastHorizonChange_forTest() const;
+    [[MONGO_MOD_PRIVATE]] int64_t getLastHorizonChange_forTest() const;
 
     /**
      * Simple wrappers around _setLastOptimeForMember to make it easier to test.
      */
-    MONGO_MOD_PRIVATE Status setLastAppliedOptime_forTest(long long cfgVer,
-                                                          long long memberId,
-                                                          const OpTime& opTime,
-                                                          Date_t wallTime = Date_t());
-    MONGO_MOD_PRIVATE Status setLastWrittenOptime_forTest(long long cfgVer,
-                                                          long long memberId,
-                                                          const OpTime& opTime,
-                                                          Date_t wallTime = Date_t());
-    MONGO_MOD_PRIVATE Status setLastDurableOptime_forTest(long long cfgVer,
-                                                          long long memberId,
-                                                          const OpTime& opTime,
-                                                          Date_t wallTime = Date_t());
+    [[MONGO_MOD_PRIVATE]] Status setLastAppliedOptime_forTest(long long cfgVer,
+                                                              long long memberId,
+                                                              const OpTime& opTime,
+                                                              Date_t wallTime = Date_t());
+    [[MONGO_MOD_PRIVATE]] Status setLastWrittenOptime_forTest(long long cfgVer,
+                                                              long long memberId,
+                                                              const OpTime& opTime,
+                                                              Date_t wallTime = Date_t());
+    [[MONGO_MOD_PRIVATE]] Status setLastDurableOptime_forTest(long long cfgVer,
+                                                              long long memberId,
+                                                              const OpTime& opTime,
+                                                              Date_t wallTime = Date_t());
 
     /**
      * Simple test wrappers that expose private methods.
      */
-    MONGO_MOD_PRIVATE void handleHeartbeatResponse_forTest(BSONObj response,
-                                                           int targetIndex,
-                                                           Milliseconds ping = Milliseconds(100));
+    [[MONGO_MOD_PRIVATE]] void handleHeartbeatResponse_forTest(
+        BSONObj response, int targetIndex, Milliseconds ping = Milliseconds(100));
 
     /**
      * Non-blocking version of updateTerm.
@@ -622,52 +622,52 @@ public:
      * When the operation is complete (waitForEvent() returns), 'updateResult' will be set
      * to a status telling if the term increased or a stepdown was triggered.
      */
-    MONGO_MOD_PRIVATE executor::TaskExecutor::EventHandle updateTerm_forTest(
+    [[MONGO_MOD_PRIVATE]] executor::TaskExecutor::EventHandle updateTerm_forTest(
         long long term, TopologyCoordinator::UpdateTermResult* updateResult);
 
     /**
      * If called after ElectionState::start(), blocks until all asynchronous
      * activities associated with election complete.
      */
-    MONGO_MOD_PRIVATE void waitForElectionFinish_forTest();
+    [[MONGO_MOD_PRIVATE]] void waitForElectionFinish_forTest();
 
     /**
      * If called after ElectionState::start(), blocks until all asynchronous
      * activities associated with election dry run complete, including writing
      * last vote and scheduling the real election.
      */
-    MONGO_MOD_PRIVATE void waitForElectionDryRunFinish_forTest();
+    [[MONGO_MOD_PRIVATE]] void waitForElectionDryRunFinish_forTest();
 
     /**
      * Waits until a stepdown attempt has begun. Callers should ensure that the stepdown attempt
      * won't fully complete before this method is called, or this method may never return.
      */
-    MONGO_MOD_PRIVATE void waitForStepDownAttempt_forTest();
+    [[MONGO_MOD_PRIVATE]] void waitForStepDownAttempt_forTest();
 
     /**
      * Cancels all future processing work of the VoteRequester and sets the election state to
      * kCanceled.
      */
-    MONGO_MOD_PRIVATE void cancelElection_forTest();
+    [[MONGO_MOD_PRIVATE]] void cancelElection_forTest();
 
 
     /**
      * Returns a pointer to the topology coordinator used by this replication coordinator.
      */
-    MONGO_MOD_PRIVATE TopologyCoordinator* getTopologyCoordinator_forTest();
+    [[MONGO_MOD_PRIVATE]] TopologyCoordinator* getTopologyCoordinator_forTest();
 
     /**
      * Runs the repl set initiate internal function.
      */
-    MONGO_MOD_PRIVATE Status runReplSetInitiate_forTest(const BSONObj& configObj,
-                                                        BSONObjBuilder* resultObj);
+    [[MONGO_MOD_PRIVATE]] Status runReplSetInitiate_forTest(const BSONObj& configObj,
+                                                            BSONObjBuilder* resultObj);
 
     /**
      * Implementation of an interface used to synchronize changes to custom write concern tags in
      * the config and custom default write concern settings.
      * See base class fore more information.
      */
-    class MONGO_MOD_PRIVATE WriteConcernTagChangesImpl : public WriteConcernTagChanges {
+    class [[MONGO_MOD_PRIVATE]] WriteConcernTagChangesImpl : public WriteConcernTagChanges {
     public:
         WriteConcernTagChangesImpl() = default;
         ~WriteConcernTagChangesImpl() override = default;
@@ -735,10 +735,10 @@ public:
 
     void setConsistentDataAvailable(OperationContext* opCtx, bool isDataMajorityCommitted) override;
     bool isDataConsistent() const override;
-    MONGO_MOD_PRIVATE void setConsistentDataAvailable_forTest();
+    [[MONGO_MOD_PRIVATE]] void setConsistentDataAvailable_forTest();
 
-    MONGO_MOD_PRIVATE ReplicationCoordinatorExternalState* getExternalState_forTest();
-    MONGO_MOD_PRIVATE executor::TaskExecutor* getReplExecutor_forTest();
+    [[MONGO_MOD_PRIVATE]] ReplicationCoordinatorExternalState* getExternalState_forTest();
+    [[MONGO_MOD_PRIVATE]] executor::TaskExecutor* getReplExecutor_forTest();
 
 private:
     using CallbackFn = executor::TaskExecutor::CallbackFn;

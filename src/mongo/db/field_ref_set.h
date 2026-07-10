@@ -56,7 +56,7 @@ namespace mongo {
  *
  * FieldRefSets do not own the FieldRef paths they contain.
  */
-class MONGO_MOD_PUBLIC FieldRefSet {
+class [[MONGO_MOD_PUBLIC]] FieldRefSet {
     FieldRefSet(const FieldRefSet&) = delete;
     FieldRefSet& operator=(const FieldRefSet&) = delete;
 
@@ -166,7 +166,7 @@ private:
 /**
  * A wrapper class for FieldRefSet which owns the storage of the underlying FieldRef objects.
  */
-class MONGO_MOD_PUBLIC FieldRefSetWithStorage {
+class [[MONGO_MOD_PUBLIC]] FieldRefSetWithStorage {
 public:
     /**
      * Inserts the given FieldRef into the set. In the case of a conflict with an existing element,

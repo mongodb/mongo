@@ -45,11 +45,12 @@ namespace mongo {
 class BSONObjBuilder;
 class OperationContext;
 
-MONGO_MOD_PUBLIC const BSONObj kWouldChangeOwningShardSentinel(BSON("$wouldChangeOwningShard"
-                                                                    << 1));
+[[MONGO_MOD_PUBLIC]] const BSONObj kWouldChangeOwningShardSentinel(BSON("$wouldChangeOwningShard"
+                                                                        << 1));
 
 template <typename OplogEntryType>
-MONGO_MOD_PUBLIC bool isWouldChangeOwningShardSentinelOplogEntry(const OplogEntryType& oplogEntry) {
+[[MONGO_MOD_PUBLIC]] bool isWouldChangeOwningShardSentinelOplogEntry(
+    const OplogEntryType& oplogEntry) {
     return (oplogEntry.getOpType() == repl::OpTypeEnum::kNoop) &&
         (oplogEntry.getObject().woCompare(kWouldChangeOwningShardSentinel) == 0) &&
         oplogEntry.getObject2() && oplogEntry.getObject2()->isEmpty();

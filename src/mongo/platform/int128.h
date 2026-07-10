@@ -35,14 +35,14 @@
 
 #include <absl/numeric/int128.h>
 
-namespace MONGO_MOD_PUB absl {
+namespace [[MONGO_MOD_PUBLIC]] absl {
 
 std::string toString(const uint128& v);
 std::string toString(const int128& v);
 
-}  // namespace MONGO_MOD_PUB absl
+}  // namespace absl
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 using uint128_t = absl::uint128;
 using int128_t = absl::int128;
@@ -64,8 +64,8 @@ struct make_signed<uint128_t> {
 };
 
 template <typename T>
-using make_unsigned_t MONGO_MOD_PUB = typename make_unsigned<T>::type;
+using make_unsigned_t [[MONGO_MOD_PUBLIC]] = typename make_unsigned<T>::type;
 
 template <typename T>
-using make_signed_t MONGO_MOD_PUB = typename make_signed<T>::type;
-}  // namespace MONGO_MOD_PUB mongo
+using make_signed_t [[MONGO_MOD_PUBLIC]] = typename make_signed<T>::type;
+}  // namespace mongo

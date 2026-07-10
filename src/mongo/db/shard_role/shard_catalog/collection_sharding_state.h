@@ -51,7 +51,7 @@ namespace mongo {
  * Implementations perform recovery or refresh actions for sharding metadata for a given collection
  * when stale metadata exceptions are encountered.
  */
-class MONGO_MOD_PRIVATE StaleShardCollectionMetadataHandler {
+class [[MONGO_MOD_PRIVATE]] StaleShardCollectionMetadataHandler {
 public:
     /**
      * Handles a StaleConfig error by recovering the sharding metadata for the specified collection.
@@ -79,7 +79,7 @@ public:
  * this reason, it must always be accessed through ScopedCollectionShardingState  helper classes,
  * which acquire the appropriate read locks to protect against concurrent modifications.
  */
-class MONGO_MOD_USE_REPLACEMENT(acquireCollection) CollectionShardingState {
+class [[MONGO_MOD_USE_REPLACEMENT(acquireCollection)]] CollectionShardingState {
 public:
     CollectionShardingState() = default;
     virtual ~CollectionShardingState() = default;
@@ -266,7 +266,7 @@ public:
  * Singleton factory to instantiate CollectionShardingState objects specific to the type of instance
  * which is running.
  */
-class MONGO_MOD_PUBLIC CollectionShardingStateFactory {
+class [[MONGO_MOD_PUBLIC]] CollectionShardingStateFactory {
     CollectionShardingStateFactory(const CollectionShardingStateFactory&) = delete;
     CollectionShardingStateFactory& operator=(const CollectionShardingStateFactory&) = delete;
 

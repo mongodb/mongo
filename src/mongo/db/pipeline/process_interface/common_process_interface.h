@@ -62,7 +62,7 @@ namespace mongo {
  * CommonProcessInterface provides base implementations of any MongoProcessInterface methods
  * whose code is largely identical on mongoD and mongoS.
  */
-class MONGO_MOD_PUBLIC CommonProcessInterface : public MongoProcessInterface {
+class [[MONGO_MOD_PUBLIC]] CommonProcessInterface : public MongoProcessInterface {
 public:
     using MongoProcessInterface::MongoProcessInterface;
     ~CommonProcessInterface() override = default;

@@ -40,7 +40,7 @@ namespace mongo {
 namespace process_health {
 using namespace std::literals::string_view_literals;
 
-enum class MONGO_MOD_PUBLIC Severity { kOk, kFailure };
+enum class [[MONGO_MOD_PUBLIC]] Severity { kOk, kFailure };
 static const std::string_view SeverityStrings[] = {"kOk", "kFailure"};
 
 inline StringBuilder& operator<<(StringBuilder& s, const Severity& sev) {
@@ -53,7 +53,7 @@ inline std::ostream& operator<<(std::ostream& s, const Severity& sev) {
 /**
  * Immutable class representing current status of an ongoing fault tracked by facet.
  */
-class MONGO_MOD_PUBLIC HealthCheckStatus {
+class [[MONGO_MOD_PUBLIC]] HealthCheckStatus {
 public:
     HealthCheckStatus(FaultFacetType type, Severity severity, std::string_view description)
         : _type(type), _severity(severity), _description(description) {}

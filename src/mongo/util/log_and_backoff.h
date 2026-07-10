@@ -38,7 +38,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace log_backoff_detail {
 void logAndBackoffImpl(size_t numAttempts);
 }  // namespace log_backoff_detail
@@ -58,4 +58,4 @@ void logAndBackoff(int32_t logId,
     log_backoff_detail::logAndBackoffImpl(numAttempts);
 }
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

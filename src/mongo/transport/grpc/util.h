@@ -89,7 +89,7 @@ HostAndPort parseGRPCFormattedURI(std::string_view uri);
 /**
  * Converts a gRPC status code into its corresponding MongoDB error code.
  */
-MONGO_MOD_PUBLIC ErrorCodes::Error statusToErrorCode(::grpc::StatusCode statusCode);
+[[MONGO_MOD_PUBLIC]] ErrorCodes::Error statusToErrorCode(::grpc::StatusCode statusCode);
 
 /**
  * Converts a MongoDB error code into its corresponding gRPC status code.

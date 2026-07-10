@@ -50,7 +50,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PARENT_PRIVATE SetClusterParameterCoordinator
+class [[MONGO_MOD_PARENT_PRIVATE]] SetClusterParameterCoordinator
     : public ConfigsvrCoordinatorImpl<SetClusterParameterCoordinatorDocument,
                                       SetClusterParameterCoordinatorPhaseEnum> {
 public:

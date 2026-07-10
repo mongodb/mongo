@@ -61,7 +61,7 @@ class DeleteRequest;
  * The query part of the delete is parsed to a CanonicalQuery, which is originally a
  * ParsedFindCommand.
  */
-class MONGO_MOD_PUBLIC CanonicalDelete {
+class [[MONGO_MOD_PUBLIC]] CanonicalDelete {
     CanonicalDelete(const CanonicalDelete&) = delete;
     CanonicalDelete& operator=(const CanonicalDelete&) = delete;
 

@@ -91,7 +91,7 @@ struct HostOpTime {
 typedef std::map<ConnectionString, HostOpTime> HostOpTimeMap;
 
 // TODO SERVER-109104 This macro will be resolved once we delete the BatchWriteExec.
-class MONGO_MOD_NEEDS_REPLACEMENT BatchWriteExecStats {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] BatchWriteExecStats {
 public:
     BatchWriteExecStats() : numRounds(0), numStaleShardBatches(0), numStaleDbBatches(0) {}
 

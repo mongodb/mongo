@@ -61,7 +61,7 @@ namespace mongo {
 /**
  * Tracks cumulative latency statistics for a Service (shard-role or router-role).
  */
-class MONGO_MOD_PUB ServiceLatencyTracker {
+class [[MONGO_MOD_PUBLIC]] ServiceLatencyTracker {
 public:
     static ServiceLatencyTracker& getDecoration(Service* service);
 
@@ -103,7 +103,7 @@ private:
 /**
  * Tracks shard-role usage by collection.
  */
-class MONGO_MOD_PUB Top {
+class [[MONGO_MOD_PUBLIC]] Top {
 public:
     struct UsageData {
         Atomic<long long> time{0};

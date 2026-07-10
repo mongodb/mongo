@@ -51,7 +51,7 @@ namespace mongo {
 
 class SessionsCollection;
 
-class MONGO_MOD_PUB MongoDSessionCatalog {
+class [[MONGO_MOD_PUBLIC]] MongoDSessionCatalog {
     MongoDSessionCatalog(const MongoDSessionCatalog&) = delete;
     MongoDSessionCatalog& operator=(const MongoDSessionCatalog&) = delete;
 
@@ -213,7 +213,7 @@ private:
  * it for later access by the command. The session is installed at construction time and is removed
  * at destruction.
  */
-class MONGO_MOD_PRIVATE MongoDOperationContextSession : public MongoDSessionCatalog::Session {
+class [[MONGO_MOD_PRIVATE]] MongoDOperationContextSession : public MongoDSessionCatalog::Session {
     MongoDOperationContextSession(const MongoDOperationContextSession&) = delete;
     MongoDOperationContextSession& operator=(const MongoDOperationContextSession&) = delete;
 

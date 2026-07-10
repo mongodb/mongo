@@ -80,7 +80,7 @@ typedef std::shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorPtr;
    On a failover situation, expect at least one operation to return an error (throw
    an exception) before the failover is complete.  Operations are not retried.
 */
-class MONGO_MOD_PUBLIC DBClientReplicaSet : public DBClientBase {
+class [[MONGO_MOD_PUBLIC]] DBClientReplicaSet : public DBClientBase {
 public:
     using DBClientBase::find;
 

@@ -560,7 +560,7 @@ def make_mod_tag(vis: str):
     if vis is None:
         return ""
     tag, paren, rest = vis.partition("(")
-    return f"MONGO_MOD_{tag.upper()}{paren}{rest} "
+    return f"[[MONGO_MOD_{tag.upper()}{paren}{rest}]] "
 
 
 class _CppHeaderFileWriter(_CppFileWriterBase):

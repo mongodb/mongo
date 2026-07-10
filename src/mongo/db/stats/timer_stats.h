@@ -34,7 +34,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/timer.h"
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Holds timing information in milliseconds. Keeps track of number of times and total milliseconds
@@ -88,4 +88,4 @@ private:
     bool _recorded;
     Timer _t;
 };
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

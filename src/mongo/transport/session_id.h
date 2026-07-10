@@ -33,9 +33,9 @@
 
 #include <cstdint>
 namespace mongo {
-namespace MONGO_MOD_PUBLIC transport {
+namespace [[MONGO_MOD_PUBLIC]] transport {
 
 using SessionId = uint64_t;
 
-}  // namespace MONGO_MOD_PUBLIC transport
+}  // namespace transport
 }  // namespace mongo

@@ -35,7 +35,7 @@
 
 #include <type_traits>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * A replacement for the Record class. This class represents data in a record store.
@@ -103,4 +103,4 @@ private:
 MONGO_STATIC_ASSERT(std::is_nothrow_move_constructible_v<RecordData>);
 MONGO_STATIC_ASSERT(std::is_nothrow_move_assignable_v<RecordData>);
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -46,7 +46,7 @@ class Collection;
 class CollectionPtr;
 class IndexDescriptor;
 
-class MONGO_MOD_NEEDS_REPLACEMENT ShardKeyIndex {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardKeyIndex {
 public:
     /**
      * Wraps information pertaining to the 'index' used as the shard key.
@@ -78,12 +78,12 @@ private:
  * If return value is false and errMsg is non-null, the reasons that the existing index is
  * incompatible will be appended to errMsg.
  */
-MONGO_MOD_NEEDS_REPLACEMENT bool isCompatibleWithShardKey(OperationContext* opCtx,
-                                                          const CollectionPtr& collection,
-                                                          const IndexCatalogEntry* indexEntry,
-                                                          const BSONObj& shardKey,
-                                                          bool requireSingleKey,
-                                                          std::string* errMsg = nullptr);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] bool isCompatibleWithShardKey(OperationContext* opCtx,
+                                                              const CollectionPtr& collection,
+                                                              const IndexCatalogEntry* indexEntry,
+                                                              const BSONObj& shardKey,
+                                                              bool requireSingleKey,
+                                                              std::string* errMsg = nullptr);
 
 /**
  * Returns an index suitable for shard key range scans if it exists.
@@ -97,7 +97,7 @@ MONGO_MOD_NEEDS_REPLACEMENT bool isCompatibleWithShardKey(OperationContext* opCt
  * If the parameter 'requireSingleKey' is true, then this index additionally must not be
  * multi-key.
  */
-MONGO_MOD_NEEDS_REPLACEMENT boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(
     OperationContext* opCtx,
     const CollectionPtr& collection,
     const BSONObj& shardKey,
@@ -109,9 +109,10 @@ MONGO_MOD_NEEDS_REPLACEMENT boost::optional<ShardKeyIndex> findShardKeyPrefixedI
  * ranged shard key. False otherwise. Hashed indexes are excluded here because users are allowed
  * to drop shard key compatible hashed indexes.
  */
-MONGO_MOD_NEEDS_REPLACEMENT bool isLastNonHiddenRangedShardKeyIndex(OperationContext* opCtx,
-                                                                    const CollectionPtr& collection,
-                                                                    const std::string& indexName,
-                                                                    const BSONObj& shardKey);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] bool isLastNonHiddenRangedShardKeyIndex(
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    const std::string& indexName,
+    const BSONObj& shardKey);
 
 }  // namespace mongo

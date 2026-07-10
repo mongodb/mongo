@@ -116,9 +116,9 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Facet);
  * stage which will produce a document like the following:
  * {facetA: [<all input documents except the first one>], facetB: [<the first document>]}.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceFacet final : public DocumentSource {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DocumentSourceFacet final : public DocumentSource {
 public:
-    MONGO_MOD_NEEDS_REPLACEMENT static constexpr std::string_view kStageName = "$facet"sv;
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] static constexpr std::string_view kStageName = "$facet"sv;
     static constexpr std::string_view kTeeConsumerStageName = "$internalFacetTeeConsumer"sv;
     struct FacetPipeline {
         FacetPipeline(std::string name, std::unique_ptr<Pipeline> pipeline)

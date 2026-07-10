@@ -136,7 +136,7 @@ private:
     std::vector<std::unique_ptr<MatchExpression>> _expressions;
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT AndMatchExpression : public ListOfMatchExpression {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] AndMatchExpression : public ListOfMatchExpression {
 public:
     static constexpr std::string_view kName = "$and"sv;
 
@@ -263,7 +263,7 @@ public:
     }
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT NotMatchExpression final : public MatchExpression {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] NotMatchExpression final : public MatchExpression {
 public:
     static constexpr int kNumChildren = 1;
     explicit NotMatchExpression(MatchExpression* e,

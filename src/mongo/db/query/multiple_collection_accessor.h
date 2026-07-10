@@ -45,7 +45,7 @@ namespace mongo {
  * store the namespace strings and fetch 'collectionPtr' on demand, since they can become invalid
  * during query yields. The main collectionPtr is restored through yield so it can be stored.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT MultipleCollectionAccessor final {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] MultipleCollectionAccessor final {
 public:
     MultipleCollectionAccessor() = default;
 

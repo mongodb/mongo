@@ -57,7 +57,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListExtensions);
 /**
  * Document source for the $listExtensions stage, implemented as a wrapper of DocumentSourceQueue.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceListExtensions final {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DocumentSourceListExtensions final {
 public:
     static constexpr std::string_view kStageName = "$listExtensions"sv;
 

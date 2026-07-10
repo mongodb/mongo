@@ -46,7 +46,7 @@ using DocsNeededConstraint = docs_needed_bounds::DocsNeededConstraint;
  * NOTE: Any blocking stages (like $sort, $group) should use only applyBlockingStage(), since the
  * result cardinality of a stage doesn't matter if it requires all documents as input.
  */
-struct MONGO_MOD_PUB DocsNeededBoundsContext : public DocumentSourceVisitorContextBase {
+struct [[MONGO_MOD_PUBLIC]] DocsNeededBoundsContext : public DocumentSourceVisitorContextBase {
     DocsNeededBoundsContext(DocsNeededConstraint startingMinBounds = docs_needed_bounds::Unknown(),
                             DocsNeededConstraint startingMaxBounds = docs_needed_bounds::Unknown())
         : minBounds(startingMinBounds), maxBounds(startingMaxBounds) {}

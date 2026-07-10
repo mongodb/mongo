@@ -32,7 +32,7 @@
 #include "mongo/util/modules.h"
 
 namespace mongo {
-class MONGO_MOD_OPEN Yieldable {
+class [[MONGO_MOD_OPEN]] Yieldable {
 public:
     virtual ~Yieldable() {}
     virtual bool yieldable() const = 0;

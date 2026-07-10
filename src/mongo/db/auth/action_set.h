@@ -47,7 +47,7 @@ namespace mongo {
  *  If the special ActionType::anyAction is granted to this set, it automatically sets all bits
  *  in the bitmask, indicating that it contains all possible actions.
  */
-class MONGO_MOD_PUBLIC ActionSet {
+class [[MONGO_MOD_PUBLIC]] ActionSet {
 public:
     ActionSet() = default;
     ActionSet(std::initializer_list<ActionType> actions);

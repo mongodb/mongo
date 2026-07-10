@@ -54,13 +54,13 @@ struct IndexProperties {
 };
 
 // A relevant field to index requirement map.
-using RelevantFieldIndexMap MONGO_MOD_NEEDS_REPLACEMENT =
+using RelevantFieldIndexMap [[MONGO_MOD_NEEDS_REPLACEMENT]] =
     stdx::unordered_map<std::string, IndexProperties>;
 
 /**
  * Methods for determining what fields and predicates can use indices.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerIXSelect {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] QueryPlannerIXSelect {
 public:
     /**
      * Used to keep track of if any $elemMatch predicates were encountered when walking a

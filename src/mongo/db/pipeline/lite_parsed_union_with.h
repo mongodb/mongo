@@ -53,7 +53,7 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
+namespace [[MONGO_MOD_NEEDS_REPLACEMENT]] mongo {
 using namespace std::literals::string_view_literals;
 
 class UnionWithStageParams : public DefaultStageParams {
@@ -136,4 +136,4 @@ private:
     bool _isHybridSearch;
 };
 
-}  // namespace MONGO_MOD_NEEDS_REPLACEMENT mongo
+}  // namespace mongo

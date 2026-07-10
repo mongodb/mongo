@@ -102,7 +102,7 @@ enum class PathAcceptingKeyword {
     WITHIN,
 };
 
-class MONGO_MOD_PUB MatchExpressionParser {
+class [[MONGO_MOD_PUBLIC]] MatchExpressionParser {
 public:
     /**
      * Features allowed in match expression parsing.

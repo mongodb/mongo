@@ -64,7 +64,7 @@ bool shouldEmitCollectionUUIDForChangeEvent(const DocumentSourceChangeStreamSpec
 /**
  * Creates endOfTransaction no-op oplog entry
  */
-MONGO_MOD_NEEDS_REPLACEMENT
+[[MONGO_MOD_NEEDS_REPLACEMENT]]
 repl::MutableOplogEntry createEndOfTransactionOplogEntry(
     const LogicalSessionId& lsid,
     const TxnNumber& txnNumber,

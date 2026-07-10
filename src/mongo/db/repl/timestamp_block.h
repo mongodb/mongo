@@ -33,7 +33,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * TimestampBlock is an raii type that sets a commit timestamp on the RecoveryUnit at construction
@@ -53,4 +53,4 @@ private:
     Timestamp _ts;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

@@ -91,15 +91,15 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextForGetExecutor(
  * prefix of the pipeline might be moved into the provided 'canonicalQuery' for pushing down into
  * the find layer.
  */
-MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
-    OperationContext* opCtx,
-    const MultipleCollectionAccessor& collections,
-    std::unique_ptr<CanonicalQuery> canonicalQuery,
-    PlanYieldPolicy::YieldPolicy yieldPolicy,
-    size_t plannerOptions = QueryPlannerParams::DEFAULT,
-    Pipeline* pipeline = nullptr,
-    bool needsMerge = false,
-    boost::optional<TraversalPreference> traversalPreference = boost::none);
+[[MONGO_MOD_PUBLIC]] StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
+getExecutorFind(OperationContext* opCtx,
+                const MultipleCollectionAccessor& collections,
+                std::unique_ptr<CanonicalQuery> canonicalQuery,
+                PlanYieldPolicy::YieldPolicy yieldPolicy,
+                size_t plannerOptions = QueryPlannerParams::DEFAULT,
+                Pipeline* pipeline = nullptr,
+                bool needsMerge = false,
+                boost::optional<TraversalPreference> traversalPreference = boost::none);
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSearchMetadataExecutorSBE(
     OperationContext* opCtx,
@@ -188,11 +188,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
  *
  * If the query cannot be executed, returns a Status indicating why.
  */
-MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
-    OpDebug* opDebug,
-    CollectionAcquisition coll,
-    CanonicalDelete& canonicalDelete,
-    boost::optional<ExplainOptions::Verbosity> verbosity);
+[[MONGO_MOD_PUBLIC]] StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
+getExecutorDelete(OpDebug* opDebug,
+                  CollectionAcquisition coll,
+                  CanonicalDelete& canonicalDelete,
+                  boost::optional<ExplainOptions::Verbosity> verbosity);
 
 /**
  * Get a PlanExecutor for an update operation. 'canonicalUpdate' describes the query predicate
@@ -214,21 +214,21 @@ MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>
  *
  * If the query cannot be executed, returns a Status indicating why.
  */
-MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
-    OpDebug* opDebug,
-    CollectionAcquisition coll,
-    CanonicalUpdate& canonicalUpdate,
-    boost::optional<ExplainOptions::Verbosity> verbosity);
+[[MONGO_MOD_PUBLIC]] StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
+getExecutorUpdate(OpDebug* opDebug,
+                  CollectionAcquisition coll,
+                  CanonicalUpdate& canonicalUpdate,
+                  boost::optional<ExplainOptions::Verbosity> verbosity);
 
 /**
  * Direction of collection scan plan executor returned by makeCollectionScanPlanExecutor() below.
  */
-enum class MONGO_MOD_PUBLIC CollectionScanDirection {
+enum class [[MONGO_MOD_PUBLIC]] CollectionScanDirection {
     kForward = 1,
     kBackward = -1,
 };
 
-MONGO_MOD_PUBLIC std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getCollectionScanExecutor(
+[[MONGO_MOD_PUBLIC]] std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getCollectionScanExecutor(
     OperationContext* opCtx,
     const CollectionAcquisition& collection,
     PlanYieldPolicy::YieldPolicy yieldPolicy,

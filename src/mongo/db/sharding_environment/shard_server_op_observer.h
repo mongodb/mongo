@@ -54,7 +54,7 @@ namespace mongo {
  * OpObserver which is installed on the op observers chain when the server is running as a shard
  * server (--shardsvr).
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ShardServerOpObserver final : public OpObserverNoop {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardServerOpObserver final : public OpObserverNoop {
     ShardServerOpObserver(const ShardServerOpObserver&) = delete;
     ShardServerOpObserver& operator=(const ShardServerOpObserver&) = delete;
 

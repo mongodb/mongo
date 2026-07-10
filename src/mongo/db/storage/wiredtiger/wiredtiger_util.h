@@ -428,7 +428,7 @@ public:
      */
     static int handleWtEvictionEvent(WT_SESSION* session);
 
-    MONGO_MOD_PRIVATE static long long getCancelledCacheMetric_forTest();
+    [[MONGO_MOD_PRIVATE]] static long long getCancelledCacheMetric_forTest();
 
     /**
      * Dumps the complete contents of the WiredTiger metadata table to the log output.

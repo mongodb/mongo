@@ -44,21 +44,22 @@ namespace executor {
  * Provides access to a service context scoped task executor for mongot.
  * Returns ErrorCodes::ShutdownInProgress if shutdown has begun.
  */
-MONGO_MOD_PUB StatusWith<std::shared_ptr<TaskExecutor>> getMongotTaskExecutor(ServiceContext* svc);
+[[MONGO_MOD_PUBLIC]] StatusWith<std::shared_ptr<TaskExecutor>> getMongotTaskExecutor(
+    ServiceContext* svc);
 
 /**
  * Provides access to a service context scoped task executor for the search-index-management server.
  * Returns ErrorCodes::ShutdownInProgress if shutdown has begun.
  */
-MONGO_MOD_PUB StatusWith<std::shared_ptr<TaskExecutor>> getSearchIndexManagementTaskExecutor(
+[[MONGO_MOD_PUBLIC]] StatusWith<std::shared_ptr<TaskExecutor>> getSearchIndexManagementTaskExecutor(
     ServiceContext* svc);
 
 /**
  * Starts up the search executors if configured.
  */
-MONGO_MOD_PUB void startupSearchExecutorsIfNeeded(ServiceContext* svc);
+[[MONGO_MOD_PUBLIC]] void startupSearchExecutorsIfNeeded(ServiceContext* svc);
 
-MONGO_MOD_PUB void shutdownSearchExecutorsIfNeeded(ServiceContext* svc);
+[[MONGO_MOD_PUBLIC]] void shutdownSearchExecutorsIfNeeded(ServiceContext* svc);
 
 }  // namespace executor
 }  // namespace mongo

@@ -328,8 +328,8 @@ namespace repl {
  * Returns a `Status` to match the type used for oplog command hooks, but in fact always handles
  * errors (primarily by writing to the health log), so always returns `Status::OK`.
  */
-MONGO_MOD_PUBLIC Status dbCheckOplogCommand(OperationContext* opCtx,
-                                            const repl::OplogEntry& entry,
-                                            OplogApplication::Mode mode);
+[[MONGO_MOD_PUBLIC]] Status dbCheckOplogCommand(OperationContext* opCtx,
+                                                const repl::OplogEntry& entry,
+                                                OplogApplication::Mode mode);
 }  // namespace repl
 }  // namespace mongo

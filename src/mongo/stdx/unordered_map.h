@@ -36,7 +36,7 @@
 
 #include <absl/container/node_hash_map.h>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace stdx {
 
 template <class Key, class Value, class Hasher = DefaultHasher<Key>, typename... Args>
@@ -60,4 +60,4 @@ size_t erase_if(absl::node_hash_map<Key, T, Hash, Eq, Alloc>& c, Pred&& pred) {
 }
 
 }  // namespace stdx
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

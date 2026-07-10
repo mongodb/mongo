@@ -48,7 +48,7 @@ namespace repl {
  * Scans local oplog collection in reverse natural order.
  */
 
-class MONGO_MOD_PUB OplogInterfaceLocal : public OplogInterface {
+class [[MONGO_MOD_PUBLIC]] OplogInterfaceLocal : public OplogInterface {
 public:
     OplogInterfaceLocal(OperationContext* opCtx);
     std::string toString() const override;

@@ -57,7 +57,7 @@
 #include "mongo/util/modules.h"
 
 // TODO SERVER-113198: Remove external dependencies on this header.
-namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
+namespace [[MONGO_MOD_NEEDS_REPLACEMENT]] mongo {
 
 namespace exec::matcher {
 
@@ -519,4 +519,4 @@ BSONElement findFirstDuplicateValue(const InternalSchemaUniqueItemsMatchExpressi
 bool matchesBSONObj(const InternalSchemaAllowedPropertiesMatchExpression* expr, const BSONObj& obj);
 
 }  // namespace exec::matcher
-}  // namespace MONGO_MOD_NEEDS_REPLACEMENT mongo
+}  // namespace mongo

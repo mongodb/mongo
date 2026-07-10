@@ -48,7 +48,7 @@ namespace mozjs {
  * Its major magic is in its getProperty() callback, which threads through to
  * a getCollection method installed in js
  */
-struct MONGO_MOD_PUB DBInfo : public BaseInfo {
+struct [[MONGO_MOD_PUBLIC]] DBInfo : public BaseInfo {
     static void construct(JSContext* cx, JS::CallArgs args);
     static void resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* resolvedp);
 

@@ -45,7 +45,7 @@ namespace mongo {
 /**
  * Registry of opened databases.
  */
-class MONGO_MOD_PUBLIC DatabaseHolder {
+class [[MONGO_MOD_PUBLIC]] DatabaseHolder {
 public:
     // Operation Context binding.
     static DatabaseHolder* get(ServiceContext* service);

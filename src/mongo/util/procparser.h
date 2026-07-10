@@ -45,7 +45,7 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class BSONObjBuilder;
 
@@ -144,7 +144,7 @@ size_t getProcFileSizeLimit();
 // The rest of this file is implementation details that are only in the header to support testing.
 //
 
-namespace MONGO_MOD_FILE_PRIVATE detail {
+namespace [[MONGO_MOD_FILE_PRIVATE]] detail {
 /**
  * Reads a string matching /proc/stat format, and writes the values of the specified keys into
  * builder. If fields are not in the "data" parameter, they are omitted. Converts fields
@@ -284,7 +284,7 @@ static const std::string_view kPressureFullTime = "full"sv;
  */
 Status parseProcPressure(std::string_view data, BSONObjBuilder* builder);
 
-}  // namespace MONGO_MOD_FILE_PRIVATE detail
+}  // namespace detail
 
 }  // namespace procparser
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

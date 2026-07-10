@@ -143,7 +143,7 @@ private:
     bool shouldUseRawDataOperations(const VersionContext& vCtx);
 };
 
-class MONGO_MOD_PUBLIC Cloner {
+class [[MONGO_MOD_PUBLIC]] Cloner {
 
 public:
     Cloner(std::unique_ptr<ClonerImpl> clonerImpl) : _clonerImpl(std::move(clonerImpl)) {}

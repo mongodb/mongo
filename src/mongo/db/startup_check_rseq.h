@@ -36,6 +36,6 @@
 namespace mongo {
 
 void validateRseqKernelCompat();
-MONGO_MOD_FILE_PRIVATE bool isKernelVersionSafeForTCMallocPerCPUCache(std::string_view release);
+[[MONGO_MOD_FILE_PRIVATE]] bool isKernelVersionSafeForTCMallocPerCPUCache(std::string_view release);
 
 }  // namespace mongo

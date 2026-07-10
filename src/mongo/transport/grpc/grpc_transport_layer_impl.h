@@ -45,7 +45,7 @@
 
 namespace mongo::transport::grpc {
 
-class MONGO_MOD_NEEDS_REPLACEMENT GRPCTransportLayerImpl : public GRPCTransportLayer {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] GRPCTransportLayerImpl : public GRPCTransportLayer {
 public:
     // Note that passing `nullptr` for {sessionManager} will disallow ingress usage.
     GRPCTransportLayerImpl(ServiceContext* svcCtx,

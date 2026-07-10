@@ -74,26 +74,26 @@ namespace mongo {
    exhaustive for example need to check for size too big after
      update $push (append) operation
 */
-MONGO_MOD_PUBLIC const int BSONObjMaxUserSize = 16 * 1024 * 1024;
+[[MONGO_MOD_PUBLIC]] const int BSONObjMaxUserSize = 16 * 1024 * 1024;
 
 /*
    Sometimes we need objects slightly larger - an object in the replication local.oplog
    is slightly larger than a user object for example.
 */
-MONGO_MOD_PUBLIC const int BSONObjMaxInternalSize = BSONObjMaxUserSize + (16 * 1024);
+[[MONGO_MOD_PUBLIC]] const int BSONObjMaxInternalSize = BSONObjMaxUserSize + (16 * 1024);
 
 /**
  * Maximum size of a builder buffer and for BSONObj with BsonLargeSizeTrait. Limiting it to 27 bits
  * because SharedBuffer::Holder might bit pack information. Setting it to 125 MB to have some
  * wiggle room before size crosses 27 bits.
  */
-MONGO_MOD_PUBLIC const int BufferMaxSize = 125 * 1024 * 1024;
+[[MONGO_MOD_PUBLIC]] const int BufferMaxSize = 125 * 1024 * 1024;
 static_assert(BufferMaxSize < (1 << 27));
 
 /**
  * This is the maximum size of a buffer needed for storing a BSON object in a response message.
  */
-MONGO_MOD_PUBLIC const int kOpMsgReplyBSONBufferMaxSize = BSONObjMaxUserSize * 2 + 64 * 1024;
+[[MONGO_MOD_PUBLIC]] const int kOpMsgReplyBSONBufferMaxSize = BSONObjMaxUserSize * 2 + 64 * 1024;
 
 namespace allocator_aware {
 template <class Allocator = std::allocator<void>>
@@ -321,7 +321,7 @@ private:
 };
 
 template <class BufferAllocator>
-class MONGO_MOD_PUBLIC BasicBufBuilder {
+class [[MONGO_MOD_PUBLIC]] BasicBufBuilder {
 public:
     template <typename... AllocatorArgs>
     BasicBufBuilder(AllocatorArgs&&... args)
@@ -616,7 +616,7 @@ protected:
 // the extern template declaration.
 extern template class BasicBufBuilder<SharedBufferAllocator>;
 
-class MONGO_MOD_PUBLIC BufBuilder : public BasicBufBuilder<SharedBufferAllocator> {
+class [[MONGO_MOD_PUBLIC]] BufBuilder : public BasicBufBuilder<SharedBufferAllocator> {
 public:
     static constexpr size_t kDefaultInitSizeBytes = 512;
     BufBuilder(size_t initsize = kDefaultInitSizeBytes) : BasicBufBuilder(initsize) {}
@@ -651,7 +651,7 @@ extern template class BasicBufBuilder<
 
 namespace allocator_aware {
 template <class Allocator = std::allocator<void>>
-class MONGO_MOD_PUBLIC BufBuilder : public BasicBufBuilder<SharedBufferAllocator<Allocator>> {
+class [[MONGO_MOD_PUBLIC]] BufBuilder : public BasicBufBuilder<SharedBufferAllocator<Allocator>> {
 public:
     static constexpr size_t kDefaultInitSizeBytes = mongo::BufBuilder::kDefaultInitSizeBytes;
     BufBuilder(size_t size = kDefaultInitSizeBytes, const Allocator& allocator = {})
@@ -678,7 +678,7 @@ public:
 // advantages of the extern template declaration.
 extern template class BasicBufBuilder<SharedBufferFragmentAllocator>;
 
-class MONGO_MOD_PUBLIC PooledFragmentBuilder
+class [[MONGO_MOD_PUBLIC]] PooledFragmentBuilder
     : public BasicBufBuilder<SharedBufferFragmentAllocator> {
 public:
     PooledFragmentBuilder(SharedBufferFragmentBuilder& fragmentBuilder)
@@ -697,7 +697,7 @@ MONGO_STATIC_ASSERT(std::is_move_constructible_v<BufBuilder>);
 // advantages of the extern template declaration.
 extern template class BasicBufBuilder<UniqueBufferAllocator>;
 
-class MONGO_MOD_PUBLIC UniqueBufBuilder : public BasicBufBuilder<UniqueBufferAllocator> {
+class [[MONGO_MOD_PUBLIC]] UniqueBufBuilder : public BasicBufBuilder<UniqueBufferAllocator> {
 public:
     static constexpr size_t kDefaultInitSizeBytes = 512;
     UniqueBufBuilder(size_t initsize = kDefaultInitSizeBytes) : BasicBufBuilder(initsize) {}
@@ -719,7 +719,7 @@ public:
       embedded in some other object.
 */
 template <size_t SZ>
-class MONGO_MOD_PUBLIC StackBufBuilderBase : public BasicBufBuilder<StackAllocator<SZ>> {
+class [[MONGO_MOD_PUBLIC]] StackBufBuilderBase : public BasicBufBuilder<StackAllocator<SZ>> {
 public:
     StackBufBuilderBase() : BasicBufBuilder<StackAllocator<SZ>>() {}
     StackBufBuilderBase(const StackBufBuilderBase&) = delete;
@@ -737,7 +737,7 @@ extern template class StackBufBuilderBase<StackSizeDefault>;
 
 /** std::stringstream deals with locale so this is a lot faster than std::stringstream for UTF8 */
 template <typename Builder>
-class MONGO_MOD_PUBLIC StringBuilderImpl {
+class [[MONGO_MOD_PUBLIC]] StringBuilderImpl {
 public:
     // Sizes are determined based on the number of characters in 64-bit + the trailing '\0'
     static const size_t MONGO_DBL_SIZE = 3 + DBL_MANT_DIG - DBL_MIN_EXP + 1;

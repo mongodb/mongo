@@ -44,7 +44,7 @@ namespace mongo::unittest {
 
 namespace fs = ::boost::filesystem;
 
-class MONGO_MOD_PUBLIC GoldenTestContext : public GoldenTestContextBase {
+class [[MONGO_MOD_PUBLIC]] GoldenTestContext : public GoldenTestContextBase {
 public:
     /** Format of the test header*/
     enum HeaderFormat {

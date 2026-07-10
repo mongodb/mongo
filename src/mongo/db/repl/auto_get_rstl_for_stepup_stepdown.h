@@ -41,7 +41,7 @@
 #include <vector>
 
 namespace mongo {
-namespace MONGO_MOD_PRIVATE repl {
+namespace [[MONGO_MOD_PRIVATE]] repl {
 class StepUpStepDownCoordinator {
 public:
     /**
@@ -158,7 +158,7 @@ private:
 /**
  * Helper class to kill conflicting operations and sessions on step-up or step-down.
  */
-class MONGO_MOD_FILE_PRIVATE OpsAndSessionsKiller {
+class [[MONGO_MOD_FILE_PRIVATE]] OpsAndSessionsKiller {
 public:
     OpsAndSessionsKiller(ServiceContext* serviceCtx,
                          ErrorCodes::Error killReason,
@@ -208,5 +208,5 @@ private:
     size_t _totalOpsRunning = 0;
 };
 
-}  // namespace MONGO_MOD_PRIVATE repl
+}  // namespace repl
 }  // namespace mongo

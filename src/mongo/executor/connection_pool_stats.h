@@ -48,7 +48,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC executor {
+namespace [[MONGO_MOD_PUBLIC]] executor {
 namespace details {
 constexpr inline auto kStartSize = 0;
 constexpr inline auto kPartitionStepSize = 50;
@@ -150,5 +150,5 @@ struct ConnectionPoolStats {
     StatsByPool statsByPool;
 };
 
-}  // namespace MONGO_MOD_PUBLIC executor
+}  // namespace executor
 }  // namespace mongo

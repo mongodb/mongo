@@ -45,7 +45,7 @@ class BSONObjBuilder;
  * particular, this class captures the 'invalidate' event that contains the client-provided resume
  * token.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ChangeStreamStartAfterInvalidateInfo final
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ChangeStreamStartAfterInvalidateInfo final
     : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::ChangeStreamStartAfterInvalidate;

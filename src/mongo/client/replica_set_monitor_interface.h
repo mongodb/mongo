@@ -47,7 +47,7 @@ namespace mongo {
 
 struct ReadPreferenceSetting;
 
-class MONGO_MOD_OPEN ReplicaSetMonitorInterface {
+class [[MONGO_MOD_OPEN]] ReplicaSetMonitorInterface {
 public:
     virtual ~ReplicaSetMonitorInterface() = default;
 

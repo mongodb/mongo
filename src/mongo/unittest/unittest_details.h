@@ -61,7 +61,7 @@ static const auto stdoutFileNo = STDOUT_FILENO;
 static const auto stderrFileNo = STDERR_FILENO;
 #endif
 
-MONGO_MOD_PUBLIC inline void suppressCoreDumps() {
+[[MONGO_MOD_PUBLIC]] inline void suppressCoreDumps() {
 #ifndef _WIN32
     const struct rlimit zero{0, 0};
     if (int res = setrlimit(RLIMIT_CORE, &zero); res == -1) {
@@ -75,7 +75,7 @@ MONGO_MOD_PUBLIC inline void suppressCoreDumps() {
  * This is useful for DEATH_TEST because GTest ASSERT_DEATH captures
  * stderr output.
  */
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS inline void redirectStdoutToStderr() {
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] inline void redirectStdoutToStderr() {
 #ifdef _WIN32
     int res = _dup2(stderrFileNo, stdoutFileNo);
 #else

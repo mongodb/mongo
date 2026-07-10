@@ -40,7 +40,7 @@
 #include <mutex>
 #include <string>
 
-namespace MONGO_MOD_PARENT_PRIVATE mongo {
+namespace [[MONGO_MOD_PARENT_PRIVATE]] mongo {
 
 class Status;
 class OperationContext;
@@ -155,4 +155,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace MONGO_MOD_PARENT_PRIVATE mongo
+}  // namespace mongo

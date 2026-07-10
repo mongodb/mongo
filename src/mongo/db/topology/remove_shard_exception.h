@@ -38,7 +38,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_NEEDS_REPLACEMENT RemoveShardDrainingInfo final : public ErrorExtraInfo {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] RemoveShardDrainingInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::RemoveShardDrainingInProgress;
 

@@ -45,7 +45,7 @@ namespace mongo {
  * The error code ErrorCodes::ReplanningRequired is used whenever the query system detects that we
  * should replan this query. This class stores information used in that process.
  */
-class MONGO_MOD_PUBLIC ReplanningRequiredInfo final : public ErrorExtraInfo {
+class [[MONGO_MOD_PUBLIC]] ReplanningRequiredInfo final : public ErrorExtraInfo {
 public:
     // Required member of every ErrorExtraInfo.
     static constexpr auto code = ErrorCodes::ReplanningRequired;

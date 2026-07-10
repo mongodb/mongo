@@ -43,13 +43,13 @@ namespace mongo::otel::metrics {
  * called more than once, `shutdown` must be called before it can be called again. This is not
  * thread-safe.
  */
-MONGO_MOD_PUBLIC Status initialize();
+[[MONGO_MOD_PUBLIC]] Status initialize();
 
 /**
  * Shuts down the OpenTelemetry metric export process by setting the global MeterProvider to a
  * NoopMeterProvider. This is not thread-safe.
  */
-MONGO_MOD_PUBLIC void shutdown();
+[[MONGO_MOD_PUBLIC]] void shutdown();
 
 namespace metrics_initialization_detail {
 /**

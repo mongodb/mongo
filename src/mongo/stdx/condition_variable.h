@@ -39,7 +39,7 @@
 #include <list>
 #include <mutex>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 namespace stdx {
 
@@ -98,4 +98,4 @@ private:
 
 using condition_variable_any = stdx::condition_variable;
 }  // namespace stdx
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

@@ -53,7 +53,7 @@ namespace rss {
  * expected behaviors, allowing consumers to act based on these flags, rather than needing to reason
  * about how a particular provider would behave in a given context.
  */
-class MONGO_MOD_OPEN PersistenceProvider {
+class [[MONGO_MOD_OPEN]] PersistenceProvider {
 public:
     virtual ~PersistenceProvider() = default;
 

@@ -74,7 +74,7 @@ public:
     }
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceLimit final : public DocumentSource {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DocumentSourceLimit final : public DocumentSource {
 public:
     static constexpr std::string_view kStageName = "$limit"sv;
 

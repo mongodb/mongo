@@ -43,7 +43,7 @@ namespace mongo {
  * HarnessHelper implementation. The newRecoveryUnit() implementation dictates what RecoveryUnit
  * implementation the OperationContext has.
  */
-class MONGO_MOD_OPEN HarnessHelper : public ScopedGlobalServiceContextForTest {
+class [[MONGO_MOD_OPEN]] HarnessHelper : public ScopedGlobalServiceContextForTest {
 public:
     explicit HarnessHelper() : _threadClient(getGlobalServiceContext()->getService()) {}
 

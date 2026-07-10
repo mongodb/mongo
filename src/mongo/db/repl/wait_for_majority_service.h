@@ -177,7 +177,7 @@ private:
  * Provides a facility for asynchronously waiting a local opTime to be majority committed.
  */
 
-class MONGO_MOD_PUB WaitForMajorityService {
+class [[MONGO_MOD_PUBLIC]] WaitForMajorityService {
 public:
     ~WaitForMajorityService();
 

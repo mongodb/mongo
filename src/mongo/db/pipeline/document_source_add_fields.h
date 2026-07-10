@@ -52,7 +52,7 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(AddFields);
  *
  * This stage is also aliased as $set and functions the same way.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceAddFields final {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DocumentSourceAddFields final {
 public:
     static constexpr std::string_view kStageName{"$addFields"};
     static constexpr std::string_view kAliasNameSet{"$set"};  // An alternate name for this stage.

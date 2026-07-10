@@ -55,7 +55,7 @@ namespace mongo {
  * services, attaches them to the same service context to which it itself is attached and puts the
  * ShardingState in the initialized state.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ShardingInitializationMongoD
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardingInitializationMongoD
     : public ReplicaSetAwareService<ShardingInitializationMongoD> {
     ShardingInitializationMongoD(const ShardingInitializationMongoD&) = delete;
     ShardingInitializationMongoD& operator=(const ShardingInitializationMongoD&) = delete;
@@ -142,7 +142,7 @@ private:
  * Initialize the sharding components for a mongod running as a config server (if they haven't
  * already been set up).
  */
-MONGO_MOD_NEEDS_REPLACEMENT void initializeGlobalShardingStateForConfigServer(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void initializeGlobalShardingStateForConfigServer(
     OperationContext* opCtx);
 
 /**
@@ -153,7 +153,7 @@ MONGO_MOD_NEEDS_REPLACEMENT void initializeGlobalShardingStateForConfigServer(
  * this function into one single builder that records the time elapsed during startup. Its default
  * value is nullptr because we only want to time this function when it is called during startup.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void initializeShardingAwarenessAndLoadGlobalSettings(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void initializeShardingAwarenessAndLoadGlobalSettings(
     OperationContext* opCtx,
     const ShardIdentity& shardIdentity,
     BSONObjBuilder* startupTimeElapsedBuilder = nullptr);
@@ -161,7 +161,7 @@ MONGO_MOD_NEEDS_REPLACEMENT void initializeShardingAwarenessAndLoadGlobalSetting
 /**
  * Ensures that the shard-local catalog collections exist with the correct indexes.
  */
-// TODO (SERVER-98118): remove MONGO_MOD_NEEDS_REPLACEMENT once 9.0 becomes last LTS.
-MONGO_MOD_NEEDS_REPLACEMENT Status ensureShardLocalCatalogIndexes(OperationContext* opCtx);
+// TODO (SERVER-98118): remove [[MONGO_MOD_NEEDS_REPLACEMENT]] once 9.0 becomes last LTS.
+[[MONGO_MOD_NEEDS_REPLACEMENT]] Status ensureShardLocalCatalogIndexes(OperationContext* opCtx);
 
 }  // namespace mongo

@@ -295,7 +295,7 @@ public:
 
     bool hasPendingChildOps() const;
 
-    MONGO_MOD_PRIVATE const std::vector<ChildWriteOp>& getChildWriteOps_forTest() const;
+    [[MONGO_MOD_PRIVATE]] const std::vector<ChildWriteOp>& getChildWriteOps_forTest() const;
 
 private:
     /**

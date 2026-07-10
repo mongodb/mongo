@@ -34,7 +34,7 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class OperationContext;
 class Timestamp;
@@ -74,7 +74,7 @@ inline std::ostream& operator<<(std::ostream& os, const ChangeSyncSourceAction a
 /**
  * Manage list of viable and blocked sync sources that we can replicate from.
  */
-class MONGO_MOD_OPEN SyncSourceSelector {
+class [[MONGO_MOD_OPEN]] SyncSourceSelector {
     SyncSourceSelector(const SyncSourceSelector&) = delete;
     SyncSourceSelector& operator=(const SyncSourceSelector&) = delete;
 
@@ -124,4 +124,4 @@ public:
 };
 
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

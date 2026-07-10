@@ -58,7 +58,7 @@ namespace mongo {
  * TODO (SERVER-116151): The NSTargeter(s) hierarchy is a legacy implementation. When it is no
  * longer needed by BatchWriteExec and bulk_write_exec it should be removed.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT CollectionRoutingInfoTargeter final : public NSTargeter {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] CollectionRoutingInfoTargeter final : public NSTargeter {
 public:
     enum class LastErrorType {
         kCouldNotTarget,

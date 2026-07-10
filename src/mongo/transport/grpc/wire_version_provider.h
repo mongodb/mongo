@@ -34,7 +34,7 @@
 
 namespace mongo::transport::grpc {
 
-class MONGO_MOD_PARENT_PRIVATE WireVersionProvider {
+class [[MONGO_MOD_PARENT_PRIVATE]] WireVersionProvider {
 public:
     WireVersionProvider() = default;
     virtual ~WireVersionProvider() = default;

@@ -44,7 +44,7 @@
 
 #include <boost/optional.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 namespace mongo::index_builds::primary_driven {
 
 Registry& registry(ServiceContext* svcCtx);

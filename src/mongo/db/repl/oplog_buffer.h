@@ -113,7 +113,7 @@ inline auto& writeBufferMaxSizeMetric = otel::metrics::MetricsService::instance(
  *
  * Implementations are only required to support one pusher and one popper.
  */
-class MONGO_MOD_OPEN OplogBuffer {
+class [[MONGO_MOD_OPEN]] OplogBuffer {
     OplogBuffer(const OplogBuffer&) = delete;
     OplogBuffer& operator=(const OplogBuffer&) = delete;
 
@@ -267,7 +267,7 @@ struct OplogBuffer::Cost {
     std::size_t count = 0;
 };
 
-class MONGO_MOD_PRIVATE OplogBuffer::Counters {
+class [[MONGO_MOD_PRIVATE]] OplogBuffer::Counters {
 public:
     Counters() = delete;
     Counters(otel::metrics::UpDownCounter<int64_t>& countMetric,
@@ -348,7 +348,7 @@ private:
     boost::optional<otel::metrics::Gauge<int64_t>&> _maxCountMetric;
 };
 
-class MONGO_MOD_PUB OplogBufferMetrics {
+class [[MONGO_MOD_PUBLIC]] OplogBufferMetrics {
 public:
     OplogBuffer::Counters* getWriteBufferCounter() {
         return &_writeBufferCounter;
@@ -400,7 +400,7 @@ private:
  * from the buffer.  It is up to the implementing subclass to ensure that such timestamps are
  * available to be read.
  */
-class MONGO_MOD_PRIVATE RandomAccessOplogBuffer : public OplogBuffer {
+class [[MONGO_MOD_PRIVATE]] RandomAccessOplogBuffer : public OplogBuffer {
 public:
     enum SeekStrategy {
         kInexact = 0,

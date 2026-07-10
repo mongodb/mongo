@@ -81,7 +81,8 @@ inline TaskExecutor::CallbackHandle makeCallbackHandle() {
 
 using StartCommandCB = std::function<void(const RemoteCommandResponse&)>;
 
-class MONGO_MOD_OPEN NetworkInterfaceIntegrationFixture : public ExecutorIntegrationTestFixture {
+class [[MONGO_MOD_OPEN]] NetworkInterfaceIntegrationFixture
+    : public ExecutorIntegrationTestFixture {
 public:
     void createNet();
     void startNet();

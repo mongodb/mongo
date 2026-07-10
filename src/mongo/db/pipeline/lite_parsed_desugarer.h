@@ -35,7 +35,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC LiteParsedDesugarer {
+class [[MONGO_MOD_PUBLIC]] LiteParsedDesugarer {
 public:
     using StageExpander =
         std::function<size_t(LiteParsedPipeline*, size_t index, LiteParsedDocumentSource&)>;

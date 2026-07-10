@@ -32,7 +32,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 
@@ -61,7 +61,7 @@ void setupSignalHandlers();
  * Clobbers the previously-registered callback. Only called by asynchronous signals expected
  * to terminate the process.
  */
-MONGO_MOD_PUBLIC void setSignalPostProcessingCallback_forTest(std::function<void()> cb);
+[[MONGO_MOD_PUBLIC]] void setSignalPostProcessingCallback_forTest(std::function<void()> cb);
 
 /**
  * Registers a user-defined callback to be invoked on the asynchronous signal handling thread

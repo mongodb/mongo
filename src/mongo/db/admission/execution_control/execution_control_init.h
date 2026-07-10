@@ -36,13 +36,13 @@ namespace mongo {
 class ServiceContext;
 
 namespace admission {
-namespace MONGO_MOD_PUBLIC execution_control {
+namespace [[MONGO_MOD_PUBLIC]] execution_control {
 
 /**
  * Globally initialize the ticketing system from execution control.
  */
 void initializeTicketingSystem(ServiceContext* svCctx);
-}  // namespace MONGO_MOD_PUBLIC execution_control
+}  // namespace execution_control
 }  // namespace admission
 
 }  // namespace mongo

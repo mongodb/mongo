@@ -43,9 +43,9 @@
 namespace mongo {
 using namespace std::literals::string_view_literals;
 
-MONGO_MOD_FILE_PRIVATE constexpr std::string_view kLockFileBasename = "mongod.lock"sv;
+[[MONGO_MOD_FILE_PRIVATE]] constexpr std::string_view kLockFileBasename = "mongod.lock"sv;
 
-class MONGO_MOD_PUBLIC StorageEngineLockFile {
+class [[MONGO_MOD_PUBLIC]] StorageEngineLockFile {
     StorageEngineLockFile(const StorageEngineLockFile&) = delete;
     StorageEngineLockFile& operator=(const StorageEngineLockFile&) = delete;
 

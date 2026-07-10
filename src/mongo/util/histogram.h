@@ -47,7 +47,7 @@
 #include <fmt/format.h>
 
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Generic histogram that supports data collection into intervals based on user-specified partitions
@@ -62,7 +62,7 @@ namespace MONGO_MOD_PUB mongo {
 template <typename T,
           typename Cmp = std::less<T>,
           typename Counter = std::atomic_int64_t>  // NOLINT
-class MONGO_MOD_UNFORTUNATELY_OPEN Histogram {
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] Histogram {
     struct AtEnd {};
 
 public:
@@ -200,4 +200,4 @@ void appendHistogram(BSONObjBuilder& bob,
     histBob.append("totalCount", totalCount);
 }
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

@@ -59,7 +59,7 @@ struct _timelib_tzinfo;
 /**
  * TODO SERVER-114888: Remove external dependencies on this module.
  */
-namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
+namespace [[MONGO_MOD_NEEDS_REPLACEMENT]] mongo {
 using namespace std::literals::string_view_literals;
 
 /**
@@ -752,4 +752,4 @@ Date_t truncateDate(Date_t date,
 Date_t truncateDateMillis(Date_t date, Date_t referencePoint, unsigned long long binSizeMillis);
 
 long long getBinSizeInMillis(unsigned long long binSize, TimeUnit unit);
-}  // namespace MONGO_MOD_NEEDS_REPLACEMENT mongo
+}  // namespace mongo

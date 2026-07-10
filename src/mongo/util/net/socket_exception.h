@@ -34,7 +34,7 @@
 
 #include <string>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 enum class SocketErrorKind {
     CLOSED,
     RECV_ERROR,
@@ -61,4 +61,4 @@ Status makeSocketError(SocketErrorKind kind,
 
 using NetworkException = ExceptionFor<ErrorCategory::NetworkError>;
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

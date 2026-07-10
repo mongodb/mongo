@@ -36,7 +36,7 @@
 #include <string>
 #include <string_view>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 inline constexpr Seconds kMaxKeepIdleSecs{300};
 inline constexpr Seconds kMaxKeepIntvlSecs{1};
@@ -93,4 +93,4 @@ std::string prettyHostNameAndPort(int port);
  */
 std::string prettyHostName(int port);
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

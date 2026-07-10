@@ -36,7 +36,7 @@
 #include <string>
 #include <string_view>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Every collection / index persisted by the server has a corresponding table in the storage engine.
@@ -192,4 +192,4 @@ std::string createDBNamePathComponent(const DatabaseName& dbName);
 
 }  // namespace ident
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

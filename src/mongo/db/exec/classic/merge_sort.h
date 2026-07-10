@@ -84,7 +84,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    MONGO_MOD_PRIVATE const SimpleMemoryUsageTracker& getMemoryTracker_forTest() const {
+    [[MONGO_MOD_PRIVATE]] const SimpleMemoryUsageTracker& getMemoryTracker_forTest() const {
         return _memoryTracker;
     }
 

@@ -34,7 +34,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * The result of checking a thing's readConcern support.  There are two parts:
@@ -103,4 +103,4 @@ struct ReadConcernSupportResult {
     }
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

@@ -61,7 +61,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 class Collection;
 class CollectionPtr;
 class Database;
@@ -103,16 +103,16 @@ public:
 namespace repl {
 using namespace std::literals::string_view_literals;
 namespace internal {
-MONGO_MOD_NEEDS_REPLACEMENT Status
-insertDocumentsForOplog(OperationContext* opCtx,
-                        const CollectionPtr& oplogCollection,
-                        std::vector<Record>* records,
-                        const std::vector<Timestamp>& timestamps);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] Status insertDocumentsForOplog(
+    OperationContext* opCtx,
+    const CollectionPtr& oplogCollection,
+    std::vector<Record>* records,
+    const std::vector<Timestamp>& timestamps);
 }  // namespace internal
 
 class ReplSettings;
 
-struct MONGO_MOD_PRIVATE OplogLink {
+struct [[MONGO_MOD_PRIVATE]] OplogLink {
     OplogLink() = default;
 
     OpTime prevOpTime;
@@ -363,4 +363,4 @@ auto writeConflictRetryWithLimit(OperationContext* opCtx,
 }
 
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

@@ -37,7 +37,7 @@
 #include <memory>
 #include <utility>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * RunOnceGuard promises that it its run() function is invoked exactly once.
@@ -49,7 +49,7 @@ namespace MONGO_MOD_PUBLIC mongo {
  * actually consumed. It can be bound into lambdas or be constructed as a default member of
  * parameter objects in work queues or maps.
  */
-class MONGO_MOD_FILE_PRIVATE RunOnceGuard {
+class [[MONGO_MOD_FILE_PRIVATE]] RunOnceGuard {
     enum class State {
         kDone,
         kArmed,
@@ -98,7 +98,7 @@ private:
  *          .then([] { return doThing2(); })
  *          ...
  */
-class MONGO_MOD_OPEN OutOfLineExecutor {
+class [[MONGO_MOD_OPEN]] OutOfLineExecutor {
 public:
     using Task = unique_function<void(Status)>;
 
@@ -133,7 +133,7 @@ using ExecutorPtr = std::shared_ptr<OutOfLineExecutor>;
  * If a Task cannot be run, would be destructed without being run, or would run multiple times, it
  * will trigger an invariant.
  */
-class MONGO_MOD_PRIVATE GuaranteedExecutor final : public OutOfLineExecutor {
+class [[MONGO_MOD_PRIVATE]] GuaranteedExecutor final : public OutOfLineExecutor {
 public:
     explicit GuaranteedExecutor(ExecutorPtr exec) : _exec(std::move(exec)) {
         invariant(_exec, kNoExecutorStr);
@@ -172,7 +172,7 @@ private:
  * with a not-okay Status. The _fallback executor is a GuaranteedExecutor wrapper, and thus must run
  * Tasks under threat of invariant.
  */
-class MONGO_MOD_PRIVATE GuaranteedExecutorWithFallback final : public OutOfLineExecutor {
+class [[MONGO_MOD_PRIVATE]] GuaranteedExecutorWithFallback final : public OutOfLineExecutor {
 public:
     explicit GuaranteedExecutorWithFallback(ExecutorPtr preferred, ExecutorPtr fallback)
         : _preferred(std::move(preferred)), _fallback(std::move(fallback)) {
@@ -231,4 +231,4 @@ inline ExecutorPtr makeGuaranteedExecutor(ExecutorPtr preferred, ExecutorPtr fal
                                                             std::move(fallback));
 }
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

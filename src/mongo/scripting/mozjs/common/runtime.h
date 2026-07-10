@@ -86,7 +86,7 @@ struct TimestampInfo;
  * A pointer to this interface is stored in JSContext private data and
  * retrieved via getCommonRuntime(cx).
  */
-struct MONGO_MOD_PUB MozJSCommonRuntimeInterface {
+struct [[MONGO_MOD_PUBLIC]] MozJSCommonRuntimeInterface {
     virtual ~MozJSCommonRuntimeInterface() = default;
 
     virtual void gc() = 0;
@@ -230,7 +230,7 @@ void trackedDelete(MozJSCommonRuntimeInterface* runtime, T* t) {
     delete t;
 }
 
-MONGO_MOD_PUB inline MozJSCommonRuntimeInterface* getCommonRuntime(JSContext* cx) {
+[[MONGO_MOD_PUBLIC]] inline MozJSCommonRuntimeInterface* getCommonRuntime(JSContext* cx) {
     return static_cast<MozJSCommonRuntimeInterface*>(JS_GetContextPrivate(cx));
 }
 

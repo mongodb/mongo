@@ -59,7 +59,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 /**
  * Builds one or more indexes.
  *
@@ -487,4 +487,4 @@ private:
     // The temporary record store used for persisting the resume state of a resumable index build.
     boost::optional<LazyRecordStore> _resumeStateTempRecordStore;
 };
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

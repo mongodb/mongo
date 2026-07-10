@@ -36,7 +36,7 @@
 #include <memory>
 #include <type_traits>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 

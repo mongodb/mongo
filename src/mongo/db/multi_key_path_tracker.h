@@ -45,7 +45,7 @@
 
 namespace mongo {
 
-struct MONGO_MOD_PUBLIC MultikeyPathInfo {
+struct [[MONGO_MOD_PUBLIC]] MultikeyPathInfo {
     NamespaceString nss;
     UUID collectionUUID;
     std::string indexName;
@@ -67,7 +67,7 @@ struct MONGO_MOD_PUBLIC MultikeyPathInfo {
     void mergePathsAndKeys(MultikeyPathInfo&& info);
 };
 
-using WorkerMultikeyPathInfo MONGO_MOD_PUBLIC = std::vector<MultikeyPathInfo>;
+using WorkerMultikeyPathInfo [[MONGO_MOD_PUBLIC]] = std::vector<MultikeyPathInfo>;
 
 /**
  * An OperationContext decoration that tracks which indexes should be made multikey. This is used
@@ -80,7 +80,7 @@ using WorkerMultikeyPathInfo MONGO_MOD_PUBLIC = std::vector<MultikeyPathInfo>;
  * timestamp are merged immediately, and entries with different timestamps are sorted later so
  * deferred multikey writes are applied in timestamp order.
  */
-class MONGO_MOD_PUBLIC MultikeyPathTracker {
+class [[MONGO_MOD_PUBLIC]] MultikeyPathTracker {
 public:
     static const OperationContext::Decoration<MultikeyPathTracker> get;
 

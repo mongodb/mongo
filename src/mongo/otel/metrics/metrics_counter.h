@@ -44,7 +44,7 @@ namespace mongo::otel::metrics {
  * a non-virtual wrapper that calls the virtual addNonNegative().
  */
 template <typename T, AttributeType... AttributeTs>
-class MONGO_MOD_PUBLIC Counter {
+class [[MONGO_MOD_PUBLIC]] Counter {
 public:
     using Attributes = std::tuple<AttributeTs...>;
     virtual ~Counter() = default;
@@ -72,7 +72,7 @@ protected:
 
 /** Specialization when there are no attributes, adding a convenience add(T) overload. */
 template <typename T>
-class MONGO_MOD_PUBLIC Counter<T> {
+class [[MONGO_MOD_PUBLIC]] Counter<T> {
 public:
     using Attributes = std::tuple<>;
     virtual ~Counter() = default;

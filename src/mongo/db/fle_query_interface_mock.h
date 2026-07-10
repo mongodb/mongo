@@ -48,7 +48,7 @@
 #include <utility>
 #include <vector>
 
-namespace MONGO_MOD_PRIVATE mongo {
+namespace [[MONGO_MOD_PRIVATE]] mongo {
 
 class FLEQueryInterfaceMock : public FLEQueryInterface {
 public:
@@ -105,4 +105,4 @@ private:
     repl::StorageInterface* _storage;
 };
 
-}  // namespace MONGO_MOD_PRIVATE mongo
+}  // namespace mongo

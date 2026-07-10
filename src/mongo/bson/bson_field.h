@@ -77,7 +77,7 @@ namespace mongo {
  */
 
 template <typename T>
-class MONGO_MOD_USE_REPLACEMENT(idl) BSONFieldValue {
+class [[MONGO_MOD_USE_REPLACEMENT(idl)]] BSONFieldValue {
 public:
     BSONFieldValue(const std::string& name, const T& t) : _name(name), _t(t) {}
 
@@ -94,7 +94,7 @@ private:
 };
 
 template <typename T>
-class MONGO_MOD_USE_REPLACEMENT(idl) BSONField {
+class [[MONGO_MOD_USE_REPLACEMENT(idl)]] BSONField {
 public:
     BSONField(const std::string& name) : _name(name) {}
 

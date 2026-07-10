@@ -37,7 +37,7 @@
 #include <memory>
 #include <span>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace container {
 
 /**
@@ -68,9 +68,9 @@ enum class UpdateOplogEntryVersion {
  * from, where the keys are integers and the values are byte arrays. Multiple container instances
  * may refer to the same ident.
  */
-class MONGO_MOD_OPEN IntegerKeyedContainer {
+class [[MONGO_MOD_OPEN]] IntegerKeyedContainer {
 public:
-    class MONGO_MOD_OPEN Cursor {
+    class [[MONGO_MOD_OPEN]] Cursor {
     public:
         virtual ~Cursor() = default;
 
@@ -128,9 +128,9 @@ public:
  * where the keys and values are both byte arrays. Multiple container instances may refer to the
  * same ident.
  */
-class MONGO_MOD_OPEN StringKeyedContainer {
+class [[MONGO_MOD_OPEN]] StringKeyedContainer {
 public:
-    class MONGO_MOD_OPEN Cursor {
+    class [[MONGO_MOD_OPEN]] Cursor {
     public:
         virtual ~Cursor() = default;
 
@@ -185,4 +185,4 @@ public:
     virtual std::unique_ptr<Cursor> getCursor(RecoveryUnit& ru) const = 0;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

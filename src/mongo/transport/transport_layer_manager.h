@@ -56,7 +56,7 @@ enum class TransportProtocol;
  * The manager must be provided with an immutable list of TransportLayers that it will manage at
  * construction (preferably through factory functions) to obviate the need for synchronization.
  */
-class MONGO_MOD_PUBLIC TransportLayerManager {
+class [[MONGO_MOD_PUBLIC]] TransportLayerManager {
     TransportLayerManager(const TransportLayerManager&) = delete;
     TransportLayerManager& operator=(const TransportLayerManager&) = delete;
 

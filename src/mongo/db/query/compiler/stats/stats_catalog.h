@@ -47,7 +47,7 @@ namespace mongo::stats {
 /**
  * This class owns statsCache and manages executor lifetime.
  */
-class MONGO_MOD_PUB StatsCatalog {
+class [[MONGO_MOD_PUBLIC]] StatsCatalog {
 public:
     /**
      * Stores the catalog on the specified service context. May only be called once for the lifetime

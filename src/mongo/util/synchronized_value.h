@@ -33,7 +33,7 @@
 
 #include <mutex>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 

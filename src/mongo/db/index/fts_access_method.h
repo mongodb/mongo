@@ -49,7 +49,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC FTSAccessMethod : public SortedDataIndexAccessMethod {
+class [[MONGO_MOD_PUBLIC]] FTSAccessMethod : public SortedDataIndexAccessMethod {
 public:
     FTSAccessMethod(IndexCatalogEntry* btreeState, std::unique_ptr<SortedDataInterface> btree);
 

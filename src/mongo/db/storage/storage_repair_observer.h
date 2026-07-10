@@ -46,7 +46,7 @@ namespace mongo {
  * handles state transitions so that failed repairs are recoverable and so that replica set
  * corruption is not possible.
  * */
-class MONGO_MOD_PUBLIC StorageRepairObserver {
+class [[MONGO_MOD_PUBLIC]] StorageRepairObserver {
 public:
     using InvalidateReplConfigCallback = std::function<void()>;
 

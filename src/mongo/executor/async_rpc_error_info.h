@@ -51,7 +51,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 using executor::RemoteCommandResponse;
 
 enum class CommandErrorProvenance { kLocal, kRemote };
@@ -244,4 +244,4 @@ Status unpackRPCStatusIgnoringWriteErrors(Status status);
  */
 Status unpackRPCStatusIgnoringWriteConcernAndWriteErrors(Status status);
 };  // namespace async_rpc
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -42,7 +42,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC auth {
+namespace [[MONGO_MOD_PUBLIC]] auth {
 
 /**
  * Sets the keys used by authenticateInternalClient - these should be a vector of raw passwords,
@@ -84,5 +84,5 @@ boost::optional<Credential> getInternalAuthParams(size_t idx, std::string_view m
 Credential createInternalX509AuthCredential(
     boost::optional<std::string_view> userName = boost::none);
 
-}  // namespace MONGO_MOD_PUBLIC auth
+}  // namespace auth
 }  // namespace mongo

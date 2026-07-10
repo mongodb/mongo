@@ -58,26 +58,26 @@
 // IWYU pragma: friend "mongo/base/status_with.h"
 // IWYU pragma: friend "mongo/util/intrusive_counter.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 namespace error_details {
 #ifdef MONGO_SOURCE_LOCATION_HAVE_STD
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS MONGO_COMPILER_NORETURN void invariantFailed(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void invariantFailed(
     const char* expr, WrappedStdSourceLocation loc) noexcept;
 #endif
 
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS MONGO_COMPILER_NORETURN void invariantFailed(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void invariantFailed(
     const char* expr, SyntheticSourceLocation loc) noexcept;
 
 #ifdef MONGO_SOURCE_LOCATION_HAVE_STD
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS MONGO_COMPILER_NORETURN void invariantFailedWithMsg(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void invariantFailedWithMsg(
     const char* expr, const std::string& msg, WrappedStdSourceLocation loc) noexcept;
 #endif
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS MONGO_COMPILER_NORETURN void invariantFailedWithMsg(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void invariantFailedWithMsg(
     const char* expr, const std::string& msg, SyntheticSourceLocation loc) noexcept;
 
 template <typename T>
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void invariantWithLocation(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr void invariantWithLocation(
     const T& testOK, const char* expr, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!testOK)) {
         ::mongo::error_details::invariantFailed(expr, loc);
@@ -85,7 +85,7 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void invariantWithLocation(
 }
 
 template <typename T, typename ContextExpr>
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void invariantWithContextAndLocation(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr void invariantWithContextAndLocation(
     const T& testOK,
     const char* expr,
     ContextExpr&& contextExpr,
@@ -135,4 +135,4 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void invariantWithContextAndLoc
 
 #define dassert MONGO_dassert
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

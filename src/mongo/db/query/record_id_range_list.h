@@ -50,7 +50,7 @@ namespace mongo {
  *    matching all RecordIds.
  *  - An empty _ranges vector is the "empty" list (∅): no ranges, no records match.
  */
-class MONGO_MOD_PUBLIC RecordIdRangeList {
+class [[MONGO_MOD_PUBLIC]] RecordIdRangeList {
 public:
     /**
      * Constructs an unbounded list (∀) — a single fully-open range with no min and no max.

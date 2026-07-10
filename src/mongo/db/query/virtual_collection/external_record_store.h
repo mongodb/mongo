@@ -54,9 +54,9 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
-class MONGO_MOD_PUB ExternalRecordStore : public RecordStore {
+class [[MONGO_MOD_PUBLIC]] ExternalRecordStore : public RecordStore {
 public:
     ExternalRecordStore(boost::optional<UUID> uuid, const VirtualCollectionOptions& vopts);
 
@@ -278,4 +278,4 @@ private:
     VirtualCollectionOptions _vopts;
     std::variant<StubIntegerKeyedContainer, StubStringKeyedContainer> _container;
 };
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

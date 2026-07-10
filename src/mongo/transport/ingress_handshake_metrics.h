@@ -42,7 +42,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC transport {
+namespace [[MONGO_MOD_PUBLIC]] transport {
 
 /**
  * A decoration on the Session object used to capture and report the metrics around connection
@@ -133,5 +133,5 @@ public:
                     rpc::ReplyBuilderInterface* response) override;
 };
 
-}  // namespace MONGO_MOD_PUBLIC transport
+}  // namespace transport
 }  // namespace mongo

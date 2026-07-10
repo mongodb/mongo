@@ -74,7 +74,7 @@ class DBClientCursor;
  *  A basic connection to the database.
  *  This is the main entry point for talking to a simple Mongo setup
  */
-class MONGO_MOD_OPEN DBClientConnection : public DBClientSession {
+class [[MONGO_MOD_OPEN]] DBClientConnection : public DBClientSession {
 public:
     DBClientConnection(bool autoReconnect = false,
                        double soTimeout = 0,

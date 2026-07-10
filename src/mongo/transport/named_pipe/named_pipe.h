@@ -42,7 +42,7 @@
 
 #include <string>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 using namespace std::literals::string_view_literals;
 #ifndef _WIN32
 static constexpr auto kDefaultPipePath = "/tmp/"sv;
@@ -108,4 +108,4 @@ private:
     bool _isEof : 1;
 #endif
 };
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

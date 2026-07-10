@@ -97,7 +97,7 @@ struct CollectionOptionsAndIndexes {
 /**
  * Drives the receiving side of the MongoD migration process. One instance exists per shard.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT MigrationDestinationManager
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] MigrationDestinationManager
     : public ReplicaSetAwareServiceShardSvr<MigrationDestinationManager> {
     MigrationDestinationManager(const MigrationDestinationManager&) = delete;
     MigrationDestinationManager& operator=(const MigrationDestinationManager&) = delete;
@@ -216,7 +216,7 @@ public:
         std::vector<BSONObj> indexSpecs;
         BSONObj idIndexSpec;
     };
-    MONGO_MOD_NEEDS_REPLACEMENT static IndexesAndIdIndex getCollectionIndexes(
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] static IndexesAndIdIndex getCollectionIndexes(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const ShardId& fromShardId,
@@ -245,7 +245,7 @@ public:
      * If the collection already exists, it will be updated to match the target options and indexes,
      * including dropping any indexes not specified in the target index specs.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT static void cloneCollectionIndexesAndOptions(
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] static void cloneCollectionIndexesAndOptions(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const CollectionOptionsAndIndexes& collectionOptionsAndIndexes);

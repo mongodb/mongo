@@ -110,7 +110,7 @@ class TransactionHistoryIteratorBase;
  * interface. This allows all DocumentSources to be parsed on either mongos or mongod, but only
  * executable where it makes sense.
  */
-class MONGO_MOD_OPEN MongoProcessInterface {
+class [[MONGO_MOD_OPEN]] MongoProcessInterface {
 public:
     /**
      * Storage for a batch of BSON Objects to be updated in the write namespace. For each element
@@ -143,7 +143,7 @@ public:
     /**
      * Interface which estimates the size of a given write operation.
      */
-    class MONGO_MOD_OPEN WriteSizeEstimator {
+    class [[MONGO_MOD_OPEN]] WriteSizeEstimator {
     public:
         virtual ~WriteSizeEstimator() = default;
 
@@ -720,7 +720,7 @@ public:
     /**
      * Used to enforce the constraint that the foreign collection must be untracked.
      */
-    class MONGO_MOD_UNFORTUNATELY_OPEN ScopedExpectUntrackedCollection {
+    class [[MONGO_MOD_UNFORTUNATELY_OPEN]] ScopedExpectUntrackedCollection {
     public:
         virtual ~ScopedExpectUntrackedCollection() = default;
     };

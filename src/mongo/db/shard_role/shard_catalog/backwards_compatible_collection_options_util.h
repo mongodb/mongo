@@ -50,7 +50,7 @@ namespace mongo {
  * - Collection options are strict (so can't simply add an option to previous mongod [sub-]versions)
  *
  */
-namespace MONGO_MOD_NEEDS_REPLACEMENT backwards_compatible_collection_options {
+namespace [[MONGO_MOD_NEEDS_REPLACEMENT]] backwards_compatible_collection_options {
 
 constexpr inline std::string_view kTimeseriesBucketsMayHaveMixedSchemaData =
     "timeseriesBucketsMayHaveMixedSchemaData";
@@ -124,5 +124,5 @@ std::pair<BSONObj, BSONObj> getCollModCmdAndAdditionalO2Field(const BSONObj& col
  */
 BSONObj parseCollModCmdFromOplogEntry(const repl::OplogEntry& entry);
 
-}  // namespace MONGO_MOD_NEEDS_REPLACEMENT backwards_compatible_collection_options
+}  // namespace backwards_compatible_collection_options
 }  // namespace mongo

@@ -41,6 +41,6 @@ namespace mongo::otel::traces {
  * "<version>-<trace-id>-<parent-id>-<trace-flags>" as defined by
  * https://www.w3.org/TR/trace-context/#traceparent-header.
  */
-MONGO_MOD_PUBLIC Status validateW3CTraceparent(std::string_view value);
+[[MONGO_MOD_PUBLIC]] Status validateW3CTraceparent(std::string_view value);
 
 }  // namespace mongo::otel::traces

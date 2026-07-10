@@ -30,7 +30,7 @@
 #pragma once
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC executor {
+namespace [[MONGO_MOD_PUBLIC]] executor {
 
 /**
  * The set of states that a host pool can assume within the ConnectionPool class.
@@ -58,6 +58,6 @@ enum class ConnectionPoolState {
     kShutdown,
 };
 
-}  // namespace MONGO_MOD_PUBLIC executor
+}  // namespace executor
 }  // namespace mongo
 

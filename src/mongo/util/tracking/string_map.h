@@ -37,7 +37,7 @@
 #include <scoped_allocator>
 #include <string_view>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace tracking {
 
 struct StringMapHashedKey {
@@ -139,4 +139,4 @@ inline StringSet makeStringSet(Context& Context) {
 }
 
 }  // namespace tracking
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

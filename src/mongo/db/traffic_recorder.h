@@ -108,7 +108,7 @@ private:
  * The recording can have one recording running at a time and the intention is that observe() blocks
  * callers for the least amount of time possible.
  */
-class MONGO_MOD_PUBLIC TrafficRecorder {
+class [[MONGO_MOD_PUBLIC]] TrafficRecorder {
 public:
     using RecordingID = std::string;
     // The Recorder may record some special events that are required by the replay client.

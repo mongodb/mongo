@@ -46,7 +46,7 @@ class SaslClientConversation;
  * Implementation of the client side of a SASL authentication conversation using the
  * native SASL implementation.
  */
-class MONGO_MOD_PUBLIC NativeSaslClientSession : public SaslClientSession {
+class [[MONGO_MOD_PUBLIC]] NativeSaslClientSession : public SaslClientSession {
     NativeSaslClientSession(const NativeSaslClientSession&) = delete;
     NativeSaslClientSession& operator=(const NativeSaslClientSession&) = delete;
 

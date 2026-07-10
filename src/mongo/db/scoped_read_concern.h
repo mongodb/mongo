@@ -38,7 +38,7 @@ namespace mongo {
  * Overrides the ReadConcern in the OperationContext while in scope, mainly useful for
  * DBDirectClient.
  */
-class MONGO_MOD_PUB ScopedReadConcern {
+class [[MONGO_MOD_PUBLIC]] ScopedReadConcern {
 public:
     ScopedReadConcern(OperationContext* opCtx, repl::ReadConcernArgs requestReadConcernArgs);
     ~ScopedReadConcern();

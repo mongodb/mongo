@@ -40,7 +40,7 @@
 #include <string>
 #include <utility>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 /**
  * The `WeakFunction` mechanism allows for the creation of "weak-symbol-like" functions

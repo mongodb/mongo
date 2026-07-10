@@ -43,7 +43,7 @@
 
 #include <fmt/format.h>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo::unittest::match {
 using namespace ::testing;
@@ -57,7 +57,7 @@ struct BSONBinDataView {
     friend bool operator==(const BSONBinDataView&, const BSONBinDataView&) = default;
 };
 
-namespace MONGO_MOD_FILE_PRIVATE match_details {
+namespace [[MONGO_MOD_FILE_PRIVATE]] match_details {
 
 using AnythingMatcher = decltype(_);
 
@@ -105,7 +105,7 @@ inline BSONBinDataView makeBinDataView(BSONElement el) {
     };
 }
 
-}  // namespace MONGO_MOD_FILE_PRIVATE match_details
+}  // namespace match_details
 
 /**
  * `BSONObjElements(match)` match all elements of a BSONObj against a matcher.

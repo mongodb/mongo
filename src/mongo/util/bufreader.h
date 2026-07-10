@@ -50,7 +50,7 @@ namespace mongo {
     methods throw the eof exception if the operation would pass the end of the
     buffer with which we are working.
 */
-class MONGO_MOD_PUB BufReader {
+class [[MONGO_MOD_PUBLIC]] BufReader {
     BufReader(const BufReader&) = delete;
     BufReader& operator=(const BufReader&) = delete;
 

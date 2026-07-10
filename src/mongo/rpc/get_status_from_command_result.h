@@ -33,7 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Converts "result" into a Status object.  The input is expected to be the object returned
@@ -54,4 +54,4 @@ Status getStatusFromCommandResult(const BSONObj& result);
  */
 Status getErrorStatusFromCommandResult(const BSONObj& result);
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

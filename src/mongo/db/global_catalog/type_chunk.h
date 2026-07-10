@@ -67,7 +67,7 @@ class Status;
 template <typename T>
 class StatusWith;
 
-class MONGO_MOD_NEEDS_REPLACEMENT ChunkHistory : public ChunkHistoryBase {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ChunkHistory : public ChunkHistoryBase {
 public:
     using ChunkHistoryBase::serialize;
     using ChunkHistoryBase::toBSON;
@@ -125,7 +125,7 @@ public:
  * server's collection schema, but that will be future work when the new schema is stable and there
  * is time to do the extra work, as well as handle the backwards compatibility issues it poses.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ChunkType {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ChunkType {
 public:
     // Name of the chunks collection in the config server.
     static const NamespaceString ConfigNS;
@@ -185,7 +185,8 @@ public:
      *
      * TODO SERVER-121075: See if this can be removed.
      */
-    MONGO_MOD_PRIVATE static ChunkType parse(const BSONObj& source, const IDLParserContext& ctxt) {
+    [[MONGO_MOD_PRIVATE]] static ChunkType parse(const BSONObj& source,
+                                                 const IDLParserContext& ctxt) {
         return uassertStatusOK(parseFromConfigBSON(source, OID(), Timestamp()));
     }
 

@@ -42,7 +42,7 @@
 
 namespace mongo::rpc {
 
-class MONGO_MOD_PUBLIC AuditClientAttrs : public rpc::AuditClientAttrsBase {
+class [[MONGO_MOD_PUBLIC]] AuditClientAttrs : public rpc::AuditClientAttrsBase {
 public:
     AuditClientAttrs(HostAndPort local,
                      HostAndPort remote,

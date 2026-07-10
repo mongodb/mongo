@@ -34,7 +34,7 @@
 
 #include <functional>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 class ServiceContext;
 
 /**
@@ -54,4 +54,4 @@ void registerTenantToShardCacheInitializer(std::function<void(ServiceContext* se
  * to call when no function has been registered.
  */
 void initializeTenantToShardCache(ServiceContext* service);
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

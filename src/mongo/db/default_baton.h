@@ -49,7 +49,7 @@ class OperationContext;
 /**
  * The most basic Baton implementation.
  */
-class MONGO_MOD_PUBLIC DefaultBaton : public Baton {
+class [[MONGO_MOD_PUBLIC]] DefaultBaton : public Baton {
 public:
     explicit DefaultBaton(OperationContext* opCtx);
 

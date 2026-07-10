@@ -37,7 +37,7 @@
 namespace mongo {
 class LiteParsedPipeline;
 
-namespace MONGO_MOD_PUBLIC pipeline_factory {
+namespace [[MONGO_MOD_PUBLIC]] pipeline_factory {
 /**
  * Options for creating a pipeline.
  */
@@ -146,5 +146,5 @@ std::unique_ptr<Pipeline> makeFacetPipeline(const std::vector<BSONObj>& rawPipel
                                             const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                             PipelineValidatorCallback validator = nullptr);
 
-}  // namespace MONGO_MOD_PUBLIC pipeline_factory
+}  // namespace pipeline_factory
 }  // namespace mongo

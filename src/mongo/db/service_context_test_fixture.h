@@ -35,7 +35,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/modules.h"
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 namespace service_context_test {
@@ -64,7 +64,7 @@ inline ClusterRole getClusterRole(ServerRoleIndex i) {
  * is often a virtual base and those run before all non-virtual bases.
  */
 template <ServerRoleIndex roleIndex>
-class MONGO_MOD_OPEN RoleOverride {
+class [[MONGO_MOD_OPEN]] RoleOverride {
 public:
     ~RoleOverride() {
         serverGlobalParams.clusterRole = _saved;
@@ -74,9 +74,9 @@ private:
     ClusterRole _saved{std::exchange(serverGlobalParams.clusterRole, getClusterRole(roleIndex))};
 };
 
-using ReplicaSetRoleOverride MONGO_MOD_OPEN = RoleOverride<ServerRoleIndex::replicaSet>;
-using ShardRoleOverride MONGO_MOD_OPEN = RoleOverride<ServerRoleIndex::shard>;
-using RouterRoleOverride MONGO_MOD_OPEN = RoleOverride<ServerRoleIndex::router>;
+using ReplicaSetRoleOverride [[MONGO_MOD_OPEN]] = RoleOverride<ServerRoleIndex::replicaSet>;
+using ShardRoleOverride [[MONGO_MOD_OPEN]] = RoleOverride<ServerRoleIndex::shard>;
+using RouterRoleOverride [[MONGO_MOD_OPEN]] = RoleOverride<ServerRoleIndex::router>;
 
 /**
  * A hook for the ServiceContextTest that is used configure whether or not an egress-only
@@ -104,7 +104,7 @@ struct ServiceContextTestHook {
  * This class will either use the default value of shouldSetupTL or the value set by another object
  * that virtually inherites from ServiceContextTestHook (see example in ServiceContextTestHook).
  */
-class MONGO_MOD_OPEN WithoutSetupTransportLayer : public virtual ServiceContextTestHook {};
+class [[MONGO_MOD_OPEN]] WithoutSetupTransportLayer : public virtual ServiceContextTestHook {};
 
 /**
  * Configures a ServiceContextTest to setup a TransportLayer to be stored on the ServiceContext. It
@@ -112,14 +112,14 @@ class MONGO_MOD_OPEN WithoutSetupTransportLayer : public virtual ServiceContextT
  * value is set up before the ServiceContextTest constructor. It must precede ServiceContextTest (or
  * any of its derived classes) in the base class list.
  */
-class MONGO_MOD_OPEN WithSetupTransportLayer : virtual ServiceContextTestHook {
+class [[MONGO_MOD_OPEN]] WithSetupTransportLayer : virtual ServiceContextTestHook {
 public:
     WithSetupTransportLayer() {
         shouldSetupTL = true;
     }
 };
 
-class MONGO_MOD_OPEN ScopedGlobalServiceContextForTest {
+class [[MONGO_MOD_OPEN]] ScopedGlobalServiceContextForTest {
 public:
     ScopedGlobalServiceContextForTest();
     explicit ScopedGlobalServiceContextForTest(bool shouldSetupTL);
@@ -142,7 +142,8 @@ public:
  * that need to use a TransportLayer for egress should also derive from WithSetupTransportLayer.
  * WithSetupTransportLayer must precede ServiceContextTest in the list of base classess.
  */
-class MONGO_MOD_OPEN ServiceContextTest : public WithoutSetupTransportLayer, public unittest::Test {
+class [[MONGO_MOD_OPEN]] ServiceContextTest : public WithoutSetupTransportLayer,
+                                              public unittest::Test {
 public:
     /**
      * Returns the default Client for this test.
@@ -184,7 +185,7 @@ private:
  * the fast and precise clock sources set to instances of ClockSourceMock and the tick source
  * set to an instance of TickSourceMock.
  */
-class MONGO_MOD_OPEN ClockSourceMockServiceContextTest : public ServiceContextTest {
+class [[MONGO_MOD_OPEN]] ClockSourceMockServiceContextTest : public ServiceContextTest {
 protected:
     ClockSourceMockServiceContextTest();
 };
@@ -194,7 +195,7 @@ protected:
  * the fast and precise clock sources set to instances of SharedClockSourceAdapter with the
  * same underlying clock source.
  */
-class MONGO_MOD_OPEN SharedClockSourceAdapterServiceContextTest : public ServiceContextTest {
+class [[MONGO_MOD_OPEN]] SharedClockSourceAdapterServiceContextTest : public ServiceContextTest {
 protected:
     explicit SharedClockSourceAdapterServiceContextTest(std::shared_ptr<ClockSource> clock);
 };

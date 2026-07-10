@@ -49,7 +49,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_NEEDS_REPLACEMENT MongosTopologyCoordinator {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] MongosTopologyCoordinator {
 public:
     static MongosTopologyCoordinator* get(OperationContext* opCtx);
 

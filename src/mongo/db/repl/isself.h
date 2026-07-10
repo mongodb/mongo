@@ -36,7 +36,7 @@
 #include <string>
 #include <vector>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 struct HostAndPort;
 class ServiceContext;
 
@@ -84,4 +84,4 @@ bool isSelfSlowPath(const HostAndPort& hostAndPort,
 std::vector<std::string> getBoundAddrs(bool ipv6enabled);
 
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

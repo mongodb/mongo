@@ -69,7 +69,7 @@ namespace mongo {
 
 class CurrentChunkManager;
 
-struct MONGO_MOD_NEEDS_REPLACEMENT PlacementVersionTargetingInfo {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] PlacementVersionTargetingInfo {
     /**
      * Constructs a placement information for a collection with the specified generation, starting
      * at placementVersion {0, 0} and maxValidAfter of Timestamp{0, 0}. The expectation is that the
@@ -89,7 +89,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT PlacementVersionTargetingInfo {
 
 // Map from a shard to a struct indicating both the max chunk version on that shard and whether the
 // shard is currently marked as needing a catalog cache refresh (stale).
-using ShardPlacementVersionMap MONGO_MOD_NEEDS_REPLACEMENT =
+using ShardPlacementVersionMap [[MONGO_MOD_NEEDS_REPLACEMENT]] =
     stdx::unordered_map<ShardId, PlacementVersionTargetingInfo, ShardId::Hasher>;
 
 /**
@@ -97,7 +97,7 @@ using ShardPlacementVersionMap MONGO_MOD_NEEDS_REPLACEMENT =
  * provides a simpler, high-level interface for domain specific operations without exposing the
  * underlying implementation.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ChunkMap {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ChunkMap {
 public:
     // Vector of chunks ordered by max key in ascending order.
     using ChunkVector = std::vector<std::shared_ptr<ChunkInfo>>;
@@ -358,7 +358,7 @@ private:
  * In-memory representation of the routing table for a single sharded collection at various points
  * in time.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT RoutingTableHistory {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] RoutingTableHistory {
     RoutingTableHistory(const RoutingTableHistory&) = delete;
     RoutingTableHistory& operator=(const RoutingTableHistory&) = delete;
 
@@ -621,7 +621,7 @@ private:
  *
  * This class should go away once a cluster-wide comparable ChunkVersion is implemented.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ComparableChunkVersion {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ComparableChunkVersion {
 public:
     /**
      * Creates a ComparableChunkVersion that wraps the given ChunkVersion.
@@ -688,7 +688,7 @@ private:
           _chunkVersion(std::move(version)),
           _epochDisambiguatingSequenceNum(epochDisambiguatingSequenceNum) {}
 
-    MONGO_MOD_NEEDS_REPLACEMENT void setChunkVersion(const ChunkVersion& version);
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] void setChunkVersion(const ChunkVersion& version);
 
     uint64_t _forcedRefreshSequenceNum{0};
 
@@ -706,7 +706,7 @@ private:
  * supports tracked collections (i.e., collections which have entries in config.collections and
  * config.chunks).
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT OptionalRoutingTableHistory {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] OptionalRoutingTableHistory {
     // UNTRACKED collection constructor
     OptionalRoutingTableHistory() = default;
 
@@ -717,18 +717,18 @@ struct MONGO_MOD_NEEDS_REPLACEMENT OptionalRoutingTableHistory {
     std::shared_ptr<RoutingTableHistory> optRt;
 };
 
-using RoutingTableHistoryCache MONGO_MOD_UNFORTUNATELY_OPEN =
+using RoutingTableHistoryCache [[MONGO_MOD_UNFORTUNATELY_OPEN]] =
     ReadThroughCache<NamespaceString,
                      OptionalRoutingTableHistory,
                      ComparableChunkVersion,
                      ObservableMutex<std::mutex>>;
-using RoutingTableHistoryValueHandle MONGO_MOD_NEEDS_REPLACEMENT =
+using RoutingTableHistoryValueHandle [[MONGO_MOD_NEEDS_REPLACEMENT]] =
     RoutingTableHistoryCache::ValueHandle;
 
 /**
  * Combines a shard, the shard version, and database version that the shard should be using
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT ShardEndpoint {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardEndpoint {
     ShardEndpoint(const ShardId& shardName,
                   boost::optional<ShardVersion> shardVersionParam,
                   boost::optional<DatabaseVersion> dbVersionParam);
@@ -744,7 +744,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT ShardEndpoint {
 /**
  * Compares shard endpoints in a map.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT EndpointComp {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] EndpointComp {
     bool operator()(const ShardEndpoint* endpointA, const ShardEndpoint* endpointB) const;
 };
 
@@ -799,7 +799,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT EndpointComp {
  *    - Respects atClusterTime for all chunk operations
  *    - Used for snapshot reads and multi-document transactions
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ChunkManager {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ChunkManager {
     friend class PointInTimeChunkManager;
 
 public:
@@ -1089,7 +1089,7 @@ protected:
     boost::optional<Timestamp> _clusterTime;
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT CurrentChunkManager : public ChunkManager {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] CurrentChunkManager : public ChunkManager {
 public:
     explicit CurrentChunkManager(RoutingTableHistoryValueHandle rt)
         : ChunkManager(std::move(rt), boost::none) {}
@@ -1135,7 +1135,7 @@ public:
     }
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT PointInTimeChunkManager : public ChunkManager {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] PointInTimeChunkManager : public ChunkManager {
 public:
     PointInTimeChunkManager(RoutingTableHistoryValueHandle rt, Timestamp clusterTime)
         : ChunkManager(std::move(rt), clusterTime) {}
@@ -1149,6 +1149,7 @@ public:
  * If `max` is the max bound of some chunk, returns that chunk.
  * Otherwise, returns the chunk that contains the key `max`.
  */
-MONGO_MOD_NEEDS_REPLACEMENT Chunk getChunkForMaxBound(const ChunkManager& cm, const BSONObj& max);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] Chunk getChunkForMaxBound(const ChunkManager& cm,
+                                                          const BSONObj& max);
 
 }  // namespace mongo

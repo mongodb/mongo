@@ -49,7 +49,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PRIVATE DatabaseImpl final : public Database {
+class [[MONGO_MOD_PRIVATE]] DatabaseImpl final : public Database {
 public:
     explicit DatabaseImpl(const DatabaseName& dbName);
 

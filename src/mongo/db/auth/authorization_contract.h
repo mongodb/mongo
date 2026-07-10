@@ -60,7 +60,7 @@ namespace mongo {
  * When commands execute other commands via DBDirectClient, we only want
  * the top-level command to accumulate authorization checks.
  */
-class MONGO_MOD_PUBLIC AuthorizationContract {
+class [[MONGO_MOD_PUBLIC]] AuthorizationContract {
 public:
     AuthorizationContract() = default;
     AuthorizationContract(bool isTestModeEnabled) : _isTestModeEnabled(isTestModeEnabled) {};

@@ -36,7 +36,7 @@
 #include <memory>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC executor {
+namespace [[MONGO_MOD_PUBLIC]] executor {
 
 /**
  * Returns a new TaskExecutor that does all of its RPC execution over the same transport session.
@@ -53,5 +53,5 @@ std::shared_ptr<TaskExecutor> makePinnedConnectionTaskExecutor(std::shared_ptr<T
  */
 std::shared_ptr<TaskExecutor> makePinnedConnectionTaskExecutor(std::shared_ptr<TaskExecutor> exec);
 
-}  // namespace MONGO_MOD_PUBLIC executor
+}  // namespace executor
 }  // namespace mongo

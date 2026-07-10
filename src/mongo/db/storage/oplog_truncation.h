@@ -42,7 +42,7 @@ namespace mongo::oplog_truncation {
 // Callback for truncating oplog entries within a marker range. Depending on the architecture,
 // different truncation APIs should be used to ensure oplog truncation is properly replicated.
 // Returns true if truncation succeeded and the marker should be popped, false otherwise.
-using TruncateFn MONGO_MOD_PUBLIC =
+using TruncateFn [[MONGO_MOD_PUBLIC]] =
     std::function<bool(OperationContext*, const CollectionTruncateMarkers::Marker&)>;
 
 /**
@@ -51,10 +51,11 @@ using TruncateFn MONGO_MOD_PUBLIC =
  *
  * Returns true if validation passed and truncation can proceed, false otherwise.
  */
-MONGO_MOD_PUBLIC bool checkOplogTruncationBounds(OperationContext* opCtx,
-                                                 RecordStore& oplog,
-                                                 const CollectionTruncateMarkers::Marker& marker,
-                                                 RecordId mayTruncateUpTo);
+[[MONGO_MOD_PUBLIC]] bool checkOplogTruncationBounds(
+    OperationContext* opCtx,
+    RecordStore& oplog,
+    const CollectionTruncateMarkers::Marker& marker,
+    RecordId mayTruncateUpTo);
 
 /**
  * Shared helper for iterating marker queue and validating cursor bounds before truncation.
@@ -62,10 +63,10 @@ MONGO_MOD_PUBLIC bool checkOplogTruncationBounds(OperationContext* opCtx,
  *
  * Returns the highest RecordId that was truncated, or a null RecordId if nothing was truncated.
  */
-MONGO_MOD_PUBLIC RecordId truncateByMarkerQueue(OperationContext* opCtx,
-                                                RecordStore& oplog,
-                                                RecordId mayTruncateUpTo,
-                                                TruncateFn truncateFn);
+[[MONGO_MOD_PUBLIC]] RecordId truncateByMarkerQueue(OperationContext* opCtx,
+                                                    RecordStore& oplog,
+                                                    RecordId mayTruncateUpTo,
+                                                    TruncateFn truncateFn);
 
 /**
  * Attempts to truncate oplog entries before the pinned oplog timestamp. Truncation will occur
@@ -84,6 +85,6 @@ RecordId reclaimOplog(OperationContext* opCtx, RecordStore& oplog, RecordId mayT
  * persisted in the timestamp store and the storage engine's pinned oplog timestamp. Otherwise, this
  * will be the storage engine's pinned oplog timestamp.
  */
-MONGO_MOD_PUBLIC Timestamp computeTruncationBound(OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] Timestamp computeTruncationBound(OperationContext* opCtx);
 
 }  // namespace mongo::oplog_truncation

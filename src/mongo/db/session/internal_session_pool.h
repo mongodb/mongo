@@ -58,7 +58,7 @@ namespace mongo {
  * to execute an internal transaction. Sessions are reaped from the pool if they have not been used
  * for over 15 minutes. The session pool is partitioned by uid.
  */
-class MONGO_MOD_PUB InternalSessionPool {
+class [[MONGO_MOD_PUBLIC]] InternalSessionPool {
 
 public:
     class Session {

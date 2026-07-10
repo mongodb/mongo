@@ -109,7 +109,7 @@ void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx);
  * blocks until the first finishes), so the two never hold the collection critical section at the
  * same time.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ActiveMigrationsRegistry {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ActiveMigrationsRegistry {
     ActiveMigrationsRegistry(const ActiveMigrationsRegistry&) = delete;
     ActiveMigrationsRegistry& operator=(const ActiveMigrationsRegistry&) = delete;
 
@@ -127,7 +127,7 @@ public:
      * so that recovered coordinators obtain their ActiveMigrationsRegistry before newly-submitted
      * operations.
      */
-    class MONGO_MOD_OPEN Recoverable {
+    class [[MONGO_MOD_OPEN]] Recoverable {
     public:
         virtual ~Recoverable() = default;
 
@@ -358,7 +358,7 @@ private:
  * held, any newly submitted chunk operation fails with ConflictingOperationInProgress. The
  * destructor releases the lock and lets chunk operations resume.
  */
-class MONGO_MOD_PUBLIC MigrationBlockingGuard {
+class [[MONGO_MOD_PUBLIC]] MigrationBlockingGuard {
 public:
     MigrationBlockingGuard(OperationContext* opCtx, std::string reason)
         : _registry(ActiveMigrationsRegistry::get(opCtx)), _reason(std::move(reason)) {
@@ -457,7 +457,7 @@ private:
  * Object of this class is returned from the registerSplitOrMergeChunk call of the active migrations
  * registry.
  */
-class MONGO_MOD_PUBLIC ScopedSplitMergeChunk {
+class [[MONGO_MOD_PUBLIC]] ScopedSplitMergeChunk {
 public:
     ScopedSplitMergeChunk(ActiveMigrationsRegistry* registry, const NamespaceString& nss);
     ~ScopedSplitMergeChunk();

@@ -307,7 +307,7 @@ public:
     /**
      * Updates the stored fields provided by 'doc', ignoring the 'metaField' field.
      */
-    MONGO_MOD_PUBLIC
+    [[MONGO_MOD_PUBLIC]]
     UpdateStatus update(const BSONObj& doc,
                         boost::optional<std::string_view> metaField,
                         const StringDataComparator* stringComparator);
@@ -447,7 +447,7 @@ private:
 /**
  * Manages Min and Max values for timeseries measurements within a bucket.
  */
-class MONGO_MOD_PUBLIC MinMax : public FlatBSON<MinMax, MinMaxElement, BSONElementValueBuffer> {
+class [[MONGO_MOD_PUBLIC]] MinMax : public FlatBSON<MinMax, MinMaxElement, BSONElementValueBuffer> {
     friend class FlatBSON<MinMax, MinMaxElement, BSONElementValueBuffer>;
 
 public:
@@ -558,7 +558,7 @@ private:
 /**
  * Manages schema data for timeseries measurements within a bucket.
  */
-class MONGO_MOD_PUBLIC Schema : public FlatBSON<Schema, SchemaElement, BSONTypeValue> {
+class [[MONGO_MOD_PUBLIC]] Schema : public FlatBSON<Schema, SchemaElement, BSONTypeValue> {
     friend class FlatBSON<Schema, SchemaElement, BSONTypeValue>;
 
 public:

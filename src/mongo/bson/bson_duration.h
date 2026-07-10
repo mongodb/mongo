@@ -44,7 +44,8 @@ namespace mongo {
  * e.g. parseDurationFromCount<Seconds> will parse a number of seconds as a Duration.
  */
 template <typename Duration>
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS Duration parseDurationFromCount(const BSONElement& elem) {
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] Duration parseDurationFromCount(
+    const BSONElement& elem) {
     uassert(ErrorCodes::BadValue,
             str::stream() << "Duration value must be numeric, got: " << typeName(elem.type()),
             elem.isNumber());
@@ -57,7 +58,7 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS Duration parseDurationFromCount(const BSO
  * Serializes a Duration to a BSON int32/int64 for the specified units.
  */
 template <typename ToDuration, typename Period>
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS void serializeDurationToCount(
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] void serializeDurationToCount(
     const Duration<Period>& duration, std::string_view fieldName, BSONObjBuilder* builder) {
     builder->append(fieldName, durationCount<ToDuration>(duration));
 }

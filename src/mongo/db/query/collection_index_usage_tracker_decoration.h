@@ -46,7 +46,7 @@ namespace mongo {
  * CollectionIndexUsageTracker needs a wrapper class (this class) to initialize it with a clock
  * source.
  */
-class MONGO_MOD_PUBLIC CollectionIndexUsageTrackerDecoration {
+class [[MONGO_MOD_PUBLIC]] CollectionIndexUsageTrackerDecoration {
 public:
     /**
      * Performs a copy of the CollectionIndexUsageTracker and stores the new instance in the

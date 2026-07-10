@@ -38,10 +38,10 @@
 
 #include <boost/intrusive_ptr.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /// This is an alternative base class to the above ones (will replace them eventually)
-class MONGO_MOD_OPEN RefCountable {
+class [[MONGO_MOD_OPEN]] RefCountable {
     RefCountable(const RefCountable&) = delete;
     RefCountable& operator=(const RefCountable&) = delete;
 
@@ -103,4 +103,4 @@ boost::intrusive_ptr<T> make_intrusive(Args&&... args) {
     ptr->threadUnsafeIncRefCountTo(1);
     return boost::intrusive_ptr<T>(ptr, /*add ref*/ false);
 }
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

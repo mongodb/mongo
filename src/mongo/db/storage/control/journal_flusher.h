@@ -43,7 +43,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 /**
  * A periodic and signalable thread that flushes data to disk. Constructor parameter will dictate
  * whether to periodically flush or only on signal.
@@ -178,4 +178,4 @@ private:
     bool _disablePeriodicFlushes;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

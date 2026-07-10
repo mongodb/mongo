@@ -46,7 +46,7 @@ namespace repl {
  *
  * Example: `mySet/host1:10001,host2:10002`
  */
-MONGO_MOD_PUB std::tuple<std::string, std::vector<HostAndPort>> parseReplSetSeedList(
+[[MONGO_MOD_PUBLIC]] std::tuple<std::string, std::vector<HostAndPort>> parseReplSetSeedList(
     ReplicationCoordinatorExternalState* externalState, std::string_view replSetString);
 }  // namespace repl
 }  // namespace mongo

@@ -55,7 +55,7 @@ class ServiceContext;
  * the next time period (one second). The consumers will call `getTicket` and the producer will call
  * `refreshTo`.
  */
-class MONGO_MOD_PUBLIC FlowControlTicketholder {
+class [[MONGO_MOD_PUBLIC]] FlowControlTicketholder {
 public:
     /**
      * A structure to accommodate curop reporting.

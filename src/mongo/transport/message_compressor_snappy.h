@@ -39,7 +39,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-class MONGO_MOD_PUBLIC SnappyMessageCompressor final : public MessageCompressorBase {
+class [[MONGO_MOD_PUBLIC]] SnappyMessageCompressor final : public MessageCompressorBase {
 public:
     SnappyMessageCompressor();
 

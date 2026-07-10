@@ -52,7 +52,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 using namespace std::literals::string_view_literals;
 
 /**
@@ -206,7 +206,7 @@ public:
      * Gets a bool indicating whether the implicit default write concern is majority.
      * This function should only be used for testing purposes.
      */
-    MONGO_MOD_PARENT_PRIVATE bool getImplicitDefaultWriteConcernMajority_forTest();
+    [[MONGO_MOD_PARENT_PRIVATE]] bool getImplicitDefaultWriteConcernMajority_forTest();
 
     /**
      * Gets the cluster-wide write concern (CWWC) persisted on disk.
@@ -250,4 +250,4 @@ private:
     AtomicWord<bool> _customDefaultReadConcernSet{false};
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

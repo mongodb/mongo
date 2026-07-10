@@ -41,7 +41,7 @@ namespace mongo::repl {
  * Callbacks are invoked from a dedicated dispatcher thread outside of any replication lock.
  * Observers are registered once before startup and are never removed.
  */
-class MONGO_MOD_OPEN OpTimeObserver {
+class [[MONGO_MOD_OPEN]] OpTimeObserver {
 public:
     virtual ~OpTimeObserver() = default;
 

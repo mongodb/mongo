@@ -52,7 +52,7 @@ class DiskSpaceMonitor;
  * any cursors created from it at any given time. Note that the underlying RecordStore creates its
  * own RecoveryUnit instance and uses it for all operations performed through this class.
  */
-class MONGO_MOD_PUBLIC SpillTable final {
+class [[MONGO_MOD_PUBLIC]] SpillTable final {
 public:
     class Cursor {
     public:

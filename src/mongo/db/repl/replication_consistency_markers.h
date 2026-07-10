@@ -37,7 +37,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class BSONObj;
 
@@ -90,7 +90,7 @@ class StorageInterface;
  *      wallTime: <Date_t>
  * }
  */
-class MONGO_MOD_OPEN ReplicationConsistencyMarkers {
+class [[MONGO_MOD_OPEN]] ReplicationConsistencyMarkers {
     ReplicationConsistencyMarkers(const ReplicationConsistencyMarkers&) = delete;
     ReplicationConsistencyMarkers& operator=(const ReplicationConsistencyMarkers&) = delete;
 
@@ -262,4 +262,4 @@ public:
 };
 
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

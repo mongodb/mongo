@@ -60,7 +60,7 @@
 namespace mongo {
 using namespace std::literals::string_view_literals;
 
-class MONGO_MOD_NEEDS_REPLACEMENT RenameCollectionParticipantService final
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] RenameCollectionParticipantService final
     : public repl::PrimaryOnlyService {
 public:
     static constexpr std::string_view kServiceName = "RenameCollectionParticipantService"sv;
@@ -100,7 +100,7 @@ public:
  * --  Unblock CRUD operations.
  *
  */
-class MONGO_MOD_NEEDS_REPLACEMENT RenameParticipantInstance
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] RenameParticipantInstance
     : public repl::PrimaryOnlyService::TypedInstance<RenameParticipantInstance> {
 public:
     using StateDoc = RenameCollectionParticipantDocument;

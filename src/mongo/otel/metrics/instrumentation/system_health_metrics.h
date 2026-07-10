@@ -92,6 +92,6 @@ private:
  * reads /proc/stat and /proc/sys/fs/file-nr to push the latest values.
  * No-op on unsupported platforms.
  */
-MONGO_MOD_PUBLIC void installSystemHealthOtelMetrics(ServiceContext* svcCtx);
+[[MONGO_MOD_PUBLIC]] void installSystemHealthOtelMetrics(ServiceContext* svcCtx);
 
 }  // namespace mongo

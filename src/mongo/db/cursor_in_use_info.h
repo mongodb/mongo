@@ -38,7 +38,7 @@
 #include <memory>
 #include <string_view>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Contains the name of the command that uses the cursor.
@@ -60,4 +60,4 @@ private:
     std::string _commandName;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

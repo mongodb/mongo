@@ -36,7 +36,7 @@
 #include <mutex>
 #include <utility>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * WithLock is an attestation to pass as an argument to functions that must be called only while
@@ -100,4 +100,4 @@ private:
     WithLock() = default;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

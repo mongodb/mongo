@@ -51,7 +51,7 @@
 
 #include <boost/move/utility_core.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace projection_executor {
 class ProjectionExecutor;
 }  // namespace projection_executor
@@ -278,4 +278,4 @@ private:
     mutable SpinLock _lock;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

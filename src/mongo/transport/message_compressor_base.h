@@ -39,7 +39,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 enum class MessageCompressor : uint8_t {
     kNoop = 0,
     kSnappy = 1,
@@ -161,4 +161,4 @@ private:
     AtomicWord<long long> _decompressBytesIn;
     AtomicWord<long long> _decompressBytesOut;
 };
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

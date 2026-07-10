@@ -41,7 +41,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC IndexSpec {
+class [[MONGO_MOD_PUBLIC]] IndexSpec {
 public:
     // An enumeration of symbolic names for index types.
     enum IndexType {

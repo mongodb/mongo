@@ -40,7 +40,7 @@
 
 #include <boost/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class Client;
 class PeriodicJobAnchor;
@@ -56,7 +56,7 @@ class PeriodicJobAnchor;
  *
  * The runner will create client objects that it passes to jobs to use.
  */
-class MONGO_MOD_OPEN PeriodicRunner {
+class [[MONGO_MOD_OPEN]] PeriodicRunner {
 public:
     using Job = std::function<void(Client* client)>;
     using JobAnchor = PeriodicJobAnchor;
@@ -92,7 +92,7 @@ public:
     /**
      * A ControllableJob allows a user to reschedule the execution of a Job
      */
-    class MONGO_MOD_UNFORTUNATELY_OPEN ControllableJob {
+    class [[MONGO_MOD_UNFORTUNATELY_OPEN]] ControllableJob {
     public:
         virtual ~ControllableJob() = default;
 
@@ -199,4 +199,4 @@ private:
     std::shared_ptr<Job> _handle;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

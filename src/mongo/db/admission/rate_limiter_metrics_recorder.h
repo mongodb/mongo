@@ -42,7 +42,7 @@ namespace mongo::admission {
  * Abstract base class for rate limiter metrics recorders. It consumes the rate limiter's metric
  * events via record() and exposes the resulting aggregate values through the typed accessors below.
  */
-class MONGO_MOD_PUBLIC RateLimiterMetricsRecorder {
+class [[MONGO_MOD_PUBLIC]] RateLimiterMetricsRecorder {
 public:
     using Event = RateLimiterMetricsRecorderEvent;
 

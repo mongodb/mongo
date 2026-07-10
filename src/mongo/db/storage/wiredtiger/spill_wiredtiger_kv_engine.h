@@ -243,7 +243,7 @@ private:
  * Returns a WiredTigerKVEngineBase::WiredTigerConfig populated with config values provided at
  * startup for the Spill WiredTiger Engine.
  */
-MONGO_MOD_USE_REPLACEMENT(jstest)
+[[MONGO_MOD_USE_REPLACEMENT(jstest)]]
 WiredTigerKVEngineBase::WiredTigerConfig getSpillWiredTigerConfigFromStartupOptions();
 
 }  // namespace mongo

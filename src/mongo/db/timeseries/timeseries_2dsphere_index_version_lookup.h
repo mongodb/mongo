@@ -42,7 +42,7 @@ namespace timeseries {
  * 2dsphereIndexVersion for every 2dsphere_bucket index found. When multiple indexes cover the
  * same field, the version from the first index encountered is kept.
  */
-MONGO_MOD_PUBLIC StringMap<int> build2dsphereIndexVersionMap(const Collection& coll);
+[[MONGO_MOD_PUBLIC]] StringMap<int> build2dsphereIndexVersionMap(const Collection& coll);
 
 }  // namespace timeseries
 }  // namespace mongo

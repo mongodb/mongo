@@ -31,7 +31,7 @@
 
 #include "mongo/util/modules.h"
 
-MONGO_MOD_PARENT_PRIVATE;
+[[MONGO_MOD_PARENT_PRIVATE]];
 namespace mongo::timeseries::bucket_catalog {
 
 /**

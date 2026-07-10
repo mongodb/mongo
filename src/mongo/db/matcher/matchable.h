@@ -44,7 +44,7 @@ namespace mongo {
 /**
  * TODO SERVER-114832 Break audit dependency on this class.
  */
-class MONGO_MOD_UNFORTUNATELY_OPEN MatchableDocument {
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] MatchableDocument {
 public:
     // Inlining to allow subclasses to see that this is a no-op and avoid a function call.
     // Speeds up query execution measurably.

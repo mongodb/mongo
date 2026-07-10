@@ -51,7 +51,7 @@ class PrimaryOnlyServiceRegistry;
 /**
  * OpObserver for PrimaryOnlyService.
  */
-class MONGO_MOD_PUB PrimaryOnlyServiceOpObserver final : public OpObserverNoop {
+class [[MONGO_MOD_PUBLIC]] PrimaryOnlyServiceOpObserver final : public OpObserverNoop {
     PrimaryOnlyServiceOpObserver(const PrimaryOnlyServiceOpObserver&) = delete;
     PrimaryOnlyServiceOpObserver& operator=(const PrimaryOnlyServiceOpObserver&) = delete;
 

@@ -46,7 +46,7 @@ namespace mongo {
  * The class is immutable and is used to hold the cryptographically protected LogicalTime.
  */
 // TODO This class should be parent_private ideally
-class MONGO_MOD_NEEDS_REPLACEMENT SignedLogicalTime {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] SignedLogicalTime {
 public:
     using TimeProof = TimeProofService::TimeProof;
 

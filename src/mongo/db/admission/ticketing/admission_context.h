@@ -45,7 +45,7 @@ class OperationContext;
 /**
  * Stores state and statistics related to admission control for a given transactional context.
  */
-class MONGO_MOD_OPEN AdmissionContext {
+class [[MONGO_MOD_OPEN]] AdmissionContext {
 public:
     AdmissionContext(const AdmissionContext& other);
     AdmissionContext& operator=(const AdmissionContext& other);
@@ -156,9 +156,9 @@ public:
     /**
      * Setters for queue statistics to be used in unit tests only
      */
-    MONGO_MOD_PUBLIC void setAdmission_forTest(int32_t admissions);
+    [[MONGO_MOD_PUBLIC]] void setAdmission_forTest(int32_t admissions);
 
-    MONGO_MOD_PUBLIC void setTotalTimeQueuedMicros_forTest(int64_t micros);
+    [[MONGO_MOD_PUBLIC]] void setTotalTimeQueuedMicros_forTest(int64_t micros);
 
 protected:
     friend class ScopedAdmissionPriorityBase;
@@ -168,20 +168,20 @@ protected:
 
     constexpr static TickSource::Tick kNotQueueing = -1;
 
-    MONGO_MOD_PRIVATE Atomic<std::int32_t> _exemptedAdmissions{0};
-    MONGO_MOD_PRIVATE Atomic<std::int32_t> _lowAdmissions{0};
-    MONGO_MOD_PRIVATE Atomic<std::int32_t> _admissions{0};
-    MONGO_MOD_PRIVATE Atomic<Priority> _priority{Priority::kNormal};
-    MONGO_MOD_PRIVATE Atomic<std::int64_t> _totalTimeQueuedMicros;
-    MONGO_MOD_PRIVATE WaitableAtomic<TickSource::Tick> _startQueueingTime{kNotQueueing};
-    MONGO_MOD_PRIVATE Atomic<bool> _holdingTicket;
-    MONGO_MOD_PRIVATE Atomic<bool> _loadShed;
+    [[MONGO_MOD_PRIVATE]] Atomic<std::int32_t> _exemptedAdmissions{0};
+    [[MONGO_MOD_PRIVATE]] Atomic<std::int32_t> _lowAdmissions{0};
+    [[MONGO_MOD_PRIVATE]] Atomic<std::int32_t> _admissions{0};
+    [[MONGO_MOD_PRIVATE]] Atomic<Priority> _priority{Priority::kNormal};
+    [[MONGO_MOD_PRIVATE]] Atomic<std::int64_t> _totalTimeQueuedMicros;
+    [[MONGO_MOD_PRIVATE]] WaitableAtomic<TickSource::Tick> _startQueueingTime{kNotQueueing};
+    [[MONGO_MOD_PRIVATE]] Atomic<bool> _holdingTicket;
+    [[MONGO_MOD_PRIVATE]] Atomic<bool> _loadShed;
 };
 
 /**
  * Default-constructible admission context to use for testing purposes.
  */
-class MONGO_MOD_PUBLIC MockAdmissionContext : public AdmissionContext {
+class [[MONGO_MOD_PUBLIC]] MockAdmissionContext : public AdmissionContext {
 public:
     MockAdmissionContext() = default;
     // Block until this AdmissionContext is queued waiting on a ticket or the timeout expires.
@@ -205,7 +205,7 @@ public:
  * RAII-style class to set the priority for the ticket admission mechanism when acquiring a global
  * lock.
  */
-class MONGO_MOD_PUBLIC ScopedAdmissionPriorityBase {
+class [[MONGO_MOD_PUBLIC]] ScopedAdmissionPriorityBase {
 public:
     explicit ScopedAdmissionPriorityBase(OperationContext* opCtx,
                                          AdmissionContext& admCtx,
@@ -221,14 +221,14 @@ private:
 };
 
 template <typename AdmissionContextType>
-class MONGO_MOD_PUBLIC ScopedAdmissionPriority : public ScopedAdmissionPriorityBase {
+class [[MONGO_MOD_PUBLIC]] ScopedAdmissionPriority : public ScopedAdmissionPriorityBase {
 public:
     explicit ScopedAdmissionPriority(OperationContext* opCtx, AdmissionContext::Priority priority)
         : ScopedAdmissionPriorityBase(opCtx, AdmissionContextType::get(opCtx), priority) {}
     ~ScopedAdmissionPriority() = default;
 };
 
-class MONGO_MOD_PUBLIC WaitingForAdmissionGuard {
+class [[MONGO_MOD_PUBLIC]] WaitingForAdmissionGuard {
 public:
     explicit WaitingForAdmissionGuard(AdmissionContext* admCtx, TickSource* tickSource);
     ~WaitingForAdmissionGuard();
@@ -238,41 +238,41 @@ private:
     TickSource* _tickSource;
 };
 
-MONGO_MOD_PUBLIC std::string_view toString(AdmissionContext::Priority priority);
+[[MONGO_MOD_PUBLIC]] std::string_view toString(AdmissionContext::Priority priority);
 
-MONGO_MOD_PUBLIC inline int compare(AdmissionContext::Priority lhs,
-                                    AdmissionContext::Priority rhs) {
+[[MONGO_MOD_PUBLIC]] inline int compare(AdmissionContext::Priority lhs,
+                                        AdmissionContext::Priority rhs) {
     using enum_t = std::underlying_type_t<AdmissionContext::Priority>;
     return static_cast<enum_t>(lhs) - static_cast<enum_t>(rhs);
 }
 
-MONGO_MOD_PUBLIC inline bool operator==(AdmissionContext::Priority lhs,
-                                        AdmissionContext::Priority rhs) {
+[[MONGO_MOD_PUBLIC]] inline bool operator==(AdmissionContext::Priority lhs,
+                                            AdmissionContext::Priority rhs) {
     return compare(lhs, rhs) == 0;
 }
 
-MONGO_MOD_PUBLIC inline bool operator!=(AdmissionContext::Priority lhs,
-                                        AdmissionContext::Priority rhs) {
+[[MONGO_MOD_PUBLIC]] inline bool operator!=(AdmissionContext::Priority lhs,
+                                            AdmissionContext::Priority rhs) {
     return compare(lhs, rhs) != 0;
 }
 
-MONGO_MOD_PUBLIC inline bool operator<(AdmissionContext::Priority lhs,
-                                       AdmissionContext::Priority rhs) {
+[[MONGO_MOD_PUBLIC]] inline bool operator<(AdmissionContext::Priority lhs,
+                                           AdmissionContext::Priority rhs) {
     return compare(lhs, rhs) < 0;
 }
 
-MONGO_MOD_PUBLIC inline bool operator>(AdmissionContext::Priority lhs,
-                                       AdmissionContext::Priority rhs) {
+[[MONGO_MOD_PUBLIC]] inline bool operator>(AdmissionContext::Priority lhs,
+                                           AdmissionContext::Priority rhs) {
     return compare(lhs, rhs) > 0;
 }
 
-MONGO_MOD_PUBLIC inline bool operator<=(AdmissionContext::Priority lhs,
-                                        AdmissionContext::Priority rhs) {
+[[MONGO_MOD_PUBLIC]] inline bool operator<=(AdmissionContext::Priority lhs,
+                                            AdmissionContext::Priority rhs) {
     return compare(lhs, rhs) <= 0;
 }
 
-MONGO_MOD_PUBLIC inline bool operator>=(AdmissionContext::Priority lhs,
-                                        AdmissionContext::Priority rhs) {
+[[MONGO_MOD_PUBLIC]] inline bool operator>=(AdmissionContext::Priority lhs,
+                                            AdmissionContext::Priority rhs) {
     return compare(lhs, rhs) >= 0;
 }
 

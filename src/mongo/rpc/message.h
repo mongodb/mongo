@@ -44,7 +44,7 @@
 #include <string>
 #include <utility>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Maximum accepted message size on the wire protocol.
@@ -483,4 +483,4 @@ private:
  */
 int32_t nextMessageId();
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

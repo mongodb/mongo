@@ -47,7 +47,7 @@ namespace mongo::exec::agg {
  * TODO SERVER-112776: Remove 'data_movement' dependency on this class.
  * TODO SERVER-112777: Remove 'atlas_streams' dependency on this class.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT Pipeline {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] Pipeline {
 public:
     using StageContainer = std::vector<StagePtr>;
 

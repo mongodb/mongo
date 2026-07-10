@@ -35,7 +35,7 @@
 #include <string_view>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC auth {
+namespace [[MONGO_MOD_PUBLIC]] auth {
 using namespace std::literals::string_view_literals;
 
 /** Wire-protocol names for supported authentication mechanisms. */
@@ -70,5 +70,5 @@ StatusWith<AuthMechanism> authMechanismFromString(std::string_view s);
 /** Validate that a string names a supported mechanism; returns BadValue on failure. */
 Status validateAuthMechanism(std::string_view value);
 
-}  // namespace MONGO_MOD_PUBLIC auth
+}  // namespace auth
 }  // namespace mongo

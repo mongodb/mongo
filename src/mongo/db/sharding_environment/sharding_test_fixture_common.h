@@ -56,7 +56,7 @@ namespace mongo {
 /**
  * Contains common functionality and tools, which apply to both mongos and mongod unit-tests.
  */
-class MONGO_MOD_OPEN ShardingTestFixtureCommon : public ServiceContextTest {
+class [[MONGO_MOD_OPEN]] ShardingTestFixtureCommon : public ServiceContextTest {
 public:
     /**
      * Constructs a standalone RoutingTableHistory object (i.e., not linked to any CatalogCache),

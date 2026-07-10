@@ -34,7 +34,7 @@
 
 #include <string_view>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 constexpr inline std::string_view kIsDirectSystemBucketsAccessFieldName{
     "isDirectSystemBucketsAccess"};
@@ -52,4 +52,4 @@ constexpr inline std::string_view kIsDirectSystemBucketsAccessFieldName{
  */
 bool& isDirectSystemBucketsAccess(OperationContext*);
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

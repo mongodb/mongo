@@ -48,7 +48,7 @@
 
 #include <boost/optional.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 namespace mongo::index_key_validate {
 using namespace std::literals::string_view_literals;
 

@@ -57,20 +57,20 @@ class DBException;
  *  In 'redact' mode (or if forceRedaction is true) replace all values with '###' and keep keys
  *  intact. In normal mode return objectToRedact.toString().
  */
-MONGO_MOD_PUBLIC BSONObj redact(const BSONObj& objectToRedact, bool forceRedaction = false);
+[[MONGO_MOD_PUBLIC]] BSONObj redact(const BSONObj& objectToRedact, bool forceRedaction = false);
 
 /**
  *  In 'redact' mode (or if forceRedaction is true) return '###'.
  *  In normal mode return stringToRedact.
  */
-MONGO_MOD_PUBLIC std::string_view redact(std::string_view stringToRedact,
-                                         bool forceRedaction = false);
-MONGO_MOD_PUBLIC inline std::string_view redact(const char* stringToRedact,
-                                                bool forceRedaction = false) {
+[[MONGO_MOD_PUBLIC]] std::string_view redact(std::string_view stringToRedact,
+                                             bool forceRedaction = false);
+[[MONGO_MOD_PUBLIC]] inline std::string_view redact(const char* stringToRedact,
+                                                    bool forceRedaction = false) {
     return redact(std::string_view(stringToRedact), forceRedaction);
 }
-MONGO_MOD_PUBLIC inline std::string_view redact(const std::string& stringToRedact,
-                                                bool forceRedaction = false) {
+[[MONGO_MOD_PUBLIC]] inline std::string_view redact(const std::string& stringToRedact,
+                                                    bool forceRedaction = false) {
     return redact(std::string_view(stringToRedact), forceRedaction);
 }
 
@@ -78,13 +78,13 @@ MONGO_MOD_PUBLIC inline std::string_view redact(const std::string& stringToRedac
  *  In 'redact' mode (or if forceRedaction is true) keep status code and replace reason with '###'.
  *  In normal mode return statusToRedact.toString().
  */
-MONGO_MOD_PUBLIC std::string redact(const Status& statusToRedact, bool forceRedaction = false);
+[[MONGO_MOD_PUBLIC]] std::string redact(const Status& statusToRedact, bool forceRedaction = false);
 
 /**
  * In 'redact' mode (or if forceRedaction is true) keep exception type and replace causedBy
  * with '###'. In normal mode return exceptionToRedact.toString().
  */
-MONGO_MOD_PUBLIC std::string redact(const DBException& exceptionToRedact,
-                                    bool forceRedaction = false);
+[[MONGO_MOD_PUBLIC]] std::string redact(const DBException& exceptionToRedact,
+                                        bool forceRedaction = false);
 
 }  // namespace mongo

@@ -53,9 +53,9 @@ namespace mongo {
  *         ...
  *     }
  */
-MONGO_MOD_PUBLIC bool getTestCommandsEnabled();
+[[MONGO_MOD_PUBLIC]] bool getTestCommandsEnabled();
 
-MONGO_MOD_PUBLIC void setTestCommandsEnabled(bool b);
+[[MONGO_MOD_PUBLIC]] void setTestCommandsEnabled(bool b);
 
 /** Callback for the enableTestCommands server parameter. */
 Status onUpdateTestCommandsEnabled(bool b);

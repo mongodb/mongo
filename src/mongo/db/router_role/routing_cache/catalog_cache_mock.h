@@ -47,7 +47,7 @@ namespace mongo {
  * Mocks the metadata refresh results with settable return values. The purpose of this class is to
  * facilitate testing of classes that use a CatalogCacheLoader.
  */
-class MONGO_MOD_OPEN CatalogCacheMock : public CatalogCache {
+class [[MONGO_MOD_OPEN]] CatalogCacheMock : public CatalogCache {
     CatalogCacheMock(const CatalogCacheMock&) = delete;
     CatalogCacheMock& operator=(const CatalogCacheMock&) = delete;
 

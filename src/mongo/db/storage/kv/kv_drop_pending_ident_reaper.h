@@ -46,7 +46,7 @@
 
 #include <boost/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 /**
  * This class manages idents in the KV storage engine that are marked as drop-pending by the
  * two-phase index/collection drop algorithm.
@@ -267,4 +267,4 @@ private:
     absl::node_hash_map<std::string, IdentInfo, StringMapHasher, StringMapEq> _dropPendingIdents;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -41,7 +41,7 @@
 #include <boost/any.hpp>
 #include <boost/optional/optional.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo::timeseries::dotted_path_support {
 /**

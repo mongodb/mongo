@@ -37,17 +37,17 @@
 #include <fmt/format.h>
 
 namespace mongo::feature_compatibility_version_documentation {
-MONGO_MOD_PUB constexpr inline std::string_view kReleaseNotesRoot{
+[[MONGO_MOD_PUBLIC]] constexpr inline std::string_view kReleaseNotesRoot{
     "https://docs.mongodb.com/master/release-notes"};
 
-MONGO_MOD_PUB inline std::string compatibilityLink() {
+[[MONGO_MOD_PUBLIC]] inline std::string compatibilityLink() {
     return fmt::format(                                //
         "{}/{}-compatibility/#feature-compatibility",  //
         kReleaseNotesRoot,                             //
         multiversion::toString(multiversion::GenericFCV::kLastLTS));
 }
 
-MONGO_MOD_PUB inline std::string upgradeLink() {
+[[MONGO_MOD_PUBLIC]] inline std::string upgradeLink() {
     return fmt::format(               //
         "{}/{}/#upgrade-procedures",  //
         kReleaseNotesRoot,            //

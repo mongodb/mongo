@@ -45,7 +45,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 namespace executor {
 class TaskExecutor;
@@ -66,7 +66,7 @@ using OpTimeWithTerm = OpTimeWith<long long>;
  * dependencies on large sections of the server code and thus break the unit testability of
  * InitialSyncer should be moved here.
  */
-class MONGO_MOD_PARENT_PRIVATE DataReplicatorExternalState {
+class [[MONGO_MOD_PARENT_PRIVATE]] DataReplicatorExternalState {
     DataReplicatorExternalState(const DataReplicatorExternalState&) = delete;
     DataReplicatorExternalState& operator=(const DataReplicatorExternalState&) = delete;
 
@@ -157,4 +157,4 @@ public:
 };
 
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

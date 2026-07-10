@@ -47,7 +47,7 @@ using namespace std::literals::string_view_literals;
 
 class ConfigsvrCoordinator;
 
-class MONGO_MOD_NEEDS_REPLACEMENT ConfigsvrCoordinatorService final
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ConfigsvrCoordinatorService final
     : public repl::PrimaryOnlyService {
 public:
     static constexpr std::string_view kServiceName = "ConfigsvrCoordinatorService"sv;

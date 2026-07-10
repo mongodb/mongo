@@ -55,7 +55,7 @@ inline Status validateClientSourceAuthenticationRestrictionMode(std::string_view
 // It must be constructed and attached to a Client object while a server is accepting a connection.
 // Clients created by internal server operations may not have a RestrictionEnvironment. Clients
 // which attempt to perform authentication or authorization must have a RestrictionEnvironment.
-class MONGO_MOD_PUBLIC RestrictionEnvironment {
+class [[MONGO_MOD_PUBLIC]] RestrictionEnvironment {
 public:
     RestrictionEnvironment() = default;
     RestrictionEnvironment(SockAddr clientSource, SockAddr serverAddress)

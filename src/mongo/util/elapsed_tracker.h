@@ -36,7 +36,7 @@
 
 #include <cstdint>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class ClockSource;
 
@@ -72,4 +72,4 @@ private:
     Date_t _last;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

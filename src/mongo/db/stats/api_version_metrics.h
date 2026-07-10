@@ -50,7 +50,7 @@ namespace mongo {
 /**
  * A service context decoration that stores metrics related to the API version used by applications.
  */
-class MONGO_MOD_PUBLIC APIVersionMetrics {
+class [[MONGO_MOD_PUBLIC]] APIVersionMetrics {
 public:
     // To ensure that the BSONObject doesn't exceed the size limit, the 'appName' field has a limit
     // of 128 bytes, which results in an output of approximately 128KB for app names.

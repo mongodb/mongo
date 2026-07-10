@@ -37,7 +37,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/path.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Loads shared library or DLL at runtime
@@ -99,4 +99,4 @@ private:
     void* const _handle;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

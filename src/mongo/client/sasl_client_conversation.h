@@ -47,7 +47,7 @@ class StatusWith;
  * Abstract class for implementing the client-side
  * of a SASL mechanism conversation.
  */
-class MONGO_MOD_OPEN SaslClientConversation {
+class [[MONGO_MOD_OPEN]] SaslClientConversation {
     SaslClientConversation(const SaslClientConversation&) = delete;
     SaslClientConversation& operator=(const SaslClientConversation&) = delete;
 

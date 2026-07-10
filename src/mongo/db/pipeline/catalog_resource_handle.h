@@ -38,7 +38,7 @@ namespace mongo {
  * Interface for acquiring and releasing catalog resources needed for stages that need catalog
  * information (i.e. DocumentSourceCursor and DocumentSourceInternalSearchIdLookUp).
  */
-class MONGO_MOD_PUBLIC CatalogResourceHandle : public RefCountable {
+class [[MONGO_MOD_PUBLIC]] CatalogResourceHandle : public RefCountable {
 public:
     ~CatalogResourceHandle() override = default;
 
@@ -51,7 +51,7 @@ public:
         const = 0;
 };
 
-class MONGO_MOD_PRIVATE DSCatalogResourceHandleBase : public CatalogResourceHandle {
+class [[MONGO_MOD_PRIVATE]] DSCatalogResourceHandleBase : public CatalogResourceHandle {
 public:
     DSCatalogResourceHandleBase(
         boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> stasher)

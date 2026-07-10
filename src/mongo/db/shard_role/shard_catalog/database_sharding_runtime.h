@@ -53,7 +53,7 @@ namespace mongo {
  * See the comments for DatabaseShardingState for more information on how this class fits in the
  * sharding architecture.
  */
-class MONGO_MOD_PARENT_PRIVATE DatabaseShardingRuntime : public DatabaseShardingState {
+class [[MONGO_MOD_PARENT_PRIVATE]] DatabaseShardingRuntime : public DatabaseShardingState {
     DatabaseShardingRuntime(const DatabaseShardingRuntime&) = delete;
     DatabaseShardingRuntime& operator=(const DatabaseShardingRuntime&) = delete;
 
@@ -281,7 +281,7 @@ private:
  * metadata, or not hold the critical section to read it. Usages of this class should be minimal and
  * properly justified.
  */
-class MONGO_MOD_PARENT_PRIVATE [[nodiscard]] BypassDatabaseMetadataAccess {
+class [[MONGO_MOD_PARENT_PRIVATE]] [[nodiscard]] BypassDatabaseMetadataAccess {
 public:
     enum class Type { kReadOnly, kWriteOnly, kReadAndWrite };
 

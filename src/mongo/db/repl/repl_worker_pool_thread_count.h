@@ -37,7 +37,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace MONGO_MOD_PARENT_PRIVATE repl {
+namespace [[MONGO_MOD_PARENT_PRIVATE]] repl {
 
 size_t getMinThreadCountForReplWorkerPool();
 size_t getThreadCountForReplWorkerPool();
@@ -46,5 +46,5 @@ Status onUpdateReplWriterThreadCount(int);
 Status validateUpdateReplWriterMinThreadCount(int count, const boost::optional<TenantId>&);
 Status onUpdateReplWriterMinThreadCount(int);
 
-}  // namespace MONGO_MOD_PARENT_PRIVATE repl
+}  // namespace repl
 }  // namespace mongo

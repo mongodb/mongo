@@ -43,7 +43,7 @@ namespace mongo {
  * waiting on this signal then the CriticalSectionSignal object will not wait on the new critical
  * section being released since the original one has already been released.
  */
-class MONGO_MOD_PUBLIC CriticalSectionSignal {
+class [[MONGO_MOD_PUBLIC]] CriticalSectionSignal {
 public:
     enum class CriticalSectionType { Database, Collection };
     CriticalSectionSignal(SharedSemiFuture<void> signal, CriticalSectionType type)

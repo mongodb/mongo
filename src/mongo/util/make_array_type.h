@@ -42,7 +42,7 @@
 #define MONGO_CONSTEXPR constexpr
 #endif
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * A synthetic std::array alike builder for making arrays with unique types.
@@ -219,7 +219,7 @@ struct MakeArrayType {
     Array _data;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo
 
 #undef MONGO_CONSTEXPR
 #pragma pop_macro("MONGO_CONSTEXPR")

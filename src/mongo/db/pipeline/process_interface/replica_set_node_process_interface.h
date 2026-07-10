@@ -63,7 +63,7 @@ namespace mongo {
  * An implementation of the MongoProcessInterface used on replica set nodes when sharding is not
  * enabled.
  */
-class MONGO_MOD_PUBLIC ReplicaSetNodeProcessInterface final
+class [[MONGO_MOD_PUBLIC]] ReplicaSetNodeProcessInterface final
     : public NonShardServerProcessInterface {
 public:
     using NonShardServerProcessInterface::NonShardServerProcessInterface;

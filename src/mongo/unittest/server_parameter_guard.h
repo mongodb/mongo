@@ -37,7 +37,7 @@
 #include <string_view>
 #include <utility>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo::unittest {
 namespace server_parameter_guard_detail {

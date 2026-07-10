@@ -36,7 +36,7 @@
 #include <list>
 #include <scoped_allocator>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace tracking {
 
 template <class T>
@@ -48,4 +48,4 @@ list<T> make_list(Context& Context) {
 }
 
 }  // namespace tracking
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

@@ -45,13 +45,13 @@ extern FailPoint disablePipelineOptimization;
 /**
  * Modifies the pipeline, optimizing it by combining and swapping stages.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void optimizePipeline(Pipeline& pipeline);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void optimizePipeline(Pipeline& pipeline);
 
 /**
  * Modifies the container, optimizes each stage individually.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void optimizeEachStage(ExpressionContext&,
-                                                   DocumentSourceContainer* container);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void optimizeEachStage(ExpressionContext&,
+                                                       DocumentSourceContainer* container);
 
 /**
  * Modifies the container, optimizing it by combining, swapping, dropping and/or inserting

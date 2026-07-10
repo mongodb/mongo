@@ -62,7 +62,7 @@
 // here until such time as it's available in `std::` or the trait
 // creation niche is filled by simpler language features (e.g.
 // `concept`) and we all migrate off of direct SFINAE.
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace stdx {
 namespace detail {
 template <typename Default, typename AlwaysVoid, template <class...> class Op, typename... Args>
@@ -112,4 +112,4 @@ template <typename To, template <class...> class Op, typename... Args>
 constexpr bool is_detected_convertible_v = is_detected_convertible<To, Op, Args...>::value;
 
 }  // namespace stdx
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

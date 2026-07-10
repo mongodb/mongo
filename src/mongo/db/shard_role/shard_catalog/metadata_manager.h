@@ -61,7 +61,7 @@ class RangePreserver;
 /**
  * Contains filtering metadata for a collection.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT MetadataManager
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] MetadataManager
     : public std::enable_shared_from_this<MetadataManager> {
 public:
     MetadataManager(ServiceContext* serviceContext,

@@ -101,7 +101,7 @@ namespace mongo {
 /**
  * Main API implemented by each FCV step
  */
-class MONGO_MOD_PRIVATE FCVStep {
+class [[MONGO_MOD_PRIVATE]] FCVStep {
 public:
     using FCV = multiversion::FeatureCompatibilityVersion;
 
@@ -182,7 +182,7 @@ public:
 /**
  * The registry of FCVSteps.
  */
-class MONGO_MOD_PUB FCVStepRegistry final : public FCVStep {
+class [[MONGO_MOD_PUBLIC]] FCVStepRegistry final : public FCVStep {
     FCVStepRegistry(const FCVStepRegistry&) = delete;
     FCVStepRegistry& operator=(const FCVStepRegistry&) = delete;
 

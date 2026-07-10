@@ -33,7 +33,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class ServiceContext;
 
@@ -92,4 +92,4 @@ void registerAppliedOpTimeObserver(ServiceContext* svcCtx);
  */
 void resetOplogLagState_ForTest();
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

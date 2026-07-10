@@ -48,13 +48,13 @@ namespace logv2 {
  * LogLineListener is a wrapper class used in the LogCaptureBackend that defines what to do with
  * log lines upon consumption.
  */
-class MONGO_MOD_OPEN LogLineListener {
+class [[MONGO_MOD_OPEN]] LogLineListener {
 public:
     virtual ~LogLineListener() = default;
     virtual void accept(const std::string& line) = 0;
 };
 
-class MONGO_MOD_PUBLIC LogCaptureBackend
+class [[MONGO_MOD_PUBLIC]] LogCaptureBackend
     : public boost::log::sinks::
           basic_formatted_sink_backend<char, boost::log::sinks::concurrent_feeding> {
 public:

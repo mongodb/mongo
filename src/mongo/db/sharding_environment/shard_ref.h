@@ -46,7 +46,7 @@ namespace mongo {
  * Identifies a shard uniquely. May be either a legacy string name (for backward compatibility with
  * older documents that only store the shard name) or a UUID assigned at shard registration time.
  */
-class MONGO_MOD_PUBLIC ShardRef {
+class [[MONGO_MOD_PUBLIC]] ShardRef {
 public:
     // Required for IDL-generated code which default-constructs the field before parsing.
     ShardRef() : _ref(ShardId{}) {}
@@ -175,19 +175,19 @@ private:
  * TODO SERVER-127411: remove these overloads once ShardId has been removed and every comparison
  * site has been migrated to ShardRef.
  */
-MONGO_MOD_PUBLIC inline bool operator==(const ShardRef& ref, const ShardId& id) {
+[[MONGO_MOD_PUBLIC]] inline bool operator==(const ShardRef& ref, const ShardId& id) {
     return ref.isString() && ref.getString() == id.toString();
 }
 
-MONGO_MOD_PUBLIC inline bool operator==(const ShardId& id, const ShardRef& ref) {
+[[MONGO_MOD_PUBLIC]] inline bool operator==(const ShardId& id, const ShardRef& ref) {
     return ref == id;
 }
 
-MONGO_MOD_PUBLIC inline bool operator!=(const ShardRef& ref, const ShardId& id) {
+[[MONGO_MOD_PUBLIC]] inline bool operator!=(const ShardRef& ref, const ShardId& id) {
     return !(ref == id);
 }
 
-MONGO_MOD_PUBLIC inline bool operator!=(const ShardId& id, const ShardRef& ref) {
+[[MONGO_MOD_PUBLIC]] inline bool operator!=(const ShardId& id, const ShardRef& ref) {
     return !(id == ref);
 }
 

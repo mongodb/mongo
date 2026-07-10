@@ -46,7 +46,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 struct ResolvedFCVTransition {
     /**
@@ -243,4 +243,4 @@ auto tryCheckUnderStableFCV(OperationContext* opCtx, Fn&& checkFn)
     return result;
 }
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

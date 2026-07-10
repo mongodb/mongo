@@ -64,7 +64,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 struct IndexBuildInfo;
 
@@ -787,4 +787,4 @@ private:
     // observers must be registered before any callback fires.
     Atomic<bool> _sealed{false};
 };
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

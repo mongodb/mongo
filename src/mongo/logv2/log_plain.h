@@ -35,7 +35,7 @@
 
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC logv2 {
+namespace [[MONGO_MOD_PUBLIC]] logv2 {
 
 /**
  * This is used for dev stacktraces which bypass structured logging. LOGV2 sinks
@@ -47,5 +47,5 @@ namespace MONGO_MOD_PUBLIC logv2 {
  */
 void plainLogBypass(std::string_view message);
 
-}  // namespace MONGO_MOD_PUBLIC logv2
+}  // namespace logv2
 }  // namespace mongo

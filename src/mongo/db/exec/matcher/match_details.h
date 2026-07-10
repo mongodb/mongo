@@ -41,7 +41,7 @@ namespace mongo {
  *
  * TODO SERVER-113198: Remove external dependency on this class.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT MatchDetails {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] MatchDetails {
 public:
     MatchDetails();
 

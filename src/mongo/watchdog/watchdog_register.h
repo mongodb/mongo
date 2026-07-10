@@ -35,7 +35,7 @@
 #include <string_view>
 #include <vector>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Allow components a way to tell the watchdog what to watch.
@@ -47,4 +47,4 @@ void registerWatchdogPath(std::string_view path);
  */
 std::vector<std::string>& getWatchdogPaths();
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -49,7 +49,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 template <typename T>
 class StatusWith;
 
@@ -284,4 +284,4 @@ private:
     bool _usedDefaultReadPrefValue = false;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

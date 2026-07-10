@@ -47,7 +47,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  *  Representation of a tenant identifier.
@@ -134,7 +134,7 @@ private:
     friend class NamespaceString;
     friend class DatabaseName;
 
-    MONGO_MOD_NEEDS_REPLACEMENT OID _oid;
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] OID _oid;
 };
 
 inline bool operator==(const TenantId& lhs, const TenantId& rhs) {
@@ -171,4 +171,4 @@ StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& stream,
     return stream << tenantId.toString();
 }
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

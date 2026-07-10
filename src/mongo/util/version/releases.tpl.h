@@ -48,7 +48,7 @@ commentStartToken = //##
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 //##
 //##

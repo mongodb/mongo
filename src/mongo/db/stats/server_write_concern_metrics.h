@@ -47,7 +47,7 @@ namespace mongo {
 /**
  * Container for server-wide statistics on writeConcern levels used by operations.
  */
-class MONGO_MOD_PUB ServerWriteConcernMetrics {
+class [[MONGO_MOD_PUBLIC]] ServerWriteConcernMetrics {
     ServerWriteConcernMetrics(const ServerWriteConcernMetrics&) = delete;
     ServerWriteConcernMetrics& operator=(const ServerWriteConcernMetrics&) = delete;
 

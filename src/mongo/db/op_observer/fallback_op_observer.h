@@ -44,7 +44,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * This OpObserver contains notifications to miscellaneous entities that were sitting in
@@ -95,4 +95,4 @@ public:
                                   bool isTimeseries) final;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

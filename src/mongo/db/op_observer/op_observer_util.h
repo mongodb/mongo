@@ -47,7 +47,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 // Common fail points for logOp() and logInsertOps().
 extern FailPoint addDestinedRecipient;
@@ -109,4 +109,4 @@ DocumentKey getDocumentKey(const CollectionPtr& coll, BSONObj const& doc);
 
 DocumentKey getDocumentKey(const ShardKeyPattern& shardKeyPattern, BSONObj const& doc);
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

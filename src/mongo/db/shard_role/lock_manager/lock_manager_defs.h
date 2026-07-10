@@ -65,7 +65,7 @@ struct PartitionedLockHead;
  * | MODE_S         |      +       |    +    |          |    +   |          |
  * | MODE_X         |      +       |         |          |        |          |
  */
-enum MONGO_MOD_PUBLIC LockMode : uint8_t {
+enum [[MONGO_MOD_PUBLIC]] LockMode : uint8_t {
     /** None */
     MODE_NONE = 0,
     /** Intent shared */
@@ -87,31 +87,31 @@ enum MONGO_MOD_PUBLIC LockMode : uint8_t {
 /**
  * Returns a human-readable name for the specified lock mode.
  */
-MONGO_MOD_PUBLIC const char* modeName(LockMode mode);
+[[MONGO_MOD_PUBLIC]] const char* modeName(LockMode mode);
 
 /**
  * Legacy lock mode names in parity for 2.6 reports.
  */
-MONGO_MOD_PRIVATE const char* legacyModeName(LockMode mode);
+[[MONGO_MOD_PRIVATE]] const char* legacyModeName(LockMode mode);
 
 /**
  * Mode A is covered by mode B if the set of conflicts for mode A is a subset of the set of
  * conflicts for mode B. For example S is covered by X. IS is covered by S. However, IX is not
  * covered by S or IS.
  */
-MONGO_MOD_PRIVATE bool isModeCovered(LockMode mode, LockMode coveringMode);
+[[MONGO_MOD_PRIVATE]] bool isModeCovered(LockMode mode, LockMode coveringMode);
 
 /**
  * Returns whether the passed in mode is S or IS. Used for validation checks.
  */
-MONGO_MOD_NEEDS_REPLACEMENT constexpr bool isSharedLockMode(LockMode mode) {
+[[MONGO_MOD_NEEDS_REPLACEMENT]] constexpr bool isSharedLockMode(LockMode mode) {
     return (mode == MODE_IS || mode == MODE_S);
 }
 
 /**
  * Return values for the locking functions of the lock manager.
  */
-enum MONGO_MOD_PUBLIC LockResult {
+enum [[MONGO_MOD_PUBLIC]] LockResult {
 
     /**
      * The lock request was granted and is now on the granted list for the specified resource.
@@ -153,7 +153,7 @@ enum MONGO_MOD_PUBLIC LockResult {
  * It is OK to lock resources out of order, but it is the users responsibility to ensure
  * ordering is consistent so deadlock cannot occur.
  */
-enum MONGO_MOD_USE_REPLACEMENT("Lock Acquisition RAII Classes") ResourceType {
+enum [[MONGO_MOD_USE_REPLACEMENT("Lock Acquisition RAII Classes")]] ResourceType {
     RESOURCE_INVALID = 0,
 
     /**  Used for global exclusive operations */
@@ -187,7 +187,7 @@ enum MONGO_MOD_USE_REPLACEMENT("Lock Acquisition RAII Classes") ResourceType {
 /**
  * IDs for usages of RESOURCE_GLOBAL.
  */
-enum class MONGO_MOD_PRIVATE ResourceGlobalId : uint8_t {
+enum class [[MONGO_MOD_PRIVATE]] ResourceGlobalId : uint8_t {
     kMultiDocumentTransactionsBarrier,
     kReplicationStateTransitionLock,
     kGlobal,
@@ -199,20 +199,20 @@ enum class MONGO_MOD_PRIVATE ResourceGlobalId : uint8_t {
 /**
  * Maps the resource id to a human-readable string.
  */
-MONGO_MOD_PRIVATE inline constexpr const char* ResourceTypeNames[] = {"Invalid",
-                                                                      "Global",
-                                                                      "Tenant",
-                                                                      "Database",
-                                                                      "Collection",
-                                                                      "Metadata",
-                                                                      "DDLDatabase",
-                                                                      "DDLCollection",
-                                                                      "Mutex"};
+[[MONGO_MOD_PRIVATE]] inline constexpr const char* ResourceTypeNames[] = {"Invalid",
+                                                                          "Global",
+                                                                          "Tenant",
+                                                                          "Database",
+                                                                          "Collection",
+                                                                          "Metadata",
+                                                                          "DDLDatabase",
+                                                                          "DDLCollection",
+                                                                          "Mutex"};
 
 /**
  * Maps the global resource id to a human-readable string.
  */
-MONGO_MOD_PRIVATE inline constexpr const char* ResourceGlobalIdNames[] = {
+[[MONGO_MOD_PRIVATE]] inline constexpr const char* ResourceGlobalIdNames[] = {
     "MultiDocumentTransactionsBarrier",
     "ReplicationStateTransition",
     "Global",
@@ -229,24 +229,24 @@ MONGO_STATIC_ASSERT((sizeof(ResourceGlobalIdNames) / sizeof(ResourceGlobalIdName
 /**
  * Returns a human-readable name for the specified resource type.
  */
-MONGO_MOD_PRIVATE constexpr const char* resourceTypeName(ResourceType resourceType) {
+[[MONGO_MOD_PRIVATE]] constexpr const char* resourceTypeName(ResourceType resourceType) {
     return ResourceTypeNames[resourceType];
 }
 
 /**
  * Returns a human-readable name for the specified global resource.
  */
-MONGO_MOD_PRIVATE constexpr const char* resourceGlobalIdName(ResourceGlobalId id) {
+[[MONGO_MOD_PRIVATE]] constexpr const char* resourceGlobalIdName(ResourceGlobalId id) {
     return ResourceGlobalIdNames[static_cast<uint8_t>(id)];
 }
 
-MONGO_MOD_FILE_PRIVATE uint64_t hashStringDataForResourceId(std::string_view str,
-                                                            const std::array<std::byte, 16>& salt);
+[[MONGO_MOD_FILE_PRIVATE]] uint64_t hashStringDataForResourceId(
+    std::string_view str, const std::array<std::byte, 16>& salt);
 
 /**
  * Uniquely identifies a lockable resource.
  */
-class MONGO_MOD_PUBLIC ResourceId {
+class [[MONGO_MOD_PUBLIC]] ResourceId {
 public:
     // We only use 4 bits for the resource type in the ResourceId hash
     static constexpr size_t resourceTypeBits = 4;
@@ -314,7 +314,7 @@ private:
     }
 };
 
-MONGO_MOD_PUBLIC std::string toStringForLogging(const ResourceId&);
+[[MONGO_MOD_PUBLIC]] std::string toStringForLogging(const ResourceId&);
 
 #ifndef MONGO_CONFIG_DEBUG_BUILD
 // Treat the resource ids as 64-bit integers in release mode in order to ensure we do
@@ -323,24 +323,24 @@ MONGO_STATIC_ASSERT(sizeof(ResourceId) == sizeof(uint64_t));
 #endif
 
 // Type to uniquely identify a given locker object
-MONGO_MOD_PUBLIC typedef uint64_t LockerId;
+[[MONGO_MOD_PUBLIC]] typedef uint64_t LockerId;
 
 // Global lock. Every server operation, which uses the Locker must acquire this lock at least
 // once. See comments in the header file (begin/endTransaction) for more information.
-MONGO_MOD_NEEDS_REPLACEMENT extern const ResourceId resourceIdGlobal;
+[[MONGO_MOD_NEEDS_REPLACEMENT]] extern const ResourceId resourceIdGlobal;
 
 // Hardcoded resource id for draining prepared transactions and avoiding a deadlock with global lock
 // acquisitions in strong mode. This lock is acquired before the RSTL and resourceIdGlobal. It is
 // acquired by operations processing transaction statements, and by operations acquiring the global
 // lock in non-intent mode; all other requests skip this acquisition. It is acquired in the same
 // mode as the requested global lock mode.
-MONGO_MOD_NEEDS_REPLACEMENT extern const ResourceId resourceIdMultiDocumentTransactionsBarrier;
+[[MONGO_MOD_NEEDS_REPLACEMENT]] extern const ResourceId resourceIdMultiDocumentTransactionsBarrier;
 
 // Hardcoded resource id for the ReplicationStateTransitionLock (RSTL). This lock is acquired in
 // mode X for any replication state transition and is acquired by all other reads and writes in mode
 // IX. This lock is acquired after the MultiDocumentTransactionsBarrier lock but before the
 // resourceIdGlobal.
-MONGO_MOD_NEEDS_REPLACEMENT extern const ResourceId resourceIdReplicationStateTransitionLock;
+[[MONGO_MOD_NEEDS_REPLACEMENT]] extern const ResourceId resourceIdReplicationStateTransitionLock;
 
 /**
  * Interface on which granted lock requests will be notified. See the contract for the notify
@@ -352,7 +352,7 @@ MONGO_MOD_NEEDS_REPLACEMENT extern const ResourceId resourceIdReplicationStateTr
  * Test implementations could just count the number of notifications and their outcome so that
  * they can validate locks are granted as desired and drive the test execution.
  */
-class MONGO_MOD_PRIVATE LockGrantNotification {
+class [[MONGO_MOD_PRIVATE]] LockGrantNotification {
 public:
     virtual ~LockGrantNotification() {}
 
@@ -382,7 +382,7 @@ public:
  * LockRequest are owned by the Locker class and it controls their lifetime. They should not
  * be deleted while on the LockManager though (see the contract for the lock/unlock methods).
  */
-struct MONGO_MOD_PRIVATE LockRequest {
+struct [[MONGO_MOD_PRIVATE]] LockRequest {
     enum Status : uint8_t {
         STATUS_NEW,
         STATUS_GRANTED,
@@ -517,7 +517,7 @@ struct MONGO_MOD_PRIVATE LockRequest {
  * Note that using a struct to fetch internal LockManager information is preferable than a BSONObj
  * to minimize the time the LockManager mutexes are hold.
  */
-struct MONGO_MOD_PARENT_PRIVATE LockDebugInfo {
+struct [[MONGO_MOD_PARENT_PRIVATE]] LockDebugInfo {
     LockDebugInfo(LockMode mode, const std::string& debugInfo) : mode(mode), debugInfo(debugInfo) {}
 
     LockMode mode;
@@ -527,6 +527,6 @@ struct MONGO_MOD_PARENT_PRIVATE LockDebugInfo {
 /**
  * Returns a human readable status name for the specified LockRequest status.
  */
-MONGO_MOD_PRIVATE const char* lockRequestStatusName(LockRequest::Status status);
+[[MONGO_MOD_PRIVATE]] const char* lockRequestStatusName(LockRequest::Status status);
 
 }  // namespace mongo

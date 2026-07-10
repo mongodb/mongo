@@ -37,7 +37,7 @@
 #include <cstddef>
 
 namespace mongo {
-class MONGO_MOD_NEEDS_REPLACEMENT ZstdMessageCompressor final : public MessageCompressorBase {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ZstdMessageCompressor final : public MessageCompressorBase {
 public:
     ZstdMessageCompressor();
 

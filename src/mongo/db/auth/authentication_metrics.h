@@ -49,7 +49,7 @@ private:
     Timer _timer;
 };
 
-class MONGO_MOD_PUBLIC AuthMetricsRecorder {
+class [[MONGO_MOD_PUBLIC]] AuthMetricsRecorder {
 public:
     AuthMetricsRecorder() : _timer(), _appendedMetrics() {}
     void restart();

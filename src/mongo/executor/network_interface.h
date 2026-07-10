@@ -70,7 +70,7 @@ extern FailPoint networkInterfaceShouldNotKillPendingRequests;
 /**
  * Interface to networking for use by TaskExecutor implementations.
  */
-class MONGO_MOD_PUBLIC NetworkInterface {
+class [[MONGO_MOD_PUBLIC]] NetworkInterface {
     NetworkInterface(const NetworkInterface&) = delete;
     NetworkInterface& operator=(const NetworkInterface&) = delete;
 

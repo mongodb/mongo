@@ -35,7 +35,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Additional information used to inform remote command targeting / server selection.
@@ -60,4 +60,4 @@ struct TargetingMetadata {
     // If null, stats will not be recorded.
     std::shared_ptr<Stats> stats = {};
 };
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

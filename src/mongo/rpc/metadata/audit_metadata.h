@@ -42,7 +42,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC rpc {
+namespace [[MONGO_MOD_PUBLIC]] rpc {
 
 /*
  * The name of the BSON element in message metadata that contains the impersonated user and the
@@ -55,7 +55,7 @@ namespace MONGO_MOD_PUBLIC rpc {
  *
  * This metadata should only appear in requests from mongos to mongod.
  */
-MONGO_MOD_FILE_PRIVATE inline constexpr std::string_view kImpersonationMetadataSectionName{
+[[MONGO_MOD_FILE_PRIVATE]] inline constexpr std::string_view kImpersonationMetadataSectionName{
     "$audit"};
 
 /*
@@ -84,5 +84,5 @@ void writeAuditMetadata(OperationContext* opCtx, BSONObjBuilder* out);
 std::size_t estimateAuditMetadataSize(const AuditMetadata& md);
 std::size_t estimateAuditMetadataSize(OperationContext* opCtx);
 
-}  // namespace MONGO_MOD_PUBLIC rpc
+}  // namespace rpc
 }  // namespace mongo

@@ -37,7 +37,7 @@
 
 namespace mongo::rss {
 
-class MONGO_MOD_PUB ReplicatedStorageService {
+class [[MONGO_MOD_PUBLIC]] ReplicatedStorageService {
 public:
     static ReplicatedStorageService& get(ServiceContext*);
     static ReplicatedStorageService& get(OperationContext*);

@@ -41,7 +41,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PRIVATE ReplicaSetDDLHook {
+class [[MONGO_MOD_PRIVATE]] ReplicaSetDDLHook {
 public:
     virtual ~ReplicaSetDDLHook() = default;
     virtual std::string_view getName() const = 0;
@@ -49,14 +49,14 @@ public:
     virtual void onEndDDL(OperationContext* opCtx, const std::vector<NamespaceString>& nss) = 0;
 };
 
-struct MONGO_MOD_PUBLIC ReplicaSetDDLOptions {
+struct [[MONGO_MOD_PUBLIC]] ReplicaSetDDLOptions {
     // If true, acquire DDL locks in X mode for all affected namespaces.
     // DDL locks are only acquired in replica sets (not shard direct commands). In sharded
     // clusters, DDL coordinators are responsible for acquiring the DDL lock in the DB primary.
     bool acquireDDLLocks = false;
 };
 
-class MONGO_MOD_PUBLIC ReplicaSetDDLTracker {
+class [[MONGO_MOD_PUBLIC]] ReplicaSetDDLTracker {
 public:
     ReplicaSetDDLTracker(const ReplicaSetDDLTracker&) = delete;
     ReplicaSetDDLTracker& operator=(const ReplicaSetDDLTracker&) = delete;

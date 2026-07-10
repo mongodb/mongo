@@ -43,7 +43,7 @@
 namespace mongo {
 namespace repl {
 
-class MONGO_MOD_OPEN OplogInterface {
+class [[MONGO_MOD_OPEN]] OplogInterface {
     OplogInterface(const OplogInterface&) = delete;
     OplogInterface& operator=(const OplogInterface&) = delete;
 

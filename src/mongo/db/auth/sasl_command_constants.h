@@ -33,7 +33,7 @@
 
 #include <string_view>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /// String name of the saslStart command.
 constexpr inline std::string_view saslStartCommandName{"saslStart"};
@@ -101,4 +101,4 @@ constexpr inline std::string_view saslCommandOIDCAccessToken{"oidcAccessToken"};
 // Field in saslStart.options for mechanisms which omit empty "OK" exchange.
 constexpr inline std::string_view saslCommandOptionSkipEmptyExchange{"skipEmptyExchange"};
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

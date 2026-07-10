@@ -48,7 +48,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Interface for building a single index from an index spec and persisting its state to disk.
@@ -176,4 +176,4 @@ private:
     // and IndexBuildInterceptor.
     std::shared_ptr<IndexBuildInterceptor> _indexBuildInterceptor;
 };
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

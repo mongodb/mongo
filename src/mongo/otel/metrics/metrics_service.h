@@ -62,7 +62,7 @@
 #include <opentelemetry/metrics/provider.h>
 #endif  // MONGO_CONFIG_OTEL
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 namespace mongo::otel::metrics {
 
 struct ScalarMetricOptions {
@@ -335,7 +335,7 @@ public:
         const HistogramOptions& options = {});
 
     /** Returns the attribute names for a metric in definition order. Exposed for testing only. */
-    MONGO_MOD_PRIVATE std::vector<std::string> getAttributeNamesForTests(MetricName name) const;
+    [[MONGO_MOD_PRIVATE]] std::vector<std::string> getAttributeNamesForTests(MetricName name) const;
 
 #ifdef MONGO_CONFIG_OTEL
     /**
@@ -346,7 +346,7 @@ public:
      * initialized in mongod_main.cpp. Any metrics created before initialization are reset to their
      * default value.
      */
-    MONGO_MOD_PRIVATE void initialize(opentelemetry::metrics::MeterProvider& provider);
+    [[MONGO_MOD_PRIVATE]] void initialize(opentelemetry::metrics::MeterProvider& provider);
 #endif  // MONGO_CONFIG_OTEL
 
 private:
@@ -718,7 +718,7 @@ Histogram<double, AttributeTs...>& MetricsService::createDoubleHistogram(
 namespace metrics_service_detail {
 
 template <template <typename> class MetricT, typename ValueT>
-MONGO_MOD_FILE_PRIVATE void observableCallback(
+[[MONGO_MOD_FILE_PRIVATE]] void observableCallback(
     opentelemetry::metrics::ObserverResult observer_result, void* state) {
     invariant(state != nullptr);
     auto* const metric = static_cast<MetricT<ValueT>*>(state);
@@ -731,14 +731,14 @@ MONGO_MOD_FILE_PRIVATE void observableCallback(
 }
 
 template <typename T>
-MONGO_MOD_FILE_PRIVATE std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+[[MONGO_MOD_FILE_PRIVATE]] std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
 makeObservableInstrument(opentelemetry::metrics::MeterProvider& provider,
                          std::string name,
                          std::string description,
                          MetricUnit unit);
 
 template <>
-MONGO_MOD_FILE_PRIVATE inline std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+[[MONGO_MOD_FILE_PRIVATE]] inline std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
 makeObservableInstrument<ObservableCounter<int64_t>>(
     opentelemetry::metrics::MeterProvider& provider,
     std::string name,
@@ -749,7 +749,7 @@ makeObservableInstrument<ObservableCounter<int64_t>>(
 }
 
 template <>
-MONGO_MOD_FILE_PRIVATE inline std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+[[MONGO_MOD_FILE_PRIVATE]] inline std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
 makeObservableInstrument<ObservableCounter<double>>(opentelemetry::metrics::MeterProvider& provider,
                                                     std::string name,
                                                     std::string description,
@@ -759,7 +759,7 @@ makeObservableInstrument<ObservableCounter<double>>(opentelemetry::metrics::Mete
 }
 
 template <>
-MONGO_MOD_FILE_PRIVATE inline std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+[[MONGO_MOD_FILE_PRIVATE]] inline std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
 makeObservableInstrument<ObservableUpDownCounter<int64_t>>(
     opentelemetry::metrics::MeterProvider& provider,
     std::string name,
@@ -770,7 +770,7 @@ makeObservableInstrument<ObservableUpDownCounter<int64_t>>(
 }
 
 template <>
-MONGO_MOD_FILE_PRIVATE inline std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+[[MONGO_MOD_FILE_PRIVATE]] inline std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
 makeObservableInstrument<ObservableUpDownCounter<double>>(
     opentelemetry::metrics::MeterProvider& provider,
     std::string name,
@@ -781,7 +781,7 @@ makeObservableInstrument<ObservableUpDownCounter<double>>(
 }
 
 template <>
-MONGO_MOD_FILE_PRIVATE inline std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+[[MONGO_MOD_FILE_PRIVATE]] inline std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
 makeObservableInstrument<ObservableGauge<int64_t>>(opentelemetry::metrics::MeterProvider& provider,
                                                    std::string name,
                                                    std::string description,
@@ -791,7 +791,7 @@ makeObservableInstrument<ObservableGauge<int64_t>>(opentelemetry::metrics::Meter
 }
 
 template <>
-MONGO_MOD_FILE_PRIVATE inline std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+[[MONGO_MOD_FILE_PRIVATE]] inline std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
 makeObservableInstrument<ObservableGauge<double>>(opentelemetry::metrics::MeterProvider& provider,
                                                   std::string name,
                                                   std::string description,
@@ -801,7 +801,7 @@ makeObservableInstrument<ObservableGauge<double>>(opentelemetry::metrics::MeterP
 }
 
 template <>
-MONGO_MOD_FILE_PRIVATE inline std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+[[MONGO_MOD_FILE_PRIVATE]] inline std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
 makeObservableInstrument<ObservableMinGauge<int64_t>>(
     opentelemetry::metrics::MeterProvider& provider,
     std::string name,
@@ -812,7 +812,7 @@ makeObservableInstrument<ObservableMinGauge<int64_t>>(
 }
 
 template <>
-MONGO_MOD_FILE_PRIVATE inline std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+[[MONGO_MOD_FILE_PRIVATE]] inline std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
 makeObservableInstrument<ObservableMinGauge<double>>(
     opentelemetry::metrics::MeterProvider& provider,
     std::string name,
@@ -823,7 +823,7 @@ makeObservableInstrument<ObservableMinGauge<double>>(
 }
 
 template <>
-MONGO_MOD_FILE_PRIVATE inline std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+[[MONGO_MOD_FILE_PRIVATE]] inline std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
 makeObservableInstrument<ObservableMaxGauge<int64_t>>(
     opentelemetry::metrics::MeterProvider& provider,
     std::string name,
@@ -834,7 +834,7 @@ makeObservableInstrument<ObservableMaxGauge<int64_t>>(
 }
 
 template <>
-MONGO_MOD_FILE_PRIVATE inline std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+[[MONGO_MOD_FILE_PRIVATE]] inline std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
 makeObservableInstrument<ObservableMaxGauge<double>>(
     opentelemetry::metrics::MeterProvider& provider,
     std::string name,

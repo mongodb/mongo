@@ -75,7 +75,7 @@ class StorageInterface;
 
 class NoopWriter;
 
-class MONGO_MOD_PUB ReplicationCoordinatorExternalStateImpl final
+class [[MONGO_MOD_PUBLIC]] ReplicationCoordinatorExternalStateImpl final
     : public ReplicationCoordinatorExternalState,
       public JournalListener {
     ReplicationCoordinatorExternalStateImpl(const ReplicationCoordinatorExternalStateImpl&) =
@@ -84,7 +84,7 @@ class MONGO_MOD_PUB ReplicationCoordinatorExternalStateImpl final
         const ReplicationCoordinatorExternalStateImpl&) = delete;
 
 public:
-    class MONGO_MOD_PRIVATE ReplDurabilityToken : public JournalListener::Token {
+    class [[MONGO_MOD_PRIVATE]] ReplDurabilityToken : public JournalListener::Token {
     public:
         ReplDurabilityToken(OpTimeAndWallTime opTimeAndWallTime, bool isPrimary)
             : opTimeAndWallTime(opTimeAndWallTime), isPrimary(isPrimary) {}

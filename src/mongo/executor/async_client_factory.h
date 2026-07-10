@@ -45,7 +45,7 @@ namespace mongo::executor {
  * The factory dictates which transport protocol the TransportLayer provided to startup() should
  * communicate over.
  */
-class MONGO_MOD_PUBLIC AsyncClientFactory : public EgressConnectionCloser {
+class [[MONGO_MOD_PUBLIC]] AsyncClientFactory : public EgressConnectionCloser {
 public:
     /**
      * A handle to a client produced from this factory.

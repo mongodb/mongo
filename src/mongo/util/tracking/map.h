@@ -36,7 +36,7 @@
 #include <map>
 #include <scoped_allocator>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace tracking {
 
 template <class Key, class T, class Compare = std::less<Key>>
@@ -49,4 +49,4 @@ map<Key, T, Compare> make_map(Context& Context) {
 }
 
 }  // namespace tracking
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

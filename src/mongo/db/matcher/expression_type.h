@@ -63,7 +63,7 @@ using namespace std::literals::string_view_literals;
 /**
  * The structure represents how data is laid out in an encrypted payload.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT FleBlobHeader {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] FleBlobHeader {
     int8_t fleBlobSubtype;
     int8_t keyUUID[16];
     int8_t originalBsonType;

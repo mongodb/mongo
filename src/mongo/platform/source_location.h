@@ -44,7 +44,7 @@
 #define MONGO_SOURCE_LOCATION_HAVE_STD
 #endif
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 struct SourceLocationFormatter {
     constexpr auto parse(auto&& ctx) const {
@@ -119,10 +119,10 @@ private:
 }  // namespace mongo
 
 template <>
-struct MONGO_MOD_PUB fmt::formatter<mongo::WrappedStdSourceLocation>
+struct [[MONGO_MOD_PUBLIC]] fmt::formatter<mongo::WrappedStdSourceLocation>
     : mongo::SourceLocationFormatter {};
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /** Must appear after formatter specialization. */
 inline std::string WrappedStdSourceLocation::_toString() const {
@@ -184,10 +184,10 @@ private:
 }  // namespace mongo
 
 template <>
-struct MONGO_MOD_PUB fmt::formatter<mongo::SyntheticSourceLocation>
+struct [[MONGO_MOD_PUBLIC]] fmt::formatter<mongo::SyntheticSourceLocation>
     : mongo::SourceLocationFormatter {};
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /** Must appear after formatter specialization. */
 inline std::string SyntheticSourceLocation::_toString() const {
@@ -220,4 +220,4 @@ constexpr SourceLocation makeHeaderSourceLocation_forTest() {
     return MONGO_SOURCE_LOCATION();
 }
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

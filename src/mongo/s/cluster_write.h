@@ -45,7 +45,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace cluster {
 
 /**
@@ -71,4 +71,4 @@ bulk_write_exec::BulkWriteReplyInfo bulkWrite(
     bulk_write_exec::BulkWriteExecStats& execStats);
 
 }  // namespace cluster
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

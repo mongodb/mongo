@@ -38,7 +38,7 @@
 #include "mongo/util/modules.h"
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC logv2 {
+namespace [[MONGO_MOD_PUBLIC]] logv2 {
 
 class UserAssertAfterLog {
 public:
@@ -145,5 +145,5 @@ private:
     FatalMode _fatalMode = FatalMode::kAssert;
 };
 
-}  // namespace MONGO_MOD_PUBLIC logv2
+}  // namespace logv2
 }  // namespace mongo

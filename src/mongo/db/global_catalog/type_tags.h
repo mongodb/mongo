@@ -56,7 +56,7 @@ class StatusWith;
  * collection. All manipulation of documents coming from that collection should be done with
  * this class.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT TagsType {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] TagsType {
 public:
     // Name of the tags collection in the config server.
     static const NamespaceString ConfigNS;

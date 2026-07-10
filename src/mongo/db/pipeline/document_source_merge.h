@@ -92,7 +92,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Merge);
  * this class must be initialized (via a constructor) with a 'MergeDescriptor', which defines a
  * a particular merge strategy for a pair of 'whenMatched' and 'whenNotMatched' merge  modes.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceMerge final : public DocumentSourceWriter {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DocumentSourceMerge final : public DocumentSourceWriter {
 public:
     static constexpr std::string_view kStageName = "$merge"sv;
     static constexpr auto kDefaultWhenMatched = MergeStrategyDescriptor::WhenMatched::kMerge;

@@ -35,7 +35,7 @@
 #include <cstring>
 #include <memory>
 
-namespace MONGO_MOD_NEEDS_REPLACEMENT linenoise_utf8 {
+namespace [[MONGO_MOD_NEEDS_REPLACEMENT]] linenoise_utf8 {
 
 typedef unsigned char UChar8;  // UTF-8 octet
 typedef char32_t UChar32;      // Unicode code point
@@ -262,4 +262,4 @@ inline Utf8String::Utf8String(const Utf32String& s) {
     initFrom32(s.get(), s.chars());
 }
 
-}  // namespace MONGO_MOD_NEEDS_REPLACEMENT linenoise_utf8
+}  // namespace linenoise_utf8

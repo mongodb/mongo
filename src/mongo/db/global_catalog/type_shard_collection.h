@@ -44,7 +44,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_NEEDS_REPLACEMENT ShardCollectionType : private ShardCollectionTypeBase {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardCollectionType : private ShardCollectionTypeBase {
 public:
     static constexpr auto kAllowMigrationsFieldName = kPre50CompatibleAllowMigrationsFieldName;
 

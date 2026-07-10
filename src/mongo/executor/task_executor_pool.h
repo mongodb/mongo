@@ -39,7 +39,7 @@
 #include <memory>
 #include <vector>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace executor {
 
 /**
@@ -76,8 +76,8 @@ public:
      */
     void shutdownAndJoin();
 
-    MONGO_MOD_PUB void shutdown_forTest();
-    MONGO_MOD_PUB void join_forTest();
+    [[MONGO_MOD_PUBLIC]] void shutdown_forTest();
+    [[MONGO_MOD_PUBLIC]] void join_forTest();
 
     /**
      * Adds 'executors' and 'fixedExecutor' to the pool. May be called at most once to initialize an
@@ -133,4 +133,4 @@ private:
 };
 
 }  // namespace executor
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

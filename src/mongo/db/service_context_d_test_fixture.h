@@ -51,7 +51,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_OPEN MongoDScopedGlobalServiceContextForTest
+class [[MONGO_MOD_OPEN]] MongoDScopedGlobalServiceContextForTest
     : public ScopedGlobalServiceContextForTest {
 public:
     constexpr static StorageEngineInitFlags kDefaultStorageEngineInitFlags =
@@ -228,7 +228,7 @@ private:
     unittest::TempDir _tempDir{"service_context_d_test_fixture"};
 };
 
-class MONGO_MOD_OPEN ServiceContextMongoDTest : public ServiceContextTest {
+class [[MONGO_MOD_OPEN]] ServiceContextMongoDTest : public ServiceContextTest {
 public:
     using Options = MongoDScopedGlobalServiceContextForTest::Options;
 

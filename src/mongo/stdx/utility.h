@@ -34,7 +34,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace stdx {
 
 /** https://en.cppreference.com/w/cpp/utility/to_underlying */
@@ -45,4 +45,4 @@ constexpr auto to_underlying(E e) noexcept {
 }
 
 }  // namespace stdx
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

@@ -35,7 +35,7 @@
 
 #include <absl/container/btree_map.h>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace tracking {
 
 
@@ -50,4 +50,4 @@ btree_map<Key, T, Compare> make_btree_map(Context& Context) {
 }
 
 }  // namespace tracking
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

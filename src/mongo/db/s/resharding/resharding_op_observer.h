@@ -50,7 +50,7 @@
 namespace mongo {
 using namespace std::literals::string_view_literals;
 
-class MONGO_MOD_PUBLIC ReshardingHistoryHook : public DurableHistoryPin {
+class [[MONGO_MOD_PUBLIC]] ReshardingHistoryHook : public DurableHistoryPin {
 public:
     static constexpr std::string_view kName = "resharding"sv;
 
@@ -66,7 +66,7 @@ public:
  * such as config.reshardingOperations, config.localReshardingOperations.donor, and
  * config.localReshardingOperations.recipient.
  */
-class MONGO_MOD_PUBLIC ReshardingOpObserver final : public OpObserverNoop {
+class [[MONGO_MOD_PUBLIC]] ReshardingOpObserver final : public OpObserverNoop {
     ReshardingOpObserver(const ReshardingOpObserver&) = delete;
     ReshardingOpObserver& operator=(const ReshardingOpObserver&) = delete;
 

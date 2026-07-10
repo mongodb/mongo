@@ -63,7 +63,7 @@ class StatusWith;
  */
 namespace shardutil {
 
-MONGO_MOD_NEEDS_REPLACEMENT static constexpr size_t kMaxSplitPoints = 8192;
+[[MONGO_MOD_NEEDS_REPLACEMENT]] static constexpr size_t kMaxSplitPoints = 8192;
 
 /**
  * Executes the dataSize command against the specified shard and obtains the total data
@@ -73,7 +73,7 @@ MONGO_MOD_NEEDS_REPLACEMENT static constexpr size_t kMaxSplitPoints = 8192;
  *  ShardNotFound if shard by that id is not available on the registry
  *  NoSuchKey if the total shard size could not be retrieved
  */
-MONGO_MOD_NEEDS_REPLACEMENT StatusWith<long long> retrieveCollectionShardSize(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] StatusWith<long long> retrieveCollectionShardSize(
     OperationContext* opCtx,
     const ShardId& shardId,
     NamespaceString const& ns,
@@ -89,7 +89,7 @@ MONGO_MOD_NEEDS_REPLACEMENT StatusWith<long long> retrieveCollectionShardSize(
  * - chunkSizeBytes: chunk size to target in bytes.
  * - limit: limits the number of split points to search. Unspecified means no limit
  */
-MONGO_MOD_NEEDS_REPLACEMENT StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(
     OperationContext* opCtx,
     const ShardId& shardId,
     const NamespaceString& nss,
@@ -110,15 +110,15 @@ MONGO_MOD_NEEDS_REPLACEMENT StatusWith<std::vector<BSONObj>> selectChunkSplitPoi
  * chunkRange Bounds of the chunk to be split.
  * splitPoints The set of points at which the chunk should be split.
  */
-MONGO_MOD_NEEDS_REPLACEMENT Status
-splitChunkAtMultiplePoints(OperationContext* opCtx,
-                           const ShardId& shardId,
-                           const NamespaceString& nss,
-                           const ShardKeyPattern& shardKeyPattern,
-                           const OID& epoch,
-                           const Timestamp& timestamp,
-                           const ChunkRange& chunkRange,
-                           const std::vector<BSONObj>& splitPoints);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] Status splitChunkAtMultiplePoints(
+    OperationContext* opCtx,
+    const ShardId& shardId,
+    const NamespaceString& nss,
+    const ShardKeyPattern& shardKeyPattern,
+    const OID& epoch,
+    const Timestamp& timestamp,
+    const ChunkRange& chunkRange,
+    const std::vector<BSONObj>& splitPoints);
 
 }  // namespace shardutil
 }  // namespace mongo

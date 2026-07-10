@@ -36,7 +36,7 @@ namespace mongo {
 /**
  * Allows other components to observe when storage engine flushes all files.
  */
-class MONGO_MOD_OPEN FlushAllFilesObserver {
+class [[MONGO_MOD_OPEN]] FlushAllFilesObserver {
 public:
     virtual ~FlushAllFilesObserver() = default;
 

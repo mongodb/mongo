@@ -278,7 +278,7 @@ public:
     /**
      * Setter used for testing to allow tick source to be mocked.
      */
-    MONGO_MOD_PRIVATE void setTickSource_forTest(TickSource* tickSource) {
+    [[MONGO_MOD_PRIVATE]] void setTickSource_forTest(TickSource* tickSource) {
         _tickSource = tickSource;
     }
 

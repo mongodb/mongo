@@ -83,7 +83,7 @@ enum class AccumulatorDocumentsNeeded {
     kLastOutputDocument,
 };
 
-class MONGO_MOD_PUBLIC AccumulatorState : public RefCountable {
+class [[MONGO_MOD_PUBLIC]] AccumulatorState : public RefCountable {
 public:
     using Factory = std::function<boost::intrusive_ptr<AccumulatorState>()>;
 

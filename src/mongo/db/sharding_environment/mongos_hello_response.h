@@ -49,7 +49,7 @@ class BSONObjBuilder;
  *
  * Only handles responses from mongos.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT MongosHelloResponse {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] MongosHelloResponse {
 public:
     static constexpr std::string_view kTopologyVersionFieldName = "topologyVersion"sv;
     static constexpr std::string_view kIsMasterFieldName = "ismaster"sv;

@@ -56,7 +56,7 @@ namespace mongo {
  * Mocks the metadata refresh results with settable return values. The purpose of this class is to
  * facilitate testing of classes that use a ShardServerCatalogCacheLoader.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ShardServerCatalogCacheLoaderMock final
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardServerCatalogCacheLoaderMock final
     : public ShardServerCatalogCacheLoader {
     ShardServerCatalogCacheLoaderMock(const ShardServerCatalogCacheLoaderMock&) = delete;
     ShardServerCatalogCacheLoaderMock& operator=(const ShardServerCatalogCacheLoaderMock&) = delete;

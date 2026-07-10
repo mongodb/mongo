@@ -73,7 +73,7 @@
 namespace mongo {
 using namespace std::literals::string_view_literals;
 
-class MONGO_MOD_PUBLIC ReshardingDonorService : public repl::PrimaryOnlyService {
+class [[MONGO_MOD_PUBLIC]] ReshardingDonorService : public repl::PrimaryOnlyService {
 public:
     static constexpr std::string_view kServiceName = "ReshardingDonorService"sv;
 
@@ -81,31 +81,31 @@ public:
         : PrimaryOnlyService(serviceContext), _serviceContext(serviceContext) {}
     ~ReshardingDonorService() override = default;
 
-    class MONGO_MOD_PRIVATE DonorStateMachine;
+    class [[MONGO_MOD_PRIVATE]] DonorStateMachine;
 
-    class MONGO_MOD_PRIVATE DonorStateMachineExternalState;
+    class [[MONGO_MOD_PRIVATE]] DonorStateMachineExternalState;
 
-    MONGO_MOD_PRIVATE std::string_view getServiceName() const override {
+    [[MONGO_MOD_PRIVATE]] std::string_view getServiceName() const override {
         return kServiceName;
     }
 
-    MONGO_MOD_PRIVATE NamespaceString getStateDocumentsNS() const override {
+    [[MONGO_MOD_PRIVATE]] NamespaceString getStateDocumentsNS() const override {
         return NamespaceString::kDonorReshardingOperationsNamespace;
     }
 
-    MONGO_MOD_PRIVATE ThreadPoolLimits getThreadPoolLimits() const override;
+    [[MONGO_MOD_PRIVATE]] ThreadPoolLimits getThreadPoolLimits() const override;
 
     // The service implemented its own conflict check before this method was added.
-    MONGO_MOD_PRIVATE void checkIfConflictsWithOtherInstances(
+    [[MONGO_MOD_PRIVATE]] void checkIfConflictsWithOtherInstances(
         OperationContext* opCtx,
         BSONObj initialState,
         const std::vector<const Instance*>& existingInstances) override {}
 
-    MONGO_MOD_PRIVATE std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(
+    [[MONGO_MOD_PRIVATE]] std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(
         BSONObj initialState) override;
 
-    MONGO_MOD_PRIVATE void stepDown_forTest();
-    MONGO_MOD_PRIVATE void stepUp_forTest();
+    [[MONGO_MOD_PRIVATE]] void stepDown_forTest();
+    [[MONGO_MOD_PRIVATE]] void stepUp_forTest();
 
 private:
     ServiceContext* _serviceContext;

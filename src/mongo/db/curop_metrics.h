@@ -33,7 +33,7 @@
 
 #include <cstdint>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class OperationContext;
 
@@ -89,4 +89,4 @@ int64_t aggNonTicketedIntervalThresholdMillis();
 void closeAggNonTicketedIntervalIfOpen(AggNonTicketedIntervalTracker& tracker,
                                        OperationContext* opCtx);
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

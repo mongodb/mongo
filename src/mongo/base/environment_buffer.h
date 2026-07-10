@@ -31,7 +31,7 @@
 
 #include "mongo/util/modules.h"
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 // Instead of making a forward declaration to `extern char** environ;`, it's better to call this

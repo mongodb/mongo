@@ -38,7 +38,7 @@
 #include <string_view>
 
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 class EncryptedField;
 class EncryptedFieldConfig;
 class QueryTypeConfig;
@@ -120,4 +120,4 @@ void validateTextSearchIndex(BSONType fieldType,
                              boost::optional<bool> previousCaseSensitivity,
                              boost::optional<bool> previousDiacriticSensitivity,
                              boost::optional<int64_t> previousContention);
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

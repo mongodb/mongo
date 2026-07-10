@@ -50,7 +50,7 @@ namespace mongo {
  * the specified collection. This indicates to the underlying storage system that the caller has
  * performed 'routing', in the sense that it is aware of what data is located on this node.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ScopedSetShardRole {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ScopedSetShardRole {
 public:
     ScopedSetShardRole(OperationContext* opCtx,
                        NamespaceString nss,
@@ -72,7 +72,7 @@ private:
 
 // Stashes the shard role for the given namespace.
 // DON'T USE unless you understand very well what you're doing.
-class MONGO_MOD_NEEDS_REPLACEMENT ScopedStashShardRole {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ScopedStashShardRole {
 public:
     ScopedStashShardRole(OperationContext* opCtx, const NamespaceString& nss);
 
@@ -94,7 +94,7 @@ private:
  *
  * The metadata for a particular operation can be retrieved using the get() method.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT OperationShardingState {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] OperationShardingState {
     OperationShardingState(const OperationShardingState&) = delete;
     OperationShardingState& operator=(const OperationShardingState&) = delete;
 
@@ -237,7 +237,7 @@ private:
         int recursion{0};
     };
 
-    MONGO_MOD_NEEDS_REPLACEMENT ImplicitCreationInfo _implicitCreationInfo;
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] ImplicitCreationInfo _implicitCreationInfo;
 
 
     // Stores the shard version expected for each collection that will be accessed
@@ -279,7 +279,7 @@ private:
     bool _bypassCheckAllShardRoleAcquisitionsVersioned{false};
 };
 
-class MONGO_MOD_PRIVATE BypassCheckAllShardRoleAcquisitionsVersioned {
+class [[MONGO_MOD_PRIVATE]] BypassCheckAllShardRoleAcquisitionsVersioned {
 public:
     BypassCheckAllShardRoleAcquisitionsVersioned(OperationContext* opCtx) : _opCtx(opCtx) {
         OperationShardingState::get(opCtx).setBypassCheckAllShardRoleAcquisitionsVersioned(true);

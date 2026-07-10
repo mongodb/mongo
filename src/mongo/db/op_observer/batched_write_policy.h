@@ -42,7 +42,7 @@
 
 #include <boost/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /*
  * Determines which Records should be placed in the next batch of Oplog
@@ -93,4 +93,4 @@ inline void buildBatchedWritesWithPolicy(size_t batchedWriteMaxSizeBytes,
     }
 }
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

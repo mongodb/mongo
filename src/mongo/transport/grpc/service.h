@@ -45,7 +45,7 @@
 #include <grpcpp/support/status.h>
 
 namespace mongo::transport {
-namespace MONGO_MOD_PARENT_PRIVATE grpc {
+namespace [[MONGO_MOD_PARENT_PRIVATE]] grpc {
 using namespace std::literals::string_view_literals;
 
 /**
@@ -127,5 +127,5 @@ private:
     bool _acceptNewRequests = true;
     bool _shutdown = false;
 };
-}  // namespace MONGO_MOD_PARENT_PRIVATE grpc
+}  // namespace grpc
 }  // namespace mongo::transport

@@ -41,7 +41,7 @@
 #include <memory>
 #include <mutex>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 enum UserAcquisitionOpType { kCache, kBind, kSearch, kSuccessfulReferral, kFailedReferral };
 
 /**
@@ -287,4 +287,4 @@ private:
     TickSource* _tickSource;
     UserAcquisitionOpType _type;
 };
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

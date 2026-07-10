@@ -62,7 +62,7 @@ using PlanStageKey = const PlanStage*;
  *
  * TODO SERVER-112777: Remove 'atlas_streams' dependency on this struct.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT SpecificStats {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] SpecificStats {
     virtual ~SpecificStats() {}
 
     /**
@@ -422,7 +422,7 @@ struct CountScanStats : public SpecificStats {
 /**
  * SERVER-112776: Remove 'data_movement' dependency on this struct.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT DeleteStats : public SpecificStats {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] DeleteStats : public SpecificStats {
     DeleteStats() = default;
 
     std::unique_ptr<SpecificStats> clone() const final {
@@ -451,7 +451,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT DeleteStats : public SpecificStats {
 /**
  * SERVER-112776: Remove 'ttl' dependency on this struct.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT BatchedDeleteStats : public DeleteStats {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] BatchedDeleteStats : public DeleteStats {
     BatchedDeleteStats() = default;
 
     // Unlike a standard multi:true delete, BatchedDeleteStage can complete with PlanStage::IS_EOF
@@ -828,7 +828,7 @@ struct ProjectionStats : public SpecificStats {
 /**
  * TODO SERVER-112777: Remove 'atlas_streams' dependency on this struct.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT SortStats : public SpecificStats {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] SortStats : public SpecificStats {
     SortStats() = default;
     SortStats(uint64_t limit, uint64_t maxMemoryUsageBytes)
         : limit(limit), maxMemoryUsageBytes(maxMemoryUsageBytes) {}

@@ -52,7 +52,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * For performance reasons, we need to reduce the size of FieldRef::StringView. Since we have a cap
@@ -382,4 +382,4 @@ private:
     mutable std::vector<ValidatedPathString> _replacements;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

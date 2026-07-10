@@ -78,7 +78,7 @@
 #include <vector>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC async_rpc {
+namespace [[MONGO_MOD_PUBLIC]] async_rpc {
 
 /**
  * This header provides two mock implementations of the async_rpc::sendCommand API. In
@@ -427,5 +427,5 @@ public:
     }
 };
 
-}  // namespace MONGO_MOD_PUBLIC async_rpc
+}  // namespace async_rpc
 }  // namespace mongo

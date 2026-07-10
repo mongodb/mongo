@@ -38,16 +38,16 @@
 
 namespace mongo::catalog_helper {
 
-MONGO_MOD_NEEDS_REPLACEMENT
+[[MONGO_MOD_NEEDS_REPLACEMENT]]
 extern StorageEngine::TimestampMonitor::TimestampListener
     kCollectionCatalogCleanupTimestampListener;
 
-MONGO_MOD_PRIVATE extern FailPoint setAutoGetCollectionWait;
+[[MONGO_MOD_PRIVATE]] extern FailPoint setAutoGetCollectionWait;
 
 /**
  * Executes the provided callback on the 'setAutoGetCollectionWait' FailPoint.
  */
-MONGO_MOD_PRIVATE
+[[MONGO_MOD_PRIVATE]]
 static void setAutoGetCollectionWaitFailpointExecute(
     const std::function<void(const BSONObj&)>& callback) {
     setAutoGetCollectionWait.execute(callback);

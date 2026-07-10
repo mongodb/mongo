@@ -106,7 +106,7 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
  * Queries separate collection for equality matches with documents in the pipeline collection.
  * Adds matching documents to a new array field in the input document.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceLookUp final : public DocumentSource {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DocumentSourceLookUp final : public DocumentSource {
 public:
     static constexpr std::string_view kStageName = "$lookup"sv;
     static constexpr std::string_view kFromField = "from"sv;
@@ -210,7 +210,7 @@ public:
     /**
      * Helper to absorb an $unwind stage. Only used for testing this special behavior.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT void setUnwindStage_forTest(
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] void setUnwindStage_forTest(
         const boost::intrusive_ptr<DocumentSourceUnwind>& unwind) {
         invariant(!_unwindSrc);
         _unwindSrc = unwind;

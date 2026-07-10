@@ -54,7 +54,7 @@
 #include <vector>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC scram {
+namespace [[MONGO_MOD_PUBLIC]] scram {
 using namespace std::literals::string_view_literals;
 
 constexpr auto kServerKeyConst = "Server Key"sv;
@@ -333,5 +333,5 @@ private:
     std::shared_ptr<MemoryPolicy<HashBlock>> _ptr;
 };
 
-}  // namespace MONGO_MOD_PUBLIC scram
+}  // namespace scram
 }  // namespace mongo

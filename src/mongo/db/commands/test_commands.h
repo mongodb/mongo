@@ -45,7 +45,7 @@ namespace mongo {
  * oldest timestamp and perform a write into `mdb_testing.pinned_timestamp`. This hook knows how to
  * read that collection and re-pin any history requests after a restart or across rollback.
  */
-class MONGO_MOD_PUBLIC TestingDurableHistoryPin : public DurableHistoryPin {
+class [[MONGO_MOD_PUBLIC]] TestingDurableHistoryPin : public DurableHistoryPin {
 public:
     std::string getName() override;
     boost::optional<Timestamp> calculatePin(OperationContext* opCtx) override;

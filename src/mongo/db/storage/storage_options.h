@@ -44,11 +44,11 @@
  * that allow the user to change a different subset of these options.
  */
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 struct StorageGlobalParams {
     StorageGlobalParams();
-    MONGO_MOD_PUBLIC void reset_forTest();
+    [[MONGO_MOD_PUBLIC]] void reset_forTest();
 
     // Returns the directory path used by the spill storage engine to store spilled data.
     boost::filesystem::path getSpillDbPath() const;
@@ -168,4 +168,4 @@ std::string storageDBPathDescription();
 
 extern StorageGlobalParams storageGlobalParams;
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

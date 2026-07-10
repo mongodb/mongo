@@ -41,6 +41,6 @@ namespace mongo::coll_mod_reply_validation {
  *  - (hidden_new and hidden_old) together or none of them.
  *  - (prepareUnique_new and prepareUnique_old) together or none of them."
  */
-MONGO_MOD_PARENT_PRIVATE void validateReply(const CollModReply& reply);
+[[MONGO_MOD_PARENT_PRIVATE]] void validateReply(const CollModReply& reply);
 
 }  // namespace mongo::coll_mod_reply_validation

@@ -158,7 +158,7 @@ public:
 
     ~ReshardingMetrics();
 
-    MONGO_MOD_PRIVATE static std::unique_ptr<ReshardingMetrics> makeInstance_forTest(
+    [[MONGO_MOD_PRIVATE]] static std::unique_ptr<ReshardingMetrics> makeInstance_forTest(
         UUID instanceId,
         BSONObj shardKey,
         NamespaceString nss,

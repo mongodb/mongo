@@ -371,8 +371,8 @@ public:
      * Test-only helper for swapping in a mock SBE plan for the one that was built from the cache
      * entry.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT void setSbePlan_forTest(std::unique_ptr<sbe::PlanStage> sbePlan,
-                                                        stage_builder::PlanStageData data) {
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] void setSbePlan_forTest(std::unique_ptr<sbe::PlanStage> sbePlan,
+                                                            stage_builder::PlanStageData data) {
         _sbePlan = std::move(sbePlan);
         _planStageData = std::move(data);
     }

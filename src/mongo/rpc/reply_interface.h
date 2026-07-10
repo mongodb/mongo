@@ -41,7 +41,7 @@ namespace rpc {
 /**
  * An immutable view of an RPC Reply.
  */
-class MONGO_MOD_OPEN ReplyInterface {
+class [[MONGO_MOD_OPEN]] ReplyInterface {
     ReplyInterface(const ReplyInterface&) = delete;
     ReplyInterface& operator=(const ReplyInterface&) = delete;
 

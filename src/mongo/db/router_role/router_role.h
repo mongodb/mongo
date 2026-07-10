@@ -49,7 +49,7 @@ namespace mongo {
 namespace sharding {
 namespace router {
 
-class MONGO_MOD_PRIVATE RouterBase {
+class [[MONGO_MOD_PRIVATE]] RouterBase {
 protected:
     RouterBase(OperationContext* opCtx, CatalogCache* catalogCache);
 
@@ -72,7 +72,7 @@ protected:
  * This class should mostly be used for routing of DDL operations which need to be coordinated from
  * the primary shard of the database.
  */
-class MONGO_MOD_PUBLIC DBPrimaryRouter final : public RouterBase {
+class [[MONGO_MOD_PUBLIC]] DBPrimaryRouter final : public RouterBase {
 public:
     DBPrimaryRouter(OperationContext* opCtx, const DatabaseName& db);
 
@@ -127,7 +127,7 @@ private:
 /**
  * Class which contains logic common to routers which target one or more collections.
  */
-class MONGO_MOD_PRIVATE CollectionRouterCommon : public RouterBase {
+class [[MONGO_MOD_PRIVATE]] CollectionRouterCommon : public RouterBase {
 protected:
     CollectionRouterCommon(OperationContext* opCtx,
                            CatalogCache* catalogCache,
@@ -147,7 +147,7 @@ protected:
  * This class should mostly be used for routing CRUD operations which need to have a view of the
  * entire routing table for a collection.
  */
-class MONGO_MOD_PUBLIC CollectionRouter final : public CollectionRouterCommon {
+class [[MONGO_MOD_PUBLIC]] CollectionRouter final : public CollectionRouterCommon {
 public:
     CollectionRouter(OperationContext* opCtx, NamespaceString nss);
 
@@ -208,7 +208,7 @@ private:
     boost::optional<ShardId> _suggestedPrimaryId;
 };
 
-class MONGO_MOD_PUBLIC MultiCollectionRouter final : public CollectionRouterCommon {
+class [[MONGO_MOD_PUBLIC]] MultiCollectionRouter final : public CollectionRouterCommon {
 public:
     MultiCollectionRouter(OperationContext* opCtx, const std::vector<NamespaceString>& nssList);
 
@@ -245,7 +245,7 @@ public:
  * Creates all of the databases referenced by 'nssList' (if they don't already exist), and then
  * creates and returns a RoutingContext that can be used for targeting write ops.
  */
-MONGO_MOD_PUBLIC std::unique_ptr<RoutingContext> createDatabasesAndGetRoutingCtx(
+[[MONGO_MOD_PUBLIC]] std::unique_ptr<RoutingContext> createDatabasesAndGetRoutingCtx(
     OperationContext* opCtx,
     const std::vector<NamespaceString>& nssList,
     bool checkTimeseriesBucketsNss,

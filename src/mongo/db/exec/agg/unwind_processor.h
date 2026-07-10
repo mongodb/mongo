@@ -41,7 +41,7 @@ namespace mongo::exec::agg {
  * This class is used by the aggregation framework and streams enterprise module to perform the
  * document processing needed for $unwind.
  */
-class MONGO_MOD_PUBLIC UnwindProcessor {
+class [[MONGO_MOD_PUBLIC]] UnwindProcessor {
 public:
     UnwindProcessor(const FieldPath& unwindPath,
                     bool preserveNullAndEmptyArrays,

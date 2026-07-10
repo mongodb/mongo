@@ -38,13 +38,13 @@
 #include <memory>
 #include <mutex>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Abstract interface governing when the Checkpointer thread wakes up to take a checkpoint.
  * The Checkpointer calls waitUntilReady() each loop iteration and then takes a checkpoint.
  */
-class MONGO_MOD_OPEN CheckpointSchedulePolicy {
+class [[MONGO_MOD_OPEN]] CheckpointSchedulePolicy {
 public:
     virtual ~CheckpointSchedulePolicy() = default;
 
@@ -64,4 +64,4 @@ public:
 std::unique_ptr<CheckpointSchedulePolicy> createFixedIntervalPolicy(
     ClockSource* clock = SystemClockSource::get());
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

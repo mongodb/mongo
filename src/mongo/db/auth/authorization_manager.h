@@ -61,7 +61,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 using namespace std::literals::string_view_literals;
 
 class AuthorizationSession;
@@ -72,7 +72,7 @@ class ServiceContext;
 /**
  * Internal secret key info.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT SystemAuthInfo {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] SystemAuthInfo {
     std::shared_ptr<UserHandle> getUser() {
         return std::atomic_load(&_user);  // NOLINT
     }
@@ -94,7 +94,7 @@ extern SystemAuthInfo internalSecurity;
 /**
  * How user management functions should structure the BSON representation of privileges and roles.
  */
-enum class MONGO_MOD_PRIVATE AuthenticationRestrictionsFormat {
+enum class [[MONGO_MOD_PRIVATE]] AuthenticationRestrictionsFormat {
     kOmit,  // AuthenticationRestrictions should not be included in the BSON representation.
     kShow,  // AuthenticationRestrictions should be included in the BSON representation.
 };
@@ -268,4 +268,4 @@ public:
      * Otherwise, they will be equal to boost::none.
      */
 };
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

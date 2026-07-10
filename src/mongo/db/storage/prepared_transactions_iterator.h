@@ -40,7 +40,7 @@ namespace mongo {
  * An iterator that yields the prepared_id of unclaimed prepared transactions that exist in the
  * checkpoint on startup recovery.
  */
-class MONGO_MOD_OPEN PreparedTransactionsIterator {
+class [[MONGO_MOD_OPEN]] PreparedTransactionsIterator {
 public:
     virtual ~PreparedTransactionsIterator() = default;
     // Returns the id of a prepared transaction that has been unclaimed on startup recovery or an

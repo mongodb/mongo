@@ -44,7 +44,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 using namespace std::literals::string_view_literals;
 
 /**
@@ -161,4 +161,4 @@ private:
     bool _released = false;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

@@ -38,7 +38,7 @@ namespace mongo {
 
 class ServiceContext;
 
-struct MONGO_MOD_PUBLIC GlobalLockStatsSnapshot {
+struct [[MONGO_MOD_PUBLIC]] GlobalLockStatsSnapshot {
     int64_t totalTimeMicros{0};
     int64_t activeReaders{0};
     int64_t activeWriters{0};
@@ -52,6 +52,6 @@ struct MONGO_MOD_PUBLIC GlobalLockStatsSnapshot {
  * each caller owns its own reference point (e.g. captured at static initialization or at
  * install time).
  */
-MONGO_MOD_PUBLIC GlobalLockStatsSnapshot collectGlobalLockStatsSnapshot(Date_t startedAt);
+[[MONGO_MOD_PUBLIC]] GlobalLockStatsSnapshot collectGlobalLockStatsSnapshot(Date_t startedAt);
 
 }  // namespace mongo

@@ -71,6 +71,6 @@ private:
  * Registers OpenTelemetry mount filesystem gauges and starts a periodic job that samples
  * OS-level mount stats once per second. No-op on unsupported platforms.
  */
-MONGO_MOD_PUBLIC void installSystemMountOtelMetrics(ServiceContext* svcCtx);
+[[MONGO_MOD_PUBLIC]] void installSystemMountOtelMetrics(ServiceContext* svcCtx);
 
 }  // namespace mongo

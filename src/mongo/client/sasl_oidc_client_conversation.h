@@ -40,7 +40,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC SaslOIDCClientConversation : public SaslClientConversation {
+class [[MONGO_MOD_PUBLIC]] SaslOIDCClientConversation : public SaslClientConversation {
     SaslOIDCClientConversation(const SaslOIDCClientConversation&) = delete;
     SaslOIDCClientConversation& operator=(const SaslOIDCClientConversation&) = delete;
 

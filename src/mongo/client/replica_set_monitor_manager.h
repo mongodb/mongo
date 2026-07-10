@@ -65,7 +65,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class BSONObjBuilder;
 class ConnectionString;
@@ -252,4 +252,4 @@ private:
         std::make_shared<ReplicaSetMonitorManagerStats>();
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

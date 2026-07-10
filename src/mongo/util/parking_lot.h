@@ -44,7 +44,7 @@ namespace mongo {
  * ParkingLot.  Specifially, the notify() on this type will be called directly from
  * ParkingLot::unpark(One|All).
  */
-class MONGO_MOD_NEEDS_REPLACEMENT Notifiable {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] Notifiable {
 public:
     /**
      * A call to notify() must either unblock the notifiable immediately, if it is currently

@@ -39,7 +39,7 @@
 #include "mongo/util/modules.h"
 
 namespace mongo {
-class MONGO_MOD_PARENT_PRIVATE AddShardCoordinator final
+class [[MONGO_MOD_PARENT_PRIVATE]] AddShardCoordinator final
     : public RecoverableShardingDDLCoordinator<AddShardCoordinatorDocument> {
 public:
     AddShardCoordinator(ShardingCoordinatorService* service, const BSONObj& initialState);

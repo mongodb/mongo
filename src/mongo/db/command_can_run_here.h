@@ -36,11 +36,11 @@
 
 #include <string>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 bool commandCanRunHere(OperationContext* opCtx,
                        const DatabaseName& dbName,
                        const Command* command,
                        bool inMultiDocumentTransaction);
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

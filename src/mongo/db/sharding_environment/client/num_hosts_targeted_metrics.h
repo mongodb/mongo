@@ -42,7 +42,7 @@ class BSONObjBuilder;
 class OperationContext;
 class ServiceContext;
 
-class MONGO_MOD_PUBLIC NumHostsTargetedMetrics {
+class [[MONGO_MOD_PUBLIC]] NumHostsTargetedMetrics {
 public:
     enum QueryType {
         kFindCmd,

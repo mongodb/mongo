@@ -49,7 +49,7 @@ namespace mozjs {
 /**
  * Reads into a JS Value from some Mongo C++ primitive
  */
-class MONGO_MOD_PUB ValueReader {
+class [[MONGO_MOD_PUBLIC]] ValueReader {
 public:
     /**
      * Depth is used when readers are invoked from ObjectWrappers to avoid

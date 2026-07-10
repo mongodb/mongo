@@ -40,7 +40,7 @@
 
 #include <string_view>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 enum class OCSPPurpose { kClientVerify, kStaple };
 
@@ -69,4 +69,4 @@ private:
     std::unique_ptr<ThreadPool> _pool;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

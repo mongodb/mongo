@@ -49,7 +49,7 @@
 
 namespace mongo {
 
-namespace MONGO_MOD_PARENT_PRIVATE list_databases {
+namespace [[MONGO_MOD_PARENT_PRIVATE]] list_databases {
 using namespace std::literals::string_view_literals;
 constexpr auto kName = "name"sv;
 
@@ -67,9 +67,9 @@ std::unique_ptr<MatchExpression> getFilter(CommandType cmd,
     }
     return std::unique_ptr<MatchExpression>{};
 }
-}  // namespace MONGO_MOD_PARENT_PRIVATE list_databases
+}  // namespace list_databases
 
-namespace MONGO_MOD_PRIVATE list_databases {
+namespace [[MONGO_MOD_PRIVATE]] list_databases {
 
 // Initialize ListDatabasesForAllTenantsReplyItem reply item by setting the tenantId
 void inline initializeItemWithTenantId(ListDatabasesForAllTenantsReplyItem& item,
@@ -140,5 +140,5 @@ int64_t setReplyItems(OperationContext* opCtx,
     return totalSize;
 }
 
-}  // namespace MONGO_MOD_PRIVATE list_databases
+}  // namespace list_databases
 }  // namespace mongo

@@ -45,7 +45,7 @@
 #include <string_view>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC record_id_helpers {
+namespace [[MONGO_MOD_PUBLIC]] record_id_helpers {
 
 /**
  * Converts Timestamp to a RecordId in an unspecified manor that is safe to use as the key to
@@ -101,5 +101,5 @@ RecordId maxRecordId(KeyFormat keyFormat);
  */
 bool isReserved(const RecordId& id);
 
-}  // namespace MONGO_MOD_PUBLIC record_id_helpers
+}  // namespace record_id_helpers
 }  // namespace mongo

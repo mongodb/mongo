@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_OPEN IntegerKeyedContainerBase : public IntegerKeyedContainer {
+class [[MONGO_MOD_OPEN]] IntegerKeyedContainerBase : public IntegerKeyedContainer {
 public:
     explicit IntegerKeyedContainerBase(std::shared_ptr<Ident> ident);
 
@@ -46,7 +46,7 @@ private:
     std::shared_ptr<Ident> _ident;
 };
 
-class MONGO_MOD_OPEN StringKeyedContainerBase : public StringKeyedContainer {
+class [[MONGO_MOD_OPEN]] StringKeyedContainerBase : public StringKeyedContainer {
 public:
     explicit StringKeyedContainerBase(std::shared_ptr<Ident> ident);
 

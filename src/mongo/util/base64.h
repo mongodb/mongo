@@ -40,8 +40,8 @@
 
 #include <fmt/format.h>
 
-namespace MONGO_MOD_PUB mongo {
-namespace MONGO_MOD_FILE_PRIVATE base64_detail {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
+namespace [[MONGO_MOD_FILE_PRIVATE]] base64_detail {
 using namespace std::literals::string_view_literals;
 
 /**
@@ -49,7 +49,7 @@ using namespace std::literals::string_view_literals;
  * into something resembling namespaced implementations.
  */
 template <typename Mode>
-class MONGO_MOD_PUB Base64Impl {
+class [[MONGO_MOD_PUBLIC]] Base64Impl {
 private:
     Base64Impl() = delete;
 
@@ -120,9 +120,9 @@ struct URL {
     static constexpr auto kDecodeTable = invertTable(kEncodeTable, std::make_index_sequence<256>{});
     static constexpr bool kTerminatorRequired = false;
 };
-}  // namespace MONGO_MOD_FILE_PRIVATE base64_detail
+}  // namespace base64_detail
 
 using base64 = typename base64_detail::Base64Impl<base64_detail::Standard>;
 using base64url = typename base64_detail::Base64Impl<base64_detail::URL>;
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

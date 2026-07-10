@@ -186,15 +186,16 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
  *     1. The reshardingFields state indicates that the resharding operation is new, and
  *     2. A state machine does not exist on this node for the given namespace.
  */
-MONGO_MOD_PUBLIC void processReshardingFieldsForCollection(
+[[MONGO_MOD_PUBLIC]] void processReshardingFieldsForCollection(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const CollectionMetadata& metadata,
     const ReshardingFields& reshardingFields);
 
-MONGO_MOD_PUBLIC void clearCollectionMetadata(OperationContext* opCtx, bool scheduleAsyncRefresh);
+[[MONGO_MOD_PUBLIC]] void clearCollectionMetadata(OperationContext* opCtx,
+                                                  bool scheduleAsyncRefresh);
 
-MONGO_MOD_PUBLIC void clearCollectionMetadata(
+[[MONGO_MOD_PUBLIC]] void clearCollectionMetadata(
     OperationContext* opCtx,
     stdx::unordered_set<NamespaceString> namespacesToRefresh,
     bool scheduleAsyncRefresh);

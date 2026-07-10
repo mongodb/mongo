@@ -48,7 +48,7 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /*
  * An alarm scheduler will fill a Future<void> at some time in the future and allow the caller to
@@ -203,4 +203,4 @@ private:
     AlarmMap _alarms;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

@@ -33,7 +33,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
 inline constexpr bool kDebugBuild = true;
@@ -56,4 +56,4 @@ private:
 struct Occasionally : SampleEveryNth<16> {};
 struct Rarely : SampleEveryNth<128> {};
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

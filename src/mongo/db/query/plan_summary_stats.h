@@ -77,7 +77,7 @@ inline void appendExecutionTimeFields(BSONObjBuilder& bob, const QueryExecTime& 
  * A container for the summary statistics that the profiler, slow query log, and
  * other non-explain debug mechanisms may want to collect.
  */
-struct MONGO_MOD_PUBLIC PlanSummaryStats {
+struct [[MONGO_MOD_PUBLIC]] PlanSummaryStats {
 
     uint64_t estimateObjectSizeInBytes() const {
         auto strSize = [](const std::string& str) {

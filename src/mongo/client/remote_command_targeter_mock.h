@@ -49,7 +49,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC RemoteCommandTargeterMock final : public RemoteCommandTargeter {
+class [[MONGO_MOD_PUBLIC]] RemoteCommandTargeterMock final : public RemoteCommandTargeter {
 public:
     RemoteCommandTargeterMock();
     ~RemoteCommandTargeterMock() override;

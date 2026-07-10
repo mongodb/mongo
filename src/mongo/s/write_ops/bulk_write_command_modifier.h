@@ -58,7 +58,7 @@ namespace mongo {
  * Helper functions which add new operations into an existing BulkWriteCommandRequest.
  * Only used from tests.
  */
-class MONGO_MOD_FILE_PRIVATE BulkWriteCommandModifier {
+class [[MONGO_MOD_FILE_PRIVATE]] BulkWriteCommandModifier {
 public:
     BulkWriteCommandModifier(BulkWriteCommandRequest* request, size_t capacity = 0)
         : _request(request), _ops(request->getOps()), _nsInfos(request->getNsInfo()) {

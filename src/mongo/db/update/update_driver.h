@@ -78,7 +78,7 @@ struct DocumentUpdateRecord {
     boost::optional<BSONObj> diff;
 };
 
-class MONGO_MOD_PUBLIC UpdateDriver {
+class [[MONGO_MOD_PUBLIC]] UpdateDriver {
 public:
     enum class UpdateType { kOperator, kReplacement, kPipeline, kDelta, kTransform };
 

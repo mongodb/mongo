@@ -49,7 +49,7 @@ namespace mongo {
 /**
  * Diagnostic logging of sharding metadata events (changelog and actionlog).
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ShardingLogging {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardingLogging {
 public:
     /**
      * Retrieves the ShardingLogging instance associated with the current service/operation context.

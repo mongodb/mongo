@@ -41,7 +41,7 @@
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/flat_hash_set.h>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class ValueComparator {
 public:
@@ -241,4 +241,4 @@ template <typename T>
 using ValueFlatUnorderedMap =
     absl::flat_hash_map<Value, T, ValueComparator::Hasher, ValueComparator::EqualTo>;
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

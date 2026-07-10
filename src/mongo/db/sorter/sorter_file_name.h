@@ -33,7 +33,7 @@
 
 #include <boost/filesystem/path.hpp>
 
-MONGO_MOD_PUB;
+[[MONGO_MOD_PUBLIC]];
 namespace mongo::sorter {
 /**
  * Generates a new file name on each call using a static, atomic and monotonically increasing

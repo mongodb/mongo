@@ -39,7 +39,7 @@
 
 #include <boost/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 namespace waitable_atomic_details {
 
@@ -319,7 +319,7 @@ public:
     }
 
 private:
-    MONGO_MOD_PRIVATE friend bool hasWaiters_forTest(const WaitableAtomic& wa) {
+    [[MONGO_MOD_PRIVATE]] friend bool hasWaiters_forTest(const WaitableAtomic& wa) {
         return wa._waitFlag.load() & 1;
     }
 
@@ -344,4 +344,4 @@ private:
     mutable BasicWaitableAtomic<uint32_t> _waitFlag = 0;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

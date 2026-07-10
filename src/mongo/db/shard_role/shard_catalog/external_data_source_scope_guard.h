@@ -46,7 +46,7 @@ namespace mongo {
  * This class makes sure that virtual collections that are created for external data sources are
  * dropped when it's destroyed.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ExternalDataSourceScopeGuard {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ExternalDataSourceScopeGuard {
 public:
     // Makes ExternalDataSourceScopeGuard a decoration of ClientCursor.
     static const ClientCursor::Decoration<std::shared_ptr<ExternalDataSourceScopeGuard>> get;

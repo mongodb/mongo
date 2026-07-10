@@ -43,7 +43,7 @@
 
 #include <fmt/format.h>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 /**
  * Defines a basic set of matchers to be used with the ASSERT_THAT macro (see
@@ -56,7 +56,7 @@ namespace mongo::unittest::match {
 using namespace ::testing;
 using ::testing::Matcher;
 
-namespace MONGO_MOD_FILE_PRIVATE match_details {
+namespace [[MONGO_MOD_FILE_PRIVATE]] match_details {
 inline std::string maybeNegate(bool negation, std::string str) {
     if (negation)
         return fmt::format("not ({})", str);
@@ -115,7 +115,7 @@ public:
 
     Matcher<const Exception&> _matcher;
 };
-}  // namespace MONGO_MOD_FILE_PRIVATE match_details
+}  // namespace match_details
 
 inline auto Any() {
     return _;

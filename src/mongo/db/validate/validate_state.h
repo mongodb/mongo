@@ -72,7 +72,7 @@ namespace collection_validation {
  * the given scope. It must only be used to coordinate validation with concurrent
  * oplog batch applications.
  */
-MONGO_MOD_PUBLIC Lock::ExclusiveLock obtainExclusiveValidationLock(OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] Lock::ExclusiveLock obtainExclusiveValidationLock(OperationContext* opCtx);
 
 enum struct FastCountType {
     // The size storer table created by WiredTiger.

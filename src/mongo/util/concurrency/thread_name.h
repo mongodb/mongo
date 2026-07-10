@@ -37,7 +37,7 @@
 #include <string_view>
 #include <utility>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * A nullable handle pinning a ref-counted immutable string.
@@ -56,7 +56,7 @@ namespace MONGO_MOD_PUB mongo {
  * to the same string and will compare equal to each other.
  *
  */
-class MONGO_MOD_PRIVATE ThreadNameRef {
+class [[MONGO_MOD_PRIVATE]] ThreadNameRef {
 public:
     /** An empty ref (empty refs still stringify as "-"). */
     ThreadNameRef() = default;
@@ -116,7 +116,7 @@ private:
  * This string is not limited in length, so it will be a better name
  * than the name the OS uses to refer to the same thread.
  */
-MONGO_MOD_PRIVATE ThreadNameRef getThreadNameRef();
+[[MONGO_MOD_PRIVATE]] ThreadNameRef getThreadNameRef();
 
 /**
  * Swaps in a new active name, returns the old one if it was active.
@@ -127,7 +127,7 @@ MONGO_MOD_PRIVATE ThreadNameRef getThreadNameRef();
  * - Populating the "ctx" field for log lines.
  * - Providing a thread name to GDB.
  */
-MONGO_MOD_PRIVATE ThreadNameRef setThreadNameRef(ThreadNameRef name);
+[[MONGO_MOD_PRIVATE]] ThreadNameRef setThreadNameRef(ThreadNameRef name);
 
 /**
  * Marks the ThreadNameRef attached to the current thread as inactive.
@@ -140,7 +140,7 @@ MONGO_MOD_PRIVATE ThreadNameRef setThreadNameRef(ThreadNameRef name);
  * temporarily set to the same `ThreadNameRef` repeatedly, so setting it and
  * resetting it with the OS on each change would be wasteful.
  */
-MONGO_MOD_PRIVATE void releaseThreadNameRef();
+[[MONGO_MOD_PRIVATE]] void releaseThreadNameRef();
 
 /**
  * Sets the name of the current thread.
@@ -159,4 +159,4 @@ inline std::string_view getThreadName() {
     return *getThreadNameRef();
 }
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

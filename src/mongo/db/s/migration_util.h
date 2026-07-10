@@ -154,7 +154,8 @@ void advanceTransactionOnRecipient(OperationContext* opCtx,
  * Submits an asynchronous task to scan config.migrationCoordinators and drive each unfinished
  * migration coordination to completion.
  */
-MONGO_MOD_PUBLIC void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx, long long term);
+[[MONGO_MOD_PUBLIC]] void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx,
+                                                               long long term);
 
 /**
  * Instructs the recipient shard to release its critical section.
@@ -198,20 +199,20 @@ void deleteMigrationRecipientRecoveryDocument(OperationContext* opCtx, const UUI
  * If there was any ongoing receiveChunk that requires recovery (i.e that has reached the
  * critical section stage), restores the MigrationDestinationManager state.
  */
-MONGO_MOD_PUBLIC void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx);
 
 /**
  * Recovers all unfinished migrations pending recovery.
  * Note: This method assumes its caller is preventing new migrations from starting.
  */
-// TODO (SERVER-98118): remove MONGO_MOD_NEEDS_REPLACEMENT once 9.0 becomes last LTS.
-MONGO_MOD_NEEDS_REPLACEMENT void drainMigrationsPendingRecovery(OperationContext* opCtx);
+// TODO (SERVER-98118): remove [[MONGO_MOD_NEEDS_REPLACEMENT]] once 9.0 becomes last LTS.
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void drainMigrationsPendingRecovery(OperationContext* opCtx);
 
 /**
  * Asserts no migration is in progress or pending recovery.
  */
 // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
-MONGO_MOD_NEEDS_REPLACEMENT void assertNoMigrationsRemaining(OperationContext* opCtx);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void assertNoMigrationsRemaining(OperationContext* opCtx);
 
 /**
  * Refreshes the filtering metadata for the given namespace from the config server, retrying until
@@ -232,7 +233,7 @@ void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const Namespa
  * ShardingCoordinatorService::_onServiceInitialization() (see
  * notify_range_deleter_after_move_range_recovery.h).
  */
-MONGO_MOD_PUBLIC void registerMigrationRecoveryJobs(OperationContext* opCtx, long long term);
+[[MONGO_MOD_PUBLIC]] void registerMigrationRecoveryJobs(OperationContext* opCtx, long long term);
 
 /**
  * Submits an asynchronous task to recover the migration until it succeeds or the node steps down.
@@ -245,7 +246,7 @@ SemiFuture<void> asyncRecoverMigrationUntilSuccessOrStepDown(OperationContext* o
  * within the context of a FCV downgrade.
  * TODO SERVER-103838 Remove this method and its invocations once 9.0 becomes LTS.
  */
-MONGO_MOD_PUBLIC void drainMigrationsOnFcvDowngrade(OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] void drainMigrationsOnFcvDowngrade(OperationContext* opCtx);
 
 }  // namespace migrationutil
 }  // namespace mongo
