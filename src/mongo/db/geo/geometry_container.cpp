@@ -951,36 +951,59 @@ Status GeometryContainer::parseFromGeoJSON(bool skipValidation) {
     Status status = Status::OK();
     vector<S2Region*> regions;
 
+    // Resets `member` if `status` is not OK. Returns true when the caller should propagate
+    // the error, ensuring no partially-initialized member escapes on parse failure.
+    auto resetOnError = [&status](auto& member) {
+        if (status.isOK())
+            return false;
+        member.reset();
+        return true;
+    };
+
     if (GeoParser::GEOJSON_POINT == type) {
         _point.reset(new PointWithCRS());
         status = GeoParser::parseGeoJSONPoint(obj, _point.get());
+        if (resetOnError(_point))
+            return status;
     } else if (GeoParser::GEOJSON_LINESTRING == type) {
         _line.reset(new LineWithCRS());
         status = GeoParser::parseGeoJSONLine(obj, skipValidation, _line.get());
+        if (resetOnError(_line))
+            return status;
     } else if (GeoParser::GEOJSON_POLYGON == type) {
         _polygon.reset(new PolygonWithCRS());
         status = GeoParser::parseGeoJSONPolygon(obj, skipValidation, _polygon.get());
+        if (resetOnError(_polygon))
+            return status;
     } else if (GeoParser::GEOJSON_MULTI_POINT == type) {
         _multiPoint.reset(new MultiPointWithCRS());
         status = GeoParser::parseMultiPoint(obj, _multiPoint.get());
+        if (resetOnError(_multiPoint))
+            return status;
         for (size_t i = 0; i < _multiPoint->cells.size(); ++i) {
             regions.push_back(&_multiPoint->cells[i]);
         }
     } else if (GeoParser::GEOJSON_MULTI_LINESTRING == type) {
         _multiLine.reset(new MultiLineWithCRS());
         status = GeoParser::parseMultiLine(obj, skipValidation, _multiLine.get());
+        if (resetOnError(_multiLine))
+            return status;
         for (size_t i = 0; i < _multiLine->lines.size(); ++i) {
             regions.push_back(_multiLine->lines[i].get());
         }
     } else if (GeoParser::GEOJSON_MULTI_POLYGON == type) {
         _multiPolygon.reset(new MultiPolygonWithCRS());
         status = GeoParser::parseMultiPolygon(obj, skipValidation, _multiPolygon.get());
+        if (resetOnError(_multiPolygon))
+            return status;
         for (size_t i = 0; i < _multiPolygon->polygons.size(); ++i) {
             regions.push_back(_multiPolygon->polygons[i].get());
         }
     } else if (GeoParser::GEOJSON_GEOMETRY_COLLECTION == type) {
         _geometryCollection.reset(new GeometryCollection());
         status = GeoParser::parseGeometryCollection(obj, skipValidation, _geometryCollection.get());
+        if (resetOnError(_geometryCollection))
+            return status;
 
         // Add regions
         for (size_t i = 0; i < _geometryCollection->points.size(); ++i) {
@@ -1013,10 +1036,6 @@ Status GeometryContainer::parseFromGeoJSON(bool skipValidation) {
     } else {
         MONGO_UNREACHABLE_TASSERT(9911954);
     }
-
-    // Check parsing result.
-    if (!status.isOK())
-        return status;
 
     if (regions.size() > 0) {
         // S2RegionUnion doesn't take ownership of pointers.

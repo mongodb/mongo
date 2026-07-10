@@ -751,4 +751,40 @@ TEST_F(S2KeyGeneratorTest, StrictWindingPolygonInGeometryCollectionRejectsGracef
         DBException,
         16755);
 }
+
+// Regression test: a v4 2dsphere index with a strict-winding Polygon whose "coordinates" field is
+// a scalar (not an array) must not crash the server. The v4 parse path tries GeoJSON first; when
+// that fails it falls back to legacy point parsing. A bug left _polygon partially initialized
+// (bigPolygon allocated but _loop == nullptr), which caused a null dereference in
+// BigSimplePolygon::GetCapBound() during index key generation.
+TEST_F(S2KeyGeneratorTest, V4IndexStrictWindingPolygonWithScalarCoordinatesAndLegacyPointFields) {
+    BSONObj keyPattern = fromjson("{loc: '2dsphere'}");
+    BSONObj infoObj = fromjson("{key: {loc: '2dsphere'}, '2dsphereIndexVersion': 4}");
+    S2IndexingParams params;
+    const CollatorInterface* collator = nullptr;
+    index2dsphere::initialize2dsphereParams(infoObj, collator, &params);
+
+    // The document has numeric first-two fields (triggers legacy point fallback in v4),
+    // type Polygon with strict-winding CRS, and a non-array "coordinates" field.
+    BSONObj doc = fromjson(
+        "{loc: {a: 1, b: 2, type: 'Polygon',"
+        " crs: {type: 'name', properties:"
+        "       {name: 'urn:x-mongodb:crs:strictwinding:EPSG:4326'}},"
+        " coordinates: 0}}");
+
+    KeyStringSet keys;
+    MultikeyPaths multikeyPaths;
+    // GeoJSON parsing fails (coordinates is not an array), _polygon is reset, legacy point
+    // fallback succeeds on the numeric first-two fields {a:1, b:2} — one key generated.
+    index2dsphere::getS2Keys(allocator,
+                             doc,
+                             keyPattern,
+                             params,
+                             &keys,
+                             &multikeyPaths,
+                             key_string::Version::kLatestVersion,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                             Ordering::make(BSONObj()));
+    ASSERT_EQUALS(1U, keys.size());
+}
 }  // namespace
