@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2025-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,43 +27,34 @@
  *    it in the license file.
  */
 
+#pragma once
+
+#include "mongo/base/status_with.h"
 #include "mongo/otel/traces/tracer_provider_service.h"
 
-#include "mongo/util/static_immortal.h"
-
-#include <chrono>
-#include <utility>
+#include <memory>
+#include <string>
 
 namespace mongo::otel::traces {
-namespace {
 
-std::unique_ptr<TracerProviderService>& globalTracerProviderService() {
-    static StaticImmortal<std::unique_ptr<TracerProviderService>> instance;
-    return *instance;
-}
+/**
+ * Creates a TracerProviderService whose tracer provider exports spans over HTTP, configured via
+ * the relevant server parameters.
+ */
+StatusWith<std::unique_ptr<TracerProviderService>> createHttpTracerProviderService(
+    std::string name, std::string endpoint);
 
-}  // namespace
+/**
+ * Creates a TracerProviderService whose tracer provider exports spans to files, configured via the
+ * relevant server parameters.
+ */
+StatusWith<std::unique_ptr<TracerProviderService>> createFileTracerProviderService(
+    std::string name, std::string directory);
 
-TracerProviderService* getGlobalTracerProviderService() {
-    return globalTracerProviderService().get();
-}
-
-void setGlobalTracerProviderService(std::unique_ptr<TracerProviderService> service) {
-    globalTracerProviderService() = std::move(service);
-}
-
-std::unique_ptr<TracerProviderService> swapGlobalTracerProviderServiceForTest(
-    std::unique_ptr<TracerProviderService> newService) {
-    return std::exchange(globalTracerProviderService(), std::move(newService));
-}
-
-void TracerProviderService::shutdown() {
-    if (_enabled && _tracerProvider) {
-        auto tracer = _tracerProvider->GetTracer("mongodb");
-        tracer->Close(std::chrono::seconds{1});
-        _tracerProvider = nullptr;
-        _enabled = false;
-    }
-}
+/**
+ * Creates a TracerProviderService with a no-op tracer provider. This should be used when tracing is
+ * disabled, or for tests when an arbitrary service is needed.
+ */
+std::unique_ptr<TracerProviderService> createNoOpTracerProviderService();
 
 }  // namespace mongo::otel::traces

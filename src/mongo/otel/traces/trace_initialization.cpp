@@ -32,6 +32,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/otel/traces/trace_settings_gen.h"
 #include "mongo/otel/traces/tracer_provider_service.h"
+#include "mongo/otel/traces/tracer_provider_service_factory.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -40,29 +41,6 @@ namespace otel {
 namespace traces {
 
 namespace {
-
-Status initializeHttp(std::string name, std::string endpoint) {
-    auto tracerProviderService = getGlobalTracerProviderService();
-    if (!tracerProviderService) {
-        return Status(ErrorCodes::InternalError, "TracerProviderService not initialized");
-    }
-    return tracerProviderService->initializeHttp(name, endpoint);
-}
-
-Status initializeFile(std::string name, std::string directory) {
-    auto tracerProviderService = getGlobalTracerProviderService();
-    if (!tracerProviderService) {
-        return Status(ErrorCodes::InternalError, "TracerProviderService not initialized");
-    }
-    return tracerProviderService->initializeFile(name, directory);
-}
-
-void initializeNoOp() {
-    auto tracerProviderService = getGlobalTracerProviderService();
-    if (tracerProviderService) {
-        tracerProviderService->initializeNoOp();
-    }
-}
 
 /** Throws InvalidOptions if any combination of server parameters is logically inconsistent. */
 void validateOptions() {
@@ -91,20 +69,25 @@ void validateOptions() {
 Status initialize(std::string name) {
     validateOptions();
 
-    // In production mongod this is always a fresh service; in tests, callers may pre-set a
-    // mock provider via setGlobalTracerProviderService(), so only create one if absent.
-    if (!getGlobalTracerProviderService()) {
-        setGlobalTracerProviderService(TracerProviderService::create());
+    if (!gOpenTelemetryHttpEndpoint.empty()) {
+        auto swTracerProviderService =
+            createHttpTracerProviderService(name, gOpenTelemetryHttpEndpoint);
+        if (!swTracerProviderService.isOK()) {
+            return swTracerProviderService.getStatus();
+        }
+        setGlobalTracerProviderService(std::move(swTracerProviderService.getValue()));
+    } else if (!gOpenTelemetryTraceDirectory.empty()) {
+        auto swTracerProviderService =
+            createFileTracerProviderService(name, gOpenTelemetryTraceDirectory);
+        if (!swTracerProviderService.isOK()) {
+            return swTracerProviderService.getStatus();
+        }
+        setGlobalTracerProviderService(std::move(swTracerProviderService.getValue()));
+    } else {
+        setGlobalTracerProviderService(createNoOpTracerProviderService());
     }
 
-    if (!gOpenTelemetryHttpEndpoint.empty()) {
-        return initializeHttp(name, gOpenTelemetryHttpEndpoint);
-    } else if (!gOpenTelemetryTraceDirectory.empty()) {
-        return initializeFile(name, gOpenTelemetryTraceDirectory);
-    } else {
-        initializeNoOp();
-        return Status::OK();
-    }
+    return Status::OK();
 }
 
 void shutdown() {

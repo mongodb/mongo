@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/otel/traces/tracer_provider_service.h"
+#include "mongo/otel/traces/tracer_provider_service_factory.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/otel/traces/trace_settings.h"
@@ -73,8 +73,9 @@ std::string getStringAttr(const opentelemetry::sdk::resource::Resource& resource
 }
 
 TEST(HttpInitTest, ResourceHasServiceName) {
-    std::unique_ptr<TracerProviderService> service = TracerProviderService::create();
-    ASSERT_OK(service->initializeHttp(kServiceName, kHttpEndpoint));
+    auto swService = createHttpTracerProviderService(kServiceName, kHttpEndpoint);
+    ASSERT_OK(swService);
+    auto service = std::move(swService.getValue());
 
     auto* sdkProvider = getSdkProvider(*service);
     ASSERT_NE(sdkProvider, nullptr);
@@ -82,8 +83,9 @@ TEST(HttpInitTest, ResourceHasServiceName) {
 }
 
 TEST(HttpInitTest, ResourceHasServiceInstanceId) {
-    std::unique_ptr<TracerProviderService> service = TracerProviderService::create();
-    ASSERT_OK(service->initializeHttp(kServiceName, kHttpEndpoint));
+    auto swService = createHttpTracerProviderService(kServiceName, kHttpEndpoint);
+    ASSERT_OK(swService);
+    auto service = std::move(swService.getValue());
 
     auto* sdkProvider = getSdkProvider(*service);
     ASSERT_NE(sdkProvider, nullptr);
@@ -92,12 +94,13 @@ TEST(HttpInitTest, ResourceHasServiceInstanceId) {
 }
 
 TEST(HttpInitTest, UserResourceAttributesAppearInProvider) {
-    std::unique_ptr<TracerProviderService> service = TracerProviderService::create();
     unittest::ServerParameterGuard attrsParam{
         "openTelemetryTracingResourceAttributes",
         BSON("deployment.environment" << "staging" << "custom.key" << "custom-val")};
 
-    ASSERT_OK(service->initializeHttp(kServiceName, kHttpEndpoint));
+    auto swService = createHttpTracerProviderService(kServiceName, kHttpEndpoint);
+    ASSERT_OK(swService);
+    auto service = std::move(swService.getValue());
 
     auto* sdkProvider = getSdkProvider(*service);
     ASSERT_NE(sdkProvider, nullptr);
@@ -108,13 +111,14 @@ TEST(HttpInitTest, UserResourceAttributesAppearInProvider) {
 }
 
 TEST(HttpInitTest, UserAttributeOverrideServiceNameAndPidOverride) {
-    std::unique_ptr<TracerProviderService> service = TracerProviderService::create();
     unittest::ServerParameterGuard attrsParam{
         "openTelemetryTracingResourceAttributes",
         BSON("service.name" << "user-supplied-name" << "service.instance.id" << "user-pid"
                             << "custom.key" << "custom-val")};
 
-    ASSERT_OK(service->initializeHttp(kServiceName, kHttpEndpoint));
+    auto swService = createHttpTracerProviderService(kServiceName, kHttpEndpoint);
+    ASSERT_OK(swService);
+    auto service = std::move(swService.getValue());
 
     auto* sdkProvider = getSdkProvider(*service);
     ASSERT_NE(sdkProvider, nullptr);
@@ -124,9 +128,10 @@ TEST(HttpInitTest, UserAttributeOverrideServiceNameAndPidOverride) {
 }
 
 TEST(FileInitTest, ResourceHasServiceName) {
-    std::unique_ptr<TracerProviderService> service = TracerProviderService::create();
     TempDir dir("tmp");
-    ASSERT_OK(service->initializeFile(kServiceName, dir.path()));
+    auto swService = createFileTracerProviderService(kServiceName, dir.path());
+    ASSERT_OK(swService);
+    auto service = std::move(swService.getValue());
 
     auto* sdkProvider = getSdkProvider(*service);
     ASSERT_NE(sdkProvider, nullptr);
@@ -134,9 +139,10 @@ TEST(FileInitTest, ResourceHasServiceName) {
 }
 
 TEST(FileInitTest, ResourceHasServiceInstanceId) {
-    std::unique_ptr<TracerProviderService> service = TracerProviderService::create();
     TempDir dir("tmp");
-    ASSERT_OK(service->initializeFile(kServiceName, dir.path()));
+    auto swService = createFileTracerProviderService(kServiceName, dir.path());
+    ASSERT_OK(swService);
+    auto service = std::move(swService.getValue());
 
     auto* sdkProvider = getSdkProvider(*service);
     ASSERT_NE(sdkProvider, nullptr);
@@ -145,12 +151,13 @@ TEST(FileInitTest, ResourceHasServiceInstanceId) {
 }
 
 TEST(FileInitTest, UserResourceAttributesAppearInProvider) {
-    std::unique_ptr<TracerProviderService> service = TracerProviderService::create();
     unittest::ServerParameterGuard attrsParam{"openTelemetryTracingResourceAttributes",
                                               BSON("deployment.environment" << "production")};
 
     TempDir dir("tmp");
-    ASSERT_OK(service->initializeFile(kServiceName, dir.path()));
+    auto swService = createFileTracerProviderService(kServiceName, dir.path());
+    ASSERT_OK(swService);
+    auto service = std::move(swService.getValue());
 
     auto* sdkProvider = getSdkProvider(*service);
     ASSERT_NE(sdkProvider, nullptr);
@@ -158,14 +165,15 @@ TEST(FileInitTest, UserResourceAttributesAppearInProvider) {
 }
 
 TEST(FileInitTest, UserAttributeOverrideServiceNameAndPidOverride) {
-    std::unique_ptr<TracerProviderService> service = TracerProviderService::create();
     unittest::ServerParameterGuard attrsParam{
         "openTelemetryTracingResourceAttributes",
         BSON("service.name" << "user-supplied-name" << "service.instance.id" << "user-pid"
                             << "custom.key" << "custom-val")};
 
     TempDir dir("tmp");
-    ASSERT_OK(service->initializeFile(kServiceName, dir.path()));
+    auto swService = createFileTracerProviderService(kServiceName, dir.path());
+    ASSERT_OK(swService);
+    auto service = std::move(swService.getValue());
 
     auto* sdkProvider = getSdkProvider(*service);
     ASSERT_NE(sdkProvider, nullptr);

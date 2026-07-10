@@ -30,6 +30,7 @@
 #include "mongo/otel/traces/trace_initialization.h"
 
 #include "mongo/otel/traces/tracer_provider_service.h"
+#include "mongo/otel/traces/tracer_provider_service_factory.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
@@ -46,7 +47,7 @@ class TraceInitializationTest : public unittest::Test {
 public:
     void setUp() override {
         // Initialize TracerProviderService with no-op provider
-        auto tracerProviderService = TracerProviderService::create();
+        auto tracerProviderService = createNoOpTracerProviderService();
         tracerProviderService->setTracerProvider_ForTest(
             std::make_shared<opentelemetry::trace::NoopTracerProvider>());
         setGlobalTracerProviderService(std::move(tracerProviderService));

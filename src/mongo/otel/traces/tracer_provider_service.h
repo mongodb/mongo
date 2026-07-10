@@ -29,10 +29,9 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 
 #include <memory>
-#include <string>
 
 #ifdef MONGO_CONFIG_OTEL
 #include <opentelemetry/trace/provider.h>
@@ -43,23 +42,17 @@ namespace mongo::otel::traces {
 /**
  * Service class that manages the OpenTelemetry TracerProvider. This allows the tracer provider to
  * be isolated from other code that may interact with the OpenTelemetry library.
+ *
+ * Instances are constructed with an already-created tracer provider (or none, if tracing is
+ * disabled). The logic for building a tracer provider (e.g. from an HTTP or file OTLP exporter)
+ * and its dependencies (OTLP exporters, trace settings, etc.) lives in a separate library; see
+ * tracer_provider_service_factory.h.
  */
 class TracerProviderService {
 public:
-    /**
-     * Initialize the tracer provider with HTTP exporter.
-     */
-    Status initializeHttp(std::string name, std::string endpoint);
-
-    /**
-     * Initialize the tracer provider with file exporter.
-     */
-    Status initializeFile(std::string name, std::string directory);
-
-    /**
-     * Initialize with no-op tracer provider (when tracing is disabled).
-     */
-    void initializeNoOp();
+    TracerProviderService(std::shared_ptr<opentelemetry::trace::TracerProvider> tracerProvider,
+                          bool enabled)
+        : _tracerProvider(std::move(tracerProvider)), _enabled(enabled) {}
 
     /**
      * Shutdown the tracer provider.
@@ -80,14 +73,6 @@ public:
         return _enabled;
     }
 
-    /**
-     * Factory method for creating TracerProviderService instances.
-     * This is needed for testing and should be used instead of direct construction.
-     */
-    static std::unique_ptr<TracerProviderService> create() {
-        return std::unique_ptr<TracerProviderService>(new TracerProviderService());
-    }
-
     void setTracerProvider_ForTest(
         std::shared_ptr<opentelemetry::trace::TracerProvider> tracerProvider) {
         _tracerProvider = tracerProvider;
@@ -95,8 +80,6 @@ public:
     }
 
 private:
-    TracerProviderService() = default;
-
     std::shared_ptr<opentelemetry::trace::TracerProvider> _tracerProvider;
     bool _enabled = false;
 };

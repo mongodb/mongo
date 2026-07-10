@@ -33,6 +33,7 @@
 #include "mongo/otel/traces/mock_exporter.h"
 #include "mongo/otel/traces/span/span_names.h"
 #include "mongo/otel/traces/tracer_provider_service.h"
+#include "mongo/otel/traces/tracer_provider_service_factory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/modules.h"
 
@@ -74,7 +75,7 @@ public:
             opentelemetry::sdk::trace::TracerProviderFactory::Create(std::move(processor),
                                                                      resource);
         // Create and set the TracerProviderService
-        auto tracerProviderService = TracerProviderService::create();
+        auto tracerProviderService = createNoOpTracerProviderService();
         tracerProviderService->setTracerProvider_ForTest(provider);
 
         setGlobalTracerProviderService(std::move(tracerProviderService));

@@ -30,6 +30,8 @@
 #include "mongo/otel/traces/traces_test_util.h"
 
 #ifdef MONGO_CONFIG_OTEL
+#include "mongo/otel/traces/tracer_provider_service_factory.h"
+
 #include <opentelemetry/sdk/resource/resource.h>
 #include <opentelemetry/sdk/trace/simple_processor_factory.h>
 #include <opentelemetry/sdk/trace/tracer_provider_factory.h>
@@ -145,7 +147,7 @@ OtelTracesCapturer::OtelTracesCapturer() {
         opentelemetry::sdk::trace::SimpleSpanProcessorFactory::Create(std::move(uniqueExporter));
     auto provider = opentelemetry::sdk::trace::TracerProviderFactory::Create(std::move(processor));
 
-    auto service = TracerProviderService::create();
+    auto service = createNoOpTracerProviderService();
     service->setTracerProvider_ForTest(std::move(provider));
     _savedProvider = swapGlobalTracerProviderServiceForTest(std::move(service));
 

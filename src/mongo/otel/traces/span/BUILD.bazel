@@ -65,6 +65,7 @@ mongo_cc_unit_test(
     deps = [
         ":span",
         "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/otel/traces:tracer_provider_service_factory",
         "//src/mongo/otel/traces:tracing_test_util",
         "//src/mongo/otel/traces/sampler",
         "//src/mongo/unittest:server_parameter_guard",

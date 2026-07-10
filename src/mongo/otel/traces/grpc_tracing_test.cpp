@@ -28,6 +28,7 @@
  */
 
 #include "mongo/otel/traces/tracer_provider_service.h"
+#include "mongo/otel/traces/tracer_provider_service_factory.h"
 #include "mongo/unittest/unittest.h"
 
 #include <opentelemetry/exporters/otlp/otlp_grpc_exporter_factory.h>
@@ -46,7 +47,7 @@ class GRPCTracingTest : public unittest::Test {
 public:
     void setUp() override {
         // Initialize TracerProviderService with a basic provider
-        auto tracerProviderService = TracerProviderService::create();
+        auto tracerProviderService = createNoOpTracerProviderService();
         tracerProviderService->setTracerProvider_ForTest(
             opentelemetry::trace::Provider::GetTracerProvider());
         setGlobalTracerProviderService(std::move(tracerProviderService));
