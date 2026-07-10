@@ -18,7 +18,6 @@ export const sampleDocFieldNames = {
     schemaVersionField: "schemaVersion",
 };
 
-// TODO SERVER-128327: may need to update for full collection scan as well
 export function getExpectedSamplingMethod(db, requestedSamplingMethod) {
     const {internalQuerySamplingBySequentialScan, internalQuerySamplingByStrides} =
         assert.commandWorked(
