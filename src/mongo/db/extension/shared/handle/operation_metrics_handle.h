@@ -70,7 +70,9 @@ public:
     }
 
     static void assertVTableConstraints(const VTable_t& vtable) {
-        tassert(11265504, "HostOperationMetrics' 'serialize' is null", vtable.serialize != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "HostOperationMetrics' 'serialize' is null",
+                vtable.serialize != nullptr);
     };
 };
 }  // namespace mongo::extension

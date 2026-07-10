@@ -342,31 +342,31 @@ TEST(
     assertExpectedMetricsOnError(2, 3);
 }
 
-DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsGetCode, "10930105") {
+DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsGetCode, "517") {
     auto vtable = ExtensionStatusOK::getVTable();
     vtable.get_code = nullptr;
     StatusAPI::assertVTableConstraints(vtable);
 }
 
-DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsGetReason, "10930106") {
+DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsGetReason, "517") {
     auto vtable = ExtensionStatusOK::getVTable();
     vtable.get_reason = nullptr;
     StatusAPI::assertVTableConstraints(vtable);
 }
 
-DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsSetCode, "11186306") {
+DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsSetCode, "517") {
     auto vtable = ExtensionStatusOK::getVTable();
     vtable.set_code = nullptr;
     StatusAPI::assertVTableConstraints(vtable);
 }
 
-DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsSetReason, "11186309") {
+DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsSetReason, "517") {
     auto vtable = ExtensionStatusOK::getVTable();
     vtable.set_reason = nullptr;
     StatusAPI::assertVTableConstraints(vtable);
 }
 
-DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsClone, "11186310") {
+DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsClone, "517") {
     auto vtable = ExtensionStatusOK::getVTable();
     vtable.clone = nullptr;
     StatusAPI::assertVTableConstraints(vtable);

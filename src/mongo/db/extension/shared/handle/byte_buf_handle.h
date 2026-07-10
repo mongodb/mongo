@@ -70,7 +70,9 @@ public:
     }
 
     static void assertVTableConstraints(const VTable_t& vtable) {
-        tassert(10806301, "ByteBuf 'get_view' is null", vtable.get_view != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "ByteBuf 'get_view' is null",
+                vtable.get_view != nullptr);
     };
 };
 

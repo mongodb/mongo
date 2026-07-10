@@ -69,8 +69,12 @@ public:
     }
 
     static void assertVTableConstraints(const VTable_t& vtable) {
-        tassert(11591603, "ExpandedArrayContainer 'size' is null", vtable.size != nullptr);
-        tassert(11591604, "ExpandedArrayContainer 'transfer' is null", vtable.transfer != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "ExpandedArrayContainer 'size' is null",
+                vtable.size != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "ExpandedArrayContainer 'transfer' is null",
+                vtable.transfer != nullptr);
     }
 
 protected:

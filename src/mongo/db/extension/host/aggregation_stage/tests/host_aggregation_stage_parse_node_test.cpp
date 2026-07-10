@@ -100,23 +100,23 @@ TEST(HostParseNodeTest, IsNotHostAllocated) {
     ASSERT_FALSE(host::HostAggStageParseNodeAdapter::isHostAllocated(*handle.get()));
 }
 
-DEATH_TEST(HostParseNodeVTableTestDeathTest, InvalidParseNodeVTableFailsGetName, "11217600") {
+DEATH_TEST(HostParseNodeVTableDeathTest, InvalidParseNodeVTableFailsGetName, "517") {
     auto vtable = host::HostAggStageParseNodeAdapter::getVTable();
     vtable.get_name = nullptr;
     AggStageParseNodeAPI::assertVTableConstraints(vtable);
-};
+}
 
-DEATH_TEST(HostParseNodeVTableTestDeathTest, InvalidParseNodeVTableFailsGetQueryShape, "10977600") {
+DEATH_TEST(HostParseNodeVTableDeathTest, InvalidParseNodeVTableFailsGetQueryShape, "517") {
     auto vtable = host::HostAggStageParseNodeAdapter::getVTable();
     vtable.get_query_shape = nullptr;
     AggStageParseNodeAPI::assertVTableConstraints(vtable);
-};
+}
 
-DEATH_TEST(HostParseNodeVTableTestDeathTest, InvalidParseNodeVTableFailsExpand, "10977601") {
+DEATH_TEST(HostParseNodeVTableDeathTest, InvalidParseNodeVTableFailsExpand, "517") {
     auto vtable = host::HostAggStageParseNodeAdapter::getVTable();
     vtable.expand = nullptr;
     AggStageParseNodeAPI::assertVTableConstraints(vtable);
-};
+}
 
 DEATH_TEST(HostParseNodeTestDeathTest, HostExpandUnimplemented, "10977801") {
     auto noOpParseNode = new host::HostAggStageParseNodeAdapter(NoOpHostParseNode::make({}));

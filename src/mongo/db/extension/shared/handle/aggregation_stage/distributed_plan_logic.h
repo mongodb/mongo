@@ -59,13 +59,13 @@ public:
     BSONObj getSortPattern() const;
 
     static void assertVTableConstraints(const VTable_t& vtable) {
-        tassert(11027300,
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "DistributedPlanLogic 'extract_shards_pipeline' is null",
                 vtable.extract_shards_pipeline != nullptr);
-        tassert(11027301,
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "DistributedPlanLogic 'extract_merging_pipeline' is null",
                 vtable.extract_merging_pipeline != nullptr);
-        tassert(11027302,
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "DistributedPlanLogic 'get_sort_pattern' is null",
                 vtable.get_sort_pattern != nullptr);
     }

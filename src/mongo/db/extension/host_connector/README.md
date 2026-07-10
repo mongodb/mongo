@@ -56,8 +56,8 @@ public:
     // ...
 
     static void assertVTableConstraints(const VTable_t& vtable) {
-        tassert(11216705, "ExecAggStage 'open' is null",     vtable.open     != nullptr);
-        tassert(10956800, "ExecAggStage 'get_next' is null", vtable.get_next != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable, "ExecAggStage 'open' is null",     vtable.open     != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable, "ExecAggStage 'get_next' is null", vtable.get_next != nullptr);
         // ...
     }
 };

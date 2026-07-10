@@ -96,13 +96,11 @@ DEATH_TEST(ByteBufDeathTest, AssignNullWithPositiveLenFails, "10806300") {
     buf.assign(nullptr, 4);
 }
 
-DEATH_TEST(ExtensionByteBufVTableTestDeathTest,
-           InvalidExtensionByteBufVTableFailsGetView,
-           "10806301") {
+DEATH_TEST(ExtensionByteBufVTableDeathTest, InvalidExtensionByteBufVTableFailsGetView, "517") {
     auto vtable = ByteBuf::getVTable();
     vtable.get_view = nullptr;
     ExtensionByteBufAPI::assertVTableConstraints(vtable);
-};
+}
 
 }  // namespace
 }  // namespace mongo::extension

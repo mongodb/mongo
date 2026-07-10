@@ -70,7 +70,9 @@ public:
     }
 
     static void assertVTableConstraints(const VTable_t& vtable) {
-        tassert(10930101, "Extension 'initialize' is null", vtable.initialize != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "Extension 'initialize' is null",
+                vtable.initialize != nullptr);
     };
 };
 

@@ -85,13 +85,13 @@ public:
     }
 
     static void assertVTableConstraints(const VTable_t& vtable) {
-        tassert(10930102,
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "ExtensionAggStageDescriptorAdapter 'get_name' is null",
                 vtable.get_name != nullptr);
-        tassert(10930104,
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "ExtensionAggStageDescriptorAdapter 'parse' is null",
                 vtable.parse != nullptr);
-        tassert(11436400,
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "ExtensionAggStageDescriptorAdapter 'get_client_type' is null",
                 vtable.get_client_type != nullptr);
     }

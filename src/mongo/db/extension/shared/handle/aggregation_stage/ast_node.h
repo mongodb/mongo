@@ -100,15 +100,22 @@ public:
     void bindResolvedNamespace(const ::MongoExtensionResolvedNamespace& resolvedNamespace);
 
     static void assertVTableConstraints(const VTable_t& vtable) {
-        tassert(11217601, "AggStageAstNode 'get_name' is null", vtable.get_name != nullptr);
-        tassert(
-            11347800, "AggStageAstNode 'get_properties' is null", vtable.get_properties != nullptr);
-        tassert(11113700, "AggStageAstNode 'promote' is null", vtable.promote != nullptr);
-        tassert(11565501, "AggStageAstNode 'clone' is null", vtable.clone != nullptr);
-        tassert(11507400,
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "AggStageAstNode 'get_name' is null",
+                vtable.get_name != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "AggStageAstNode 'get_properties' is null",
+                vtable.get_properties != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "AggStageAstNode 'promote' is null",
+                vtable.promote != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "AggStageAstNode 'clone' is null",
+                vtable.clone != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "AggStageAstNode 'get_first_stage_view_application_policy` is null",
                 vtable.get_first_stage_view_application_policy != nullptr);
-        tassert(11507500,
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "AggStageAstNode `bind_resolved_namespace` is null",
                 vtable.bind_resolved_namespace != nullptr);
     }

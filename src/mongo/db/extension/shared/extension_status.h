@@ -281,11 +281,21 @@ public:
     StatusHandle clone() const;
 
     static void assertVTableConstraints(const VTable_t& vtable) {
-        tassert(10930105, "HostStatus 'get_code' is null", vtable.get_code != nullptr);
-        tassert(10930106, "HostStatus 'get_reason' is null", vtable.get_reason != nullptr);
-        tassert(11186306, "HostStatus 'set_code' is null", vtable.set_code != nullptr);
-        tassert(11186309, "HostStatus 'set_reason' is null", vtable.set_reason != nullptr);
-        tassert(11186310, "HostStatus 'clone' is null", vtable.clone != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "HostStatus 'get_code' is null",
+                vtable.get_code != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "HostStatus 'get_reason' is null",
+                vtable.get_reason != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "HostStatus 'set_code' is null",
+                vtable.set_code != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "HostStatus 'set_reason' is null",
+                vtable.set_reason != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "HostStatus 'clone' is null",
+                vtable.clone != nullptr);
     };
 };
 

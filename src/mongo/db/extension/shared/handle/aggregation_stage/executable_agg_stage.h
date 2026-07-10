@@ -77,15 +77,30 @@ public:
                     ExplainOptions::Verbosity verbosity) const;
 
     static void assertVTableConstraints(const VTable_t& vtable) {
-        tassert(10956800, "ExecAggStage 'get_next' is null", vtable.get_next != nullptr);
-        tassert(11213503, "ExecAggStage 'get_name' is null", vtable.get_name != nullptr);
-        tassert(
-            11213504, "ExecAggStage 'create_metrics' is null", vtable.create_metrics != nullptr);
-        tassert(10957202, "ExecAggStage 'set_source' is null", vtable.set_source != nullptr);
-        tassert(11216705, "ExecAggStage 'open' is null", vtable.open != nullptr);
-        tassert(11216706, "ExecAggStage 'reopen' is null", vtable.reopen != nullptr);
-        tassert(11216707, "ExecAggStage 'close' is null", vtable.close != nullptr);
-        tassert(12149001, "ExecAggStage 'explain' is null", vtable.explain != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "ExecAggStage 'get_next' is null",
+                vtable.get_next != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "ExecAggStage 'get_name' is null",
+                vtable.get_name != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "ExecAggStage 'create_metrics' is null",
+                vtable.create_metrics != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "ExecAggStage 'set_source' is null",
+                vtable.set_source != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "ExecAggStage 'open' is null",
+                vtable.open != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "ExecAggStage 'reopen' is null",
+                vtable.reopen != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "ExecAggStage 'close' is null",
+                vtable.close != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "ExecAggStage 'explain' is null",
+                vtable.explain != nullptr);
     }
 };
 }  // namespace mongo::extension

@@ -249,17 +249,17 @@ TEST(HandleTest, unownedHandleMoveAndDestroy) {
     ASSERT_EQUALS(DestroyableImpl::getDestroyCount(), 1);
 }
 
-DEATH_TEST(HandleTestDeathTest, ownedHandleConstructorRejectsNullVtable, "10596404") {
+DEATH_TEST(HandleTestDeathTest, ownedHandleConstructorRejectsNullVtable, "517") {
     DestroyableCAPI obj{nullptr};
     OwnedDestroyableHandle handle(&obj);
 }
 
-DEATH_TEST(HandleTestDeathTest, unownedHandleConstructorRejectsNullVtable, "10596404") {
+DEATH_TEST(HandleTestDeathTest, unownedHandleConstructorRejectsNullVtable, "517") {
     DestroyableCAPI obj{nullptr};
     UnownedDestroyableHandle handle(&obj);
 }
 
-DEATH_TEST(HandleTestDeathTest, ownedHandleConstructorRejectsNullDestroyPointer, "10930100") {
+DEATH_TEST(HandleTestDeathTest, ownedHandleConstructorRejectsNullDestroyPointer, "517") {
     DestroyableVTable invalidVtable{.destroy = nullptr};
     DestroyableCAPI obj{&invalidVtable};
     OwnedDestroyableHandle handle(&obj);

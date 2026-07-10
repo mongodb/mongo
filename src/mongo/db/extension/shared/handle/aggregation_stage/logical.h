@@ -140,32 +140,46 @@ public:
     boost::optional<MongoExtensionDocsNeededBoundsInfo> getDocsNeededBounds() const;
 
     static void assertVTableConstraints(const VTable_t& vtable) {
-        tassert(11420603, "LogicalAggStage 'get_name' is null", vtable.get_name != nullptr);
-        tassert(11173703, "LogicalAggStage 'serialize' is null", vtable.serialize != nullptr);
-        tassert(11239401, "LogicalAggStage 'explain' is null", vtable.explain != nullptr);
-        tassert(10957200, "LogicalAggStage 'compile' is null", vtable.compile != nullptr);
-        tassert(10917600,
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "LogicalAggStage 'get_name' is null",
+                vtable.get_name != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "LogicalAggStage 'serialize' is null",
+                vtable.serialize != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "LogicalAggStage 'explain' is null",
+                vtable.explain != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "LogicalAggStage 'compile' is null",
+                vtable.compile != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "LogicalAggStage 'get_distributed_plan_logic' is null",
                 vtable.get_distributed_plan_logic != nullptr);
-        tassert(11713400, "LogicalAggStage 'clone' is null", vtable.clone != nullptr);
-        tassert(11553300,
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "LogicalAggStage 'clone' is null",
+                vtable.clone != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "LogicalAggStage 'set_vector_search_limit_for_optimization' is null",
                 vtable.set_vector_search_limit_for_optimization_deprecated != nullptr);
-        tassert(12201402,
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "LogicalAggStage 'evaluate_pipeline_rewrite_rule_precondition' is null",
                 vtable.evaluate_pipeline_rewrite_rule_precondition != nullptr);
-        tassert(12201403,
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "LogicalAggStage 'evaluate_pipeline_rewrite_rule_transform' is null",
                 vtable.evaluate_pipeline_rewrite_rule_transform != nullptr);
-        tassert(12200400, "LogicalAggStage 'get_filter' is null", vtable.get_filter != nullptr);
-        tassert(12200100,
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "LogicalAggStage 'get_filter' is null",
+                vtable.get_filter != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "LogicalAggStage 'apply_pipeline_suffix_dependencies' is null",
                 vtable.apply_pipeline_suffix_dependencies != nullptr);
-        tassert(12327100,
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "LogicalAggStage 'get_sort_pattern' is null",
                 vtable.get_sort_pattern != nullptr);
-        tassert(12601400, "LogicalAggStage 'skip_stream' is null", vtable.skip_stream != nullptr);
-        tassert(11842300,
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "LogicalAggStage 'skip_stream' is null",
+                vtable.skip_stream != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "LogicalAggStage 'get_docs_needed_bounds' is null",
                 vtable.get_docs_needed_bounds != nullptr);
     }

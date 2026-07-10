@@ -134,13 +134,19 @@ public:
     BSONObj toBsonForLog() const;
 
     static void assertVTableConstraints(const VTable_t& vtable) {
-        tassert(11217600, "AggStageParseNode 'get_name' is null", vtable.get_name != nullptr);
-        tassert(10977600,
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "AggStageParseNode 'get_name' is null",
+                vtable.get_name != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "AggStageParseNode 'get_query_shape' is null",
                 vtable.get_query_shape != nullptr);
-        tassert(10977601, "AggStageParseNode 'expand' is null", vtable.expand != nullptr);
-        tassert(11565500, "AggStageParseNode 'clone' is null", vtable.clone != nullptr);
-        tassert(11906801,
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "AggStageParseNode 'expand' is null",
+                vtable.expand != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "AggStageParseNode 'clone' is null",
+                vtable.clone != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "AggStageParseNode 'to_bson_for_log' is null",
                 vtable.to_bson_for_log != nullptr);
     }

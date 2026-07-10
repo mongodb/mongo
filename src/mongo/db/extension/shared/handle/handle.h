@@ -111,7 +111,7 @@ public:
 protected:
     VTable_t& _vtable() const {
         assertValid();
-        tassert(10596404, "Invalid vtable ptr!", _ptr->vtable != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable, "Invalid vtable ptr!", _ptr->vtable != nullptr);
         return *(_ptr->vtable);
     }
 
@@ -270,8 +270,10 @@ public:
 private:
     void _assertValidDestroy() {
         if (_ptr) {
-            tassert(11511000, "OwnedHandle's vtable is null", _ptr->vtable != nullptr);
-            tassert(10930100,
+            tassert(ErrorCodes::InvalidExtensionVTable,
+                    "OwnedHandle's vtable is null",
+                    _ptr->vtable != nullptr);
+            tassert(ErrorCodes::InvalidExtensionVTable,
                     "OwnedHandle's vtable 'destroy' is null",
                     _ptr->vtable->destroy != nullptr);
         }

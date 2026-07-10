@@ -305,35 +305,33 @@ std::unique_ptr<host::AggStageAstNode> makeIdLookupAstNode() {
         std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(spec));
 }
 
-DEATH_TEST(HostAstNodeVTableTestDeathTest, InvalidAstNodeVTableFailsGetName, "11217601") {
+DEATH_TEST(HostAstNodeVTableDeathTest, InvalidAstNodeVTableFailsGetName, "517") {
     auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
     vtable.get_name = nullptr;
     AggStageAstNodeAPI::assertVTableConstraints(vtable);
 }
 
-DEATH_TEST(HostAstNodeVTableTestDeathTest, InvalidAstNodeVTableFailsGetProperties, "11347800") {
+DEATH_TEST(HostAstNodeVTableDeathTest, InvalidAstNodeVTableFailsGetProperties, "517") {
     auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
     vtable.get_properties = nullptr;
     AggStageAstNodeAPI::assertVTableConstraints(vtable);
 }
 
-DEATH_TEST(HostAstNodeVTableTestDeathTest, InvalidAstNodeVTableFailsPromote, "11113700") {
+DEATH_TEST(HostAstNodeVTableDeathTest, InvalidAstNodeVTableFailsPromote, "517") {
     auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
     vtable.promote = nullptr;
     AggStageAstNodeAPI::assertVTableConstraints(vtable);
 }
 
-DEATH_TEST(HostAstNodeVTableTestDeathTest,
+DEATH_TEST(HostAstNodeVTableDeathTest,
            InvalidAstNodeVTableFailsGetFirstStageViewApplicationPolicy,
-           "11507400") {
+           "517") {
     auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
     vtable.get_first_stage_view_application_policy = nullptr;
     AggStageAstNodeAPI::assertVTableConstraints(vtable);
 }
 
-DEATH_TEST(HostAstNodeVTableTestDeathTest,
-           InvalidAstNodeVTableFailsBindResolvedNamespace,
-           "11507500") {
+DEATH_TEST(HostAstNodeVTableDeathTest, InvalidAstNodeVTableFailsBindResolvedNamespace, "517") {
     auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
     vtable.bind_resolved_namespace = nullptr;
     AggStageAstNodeAPI::assertVTableConstraints(vtable);
