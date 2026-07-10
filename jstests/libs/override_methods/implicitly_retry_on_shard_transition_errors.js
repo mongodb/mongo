@@ -47,12 +47,8 @@ const kRetryableErrors = [
 const kCommandRetryableOnShardNotFoundError = {
     // The function in the KV pair's value must return true if the command is retryable
     "moveChunk": (command) => {
-        // only retryable if the target is the config shard (as eventually it will show up again).
-        return command.to == "config";
-    },
-    "mergeAllChunksOnShard": (command) => {
         // only retryable if the target is the config shard (as eventually it will show up again)
-        return command.shard == "config";
+        return command.toShard == "config";
     },
     "moveRange": (command) => {
         // only retryable if the target is the config shard (as eventually it will show up again)

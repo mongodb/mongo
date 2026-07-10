@@ -148,7 +148,7 @@ export const $config = (function () {
     let states = (function () {
         // Inform this thread about its partition,
         // and verify that its partition is encapsulated in a single chunk.
-        function init(db, collName, connCache, skipNumChunksCheck = false) {
+        function init(db, collName, connCache) {
             let ns = db[collName].getFullName();
 
             // Inform this thread about its partition.
@@ -156,21 +156,17 @@ export const $config = (function () {
             this.partition = this.makePartition(ns, this.tid, this.partitionSize);
             Object.freeze(this.partition);
 
-            // Verify that there is exactly 1 chunk in our partition. Workloads that run with the
-            // balancer, chunk auto-merge, or add/remove-shard enabled cannot rely on this
-            // invariant, since chunk boundaries and placement churn independently of the thread.
-            if (!skipNumChunksCheck) {
-                let config = connCache.rsConns.config;
-                let numChunks = ChunkHelper.getNumChunks(
-                    config,
-                    ns,
-                    this.partition.chunkLower,
-                    this.partition.chunkUpper,
-                );
-                let chunks = ChunkHelper.getChunks(config, ns, MinKey, MaxKey);
-                let msg = tojson({tid: this.tid, data: this.data, chunks: chunks});
-                assert.eq(numChunks, 1, msg);
-            }
+            // Verify that there is exactly 1 chunk in our partition.
+            let config = connCache.rsConns.config;
+            let numChunks = ChunkHelper.getNumChunks(
+                config,
+                ns,
+                this.partition.chunkLower,
+                this.partition.chunkUpper,
+            );
+            let chunks = ChunkHelper.getChunks(config, ns, MinKey, MaxKey);
+            let msg = tojson({tid: this.tid, data: this.data, chunks: chunks});
+            assert.eq(numChunks, 1, msg);
         }
 
         function dummy(db, collName, connCache) {}
