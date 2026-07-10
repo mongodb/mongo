@@ -255,7 +255,7 @@ SbExpr generateForeignKeyStream(SbVar inputSlot,
             std::move(shouldGetField),
             b.makeFillEmptyNull(b.makeFunction(
                 sbe::EFn::kGetField, inputSlot, b.makeStrConstant(fp.getFieldName(level)))),
-            b.makeNothingConstant());
+            state.legacyDottedPathNullSemantics ? b.makeNothingConstant() : b.makeNullConstant());
     }
 
     if (level == fp.getPathLength() - 1) {
@@ -300,16 +300,26 @@ SbExpr generateForeignKeyStream(SbVar inputSlot,
     // The result would be [1, [2]] that is already in the correct form and should not be processed
     // with unwindArray, or the result would be an incorrect [1, 2].
     sbe::FrameId getFieldFrameId = state.frameId();
-    return b.makeLet(
-        getFieldFrameId,
-        SbExpr::makeSeq(std::move(getFieldFromObject),
-                        b.makeFunction(sbe::EFn::kTraverseP,
-                                       SbLocalVar{getFieldFrameId, 0},
-                                       std::move(lambdaForArrayExpr),
-                                       b.makeInt32Constant(1))),
-        b.makeIf(b.makeFunction(sbe::EFn::kIsArray, SbLocalVar{getFieldFrameId, 0}),
-                 b.makeFunction(sbe::EFn::kUnwindArray, SbLocalVar{getFieldFrameId, 1}),
-                 SbLocalVar{getFieldFrameId, 1}));
+    SbExpr arrayResult = b.makeFunction(sbe::EFn::kUnwindArray, SbLocalVar{getFieldFrameId, 1});
+    if (!state.legacyDottedPathNullSemantics) {
+        // An empty array on a non-terminal path component resolves to a non-existent document,
+        // which MQL treats as 'null'. 'unwindArray' returns Nothing for an empty array (dropping
+        // the value entirely), so we explicitly emit a 'null' key in that case instead. This
+        // matches the treatment in 'buildForeignMatches' used by the nested loop join.
+        arrayResult =
+            b.makeIf(b.makeFunction(sbe::EFn::kIsArrayEmpty, SbLocalVar{getFieldFrameId, 0}),
+                     b.makeFunction(sbe::EFn::kNewArray, b.makeNullConstant()),
+                     std::move(arrayResult));
+    }
+    return b.makeLet(getFieldFrameId,
+                     SbExpr::makeSeq(std::move(getFieldFromObject),
+                                     b.makeFunction(sbe::EFn::kTraverseP,
+                                                    SbLocalVar{getFieldFrameId, 0},
+                                                    std::move(lambdaForArrayExpr),
+                                                    b.makeInt32Constant(1))),
+                     b.makeIf(b.makeFunction(sbe::EFn::kIsArray, SbLocalVar{getFieldFrameId, 0}),
+                              std::move(arrayResult),
+                              SbLocalVar{getFieldFrameId, 1}));
 }
 
 // Returns the vector of local slots to be used in lookup join, including the record slot and
@@ -633,6 +643,7 @@ std::pair<SbSlot /* matched docs */, SbStage> buildForeignMatches(SbSlot localKe
     const int32_t foreignPathLength = foreignFieldName.getPathLength();
     for (int32_t i = foreignPathLength - 1; i >= 0; --i) {
         auto arrayLambda = b.makeLocalLambda(frameId, std::move(filter));
+        const bool isLeafField = (i == foreignPathLength - 1);
 
         frameId = state.frameId();
         lambdaArg = i == 0 ? SbExpr{foreignRecordSlot} : SbExpr{SbVar{frameId, 0}};
@@ -645,7 +656,7 @@ std::pair<SbSlot /* matched docs */, SbStage> buildForeignMatches(SbSlot localKe
 
         // Non object/array field will be converted into Nothing, passing along recursive traverseF
         // and will be treated as null to compared against local key set.
-        if (i != foreignPathLength - 1) {
+        if (!isLeafField) {
             auto localBindFrameId = state.frameId();
 
             auto binds = SbExpr::makeSeq(std::move(getFieldOrNull));
@@ -662,17 +673,42 @@ std::pair<SbSlot /* matched docs */, SbStage> buildForeignMatches(SbSlot localKe
             getFieldOrNull = b.makeLet(localBindFrameId, std::move(binds), std::move(innerExpr));
         }
 
-        filter = b.makeFunction(sbe::EFn::kTraverseF,
-                                std::move(getFieldOrNull),
-                                std::move(arrayLambda),
-                                b.makeBoolConstant(i == foreignPathLength - 1) /*compareArray*/);
+        {
+            auto localBindFrameId = state.frameId();
+            auto binds = SbExpr::makeSeq(std::move(getFieldOrNull));
+            SbVar var = SbVar{localBindFrameId, 0};
 
-        if (i > 0) {
-            // Ignoring the nulls produced by missing field in array.
-            filter = b.makeIf(
-                b.makeFillEmptyTrue(b.makeFunction(sbe::EFn::kIsObject, lambdaArg.clone())),
-                std::move(filter),
-                b.makeBoolConstant(false));
+            filter = b.makeFunction(sbe::EFn::kTraverseF,
+                                    var,
+                                    std::move(arrayLambda),
+                                    b.makeBoolConstant(isLeafField) /*compareArray*/);
+            if (!state.legacyDottedPathNullSemantics) {
+                if (!isLeafField) {
+                    // If the result of getField() was Nothing or a scalar value, then don't bother
+                    // traversing the remaining levels of the path.
+                    filter = b.makeIf(
+                        b.makeFillEmptyFalse(
+                            b.makeFunction(sbe::EFn::kTypeMatch,
+                                           var,
+                                           b.makeInt32Constant(getBSONTypeMask(BSONType::array) |
+                                                               getBSONTypeMask(BSONType::object)))),
+                        std::move(filter),
+                        b.makeFunction(sbe::EFn::kIsMember, b.makeNullConstant(), localKeySlot));
+                    // Treat an array with no values as a non-existent document when it is not the
+                    // leaf
+                    filter = b.makeIf(
+                        b.makeFillEmptyFalse(b.makeFunction(sbe::EFn::kIsArrayEmpty, var)),
+                        b.makeFunction(sbe::EFn::kIsMember, b.makeNullConstant(), localKeySlot),
+                        std::move(filter));
+                }
+            } else if (i > 0) {
+                // Ignoring the nulls produced by missing field in array.
+                filter = b.makeIf(
+                    b.makeFillEmptyTrue(b.makeFunction(sbe::EFn::kIsObject, lambdaArg.clone())),
+                    std::move(filter),
+                    b.makeBoolConstant(false));
+            }
+            filter = b.makeLet(localBindFrameId, std::move(binds), std::move(filter));
         }
     }
 

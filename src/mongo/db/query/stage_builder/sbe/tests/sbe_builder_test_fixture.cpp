@@ -248,6 +248,10 @@ void GoldenSbeExprBuilderTestFixture::setUp() {
     SbeStageBuilderTestFixture::setUp();
     _expCtx = new ExpressionContextForTest();
     _planStageData = std::make_unique<stage_builder::PlanStageStaticData>();
+    reinitState();
+}
+
+void GoldenSbeExprBuilderTestFixture::reinitState() {
     _state.emplace(operationContext(),
                    _env,
                    _planStageData.get(),

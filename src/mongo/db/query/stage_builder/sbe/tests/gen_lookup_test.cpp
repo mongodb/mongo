@@ -46,12 +46,14 @@
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -551,10 +553,10 @@ TEST_F(LookupStageBuilderTest, NestedLoopJoin_DeepForeignPath_ScalarsOnPath) {
          {
              fdocs[0],
              fdocs[1],
-             // fdocs[2], is expected and different from matching in local!
+             fdocs[2],
              fdocs[3],
              fdocs[4],
-             // fdocs[5], is expected and different from matching in local!
+             fdocs[5],
              fdocs[6],
              fdocs[7],
          }},
@@ -722,6 +724,103 @@ TEST_F(LookupStageBuilderTest, NestedLoopJoin_DeepForeignPath_EmptyArrays) {
 
     insertDocuments(ldocs, fdocs);
     assertMatchedDocuments("key", "a.b.c", expected);
+}
+
+// Documents whose foreign path "a.x" resolves to a value set that includes 'null' because a
+// non-leaf path component ("a") is missing, a scalar, or an *empty array*. The empty-array-on-a-
+// non-terminal-component cases (_id 10 and 12) are a regression guard for SERVER-36681:
+// 'unwindArray' returns Nothing for an empty array, so the hash join foreign-key stream used to
+// drop these values entirely instead of emitting a 'null' key, causing them to not match a local
+// 'null'.
+const std::vector<BSONObj> DocsWithEmptyArrayOnPath = {
+    // "a.x" resolves to a set that contains 'null'.
+    fromjson("{_id: 0, a: {no_x: 1}}"),
+    fromjson("{_id: 1, a: {no_x: [1, 2]}}"),
+    fromjson("{_id: 2, a: [{no_x: 1}, {no_x: 2}]}"),
+    fromjson("{_id: 3, a: [{no_x: 2}, {x: 1}]}"),
+    fromjson("{_id: 4, a: [{no_x: [1, 2]}, {x: 1}]}"),
+    fromjson("{_id: 5, a: {x: null}}"),
+    fromjson("{_id: 6, a: [{x: null}, {x: 1}]}"),
+    fromjson("{_id: 7, a: [{x: null}, {x: [1]}]}"),
+    fromjson("{_id: 8, no_a: 1}"),
+    fromjson("{_id: 9, a: [1]}"),
+    fromjson("{_id: 10, a: []}"),
+    fromjson("{_id: 11, a: [[1]]}"),
+    fromjson("{_id: 12, a: [[]]}"),
+
+    // "a.x" resolves to a set that does not contain 'null'.
+    fromjson("{_id: 20, a: {x: 2, y: 1}}"),
+    fromjson("{_id: 21, a: [{x: 2}, {x: 3}]}"),
+};
+TEST_F(LookupStageBuilderTest, ForeignPath_EmptyArrayOnPathResolvesToNull) {
+    const std::vector<BSONObj> ldocs = {
+        fromjson("{_id: 0, key: null}"),
+        fromjson("{_id: 1, key: 2}"),
+    };
+    const auto& fdocs = DocsWithEmptyArrayOnPath;
+
+    const std::vector<std::pair<BSONObj, std::vector<BSONObj>>> expected = {
+        // A local 'null' matches every document whose "a.x" set contains 'null'.
+        {ldocs[0],
+         {
+             fdocs[0],
+             fdocs[1],
+             fdocs[2],
+             fdocs[3],
+             fdocs[4],
+             fdocs[5],
+             fdocs[6],
+             fdocs[7],
+             fdocs[8],
+             fdocs[9],
+             fdocs[10],
+             fdocs[11],
+             fdocs[12],
+         }},
+        // A local scalar only matches documents where "a.x" actually contains that value.
+        {ldocs[1], {fdocs[13], fdocs[14]}},
+    };
+
+    insertDocuments(ldocs, fdocs);
+    assertMatchedDocuments("key", "a.x", expected);
+}
+
+// Same document set as 'ForeignPath_EmptyArrayOnPathResolvesToNull', but with the
+// 'internalQueryLegacyDottedPathNullSemantics' knob enabled. This exercises the pre-SERVER-36681
+// behavior, where an empty array or a scalar on a non-terminal path component ("a") does *not*
+// resolve to 'null'. Under legacy semantics, _id 9-12 therefore do not match a local 'null'.
+TEST_F(LookupStageBuilderTest, ForeignPath_EmptyArrayOnPathLegacySemantics) {
+    internalQueryLegacyDottedPathNullSemantics.store(true);
+    ON_BLOCK_EXIT([] { internalQueryLegacyDottedPathNullSemantics.store(false); });
+
+    const std::vector<BSONObj> ldocs = {
+        fromjson("{_id: 0, key: null}"),
+        fromjson("{_id: 1, key: 2}"),
+    };
+    const auto& fdocs = DocsWithEmptyArrayOnPath;
+
+    const std::vector<std::pair<BSONObj, std::vector<BSONObj>>> expected = {
+        // A local 'null' matches documents where "a.x" is missing or contains an explicit 'null',
+        // but *not* those where the value is only produced by an empty array or scalar on the path
+        // (_id 9-12), which legacy semantics leave as Nothing rather than 'null'.
+        {ldocs[0],
+         {
+             fdocs[0],
+             fdocs[1],
+             fdocs[2],
+             fdocs[3],
+             fdocs[4],
+             fdocs[5],
+             fdocs[6],
+             fdocs[7],
+             fdocs[8],
+         }},
+        // Scalar matching is unaffected by the legacy knob.
+        {ldocs[1], {fdocs[13], fdocs[14]}},
+    };
+
+    insertDocuments(ldocs, fdocs);
+    assertMatchedDocuments("key", "a.x", expected);
 }
 
 TEST_F(LookupStageBuilderTest, OneComponentAsPath) {

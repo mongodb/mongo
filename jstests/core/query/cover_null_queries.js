@@ -3,8 +3,8 @@
  * @tags: [
  *   assumes_unsharded_collection,
  *   requires_non_retryable_writes,
- *   # In 8.0, we changed behavior for equality to null.
- *   requires_fcv_80,
+ *   # SERVER-36681 changed the behavior of SBE and classic engines
+ *   requires_fcv_90,
  *   # This test could produce unexpected explain output if additional indexes are created.
  *   assumes_no_implicit_index_creation,
  *   requires_getmore,
@@ -995,19 +995,22 @@ validateFindCmdOutputAndPlan({
         {_id: 6},
         {_id: 7},
         {_id: 11},
+        {_id: 12},
         {_id: 13},
+        {_id: 14},
         {_id: 15},
+        {_id: 16},
     ],
     expectedStages: {"IXSCAN": 1, "PROJECTION_SIMPLE": 1, "FETCH": 1},
 });
 validateSimpleCountCmdOutputAndPlan({
     filter: {"a.b": null},
-    expectedCount: 9,
+    expectedCount: 12,
     expectedStages: {"COUNT": 1, "IXSCAN": 1, "FETCH": 1},
 });
 validateGroupCountAggCmdOutputAndPlan({
     filter: {"a.b": null},
-    expectedCount: 9,
+    expectedCount: 12,
     expectedStages: {"IXSCAN": 1, "FETCH": 1},
 });
 
@@ -1062,18 +1065,55 @@ validateFindCmdOutputAndPlan({
         {_id: 7},
         {_id: 8},
         {_id: 11},
+        {_id: 12},
         {_id: 13},
+        {_id: 14},
         {_id: 15},
+        {_id: 16},
     ],
     expectedStages: {"IXSCAN": 1, "PROJECTION_SIMPLE": 1, "FETCH": 1},
 });
 validateSimpleCountCmdOutputAndPlan({
     filter: {"a.b": {$in: [null, []]}},
-    expectedCount: 10,
+    expectedCount: 13,
     expectedStages: {"IXSCAN": 1, "FETCH": 1},
 });
 validateGroupCountAggCmdOutputAndPlan({
     filter: {"a.b": {$in: [null, []]}},
-    expectedCount: 10,
+    expectedCount: 13,
     expectedStages: {"IXSCAN": 1, "FETCH": 1},
+});
+
+// Check array index path
+validateFindCmdOutputAndPlan({
+    filter: {"a.b.0": {$eq: null}},
+    projection: {_id: 1},
+    expectedOutput: [
+        {_id: 1},
+        {_id: 2},
+        {_id: 3},
+        {_id: 4},
+        {_id: 5},
+        {_id: 6},
+        {_id: 7},
+        {_id: 8},
+        {_id: 10},
+        {_id: 11},
+        {_id: 12},
+        {_id: 13},
+        {_id: 14},
+        {_id: 15},
+        {_id: 16},
+    ],
+    expectedStages: {"COLLSCAN": 1, "PROJECTION_SIMPLE": 1},
+});
+validateSimpleCountCmdOutputAndPlan({
+    filter: {"a.b.0": {$eq: null}},
+    expectedCount: 15,
+    expectedStages: {"COLLSCAN": 1, "COUNT": 1},
+});
+validateGroupCountAggCmdOutputAndPlan({
+    filter: {"a.b.0": {$eq: null}},
+    expectedCount: 15,
+    expectedStages: {"COLLSCAN": 1},
 });

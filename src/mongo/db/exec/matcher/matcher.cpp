@@ -155,6 +155,7 @@ void MatchExpressionEvaluator::visitPathExpression(const PathMatchExpression* ex
         _result = true;
         return;
     }
+    // There was no match
     _result = false;
 }
 

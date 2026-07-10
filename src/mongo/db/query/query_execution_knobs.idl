@@ -1228,6 +1228,16 @@ server_parameters:
                 fcv:
                     min: "9.0"
 
+    internalQueryLegacyDottedPathNullSemantics:
+        description: >-
+            If true, disables the SERVER-36681 fix for null equality semantics on nonexistent
+            dotted paths and reverts to the pre-fix behavior.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryLegacyDottedPathNullSemantics"
+        cpp_vartype: AtomicWord<bool>
+        default: false
+        redact: false
+
     internalOperationResponseMaxMS:
         description: >-
             Limits the time that individual aggregate or getMore command requests are allowed to spend inside

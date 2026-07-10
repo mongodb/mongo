@@ -1,6 +1,8 @@
 // Test indexed elemmatch of missing field.
 // @tags: [
-//   requires_getmore
+//   requires_getmore,
+//   # SERVER-36681 changed the behavior of SBE and classic engines
+//   requires_fcv_90,
 // ]
 
 let t = db.jstests_arrayfind5;
@@ -9,7 +11,7 @@ t.drop();
 function check(nullElemMatch) {
     assert.eq(1, t.find({"a.b": 1}).itcount());
     assert.eq(1, t.find({a: {$elemMatch: {b: 1}}}).itcount());
-    assert.eq(nullElemMatch ? 1 : 0, t.find({"a.b": null}).itcount());
+    assert.eq(1, t.find({"a.b": null}).itcount());
     assert.eq(nullElemMatch ? 1 : 0, t.find({a: {$elemMatch: {b: null}}}).itcount()); // see SERVER-3377
 }
 
