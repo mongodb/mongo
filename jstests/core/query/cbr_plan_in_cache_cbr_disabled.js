@@ -13,8 +13,8 @@
  *   assumes_no_implicit_index_creation,
  *   # This test relies on $planCacheStats which must be the first stage in the pipeline
  *   exclude_from_timeseries_crud_passthrough,
- *   # featureFlagCostBasedRanker was introduced in 8.3
- *   requires_fcv_83,
+ *   # Uses internalSamplingSizeOverride via cbr_utils.js, added in 9.0
+ *   requires_fcv_90,
  *   # Aggregation stage $planCacheStats cannot run within a multi-document transaction.
  *   does_not_support_transactions,
  *   # moveCollection (used by random_migrations suites) recreates the collection on the destination
