@@ -44,6 +44,7 @@ executor:
         enableTestCommands: 1
         featureFlagEgressGrpcForSearch: true
         featureFlagExtensionsAPI: true
+        featureFlagExtensionsApiSignatureValidation: true
         featureFlagExtensionsInsideHybridSearch: false
         featureFlagSearchExtension: false
         featureFlagVectorSearchExtension: true
@@ -54,6 +55,7 @@ executor:
       set_parameters:
         featureFlagEgressGrpcForSearch: true
         featureFlagExtensionsAPI: true
+        featureFlagExtensionsApiSignatureValidation: true
         featureFlagExtensionsInsideHybridSearch: false
         featureFlagSearchExtension: false
         featureFlagVectorSearchExtension: true
@@ -61,6 +63,7 @@ executor:
         useGrpcForSearch: 1
     num_mongos: 3
     num_shards: 1
+    skip_extensions_signature_verification: true
 matrix_suite: true
 selector:
   exclude_files:

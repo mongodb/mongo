@@ -1,8 +1,6 @@
 # Overrides for the with_mongot_extension_* suites, which run the with_mongot e2e corpus against
 # the real (externally-published) mongot-extension. Only the real extension is loaded -- not
-# toy test extensions -- so these suites can run on signature secure-mode builds.
-
-# TODO SERVER-130631: run these suites on a secure-mode variant with
+# toy test extensions -- so these suites run on signature secure-mode builds with
 # featureFlagExtensionsApiSignatureValidation enabled.
 
 # Tests the mongot-extension cannot run.
@@ -63,9 +61,16 @@
   value:
     executor:
       fixture:
+        # The mongot-extension is production-signed, so we run it in secure-mode builds that expect
+        # production signatures. Non-secure builds use server parameter
+        # extensionsSignaturePublicKeyPath for test signatures, but that parameter is compiled out
+        # of secure builds. For that reason, we must set skip_extensions_signature_verification to
+        # skip setting that parameter. It will invoke real signature verification.
+        skip_extensions_signature_verification: &skip_extensions_signature_verification true
         mongod_options:
           set_parameters: &extension_set_parameters
             featureFlagExtensionsAPI: true
+            featureFlagExtensionsApiSignatureValidation: true
             featureFlagVectorSearchExtension: true
             featureFlagSearchExtension: false # TODO SERVER-130636: flip to true once the $search extension is ready.
             # TODO SERVER-130878: flip to true once extension stages are supported inside
@@ -80,6 +85,7 @@
   value:
     executor:
       fixture:
+        skip_extensions_signature_verification: *skip_extensions_signature_verification
         mongod_options:
           set_parameters: *extension_set_parameters
         mongos_options:

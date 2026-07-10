@@ -44,12 +44,14 @@ executor:
         enableTestCommands: 1
         featureFlagEgressGrpcForSearch: true
         featureFlagExtensionsAPI: true
+        featureFlagExtensionsApiSignatureValidation: true
         featureFlagExtensionsInsideHybridSearch: false
         featureFlagSearchExtension: false
         featureFlagVectorSearchExtension: true
         skipAuthenticationToMongot: true
         useGrpcForSearch: 1
     num_nodes: 1
+    skip_extensions_signature_verification: true
 matrix_suite: true
 selector:
   exclude_files:

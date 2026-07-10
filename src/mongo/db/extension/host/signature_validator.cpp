@@ -151,17 +151,16 @@ SignatureValidator::~SignatureValidator() {}
 ValidatedExtension SignatureValidator::validateExtensionSignature(
     const std::string& extensionName, const std::string& extensionPath) const {
     if (_skipValidation) {
-        LOGV2_DEBUG(11528806, 4, "Skipping signature validation");
+        LOGV2(11528806, "Skipping signature validation");
         // Nothing is being verified, so there is no time-of-check/time-of-use window to protect;
         // load the extension directly from its on-disk path (no descriptor to own).
         return ValidatedExtension{extensionPath};
     }
 
-    LOGV2_DEBUG(11528830,
-                4,
-                "Verifying signature for extension",
-                "extensionName"_attr = extensionName,
-                "path"_attr = extensionPath);
+    LOGV2(11528830,
+          "Verifying signature for extension",
+          "extensionName"_attr = extensionName,
+          "path"_attr = extensionPath);
 
     uassert(11528810,
             fmt::format("Failed to verify extension signature for extension: {}. Extension path "
