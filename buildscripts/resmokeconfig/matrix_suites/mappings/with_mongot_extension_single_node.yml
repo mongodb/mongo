@@ -6,3 +6,4 @@ excludes:
   - "with_mongot_extension.exclude_incompatible_tests"
 overrides:
   - "with_mongot_extension.load_extension"
+  - "with_mongot_extension.extension_flags"

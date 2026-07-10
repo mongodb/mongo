@@ -1,21 +1,102 @@
 # Overrides for the with_mongot_extension_* suites, which run the with_mongot e2e corpus against
-# the real (externally-published) mongot-extension.
-#
-# TODO SERVER-130648: load the mongot-extension and enable the extension feature flags. Until then,
-# these suites are exact clones of their base suites and run the server's built-in search
-# implementations (the task definitions force-disable the extension feature flags).
+# the real (externally-published) mongot-extension. Only the real extension is loaded -- not
+# toy test extensions -- so these suites can run on signature secure-mode builds.
 
-# Tests the mongot-extension cannot run, appended to each base suite's own exclusions via the
-# mappings' `excludes` tag.
+# TODO SERVER-130631: run these suites on a secure-mode variant with
+# featureFlagExtensionsApiSignatureValidation enabled.
+
+# Tests the mongot-extension cannot run.
 - name: exclude_incompatible_tests
   value:
-    exclude_files: []
+    # Risks leaving FCV stuck below 8.3, breaking all subsequent FCV-gated tests.
+    # Extension is unsupported on FCV < 8.3.
+    exclude_files:
+      - jstests/with_mongot/e2e/views/mongot_indexed_views_upgrade_downgrade.js
+      # Tests that fail due to unimplemented behavior in mongot-extension.
+      - jstests/with_mongot/e2e/views/search_with_view_injected.js
+      - jstests/with_mongot/e2e/views/mongot_stage_in_view_definition.js
+      # TODO SERVER-130914: Remove this exclusion caused by the extension's $vectorSearch rejecting the server-injected 'view' field.
+      - jstests/with_mongot/e2e/views/vector_search/unionWith.js
+      - jstests/with_mongot/e2e/views/vector_search/unionWith_nested.js
+      - jstests/with_mongot/e2e/views/vector_search/undefined_or_underlying_index.js
+      # TODO SERVER-130916: Remove this exclusion; the $sort-after-$vectorSearch optimization is not applied to the extension stage.
+      - jstests/with_mongot/e2e/hybridSearch/sort_after_vector_search_optimization.js
+      # TODO SERVER-130913: Remove these exclusions. Extension $vectorSearch inside a $lookup/$graphLookup subpipeline hits
+      # MONGO_UNREACHABLE_TASSERT 12197200 (getFirstStageViewApplicationPolicy), which also
+      # crashes mongod at teardown via the tripwire check.
+      - jstests/with_mongot/e2e/vector_search/lookup_vector_search.js
+      - jstests/with_mongot/e2e/vector_search/lookup_vector_search_disallowed.js
+      - jstests/with_mongot/e2e/views/vector_search/lookup_identity_and_combined.js
+      - jstests/with_mongot/e2e/views/vector_search/lookup_nested_view.js
+      - jstests/with_mongot/e2e/views/vector_search/lookup_subpipeline_combinations.js
+      - jstests/with_mongot/e2e/views/vector_search/lookup_vector_search_view.js
+      - jstests/with_mongot/e2e/views/mongot_stage_in_view_definition_graph_lookup.js
+      - jstests/with_mongot/e2e/hybridSearch/rank_fusion_lookup_local_foreign_field_view.js
+      # These should pass with featureFlagExtensionsInsideHybridSearch off: the IFR kickback
+      # (throwIfrKickbackIfNecessary) should retry hybrid-search pipelines with the legacy
+      # $vectorSearch, but the kickback error reaches the client instead.
+      # TODO SERVER-130918: Remove these exclusions once the kickback path works; independently
+      # of (and before) enabling extension stages inside hybrid search (SERVER-130878).
+      - jstests/with_mongot/e2e/hybridSearch/ranked_fusion_on_search_view.js
+      - jstests/with_mongot/e2e/hybridSearch/score_fusion_on_search_view.js
+      - jstests/with_mongot/e2e/hybridSearch/union_with_vector_search.js
+      - jstests/with_mongot/e2e/hybridSearch/hybrid_search_in_view_rejected.js
+      - jstests/with_mongot/e2e/hybridSearch/hybrid_search_weights_test.js
+      - jstests/with_mongot/e2e/hybridSearch/ranked_fusion_lookup.js
+      - jstests/with_mongot/e2e/hybridSearch/ranked_fusion_on_view.js
+      - jstests/with_mongot/e2e/hybridSearch/ranked_fusion_score_details_test.js
+      - jstests/with_mongot/e2e/hybridSearch/ranked_fusion_test.js
+      - jstests/with_mongot/e2e/hybridSearch/ranked_fusion_union_with.js
+      - jstests/with_mongot/e2e/hybridSearch/ranked_fusion_with_filter.js
+      - jstests/with_mongot/e2e/hybridSearch/score_fusion_failure_assertions.js
+      - jstests/with_mongot/e2e/hybridSearch/score_fusion_lookup.js
+      - jstests/with_mongot/e2e/hybridSearch/score_fusion_on_view.js
+      - jstests/with_mongot/e2e/hybridSearch/score_fusion_score_details_test.js
+      - jstests/with_mongot/e2e/hybridSearch/score_multiple_stages.js
 
-# The extensions these suites load. Note that this list REPLACES the base suite's list rather than
-# extending it.
+# Failures that only reproduce on sharded topologies: the sharded query path injects the
+# resolved view into the extension's $vectorSearch, hitting the same reserved-'view'-field
+# rejection as the exclusions above. These pass on single-node, so they are excluded only in
+# the sharded suites.
+# TODO SERVER-130914: Remove these exclusions.
+- name: exclude_incompatible_tests_sharded
+  value:
+    exclude_files:
+      - jstests/with_mongot/e2e/views/vector_search/addFields_base_case.js
+      - jstests/with_mongot/e2e/views/vector_search/match_base_case.js
+      - jstests/with_mongot/e2e/views/vector_search/nested_view.js
+
+# REPLACES the base suite's list, dropping its in-tree test extensions (see note at top).
 - name: load_extension
   value:
     executor:
       fixture:
         load_extensions:
-          - "add_fields_match"
+          - "mongot"
+
+# Extension feature flags plus the gRPC-for-search parameters the mongot-extension requires.
+- name: extension_flags
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          set_parameters: &extension_set_parameters
+            featureFlagExtensionsAPI: true
+            featureFlagVectorSearchExtension: true
+            featureFlagSearchExtension: false # TODO SERVER-130636: flip to true once the $search extension is ready.
+            # TODO SERVER-130878: flip to true once extension stages are supported inside
+            # hybrid search. Note the hybrid-search test exclusions above are NOT gated on this
+            # flag: they should pass with it off via the IFR kickback (SERVER-130918).
+            featureFlagExtensionsInsideHybridSearch: false
+            featureFlagEgressGrpcForSearch: true
+            useGrpcForSearch: 1
+            skipAuthenticationToMongot: true
+
+- name: extension_flags_sharded
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          set_parameters: *extension_set_parameters
+        mongos_options:
+          set_parameters: *extension_set_parameters

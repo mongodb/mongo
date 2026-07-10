@@ -11,10 +11,13 @@ import yaml
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib.extensions import (
+    MONGOT_EXTENSION_NAME,
     add_extensions_signature_pub_key_path,
+    build_mongot_dynamic_options,
     delete_extension_configs,
     find_and_generate_all_extension_configs,
     find_and_generate_named_extension_configs,
+    mongot_extension_requested,
     normalize_load_extensions,
 )
 from buildscripts.resmokelib.testing.fixtures import _builder, external, interface
@@ -88,6 +91,12 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             _load_exts = ["*"]
 
         self.loaded_extensions = None
+        # mongos's mongot .conf name, generated in setup(); doubles as a re-setup guard.
+        self._mongot_extension_conf_name = None
+        # mongotHost isn't known yet, so defer mongod's mongot .conf to the shards' child nodes
+        # (see _builder.py) and mongos's to setup().
+        self._defer_mongot_extension = mongot_extension_requested(_load_exts, launch_mongot)
+        self._skip_extensions_signature_verification = skip_extensions_signature_verification
         if "*" in _load_exts:
             self.loaded_extensions = find_and_generate_all_extension_configs(
                 is_evergreen=self.config.EVERGREEN_TASK_ID,
@@ -102,13 +111,19 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                 self.mongos_options,
             )
         elif _load_exts:
-            self.loaded_extensions = find_and_generate_named_extension_configs(
-                extension_names=_load_exts,
-                is_evergreen=self.config.EVERGREEN_TASK_ID,
-                logger=self.logger,
-                mongod_options=self.mongod_options,
-                mongos_options=self.mongos_options,
+            generate_now = (
+                [n for n in _load_exts if n != MONGOT_EXTENSION_NAME]
+                if self._defer_mongot_extension
+                else _load_exts
             )
+            if generate_now:
+                self.loaded_extensions = find_and_generate_named_extension_configs(
+                    extension_names=generate_now,
+                    is_evergreen=self.config.EVERGREEN_TASK_ID,
+                    logger=self.logger,
+                    mongod_options=self.mongod_options,
+                    mongos_options=self.mongos_options,
+                )
             add_extensions_signature_pub_key_path(
                 skip_extensions_signature_verification,
                 self.config,
@@ -271,6 +286,27 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
             self.searchIndexManagementHostAndPort = self.mongotHost
 
+            mongos_extension_options = None
+            if self._defer_mongot_extension and self._mongot_extension_conf_name is None:
+                # Deferred from __init__, when no mongot port existed yet. Generated into a
+                # scratch dict because each mongos holds its own copy of mongos_options.
+                mongos_extension_options = {}
+                self._mongot_extension_conf_name = find_and_generate_named_extension_configs(
+                    extension_names=[MONGOT_EXTENSION_NAME],
+                    is_evergreen=self.config.EVERGREEN_TASK_ID,
+                    logger=self.logger,
+                    mongod_options=mongos_extension_options,
+                    dynamic_options={
+                        MONGOT_EXTENSION_NAME: build_mongot_dynamic_options(self.mongotHost)
+                    },
+                )
+                # Register the mongos conf for teardown cleanup alongside any mongod-side confs.
+                self.loaded_extensions = (
+                    f"{self.loaded_extensions},{self._mongot_extension_conf_name}"
+                    if self.loaded_extensions
+                    else self._mongot_extension_conf_name
+                )
+
             for mongos in self.mongos:
                 # In search enabled sharded cluster, mongos has to be spun up with a connection string to a
                 # mongot in order to issue PlanShardedSearch commands.
@@ -278,6 +314,15 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                 mongos.mongos_options["searchIndexManagementHostAndPort"] = (
                     self.searchIndexManagementHostAndPort
                 )
+                if mongos_extension_options is not None:
+                    existing = mongos.mongos_options.get("loadExtensions")
+                    new_names = mongos_extension_options["loadExtensions"]
+                    mongos.mongos_options["loadExtensions"] = (
+                        f"{existing},{new_names}" if existing else new_names
+                    )
+                    mongos.mongos_options["extensionsConfigPath"] = mongos_extension_options[
+                        "extensionsConfigPath"
+                    ]
 
         with ThreadPoolExecutor() as executor:
             tasks = []
@@ -486,8 +531,14 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         """Shut down the sharded cluster."""
         self.logger.info("Stopping all members of the sharded cluster...")
 
-        if finished and self.loaded_extensions:
-            delete_extension_configs(self.loaded_extensions, self.logger)
+        if finished:
+            if self.loaded_extensions:
+                delete_extension_configs(self.loaded_extensions, self.logger)
+            # Shard-node teardown never receives finished=True; clean up their confs here.
+            for shard in self.shards:
+                delete_for_members = getattr(shard, "delete_extension_configs_for_members", None)
+                if delete_for_members:
+                    delete_for_members()
 
         running_at_start = self.is_running()
         if not running_at_start:

@@ -8,10 +8,45 @@ from buildscripts.resmokelib.extensions.constants import (
     EVERGREEN_SEARCH_DIRS,
     LOCAL_SEARCH_DIRS,
 )
+from buildscripts.resmokelib.extensions.download_external_extensions import (
+    download_external_extension,
+)
 from buildscripts.resmokelib.extensions.generate_extension_configs import (
     generate_extension_configs,
     get_conf_out_dir,
 )
+
+# Fixtures special-case this extension: it needs a runtime-computed mongotHost.
+MONGOT_EXTENSION_NAME = "mongot"
+
+
+def build_mongot_dynamic_options(mongot_host: str) -> dict:
+    """Build the mongot-extension's extensionOptions.
+
+    metricsFilePath is redirected because the extension's default path isn't writable under
+    resmoke.
+    """
+    return {
+        "mongotHost": mongot_host,
+        "metricsFilePath": os.path.join(get_conf_out_dir(), f"mongot_{uuid.uuid4().hex}.prom"),
+    }
+
+
+def mongot_extension_requested(load_extensions: list[str], launch_mongot: bool) -> bool:
+    """Return whether load_extensions requests the mongot extension.
+
+    Raises if launch_mongot is unset: without a mongot to connect to, the extension would fail
+    opaquely at mongod startup.
+    """
+    if MONGOT_EXTENSION_NAME not in load_extensions:
+        return False
+    if not launch_mongot:
+        raise RuntimeError(
+            f"load_extensions includes '{MONGOT_EXTENSION_NAME}' but launch_mongot is not "
+            "enabled. The mongot extension requires a mongot to connect to; set "
+            "launch_mongot: true on the fixture."
+        )
+    return True
 
 
 def normalize_load_extensions(load_extensions) -> list[str]:
@@ -58,8 +93,11 @@ def _generate_and_append_to_load_extensions(
     logger: logging.Logger,
     mongod_options: dict,
     mongos_options: dict | None = None,
+    manual_options_by_file: dict[str, dict] | None = None,
 ) -> str:
-    extension_names = generate_extension_configs(so_files, uuid.uuid4().hex, logger)
+    extension_names = generate_extension_configs(
+        so_files, uuid.uuid4().hex, logger, manual_options_by_file=manual_options_by_file
+    )
     joined_names = ",".join(extension_names)
 
     _append_to_load_extensions(mongod_options, joined_names)
@@ -105,35 +143,59 @@ def find_and_generate_all_extension_configs(
     return _generate_and_append_to_load_extensions(so_files, logger, mongod_options, mongos_options)
 
 
+# In-tree test extensions vs. externally-published ones (etc/extensions.yml) naming conventions.
+_NAMED_EXTENSION_PATTERNS = ("lib{name}_mongo_extension.so", "lib{name}_extension.so")
+
+
 def find_and_generate_named_extension_configs(
     extension_names: list[str],
     is_evergreen: bool,
     logger: logging.Logger,
     mongod_options: dict,
     mongos_options: dict | None = None,
+    dynamic_options: dict[str, dict] | None = None,
 ) -> str:
-    """Find specific extensions by name, generate their .conf files, and append to loadExtensions. Unlike
-    find_and_generate_all_extension_configs which discovers *all* extensions, this function loads only the
-    explicitly listed extensions."""
+    """Find the named extensions, generate their .conf files, and append to loadExtensions.
+
+    dynamic_options maps an extension name to runtime-computed extensionOptions, which take
+    precedence over configurations.yml.
+    """
     ext_dir = _get_extension_dir(is_evergreen, logger)
+    dynamic_options = dynamic_options or {}
     all_so_files = []
+    manual_options_by_file: dict[str, dict] = {}
 
     for name in extension_names:
-        pattern = f"lib{name}_mongo_extension.so"
-        so_files = sorted(glob.glob(os.path.join(ext_dir, pattern)))
+        # Escape the name so glob metacharacters in it (*, ?, [ ]) match literally.
+        patterns = [p.format(name=glob.escape(name)) for p in _NAMED_EXTENSION_PATTERNS]
+        so_files = sorted(
+            {f for pattern in patterns for f in glob.glob(os.path.join(ext_dir, pattern))}
+        )
+
+        if not so_files:
+            # Externally-published extensions aren't installed by the build; download them.
+            downloaded = download_external_extension(name, logger)
+            if downloaded is not None:
+                so_files = [downloaded]
 
         if not so_files:
             raise RuntimeError(
-                f"Extension '{name}' not found: no files matching {pattern} in {ext_dir}"
+                f"Extension '{name}' not found: no files matching {patterns} in {ext_dir}"
             )
         if len(so_files) > 1:
             raise RuntimeError(
-                f"Ambiguous extension '{name}': multiple files match {pattern} in {ext_dir}: {so_files}"
+                f"Ambiguous extension '{name}': multiple files match {patterns} in {ext_dir}: {so_files}"
             )
 
         logger.info("Found extension file for '%s': %s", name, so_files[0])
         all_so_files.append(so_files[0])
+        if name in dynamic_options:
+            manual_options_by_file[so_files[0]] = dynamic_options[name]
 
     return _generate_and_append_to_load_extensions(
-        all_so_files, logger, mongod_options, mongos_options
+        all_so_files,
+        logger,
+        mongod_options,
+        mongos_options,
+        manual_options_by_file=manual_options_by_file or None,
     )

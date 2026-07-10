@@ -14,10 +14,13 @@ import yaml
 
 from buildscripts.resmokelib import logging
 from buildscripts.resmokelib.extensions import (
+    MONGOT_EXTENSION_NAME,
     add_extensions_signature_pub_key_path,
+    build_mongot_dynamic_options,
     delete_extension_configs,
     find_and_generate_all_extension_configs,
     find_and_generate_named_extension_configs,
+    mongot_extension_requested,
     normalize_load_extensions,
 )
 from buildscripts.resmokelib.testing.fixtures import interface
@@ -78,6 +81,41 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             certs.expand_x509_paths(self.fixturelib.default_if_none(mongod_options, {}))
         )
 
+        if "set_parameters" not in self.mongod_options:
+            self.mongod_options["set_parameters"] = {}
+
+        if launch_mongot:
+            self.launch_mongot_bool = True
+
+            # mongot exposes two ports that it will listen for ingress communication on: "port",
+            # which expects the MongoRPC protocol, and "grpcPort", which expects the MongoDB
+            # gRPC protocol. When useGrpcForSearch is true, mongos and mongod will communicate
+            # with mongot using gRPC, and so we must set the "mongotHost" option to the listening
+            # address that expects the gRPC protocol. However, the testing infrastructure also
+            # communicates with mongot directly using the pymongo driver, which must communicate
+            # using MongoRPC, and so we also setup the "port" on mongot to listen for MongoRPC
+            # connections no matter what.
+            #
+            # Computed before load_extensions processing, which may need mongotHost.
+            self.mongot_port = fixturelib.get_next_port(job_num)
+            if self.mongod_options["set_parameters"].get("useGrpcForSearch"):
+                self.mongot_grpc_port = fixturelib.get_next_port(job_num)
+                self.mongod_options["mongotHost"] = "localhost:" + str(self.mongot_grpc_port)
+            else:
+                self.mongod_options["mongotHost"] = "localhost:" + str(self.mongot_port)
+
+            # In future architectures, this could change
+            self.mongod_options["searchIndexManagementHostAndPort"] = self.mongod_options[
+                "mongotHost"
+            ]
+        else:
+            self.launch_mongot_bool = False
+        # If a suite enables launching mongot, the necessary startup options for the MongoTFixture will be created in
+        # setup_mongot_params() which is called by the builders after all other fixture types have been setup (and
+        # therefore all other nodes have been assigned ports, which allows mongot to connect to a given mongod or
+        # mongos. The MongoTFixture is then launched by the MongoDFixture in setup().
+        self.mongot = None
+
         # Process load_extensions: ["*"] means all, otherwise load named extensions.
         _load_exts = normalize_load_extensions(load_extensions)
         if load_extensions is None and self.config.LOAD_ALL_EXTENSIONS:
@@ -94,18 +132,23 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
                 skip_extensions_signature_verification, self.config, self.mongod_options
             )
         elif _load_exts:
+            dynamic_options = None
+            if mongot_extension_requested(_load_exts, self.launch_mongot_bool):
+                dynamic_options = {
+                    MONGOT_EXTENSION_NAME: build_mongot_dynamic_options(
+                        self.mongod_options["mongotHost"]
+                    )
+                }
             self.loaded_extensions = find_and_generate_named_extension_configs(
                 extension_names=_load_exts,
                 is_evergreen=self.config.EVERGREEN_TASK_ID,
                 logger=self.logger,
                 mongod_options=self.mongod_options,
+                dynamic_options=dynamic_options,
             )
             add_extensions_signature_pub_key_path(
                 skip_extensions_signature_verification, self.config, self.mongod_options
             )
-
-        if "set_parameters" not in self.mongod_options:
-            self.mongod_options["set_parameters"] = {}
 
         if add_feature_flags:
             ifr_flags = set(self.config.IFR_FEATURE_FLAGS or [])
@@ -155,36 +198,6 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         if self.use_priority_port:
             self.priority_port = fixturelib.get_next_port(job_num)
             self.mongod_options["priorityPort"] = self.priority_port
-
-        if launch_mongot:
-            self.launch_mongot_bool = True
-
-            # mongot exposes two ports that it will listen for ingress communication on: "port",
-            # which expects the MongoRPC protocol, and "grpcPort", which expects the MongoDB
-            # gRPC protocol. When useGrpcForSearch is true, mongos and mongod will communicate
-            # with mongot using gRPC, and so we must set the "mongotHost" option to the listening
-            # address that expects the gRPC protocol. However, the testing infrastructure also
-            # communicates with mongot directly using the pymongo driver, which must communicate
-            # using MongoRPC, and so we also setup the "port" on mongot to listen for MongoRPC
-            # connections no matter what.
-            self.mongot_port = fixturelib.get_next_port(job_num)
-            if self.mongod_options["set_parameters"].get("useGrpcForSearch"):
-                self.mongot_grpc_port = fixturelib.get_next_port(job_num)
-                self.mongod_options["mongotHost"] = "localhost:" + str(self.mongot_grpc_port)
-            else:
-                self.mongod_options["mongotHost"] = "localhost:" + str(self.mongot_port)
-
-            # In future architectures, this could change
-            self.mongod_options["searchIndexManagementHostAndPort"] = self.mongod_options[
-                "mongotHost"
-            ]
-        else:
-            self.launch_mongot_bool = False
-        # If a suite enables launching mongot, the necessary startup options for the MongoTFixture will be created in
-        # setup_mongot_params() which is called by the builders after all other fixture types have been setup (and
-        # therefore all other nodes have been assigned ports, which allows mongot to connect to a given mongod or
-        # mongos. The MongoTFixture is then launched by the MongoDFixture in setup().
-        self.mongot = None
 
         if "featureFlagGRPC" in self.config.ENABLED_FEATURE_FLAGS or self.mongod_options[
             "set_parameters"

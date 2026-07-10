@@ -11,3 +11,15 @@ py_test(
         "//buildscripts/resmokelib/extensions",
     ],
 )
+
+py_test(
+    name = "test_find_and_generate_extension_configs",
+    srcs = [
+        "__init__.py",
+        "test_find_and_generate_extension_configs.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib/extensions",
+    ],
+)

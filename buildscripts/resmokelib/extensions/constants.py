@@ -29,6 +29,10 @@ else:
         os.path.join(cwd, "bazel-bin", "install-extensions", "lib"),
     ]
 
+# Externally-published extensions: config and download cache (see download_external_extensions.py).
+EXTERNAL_EXTENSIONS_CONF_PATH = os.path.join(cwd, "etc", "extensions.yml")
+EXTERNAL_EXTENSIONS_CACHE_DIR = os.path.join(cwd, "build", "external-extensions")
+
 # Path to test extensions signing public key.
 TEST_PUBLIC_KEY_PATH = os.path.join(
     cwd,

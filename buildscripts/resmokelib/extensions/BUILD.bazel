@@ -1,3 +1,4 @@
+load("@poetry//:dependencies.bzl", "dependency")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 py_library(
@@ -7,11 +8,24 @@ py_library(
         "add_extensions_signature_pub_key_path.py",
         "constants.py",
         "delete_extension_configs.py",
+        "download_external_extensions.py",
         "find_and_generate_extension_configs.py",
         "generate_extension_configs.py",
+    ],
+    # Read at runtime via CONF_IN_PATH; needed in runfiles for sandboxed tests.
+    data = [
+        "//src/mongo/db/extension/test_examples:configurations.yml",
     ],
     visibility = ["//visibility:public"],
     deps = [
         "//buildscripts/s3_binary:download",
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+        dependency(
+            "requests",
+            group = "core",
+        ),
     ],
 )

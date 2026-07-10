@@ -4,5 +4,7 @@ description: >-
   mongot-extension.
 excludes:
   - "with_mongot_extension.exclude_incompatible_tests"
+  - "with_mongot_extension.exclude_incompatible_tests_sharded"
 overrides:
   - "with_mongot_extension.load_extension"
+  - "with_mongot_extension.extension_flags_sharded"

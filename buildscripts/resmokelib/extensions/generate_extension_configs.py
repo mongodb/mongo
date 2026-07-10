@@ -29,8 +29,14 @@ def generate_extension_configs(
     with_suffix: str,
     logger: logging.Logger,
     manual_options: str | None = None,
+    manual_options_by_file: dict[str, dict] | None = None,
 ) -> list[str]:
-    """Generate a .conf file for each extension .so file specified."""
+    """Generate a .conf file for each extension .so file specified.
+
+    manual_options_by_file maps a so_file path to an extensionOptions dict for that file,
+    taking precedence over both manual_options and configurations.yml.
+    """
+    manual_options_by_file = manual_options_by_file or {}
     extensions = {}
     parsed_manual_options = None
 
@@ -88,7 +94,9 @@ def generate_extension_configs(
                 # All extension .conf files will have a sharedLibraryPath.
                 conf_file.write(f"sharedLibraryPath: {so_file}\n")
 
-                if parsed_manual_options is not None:
+                if so_file in manual_options_by_file:
+                    yaml.dump({"extensionOptions": manual_options_by_file[so_file]}, conf_file)
+                elif parsed_manual_options is not None:
                     # Write manual options as extensionOptions.
                     yaml.dump({"extensionOptions": parsed_manual_options}, conf_file)
                 # Fallback to extensionOptions from configurations.yml for this extension.

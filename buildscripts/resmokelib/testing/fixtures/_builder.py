@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Optional
 
 from buildscripts.resmokelib import config, errors, logging
+from buildscripts.resmokelib.extensions import MONGOT_EXTENSION_NAME
 from buildscripts.resmokelib.suitesconfig import _get_suite_config
 from buildscripts.resmokelib.testing import suite as _suite
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
@@ -23,6 +24,21 @@ RETRIEVE_DIR = "build/multiversionfixtures"
 RETRIEVE_LOCK = threading.Lock()
 
 _BUILDERS = {}  # type: ignore
+
+
+def _deferred_mongot_extension_kwargs(parent_fixture) -> dict:
+    """Child-fixture extension kwargs for a parent that may defer the mongot extension.
+
+    Parents defer the mongot extension to the child, which knows its own mongotHost; the
+    signature-verification setting travels with it. getattr: multiversion parents may be
+    pinned-version fixture classes without the deferral attributes.
+    """
+    if getattr(parent_fixture, "_defer_mongot_extension", False):
+        return {
+            "load_extensions": [MONGOT_EXTENSION_NAME],
+            "skip_extensions_signature_verification": parent_fixture._skip_extensions_signature_verification,
+        }
+    return {"load_extensions": []}
 
 
 def make_fixture(
@@ -387,11 +403,8 @@ class ReplSetBuilder(FixtureBuilder):
                 mongod_executable=executables[BinVersionEnum.OLD],
                 mongod_options=mongod_options,
                 preserve_dbpath=replset.preserve_dbpath,
-                # Child MongoDFixtures receive load_extensions=[] to prevent them from re-processing
-                # the LOAD_ALL_EXTENSIONS global flag. The parent ReplicaSetFixture already handled
-                # extension loading and populated mongod_options["loadExtensions"]; passing [] (rather
-                # than the default None) signals "skip the global flag" without suppressing explicitly
-                # requested extensions.
+                # [] (not the default None) so the child skips the LOAD_ALL_EXTENSIONS global
+                # flag; the parent already populated mongod_options["loadExtensions"].
                 load_extensions=[],
                 use_priority_port=use_priority_port,
                 uds_path_prefix=replset.uds_path_prefix,
@@ -413,9 +426,9 @@ class ReplSetBuilder(FixtureBuilder):
             preserve_dbpath=replset.preserve_dbpath,
             port=new_fixture_port,
             launch_mongot=launch_mongot,
-            load_extensions=[],
             use_priority_port=use_priority_port,
             uds_path_prefix=replset.uds_path_prefix,
+            **_deferred_mongot_extension_kwargs(replset),
         )
 
         return FixtureContainer(new_fixture, old_fixture, cur_version)
@@ -689,8 +702,12 @@ class ShardedClusterBuilder(FixtureBuilder):
         rs_shard_kwargs = sharded_cluster.get_rs_shard_kwargs(rs_shard_index)
         rs_shard_kwargs["launch_mongot"] = launch_mongot
         rs_shard_kwargs["use_priority_ports"] = use_priority_ports
-        # Parent ShardedClusterFixture already loaded extensions; see comment above in _new_mongod().
-        rs_shard_kwargs["load_extensions"] = []
+        # See _deferred_mongot_extension_kwargs; the config server is built with
+        # launch_mongot=False and must not receive the deferral.
+        if launch_mongot:
+            rs_shard_kwargs.update(_deferred_mongot_extension_kwargs(sharded_cluster))
+        else:
+            rs_shard_kwargs["load_extensions"] = []
 
         if mixed_bin_versions is not None:
             start_index = rs_shard_index * num_rs_nodes_per_shard
