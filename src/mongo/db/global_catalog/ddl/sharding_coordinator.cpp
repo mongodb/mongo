@@ -71,6 +71,16 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeRunningCoordinatorInstance);
 MONGO_FAIL_POINT_DEFINE(hangBeforeRemovingCoordinatorDocument);
+// Suspends any coordinator matching 'operationType' before it starts executing the handler for
+// 'phase'. The criteria can be further restricted by specifying an optional 'nss'.
+//  Following the full description of the expected schema for the failpoint 'data' section:
+//   - 'operationType': string matching the coordinator's CoordinatorType (e.g.
+//   "createCollection_V4")
+//   - 'phase': string matching the serialized value of the phase being entered (as defined by the
+//   enum in its RecoveryDocument)
+//   - 'nss' (optional): string matching the coordinator's original namespace. If omitted, the
+//   coordinator is matched regardless of its namespace.
+MONGO_FAIL_POINT_DEFINE(suspendDDLCoordinatorOnPhase);
 
 ShardingCoordinatorMetadata extractShardingCoordinatorMetadata(const BSONObj& coorDoc) {
     return ShardingCoordinatorMetadata::parse(coorDoc,
@@ -535,6 +545,33 @@ std::function<void()> RecoverableShardingCoordinator::_buildPhaseHandlerGeneric(
             // Persist the new phase if this is the first time we are executing it.
             _enterPhaseGeneric(newPhase);
         }
+
+        // Optionally suspend here if a matching 'suspendDDLCoordinatorOnPhase' failpoint is active.
+        suspendDDLCoordinatorOnPhase.executeIf(
+            [&](const BSONObj&) { suspendDDLCoordinatorOnPhase.pauseWhileSet(opCtx); },
+            [&](const BSONObj& data) {
+                auto suspendExecution =
+                    data.getStringField("operationType") == idl::serialize(operationType()) &&
+                    data.getStringField("phase") == serializeGenericPhase(newPhase);
+
+                // If an 'nss' field is specified, additionally require it to match the
+                // coordinator's original namespace. If absent, do not constrain on the namespace.
+                if (const auto nssElem = data.getField("nss"); !nssElem.eoo()) {
+                    suspendExecution = suspendExecution &&
+                        NamespaceStringUtil::deserialize(
+                            boost::none, nssElem.str(), SerializationContext::stateDefault()) ==
+                            originalNss();
+                }
+
+                if (suspendExecution) {
+                    LOGV2_DEBUG(13073500,
+                                1,
+                                "Pausing sharding coordinator on phase",
+                                logv2::DynamicAttributes{getCoordinatorLogAttrs(),
+                                                         "failpointData"_attr = redact(data)});
+                }
+                return suspendExecution;
+            });
 
         return handlerFn(opCtx);
     };
