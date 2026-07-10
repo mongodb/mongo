@@ -433,6 +433,25 @@ TEST_F(CollectionShardingRuntimeTest,
     ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
 }
 
+TEST_F(CollectionShardingRuntimeTest, SetAndClearCollectionMetadataUpdatesStatistics) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+
+    const auto statsBefore = getCollectionRecoveryStatistics();
+    const auto setsBefore = statsBefore.getIntField("countCollectionMetadataCacheSets");
+    const auto clearsBefore = statsBefore.getIntField("countCollectionMetadataCacheClears");
+
+    csr.setCollectionMetadata(opCtx, makeShardedMetadata(opCtx));
+    auto statsAfterSet = getCollectionRecoveryStatistics();
+    ASSERT_EQ(statsAfterSet.getIntField("countCollectionMetadataCacheSets"), setsBefore + 1);
+    ASSERT_EQ(statsAfterSet.getIntField("countCollectionMetadataCacheClears"), clearsBefore);
+
+    csr.clearCollectionMetadata(opCtx);
+    auto statsAfterClear = getCollectionRecoveryStatistics();
+    ASSERT_EQ(statsAfterClear.getIntField("countCollectionMetadataCacheSets"), setsBefore + 1);
+    ASSERT_EQ(statsAfterClear.getIntField("countCollectionMetadataCacheClears"), clearsBefore + 1);
+}
+
 TEST_F(CollectionShardingRuntimeTest,
        ClearFilteringMetadataAuthoritativeClearsMetadataWhenTrackedAndUUIDMatches) {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss);

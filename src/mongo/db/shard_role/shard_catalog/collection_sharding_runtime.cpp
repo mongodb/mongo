@@ -423,6 +423,9 @@ void CollectionShardingRuntime::setCollectionMetadata(OperationContext* opCtx,
         auto result = waitingVersion <=> newChunkVersion;
         return result == std::partial_ordering::less;
     });
+
+    ShardingStatistics::get(opCtx)
+        .collectionShardingMetadataStatistics.registerCollectionMetadataCacheSet();
 }
 
 void CollectionShardingRuntime::clearCollectionMetadata(OperationContext* opCtx,
@@ -454,6 +457,9 @@ void CollectionShardingRuntime::clearCollectionMetadata(OperationContext* opCtx,
     }
 
     _metadataType = MetadataType::kUnknown;
+
+    ShardingStatistics::get(opCtx)
+        .collectionShardingMetadataStatistics.registerCollectionMetadataCacheClear();
 }
 
 Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
