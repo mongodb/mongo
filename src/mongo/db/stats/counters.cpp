@@ -489,6 +489,7 @@ FastPathQueryCounters::FastPathQueryCounters()
 QueryFrameworkCounters queryFrameworkCounters;
 LookupPushdownCounters lookupPushdownCounters;
 LookupUnwindPushdownCounters lookupUnwindPushdownCounters;
+NonLeadingPushdownCounters nonLeadingPushdownCounters;
 ValidatorCounters validatorCounters;
 ValidationLevelCounters validationLevelCounters;
 GroupCounters groupCounters;

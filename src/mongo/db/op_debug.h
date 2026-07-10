@@ -719,6 +719,19 @@ public:
     // lookup+unwind stage.
     int luLocalComplex{0};
 
+    // Tracks whether a non leading $match was pushed down to SBE in the trySbeRestricted mode. This
+    // is a bool to ensure it's set only once per query.
+    bool nlpMatch{false};
+    // Tracks whether a non leading $project was pushed down to SBE in the trySbeRestricted mode.
+    // This is a bool to ensure it's set only once per query.
+    bool nlpProject{false};
+    // Tracks whether a non leading $addFields was pushed down to SBE in the trySbeRestricted mode.
+    // This is a bool to ensure it's set only once per query.
+    bool nlpAddFields{false};
+    // Tracks whether a non leading $replaceRoot was pushed down to SBE in the trySbeRestricted
+    // mode. This is a bool to ensure it's set only once per query.
+    bool nlpReplaceRoot{false};
+
     // Tracks the number of spilled bytes by hash lookup in a pushed down lookup stage. The spilled
     // storage size after compression might be different from the bytes spilled.
     long long hashLookupSpillToDiskBytes{0};

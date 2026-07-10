@@ -221,6 +221,8 @@ private:
             debug.luLocalComplex);
         sortCounters.incrementSortCountersPerQuery(debug.sortTotalDataSizeBytes, debug.keysSorted);
         queryFrameworkCounters.incrementQueryEngineCounters(curOp);
+        nonLeadingPushdownCounters.incrementCounters(
+            debug.nlpMatch, debug.nlpProject, debug.nlpAddFields, debug.nlpReplaceRoot);
     }
 
 public:

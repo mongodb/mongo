@@ -337,6 +337,9 @@ EngineChoice extendSolutionAndSelectEngine(std::unique_ptr<QuerySolution>& solut
             solution =
                 QueryPlannerAnalysis::removeInclusionProjectionBelowGroup(std::move(solution));
         }
+
+        // Increment non-leading pushdown stage counters.
+        incrementNonLeadingPushdownCounters(*cq);
     }
     return engine;
 }

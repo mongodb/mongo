@@ -54,4 +54,14 @@ void attachPipelineStages(const MultipleCollectionAccessor& collections,
                           bool needsMerge,
                           CanonicalQuery* canonicalQuery,
                           std::unique_ptr<QueryPlannerParams> plannerParams);
+
+/**
+ * Increments in the operation context of the CanonicalQuery the non-leading pushdown counters. They
+ * track whether the given query contains at least 1 non-leading $match, $project, $addFields and
+ * $replaceRoot that was pushed down to SBE.
+ *
+ * The function assumes that CqPipeline won't be changed anymore, that is, that it contains the
+ * final stages that will run in SBE.
+ */
+void incrementNonLeadingPushdownCounters(const CanonicalQuery& cq);
 }  // namespace mongo

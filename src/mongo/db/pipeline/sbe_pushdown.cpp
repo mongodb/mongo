@@ -29,6 +29,7 @@
 
 #include "mongo/db/pipeline/sbe_pushdown.h"
 
+#include "mongo/db/curop.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_internal_projection.h"
 #include "mongo/db/pipeline/document_source_internal_replace_root.h"
@@ -766,4 +767,40 @@ void attachPipelineStages(const MultipleCollectionAccessor& collections,
                                                                   stagesForPushdown);
     canonicalQuery->setCqPipeline(std::move(stagesForPushdown), allStagesPushedDown);
 };
+
+void incrementNonLeadingPushdownCounters(const CanonicalQuery& cq) {
+    const auto& queryKnob = cq.getExpCtx()->getQueryKnobConfiguration();
+
+    // Increment only for trySbeRestricted. The idea is to be able to track how many non-leading
+    // operators are being used because of enabling featureFlagSbeNonLeadingMatch /
+    // featureFlagSbeTransformStages, and not because trySbeEngine is set.
+    if (queryKnob.getInternalQueryFrameworkControlForOp() !=
+        QueryFrameworkControlEnum::kTrySbeRestricted) {
+        return;
+    }
+
+    auto* opCtx = cq.getExpCtx()->getOperationContext();
+    if (!opCtx)
+        return;
+    auto& debug = CurOp::get(opCtx)->debug();
+
+    for (const auto& stage : cq.cqPipeline()) {
+        const auto id = stage->getId();
+
+        // Match the operators that were pushed down to SBE.
+        if (id == DocumentSourceMatch::id) {
+            debug.nlpMatch = true;
+        } else if (id == DocumentSourceInternalProjection::id) {
+            const auto* proj = static_cast<const DocumentSourceInternalProjection*>(stage.get());
+            if (proj->projection().type() == projection_ast::ProjectType::kAddition) {
+                debug.nlpAddFields = true;
+            } else {
+                debug.nlpProject = true;
+            }
+        } else if (id == DocumentSourceInternalReplaceRoot::id) {
+            debug.nlpReplaceRoot = true;
+        }
+    }
+}
+
 }  // namespace mongo

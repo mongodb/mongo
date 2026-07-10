@@ -496,6 +496,34 @@ public:
 };
 extern LookupUnwindPushdownCounters lookupUnwindPushdownCounters;
 
+/**
+ * Counters tracking non-leading pushdown operators.
+ */
+class NonLeadingPushdownCounters {
+public:
+    NonLeadingPushdownCounters() = default;
+    NonLeadingPushdownCounters(const NonLeadingPushdownCounters&) = delete;
+    NonLeadingPushdownCounters& operator=(const NonLeadingPushdownCounters&) = delete;
+
+    void incrementCounters(bool nlpMatch, bool nlpProject, bool nlpAddFields, bool nlpReplaceRoot) {
+        if (nlpMatch)
+            matchCounter.incrementRelaxed(1);
+        if (nlpProject)
+            projectCounter.incrementRelaxed(1);
+        if (nlpAddFields)
+            addFieldsCounter.incrementRelaxed(1);
+        if (nlpReplaceRoot)
+            replaceRootCounter.incrementRelaxed(1);
+    }
+
+    Counter64& matchCounter = *MetricBuilder<Counter64>{"query.nonLeadingPushdown.match"};
+    Counter64& projectCounter = *MetricBuilder<Counter64>{"query.nonLeadingPushdown.project"};
+    Counter64& addFieldsCounter = *MetricBuilder<Counter64>{"query.nonLeadingPushdown.addFields"};
+    Counter64& replaceRootCounter =
+        *MetricBuilder<Counter64>{"query.nonLeadingPushdown.replaceRoot"};
+};
+extern NonLeadingPushdownCounters nonLeadingPushdownCounters;
+
 /** Counters tracking group stats across all execution engines. */
 class GroupCounters : public SpillingCounters {
 public:
