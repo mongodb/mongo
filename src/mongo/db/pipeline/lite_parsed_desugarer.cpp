@@ -54,10 +54,7 @@ bool LiteParsedDesugarer::desugar(LiteParsedPipeline* pipeline,
         // that the subpipeline was modified, we will need to potentially reparse the full pipeline
         // from LPP - stages with subpipelines should pass the desugared LP subpipelines through
         // StageParams.
-        // TODO SERVER-121094 Remove when feature flag is removed.
-        auto hybridSearchFlagEnabled = ifrContext &&
-            ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
-        if (hybridSearchFlagEnabled) {
+        if (ifrContext) {
             if (auto* subpipelines = stage.getMutableSubPipelines()) {
                 for (auto& subpipelineLpp : *subpipelines) {
                     modified |= LiteParsedDesugarer::desugar(&*subpipelineLpp, ifrContext);

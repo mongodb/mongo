@@ -47,6 +47,8 @@ extern Counter64& onViewKickbackRetryCount;
 
 extern Counter64& inUnionWithKickbackRetryCount;
 
+extern Counter64& inLookupKickbackRetryCount;
+
 extern Counter64& inHybridSearchKickbackRetryCount;
 
 }  // namespace mongo::vector_search_metrics

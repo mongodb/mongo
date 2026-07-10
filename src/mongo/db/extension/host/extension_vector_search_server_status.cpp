@@ -45,6 +45,9 @@ Counter64& onViewKickbackRetryCount =
 Counter64& inUnionWithKickbackRetryCount =
     *MetricBuilder<Counter64>("extension.vectorSearch.inUnionWithKickbackRetries");
 
+Counter64& inLookupKickbackRetryCount =
+    *MetricBuilder<Counter64>("extension.vectorSearch.inLookupKickbackRetries");
+
 Counter64& inHybridSearchKickbackRetryCount =
     *MetricBuilder<Counter64>("extension.vectorSearch.inHybridSearchKickbackRetries");
 

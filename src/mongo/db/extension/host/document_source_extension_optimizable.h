@@ -446,9 +446,15 @@ public:
 
         if (expCtx->getInLookup() && !hybridSearchFlagEnabled) {
             const auto stageName = std::string(astNode->getName());
+            // Throw the IFR retry error for extension $vectorSearch in $lookup when
+            // featureFlagExtensionsInsideHybridSearch is disabled.
+            search_helpers::throwIfrKickbackIfNecessary(
+                search_helpers::isExtensionVectorSearchStage(stageName),
+                feature_flags::gFeatureFlagVectorSearchExtension,
+                vector_search_metrics::inLookupKickbackRetryCount,
+                "The $vectorSearch extension stage is not supported in a $lookup");
             // Throw the IFR retry error for extension $search/$searchMeta in $lookup when
-            // featureFlagExtensionsInsideHybridSearch is disabled. $vectorSearch is handled
-            // separately via LookupRequirement::kNotAllowed and is not covered here.
+            // featureFlagExtensionsInsideHybridSearch is disabled.
             search_helpers::throwIfrKickbackIfNecessary(
                 search_helpers::isExtensionSearchStage(stageName),
                 feature_flags::gFeatureFlagSearchExtension,

@@ -38,6 +38,7 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/host/extension_search_server_status.h"
+#include "mongo/db/extension/host/extension_vector_search_server_status.h"
 #include "mongo/db/extension/host/host_portal.h"
 #include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
@@ -54,6 +55,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
+#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_docs_needed_bounds.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -3504,6 +3506,23 @@ protected:
         }
     }
 };
+
+TEST_F(DocumentSourceExtensionOptimizableInLookupKickbackTest, FiresForExtensionVectorSearch) {
+    unittest::ServerParameterGuard hybridFlag{"featureFlagExtensionsInsideHybridSearch", false};
+    auto expCtx = getExpCtx();
+    expCtx->setInLookup(true);
+
+    auto initialCount = vector_search_metrics::inLookupKickbackRetryCount.get();
+    auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
+        std::make_unique<sdk::shared_test_stages::TransformAggStageAstNode>(
+            search_helpers::kExtensionVectorSearchStageName, BSONObj()));
+
+    ASSERT_THROWS_CODE(
+        host::DocumentSourceExtensionOptimizable::create(expCtx, AggStageAstNodeHandle{astNode}),
+        DBException,
+        ErrorCodes::IFRFlagRetry);
+    ASSERT_EQ(vector_search_metrics::inLookupKickbackRetryCount.get(), initialCount + 1);
+}
 
 TEST_F(DocumentSourceExtensionOptimizableInLookupKickbackTest, FiresForExtensionSearch) {
     runKickbackCase(/*hybridFlagEnabled=*/false,

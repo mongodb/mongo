@@ -543,14 +543,59 @@ TEST_F(LiteParsedDesugarerTest, DesugarsSubpipelineWithExpandableStage) {
     unregisterParser(extStageName);
 }
 
+TEST_F(LiteParsedDesugarerTest, DesugarsLookupSubpipelineWithExpandableStageWhenHybridFlagOff) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagExtensionsInsideHybridSearch", false};
+    registerParser(extension::AggStageDescriptorHandle(&_expandToHostParseDescriptor));
+    const auto extStageName =
+        std::string(extension::sdk::shared_test_stages::kExpandToHostParseName);
+
+    auto lookupStage = makeLookupWithSubpipeline({BSON(extStageName << BSONObj())});
+    LiteParsedPipeline lpp(_nss, {lookupStage});
+    ASSERT_EQ(lpp.getStages().size(), 1);
+
+    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
+
+    auto& stages = lpp.getStages();
+    ASSERT_EQ(stages.size(), 1);
+    assertSubpipelineStageIsMatch(stages[0].get(), 0, 0);
+
+    unregisterParser(extStageName);
+}
+
+TEST_F(LiteParsedDesugarerTest,
+       DesugarsGraphLookupSubpipelineWithExpandableStageWhenHybridFlagOff) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagExtensionsInsideHybridSearch", false};
+    registerParser(extension::AggStageDescriptorHandle(&_expandToHostParseDescriptor));
+    const auto extStageName =
+        std::string(extension::sdk::shared_test_stages::kExpandToHostParseName);
+
+    auto graphLookupStage =
+        BSON("$graphLookup" << BSON("from" << "otherCollection"
+                                           << "startWith" << "$a"
+                                           << "connectFromField" << "b"
+                                           << "connectToField" << "c"
+                                           << "as" << "d"
+                                           << "$_internalFromPipeline"
+                                           << BSON_ARRAY(BSON(extStageName << BSONObj()))));
+    LiteParsedPipeline lpp(_nss, {graphLookupStage});
+    ASSERT_EQ(lpp.getStages().size(), 1);
+
+    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
+
+    auto& stages = lpp.getStages();
+    ASSERT_EQ(stages.size(), 1);
+    assertSubpipelineStageIsMatch(stages[0].get(), 0, 0);
+
+    unregisterParser(extStageName);
+}
+
 TEST_F(LiteParsedDesugarerTest, SkipsSubpipelineDesugaringWhenIfrContextIsNull) {
     registerParser(extension::AggStageDescriptorHandle(&_expandToHostParseDescriptor));
     const auto extStageName =
         std::string(extension::sdk::shared_test_stages::kExpandToHostParseName);
 
     // Create [$lookup] with subpipeline [$expandToHostParse]. With a null IFR context, subpipeline
-    // desugaring is skipped (featureFlagExtensionsInsideHybridSearch is required), so the
-    // subpipeline should remain unchanged.
+    // desugaring is skipped, so the subpipeline should remain unchanged.
     auto lookupStage = makeLookupWithSubpipeline({BSON(extStageName << BSONObj())});
     LiteParsedPipeline lpp(_nss, {lookupStage});
     ASSERT_EQ(lpp.getStages().size(), 1);
