@@ -420,6 +420,10 @@ private:
     // TODO (SERVER-127253) Make this parameter non-optional once v9.0 branches out.
     boost::optional<ChunkRange> _enclosingChunk;
 
+    // Whether the migration commits authoritatively (driven by a MoveRangeCoordinator), as reported
+    // by the donor in the _recvChunkStart request.
+    bool _isAuthoritative{false};
+
     BSONObj _shardKeyPattern;
 
     WriteConcernOptions _writeConcern;

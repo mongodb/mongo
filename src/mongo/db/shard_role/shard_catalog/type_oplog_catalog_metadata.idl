@@ -72,12 +72,14 @@ structs:
                 type: bool
                 description: "If true, indicates the invalidation precedes a collection drop"
                 default: false
-            onlyClearIfUnowned:
+            onlyClearIfShardDoesntOwnChunks:
                 type: bool
                 description:
-                    "If true, only nodes whose collection metadata is UNOWNED clear their
-                    in-memory state. Used when a shard persists chunkless tracked metadata and
-                    only UNOWNED nodes need to recover it."
+                    "If true, only nodes that own no chunks for the collection clear their in-memory
+                    state (unowned, untracked, or tracked with zero owned chunks). Used when a shard
+                    persists chunkless tracked metadata: such a node may hold a stale leftover entry
+                    and must recover it, while a node that owns chunks is kept current by its own
+                    commit path and must not be cleared."
                 default: false
             shardVersion:
                 type: ChunkVersion

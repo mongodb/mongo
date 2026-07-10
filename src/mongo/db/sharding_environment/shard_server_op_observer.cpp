@@ -143,11 +143,16 @@ bool shouldInvalidateCollectionMetadataLocally(const InvalidateCollectionMetadat
         return true;
     }
 
-    // The entry asked to only clear UNOWNED nodes, or this node is already UNOWNED and has no
-    // durable metadata to reconcile against a shard version either way: the outcome is the same,
-    // clear if and only if this node is UNOWNED.
-    if (csr.isUnowned() || entry.getOnlyClearIfUnowned()) {
-        return csr.isUnowned();
+    // The entry asked to clear nodes that own no chunks, or this node is already UNOWNED and has no
+    // durable metadata to reconcile against a shard version either way. Either way the decision is
+    // the same: clear if and only if this node owns no chunks for the collection. The placement
+    // version is set only when this node owns chunks, so an unset version means "no chunks here"
+    // (unowned, untracked, or tracked with zero owned chunks) -- any of which may be a stale
+    // leftover that must be re-recovered from disk. A node that owns chunks keeps its metadata.
+    if (csr.isUnowned() || entry.getOnlyClearIfShardDoesntOwnChunks()) {
+        const auto currentMetadata = csr.getCurrentMetadataIfKnown();
+        return csr.isUnowned() ||
+            (currentMetadata && !currentMetadata->getShardPlacementVersion().isSet());
     }
 
     // No shard version was carried by the entry, so the invalidation is unconditional.

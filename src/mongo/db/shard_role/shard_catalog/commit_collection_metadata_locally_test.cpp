@@ -1256,8 +1256,8 @@ TEST_F(CommitCollectionMetadataLocallyTest, RefineShardKeyChunklessPersistsColle
     ASSERT_BSONOBJ_EQ(collDocs[0].getObjectField("key"), newKeyPattern);
 }
 
-TEST_F(CommitCollectionMetadataLocallyTest,
-       CommitChunklessUpdatesCatalogButPreservesExistingChunklessCSR) {
+TEST_F(CommitCollectionMetadataLocallyTest, CommitChunklessInvalidatesChunklessCSR) {
+    // Seed a tracked CSR that owns no chunks ("tracked-unowned").
     auto [collType1, _] = makeCollectionMetadata(0);
     mockCatalogClient()->setCollectionMetadata(collType1, {});
     shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss, true);
@@ -1269,7 +1269,12 @@ TEST_F(CommitCollectionMetadataLocallyTest,
         ASSERT_TRUE(metadata->hasRoutingTable());
         ASSERT_FALSE(metadata->getShardPlacementVersion().isSet());
     }
+    const auto invalidatesAfterSeed =
+        countCommandOplogEntries("invalidateCollectionMetadata", kTestNss);
 
+    // The collection was re-versioned elsewhere (new epoch/timestamp/key) while this shard was not
+    // a participant, as can happen with refineCollectionShardKey on a shard that owns chunks while
+    // this shard is temporarily not the DB primary.
     const OID epoch2 = OID::gen();
     const Timestamp ts2 = collType1.getTimestamp() + 1;
     const BSONObj newKeyPattern = BSON("_id" << 1 << "extra" << 1);
@@ -1279,19 +1284,76 @@ TEST_F(CommitCollectionMetadataLocallyTest,
 
     shard_catalog_commit::commitChunklessCollectionMetadataLocally(operationContext(), kTestNss);
 
+    // The durable catalog reflects the fresh generation.
     auto collDocs = findLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace);
     ASSERT_EQ(collDocs.size(), 1u);
     ASSERT_BSONOBJ_EQ(collDocs[0].getObjectField("key"), newKeyPattern);
 
+    // The stale in-memory CSR was invalidated (one 'c' entry emitted), so the next access recovers
+    // the fresh metadata from disk rather than serving the old generation.
+    ASSERT_EQ(countCommandOplogEntries("invalidateCollectionMetadata", kTestNss),
+              invalidatesAfterSeed + 1);
     auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
-    auto metadata = scopedCsr->getCurrentMetadataIfKnown();
-    ASSERT_TRUE(metadata);
-    ASSERT_TRUE(metadata->hasRoutingTable());
-    ASSERT_FALSE(metadata->getShardPlacementVersion().isSet());
-    ASSERT_BSONOBJ_EQ(metadata->getChunkManager()->getShardKeyPattern().getKeyPattern().toBSON(),
-                      kShardKeyPattern);
-    ASSERT_EQ(metadata->getChunkManager()->getVersion().epoch(), collType1.getEpoch());
-    ASSERT_EQ(metadata->getChunkManager()->getVersion().getTimestamp(), collType1.getTimestamp());
+    ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown());
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest,
+       CommitChunklessInvalidatesUnchangedGenerationChunklessCSR) {
+    // Seed a tracked CSR that owns no chunks ("tracked-unowned").
+    auto [collType1, _] = makeCollectionMetadata(0);
+    mockCatalogClient()->setCollectionMetadata(collType1, {});
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss, true);
+
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+        auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+        ASSERT_TRUE(metadata);
+        ASSERT_TRUE(metadata->hasRoutingTable());
+        ASSERT_FALSE(metadata->getShardPlacementVersion().isSet());
+    }
+    const auto invalidatesAfterSeed =
+        countCommandOplogEntries("invalidateCollectionMetadata", kTestNss);
+
+    // Durable generation is unchanged from what the CSR already holds.
+    shard_catalog_commit::commitChunklessCollectionMetadataLocally(operationContext(), kTestNss);
+
+    // A tracked-unowned CSR is invalidated regardless of whether the generation changed: the safety
+    // guard is "this shard owns no chunks", not staleness.
+    ASSERT_EQ(countCommandOplogEntries("invalidateCollectionMetadata", kTestNss),
+              invalidatesAfterSeed + 1);
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown());
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, CommitChunklessInvalidatesUntrackedChunklessCSR) {
+    // Seed a CSR that caches the collection as untracked (known metadata, but no routing table), as
+    // could happen if this shard learned of the collection while it was unsharded before it became
+    // tracked on another shard.
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(operationContext(), kTestNss);
+        scopedCsr->setCollectionMetadata(operationContext(), CollectionMetadata::UNTRACKED());
+    }
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+        auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+        ASSERT_TRUE(metadata);
+        ASSERT_FALSE(metadata->hasRoutingTable());
+    }
+
+    // The collection is actually tracked on the config server (owns no chunks on this shard).
+    auto [collType, _] = makeCollectionMetadata(0);
+    mockCatalogClient()->setCollectionMetadata(collType, {});
+    const auto invalidatesBefore =
+        countCommandOplogEntries("invalidateCollectionMetadata", kTestNss);
+
+    shard_catalog_commit::commitChunklessCollectionMetadataLocally(operationContext(), kTestNss);
+
+    // The stale untracked CSR is invalidated so the next access recovers the tracked entry from the
+    // on-disk catalog we just committed.
+    ASSERT_EQ(countCommandOplogEntries("invalidateCollectionMetadata", kTestNss),
+              invalidatesBefore + 1);
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown());
 }
 
 TEST_F(CommitCollectionMetadataLocallyTest, CommitChunklessPreservesCSRWithOwnedChunks) {
@@ -1407,29 +1469,33 @@ TEST_F(CommitCollectionMetadataLocallyTest,
     ASSERT_FALSE(ExecutionAdmissionContext::get(operationContext()).getMarkedNonDeprioritizable());
 }
 
-// The chunkless commit emits a 'c' entry carrying the kIfUnowned precondition, delegating the
-// decision to clear to each node. A locally tracked node does not satisfy the precondition, so its
-// filtering metadata is preserved.
+// The chunkless commit always emits a 'c' entry carrying the "clear if no owned chunks"
+// precondition, delegating the decision to each node. A node that owns chunks does not satisfy the
+// precondition, so its filtering metadata is preserved.
 TEST_F(CommitCollectionMetadataLocallyTest,
-       CommitChunklessAlwaysEmitsInvalidateWithIfUnownedConditionAndPreservesTrackedCsr) {
-    auto [collType, _] = makeCollectionMetadata(0);
-    mockCatalogClient()->setCollectionMetadata(collType, {});
-    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss, true);
+       CommitChunklessEmitsNoOwnedChunksConditionAndPreservesOwnedCsr) {
+    auto [collType, chunks] = makeCollectionMetadata(2);
+    for (auto& chunk : chunks) {
+        chunk.setShard(kMyShardName);
+    }
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss, false);
     {
         auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
-        ASSERT_TRUE(scopedCsr->getCurrentMetadataIfKnown());
-        ASSERT_FALSE(scopedCsr->isUnowned());
+        auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+        ASSERT_TRUE(metadata);
+        ASSERT_TRUE(metadata->getShardPlacementVersion().isSet());
     }
 
     shard_catalog_commit::commitChunklessCollectionMetadataLocally(operationContext(), kTestNss);
 
-    // The invalidate is always emitted and only clears UNOWNED nodes.
+    // The invalidate is always emitted and only clears nodes that own no chunks.
     auto oplogEntry = findLastOplogEntry();
     auto object = oplogEntry.getObjectField("o");
     ASSERT_EQ(object.firstElementFieldNameStringData(), "invalidateCollectionMetadata");
-    ASSERT_TRUE(object.getBoolField("onlyClearIfUnowned"));
+    ASSERT_TRUE(object.getBoolField("onlyClearIfShardDoesntOwnChunks"));
 
-    // This node is tracked, so it does not satisfy the precondition and keeps its metadata.
+    // This node owns chunks, so it does not satisfy the precondition and keeps its metadata.
     auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
     ASSERT_TRUE(scopedCsr->getCurrentMetadataIfKnown());
 }
@@ -1455,11 +1521,12 @@ TEST_F(CommitCollectionMetadataLocallyTest, CommitChunklessClearsCsrWhenLocallyU
     ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown());
 }
 
-// Directly exercises the op observer to prove the kIfUnowned precondition is evaluated per-node:
-// the same invalidate 'c' entry clears an UNOWNED node's metadata but leaves a tracked node's
-// metadata untouched.
-TEST_F(CommitCollectionMetadataLocallyTest, OnInvalidateIfUnownedClearsOnlyLocallyUnownedNodes) {
-    // Produce a real kIfUnowned invalidate 'c' entry and capture it to replay as a secondary would.
+// Directly exercises the op observer to prove the "clear if no owned chunks" precondition is
+// evaluated per-node: the same invalidate 'c' entry clears the metadata of nodes that own no chunks
+// (unowned or untracked) but leaves a node that owns chunks untouched.
+TEST_F(CommitCollectionMetadataLocallyTest,
+       OnInvalidateNoOwnedChunksClearsNodesWithoutOwnedChunks) {
+    // Produce a real invalidate 'c' entry and capture it to replay as a secondary would.
     auto [chunkless, _] = makeCollectionMetadata(0);
     mockCatalogClient()->setCollectionMetadata(chunkless, {});
     shard_catalog_commit::commitChunklessCollectionMetadataLocally(operationContext(), kTestNss);
@@ -1467,7 +1534,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, OnInvalidateIfUnownedClearsOnlyLocal
     const auto invalidateEntry = repl::OplogEntry(findLastOplogEntry());
     ASSERT_EQ(invalidateEntry.getObject().firstElementFieldNameStringData(),
               "invalidateCollectionMetadata");
-    ASSERT_TRUE(invalidateEntry.getObject().getBoolField("onlyClearIfUnowned"));
+    ASSERT_TRUE(invalidateEntry.getObject().getBoolField("onlyClearIfShardDoesntOwnChunks"));
 
     ShardServerOpObserver observer;
 
@@ -1503,8 +1570,9 @@ TEST_F(CommitCollectionMetadataLocallyTest, OnInvalidateIfUnownedClearsOnlyLocal
         ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown());
     }
 
-    // A node whose CSS is UNTRACKED (unsharded) does not satisfy the precondition: replaying the
-    // entry leaves its filtering metadata untouched.
+    // A node whose CSS is UNTRACKED (unsharded) owns no chunks, so it satisfies the precondition:
+    // replaying the entry clears it. The chunkless commit only runs for tracked collections, so an
+    // untracked cache is stale and must be re-recovered from disk.
     {
         CollectionShardingRuntime::acquireExclusive(operationContext(), kTestNss)
             ->setCollectionMetadata(operationContext(),
@@ -1514,10 +1582,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, OnInvalidateIfUnownedClearsOnlyLocal
         observer.onInvalidateCollectionMetadata(operationContext(), invalidateEntry);
 
         auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
-        auto metadata = scopedCsr->getCurrentMetadataIfKnown();
-        ASSERT_TRUE(metadata);
-        ASSERT_FALSE(metadata->isSharded());
-        ASSERT_EQ(metadata->getShardPlacementVersion(), ChunkVersion::UNTRACKED());
+        ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown());
     }
 
     // A node whose CSS is UNOWNED satisfies the precondition: replaying the entry clears it.
@@ -1899,7 +1964,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, CloneEmitsIfStaleInvalidateWithoutIn
     auto object = oplogEntry.getObjectField("o");
     ASSERT_EQ(object.firstElementFieldNameStringData(), "invalidateCollectionMetadata");
     ASSERT_TRUE(object.hasField("shardVersion"));
-    ASSERT_FALSE(object.getBoolField("onlyClearIfUnowned"));
+    ASSERT_FALSE(object.getBoolField("onlyClearIfShardDoesntOwnChunks"));
 
     // With no prior in-memory state, the kIfStale precondition does not hold, so the CSR stays
     // unknown, to be recovered lazily from the durable catalog when next needed.

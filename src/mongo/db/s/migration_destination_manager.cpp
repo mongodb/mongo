@@ -598,6 +598,7 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
     _min = cloneRequest.getMinKey();
     _max = cloneRequest.getMaxKey();
     _enclosingChunk = cloneRequest.getEnclosingChunk();
+    _isAuthoritative = cloneRequest.isAuthoritative();
     _shardKeyPattern = cloneRequest.getShardKeyPattern();
 
     _writeConcern = writeConcern;
@@ -1516,7 +1517,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                                                         _nss,
                                                         donorCollectionOptionsAndIndexes.uuid,
                                                         range,
-                                                        rangeDeletionWaitDeadline);
+                                                        rangeDeletionWaitDeadline,
+                                                        _isAuthoritative);
 
             if (!status.isOK() && status != ErrorCodes::ExceededTimeLimit) {
                 // Don't overwrite kAbort with kFail if an explicit abort is in progress.

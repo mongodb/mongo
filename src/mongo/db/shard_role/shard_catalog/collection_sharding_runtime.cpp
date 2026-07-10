@@ -43,6 +43,7 @@
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
+#include "mongo/db/shard_role/shard_role_loop.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
@@ -466,15 +467,35 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                const UUID& collectionUuid,
                                                ChunkRange orphanRange,
-                                               Date_t deadline) {
+                                               Date_t deadline,
+                                               bool refreshMetadataIfUnknown) {
     while (true) {
         const auto rangeDeleterService = RangeDeleterService::get(opCtx);
         rangeDeleterService->getServiceUpFuture().get(opCtx);
 
-        SharedSemiFuture<void> orphanCleanupFuture = [&]() {
+        auto getOrphanCleanupFuture = [&]() -> SharedSemiFuture<void> {
             AutoGetCollection autoColl(opCtx, nss, MODE_IX);
             const auto self =
                 CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
+
+            // On the authoritative path the filtering metadata may have been transiently cleared on
+            // this node by a concurrent metadata commit (for example movePrimary registering the
+            // collection on the new DB primary) while we wait. That is not a reset of the
+            // collection itself: signal the shard-role loop to recover the metadata from the
+            // durable catalog and retry, rather than treating it as a conflict. A StaleConfig with
+            // no wanted version is how "this shard doesn't know its version" is reported. Whether
+            // the migration is authoritative is decided by the donor and passed in by the caller;
+            // this node does not consult the feature flag itself.
+            if (refreshMetadataIfUnknown && self->_metadataType == MetadataType::kUnknown) {
+                uasserted(
+                    StaleConfigInfo(nss,
+                                    ShardVersionPlacementIgnored(),
+                                    boost::none /* wantedVersion */,
+                                    ShardingState::get(opCtx)->getShardHandle().toShardRef(opCtx)),
+                    str::stream() << "Filtering metadata for " << nss.toStringForErrorMsg()
+                                  << " is not known; recovering before waiting for orphan "
+                                     "cleanup");
+            }
 
             // If the metadata was reset, or the collection was dropped and recreated since the
             // metadata manager was created, return an error.
@@ -492,7 +513,23 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
 
             return rangeDeleterService->getOverlappingRangeDeletionsFuture(collectionUuid,
                                                                            orphanRange);
-        }();
+        };
+
+        SharedSemiFuture<void> orphanCleanupFuture;
+        if (refreshMetadataIfUnknown) {
+            try {
+                orphanCleanupFuture =
+                    shard_role_loop::withStaleShardRetry(opCtx, getOrphanCleanupFuture);
+            } catch (const ExceptionFor<ErrorCodes::StaleConfig>&) {
+                // The shard-role loop exhausted its metadata recovery attempts without establishing
+                // known metadata for the collection. Surface the historical "metadata reset" error.
+                return {ErrorCodes::ConflictingOperationInProgress,
+                        "Collection being migrated was dropped and created or otherwise had its "
+                        "metadata reset"};
+            }
+        } else {
+            orphanCleanupFuture = getOrphanCleanupFuture();
+        }
 
         if (orphanCleanupFuture.isReady()) {
             LOGV2_OPTIONS(21918,

@@ -1488,7 +1488,8 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
         kTestNss,
         uuid(),
         ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
-        Date_t::max());
+        Date_t::max(),
+        false /* isAuthoritative */);
     ASSERT_EQ(status.code(), ErrorCodes::ConflictingOperationInProgress);
 }
 
@@ -1505,6 +1506,25 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
         randomUuid,
         ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
         Date_t::max());
+    ASSERT_EQ(status.code(), ErrorCodes::ConflictingOperationInProgress);
+}
+
+TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
+       WaitForCleanAuthoritativeReturnsErrorIfCollectionUUIDDoesNotMatchFilteringMetadata) {
+    // Even on the authoritative path, known metadata whose UUID does not match is a genuine reset
+    // (not a transiently-cleared metadata), so it must fail rather than attempt recovery.
+    OperationContext* opCtx = operationContext();
+    auto metadata = makeShardedMetadata(opCtx, uuid());
+    csr()->setCollectionMetadata(opCtx, metadata);
+    auto randomUuid = UUID::gen();
+
+    auto status = CollectionShardingRuntime::waitForClean(
+        opCtx,
+        kTestNss,
+        randomUuid,
+        ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
+        Date_t::max(),
+        true /* isAuthoritative */);
     ASSERT_EQ(status.code(), ErrorCodes::ConflictingOperationInProgress);
 }
 

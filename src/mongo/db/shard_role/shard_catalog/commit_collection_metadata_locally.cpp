@@ -328,11 +328,11 @@ void invalidateCollectionMetadata(
     const UUID& uuid,
     bool forDroppedCollection,
     const boost::optional<ChunkVersion>& diskShardVersion = boost::none,
-    bool onlyClearIfUnowned = false) {
+    bool onlyClearIfShardDoesntOwnChunks = false) {
     auto entry = InvalidateCollectionMetadataOplogEntry{std::string(nss.coll())};
     entry.setForDroppedCollection(forDroppedCollection);
-    if (onlyClearIfUnowned) {
-        entry.setOnlyClearIfUnowned(true);
+    if (onlyClearIfShardDoesntOwnChunks) {
+        entry.setOnlyClearIfShardDoesntOwnChunks(true);
     }
     if (diskShardVersion) {
         entry.setShardVersion(*diskShardVersion);
@@ -870,22 +870,20 @@ void commitChunklessCollectionMetadataLocally(OperationContext* opCtx, const Nam
     // upsert, but because it writes an identical document the two operations do not conflict.
     upsertCollectionEntryLocally(opCtx, nss, coll);
 
-    // There is no need to invalidate or clear the in-memory filtering metadata here, except for a
-    // specific case:
-    //   - If the CSR is non-authoritative, it will become authoritative later, and will sort ifself
-    //     out.
-    //   - If this shard owns chunks, its CSS is tracked (or unknown if it has not been refreshed
-    //     yet). No need to do anything.
-    //   - If this shard owns no chunks, then the CSS would be either unknown or unowned. In the
-    //     latter case, we need to invalidate it so that the CSS is recreated with state "tracked"
-    //     (a DB primary can't have "kUnowned" entries in the CSS by definition).
-
+    // Emit an invalidation carrying the "clear if this node owns no chunks" precondition. Each node
+    // (primary and secondaries) evaluates it against its own in-memory metadata. A node that owns
+    // no chunks -- unowned, untracked, or tracked with zero owned chunks -- may hold a stale
+    // leftover entry: another shard may have changed the collection (for example
+    // refineCollectionShardKey) while this node was not involved, and this node then became the DB
+    // primary again via movePrimary. Such a node clears and re-recovers the fresh entry from the
+    // on-disk catalog we just wrote. A node that owns chunks keeps its metadata: it is kept up to
+    // date by its own commit path and may be a migration donor.
     invalidateCollectionMetadata(opCtx,
                                  nss,
                                  coll.getUuid(),
                                  false /* forDroppedCollection */,
                                  boost::none /* diskShardVersion */,
-                                 true /* onlyClearIfUnowned */);
+                                 true /* onlyClearIfShardDoesntOwnChunks */);
 
     LOGV2_INFO(12721505,
                "Committed chunkless collection shard catalog metadata locally",
