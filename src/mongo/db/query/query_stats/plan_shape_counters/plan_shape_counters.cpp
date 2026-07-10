@@ -76,18 +76,19 @@ PlanShapeAnalysisResult analyzePlanShapeForCounters(const QuerySolution& solutio
     }
 
     // Now call all counters on the find layer.
+    AccessPathAnalyzer accessPaths;
     auto planShapeMatcher = makePlanShapeMatcher();
     // Don't allow the treeSearch call to exit early, so that every rule gets a chance to
     // match on every node.
-    const bool matched =
-        treeMatchesAny(findRoot, false /* allowEarlyExit */, nodeCounts, planShapeMatcher);
+    const bool matched = treeMatchesAny(
+        findRoot, false /* allowEarlyExit */, nodeCounts, accessPaths, planShapeMatcher);
 
     boost::optional<PlanShapeCounter> pattern;
     if (matched) {
         pattern = static_cast<PlanShapeCounter>(*planShapeMatcher.getMatchedTag());
     }
     return PlanShapeAnalysisResult{.pattern = pattern,
-                                   .accessPathCounts = identifyAccessPaths(solution),
+                                   .accessPathCounts = accessPaths.counts(),
                                    .qsnNodeCounts = nodeCounts.counts()};
 }
 

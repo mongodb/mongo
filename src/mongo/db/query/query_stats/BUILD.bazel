@@ -114,6 +114,7 @@ mongo_cc_unit_test(
         "rate_limiting_test.cpp",
         "supplemental_metrics_test.cpp",
         "update_key_test.cpp",
+        "//src/mongo/db/query/query_stats/plan_shape_counters:plan_access_path_counters_test.cpp",
         "//src/mongo/db/query/query_stats/plan_shape_counters:plan_node_counters_test.cpp",
         "//src/mongo/db/query/query_stats/plan_shape_counters:plan_shape_counts_test.cpp",
         "//src/mongo/db/query/query_stats/plan_shape_counters:plan_shape_pattern_counters_test.cpp",
