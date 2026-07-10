@@ -292,6 +292,20 @@ public:
                                              const ShardId& recipientShardId,
                                              const ChunkRange& enclosingChunk);
 
+    /**
+     * Enforces that accepting a migration over 'enclosingChunk' does not drop point-in-time
+     * (PIT) reachable ownership history from this shard's local catalog (see
+     * migrationWouldDropPITHistory() above). By default aborts with
+     * ConflictingOperationInProgress. If 'allowMigrationsToDropRecipientPITHistory' is enabled,
+     * logs a warning and lets the migration proceed instead.
+     */
+    static void ensurePITHistoryPreserved(OperationContext* opCtx,
+                                          const UUID& collUuid,
+                                          const ShardId& recipientShardId,
+                                          const ChunkRange& enclosingChunk,
+                                          const NamespaceString& nss,
+                                          const UUID& migrationId);
+
 private:
     /**
      * Set state to Fail without Logging.

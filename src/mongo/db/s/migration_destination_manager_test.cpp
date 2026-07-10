@@ -47,6 +47,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
@@ -472,6 +473,46 @@ TEST_F(MigrationDestinationManagerTest, PITReachableUnownedChunkNonOverlapping) 
     setOldestTimestamp(Timestamp(5, 0));
 
     ASSERT_FALSE(hasConflict(collUuid, ChunkRange(k0, k100)));
+}
+
+// By default, ensurePITHistoryPreserved() aborts a migration that would drop PIT-reachable
+// ownership history, and its error message points operators at the escape-hatch parameter.
+TEST_F(MigrationDestinationManagerTest, EnsurePITHistoryPreservedAbortsByDefault) {
+    const auto collUuid = UUID::gen();
+    insertShardCatalogChunk(collUuid,
+                            k0,
+                            k100,
+                            kOtherShard,
+                            {{Timestamp(20, 0), kOtherShard}, {Timestamp(10, 0), kRecipientShard}});
+    setOldestTimestamp(Timestamp(5, 0));
+
+    const auto nss = NamespaceString::createNamespaceString_forTest("test.foo");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        MigrationDestinationManager::ensurePITHistoryPreserved(
+            operationContext(), collUuid, kRecipientShard, ChunkRange(k0, k50), nss, UUID::gen()),
+        DBException,
+        ErrorCodes::ConflictingOperationInProgress,
+        "Migration aborted: committing it would drop point-in-time reachable ownership history "
+        "for a chunk only partially covered by source chunk [{ a: 0 }, { a: 50 }). Set the "
+        "allowMigrationsToDropRecipientPITHistory server parameter to bypass this check.");
+}
+
+// With the escape-hatch parameter enabled, ensurePITHistoryPreserved() lets the same migration
+// proceed instead of aborting.
+TEST_F(MigrationDestinationManagerTest, EnsurePITHistoryPreservedProceedsWithEscapeHatchEnabled) {
+    unittest::ServerParameterGuard allowDrop{"allowMigrationsToDropRecipientPITHistory", true};
+
+    const auto collUuid = UUID::gen();
+    insertShardCatalogChunk(collUuid,
+                            k0,
+                            k100,
+                            kOtherShard,
+                            {{Timestamp(20, 0), kOtherShard}, {Timestamp(10, 0), kRecipientShard}});
+    setOldestTimestamp(Timestamp(5, 0));
+
+    const auto nss = NamespaceString::createNamespaceString_forTest("test.foo");
+    MigrationDestinationManager::ensurePITHistoryPreserved(
+        operationContext(), collUuid, kRecipientShard, ChunkRange(k0, k50), nss, UUID::gen());
 }
 
 }  // namespace

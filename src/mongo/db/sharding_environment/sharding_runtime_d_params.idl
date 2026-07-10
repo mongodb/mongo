@@ -109,6 +109,21 @@ server_parameters:
         default: 10000
         redact: false
 
+    allowMigrationsToDropRecipientPITHistory:
+        description: >-
+            When enabled, a chunk migration recipient proceeds even if committing the migration
+            would drop point-in-time (PIT) reachable ownership history from its local shard
+            catalog. By default such a migration is aborted with ConflictingOperationInProgress to
+            preserve PIT reachability of the recipient's filtering metadata. This is an escape
+            hatch for operations (such as draining a shard) that would otherwise retry the same
+            migration indefinitely; enabling it may cause PIT reads on the recipient to observe
+            incorrect chunk ownership for the affected range.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: allowMigrationsToDropRecipientPITHistory
+        default: false
+        redact: false
+
     migrateCloneInsertionBatchSize:
         description: >-
             The maximum number of documents to insert in a single batch during the cloning step of

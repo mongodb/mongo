@@ -1545,22 +1545,16 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
 
         // On the authoritative path the recipient serves point-in-time (PIT) filtering-metadata
         // reads from its local shard catalog. The donor sends the enclosing source chunk, which
-        // spans the range the migration commit will refresh. Abort the migration if committing it
-        // would drop PIT-reachable ownership history: that happens when the shard catalog holds a
-        // chunk that is not fully covered by that span, is owned by another shard, and is still
-        // reachable by PIT reads, since the uncovered portion has no replacement after the refresh.
-        // This check is only needed on the authoritative path. The source chunk is absent on the
-        // legacy path and on requests from a pre-upgrade donor, so the check is skipped there.
+        // spans the range the migration commit will refresh. This check is only needed on the
+        // authoritative path. The source chunk is absent on the legacy path and on requests from
+        // a pre-upgrade donor, so the check is skipped there.
         if (_enclosingChunk.has_value()) {
-            uassert(ErrorCodes::ConflictingOperationInProgress,
-                    str::stream() << "Migration aborted: committing it would drop point-in-time "
-                                     "reachable ownership history for a chunk only partially "
-                                     "covered by source chunk "
-                                  << _enclosingChunk->toString() << ".",
-                    !migrationWouldDropPITHistory(outerOpCtx,
-                                                  donorCollectionOptionsAndIndexes.uuid,
-                                                  ShardingState::get(outerOpCtx)->shardId(),
-                                                  *_enclosingChunk));
+            ensurePITHistoryPreserved(outerOpCtx,
+                                      donorCollectionOptionsAndIndexes.uuid,
+                                      ShardingState::get(outerOpCtx)->shardId(),
+                                      *_enclosingChunk,
+                                      _nss,
+                                      *_migrationId);
         }
 
         timing->done(1);
@@ -2540,6 +2534,37 @@ bool MigrationDestinationManager::migrationWouldDropPITHistory(OperationContext*
     }
 
     return false;
+}
+
+void MigrationDestinationManager::ensurePITHistoryPreserved(OperationContext* opCtx,
+                                                            const UUID& collUuid,
+                                                            const ShardId& recipientShardId,
+                                                            const ChunkRange& enclosingChunk,
+                                                            const NamespaceString& nss,
+                                                            const UUID& migrationId) {
+    if (!migrationWouldDropPITHistory(opCtx, collUuid, recipientShardId, enclosingChunk)) {
+        return;
+    }
+
+    // By default abort so the uncovered portion keeps its PIT-reachable ownership history. The
+    // escape-hatch parameter lets the migration proceed anyway, accepting that PIT reads on this
+    // recipient may observe incorrect ownership for the affected range.
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            str::stream() << "Migration aborted: committing it would drop point-in-time "
+                             "reachable ownership history for a chunk only partially covered by "
+                             "source chunk "
+                          << enclosingChunk.toString()
+                          << ". Set the allowMigrationsToDropRecipientPITHistory server "
+                             "parameter to bypass this check.",
+            allowMigrationsToDropRecipientPITHistory.load());
+
+    LOGV2_WARNING(13104601,
+                  "Proceeding with a chunk migration that drops point-in-time reachable "
+                  "ownership history on the recipient because "
+                  "allowMigrationsToDropRecipientPITHistory is enabled",
+                  logAttrs(nss),
+                  "migrationId"_attr = migrationId.toBSON(),
+                  "enclosingChunk"_attr = redact(enclosingChunk.toString()));
 }
 
 }  // namespace mongo
