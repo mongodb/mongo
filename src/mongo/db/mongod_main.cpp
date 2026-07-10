@@ -1942,13 +1942,13 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         configServerRoutingInfoCache->shutDownAndJoin();
     }
 
-    {
+    if (auto&& rwc = ReadWriteConcernDefaults::getDecoration(serviceContext->getService())) {
         SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                        TimedSectionId::shutDownAndJoinReadWriteConcernDefaults,
                                        &shutdownTimeElapsedBuilder);
         LOGV2_OPTIONS(
             11437200, {LogComponent::kDefault}, "Shutting down the ReadWriteConcernDefaults");
-        ReadWriteConcernDefaults::get(serviceContext->getService()).shutDownAndJoin();
+        rwc->shutDownAndJoin();
     }
 
     // Finish shutting down the TransportLayers
