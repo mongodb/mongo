@@ -517,6 +517,23 @@ protected:
         return entry.getDocHash();
     }
 
+    boost::optional<int64_t> deleteAndGetDocHash(OperationContext* opCtx,
+                                                 const NamespaceString& ns,
+                                                 const BSONObj& deletedDoc,
+                                                 RecordId replicatedRecordId) {
+        OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
+        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
+        WriteUnitOfWork wuow(opCtx);
+        OplogDeleteEntryArgs deleteEntryArgs;
+        deleteEntryArgs.replicatedRecordId = replicatedRecordId;
+        const auto& documentKey = getDocumentKey(*autoColl, deletedDoc);
+        opObserver.onDelete(
+            opCtx, *autoColl, kUninitializedStmtId, deletedDoc, documentKey, deleteEntryArgs);
+        wuow.commit();
+        auto entry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx)));
+        return entry.getDocHash();
+    }
+
     int64_t calculateDocHash(const BSONObj& doc) {
         const SHA256Block sha =
             SHA256Block::computeHash({ConstDataRange(doc.objdata(), doc.objsize())});
@@ -1931,6 +1948,34 @@ TEST_F(OpObserverTest, CheckHashDoesNotExistOnUpdateWithoutRecordId) {
                      .has_value());
 }
 
+TEST_F(OpObserverTest, CheckHashExistsOnDeleteWithFlagAndRecordId) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    const int64_t expectedHash = calculateDocHash(doc);
+    const auto& hash = deleteAndGetDocHash(opCtx, nss, doc, RecordId(1));
+    ASSERT(hash);
+    EXPECT_EQ(*hash, expectedHash);
+}
+
+TEST_F(OpObserverTest, CheckHashDoesNotExistOnDeleteWithoutRecordId) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    EXPECT_FALSE(deleteAndGetDocHash(opCtx, nss, doc, RecordId()).has_value());
+}
+
+TEST_F(OpObserverTest, CheckHashDoesNotExistOnDeleteWithoutFlag) {
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    EXPECT_FALSE(deleteAndGetDocHash(opCtx, nss, doc, RecordId(1)).has_value());
+}
+
 /**
  * Test fixture for testing OpObserver behavior specific to the SessionCatalog.
  */
@@ -2274,6 +2319,22 @@ protected:
         auto oplogEntry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx())));
         return getInnerEntryFromApplyOpsOplogEntry(oplogEntry).getDocHash();
     }
+
+    // Performs a transactional delete and returns the docHash from the inner oplog entry.
+    boost::optional<int64_t> txnDeleteAndGetDocHash(const NamespaceString& ns,
+                                                    const BSONObj& doc,
+                                                    RecordId replicatedRecordId) {
+        txnParticipant().unstashTransactionResources(opCtx(), "delete");
+        AutoGetCollection autoColl(opCtx(), ns, MODE_IX);
+        const auto& documentKey = getDocumentKey(*autoColl, doc);
+        OplogDeleteEntryArgs deleteEntryArgs;
+        deleteEntryArgs.replicatedRecordId = replicatedRecordId;
+        opObserver().onDelete(
+            opCtx(), *autoColl, kUninitializedStmtId, doc, documentKey, deleteEntryArgs);
+        commitUnpreparedTransaction<OpObserverImpl>(opCtx(), opObserver());
+        auto oplogEntry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx())));
+        return getInnerEntryFromApplyOpsOplogEntry(oplogEntry).getDocHash();
+    }
 };
 
 TEST_F(OpObserverTransactionTest, checkIsTimeseriesOnMultiDocTransaction) {
@@ -2335,6 +2396,28 @@ TEST_F(OpObserverTransactionTest, CheckHashDoesNotExistOnTransactionUpdateWithou
     unittest::ServerParameterGuard continuousInternodeScope{
         "featureFlagContinuousInternodeValidationPerDocument", true};
     EXPECT_FALSE(txnUpdateAndGetDocHash(nss1, kPreImageDoc, kUpdatedDoc, RecordId{}).has_value());
+}
+
+TEST_F(OpObserverTransactionTest, CheckHashExistsOnTransactionDeleteWithFlagAndRecordId) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    const int64_t expectedHash = calculateDocHash(doc);
+    const boost::optional<int64_t> hash = txnDeleteAndGetDocHash(nss1, doc, RecordId(1));
+    ASSERT(hash);
+    EXPECT_EQ(*hash, expectedHash);
+}
+
+TEST_F(OpObserverTransactionTest, CheckHashDoesNotExistOnTransactionDeleteWithoutFlag) {
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    EXPECT_FALSE(txnDeleteAndGetDocHash(nss1, doc, RecordId(1)).has_value());
+}
+
+TEST_F(OpObserverTransactionTest, CheckHashDoesNotExistOnTransactionDeleteWithoutRecordId) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    EXPECT_FALSE(txnDeleteAndGetDocHash(nss1, doc, RecordId()).has_value());
 }
 
 TEST_F(OpObserverTransactionTest, TransactionOpsIncludeVersionContext) {
@@ -3926,6 +4009,43 @@ protected:
         OplogUpdateEntryArgs updateEntryArgs2(&updateArgs2, *autoColl);
         opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, updateEntryArgs2);
 
+        wuow.commit();
+        auto oplogEntry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx)));
+        ASSERT(oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
+        std::vector<repl::OplogEntry> innerEntries;
+        repl::ApplyOps::extractOperationsTo(
+            oplogEntry, oplogEntry.getEntry().toBSON(), &innerEntries);
+        ASSERT_GTE(innerEntries.size(), 1u);
+        return {innerEntries[0].getDocHash(),
+                innerEntries.size() > 1 ? innerEntries[1].getDocHash() : boost::none};
+    }
+
+    // Performs a batched delete of two documents and returns a pair of docHashes (first and second
+    // document) from the inner applyOps entry.
+    std::pair<boost::optional<int64_t>, boost::optional<int64_t>> batchedDeleteAndGetDocHash(
+        OperationContext* opCtx,
+        const NamespaceString& ns,
+        const BSONObj& doc1,
+        const BSONObj& doc2,
+        const RecordId& recordId1,
+        const RecordId& recordId2) {
+        reset(opCtx, ns);
+        reset(opCtx, NamespaceString::kRsOplogNamespace);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+        ASSERT(BatchedWriteContext::get(opCtx).writesAreBatched());
+        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
+
+        const auto& documentKey1 = getDocumentKey(*autoColl, doc1);
+        const auto& documentKey2 = getDocumentKey(*autoColl, doc2);
+        OplogDeleteEntryArgs deleteEntryArgs1;
+        deleteEntryArgs1.replicatedRecordId = recordId1;
+        OplogDeleteEntryArgs deleteEntryArgs2;
+        deleteEntryArgs2.replicatedRecordId = recordId2;
+
+        opCtx->getServiceContext()->getOpObserver()->onDelete(
+            opCtx, *autoColl, kUninitializedStmtId, doc1, documentKey1, deleteEntryArgs1);
+        opCtx->getServiceContext()->getOpObserver()->onDelete(
+            opCtx, *autoColl, kUninitializedStmtId, doc2, documentKey2, deleteEntryArgs2);
         wuow.commit();
         auto oplogEntry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx)));
         ASSERT(oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
@@ -5803,6 +5923,48 @@ TEST_F(BatchedWriteOutputsTest, CheckHashDoesNotExistOnBatchedUpdateWithoutRecor
     const BSONObj doc2 = BSON("_id" << 1 << "data" << 1);
     const auto hash =
         batchedUpdateAndGetDocHash(opCtx, _nss, doc1, doc1, doc2, doc2, RecordId(), RecordId());
+    EXPECT_FALSE(hash.first.has_value());
+    EXPECT_FALSE(hash.second.has_value());
+}
+
+TEST_F(BatchedWriteOutputsTest, CheckHashExistsOnBatchedDeleteWithFlagAndRecordId) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    const BSONObj doc1 = BSON("_id" << 0 << "data" << "x");
+    const BSONObj doc2 = BSON("_id" << 1 << "data" << "y");
+    const int64_t expectedHash1 = calculateDocHash(doc1);
+    const int64_t expectedHash2 = calculateDocHash(doc2);
+
+    const std::pair<boost::optional<int64_t>, boost::optional<int64_t>> hash =
+        batchedDeleteAndGetDocHash(opCtx, _nss, doc1, doc2, RecordId(1), RecordId(2));
+    ASSERT(hash.first);
+    EXPECT_EQ(*hash.first, expectedHash1);
+    ASSERT(hash.second);
+    EXPECT_EQ(*hash.second, expectedHash2);
+    EXPECT_FALSE(hash.first == hash.second);
+}
+
+TEST_F(BatchedWriteOutputsTest, CheckHashDoesNotExistOnBatchedDeleteWithoutFlag) {
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    const BSONObj doc1 = BSON("_id" << 0 << "data" << "x");
+    const BSONObj doc2 = BSON("_id" << 1 << "data" << "y");
+    const auto hash = batchedDeleteAndGetDocHash(opCtx, _nss, doc1, doc2, RecordId(1), RecordId(2));
+    EXPECT_FALSE(hash.first.has_value());
+    EXPECT_FALSE(hash.second.has_value());
+}
+
+TEST_F(BatchedWriteOutputsTest, CheckHashDoesNotExistOnBatchedDeleteWithoutRecordId) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    const BSONObj doc1 = BSON("_id" << 0 << "data" << "x");
+    const BSONObj doc2 = BSON("_id" << 1 << "data" << "y");
+    const auto hash = batchedDeleteAndGetDocHash(opCtx, _nss, doc1, doc2, RecordId(), RecordId());
     EXPECT_FALSE(hash.first.has_value());
     EXPECT_FALSE(hash.second.has_value());
 }

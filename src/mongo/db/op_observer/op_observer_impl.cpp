@@ -1262,6 +1262,9 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         return;
     }
 
+    const bool useValidationHash = isContinuousInternodeValidationPerDocumentEnabled(opCtx) &&
+        !args.replicatedRecordId.isNull();
+
     OpTimeBundle opTime;
     if (inBatchedWrite) {
         repl::ReplOperation operation =
@@ -1270,6 +1273,9 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         operation.setVersionContext(boost::none);
         operation.setDestinedRecipient(destinedRecipient);
         operation.setFromMigrateIfTrue(args.fromMigrate);
+        if (useValidationHash) {
+            operation.setDocHash(computeDocValidationHash(doc));
+        }
         if (!args.replicatedRecordId.isNull()) {
             operation.setRecordId(args.replicatedRecordId);
         }
@@ -1307,6 +1313,9 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
             MutableOplogEntry::makeDeleteOperation(nss, uuid, documentKey.getShardKeyAndId());
         operation.setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
 
+        if (useValidationHash) {
+            operation.setDocHash(computeDocValidationHash(doc));
+        }
         if (!args.replicatedRecordId.isNull()) {
             operation.setRecordId(args.replicatedRecordId);
         }
@@ -1350,6 +1359,10 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
             if (!args.retryableFindAndModifyOplogSlots.empty()) {
                 oplogEntry.setOpTime(args.retryableFindAndModifyOplogSlots.back());
             }
+        }
+
+        if (useValidationHash) {
+            oplogEntry.setDocHash(computeDocValidationHash(doc));
         }
 
         if (!args.replicatedRecordId.isNull()) {
