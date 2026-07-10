@@ -30,6 +30,7 @@
 #include "mongo/db/admission/execution_control/ticketing_system.h"
 #include "mongo/db/admission/ingress_admission_control_gen.h"
 #include "mongo/db/admission/ingress_admission_controller.h"
+#include "mongo/db/admission/write_throttler.h"
 #include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/transport/session_establishment_rate_limiter.h"
 #include "mongo/transport/transport_layer.h"
@@ -72,6 +73,15 @@ public:
                 admissionBuilder.subobjStart("ingressSessionEstablishment"));
             limiter->appendStatsQueues(&ingressSessionEstablishmentBuilder);
             ingressSessionEstablishmentBuilder.done();
+        }
+
+        if ((role.has(ClusterRole::None) || role.has(ClusterRole::ShardServer))) {
+            if (auto* throttler = WriteThrottler::get(opCtx)) {
+                BSONObjBuilder writeThrottlerBuilder(
+                    admissionBuilder.subobjStart("writeThrottler"));
+                writeThrottlerBuilder.appendElements(throttler->generateSection());
+                writeThrottlerBuilder.done();
+            }
         }
 
         return admissionBuilder.obj();

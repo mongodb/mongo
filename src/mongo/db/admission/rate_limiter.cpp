@@ -104,6 +104,10 @@ public:
             return _tb.balance(now);
         }
 
+        double rate() {
+            return _tb.rate();
+        }
+
         void returnTokens(double tk) {
             _tb.returnTokens(tk);
         }
@@ -369,6 +373,16 @@ void RateLimiter::returnTokens(double numTokensToReturn) {
     _impl->readScopedTokenBucket().returnTokens(numTokensToReturn);
 }
 
+void RateLimiter::reconcileTokens(double numTokens) {
+    if (numTokens <= 0.0) {
+        return;
+    }
+    // Borrow-consume: drains the bucket immediately, allowing the balance to go negative. The
+    // returned wait time is intentionally discarded; the reconciliation's effect is felt by the
+    // next caller.
+    _impl->readScopedTokenBucket().consumeWithBorrowNonBlocking(numTokens, _impl->nowInSeconds());
+}
+
 void RateLimiter::recordExemption() {
     _impl->metricsRecorder->record(ExemptedAdmission{});
 }
@@ -416,6 +430,10 @@ void RateLimiter::appendStats(BSONObjBuilder* bob) const {
     const auto sampledAvailableTokens = _impl->sampledAvailableTokens();
     _impl->metricsRecorder->record(TokensAvailable{sampledAvailableTokens});
     bob->append("totalAvailableTokens", sampledAvailableTokens);
+}
+
+double RateLimiter::refreshRate() const {
+    return _impl->readScopedTokenBucket().rate();
 }
 
 double RateLimiter::tokensAvailable() const {

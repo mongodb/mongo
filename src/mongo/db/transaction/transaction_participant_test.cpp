@@ -4826,7 +4826,8 @@ TEST_F(TransactionsMetricsTest, TransactionLogAggregatesQueueStats) {
     auto expectedBson = BSON(
         "execution" << BSON("admissions" << expectedVal << "totalTimeQueuedMicros" << expectedVal)
                     << "ingress"
-                    << BSON("admissions" << expectedVal << "totalTimeQueuedMicros" << expectedVal));
+                    << BSON("admissions" << expectedVal << "totalTimeQueuedMicros" << expectedVal)
+                    << "writeThrottle" << BSONObj());
     ASSERT_BSONOBJ_EQ_UNORDERED(queueBsonStats, expectedBson);
 }
 

@@ -165,6 +165,14 @@ public:
     void returnTokens(double numTokensToReturn);
 
     /**
+     * Reconciles a post-hoc cost by draining numTokens from the bucket without queuing or blocking.
+     * The balance may go negative (borrow), delaying subsequent acquisitions. Unlike
+     * acquireToken/tryAcquireToken this does not record an admission, since the operation being
+     * charged was already admitted; it only adjusts the bucket balance.
+     */
+    void reconcileTokens(double numTokens);
+
+    /**
      * Updates metrics for admission granted without having called acquireToken.
      * Use this function in place of acquireToken when admission must be granted immediately.
      * Admission granted in this way does not consume any tokens.
@@ -194,6 +202,13 @@ public:
 
     /** Adds named entries to bob based on this object's stats(). **/
     void appendStats(BSONObjBuilder* bob) const;
+
+    /**
+     * Returns the number of tokens issued per second by the underlying token bucket (its refresh
+     * rate). This is the effective rate currently configured on the bucket, so callers can report
+     * the source-of-truth rate rather than tracking it separately.
+     */
+    double refreshRate() const;
 
     /** Returns the number of tokens available in the underlying token bucket. **/
     double tokensAvailable() const;

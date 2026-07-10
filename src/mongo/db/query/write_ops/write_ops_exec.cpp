@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/admission/write_throttler_admission_context.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
@@ -1125,6 +1126,10 @@ void updateRetryStats(OperationContext* opCtx, bool containsRetry) {
 }
 
 void logOperationAndProfileIfNeeded(OperationContext* opCtx, CurOp* curOp) {
+    // TODO(SERVER-130908): Remove this temporary recording once write counts are tracked with
+    // higher fidelity.
+    recordWriteThrottlerCostForReconciliation(opCtx, curOp);
+
     const bool shouldProfile =
         curOp->completeAndLogOperation({MONGO_LOGV2_DEFAULT_COMPONENT},
                                        DatabaseProfileSettings::get(opCtx->getServiceContext())
@@ -1265,6 +1270,11 @@ WriteResult performInserts(
             // This is the only part of finishCurOp we need to do for inserts because they
             // reuse the top-level curOp. The rest is handled by the top-level entrypoint.
             curOp.done();
+            // Inserts complete here rather than through logOperationAndProfileIfNeeded, so record
+            // their batch-aware write cost for command-end reconciliation at this point.
+            // TODO(SERVER-130908): Remove this temporary recording once write counts are tracked
+            // with higher fidelity.
+            recordWriteThrottlerCostForReconciliation(opCtx, &curOp);
             Top::getDecoration(opCtx).record(opCtx,
                                              actualNs,
                                              LogicalOp::opInsert,

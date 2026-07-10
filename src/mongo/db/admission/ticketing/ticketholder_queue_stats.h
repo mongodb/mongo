@@ -45,7 +45,7 @@ namespace mongo {
  */
 class [[MONGO_MOD_PUBLIC]] TicketHolderQueueStats {
 public:
-    enum class QueueType { Ingress, Execution };
+    enum class QueueType { Ingress, Execution, WriteThrottle };
 
     TicketHolderQueueStats() = default;
 
@@ -77,6 +77,8 @@ public:
                 return "ingress";
             case QueueType::Execution:
                 return "execution";
+            case QueueType::WriteThrottle:
+                return "writeThrottle";
             default:
                 MONGO_UNREACHABLE;
         }

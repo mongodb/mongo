@@ -42,6 +42,8 @@
 #include "mongo/db/admission/ingress_request_rate_limiter_gen.h"
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/admission/ticketing/ticketholder.h"
+#include "mongo/db/admission/write_throttler.h"
+#include "mongo/db/admission/write_throttler_parameters_gen.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_contract.h"
 #include "mongo/db/auth/authorization_contract_guard.h"
@@ -205,6 +207,18 @@ auto& notPrimaryUnackWrites =
 namespace {
 using namespace std::literals::string_view_literals;
 
+
+void admitWriteThrottlerIfNeeded(OperationContext* opCtx,
+                                 CommandInvocation* invocation,
+                                 bool isExemptFromAdmissionControl) {
+    if (!gWriteThrottlerEnabled.load() || isExemptFromAdmissionControl ||
+        !invocation->supportsWriteConcern() || invocation->isReadOperation()) {
+        return;
+    }
+    if (auto* throttler = WriteThrottler::get(opCtx)) {
+        throttler->admitOperation(opCtx);
+    }
+}
 
 void runCommandInvocation(const RequestExecutionContext& rec, CommandInvocation* invocation) {
     CommandHelpers::runCommandInvocation(rec.getOpCtx(), invocation, rec.getReplyBuilder());
@@ -1890,6 +1904,8 @@ void ExecCommandDatabase::_initiateCommand() {
         _admissionTicket = admissionController.admitOperation(opCtx);
     }
 
+    admitWriteThrottlerIfNeeded(opCtx, getInvocation(), isExemptFromAdmissionControl);
+
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
 
     // If the operation is being executed as part of DBDirectClient this means we must use the
@@ -2445,6 +2461,10 @@ DbResponse HandleRequest::runOperation() {
 void HandleRequest::completeOperation(DbResponse& response) {
     auto opCtx = executionContext.getOpCtx();
     auto& currentOp = executionContext.currentOp();
+
+    if (auto* throttler = WriteThrottler::get(opCtx)) {
+        throttler->finalizeAdmission(opCtx);
+    }
 
     // Mark the op as complete, and log it if appropriate. Returns a boolean indicating whether
     // this op should be written to the profiler.

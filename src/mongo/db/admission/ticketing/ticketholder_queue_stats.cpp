@@ -35,6 +35,7 @@
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/admission/ingress_admission_context.h"
 #include "mongo/db/admission/ticketing/admission_context.h"
+#include "mongo/db/admission/write_throttler_admission_context.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/duration.h"
 
@@ -54,6 +55,10 @@ MONGO_INITIALIZER(InitGlobalQueueLookupTable)(InitializerContext*) {
     gQueueMetricsRegistry[TicketHolderQueueStats::QueueType::Execution] =
         [](OperationContext* opCtx) {
             return &ExecutionAdmissionContext::get(opCtx);
+        };
+    gQueueMetricsRegistry[TicketHolderQueueStats::QueueType::WriteThrottle] =
+        [](OperationContext* opCtx) {
+            return &WriteThrottlerAdmissionContext::get(opCtx);
         };
 }
 }  // namespace

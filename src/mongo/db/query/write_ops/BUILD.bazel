@@ -216,6 +216,7 @@ mongo_cc_library(
         "//src/mongo/db:dbhelpers",
         "//src/mongo/db:profile_collection",
         "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db/admission:write_throttler_admission_context",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/query:explain_diagnostic_printer",
         "//src/mongo/db/query:shard_key_diagnostic_printer",

@@ -988,5 +988,31 @@ TEST_F(RateLimiterWithMockClockTest, ReturnTokens) {
     ASSERT_EQ(rateLimiter.tokenBalance(), maxTokens - tokensToConsume + tokensToReturn);
 }
 
+TEST_F(RateLimiterWithMockClockTest, ReconcileTokens) {
+    RateLimiter rateLimiter = makeRateLimiter("RateLimiterReconcileTokens",
+                                              /*refreshRate=*/100,
+                                              /*burstCapacitySecs=*/3,
+                                              /*maxQueueDepth=*/100);
+    const auto maxTokens = 100 * 3;  // refreshRate * burstCapacitySecs
+    ASSERT_EQ(rateLimiter.tokenBalance(), maxTokens);
+
+    // Non-positive reconciliations are no-ops.
+    rateLimiter.reconcileTokens(0);
+    rateLimiter.reconcileTokens(-5);
+    ASSERT_EQ(rateLimiter.tokenBalance(), maxTokens);
+
+    // Reconciliation drains the bucket without blocking.
+    rateLimiter.reconcileTokens(50);
+    ASSERT_EQ(rateLimiter.tokenBalance(), maxTokens - 50);
+
+    // Reconciling past the available balance borrows (the balance goes negative).
+    rateLimiter.reconcileTokens(maxTokens);
+    ASSERT_EQ(rateLimiter.tokenBalance(), -50);
+
+    // Reconciliation adjusts only the balance; it records no admission.
+    ASSERT_EQ(rateLimiter.stats().successfulAdmissions(), 0);
+    ASSERT_EQ(rateLimiter.stats().attemptedAdmissions(), 0);
+}
+
 }  // namespace
 }  // namespace mongo::admission

@@ -2469,6 +2469,8 @@ mongo_cc_library(
         "//src/mongo/db/admission:app_name_exemption_matcher",
         "//src/mongo/db/admission:ingress_admission_control",
         "//src/mongo/db/admission:ingress_request_rate_limiter",
+        "//src/mongo/db/admission:write_throttler",
+        "//src/mongo/db/admission:write_throttler_admission_context",
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:auth_umc",
         "//src/mongo/db/auth:authprivilege",
@@ -3135,7 +3137,10 @@ mongo_cc_unit_test(
     deps = [
         ":commands",
         ":service_context_d",
+        "//src/mongo/db/admission:write_throttler",
+        "//src/mongo/db/admission:write_throttler_admission_context",
         "//src/mongo/db/rss/attached_storage:attached_persistence_provider",
+        "//src/mongo/db/shard_role:shard_role_api_stor_ex",
         "//src/mongo/transport:service_entry_point_test_fixture",
     ],
 )

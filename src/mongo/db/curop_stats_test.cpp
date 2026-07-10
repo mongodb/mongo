@@ -499,12 +499,13 @@ TEST_F(CurOpStatsTest, CheckAdmissionQueueStats) {
 
     auto expectedCurrentQueue = BSON("name" << "execution"
                                             << "timeQueuedMicros" << 5000);
-    auto expectedQueueStats =
-        BSON("execution" << BSON("admissions" << 7 << "totalTimeQueuedMicros" << 5000
-                                              << "isHoldingTicket" << false)
-                         << "ingress"
-                         << BSON("admissions" << 5 << "totalTimeQueuedMicros" << 2000
-                                              << "isHoldingTicket" << false));
+    auto expectedQueueStats = BSON(
+        "execution"
+        << BSON("admissions" << 7 << "totalTimeQueuedMicros" << 5000 << "isHoldingTicket" << false)
+        << "ingress"
+        << BSON("admissions" << 5 << "totalTimeQueuedMicros" << 2000 << "isHoldingTicket" << false)
+        << "writeThrottle"
+        << BSON("admissions" << 0 << "totalTimeQueuedMicros" << 0 << "isHoldingTicket" << false));
 
     ASSERT_BSONOBJ_EQ(currentQueue, expectedCurrentQueue);
     ASSERT_BSONOBJ_EQ_UNORDERED(queueStats, expectedQueueStats);

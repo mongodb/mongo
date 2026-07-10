@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/admission/write_throttler_admission_context.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -575,6 +576,11 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                                           docFound,
                                           preConditions,
                                           isTimeseriesLogicalRequest);
+            if (!isTimeseriesLogicalRequest) {
+                // TODO(SERVER-130908): Remove this temporary recording once write counts are
+                // tracked with higher fidelity.
+                recordWriteThrottlerCostForReconciliation(opCtx, &curOp);
+            }
             recordStatsForTopCommand(opCtx);
             return buildResponse(boost::none, true /* isRemove */, docFound);
         } else {
@@ -615,6 +621,11 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                                                       &updateRequest,
                                                       preConditions,
                                                       isTimeseriesLogicalRequest);
+                    if (!isTimeseriesLogicalRequest) {
+                        // TODO(SERVER-130908): Remove this temporary recording once write counts
+                        // are tracked with higher fidelity.
+                        recordWriteThrottlerCostForReconciliation(opCtx, &curOp);
+                    }
                     recordStatsForTopCommand(opCtx);
                     return buildResponse(updateResult, req.getRemove().value_or(false), docFound);
 

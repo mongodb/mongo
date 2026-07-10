@@ -71,6 +71,79 @@ at which that "borrow" would have been a valid token acquisition. (e.g. if the b
 capacity with a refill rate of 1 token/s, the thread would borrow 1 token, making the capacity -1,
 and then sleep for 1s, at which point the bucket has returned to 0 tokens).
 
+# Write Throttler
+
+The `WriteThrottler` is a generic write-admission gate that slows writes to a configurable target
+rate. Like the ingress request rate limiter, it is a thin wrapper around a
+[`RateLimiter`](rate_limiter.h) token bucket, and is stored as a decoration on the `ServiceContext`.
+It is installed at `ServiceContext` construction time for standalone mongod and shard-service
+contexts; mongos does not install it.
+
+## Purpose
+
+The throttler meters the rate at which writes are admitted so the rate can be tuned (via
+`setParameter`) to shed write-path pressure before it overwhelms downstream write-execution and
+storage resources on the shard/mongod.
+
+## Hook Point
+
+The throttler is invoked at service entry on mongod/shard
+([`service_entry_point_shard_role.cpp`](../service_entry_point_shard_role.cpp)). After the service
+entry point parses the command and applies ingress admission, it calls write-throttler admission for
+top-level write commands. Admission charges **one token per write operation** — not per global lock
+acquisition and not per yield/reacquire.
+
+The gate only acts when all of the following hold:
+
+- `writeThrottlerEnabled` is true.
+- The command `supportsWriteConcern()`.
+- The command is not a read (`isReadOperation()` is false).
+
+The gate reuses ingress admission's exemption decision, so internal commands, commands outside
+ingress admission control, and nested operations that already hold an ingress ticket also skip
+write-throttler admission.
+
+## Rate Source
+
+The target rate is configured entirely through the `writeThrottlerTargetRatePerSec` server parameter
+(set via `setParameter`). The `on_update` handlers push the new rate into the token bucket. Until
+the rate is lowered below `kMaxRate`, the throttler is idle (admits immediately). There is no
+internal rate-selection policy in this mechanism.
+
+## Configuration
+
+- `writeThrottlerEnabled` (bool, default false): master on/off switch. When off, the gate is a
+  no-op.
+- `writeThrottlerTargetRatePerSec` (int32, default `kMaxRate`): target write rate in documents per
+  second (see batch-aware charging below). Must be >= 1.
+- `writeThrottlerBurstCapacitySecs` (double, default 0.5): seconds of unused rate that can
+  accumulate as burst capacity.
+- `writeThrottlerMaxQueueDepth` (long long, default 1000000): max threads that may block waiting for
+  a token; requests exceeding it are rejected with `RateLimitExceeded`.
+- `writeThrottlerMaxCostPerOp` (int, default 0 = no limit): upper bound on the token cost charged
+  for a single operation, capping the borrowed-balance spike from one large batch.
+
+## Batch-Aware Charging
+
+The throttler is always batch-aware. Each admission consumes one token up front to gate the op
+entering. Successful regular write paths record their document cost into
+`WriteThrottlerAdmissionContext`; at command completion, `WriteThrottler::finalizeAdmission` debits
+the remaining cost — accumulated documents written minus admission tokens already acquired, capped
+by `writeThrottlerMaxCostPerOp` — from the bucket. This makes batched writes (insertMany,
+updateMany) throttle by their true document count while keeping a single command-end finalization
+point. Recording is skipped when the operation had no write-throttler admission. Timeseries
+reconciliation is deferred to `SERVER-130859`.
+
+## Metrics
+
+- The wait, if any, is attributed to the `WriteThrottlerAdmissionContext` (a decoration on the
+  `OperationContext`), which registers a `writeThrottle` queue in the shared
+  `TicketHolderQueueStats` registry so curOp/serverStatus report write-throttle waits like other
+  admission queues.
+- The underlying `RateLimiter`'s token-bucket stats (attempted/successful/rejected admissions, queue
+  depth, available tokens, and the effective refresh rate via `RateLimiter::refreshRate()`) are
+  surfaced through `serverStatus.queues.writeThrottler` / FTDC.
+
 # Session Establishment Rate Limiter
 
 The `SessionEstablishmentRateLimiter` places a limit on the number of connections the server (either
