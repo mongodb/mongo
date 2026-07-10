@@ -55,6 +55,11 @@ constexpr std::string_view kDataAvailable = "systemMetrics.mounts.data.available
 constexpr std::string_view kDataFree = "systemMetrics.mounts.data.free"sv;
 constexpr std::string_view kTmpCapacity = "systemMetrics.mounts.tmp.capacity"sv;
 
+// A mountpoint whose name will not resolve to a valid otel metric name
+constexpr std::string_view kInvalidMount = "/run/user/1000"sv;
+constexpr std::string_view kInvalidMountMetricName =
+    "systemMetrics.mounts.run.user.1000.capacity"sv;
+
 BSONObj makeMountsBson(std::string_view mountpoint,
                        long long capacity,
                        long long available,
@@ -127,6 +132,36 @@ TEST_F(SystemMountOtelMetricsTest, UpdateIsIdempotentForSameValues) {
 
     auto passkey = DynamicMetricNameTestPasskeyMaker::make();
     ASSERT_EQ(_capturer.readInt64Gauge(DynamicMetricNameMaker::make(kDataCapacity, passkey)), 8000);
+}
+
+TEST_F(SystemMountOtelMetricsTest, SkipMountpointsWithInvalidNames) {
+    // The valid mountpoint (kDataMount) should create a metric, and the invalid mountpoint
+    // (kInvalidMount) should be skipped.
+    SystemMountMetrics metrics{{std::string(kDataMount), std::string(kInvalidMount)}};
+
+    BSONObjBuilder both;
+    {
+        BSONObjBuilder sub(both.subobjStart(kDataMount));
+        sub.appendNumber("capacity", 1000LL);
+        sub.appendNumber("available", 400LL);
+        sub.appendNumber("free", 500LL);
+    }
+    {
+        BSONObjBuilder sub(both.subobjStart(kInvalidMount));
+        sub.appendNumber("capacity", 9000LL);
+        sub.appendNumber("available", 100LL);
+        sub.appendNumber("free", 200LL);
+    }
+    metrics.update(both.obj());
+
+    auto passkey = DynamicMetricNameTestPasskeyMaker::make();
+    ASSERT_EQ(_capturer.readInt64Gauge(DynamicMetricNameMaker::make(kDataCapacity, passkey)), 1000);
+
+    // The metric name should never have been registered.
+    ASSERT_THROWS_CODE(
+        _capturer.readInt64Gauge(DynamicMetricNameMaker::make(kInvalidMountMetricName, passkey)),
+        DBException,
+        ErrorCodes::KeyNotFound);
 }
 
 }  // namespace

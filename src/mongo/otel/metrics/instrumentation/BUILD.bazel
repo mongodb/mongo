@@ -18,6 +18,7 @@ mongo_cc_library(
         "//src/mongo/db:service_context",
     ] + select({
         "@platforms//os:linux": [
+            "//src/mongo/otel/metrics:otel_metric_name_validation",
             "//src/mongo/otel/metrics:otel_metrics_service",
             "//src/mongo/util:periodic_runner",
             "//src/mongo/util:procparser",
@@ -49,6 +50,7 @@ mongo_cc_library(
         "//src/mongo/db:service_context",
     ] + select({
         "@platforms//os:linux": [
+            "//src/mongo/otel/metrics:otel_metric_name_validation",
             "//src/mongo/otel/metrics:otel_metrics_service",
             "//src/mongo/util:periodic_runner",
             "//src/mongo/util:procparser",

@@ -62,6 +62,10 @@ constexpr std::string_view kSdaIoQueuedMs = "systemMetrics.disks.sda.io_queued_m
 constexpr std::string_view kSdbWrites = "systemMetrics.disks.sdb.writes"sv;
 constexpr std::string_view kSdcWrites = "systemMetrics.disks.sdc.writes"sv;
 
+// A disk whose name will not resolve to a valid otel metric name
+constexpr std::string_view kInvalidDisk = "dm-0"sv;
+constexpr std::string_view kInvalidDiskMetricName = "systemMetrics.disks.dm-0.writes"sv;
+
 BSONObj makeDiskBson(std::string_view device,
                      long long reads,
                      long long readSectors,
@@ -264,6 +268,24 @@ TEST_F(DiskOtelMetricsTest, MultipleRegisteredDevicesTrackedIndependently) {
     ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaReads, passkey)), 10);
     ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaWrites, passkey)), 10);
     ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdbWrites, passkey)), 5);
+}
+
+TEST_F(DiskOtelMetricsTest, SkipDisksWithInvalidNames) {
+    // The valid disk (kSda) should create a metric, and the invalid disk
+    // (kInvalidDisk) should be skipped.
+    DiskMetrics metrics{{std::string(kSda), std::string(kInvalidDisk)}};
+
+    metrics.update(makeDiskBson(kSda, 0, 0, 0, 0, 0, 0, 0, 0));
+    metrics.update(makeDiskBson(kSda, 10, 20, 50, 20, 40, 100, 200, 300));
+
+    auto passkey = DynamicMetricNameTestPasskeyMaker::make();
+    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaWrites, passkey)), 20);
+
+    // The metric name should never have been registered.
+    ASSERT_THROWS_CODE(
+        _capturer.readInt64Counter(DynamicMetricNameMaker::make(kInvalidDiskMetricName, passkey)),
+        DBException,
+        ErrorCodes::KeyNotFound);
 }
 
 }  // namespace

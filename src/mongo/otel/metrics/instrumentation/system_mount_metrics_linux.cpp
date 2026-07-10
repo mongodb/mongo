@@ -35,6 +35,7 @@
 #include "mongo/otel/metrics/metric_unit.h"
 #include "mongo/otel/metrics/metrics_gauge.h"
 #include "mongo/otel/metrics/metrics_service.h"
+#include "mongo/otel/metrics/otel_metric_name_validation.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/periodic_runner.h"
@@ -134,12 +135,24 @@ std::unique_ptr<SystemMountMetrics> makeMetrics() {
 
 class SystemMountMetrics::Impl {
 public:
-    explicit Impl(std::vector<std::string> mountpoints) : _mountpoints(std::move(mountpoints)) {
-        _instruments.resize(_mountpoints.size());
+    explicit Impl(std::vector<std::string> mountpoints) {
+        _instruments.reserve(mountpoints.size());
+        _mountpoints.reserve(mountpoints.size());
 
-        for (size_t i = 0; i < _mountpoints.size(); ++i) {
-            const auto& mountpoint = _mountpoints[i];
-            const auto sanitized = sanitizeMountpoint(mountpoint);
+        // Skip any mountpoint whose name produces an invalid metric name.
+        // TODO (SERVER-131016): Include these.
+        for (auto& mountpoint : mountpoints) {
+            auto sanitized = sanitizeMountpoint(mountpoint);
+            const std::string testName = fmt::format("systemMetrics.mounts.{}.capacity", sanitized);
+            if (Status s = otel::metrics::validateOtelMetricName(testName); !s.isOK()) {
+                LOGV2_DEBUG(13054300,
+                            2,
+                            "Skipping unsupported OTel system mount metric name",
+                            "mountpoint"_attr = mountpoint,
+                            "error"_attr = s);
+                continue;
+            }
+            _mountpoints.push_back(std::move(mountpoint));
 
             const auto makeGauge =
                 [&](std::string_view field, std::string desc, MetricUnit unit) -> Gauge<int64_t>* {
@@ -151,11 +164,12 @@ public:
                     unit);
             };
 
-            _instruments[i].capacity =
+            auto& instrument = _instruments.emplace_back();
+            instrument.capacity =
                 makeGauge("capacity", "Total filesystem capacity in bytes", MetricUnit::kBytes);
-            _instruments[i].available =
+            instrument.available =
                 makeGauge("available", "Filesystem space available in bytes", MetricUnit::kBytes);
-            _instruments[i].free =
+            instrument.free =
                 makeGauge("free", "Total free filesystem space in bytes", MetricUnit::kBytes);
         }
     }
