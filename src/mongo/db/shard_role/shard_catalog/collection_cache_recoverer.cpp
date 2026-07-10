@@ -55,8 +55,7 @@ CollectionMetadata recoverCollectionFromDisk(OperationContext* opCtx,
     if (timestampToReadAt) {
         // Setup the snapshot timestamp on the opCtx.
         repl::ReadConcernArgs::get(opCtx) =
-            repl::ReadConcernArgs{LogicalTime{timestampToReadAt->getTimestamp()},
-                                  repl::ReadConcernLevel::kSnapshotReadConcern};
+            repl::ReadConcernArgs::snapshot(timestampToReadAt->getTimestamp());
     } else {
         // Queryable backup mode is a frozen standalone snapshot. There is no live replication
         // timestamp to wait for, so recover from the local catalog as it exists on disk.

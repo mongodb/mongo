@@ -18,7 +18,7 @@ TestData.skipCheckMetadataConsistency = true;
 
 // Each shard is a 3-node replica set so that isolating one secondary still leaves a
 // primary + secondary majority in the replica set to avoid triggering elections.
-const st = new ShardingTest({shards: 2, rs: {nodes: 3}, useBridge: true});
+const st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 3}, useBridge: true});
 
 const dbName = "test";
 const collName = "recovery";
@@ -67,13 +67,13 @@ for (const rs of [st.rs0, st.rs1]) {
         primary: primary.host,
     });
 
-    target.discardMessagesFrom(primary, 1.0);
-    primary.discardMessagesFrom(target, 1.0);
+    target.disconnect(primary);
+    primary.disconnect(target);
 
     // The primary stays reachable from the router (so the router's replica set monitor keeps a healthy
     // topology and doesn't thrash looking for a primary), but the other secondary drops all messages
     // coming from the router.
-    other.discardMessagesFrom(mongos, 1.0);
+    other.disconnect(mongos);
 
     isolatedSecondaries.push({primary, target, other});
 }
@@ -117,9 +117,15 @@ assertDocCount({_id: 1}, 1);
 // Heal the partitions before tearing down so that teardown consistency checks can run.
 jsTest.log.info("Healing the partitions before teardown");
 for (const {primary, target, other} of isolatedSecondaries) {
-    target.discardMessagesFrom(primary, 0.0);
-    primary.discardMessagesFrom(target, 0.0);
-    other.discardMessagesFrom(mongos, 0.0);
+    jsTest.log.info("Reconnecting nodes", {
+        isolatedSecondary: target.host,
+        primary: primary.host,
+    });
+    target.reconnect(primary);
+    primary.reconnect(target);
+    other.reconnect(mongos);
 }
+
+st.restartMongos(0);
 
 st.stop();
