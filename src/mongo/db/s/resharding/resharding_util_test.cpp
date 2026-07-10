@@ -537,6 +537,8 @@ TEST_F(ReshardingUtilPerformVerificationTest, VerificationUnsetWhenServerParamDi
 
 TEST_F(ReshardingUtilPerformVerificationTest, VerificationDefaultsToTrueWhenGatesEnabled) {
     unittest::ServerParameterGuard ff("featureFlagReshardingVerification", true);
+    unittest::ServerParameterGuard sp("reshardingDocumentVerification", true);
+
     auto collEntry = setupTestCollection();
     auto req = makeReshardCollectionRequest();
 

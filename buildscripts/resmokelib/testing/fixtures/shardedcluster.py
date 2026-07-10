@@ -145,6 +145,16 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             ].get("maxTransactionLockRequestTimeoutMillis", 10 * 1000)
         )
 
+        # 'reshardingDocumentVerification' defaults to false in production, so enable it (and raise
+        # the size-based skip threshold, default 1KB) in test suites to keep coverage for resharding
+        # document-count validation. Skip on multiversion runs: older binaries do not have these
+        # parameters and the FCV-gated feature flag is disabled there anyway.
+        if not self.config.MIXED_BIN_VERSIONS:
+            self.mongod_options["set_parameters"].setdefault("reshardingDocumentVerification", True)
+            self.mongod_options["set_parameters"].setdefault(
+                "reshardingDocumentValidationMaxCollectionSizeBytes", 1073741824
+            )
+
         self.mongos_options["set_parameters"] = self.fixturelib.make_historic(
             self.mongos_options.get("set_parameters", {})
         ).copy()
