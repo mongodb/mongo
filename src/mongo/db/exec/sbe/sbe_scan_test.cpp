@@ -95,11 +95,10 @@ TEST_F(ScanStageTest, genericScanStage) {
     UUID uuid = colls.getMainCollection()->uuid();
     DatabaseName dbName = _nss.dbName();
 
-    auto [inputTag, inputVal] = stage_builder::makeValue(BSONArray());
-    value::ValueGuard inputGuard{inputTag, inputVal};
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(
-        BSON_ARRAY(BSON("_id" << 0 << "a" << 1) << BSON("_id" << 1 << "a" << 2)));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned input =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSONArray()));
+    value::TagValueOwned expected = value::TagValueOwned::fromRaw(stage_builder::makeValue(
+        BSON_ARRAY(BSON("_id" << 0 << "a" << 1) << BSON("_id" << 1 << "a" << 2))));
 
     auto makeStageFn = [uuid, dbName](value::SlotId scanSlot, std::unique_ptr<PlanStage> stage) {
         sbe::value::SlotVector scanFieldSlots;
@@ -124,8 +123,8 @@ TEST_F(ScanStageTest, genericScanStage) {
     };
 
     attachCollectionAcquisition(colls);
-    inputGuard.reset();
-    expectedGuard.reset();
+    auto [inputTag, inputVal] = input.releaseToRaw();
+    auto [expectedTag, expectedVal] = expected.releaseToRaw();
     runTest(inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
 }
 

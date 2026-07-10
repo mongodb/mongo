@@ -145,9 +145,8 @@ std::vector<value::SlotAccessor*> PlanStageTestFixture::prepareTree(CompileCtx* 
 std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResults(
     PlanStage* stage, value::SlotAccessor* accessor) {
     // Allocate an array to hold the results.
-    auto [resultsTag, resultsVal] = value::makeNewArray();
-    value::ValueGuard guard{resultsTag, resultsVal};
-    auto resultsView = value::getArrayView(resultsVal);
+    value::TagValueOwned resultsOwned = value::TagValueOwned::fromRaw(value::makeNewArray());
+    auto resultsView = value::getArrayView(resultsOwned.value());
     // Loop and repeatedly call getNext() until we reach the end, storing the values produced
     // into the array.
     size_t i = 0;
@@ -163,8 +162,7 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResults(
         }
     }
 
-    guard.reset();
-    return {resultsTag, resultsVal};
+    return resultsOwned.releaseToRaw();
 }
 
 void PlanStageTestFixture::exhaustStage(PlanStage* stage, value::SlotAccessor* accessor) {
@@ -175,23 +173,20 @@ void PlanStageTestFixture::exhaustStage(PlanStage* stage, value::SlotAccessor* a
 std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResultsMulti(
     PlanStage* stage, std::vector<value::SlotAccessor*> accessors, bool forceSpill) {
     // Allocate an SBE array to hold the results.
-    auto [resultsTag, resultsVal] = value::makeNewArray();
-    value::ValueGuard resultsGuard{resultsTag, resultsVal};
-    auto resultsView = value::getArrayView(resultsVal);
+    value::TagValueOwned resultsOwned = value::TagValueOwned::fromRaw(value::makeNewArray());
+    auto resultsView = value::getArrayView(resultsOwned.value());
 
     // Loop and repeatedly call getNext() until we reach the end.
     size_t j = 0;
     for (auto st = stage->getNext(); st == PlanState::ADVANCED; st = stage->getNext(), ++j) {
         // Create a new SBE array (`arr`) containing the values produced by each SlotAccessor
         // and insert `arr` into the array of results.
-        auto [arrTag, arrVal] = value::makeNewArray();
-        value::ValueGuard guard{arrTag, arrVal};
-        auto arrView = value::getArrayView(arrVal);
+        value::TagValueOwned arrOwned = value::TagValueOwned::fromRaw(value::makeNewArray());
+        auto arrView = value::getArrayView(arrOwned.value());
         for (size_t i = 0; i < accessors.size(); ++i) {
             arrView->push_back(accessors[i]->getCopyOfValue());
         }
-        guard.reset();
-        resultsView->push_back_raw(arrTag, arrVal);
+        resultsView->push_back_raw(arrOwned.releaseToRaw());
 
         // Test out saveState() and restoreState() for 50% of the documents (the first document,
         // the third document, the fifth document, and so on).
@@ -210,8 +205,7 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResultsMult
         }
     }
 
-    resultsGuard.reset();
-    return {resultsTag, resultsVal};
+    return resultsOwned.releaseToRaw();
 }
 
 std::pair<value::TypeTags, value::Value> PlanStageTestFixture::runTest(
@@ -239,15 +233,15 @@ void PlanStageTestFixture::runTest(value::TypeTags inputTag,
                                    value::TypeTags expectedTag,
                                    value::Value expectedVal,
                                    const MakeStageFn<value::SlotId>& makeStage) {
-    // Set up a ValueGuard to ensure `expected` gets released.
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    // Set up a TagValueOwned to ensure `expected` gets released.
+    value::TagValueOwned expectedOwned = value::TagValueOwned::fromRaw(expectedTag, expectedVal);
 
     auto ctx = makeCompileCtx();
-    auto [resultsTag, resultsVal] = runTest(ctx.get(), inputTag, inputVal, makeStage);
+    value::TagValueOwned resultsOwned =
+        value::TagValueOwned::fromRaw(runTest(ctx.get(), inputTag, inputVal, makeStage));
 
-    value::ValueGuard resultGuard{resultsTag, resultsVal};
     // Compare the results produced with the expected output and assert that they match.
-    ASSERT_SBE_VALUE_EQ(resultsTag, resultsVal, expectedTag, expectedVal);
+    ASSERT_SBE_VALUE_EQ(resultsOwned.tag(), resultsOwned.value(), expectedTag, expectedVal);
 }
 
 void PlanStageTestFixture::runTest(value::TagValueOwned input,
@@ -294,15 +288,14 @@ void PlanStageTestFixture::runTestMulti(int32_t numInputSlots,
                                         const MakeStageFn<value::SlotVector>& makeStageMulti,
                                         bool forceSpill,
                                         const AssertStageStatsFn& assertStageStats) {
-    // Set up a ValueGuard to ensure `expected` gets released.
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    // Set up a TagValueOwned to ensure `expected` gets released.
+    value::TagValueOwned expectedOwned = value::TagValueOwned::fromRaw(expectedTag, expectedVal);
 
-    auto [resultsTag, resultsVal] = runTestMulti(
-        numInputSlots, inputTag, inputVal, makeStageMulti, forceSpill, assertStageStats);
-    value::ValueGuard resultGuard{resultsTag, resultsVal};
+    value::TagValueOwned resultsOwned = value::TagValueOwned::fromRaw(runTestMulti(
+        numInputSlots, inputTag, inputVal, makeStageMulti, forceSpill, assertStageStats));
 
     // Compare the results produced with the expected output and assert that they match.
-    ASSERT_SBE_VALUE_EQ(resultsTag, resultsVal, expectedTag, expectedVal);
+    ASSERT_SBE_VALUE_EQ(resultsOwned.tag(), resultsOwned.value(), expectedTag, expectedVal);
 }
 
 }  // namespace mongo::sbe

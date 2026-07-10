@@ -70,18 +70,19 @@ protected:
 
         auto expr = test_detail::makeEFromNumber(input, srcTag, targetTag);
         auto compiledExpr = compileExpression(*expr);
-        auto [tag, val] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQUALS(tag, targetTag);
+        ASSERT_EQUALS(result.tag(), targetTag);
 
         if constexpr (std::is_same_v<Output, Decimal128>) {
-            ASSERT(value::bitcastTo<Decimal128>(val).isEqual(output));
+            ASSERT(value::bitcastTo<Decimal128>(result.value()).isEqual(output));
         } else if constexpr (std::is_same_v<Output, double>) {
-            ASSERT_APPROX_EQUAL(
-                value::bitcastTo<Output>(val), output, std::numeric_limits<double>::epsilon());
+            ASSERT_APPROX_EQUAL(value::bitcastTo<Output>(result.value()),
+                                output,
+                                std::numeric_limits<double>::epsilon());
         } else {
-            ASSERT_EQUALS(value::bitcastTo<Output>(val), output);
+            ASSERT_EQUALS(value::bitcastTo<Output>(result.value()), output);
         }
     }
 
@@ -91,9 +92,9 @@ protected:
         auto expr = test_detail::makeEFromNumber(input, srcTag, targetTag);
         auto compiledExpr = compileExpression(*expr);
 
-        auto [tag, val] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(tag, val);
-        ASSERT_EQUALS(tag, value::TypeTags::Nothing);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
+        ASSERT_EQUALS(result.tag(), value::TypeTags::Nothing);
     }
 };
 

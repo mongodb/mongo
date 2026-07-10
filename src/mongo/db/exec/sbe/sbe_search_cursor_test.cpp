@@ -314,9 +314,9 @@ TEST_F(SearchCursorStageTest, SearchTestStoredSource) {
         auto curElem = resultStoredSource[i].Obj();
 
         auto [actualTag, actualVal] = searchCursor->getAccessor(*ctx, resultSlot)->getViewOfValue();
-        auto [expectedTag, expectedVal] = stage_builder::makeValue(curElem["storedSource"].Obj());
-        value::ValueGuard guard(expectedTag, expectedVal);
-        ASSERT_SBE_VALUE_EQ(actualTag, actualVal, expectedTag, expectedVal);
+        value::TagValueOwned expected =
+            value::TagValueOwned::fromRaw(stage_builder::makeValue(curElem["storedSource"].Obj()));
+        ASSERT_SBE_VALUE_EQ(actualTag, actualVal, expected.tag(), expected.value());
 
         for (size_t p = 0; p < metadataNames.size(); ++p) {
             ASSERT(curElem.hasField(metadataNames[p]));

@@ -48,15 +48,13 @@ namespace mongo::sbe {
 using SortStageTest = PlanStageTestFixture;
 
 TEST_F(SortStageTest, SortNumbersTest) {
-    auto [inputTag, inputVal] = stage_builder::makeValue(
+    value::TagValueOwned input = value::TagValueOwned::fromRaw(stage_builder::makeValue(
         BSON_ARRAY(BSON_ARRAY(12LL << "A") << BSON_ARRAY(2.5 << "B") << BSON_ARRAY(7 << "C")
-                                           << BSON_ARRAY(Decimal128(4) << "D")));
-    value::ValueGuard inputGuard{inputTag, inputVal};
+                                           << BSON_ARRAY(Decimal128(4) << "D"))));
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(
+    value::TagValueOwned expected = value::TagValueOwned::fromRaw(stage_builder::makeValue(
         BSON_ARRAY(BSON_ARRAY(2.5 << "B") << BSON_ARRAY(Decimal128(4) << "D")
-                                          << BSON_ARRAY(7 << "C") << BSON_ARRAY(12LL << "A")));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+                                          << BSON_ARRAY(7 << "C") << BSON_ARRAY(12LL << "A"))));
 
     auto makeStageFn = [](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
         // Create a SortStage that sorts by slot0 in ascending order.
@@ -75,8 +73,8 @@ TEST_F(SortStageTest, SortNumbersTest) {
         return std::make_pair(scanSlots, std::move(sortStage));
     };
 
-    inputGuard.reset();
-    expectedGuard.reset();
+    auto [inputTag, inputVal] = input.releaseToRaw();
+    auto [expectedTag, expectedVal] = expected.releaseToRaw();
     runTestMulti(2, inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
 }
 
@@ -96,7 +94,8 @@ makeExpectedAndInputDataForSpillingTest() {
         expectedBuilder.append(e);
     }
     auto expected = stage_builder::makeValue(expectedBuilder.arr());
-    value::ValueGuard expectedGuard{expected.first, expected.second};
+    value::TagValueOwned expectedOwned =
+        value::TagValueOwned::fromRaw(expected.first, expected.second);
 
     std::reverse(data.begin(), data.end());
 
@@ -105,17 +104,17 @@ makeExpectedAndInputDataForSpillingTest() {
         inputBuilder.append(e);
     }
     auto input = stage_builder::makeValue(inputBuilder.arr());
-    value::ValueGuard inputGuard{input.first, input.second};
+    value::TagValueOwned inputOwned = value::TagValueOwned::fromRaw(input.first, input.second);
 
-    expectedGuard.reset();
-    inputGuard.reset();
+    expectedOwned.reset();
+    inputOwned.reset();
     return {expected, input};
 }
 
 TEST_F(SortStageTest, SortStringsWithSpillingTest) {
-    auto [expected, input] = makeExpectedAndInputDataForSpillingTest();
-    value::ValueGuard expectedGuard{expected.first, expected.second};
-    value::ValueGuard inputGuard{input.first, input.second};
+    auto [expectedRaw, inputRaw] = makeExpectedAndInputDataForSpillingTest();
+    value::TagValueOwned expected = value::TagValueOwned::fromRaw(expectedRaw);
+    value::TagValueOwned input = value::TagValueOwned::fromRaw(inputRaw);
 
     auto makeStageFn = [](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
         auto sortStage =
@@ -144,22 +143,16 @@ TEST_F(SortStageTest, SortStringsWithSpillingTest) {
         ASSERT_GT(sortStats->peakTrackedMemBytes, 0);
     };
 
-    inputGuard.reset();
-    expectedGuard.reset();
-    runTestMulti(2,
-                 input.first,
-                 input.second,
-                 expected.first,
-                 expected.second,
-                 makeStageFn,
-                 false,
-                 assertStageStats);
+    auto [inputTag, inputVal] = input.releaseToRaw();
+    auto [expectedTag, expectedVal] = expected.releaseToRaw();
+    runTestMulti(
+        2, inputTag, inputVal, expectedTag, expectedVal, makeStageFn, false, assertStageStats);
 }
 
 TEST_F(SortStageTest, SortStringsWithForceSpillingTest) {
-    auto [expected, input] = makeExpectedAndInputDataForSpillingTest();
-    value::ValueGuard expectedGuard{expected.first, expected.second};
-    value::ValueGuard inputGuard{input.first, input.second};
+    auto [expectedRaw, inputRaw] = makeExpectedAndInputDataForSpillingTest();
+    value::TagValueOwned expected = value::TagValueOwned::fromRaw(expectedRaw);
+    value::TagValueOwned input = value::TagValueOwned::fromRaw(inputRaw);
 
     auto makeStageFn = [](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
         auto sortStage =
@@ -188,16 +181,10 @@ TEST_F(SortStageTest, SortStringsWithForceSpillingTest) {
         ASSERT_GT(sortStats->peakTrackedMemBytes, 0);
     };
 
-    inputGuard.reset();
-    expectedGuard.reset();
-    runTestMulti(2,
-                 input.first,
-                 input.second,
-                 expected.first,
-                 expected.second,
-                 makeStageFn,
-                 true,
-                 assertStageStats);
+    auto [inputTag, inputVal] = input.releaseToRaw();
+    auto [expectedTag, expectedVal] = expected.releaseToRaw();
+    runTestMulti(
+        2, inputTag, inputVal, expectedTag, expectedVal, makeStageFn, true, assertStageStats);
 }
 
 }  // namespace mongo::sbe

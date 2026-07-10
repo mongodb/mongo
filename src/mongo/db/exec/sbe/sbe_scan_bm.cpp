@@ -104,8 +104,8 @@ public:
 
         UUID uuid = colls.getMainCollection()->uuid();
         DatabaseName dbName = dummyTest._nss.dbName();
-        auto [inputTag, inputVal] = stage_builder::makeValue(BSONArray());
-        value::ValueGuard inputGuard{inputTag, inputVal};
+        value::TagValueOwned inputArr =
+            value::TagValueOwned::fromRaw(stage_builder::makeValue(BSONArray()));
 
         auto makeStageFn = [uuid, dbName](value::SlotId scanSlot,
                                           std::unique_ptr<PlanStage> stage,
@@ -133,7 +133,7 @@ public:
         };
 
         for (auto _ : state) {
-            dummyTest.runFast(inputTag, inputVal, makeStageFn);
+            dummyTest.runFast(inputArr.tag(), inputArr.value(), makeStageFn);
         }
     }
 
@@ -147,8 +147,8 @@ public:
 
         UUID uuid = colls.getMainCollection()->uuid();
         DatabaseName dbName = dummyTest._nss.dbName();
-        auto [inputTag, inputVal] = stage_builder::makeValue(BSONArray());
-        value::ValueGuard inputGuard{inputTag, inputVal};
+        value::TagValueOwned inputArr =
+            value::TagValueOwned::fromRaw(stage_builder::makeValue(BSONArray()));
 
         auto makeStageFn = [uuid, dbName](value::SlotId scanSlot,
                                           std::unique_ptr<PlanStage> stage,
@@ -178,7 +178,7 @@ public:
         };
 
         for (auto _ : state) {
-            dummyTest.runFast(inputTag, inputVal, makeStageFn);
+            dummyTest.runFast(inputArr.tag(), inputArr.value(), makeStageFn);
         }
     }
 

@@ -67,10 +67,11 @@ public:
 
     void sortArray(const BSONObj& sortPattern, const CollatorInterface* collator) {
         sortedObjs = objs;
-        auto [specTag, specVal] = stage_builder::makeValue(sortPattern);
-        value::ValueGuard guard{specTag, specVal};
-        std::sort(
-            sortedObjs.begin(), sortedObjs.end(), SbePatternValueCmp(specTag, specVal, collator));
+        value::TagValueOwned spec =
+            value::TagValueOwned::fromRaw(stage_builder::makeValue(sortPattern));
+        std::sort(sortedObjs.begin(),
+                  sortedObjs.end(),
+                  SbePatternValueCmp(spec.tag(), spec.value(), collator));
     }
 
     TagValueView getOrigObj(size_t i) {

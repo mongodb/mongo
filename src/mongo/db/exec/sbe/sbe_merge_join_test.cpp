@@ -108,13 +108,13 @@ public:
 
         auto [resultAccessors, mergeJoinStage] = makeMergeJoin(outerData, innerData, dataSortDir);
 
-        auto [resultsTag, resultsVal] = getAllResultsMulti(mergeJoinStage.get(), resultAccessors);
-        value::ValueGuard resultGuard{resultsTag, resultsVal};
+        value::TagValueOwned results = value::TagValueOwned::fromRaw(
+            getAllResultsMulti(mergeJoinStage.get(), resultAccessors));
 
-        auto [expectedTag, expectedVal] = stage_builder::makeValue(expectedData);
-        sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
+        value::TagValueOwned expected =
+            value::TagValueOwned::fromRaw(stage_builder::makeValue(expectedData));
 
-        ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
+        ASSERT_TRUE(valueEquals(results.tag(), results.value(), expected.tag(), expected.value()));
     }
 };
 
