@@ -1,0 +1,76 @@
+# Copyright (C) 2026-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+server_parameters:
+    clientMetadataUpdateLogRatePerSec:
+        description: >-
+            Maximum number of clientUpdate log entries (log id 51817) logged at INFO severity per
+            second across all connections. Entries that exceed this rate are demoted to DEBUG(2)
+            severity. A value of 0 disables the limit (all entries are logged at INFO).
+
+            Evaluation order: clientMetadataUpdateLogPerConnectionThrottlingSecs is evaluated first.
+            If the per-connection interval has not elapsed, the entry is dropped. Otherwise, this
+            cross connection rate limit is evaluated second and determines the log severity.
+        set_at: [startup]
+        cpp_varname: gClientMetadataUpdateLogRatePerSec
+        cpp_vartype: int32_t
+        default: 50
+        validator: {gte: 0, lte: 1000}
+        redact: false
+
+    clientMetadataUpdateDocumentMaxByteLength:
+        description: >-
+            Maximum size in bytes of a clientUpdate metadata document. Documents exceeding this size
+            are rejected by validation.
+        set_at: [startup]
+        cpp_varname: gClientMetadataUpdateDocumentMaxByteLength
+        cpp_vartype: int32_t
+        default: 1024
+        validator: {gte: 1}
+        redact: false
+
+    clientMetadataUpdateLogPerConnectionThrottlingSecs:
+        description: >-
+            Minimum number of seconds between clientUpdate log entries (log id 51817) for the same
+            connection. If a connection sends a clientUpdate before this interval has elapsed, the
+            entry is dropped. A value of 0 disables the limit (every update is logged).
+
+            Evaluation order: this per-connection interval is evaluated first. If the entry passes,
+            clientMetadataUpdateLogRatePerSec is evaluated second and determines the log severity.
+        set_at: [startup, runtime]
+        cpp_varname: gClientMetadataUpdateLogPerConnectionThrottlingSecs
+        cpp_vartype: Atomic<int32_t>
+        default: 1800
+        validator: {gte: 0}
+        redact: false

@@ -320,3 +320,9 @@ commands:
                 type: bool
                 optional: true
                 stability: stable
+            clientUpdate:
+                # Intentionally typed as 'object' rather than 'ClientMetadata' to
+                # defer validation until the rate limiter allows logging.
+                type: object
+                optional: true
+                stability: unstable

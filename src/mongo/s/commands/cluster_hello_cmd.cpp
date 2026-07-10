@@ -207,6 +207,12 @@ public:
             audit::logClientMetadata(client);
         }
 
+        if (!isInitialHandshake) {
+            if (auto updateDoc = cmd.getClientUpdate()) {
+                ClientMetadata::logClientMetadataUpdate(client, *updateDoc);
+            }
+        }
+
         // If a client is following the awaitable hello protocol, maxAwaitTimeMS should be
         // present if and only if topologyVersion is present in the request.
         auto clientTopologyVersion = cmd.getTopologyVersion();

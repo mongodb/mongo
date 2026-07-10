@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/query/util/deferred.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/modules.h"
 
 #include <string>
@@ -51,6 +52,7 @@ class Client;
 class OperationContext;
 
 constexpr auto kMetadataDocumentName = "client"sv;
+constexpr auto kMetadataUpdateDocumentName = "clientUpdate"sv;
 
 /**
  * The ClientMetadata class is responsible for parsing the client metadata document that is received
@@ -324,6 +326,16 @@ public:
      * Log client and client metadata information to disk.
      */
     void logClientMetadata(Client* client) const;
+
+    static void logClientMetadataUpdate(Client* client, const BSONObj& updateDoc);
+
+    static Status validateClientMetadataUpdate(const BSONObj& doc);
+
+    /**
+     * Injects a mock clock into the global clientUpdate log suppressor.
+     * Pass nullptr to restore the system clock. For test use only.
+     */
+    static void setUpdateLogSuppressorClockSource_forTest(ClockSource* cs);
 
     /**
      * Field name for requests that contains client metadata.

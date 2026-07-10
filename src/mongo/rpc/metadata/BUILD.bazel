@@ -28,6 +28,14 @@ idl_generator(
 )
 
 idl_generator(
+    name = "client_metadata_server_parameters_gen",
+    src = "client_metadata_server_parameters.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
     name = "audit_attrs_gen",
     src = "audit_attrs.idl",
     deps = [

@@ -482,6 +482,12 @@ public:
             SplitHorizon::setParameters(client, std::move(sniName));
         }
 
+        if (!isInitialHandshake) {
+            if (auto updateDoc = cmd.getClientUpdate()) {
+                ClientMetadata::logClientMetadataUpdate(client, *updateDoc);
+            }
+        }
+
         // Parse the optional 'internalClient' field. This is provided by incoming connections from
         // mongod and mongos.
         if (internalClient) {

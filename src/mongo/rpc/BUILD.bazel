@@ -78,11 +78,14 @@ mongo_cc_library(
     srcs = [
         "//src/mongo/rpc/metadata:client_metadata.cpp",
         "//src/mongo/rpc/metadata:client_metadata_gen",
+        "//src/mongo/rpc/metadata:client_metadata_server_parameters_gen",
     ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/commands/server_status:server_status_metric",
         "//src/mongo/transport:message_compressor",
         "//src/mongo/util:processinfo",
         "//src/mongo/util/concurrency:spin_lock",
@@ -280,6 +283,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/shard_role:service_context_non_d",
         "//src/mongo/transport:transport_layer_mock",
+        "//src/mongo/util:clock_source_mock",
         "//src/third_party/wiredtiger:wiredtiger_checksum",
     ],
 )
