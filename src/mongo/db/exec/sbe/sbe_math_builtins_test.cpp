@@ -63,79 +63,79 @@ TEST_F(SBEMathBuiltinTest, Abs) {
 
     {
         inputAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-6));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberInt32, resultTag);
-        ASSERT_EQ(6, value::bitcastTo<int32_t>(resultVal));
+        ASSERT_EQ(value::TypeTags::NumberInt32, result.tag());
+        ASSERT_EQ(6, value::bitcastTo<int32_t>(result.value()));
     }
 
     {
         inputAccessor.reset(value::TypeTags::NumberInt32,
                             value::bitcastFrom<int32_t>(std::numeric_limits<int32_t>::min()));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberInt64, resultTag);
+        ASSERT_EQ(value::TypeTags::NumberInt64, result.tag());
         ASSERT_EQ(-static_cast<int64_t>(std::numeric_limits<int32_t>::min()),
-                  value::bitcastTo<int64_t>(resultVal));
+                  value::bitcastTo<int64_t>(result.value()));
     }
 
     {
         inputAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(-6000000000));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberInt64, resultTag);
-        ASSERT_EQ(6000000000, value::bitcastTo<int64_t>(resultVal));
+        ASSERT_EQ(value::TypeTags::NumberInt64, result.tag());
+        ASSERT_EQ(6000000000, value::bitcastTo<int64_t>(result.value()));
     }
 
     {
         inputAccessor.reset(value::TypeTags::NumberInt64,
                             value::bitcastFrom<int64_t>(std::numeric_limits<int64_t>::min()));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::Nothing, resultTag);
+        ASSERT_EQ(value::TypeTags::Nothing, result.tag());
     }
 
     {
         inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-6e300));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
-        ASSERT_APPROX_EQUAL(6e300, value::bitcastTo<double>(resultVal), 1e297);
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
+        ASSERT_APPROX_EQUAL(6e300, value::bitcastTo<double>(result.value()), 1e297);
     }
 
     {
         auto [inputTag, inputVal] = value::makeCopyDecimal(Decimal128{"-6e300"});
         inputAccessor.reset(inputTag, inputVal);
 
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guardResult(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDecimal, resultTag);
-        ASSERT(Decimal128{"6e300"} == value::bitcastTo<Decimal128>(resultVal));
+        ASSERT_EQ(value::TypeTags::NumberDecimal, result.tag());
+        ASSERT(Decimal128{"6e300"} == value::bitcastTo<Decimal128>(result.value()));
     }
 
     {
         inputAccessor.reset(value::TypeTags::NumberDouble,
                             value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN()));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
-        ASSERT_TRUE(std::isnan(value::bitcastTo<double>(resultVal)));
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
+        ASSERT_TRUE(std::isnan(value::bitcastTo<double>(result.value())));
     }
 
     {
         inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-NAN));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
-        ASSERT_TRUE(std::isnan(value::bitcastTo<double>(resultVal)));
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
+        ASSERT_TRUE(std::isnan(value::bitcastTo<double>(result.value())));
     }
 }
 
@@ -148,41 +148,41 @@ TEST_F(SBEMathBuiltinTest, Ceil) {
 
     {
         inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-10.0001));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
-        ASSERT_EQ(-10.0, value::bitcastTo<double>(resultVal));
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
+        ASSERT_EQ(-10.0, value::bitcastTo<double>(result.value()));
     }
 
     {
         auto [inputTag, inputVal] = value::makeCopyDecimal(Decimal128{"-123.456"});
         inputAccessor.reset(inputTag, inputVal);
 
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guardResult(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDecimal, resultTag);
-        ASSERT(Decimal128{"-123"} == value::bitcastTo<Decimal128>(resultVal));
+        ASSERT_EQ(value::TypeTags::NumberDecimal, result.tag());
+        ASSERT(Decimal128{"-123"} == value::bitcastTo<Decimal128>(result.value()));
     }
 
     {
         inputAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-10));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberInt32, resultTag);
-        ASSERT_EQ(-10, value::bitcastTo<int32_t>(resultVal));
+        ASSERT_EQ(value::TypeTags::NumberInt32, result.tag());
+        ASSERT_EQ(-10, value::bitcastTo<int32_t>(result.value()));
     }
 
     {
         inputAccessor.reset(value::TypeTags::NumberInt64,
                             value::bitcastFrom<int64_t>(-10000000000));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberInt64, resultTag);
-        ASSERT_EQ(-10000000000, value::bitcastTo<int64_t>(resultVal));
+        ASSERT_EQ(value::TypeTags::NumberInt64, result.tag());
+        ASSERT_EQ(-10000000000, value::bitcastTo<int64_t>(result.value()));
     }
 }
 
@@ -195,41 +195,41 @@ TEST_F(SBEMathBuiltinTest, Floor) {
 
     {
         inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-10.0001));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
-        ASSERT_EQ(-11.0, value::bitcastTo<double>(resultVal));
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
+        ASSERT_EQ(-11.0, value::bitcastTo<double>(result.value()));
     }
 
     {
         auto [inputTag, inputVal] = value::makeCopyDecimal(Decimal128{"-123.456"});
         inputAccessor.reset(inputTag, inputVal);
 
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guardResult(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDecimal, resultTag);
-        ASSERT(Decimal128{"-124"} == value::bitcastTo<Decimal128>(resultVal));
+        ASSERT_EQ(value::TypeTags::NumberDecimal, result.tag());
+        ASSERT(Decimal128{"-124"} == value::bitcastTo<Decimal128>(result.value()));
     }
 
     {
         inputAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-10));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberInt32, resultTag);
-        ASSERT_EQ(-10, value::bitcastTo<int32_t>(resultVal));
+        ASSERT_EQ(value::TypeTags::NumberInt32, result.tag());
+        ASSERT_EQ(-10, value::bitcastTo<int32_t>(result.value()));
     }
 
     {
         inputAccessor.reset(value::TypeTags::NumberInt64,
                             value::bitcastFrom<int64_t>(-10000000000));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberInt64, resultTag);
-        ASSERT_EQ(-10000000000, value::bitcastTo<int64_t>(resultVal));
+        ASSERT_EQ(value::TypeTags::NumberInt64, result.tag());
+        ASSERT_EQ(-10000000000, value::bitcastTo<int64_t>(result.value()));
     }
 }
 
@@ -242,40 +242,40 @@ TEST_F(SBEMathBuiltinTest, Exp) {
 
     {
         inputAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
-        ASSERT_APPROX_EQUAL(7.389, value::bitcastTo<double>(resultVal), 0.001);
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
+        ASSERT_APPROX_EQUAL(7.389, value::bitcastTo<double>(result.value()), 0.001);
     }
 
     {
         inputAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
-        ASSERT_APPROX_EQUAL(20.08, value::bitcastTo<double>(resultVal), 0.01);
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
+        ASSERT_APPROX_EQUAL(20.08, value::bitcastTo<double>(result.value()), 0.01);
     }
 
     {
         inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.5));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
-        ASSERT_APPROX_EQUAL(12.18, value::bitcastTo<double>(resultVal), 0.01);
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
+        ASSERT_APPROX_EQUAL(12.18, value::bitcastTo<double>(result.value()), 0.01);
     }
 
     {
         auto [inputTag, inputVal] = value::makeCopyDecimal(Decimal128{"3.5"});
         inputAccessor.reset(inputTag, inputVal);
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDecimal, resultTag);
+        ASSERT_EQ(value::TypeTags::NumberDecimal, result.tag());
         auto expected = Decimal128{"33.12"};
-        ASSERT(expected.subtract(value::bitcastTo<Decimal128>(resultVal))
+        ASSERT(expected.subtract(value::bitcastTo<Decimal128>(result.value()))
                    .toAbs()
                    .isLess(Decimal128{"0.01"}));
     }
@@ -290,40 +290,40 @@ TEST_F(SBEMathBuiltinTest, Ln) {
 
     {
         inputAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
-        ASSERT_APPROX_EQUAL(0.6931, value::bitcastTo<double>(resultVal), 0.0001);
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
+        ASSERT_APPROX_EQUAL(0.6931, value::bitcastTo<double>(result.value()), 0.0001);
     }
 
     {
         inputAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(20000000000));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
-        ASSERT_APPROX_EQUAL(23.72, value::bitcastTo<double>(resultVal), 0.01);
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
+        ASSERT_APPROX_EQUAL(23.72, value::bitcastTo<double>(result.value()), 0.01);
     }
 
     {
         inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.1e20));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
-        ASSERT_APPROX_EQUAL(46.79, value::bitcastTo<double>(resultVal), 0.01);
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
+        ASSERT_APPROX_EQUAL(46.79, value::bitcastTo<double>(result.value()), 0.01);
     }
 
     {
         auto [inputTag, inputVal] = value::makeCopyDecimal(Decimal128{"4.2e25"});
         inputAccessor.reset(inputTag, inputVal);
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDecimal, resultTag);
+        ASSERT_EQ(value::TypeTags::NumberDecimal, result.tag());
         auto expected = Decimal128{"59.00"};
-        ASSERT(expected.subtract(value::bitcastTo<Decimal128>(resultVal))
+        ASSERT(expected.subtract(value::bitcastTo<Decimal128>(result.value()))
                    .toAbs()
                    .isLess(Decimal128{"0.01"}));
     }
@@ -331,10 +331,10 @@ TEST_F(SBEMathBuiltinTest, Ln) {
     // Non-positive values evaluate to Nothing
     {
         inputAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::Nothing, resultTag);
+        ASSERT_EQ(value::TypeTags::Nothing, result.tag());
     }
 }
 
@@ -347,39 +347,39 @@ TEST_F(SBEMathBuiltinTest, Log10) {
 
     {
         inputAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(100));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
-        ASSERT_EQ(2.0, value::bitcastTo<double>(resultVal));
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
+        ASSERT_EQ(2.0, value::bitcastTo<double>(result.value()));
     }
 
     {
         inputAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(10000000000));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
-        ASSERT_EQ(10.0, value::bitcastTo<double>(resultVal));
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
+        ASSERT_EQ(10.0, value::bitcastTo<double>(result.value()));
     }
 
     {
         inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.1e20));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
-        ASSERT_APPROX_EQUAL(20.322, value::bitcastTo<double>(resultVal), 0.01);
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
+        ASSERT_APPROX_EQUAL(20.322, value::bitcastTo<double>(result.value()), 0.01);
     }
 
     {
         auto [inputTag, inputVal] = value::makeCopyDecimal(Decimal128{"1e2000"});
         inputAccessor.reset(inputTag, inputVal);
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDecimal, resultTag);
-        ASSERT(Decimal128{"2000"} == value::bitcastTo<Decimal128>(resultVal));
+        ASSERT_EQ(value::TypeTags::NumberDecimal, result.tag());
+        ASSERT(Decimal128{"2000"} == value::bitcastTo<Decimal128>(result.value()));
     }
 }
 
@@ -392,40 +392,40 @@ TEST_F(SBEMathBuiltinTest, Sqrt) {
 
     {
         inputAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
-        ASSERT_EQ(2.0, value::bitcastTo<double>(resultVal));
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
+        ASSERT_EQ(2.0, value::bitcastTo<double>(result.value()));
     }
 
     {
         inputAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(10000000000));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
-        ASSERT_EQ(100000.0, value::bitcastTo<double>(resultVal));
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
+        ASSERT_EQ(100000.0, value::bitcastTo<double>(result.value()));
     }
 
     {
         inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.5));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
-        ASSERT_APPROX_EQUAL(1.581, value::bitcastTo<double>(resultVal), 0.001);
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
+        ASSERT_APPROX_EQUAL(1.581, value::bitcastTo<double>(result.value()), 0.001);
     }
 
     {
         auto [inputTag, inputVal] = value::makeCopyDecimal(Decimal128{"5.2"});
         inputAccessor.reset(inputTag, inputVal);
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDecimal, resultTag);
+        ASSERT_EQ(value::TypeTags::NumberDecimal, result.tag());
         auto expected = Decimal128{"2.280"};
-        ASSERT(expected.subtract(value::bitcastTo<Decimal128>(resultVal))
+        ASSERT(expected.subtract(value::bitcastTo<Decimal128>(result.value()))
                    .toAbs()
                    .isLess(Decimal128{"0.001"}));
     }
@@ -434,22 +434,23 @@ TEST_F(SBEMathBuiltinTest, Sqrt) {
     // include -0, and -0 evaluates to a value that is equal to zero.
     {
         inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-0.0));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
-        ASSERT_EQ(0.0, value::bitcastTo<double>(resultVal));
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
+        ASSERT_EQ(0.0, value::bitcastTo<double>(result.value()));
     }
 
     {
         auto [inputTag, inputVal] = value::makeCopyDecimal(Decimal128{"-0.0"});
         inputAccessor.reset(inputTag, inputVal);
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDecimal, resultTag);
-        ASSERT(value::bitcastTo<Decimal128>(resultVal).normalize().isEqual(
-            Decimal128::kNormalizedZero));
+        ASSERT_EQ(value::TypeTags::NumberDecimal, result.tag());
+        ASSERT(value::bitcastTo<Decimal128>(result.value())
+                   .normalize()
+                   .isEqual(Decimal128::kNormalizedZero));
     }
 }
 
@@ -468,11 +469,11 @@ TEST_F(SBEMathBuiltinTest, Pow) {
 
         inputAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4));
         inputAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(3));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberInt32, resultTag);
-        ASSERT_EQ(64, resultVal);
+        ASSERT_EQ(value::TypeTags::NumberInt32, result.tag());
+        ASSERT_EQ(64, result.value());
     }
 
     {
@@ -480,12 +481,12 @@ TEST_F(SBEMathBuiltinTest, Pow) {
 
         inputAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(85));
         inputAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(5));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberInt64, resultTag);
+        ASSERT_EQ(value::TypeTags::NumberInt64, result.tag());
         int64_t expected = 85 * 85 * 85 * 85 * 85ll;
-        ASSERT_EQ(expected, resultVal);
+        ASSERT_EQ(expected, result.value());
     }
 
     {
@@ -493,11 +494,11 @@ TEST_F(SBEMathBuiltinTest, Pow) {
 
         inputAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-4));
         inputAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(3));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberInt32, resultTag);
-        ASSERT_EQ(-4 * -4 * -4, resultVal);
+        ASSERT_EQ(value::TypeTags::NumberInt32, result.tag());
+        ASSERT_EQ(-4 * -4 * -4, result.value());
     }
 
     {
@@ -505,12 +506,12 @@ TEST_F(SBEMathBuiltinTest, Pow) {
 
         inputAccessor1.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(12125));
         inputAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(3));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberInt64, resultTag);
+        ASSERT_EQ(value::TypeTags::NumberInt64, result.tag());
         int64_t expected = 12125 * 12125 * static_cast<int64_t>(12125);
-        ASSERT_EQ(expected, resultVal);
+        ASSERT_EQ(expected, result.value());
     }
 
     {
@@ -518,11 +519,11 @@ TEST_F(SBEMathBuiltinTest, Pow) {
 
         inputAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4));
         inputAccessor2.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberInt64, resultTag);
-        ASSERT_EQ(4 * 4 * 4, resultVal);
+        ASSERT_EQ(value::TypeTags::NumberInt64, result.tag());
+        ASSERT_EQ(4 * 4 * 4, result.value());
     }
 
     {
@@ -530,12 +531,12 @@ TEST_F(SBEMathBuiltinTest, Pow) {
 
         inputAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int64_t>(128));
         inputAccessor2.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(12));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
         double expected = 1.934e25;
-        ASSERT(std::abs(expected - value::bitcastTo<double>(resultVal)) < 0.001e25);
+        ASSERT(std::abs(expected - value::bitcastTo<double>(result.value())) < 0.001e25);
     }
 
     {
@@ -543,11 +544,11 @@ TEST_F(SBEMathBuiltinTest, Pow) {
 
         inputAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int64_t>(-4));
         inputAccessor2.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberInt64, resultTag);
-        ASSERT_EQ(-4 * -4 * -4, resultVal);
+        ASSERT_EQ(value::TypeTags::NumberInt64, result.tag());
+        ASSERT_EQ(-4 * -4 * -4, result.value());
     }
 
     {
@@ -556,12 +557,12 @@ TEST_F(SBEMathBuiltinTest, Pow) {
         auto [inputTag, inputVal] = value::makeCopyDecimal(Decimal128{"5.5"});
         inputAccessor1.reset(inputTag, inputVal);
         inputAccessor2.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDecimal, resultTag);
+        ASSERT_EQ(value::TypeTags::NumberDecimal, result.tag());
         auto expected = Decimal128{std::to_string(5.5 * 5.5 * 5.5)};
-        ASSERT(expected.subtract(value::bitcastTo<Decimal128>(resultVal))
+        ASSERT(expected.subtract(value::bitcastTo<Decimal128>(result.value()))
                    .toAbs()
                    .isLess(Decimal128{"0.001"}));
     }
@@ -572,12 +573,12 @@ TEST_F(SBEMathBuiltinTest, Pow) {
         inputAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4));
         auto [inputTag, inputVal] = value::makeCopyDecimal(Decimal128{"5.5"});
         inputAccessor2.reset(inputTag, inputVal);
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDecimal, resultTag);
+        ASSERT_EQ(value::TypeTags::NumberDecimal, result.tag());
         auto expected = Decimal128{std::to_string(4 * 4 * 4 * 4 * 4 * 2)};
-        ASSERT(expected.subtract(value::bitcastTo<Decimal128>(resultVal))
+        ASSERT(expected.subtract(value::bitcastTo<Decimal128>(result.value()))
                    .toAbs()
                    .isLess(Decimal128{"0.001"}));
     }
@@ -587,12 +588,12 @@ TEST_F(SBEMathBuiltinTest, Pow) {
 
         inputAccessor1.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(5.5));
         inputAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(3));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
         double expected = 5.5 * 5.5 * 5.5;
-        ASSERT_EQ(expected, value::bitcastTo<double>(resultVal));
+        ASSERT_EQ(expected, value::bitcastTo<double>(result.value()));
     }
 
     {
@@ -600,12 +601,12 @@ TEST_F(SBEMathBuiltinTest, Pow) {
 
         inputAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4));
         inputAccessor2.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(5.5));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
         double expected = 4 * 4 * 4 * 4 * 4 * 2;
-        ASSERT_EQ(expected, value::bitcastTo<double>(resultVal));
+        ASSERT_EQ(expected, value::bitcastTo<double>(result.value()));
     }
 
     {
@@ -613,12 +614,12 @@ TEST_F(SBEMathBuiltinTest, Pow) {
 
         inputAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2));
         inputAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(65));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
         double expected = 3.68935e19;
-        ASSERT(std::abs(expected - value::bitcastTo<double>(resultVal)) < 0.001e19);
+        ASSERT(std::abs(expected - value::bitcastTo<double>(result.value())) < 0.001e19);
     }
 
     {
@@ -626,11 +627,11 @@ TEST_F(SBEMathBuiltinTest, Pow) {
 
         inputAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2));
         inputAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-3));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
-        ASSERT_EQ(0.125, value::bitcastTo<double>(resultVal));
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
+        ASSERT_EQ(0.125, value::bitcastTo<double>(result.value()));
     }
 
     {
@@ -638,32 +639,32 @@ TEST_F(SBEMathBuiltinTest, Pow) {
 
         inputAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
         inputAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberInt32, resultTag);
-        ASSERT_EQ(1, resultVal);
+        ASSERT_EQ(value::TypeTags::NumberInt32, result.tag());
+        ASSERT_EQ(1, result.value());
     }
     {
         // base = 0, exponent > 0
 
         inputAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
         inputAccessor2.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3000000000));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberInt64, resultTag);
-        ASSERT_EQ(0, resultVal);
+        ASSERT_EQ(value::TypeTags::NumberInt64, result.tag());
+        ASSERT_EQ(0, result.value());
     }
     {
         // int/long base = 0, exponent < 0
 
         inputAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
         inputAccessor2.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int32_t>(-120));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::Nothing, resultTag);
+        ASSERT_EQ(value::TypeTags::Nothing, result.tag());
     }
     {
         // decimal base = 0, exponent < 0
@@ -671,53 +672,53 @@ TEST_F(SBEMathBuiltinTest, Pow) {
         auto [inputTag, inputVal] = value::makeCopyDecimal(Decimal128{"0.0"});
         inputAccessor1.reset(inputTag, inputVal);
         inputAccessor2.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int32_t>(-120));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::Nothing, resultTag);
+        ASSERT_EQ(value::TypeTags::Nothing, result.tag());
     }
     {
         // double base = 0, exponent < 0
 
         inputAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<double>(0.0));
         inputAccessor2.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int32_t>(-120));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::Nothing, resultTag);
+        ASSERT_EQ(value::TypeTags::Nothing, result.tag());
     }
     {
         // base = 1, exponent = 0
 
         inputAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
         inputAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberInt32, resultTag);
-        ASSERT_EQ(1, resultVal);
+        ASSERT_EQ(value::TypeTags::NumberInt32, result.tag());
+        ASSERT_EQ(1, result.value());
     }
     {
         // base = 1, exponent > 0
 
         inputAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
         inputAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(5000));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberInt32, resultTag);
-        ASSERT_EQ(1, resultVal);
+        ASSERT_EQ(value::TypeTags::NumberInt32, result.tag());
+        ASSERT_EQ(1, result.value());
     }
     {
         // base = 1, exponent < 0
 
         inputAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
         inputAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-5000));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberInt32, resultTag);
-        ASSERT_EQ(1, resultVal);
+        ASSERT_EQ(value::TypeTags::NumberInt32, result.tag());
+        ASSERT_EQ(1, result.value());
     }
 
     {
@@ -725,55 +726,55 @@ TEST_F(SBEMathBuiltinTest, Pow) {
 
         inputAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-1));
         inputAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberInt32, resultTag);
-        ASSERT_EQ(1, resultVal);
+        ASSERT_EQ(value::TypeTags::NumberInt32, result.tag());
+        ASSERT_EQ(1, result.value());
     }
     {
         // base = -1, exponent > 0 and exponent%2 = 0
 
         inputAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-1));
         inputAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1024));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberInt32, resultTag);
-        ASSERT_EQ(1, resultVal);
+        ASSERT_EQ(value::TypeTags::NumberInt32, result.tag());
+        ASSERT_EQ(1, result.value());
     }
     {
         // base = -1, exponent > 0 and exponent%2 = 1
 
         inputAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-1));
         inputAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1023));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberInt32, resultTag);
-        ASSERT_EQ(-1, resultVal);
+        ASSERT_EQ(value::TypeTags::NumberInt32, result.tag());
+        ASSERT_EQ(-1, result.value());
     }
     {
         // base = -1, exponent < 0 and exponent%2 = 0
 
         inputAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-1));
         inputAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-1024));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberInt32, resultTag);
-        ASSERT_EQ(1, resultVal);
+        ASSERT_EQ(value::TypeTags::NumberInt32, result.tag());
+        ASSERT_EQ(1, result.value());
     }
     {
         // base = -1, exponent < 0 and exponent%2 = 1
 
         inputAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-1));
         inputAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-1023));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberInt32, resultTag);
-        ASSERT_EQ(-1, resultVal);
+        ASSERT_EQ(value::TypeTags::NumberInt32, result.tag());
+        ASSERT_EQ(-1, result.value());
     }
 
     {
@@ -782,10 +783,10 @@ TEST_F(SBEMathBuiltinTest, Pow) {
         auto [inputTag, inputVal] = value::makeNewString("short");
         inputAccessor1.reset(inputTag, inputVal);
         inputAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::Nothing, resultTag);
+        ASSERT_EQ(value::TypeTags::Nothing, result.tag());
     }
 
     {
@@ -794,10 +795,10 @@ TEST_F(SBEMathBuiltinTest, Pow) {
         inputAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2));
         auto [inputTag, inputVal] = value::makeNewString("short");
         inputAccessor2.reset(inputTag, inputVal);
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::Nothing, resultTag);
+        ASSERT_EQ(value::TypeTags::Nothing, result.tag());
     }
 
     {
@@ -805,11 +806,11 @@ TEST_F(SBEMathBuiltinTest, Pow) {
 
         inputAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-5));
         inputAccessor2.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.5));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
-        ASSERT(std::isnan(value::bitcastTo<double>(resultVal)));
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
+        ASSERT(std::isnan(value::bitcastTo<double>(result.value())));
     }
 
     {
@@ -817,10 +818,10 @@ TEST_F(SBEMathBuiltinTest, Pow) {
 
         inputAccessor1.reset();
         inputAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(5));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::Nothing, resultTag);
+        ASSERT_EQ(value::TypeTags::Nothing, result.tag());
     }
 
     {
@@ -828,10 +829,10 @@ TEST_F(SBEMathBuiltinTest, Pow) {
 
         inputAccessor1.reset(value::TypeTags::Null, 0);
         inputAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(5));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::Nothing, resultTag);
+        ASSERT_EQ(value::TypeTags::Nothing, result.tag());
     }
 
     {
@@ -840,11 +841,11 @@ TEST_F(SBEMathBuiltinTest, Pow) {
         inputAccessor1.reset(value::TypeTags::NumberDouble,
                              value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN()));
         inputAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(5));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
-        ASSERT(std::isnan(value::bitcastTo<double>(resultVal)));
+        ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
+        ASSERT(std::isnan(value::bitcastTo<double>(result.value())));
     }
 }
 
@@ -865,10 +866,10 @@ TEST_F(SBEMathBuiltinTest, InvalidInputsToUnaryNumericFunctions) {
 
     auto runAllExpressionsExpectingNothing = [&]() {
         for (auto&& compiledExpr : compiledExpressionList) {
-            auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-            value::ValueGuard guard(resultTag, resultVal);
+            value::TagValueOwned result =
+                value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-            ASSERT_EQ(value::TypeTags::Nothing, resultTag);
+            ASSERT_EQ(value::TypeTags::Nothing, result.tag());
         }
     };
 
@@ -909,11 +910,11 @@ TEST_F(SBEMathBuiltinTest, InvalidInputsToUnaryNumericFunctions) {
                             value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN()));
 
         for (auto&& compiledExpr : compiledExpressionList) {
-            auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-            value::ValueGuard guard(resultTag, resultVal);
+            value::TagValueOwned result =
+                value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-            ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
-            ASSERT(std::isnan(value::bitcastTo<double>(resultVal)));
+            ASSERT_EQ(value::TypeTags::NumberDouble, result.tag());
+            ASSERT(std::isnan(value::bitcastTo<double>(result.value())));
         }
     }
 
@@ -922,11 +923,11 @@ TEST_F(SBEMathBuiltinTest, InvalidInputsToUnaryNumericFunctions) {
         inputAccessor.reset(inputTag, inputVal);
 
         for (auto&& compiledExpr : compiledExpressionList) {
-            auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-            value::ValueGuard guard(resultTag, resultVal);
+            value::TagValueOwned result =
+                value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-            ASSERT_EQ(value::TypeTags::NumberDecimal, resultTag);
-            ASSERT(value::bitcastTo<Decimal128>(resultVal).isNaN());
+            ASSERT_EQ(value::TypeTags::NumberDecimal, result.tag());
+            ASSERT(value::bitcastTo<Decimal128>(result.value()).isNaN());
         }
     }
 }
@@ -942,11 +943,11 @@ TEST_F(SBEMathBuiltinTest, DoubleDoubleSummation) {
 
         auto [inputTag, inputVal] = value::makeCopyDecimal(Decimal128{"-1.0"});
         inputAccessor.reset(inputTag, inputVal);
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDecimal, resultTag);
-        ASSERT(value::bitcastTo<Decimal128>(resultVal).isEqual(Decimal128{"-1.0"}));
+        ASSERT_EQ(value::TypeTags::NumberDecimal, result.tag());
+        ASSERT(value::bitcastTo<Decimal128>(result.value()).isEqual(Decimal128{"-1.0"}));
     }
 
     {
@@ -962,11 +963,11 @@ TEST_F(SBEMathBuiltinTest, DoubleDoubleSummation) {
         auto callExpr = makeE<EFunction>(EFn::kDoubleDoubleSum, std::move(args));
         auto compiledExpr = compileExpression(*callExpr);
 
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(resultTag, resultVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(value::TypeTags::NumberDecimal, resultTag);
-        ASSERT(value::bitcastTo<Decimal128>(resultVal).isEqual(Decimal128{"6.0"}));
+        ASSERT_EQ(value::TypeTags::NumberDecimal, result.tag());
+        ASSERT(value::bitcastTo<Decimal128>(result.value()).isEqual(Decimal128{"6.0"}));
     }
 }
 }  // namespace
