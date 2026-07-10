@@ -203,7 +203,8 @@ protected:
     // Shared logic for getNext()
     inline void handleEOF(const boost::optional<Record>& nextRecord) {
         if (_state->recordIdSlot) {
-            _recordIdAccessor.reset(value::TagValueOwned{sbe::value::makeCopyRecordId(RecordId())});
+            _recordIdAccessor.reset(
+                value::TagValueOwned::fromRaw(sbe::value::makeCopyRecordId(RecordId())));
         }
     };
 

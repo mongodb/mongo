@@ -49,11 +49,11 @@ using UniqueStageTest = PlanStageTestFixture;
 using UniqueRoaringStageTest = PlanStageTestFixture;
 
 TEST_F(UniqueStageTest, DeduplicatesAndPreservesOrderSimple) {
-    auto [inputTag, inputVal] = stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3 << 1));
-    value::ValueGuard inputGuard{inputTag, inputVal};
+    value::TagValueOwned inputOwned =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3 << 1)));
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expectedOwned =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3)));
 
     auto makeStageFn = [](value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
         auto unique =
@@ -62,17 +62,17 @@ TEST_F(UniqueStageTest, DeduplicatesAndPreservesOrderSimple) {
         return std::make_pair(scanSlot, std::move(unique));
     };
 
-    inputGuard.reset();
-    expectedGuard.reset();
+    auto [inputTag, inputVal] = inputOwned.releaseToRaw();
+    auto [expectedTag, expectedVal] = expectedOwned.releaseToRaw();
     runTest(inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
 }
 
 TEST_F(UniqueRoaringStageTest, DeduplicatesAndPreservesOrderSimple) {
-    auto [inputTag, inputVal] = stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3 << 1));
-    value::ValueGuard inputGuard{inputTag, inputVal};
+    value::TagValueOwned inputOwned =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3 << 1)));
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expectedOwned =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3)));
 
     auto makeStageFn = [](value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
         auto unique = makeS<UniqueRoaringStage>(std::move(scanStage), scanSlot, kEmptyPlanNodeId);
@@ -80,8 +80,8 @@ TEST_F(UniqueRoaringStageTest, DeduplicatesAndPreservesOrderSimple) {
         return std::make_pair(scanSlot, std::move(unique));
     };
 
-    inputGuard.reset();
-    expectedGuard.reset();
+    auto [inputTag, inputVal] = inputOwned.releaseToRaw();
+    auto [expectedTag, expectedVal] = expectedOwned.releaseToRaw();
     runTest(inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
 }
 
@@ -97,11 +97,11 @@ TEST_F(UniqueRoaringStageTest, DeduplicatesAndPreservesOrderSimpleRecordId) {
         return {arrTag, arrVal};
     };
 
-    auto [inputTag, inputVal] = createRecordIdArray({1, 2, 3, 1, 4});
-    value::ValueGuard inputGuard{inputTag, inputVal};
+    value::TagValueOwned inputOwned =
+        value::TagValueOwned::fromRaw(createRecordIdArray({1, 2, 3, 1, 4}));
 
-    auto [expectedTag, expectedVal] = createRecordIdArray({1, 2, 3, 4});
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expectedOwned =
+        value::TagValueOwned::fromRaw(createRecordIdArray({1, 2, 3, 4}));
 
     auto makeStageFn = [](value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
         auto unique = makeS<UniqueRoaringStage>(std::move(scanStage), scanSlot, kEmptyPlanNodeId);
@@ -109,8 +109,8 @@ TEST_F(UniqueRoaringStageTest, DeduplicatesAndPreservesOrderSimpleRecordId) {
         return std::make_pair(scanSlot, std::move(unique));
     };
 
-    inputGuard.reset();
-    expectedGuard.reset();
+    auto [inputTag, inputVal] = inputOwned.releaseToRaw();
+    auto [expectedTag, expectedVal] = expectedOwned.releaseToRaw();
     runTest(inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
 }
 
@@ -121,19 +121,19 @@ TEST_F(UniqueStageTest, DeduplicatesMultipleSlotsInKey) {
                                                       tag,
                                                       val);
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(
-        BSON_ARRAY(BSON_ARRAY(1 << 1) << BSON_ARRAY(2 << 2) << BSON_ARRAY(3 << 3)));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expectedOwned = value::TagValueOwned::fromRaw(stage_builder::makeValue(
+        BSON_ARRAY(BSON_ARRAY(1 << 1) << BSON_ARRAY(2 << 2) << BSON_ARRAY(3 << 3))));
 
     auto unique = makeS<UniqueStage>(std::move(scan), scanSlots, kEmptyPlanNodeId);
 
     auto ctx = makeCompileCtx();
     auto resultAccessors = prepareTree(ctx.get(), unique.get(), scanSlots);
 
-    auto [resultsTag, resultsVal] = getAllResultsMulti(unique.get(), resultAccessors);
-    value::ValueGuard resultGuard{resultsTag, resultsVal};
+    value::TagValueOwned resultsOwned =
+        value::TagValueOwned::fromRaw(getAllResultsMulti(unique.get(), resultAccessors));
 
-    ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
+    ASSERT_TRUE(valueEquals(
+        resultsOwned.tag(), resultsOwned.value(), expectedOwned.tag(), expectedOwned.value()));
 }
 
 TEST_F(UniqueStageTest, ResetsStateAfterClose) {
@@ -142,30 +142,33 @@ TEST_F(UniqueStageTest, ResetsStateAfterClose) {
     auto [scanSlot, scanStage] =
         generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, tag, val));
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(
-        BSON_ARRAY(BSON_ARRAY(1 << 1) << BSON_ARRAY(2 << 2) << BSON_ARRAY(3 << 3)));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expectedOwned = value::TagValueOwned::fromRaw(stage_builder::makeValue(
+        BSON_ARRAY(BSON_ARRAY(1 << 1) << BSON_ARRAY(2 << 2) << BSON_ARRAY(3 << 3))));
 
     auto unique = makeS<UniqueStage>(std::move(scanStage), sbe::makeSV(scanSlot), kEmptyPlanNodeId);
     auto ctx = makeCompileCtx();
     auto resultAccessor = prepareTree(ctx.get(), unique.get(), scanSlot);
 
-    auto [resultsTag, resultsVal] = getAllResults(unique.get(), resultAccessor);
-    value::ValueGuard resultGuard{resultsTag, resultsVal};
+    value::TagValueOwned resultsOwned =
+        value::TagValueOwned::fromRaw(getAllResults(unique.get(), resultAccessor));
 
-    ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
+    ASSERT_TRUE(valueEquals(
+        resultsOwned.tag(), resultsOwned.value(), expectedOwned.tag(), expectedOwned.value()));
 
     // Closing and opening the plan should have the effect of clearing the values that 'unique'
     // has seen.
     unique->close();
     unique->open(false);
 
-    auto [resetResultsTag, resetResultsVal] = getAllResults(unique.get(), resultAccessor);
-    value::ValueGuard resetResultGuard{resetResultsTag, resetResultsVal};
+    value::TagValueOwned resetResultsOwned =
+        value::TagValueOwned::fromRaw(getAllResults(unique.get(), resultAccessor));
 
     // The same result is seen again after closing and opening the plan tree. This proves the
     // seen set has been cleared, otherwise we would not get any result from the second run.
-    ASSERT_TRUE(valueEquals(resetResultsTag, resetResultsVal, expectedTag, expectedVal));
+    ASSERT_TRUE(valueEquals(resetResultsOwned.tag(),
+                            resetResultsOwned.value(),
+                            expectedOwned.tag(),
+                            expectedOwned.value()));
 }
 
 TEST_F(UniqueRoaringStageTest, ResetsStateAfterClose) {
@@ -173,29 +176,33 @@ TEST_F(UniqueRoaringStageTest, ResetsStateAfterClose) {
     auto [scanSlot, scanStage] =
         generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, tag, val));
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expectedOwned =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3)));
 
     auto unique = makeS<UniqueRoaringStage>(std::move(scanStage), scanSlot, kEmptyPlanNodeId);
     auto ctx = makeCompileCtx();
     auto resultAccessor = prepareTree(ctx.get(), unique.get(), scanSlot);
 
-    auto [resultsTag, resultsVal] = getAllResults(unique.get(), resultAccessor);
-    value::ValueGuard resultGuard{resultsTag, resultsVal};
+    value::TagValueOwned resultsOwned =
+        value::TagValueOwned::fromRaw(getAllResults(unique.get(), resultAccessor));
 
-    ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
+    ASSERT_TRUE(valueEquals(
+        resultsOwned.tag(), resultsOwned.value(), expectedOwned.tag(), expectedOwned.value()));
 
     // Closing and opening the plan should have the effect of clearing the values that 'unique'
     // has seen.
     unique->close();
     unique->open(false);
 
-    auto [resetResultsTag, resetResultsVal] = getAllResults(unique.get(), resultAccessor);
-    value::ValueGuard resetResultGuard{resetResultsTag, resetResultsVal};
+    value::TagValueOwned resetResultsOwned =
+        value::TagValueOwned::fromRaw(getAllResults(unique.get(), resultAccessor));
 
     // The same result is seen again after closing and opening the plan tree. This proves the
     // seen set has been cleared, otherwise we would not get any result from the second run.
-    ASSERT_TRUE(valueEquals(resetResultsTag, resetResultsVal, expectedTag, expectedVal));
+    ASSERT_TRUE(valueEquals(resetResultsOwned.tag(),
+                            resetResultsOwned.value(),
+                            expectedOwned.tag(),
+                            expectedOwned.value()));
 }
 
 TEST_F(UniqueStageTest, ResetsStateAfterReopen) {
@@ -204,28 +211,31 @@ TEST_F(UniqueStageTest, ResetsStateAfterReopen) {
     auto [scanSlot, scanStage] =
         generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, tag, val));
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(
-        BSON_ARRAY(BSON_ARRAY(1 << 1) << BSON_ARRAY(2 << 2) << BSON_ARRAY(3 << 3)));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expectedOwned = value::TagValueOwned::fromRaw(stage_builder::makeValue(
+        BSON_ARRAY(BSON_ARRAY(1 << 1) << BSON_ARRAY(2 << 2) << BSON_ARRAY(3 << 3))));
 
     auto unique = makeS<UniqueStage>(std::move(scanStage), sbe::makeSV(scanSlot), kEmptyPlanNodeId);
     auto ctx = makeCompileCtx();
     auto resultAccessor = prepareTree(ctx.get(), unique.get(), scanSlot);
 
-    auto [resultsTag, resultsVal] = getAllResults(unique.get(), resultAccessor);
-    value::ValueGuard resultGuard{resultsTag, resultsVal};
+    value::TagValueOwned resultsOwned =
+        value::TagValueOwned::fromRaw(getAllResults(unique.get(), resultAccessor));
 
-    ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
+    ASSERT_TRUE(valueEquals(
+        resultsOwned.tag(), resultsOwned.value(), expectedOwned.tag(), expectedOwned.value()));
 
     // Calling open with reOpen set to 'true' should have the effect of clearing the values that
     // 'unique' has seen.
     unique->open(/* reOpen */ true);
-    auto [resetResultsTag, resetResultsVal] = getAllResults(unique.get(), resultAccessor);
-    value::ValueGuard resetResultGuard{resetResultsTag, resetResultsVal};
+    value::TagValueOwned resetResultsOwned =
+        value::TagValueOwned::fromRaw(getAllResults(unique.get(), resultAccessor));
 
     // The same result is seen after re-opening the plan tree. This proves the seen set has been
     // cleared, otherwise we would not get any result from the second run.
-    ASSERT_TRUE(valueEquals(resetResultsTag, resetResultsVal, expectedTag, expectedVal));
+    ASSERT_TRUE(valueEquals(resetResultsOwned.tag(),
+                            resetResultsOwned.value(),
+                            expectedOwned.tag(),
+                            expectedOwned.value()));
 }
 
 TEST_F(UniqueStageTest, UniqueStageTracksMemory) {
@@ -257,27 +267,31 @@ TEST_F(UniqueRoaringStageTest, ResetsStateAfterReopen) {
     auto [scanSlot, scanStage] =
         generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, tag, val));
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expectedOwned =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3)));
 
     auto unique = makeS<UniqueRoaringStage>(std::move(scanStage), scanSlot, kEmptyPlanNodeId);
     auto ctx = makeCompileCtx();
     auto resultAccessor = prepareTree(ctx.get(), unique.get(), scanSlot);
 
-    auto [resultsTag, resultsVal] = getAllResults(unique.get(), resultAccessor);
-    value::ValueGuard resultGuard{resultsTag, resultsVal};
+    value::TagValueOwned resultsOwned =
+        value::TagValueOwned::fromRaw(getAllResults(unique.get(), resultAccessor));
 
-    ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
+    ASSERT_TRUE(valueEquals(
+        resultsOwned.tag(), resultsOwned.value(), expectedOwned.tag(), expectedOwned.value()));
 
     // Calling open with reOpen set to 'true' should have the effect of clearing the values that
     // 'unique' has seen.
     unique->open(/* reOpen */ true);
-    auto [resetResultsTag, resetResultsVal] = getAllResults(unique.get(), resultAccessor);
-    value::ValueGuard resetResultGuard{resetResultsTag, resetResultsVal};
+    value::TagValueOwned resetResultsOwned =
+        value::TagValueOwned::fromRaw(getAllResults(unique.get(), resultAccessor));
 
     // The same result is seen after re-opening the plan tree. This proves the seen set has been
     // cleared, otherwise we would not get any result from the second run.
-    ASSERT_TRUE(valueEquals(resetResultsTag, resetResultsVal, expectedTag, expectedVal));
+    ASSERT_TRUE(valueEquals(resetResultsOwned.tag(),
+                            resetResultsOwned.value(),
+                            expectedOwned.tag(),
+                            expectedOwned.value()));
 }
 
 TEST_F(UniqueRoaringStageTest, UniqueRoaringStageTracksMemory) {

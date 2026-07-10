@@ -219,7 +219,7 @@ void ArithmeticAverageHashAggAccumulatorBase::initialize(vm::ByteCode& bytecode,
     arrayState->push_back_raw(tagCount, valCount);
 
     // Set 'accState' to the initial state we just constructed.
-    accumulatorState.reset(value::TagValueOwned{tagState, valState});
+    accumulatorState.reset(value::TagValueOwned::fromRaw(tagState, valState));
 }
 
 void ArithmeticAverageHashAggAccumulatorBase::accumulateTransformedValue(
@@ -322,7 +322,7 @@ void ArithmeticAverageHashAggAccumulatorTerminal::finalizePartialAggregate(
 
 void ArithmeticAverageHashAggAccumulatorPartial::finalizePartialAggregate(
     value::TagValueOwned partialAggregate, value::AssignableSlotAccessor& result) const {
-    auto resultObj = value::TagValueOwned(value::makeNewObject());
+    auto resultObj = value::TagValueOwned::fromRaw(value::makeNewObject());
 
     tassert(8186813, "New object has unexpected type", resultObj.tag() == value::TypeTags::Object);
     value::Object* resultObject = value::getObjectView(resultObj.value());

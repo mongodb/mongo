@@ -148,13 +148,12 @@ static std::pair<value::TypeTags, value::Value> makeBsonObject(const BSONObj& bo
 
 static std::pair<value::TypeTags, value::Value> makeArraySetWithCollator(
     const BSONArray& arr, CollatorInterface* collator) {
-    auto [tmpTag, tmpVal] = makeBsonArray(arr);
-    value::ValueGuard tmpGuard{tmpTag, tmpVal};
+    value::TagValueOwned tmpArr = value::TagValueOwned::fromRaw(makeBsonArray(arr));
 
-    value::ArrayEnumerator enumerator{tmpTag, tmpVal};
+    value::ArrayEnumerator enumerator{tmpArr.tag(), tmpArr.value()};
 
     auto [arrTag, arrVal] = value::makeNewArraySet(collator);
-    value::ValueGuard guard{arrTag, arrVal};
+    value::TagValueOwned arrSet = value::TagValueOwned::fromRaw(arrTag, arrVal);
 
     auto arrView = value::getArraySetView(arrVal);
 
@@ -164,19 +163,18 @@ static std::pair<value::TypeTags, value::Value> makeArraySetWithCollator(
 
         arrView->push_back_clone(tag, val);
     }
-    guard.reset();
+    arrSet.reset();
 
     return {arrTag, arrVal};
 }
 
 static std::pair<value::TypeTags, value::Value> makeArraySet(const BSONArray& arr) {
-    auto [tmpTag, tmpVal] = makeBsonArray(arr);
-    value::ValueGuard tmpGuard{tmpTag, tmpVal};
+    value::TagValueOwned tmpArr = value::TagValueOwned::fromRaw(makeBsonArray(arr));
 
-    value::ArrayEnumerator enumerator{tmpTag, tmpVal};
+    value::ArrayEnumerator enumerator{tmpArr.tag(), tmpArr.value()};
 
     auto [arrTag, arrVal] = value::makeNewArraySet();
-    value::ValueGuard guard{arrTag, arrVal};
+    value::TagValueOwned arrSet = value::TagValueOwned::fromRaw(arrTag, arrVal);
 
     auto arrView = value::getArraySetView(arrVal);
 
@@ -186,19 +184,18 @@ static std::pair<value::TypeTags, value::Value> makeArraySet(const BSONArray& ar
 
         arrView->push_back_clone(tag, val);
     }
-    guard.reset();
+    arrSet.reset();
 
     return {arrTag, arrVal};
 }
 
 static std::pair<value::TypeTags, value::Value> makeArray(const BSONArray& arr) {
-    auto [tmpTag, tmpVal] = makeBsonArray(arr);
-    value::ValueGuard tmpGuard{tmpTag, tmpVal};
+    value::TagValueOwned tmpArr = value::TagValueOwned::fromRaw(makeBsonArray(arr));
 
-    value::ArrayEnumerator enumerator{tmpTag, tmpVal};
+    value::ArrayEnumerator enumerator{tmpArr.tag(), tmpArr.value()};
 
     auto [arrTag, arrVal] = value::makeNewArray();
-    value::ValueGuard guard{arrTag, arrVal};
+    value::TagValueOwned arrOwned = value::TagValueOwned::fromRaw(arrTag, arrVal);
 
     auto arrView = value::getArrayView(arrVal);
 
@@ -209,19 +206,18 @@ static std::pair<value::TypeTags, value::Value> makeArray(const BSONArray& arr) 
         auto [copyTag, copyVal] = value::copyValue(tag, val);
         arrView->push_back_raw(copyTag, copyVal);
     }
-    guard.reset();
+    arrOwned.reset();
 
     return {arrTag, arrVal};
 }
 
 static std::pair<value::TypeTags, value::Value> makeObject(const BSONObj& obj) {
-    auto [tmpTag, tmpVal] = makeBsonObject(obj);
-    value::ValueGuard tmpGuard{tmpTag, tmpVal};
+    value::TagValueOwned tmpObj = value::TagValueOwned::fromRaw(makeBsonObject(obj));
 
-    value::ObjectEnumerator enumerator{tmpTag, tmpVal};
+    value::ObjectEnumerator enumerator{tmpObj.tag(), tmpObj.value()};
 
     auto [objTag, objVal] = value::makeNewObject();
-    value::ValueGuard guard{objTag, objVal};
+    value::TagValueOwned objOwned = value::TagValueOwned::fromRaw(objTag, objVal);
 
     auto objView = value::getObjectView(objVal);
 
@@ -231,7 +227,7 @@ static std::pair<value::TypeTags, value::Value> makeObject(const BSONObj& obj) {
         objView->push_back_raw(enumerator.getFieldName(), copyTag, copyVal);
         enumerator.advance();
     }
-    guard.reset();
+    objOwned.reset();
 
     return {objTag, objVal};
 }
@@ -276,7 +272,7 @@ static std::vector<value::TagValueOwned> makeOwnedVector(std::initializer_list<T
     std::vector<value::TagValueOwned> owned;
     owned.reserve(values.size());
     for (const auto& tv : values) {
-        owned.emplace_back(tv);
+        owned.push_back(value::TagValueOwned::fromRaw(tv));
     }
     return owned;
 }

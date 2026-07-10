@@ -47,7 +47,7 @@ value::TagValueOwned makeNewPcreRegex(std::string_view pattern, std::string_view
             .matchLimit = static_cast<uint32_t>(internalQueryRegexMatchLimit.loadRelaxed())});
 
     uassert(5073402, str::stream() << "Invalid Regex: " << errorMessage(regex->error()), *regex);
-    return value::TagValueOwned(value::TypeTags::pcreRegex,
-                                value::bitcastFrom<pcre::Regex*>(regex.release()));
+    return value::TagValueOwned::fromRaw(value::TypeTags::pcreRegex,
+                                         value::bitcastFrom<pcre::Regex*>(regex.release()));
 }
 }  // namespace mongo::sbe

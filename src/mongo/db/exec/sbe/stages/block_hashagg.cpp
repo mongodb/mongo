@@ -1128,12 +1128,12 @@ size_t BlockHashAggStage::estimateCompileTimeSize() const {
 }
 
 void BlockHashAggStage::populateBitmapSlot(size_t n) {
-    _blockBitsetOutAccessor.reset(
-        value::TagValueOwned{value::TypeTags::valueBlock,
-                             value::bitcastFrom<value::ValueBlock*>(
-                                 std::make_unique<value::MonoBlock>(
-                                     n, value::TypeTags::Boolean, value::bitcastFrom<bool>(true))
-                                     .release())});
+    _blockBitsetOutAccessor.reset(value::TagValueOwned::fromRaw(
+        value::TypeTags::valueBlock,
+        value::bitcastFrom<value::ValueBlock*>(
+            std::make_unique<value::MonoBlock>(
+                n, value::TypeTags::Boolean, value::bitcastFrom<bool>(true))
+                .release())));
 }
 
 value::ValueBlock* BlockHashAggStage::makeMonoBlock(value::TypeTags tag, value::Value val) {

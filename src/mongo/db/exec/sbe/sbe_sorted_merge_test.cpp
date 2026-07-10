@@ -128,13 +128,13 @@ TEST_F(SortedMergeStageTest, TwoChildrenBasicAscending) {
                          BSON_ARRAY(BSON_ARRAY(2 << 2) << BSON_ARRAY(4 << 4))},
                         std::vector<value::SortDirection>{value::SortDirection::Ascending});
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3 << 4));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expected =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3 << 4)));
 
-    auto [resultsTag, resultsVal] = getAllResults(sortedMerge.get(), resultAccessors[0]);
-    value::ValueGuard resultGuard{resultsTag, resultsVal};
+    value::TagValueOwned results =
+        value::TagValueOwned::fromRaw(getAllResults(sortedMerge.get(), resultAccessors[0]));
 
-    ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
+    ASSERT_TRUE(valueEquals(results.tag(), results.value(), expected.tag(), expected.value()));
 }
 
 TEST_F(SortedMergeStageTest, TwoChildrenBasicDescending) {
@@ -143,13 +143,13 @@ TEST_F(SortedMergeStageTest, TwoChildrenBasicDescending) {
          BSON_ARRAY(BSON_ARRAY(4 << 4) << BSON_ARRAY(2 << 2) << BSON_ARRAY(1 << 1))},
         std::vector<value::SortDirection>{value::SortDirection::Descending});
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY(5 << 4 << 3 << 2 << 1));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expected =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(5 << 4 << 3 << 2 << 1)));
 
-    auto [resultsTag, resultsVal] = getAllResults(sortedMerge.get(), resultAccessors[0]);
-    value::ValueGuard resultGuard{resultsTag, resultsVal};
+    value::TagValueOwned results =
+        value::TagValueOwned::fromRaw(getAllResults(sortedMerge.get(), resultAccessors[0]));
 
-    ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
+    ASSERT_TRUE(valueEquals(results.tag(), results.value(), expected.tag(), expected.value()));
 }
 
 TEST_F(SortedMergeStageTest, TwoChildrenOneEmpty) {
@@ -157,13 +157,13 @@ TEST_F(SortedMergeStageTest, TwoChildrenOneEmpty) {
         makeSortedMerge({BSONArray(), BSON_ARRAY(BSON_ARRAY(1 << 1) << BSON_ARRAY(2 << 2))},
                         std::vector<value::SortDirection>{value::SortDirection::Ascending});
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY(1 << 2));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expected =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(1 << 2)));
 
-    auto [resultsTag, resultsVal] = getAllResults(sortedMerge.get(), resultAccessors[0]);
-    value::ValueGuard resultGuard{resultsTag, resultsVal};
+    value::TagValueOwned results =
+        value::TagValueOwned::fromRaw(getAllResults(sortedMerge.get(), resultAccessors[0]));
 
-    ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
+    ASSERT_TRUE(valueEquals(results.tag(), results.value(), expected.tag(), expected.value()));
 }
 
 TEST_F(SortedMergeStageTest, TwoChildrenWithDuplicates) {
@@ -172,13 +172,13 @@ TEST_F(SortedMergeStageTest, TwoChildrenWithDuplicates) {
                          BSON_ARRAY(BSON_ARRAY(1 << 1) << BSON_ARRAY(2 << 2))},
                         std::vector<value::SortDirection>{value::SortDirection::Ascending});
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY(1 << 1 << 1 << 2));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expected =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(1 << 1 << 1 << 2)));
 
-    auto [resultsTag, resultsVal] = getAllResults(sortedMerge.get(), resultAccessors[0]);
-    value::ValueGuard resultGuard{resultsTag, resultsVal};
+    value::TagValueOwned results =
+        value::TagValueOwned::fromRaw(getAllResults(sortedMerge.get(), resultAccessors[0]));
 
-    ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
+    ASSERT_TRUE(valueEquals(results.tag(), results.value(), expected.tag(), expected.value()));
 }
 
 TEST_F(SortedMergeStageTest, FiveChildren) {
@@ -191,13 +191,12 @@ TEST_F(SortedMergeStageTest, FiveChildren) {
                     << BSON_ARRAY(10 << 10) << BSON_ARRAY(11 << 11) << BSON_ARRAY(12 << 12))},
         std::vector<value::SortDirection>{value::SortDirection::Ascending});
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(
-        BSON_ARRAY(1 << 1 << 1 << 1 << 2 << 3 << 4 << 4 << 5 << 10 << 11 << 12));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expected = value::TagValueOwned::fromRaw(stage_builder::makeValue(
+        BSON_ARRAY(1 << 1 << 1 << 1 << 2 << 3 << 4 << 4 << 5 << 10 << 11 << 12)));
 
-    auto [resultsTag, resultsVal] = getAllResults(sortedMerge.get(), resultAccessors[0]);
-    value::ValueGuard resultGuard{resultsTag, resultsVal};
+    value::TagValueOwned results =
+        value::TagValueOwned::fromRaw(getAllResults(sortedMerge.get(), resultAccessors[0]));
 
-    ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
+    ASSERT_TRUE(valueEquals(results.tag(), results.value(), expected.tag(), expected.value()));
 }
 }  // namespace mongo::sbe

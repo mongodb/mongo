@@ -563,7 +563,7 @@ template value::TagValueView DoubleBlock::at(size_t idx);
 template value::TagValueView BoolBlock::at(size_t idx);
 
 void HeterogeneousBlock::push_back(TypeTags t, Value v) {
-    TagValueOwned owned{t, v};
+    TagValueOwned owned = TagValueOwned::fromRaw(t, v);
 
     _vals.push_back(v);
     _tags.push_back(t);

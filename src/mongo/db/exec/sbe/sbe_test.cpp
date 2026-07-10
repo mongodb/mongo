@@ -131,11 +131,11 @@ TEST(SBEValues, Hash) {
         auto tagDouble = value::TypeTags::NumberDouble;
         auto valDouble = value::bitcastFrom<double>(doubleValue);
 
-        auto [tagDecimal, valDecimal] = value::makeCopyDecimal(mongo::Decimal128(decimalValue));
-        value::ValueGuard guard{tagDecimal, valDecimal};
+        value::TagValueOwned decimalVal =
+            value::TagValueOwned::fromRaw(value::makeCopyDecimal(mongo::Decimal128(decimalValue)));
 
         ASSERT_EQUALS(value::hashValue(tagDouble, valDouble),
-                      value::hashValue(tagDecimal, valDecimal));
+                      value::hashValue(decimalVal.tag(), decimalVal.value()));
     };
 
     // Test bitwise identical NaNs.
