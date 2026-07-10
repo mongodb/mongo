@@ -389,6 +389,21 @@ TEST_F(ExpressionContextTest, IfrContextIsSharedWithSubPipeline) {
     ASSERT_EQ(expCtx->getIfrContext().get(), subExpCtx->getIfrContext().get());
 }
 
+TEST_F(ExpressionContextTest, AllowPartialResultsIsNotInheritedBySubPipeline) {
+    auto opCtx = makeOperationContext();
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx.get())
+                      .ns(NamespaceString::createNamespaceString_forTest("test"sv, "coll"sv))
+                      .allowPartialResults(true)
+                      .build();
+
+    auto subExpCtx = makeCopyForSubPipelineFromExpressionContext(
+        expCtx, NamespaceString::createNamespaceString_forTest("test"sv, "subColl"sv));
+
+    ASSERT_TRUE(expCtx->getAllowPartialResults());
+    ASSERT_FALSE(subExpCtx->getAllowPartialResults());
+}
+
 // Tests for ExpressionContextBuilder::fromRequest(FindCommandRequest) IDHACK eligibility.
 // The key behavior: when there is no explicit request collation, isIdHackQuery is set based
 // purely on query structure, regardless of whether the collection has a default collator.

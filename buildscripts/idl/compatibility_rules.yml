@@ -225,6 +225,7 @@ ALLOWED_STABLE_FIELDS_LIST:
   - "commandWithNewArrayTypeParameterAndArrayTypeReply-param-newArrayTypeParameter"
   - "commandWithNewNestedArrayTypeParameterAndNestedArrayTypeReply-param-newNestedArrayTypeParameter"
   # Add real use cases for allowed new stable or unstable-to-stable fields after this line.
+  - "aggregate-param-allowPartialResults"
   # Changes relative to 5.0:
   - "collMod-param-isTimeseriesNamespace"
   - "collMod-param-cappedSize"

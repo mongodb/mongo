@@ -194,6 +194,32 @@ void LiteParsedPipeline::validate(const OperationContext* opCtx,
     }
 }
 
+void LiteParsedPipeline::validateAllowPartialResults(const AggregateCommandRequest& request) const {
+    if (!request.getAllowPartialResults().value_or(false)) {
+        return;
+    }
+
+    // Write stages ($out/$merge) persist data on the shards. Silently dropping the contribution of
+    // an unreachable shard could produce an incorrect or partial write, so partial results are not
+    // permitted.
+    uassert(ErrorCodes::InvalidOptions,
+            "allowPartialResults is not supported for aggregations with write stages",
+            !endsWithWriteStage());
+
+    // Change streams are continuous, tailable cursors that must observe every shard to avoid
+    // silently missing events; returning partial results would break their correctness guarantees.
+    uassert(ErrorCodes::InvalidOptions,
+            "allowPartialResults is not supported for change stream aggregations",
+            !hasChangeStream());
+
+    // Search-family stages ($search, $vectorSearch, $rankFusion, $scoreFusion, and their extension
+    // variants) are served by mongot, not the regular shard cursor path, so the router-level
+    // partial-results mechanism does not apply to them.
+    uassert(ErrorCodes::InvalidOptions,
+            "allowPartialResults is not supported for search aggregations",
+            !hasMongotStage());
+}
+
 void LiteParsedPipeline::validateTimeseries() const {
     for (const auto& stage : _stageSpecs) {
         auto stageConstraints = stage->constraints();

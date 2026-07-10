@@ -36,6 +36,8 @@
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
@@ -44,12 +46,33 @@
 #include <string>
 #include <vector>
 
+#include <boost/none.hpp>
+
 namespace mongo {
 namespace {
 
 const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.collection");
 const HostAndPort hostAndPort("testhost", 27017);
 const ShardId shardId("testshard");
+
+BSONObj makeCursorResponseObj(CursorId cursorId,
+                              const std::vector<BSONObj>& batch,
+                              bool partialResultsReturned) {
+    rpc::OpMsgReplyBuilder builder;
+    CursorResponseBuilder::Options options;
+    options.isInitialResponse = true;
+    CursorResponseBuilder responseBuilder(&builder, options);
+    for (const auto& doc : batch) {
+        responseBuilder.append(doc);
+    }
+    responseBuilder.setPartialResultsReturned(partialResultsReturned);
+    responseBuilder.done(cursorId, nss, boost::none, SerializationContext::stateCommandReply());
+    auto msg = builder.done();
+    auto opMsg = OpMsg::parse(msg);
+    auto body = opMsg.body.getOwned();
+    auto okStatus = BSON("ok" << 1);
+    return body.addField(okStatus.firstElement());
+}
 
 class StorePossibleCursorTest : public ServiceContextTest {
 protected:
@@ -93,6 +116,26 @@ TEST_F(StorePossibleCursorTest, ReturnsValidCursorResponse) {
     ASSERT_EQ(2U, parsedOutgoingResponse.getValue().getBatch().size());
     ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), parsedOutgoingResponse.getValue().getBatch()[0]);
     ASSERT_BSONOBJ_EQ(fromjson("{_id: 2}"), parsedOutgoingResponse.getValue().getBatch()[1]);
+}
+
+TEST_F(StorePossibleCursorTest, PreservesPartialResultsReturnedForExhaustedCursorResponse) {
+    std::vector<BSONObj> batch = {fromjson("{_id: 1}")};
+    auto cursorResponseObj =
+        makeCursorResponseObj(CursorId(0), batch, true /* partialResultsReturned */);
+
+    auto outgoingCursorResponse = storePossibleCursor(opCtx(),
+                                                      shardId,
+                                                      hostAndPort,
+                                                      cursorResponseObj,
+                                                      nss,
+                                                      nullptr,  // TaskExecutor
+                                                      getManager(),
+                                                      PrivilegeVector());
+    ASSERT_OK(outgoingCursorResponse.getStatus());
+
+    auto parsedOutgoingResponse = CursorResponse::parseFromBSON(outgoingCursorResponse.getValue());
+    ASSERT_OK(parsedOutgoingResponse.getStatus());
+    ASSERT_TRUE(parsedOutgoingResponse.getValue().getPartialResultsReturned());
 }
 
 // Test that storePossibleCursor() propagates an error if it cannot parse the cursor response.

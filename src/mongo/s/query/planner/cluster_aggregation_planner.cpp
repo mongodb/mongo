@@ -481,7 +481,9 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
                             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
                             Grid::get(opCtx)->getCursorManager(),
                             privileges,
-                            expCtx->getTailableMode()));
+                            expCtx->getTailableMode(),
+                            boost::none /* routerSort */,
+                            expCtx->getAllowPartialResults()));
 
     // If the mergingShard returned an error and did not accept ownership it is our responsibility
     // to kill the cursors.
@@ -526,6 +528,11 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
     params.batchSize = batchSize == 0 ? boost::none : boost::make_optional(batchSize);
     params.originatingPrivileges = privileges;
     params.remoteMetricsToInclude = remoteMetricsToInclude;
+    // Record 'allowPartialResults' on the router cursor. The $mergeCursors AsyncResultsMerger's own
+    // tolerance for unreachable shards is configured separately in buildArmParams(); this flag is
+    // what lets ClusterClientCursorImpl report 'partialResultsReturned' if the router itself hits
+    // maxTimeMS while partial results are allowed.
+    params.isAllowPartialResults = pipelineForMerging->getContext()->getAllowPartialResults();
 
     auto ccc = cluster_aggregation_planner::buildClusterCursor(
         opCtx, std::move(pipelineForMerging), std::move(params));
@@ -562,6 +569,12 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
             responseBuilder.setInvalidated();
             cursorState = ClusterCursorManager::CursorState::Exhausted;
             break;
+        } catch (const ExceptionFor<ErrorCodes::MaxTimeMSExpired>&) {
+            if (ccc->partialResultsReturned()) {
+                cursorState = ClusterCursorManager::CursorState::Exhausted;
+                break;
+            }
+            throw;
         }
 
         // Check whether we have exhausted the pipeline's results.
@@ -605,6 +618,8 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
 
     bool exhausted = cursorState != ClusterCursorManager::CursorState::NotExhausted;
     int nShards = ccc->getNumRemotes();
+
+    const bool partialResultsReturned = ccc->partialResultsReturned();
 
     auto&& opDebug = CurOp::get(opCtx)->debug();
     // Fill out the aggregation metrics in CurOp, and record queryStats metrics, before detaching
@@ -650,6 +665,7 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
         opDebug.cursorid = clusterCursorId;
     }
 
+    responseBuilder.setPartialResultsReturned(partialResultsReturned);
     responseBuilder.done(clusterCursorId, requestedNss);
 
     auto bodyBuilder = replyBuilder.getBodyBuilder();
@@ -979,7 +995,8 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                                                namespaces.requestedNss,
                                                                std::move(remoteCursor),
                                                                privileges,
-                                                               expCtx->getTailableMode()));
+                                                               expCtx->getTailableMode(),
+                                                               expCtx->getAllowPartialResults()));
         return appendCursorResponseToCommandResult(shardId, reply, result);
     }
 
@@ -1145,7 +1162,8 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
             Grid::get(opCtx)->getCursorManager(),
             privileges,
             expCtx->getTailableMode(),
-            boost::optional<BSONObj>(change_stream_constants::kSortSpec) /* routerSort */));
+            boost::optional<BSONObj>(change_stream_constants::kSortSpec) /* routerSort */,
+            expCtx->getAllowPartialResults()));
     }
 
     // First append the properly constructed writeConcernError. It will then be skipped

@@ -717,6 +717,14 @@ public:
         _params.allowDiskUse = allowDiskUse;
     }
 
+    bool getAllowPartialResults() const {
+        return _params.allowPartialResults;
+    }
+
+    void setAllowPartialResults(bool allowPartialResults) {
+        _params.allowPartialResults = allowPartialResults;
+    }
+
     bool getInLookup() const {
         return _params.inLookup;
     }
@@ -1223,6 +1231,7 @@ protected:
         MergeType mergeType = MergeType::noMerge;
         bool forPerShardCursor = false;
         bool allowDiskUse = false;
+        bool allowPartialResults = false;
         bool bypassDocumentValidation = false;
         bool isMapReduceCommand = false;
         bool hasWhereClause = false;

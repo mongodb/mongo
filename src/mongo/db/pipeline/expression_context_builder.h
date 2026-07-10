@@ -70,6 +70,7 @@ public:
     ExpressionContextBuilder& inRouter(bool);
     ExpressionContextBuilder& forPerShardCursor(bool);
     ExpressionContextBuilder& allowDiskUse(bool);
+    ExpressionContextBuilder& allowPartialResults(bool);
     ExpressionContextBuilder& bypassDocumentValidation(bool);
     ExpressionContextBuilder& isMapReduceCommand(bool);
     ExpressionContextBuilder& hasWhereClause(bool);

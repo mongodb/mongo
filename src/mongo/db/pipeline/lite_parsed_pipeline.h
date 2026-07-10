@@ -293,6 +293,14 @@ public:
     }
 
     /**
+     * Returns true if the pipeline has a stage backed by mongot.
+     */
+    bool hasMongotStage() const {
+        return hasSearchStage() || hasHybridSearchStage() || hasExtensionSearchStage() ||
+            hasExtensionVectorSearchStage();
+    }
+
+    /**
      * Returns true if the pipeline starts with a $currentOp stage.
      */
     bool startsWithCurrentOpStage() const {
@@ -449,6 +457,15 @@ public:
      * 'validatePipelineStagesforAPIVersion' with 'opCtx'.
      */
     void validate(const OperationContext* opCtx, bool performApiVersionChecks = true) const;
+
+    /**
+     * If 'request' has 'allowPartialResults: true', throws InvalidOptions when the pipeline
+     * contains a stage for which returning partial results does not make sense (write, change
+     * stream, or search stages). This is a no-op when 'allowPartialResults' is unset or false.
+     *
+     * This is only meaningful on a router.
+     */
+    void validateAllowPartialResults(const AggregateCommandRequest& request) const;
 
     /**
      * Validates the pipeline against collection metadata. Checks stage constraints (e.g.

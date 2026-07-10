@@ -1489,12 +1489,13 @@ TEST(QueryRequestTest, ConvertToAggregationWithAwaitDataFails) {
                        ErrorCodes::InvalidPipelineOperator);
 }
 
-TEST(QueryRequestTest, ConvertToAggregationWithAllowPartialResultsFails) {
+TEST(QueryRequestTest, ConvertToAggregationWithAllowPartialResultsSucceeds) {
     FindCommandRequest findCommand(testns);
     findCommand.setAllowPartialResults(true);
-    ASSERT_THROWS_CODE(query_request_conversion::asAggregateCommandRequest(findCommand),
-                       DBException,
-                       ErrorCodes::InvalidPipelineOperator);
+
+    auto ar = query_request_conversion::asAggregateCommandRequest(findCommand);
+
+    ASSERT_TRUE(ar.getAllowPartialResults().value_or(false));
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithRequestResumeTokenSucceeds) {

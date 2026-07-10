@@ -86,6 +86,7 @@ class TaskExecutor;
  * auth checking by GetMore
  * @ routerSort the sort to apply on the router. With only one cursor this shouldn't be common, but
  * is needed to set up change stream post-batch resume tokens correctly for per shard cursors.
+ * @ allowPartialResults whether future getMore requests should tolerate unreachable remotes
  */
 StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const ShardId& shardId,
@@ -96,7 +97,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         ClusterCursorManager* cursorManager,
                                         PrivilegeVector privileges,
                                         TailableModeEnum tailableMode = TailableModeEnum::kNormal,
-                                        boost::optional<BSONObj> routerSort = boost::none);
+                                        boost::optional<BSONObj> routerSort = boost::none,
+                                        bool allowPartialResults = false);
 
 /**
  * Convenience overload taking in a const CursorResponse& instead of a const BSONObj&, as callers
@@ -114,7 +116,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         ClusterCursorManager* cursorManager,
                                         PrivilegeVector privileges,
                                         TailableModeEnum tailableMode = TailableModeEnum::kNormal,
-                                        boost::optional<BSONObj> routerSort = boost::none);
+                                        boost::optional<BSONObj> routerSort = boost::none,
+                                        bool allowPartialResults = false);
 
 /**
  * Convenience function which extracts all necessary information from the passed RemoteCursor, and
@@ -126,7 +129,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const NamespaceString& requestedNss,
                                         OwnedRemoteCursor&& remoteCursor,
                                         PrivilegeVector privileges,
-                                        TailableModeEnum tailableMode);
+                                        TailableModeEnum tailableMode,
+                                        bool allowPartialResults = false);
 
 /**
  * Overload of storePossibleCursor(), but applies 'documentTransform' to every result document, both
@@ -146,6 +150,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         PrivilegeVector privileges,
                                         std::function<BSONObj(BSONObj)> documentTransform,
                                         TailableModeEnum tailableMode = TailableModeEnum::kNormal,
-                                        boost::optional<BSONObj> routerSort = boost::none);
+                                        boost::optional<BSONObj> routerSort = boost::none,
+                                        bool allowPartialResults = false);
 
 }  // namespace mongo

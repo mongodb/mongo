@@ -157,6 +157,10 @@ Document serializeForPassthrough(const boost::intrusive_ptr<ExpressionContext>& 
                                  const AggregateCommandRequest& request,
                                  const NamespaceString& executionNs) {
     auto req = request;
+    // 'allowPartialResults' is a router-only option and must never be forwarded to a shard. Strip
+    // it from the passthrough serialization, which is used both for the command echoed back in
+    // explain output and for the command dispatched to a designated merging shard.
+    req.setAllowPartialResults(OptionalBool());
 
     // Reset all generic arguments besides those needed for the aggregation itself.
     // Other generic arguments that need to be set like txnNumber, lsid, etc. will be attached
@@ -361,6 +365,7 @@ void performValidationChecks(const OperationContext* opCtx,
                              const AggregateCommandRequest& request,
                              const LiteParsedPipeline& liteParsedPipeline) {
     liteParsedPipeline.validate(opCtx);
+    liteParsedPipeline.validateAllowPartialResults(request);
     aggregation_request_helper::validateRequestWithClient(opCtx, request);
     aggregation_request_helper::validateRequestFromClusterQueryWithoutShardKey(request);
 

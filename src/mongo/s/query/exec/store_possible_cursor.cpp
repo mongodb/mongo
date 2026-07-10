@@ -69,7 +69,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const NamespaceString& requestedNss,
                                         OwnedRemoteCursor&& remoteCursor,
                                         PrivilegeVector privileges,
-                                        TailableModeEnum tailableMode) {
+                                        TailableModeEnum tailableMode,
+                                        bool allowPartialResults) {
     auto executorPool = Grid::get(opCtx)->getExecutorPool();
     auto result = storePossibleCursor(opCtx,
                                       std::string{remoteCursor->getShardId()},
@@ -79,7 +80,9 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                       executorPool->getArbitraryExecutor(),
                                       Grid::get(opCtx)->getCursorManager(),
                                       std::move(privileges),
-                                      tailableMode);
+                                      tailableMode,
+                                      boost::none,
+                                      allowPartialResults);
 
     // On success, release ownership of the cursor because it has been registered with the cursor
     // manager and is now owned there.
@@ -96,7 +99,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         ClusterCursorManager* cursorManager,
                                         PrivilegeVector privileges,
                                         TailableModeEnum tailableMode,
-                                        boost::optional<BSONObj> routerSort) {
+                                        boost::optional<BSONObj> routerSort,
+                                        bool allowPartialResults) {
     if (!cmdResult["ok"].trueValue() || !cmdResult.hasField("cursor")) {
         return cmdResult;
     }
@@ -120,7 +124,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                cursorManager,
                                privileges,
                                tailableMode,
-                               routerSort);
+                               routerSort,
+                               allowPartialResults);
 }
 
 StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
@@ -132,7 +137,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         ClusterCursorManager* cursorManager,
                                         PrivilegeVector privileges,
                                         TailableModeEnum tailableMode,
-                                        boost::optional<BSONObj> routerSort) {
+                                        boost::optional<BSONObj> routerSort,
+                                        bool allowPartialResults) {
     auto&& opDebug = CurOp::get(opCtx)->debug();
     opDebug.getAdditiveMetrics().nBatches = 1;
     // If nShards has already been set, then we are storing the forwarding $mergeCursors cursor from
@@ -149,6 +155,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                          incomingCursorResponse.releaseBatch(),
                                          incomingCursorResponse.getAtClusterTime(),
                                          incomingCursorResponse.getPostBatchResumeToken());
+        exhaustedResponse.setPartialResultsReturned(
+            incomingCursorResponse.getPartialResultsReturned());
         return exhaustedResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
     }
 
@@ -167,16 +175,19 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                          }
                                          return osi;
                                      }());
+    params.isAllowPartialResults = allowPartialResults;
     params.remotes.emplace_back();
     auto& remoteCursor = params.remotes.back();
     remoteCursor.setShardId(shardId.toString());
     remoteCursor.setHostAndPort(server);
-    remoteCursor.setCursorResponse(
-        CursorResponse(incomingCursorResponse.getNSS(),
-                       incomingCursorResponse.getCursorId(),
-                       {}, /* batch */
-                       incomingCursorResponse.getAtClusterTime(),
-                       incomingCursorResponse.getPostBatchResumeToken()));
+    CursorResponse remoteCursorResponse(incomingCursorResponse.getNSS(),
+                                        incomingCursorResponse.getCursorId(),
+                                        {}, /* batch */
+                                        incomingCursorResponse.getAtClusterTime(),
+                                        incomingCursorResponse.getPostBatchResumeToken());
+    remoteCursorResponse.setPartialResultsReturned(
+        incomingCursorResponse.getPartialResultsReturned());
+    remoteCursor.setCursorResponse(std::move(remoteCursorResponse));
     params.originatingCommandObj = CurOp::get(opCtx)->opDescription().getOwned();
     params.tailableMode = tailableMode;
     params.originatingPrivileges = std::move(privileges);
@@ -213,6 +224,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                           incomingCursorResponse.releaseBatch(),
                                           incomingCursorResponse.getAtClusterTime(),
                                           incomingCursorResponse.getPostBatchResumeToken());
+    outgoingCursorResponse.setPartialResultsReturned(
+        incomingCursorResponse.getPartialResultsReturned());
     return outgoingCursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
 }
 
@@ -226,7 +239,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         PrivilegeVector privileges,
                                         std::function<BSONObj(BSONObj)> documentTransform,
                                         TailableModeEnum tailableMode,
-                                        boost::optional<BSONObj> routerSort) {
+                                        boost::optional<BSONObj> routerSort,
+                                        bool allowPartialResults) {
     if (!cmdResult["ok"].trueValue() || !cmdResult.hasField("cursor")) {
         return cmdResult;
     }
@@ -262,6 +276,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                          std::move(transformedFirstBatch),
                                          response.getAtClusterTime(),
                                          response.getPostBatchResumeToken());
+        exhaustedResponse.setPartialResultsReturned(response.getPartialResultsReturned());
         return exhaustedResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
     }
 
@@ -280,15 +295,18 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                          }
                                          return osi;
                                      }());
+    params.isAllowPartialResults = allowPartialResults;
     params.remotes.emplace_back();
     auto& remoteCursor = params.remotes.back();
     remoteCursor.setShardId(shardId.toString());
     remoteCursor.setHostAndPort(server);
-    remoteCursor.setCursorResponse(CursorResponse(response.getNSS(),
-                                                  response.getCursorId(),
-                                                  {} /* first batch served above */,
-                                                  response.getAtClusterTime(),
-                                                  response.getPostBatchResumeToken()));
+    CursorResponse remoteCursorResponse(response.getNSS(),
+                                        response.getCursorId(),
+                                        {} /* first batch served above */,
+                                        response.getAtClusterTime(),
+                                        response.getPostBatchResumeToken());
+    remoteCursorResponse.setPartialResultsReturned(response.getPartialResultsReturned());
+    remoteCursor.setCursorResponse(std::move(remoteCursorResponse));
     params.originatingCommandObj = CurOp::get(opCtx)->opDescription().getOwned();
     params.tailableMode = tailableMode;
     params.originatingPrivileges = std::move(privileges);
@@ -335,6 +353,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                           std::move(transformedFirstBatch),
                                           response.getAtClusterTime(),
                                           response.getPostBatchResumeToken());
+    outgoingCursorResponse.setPartialResultsReturned(response.getPartialResultsReturned());
     return outgoingCursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
 }
 

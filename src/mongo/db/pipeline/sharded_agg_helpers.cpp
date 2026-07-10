@@ -208,6 +208,10 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
                                   const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                   boost::optional<ExplainOptions::Verbosity> explainVerbosity,
                                   boost::optional<BSONObj> readConcern) {
+    // 'allowPartialResults' is a router-only option: it only governs how the router tolerates
+    // unreachable shards while establishing and merging cursors. A shard must never see it.
+    cmdForShards[AggregateCommandRequest::kAllowPartialResultsFieldName] = Value();
+
     cmdForShards[AggregateCommandRequest::kLetFieldName] =
         Value(expCtx->variablesParseState.serialize(expCtx->variables));
 
@@ -282,7 +286,8 @@ std::vector<RemoteCursor> establishShardCursors(
     const ReadPreferenceSetting& readPref,
     const std::vector<AsyncRequestsSender::Request>& requests,
     AsyncRequestsSender::ShardHostMap designatedHostsMap,
-    bool targetAllHosts) {
+    bool targetAllHosts,
+    bool allowPartialResults) {
     tassert(8221800, "expected at least one shard request, found: 0", !requests.empty());
     const BSONObj& cmdObj = requests.begin()->cmdObj;
     LOGV2_DEBUG(20904,
@@ -320,7 +325,7 @@ std::vector<RemoteCursor> establishShardCursors(
                                           nss,
                                           shardIds,
                                           cmdObj,
-                                          false,
+                                          allowPartialResults,
                                           getDesiredRetryPolicy(opCtx));
     } else {
         return establishCursors(opCtx,
@@ -328,7 +333,7 @@ std::vector<RemoteCursor> establishShardCursors(
                                 nss,
                                 readPref,
                                 requests,
-                                false /* do not allow partial results */,
+                                allowPartialResults,
                                 &routingCtx,
                                 getDesiredRetryPolicy(opCtx),
                                 {} /* providedOpKeys */,
@@ -1251,15 +1256,34 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
                                        &routingCtx);
     } else {
         try {
-            cursors = establishShardCursors(
-                opCtx,
-                routingCtx,
-                expCtx->getMongoProcessInterface()->getTaskExecutor(/* withNullCheck */ false),
-                targetedNss,
-                readPref,
-                requests,
-                std::move(designatedHostsMap),
-                targetAllHosts);
+            auto establishShardCursorsWithDeadline = [&] {
+                cursors = establishShardCursors(
+                    opCtx,
+                    routingCtx,
+                    expCtx->getMongoProcessInterface()->getTaskExecutor(/* withNullCheck */ false),
+                    targetedNss,
+                    readPref,
+                    requests,
+                    std::move(designatedHostsMap),
+                    targetAllHosts,
+                    expCtx->getAllowPartialResults());
+            };
+            if (expCtx->getAllowPartialResults() && opCtx->hasDeadline() &&
+                opCtx->getTimeoutError() == ErrorCodes::MaxTimeMSExpired) {
+                auto deadline = opCtx->getDeadline();
+                const auto reservedTime = std::min(
+                    durationCount<Microseconds>(opCtx->getRemainingMaxTimeMicros()) / 4, 100'000LL);
+                deadline -= Microseconds{reservedTime};
+                LOGV2_DEBUG(12291701,
+                            0,
+                            "Setting an earlier artificial deadline because the aggregation allows "
+                            "partial results",
+                            "deadline"_attr = deadline);
+                opCtx->runWithDeadline(
+                    deadline, ErrorCodes::MaxTimeMSExpired, establishShardCursorsWithDeadline);
+            } else {
+                establishShardCursorsWithDeadline();
+            }
         } catch (const ExceptionFor<ErrorCodes::StaleConfig>& e) {
             // Check to see if the command failed because of a stale shard version or something
             // else.
@@ -1372,6 +1396,7 @@ AsyncResultsMergerParams buildArmParams(boost::intrusive_ptr<ExpressionContext> 
     armParams.setSort(std::move(shardCursorsSortSpec));
     armParams.setTailableMode(expCtx->getTailableMode());
     armParams.setNss(expCtx->getNamespaceString());
+    armParams.setAllowPartialResults(expCtx->getAllowPartialResults());
     setRequestRemoteMetrics(remoteMetricsToInclude, armParams, expCtx->getOperationContext());
 
     if (auto lsid = expCtx->getOperationContext()->getLogicalSessionId()) {
@@ -1733,6 +1758,8 @@ std::unique_ptr<Pipeline> dispatchTargetedPipelineAndAddMergeCursors(
     IncludeMetrics remoteMetricsToInclude) {
     // The default value for 'allowDiskUse' and 'maxTimeMS' in the AggregateCommandRequest may not
     // match what was set on the originating command, so copy it from the ExpressionContext.
+    // Note: 'allowPartialResults' is intentionally not copied here; it is a router-only option that
+    // is stripped from all shard commands in genericTransformForShards().
     aggRequest.setAllowDiskUse(expCtx->getAllowDiskUse());
     if (auto maxTimeMS = expCtx->getOperationContext()->getRemainingMaxTimeMillis();
         maxTimeMS < Microseconds::max()) {

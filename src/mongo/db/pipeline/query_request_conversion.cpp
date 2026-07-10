@@ -64,10 +64,6 @@ AggregateCommandRequest asAggregateCommandRequest(const FindCommandRequest& find
                           << " not supported in aggregation.",
             !findCommand.getNoCursorTimeout());
     uassert(ErrorCodes::InvalidPipelineOperator,
-            str::stream() << "Option " << FindCommandRequest::kAllowPartialResultsFieldName
-                          << " not supported in aggregation.",
-            !findCommand.getAllowPartialResults());
-    uassert(ErrorCodes::InvalidPipelineOperator,
             str::stream() << "Sort option " << query_request_helper::kNaturalSortField
                           << " not supported in aggregation.",
             !findCommand.getSort()[query_request_helper::kNaturalSortField]);
@@ -152,6 +148,7 @@ AggregateCommandRequest asAggregateCommandRequest(const FindCommandRequest& find
     if (findCommand.getAllowDiskUse().has_value()) {
         result.setAllowDiskUse(findCommand.getAllowDiskUse());
     }
+    result.setAllowPartialResults(findCommand.getAllowPartialResults());
     result.setLegacyRuntimeConstants(findCommand.getLegacyRuntimeConstants());
     if (findCommand.getLet()) {
         result.setLet(findCommand.getLet()->getOwned());

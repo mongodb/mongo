@@ -191,6 +191,42 @@ TEST_F(ClusterAggregateTest, ShouldFailWhenExchengeIsPresent) {
     ASSERT_EQ(51028, res.code());
 }
 
+TEST_F(ClusterAggregateTest, ShouldFailWhenAllowPartialResultsIsUsedWithWriteStage) {
+    const BSONObj inputBson = fromjson(
+        "{aggregate: 'coll', pipeline: [{$out: 'out'}], cursor: {}, allowPartialResults: true, "
+        "$db: 'test'}");
+    const Status& res = testRunAggregateEarlyExit(inputBson);
+    ASSERT_EQ(ErrorCodes::InvalidOptions, res.code());
+}
+
+TEST_F(ClusterAggregateTest, ShouldFailWhenAllowPartialResultsIsUsedWithChangeStream) {
+    const BSONObj inputBson = fromjson(
+        "{aggregate: 'coll', pipeline: [{$changeStream: {}}], cursor: {}, allowPartialResults: "
+        "true, $db: 'test'}");
+    const Status& res = testRunAggregateEarlyExit(inputBson);
+    ASSERT_EQ(ErrorCodes::InvalidOptions, res.code());
+}
+
+TEST_F(ClusterAggregateTest, ShouldFailWhenAllowPartialResultsIsUsedWithSearch) {
+    const BSONObj inputBson = fromjson(
+        "{aggregate: 'coll', pipeline: [{$search: {text: {query: 'abc', path: 'a'}}}], cursor: {}, "
+        "allowPartialResults: true, $db: 'test'}");
+    const Status& res = testRunAggregateEarlyExit(inputBson);
+    ASSERT_EQ(ErrorCodes::InvalidOptions, res.code());
+}
+
+TEST_F(ClusterAggregateTest, AllowPartialResultsIsNotForwardedToShardAggregateCommand) {
+    const BSONObj inputBson = fromjson(
+        "{aggregate: 'coll', pipeline: [{$match: {_id: 0}}], explain: false, allowPartialResults: "
+        "true, cursor: {batchSize: 10}}");
+    runCommandInspectRequests(
+        inputBson,
+        [](const executor::RemoteCommandRequest& request) {
+            ASSERT_FALSE(request.cmdObj.hasField("allowPartialResults"));
+        },
+        true /* isTargeted */);
+}
+
 }  // namespace
 
 /**

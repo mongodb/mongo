@@ -64,6 +64,7 @@ AggCmdComponents::AggCmdComponents(const AggregateCommandRequest& request_,
       _hasField{.batchSize = request_.getCursor().getBatchSize().has_value(),
                 .bypassDocumentValidation = request_.getBypassDocumentValidation().has_value(),
                 .explain = request_.getExplain().has_value(),
+                // TODO SERVER-130981: Include aggregate allowPartialResults in query stats
                 .passthroughToShard = request_.getPassthroughToShard().has_value()} {}
 
 

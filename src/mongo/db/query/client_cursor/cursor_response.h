@@ -328,6 +328,10 @@ public:
         return _partialResultsReturned;
     }
 
+    void setPartialResultsReturned(bool partialResultsReturned) {
+        _partialResultsReturned = partialResultsReturned;
+    }
+
     bool getInvalidated() const {
         return _invalidated;
     }

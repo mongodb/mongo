@@ -137,6 +137,11 @@ ExpressionContextBuilder& ExpressionContextBuilder::allowDiskUse(bool allowDiskU
     return *this;
 }
 
+ExpressionContextBuilder& ExpressionContextBuilder::allowPartialResults(bool allowPartialResults) {
+    params.allowPartialResults = allowPartialResults;
+    return *this;
+}
+
 ExpressionContextBuilder& ExpressionContextBuilder::bypassDocumentValidation(
     bool bypassDocumentValidation) {
     params.bypassDocumentValidation = bypassDocumentValidation;
@@ -499,6 +504,7 @@ ExpressionContextBuilder& ExpressionContextBuilder::fromRequest(
     }
     mergeType(type);
     allowDiskUse(request.getAllowDiskUse().value_or(useDisk));
+    allowPartialResults(request.getAllowPartialResults().value_or(false));
     bypassDocumentValidation(request.getBypassDocumentValidation().value_or(false));
     isMapReduceCommand(request.getIsMapReduceCommand());
     forPerShardCursor(request.getPassthroughToShard().has_value());
@@ -613,6 +619,7 @@ boost::intrusive_ptr<ExpressionContext> makeCopyFromExpressionContext(
         .mergeType(other->mergeType())
         .forPerShardCursor(other->getForPerShardCursor())
         .allowDiskUse(other->getAllowDiskUse())
+        .allowPartialResults(other->getAllowPartialResults())
         .bypassDocumentValidation(other->getBypassDocumentValidation())
         .collUUID(uuid)
         .explain(other->getExplain())
@@ -680,6 +687,7 @@ boost::intrusive_ptr<ExpressionContext> makeCopyForSubPipelineFromExpressionCont
     auto newCopy = makeCopyFromExpressionContext(
         other, std::move(nss), uuid, boost::none, boost::none, userNs);
     newCopy->setSubPipelineDepth(newCopy->getSubPipelineDepth() + 1);
+    newCopy->setAllowPartialResults(false);
     // The original expCtx might have been attached to an aggregation pipeline running on the
     // shards. We must reset 'needsMerge' in order to get fully merged results for the
     // subpipeline.

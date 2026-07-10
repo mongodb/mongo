@@ -233,6 +233,13 @@ commands:
                 description: "Enables writing to temporary files."
                 type: optionalBool
                 stability: stable
+            allowPartialResults:
+                description:
+                    "For aggregations against a sharded collection, allows the command (or subsequent
+                    getMore commands) to return partial results, rather than an error, if one or more
+                    queried shards for the top-level aggregation are unavailable."
+                type: optionalBool
+                stability: stable
             cursor:
                 description: "To indicate a cursor with a non-default batch size."
                 type: aggregateCursor

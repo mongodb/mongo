@@ -87,7 +87,7 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
     // Using oplog namespace so that validation of $_requestReshardingResumeToken succeeds.
     BSONObj inputBson = fromjson(
         "{aggregate: 'oplog.rs', pipeline: [{$match: {a: 'abc'}}], explain: false, allowDiskUse: "
-        "true, fromRouter: true, "
+        "true, allowPartialResults: true, fromRouter: true, "
         "needsMerge: true, bypassDocumentValidation: true, $_requestReshardingResumeToken: true, "
         "collation: {locale: 'en_US'}, cursor: {batchSize: 10}, hint: {a: 1}, maxTimeMS: 100, "
         "readConcern: {level: 'linearizable'}, $queryOptions: {$readPreference: 'nearest'}, "
@@ -102,6 +102,7 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
         unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(inputBson));
     ASSERT_FALSE(request.getExplain());
     ASSERT_TRUE(request.getAllowDiskUse());
+    ASSERT_TRUE(request.getAllowPartialResults().value_or(false));
     ASSERT_TRUE(aggregation_request_helper::getFromRouter(request));
     ASSERT_TRUE(request.getNeedsMerge());
     ASSERT_TRUE(request.getBypassDocumentValidation().value_or(false));
@@ -556,6 +557,19 @@ TEST(AggregationRequestTest, ShouldRejectNonBoolAllowDiskUse) {
     const BSONObj nonBoolAllowDiskUse = fromjson("{allowDiskUse: 1}");
     aggregationRequestParseFailureHelper(
         validRequest, nonBoolAllowDiskUse, ErrorCodes::TypeMismatch);
+}
+
+TEST(AggregationRequestTest, ShouldRejectNonBoolAllowPartialResults) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.collection");
+    const BSONObj validRequest = fromjson(
+        "{aggregate: 'collection',"
+        "pipeline: [{$match: {a: 'abc'}}],"
+        "cursor: {},"
+        "allowPartialResults: true, "
+        "$db: 'a'}");
+    const BSONObj nonBoolAllowPartialResults = fromjson("{allowPartialResults: 1}");
+    aggregationRequestParseFailureHelper(
+        validRequest, nonBoolAllowPartialResults, ErrorCodes::TypeMismatch);
 }
 
 TEST(AggregationRequestTest, ShouldRejectNonBoolIsMapReduceCommand) {
