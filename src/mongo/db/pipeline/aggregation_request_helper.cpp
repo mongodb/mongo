@@ -215,6 +215,13 @@ void validateRequestWithClient(const OperationContext* opCtx,
                 "BSON field 'ifrFlags' is an unknown field",
                 isInternalThreadOrClient || client->isInDirectClient());
     }
+
+    // Forbid users from passing '$_translatedForViewlessTimeseries' explicitly.
+    if (request.getTranslatedForViewlessTimeseries()) {
+        uassert(13088600,
+                "BSON field '$_translatedForViewlessTimeseries' is an unknown field",
+                isInternalThreadOrClient || client->isInDirectClient());
+    }
 }
 
 void validateRequestFromClusterQueryWithoutShardKey(const AggregateCommandRequest& request) {
