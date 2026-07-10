@@ -43,6 +43,7 @@ import re
 import sys
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from typing import Optional, Union
 
 import yaml
@@ -55,19 +56,18 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-# Load rules from "compatibility_rules.yml" file in this directory.
+# The rules live under buildscripts/private/idl
+RULES_FILE = Path(__file__).resolve().parent.parent / "private" / "idl" / "compatibility_rules.yml"
+
+
 def load_rules_file() -> dict:
-    abs_filename = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)), "compatibility_rules.yml"
-    )
-    if not os.path.exists(abs_filename):
-        raise ValueError(f"Rules file {abs_filename} not found")
+    if not RULES_FILE.exists():
+        raise ValueError(f"Rules file {RULES_FILE} not found")
 
-    with open(abs_filename, encoding="utf8") as file:
-        return yaml.safe_load(file)
+    return yaml.safe_load(RULES_FILE.read_text(encoding="utf8"))
 
 
-# Load compatibility rules from "compatibility_rules.yml" file in this directory.
+# Load compatibility rules from the private "compatibility_rules.yml" file.
 rules = load_rules_file()
 
 # Load the subsections from the global "rules.yml" file into separate global variables.
