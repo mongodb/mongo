@@ -197,6 +197,37 @@ TEST(HandoffTransportLayerTest, AfterStartConnectionsCreateSessions) {
 }
 
 /**
+ * Verifies that the unix domain socket address (file path) of the listening socket is not
+ * interpreted as a host name by `HostAndPort` when a session is created.
+ * If a unix domain socket address like "/tmp/[weird:path]ae34fe" were passed to
+ * `HostAndPort::initialize`, an exception could be thrown due to the path containing characters
+ * ('[', ']', or ':') that look like IPv6 bookends or a host/port separator.
+ * This test uses a unix domain socket path prefix that contains such characters, and verifies that
+ * sessions can be created without an exception being thrown.
+ */
+TEST(HandoffTransportLayerTest, PrefixPathNotInterpretedAsAHostName) {
+    TemporaryDirectory dir("/tmp/[weird:path]XXXXXX");
+    auto sessionManagerOwned = std::make_unique<TestSessionManager>();
+    auto& sessionManager = *sessionManagerOwned;
+    HandoffTransportLayer transportLayer({
+        .socketPrefix = dir.path(),
+        .port = kTestPort,
+        .listenBacklog = ProcessInfo::getDefaultListenBacklog(),
+        .sessionManager = std::move(sessionManagerOwned),
+    });
+    ASSERT_OK(transportLayer.setup());
+    ASSERT_OK(transportLayer.start());
+
+    for (const auto& path : SocketPaths(dir.path()).paths()) {
+        const auto session = connectAndGetSession(path, sessionManager);
+        ASSERT_NE(session, nullptr);
+        session->end();
+    }
+
+    transportLayer.shutdown();
+}
+
+/**
  * Verifies that each of the listening sockets produces sessions having the expected properties
  * with respect to priority status. and load balancer support.
  */

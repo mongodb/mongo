@@ -67,13 +67,12 @@ public:
         return _path;
     }
 
-    TemporaryDirectory() {
-        char buffer[] = "/tmp/HandoffTest-XXXXXX";
-        const char* const path = ::mkdtemp(buffer);
-        if (path == nullptr) {
+    explicit TemporaryDirectory(std::string pathPattern = "/tmp/HandoffTest-XXXXXX") {
+        if (::mkdtemp(pathPattern.data()) == nullptr) {
             throw std::system_error(errno, std::system_category());
         }
-        _path = path;
+        // `mkdtemp` modified `pathPattern` in place.
+        _path = std::move(pathPattern);
     }
 
     ~TemporaryDirectory() {
