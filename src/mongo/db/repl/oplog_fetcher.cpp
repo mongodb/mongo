@@ -34,6 +34,7 @@
 #include "mongo/db/repl/repl_network_traffic_stats.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_auth.h"
+#include "mongo/db/repl/replication_network_compression.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/db/service_context.h"
@@ -483,6 +484,19 @@ Status OplogFetcher::_connect() {
         if (_isShuttingDown()) {
             return Status(ErrorCodes::CallbackCanceled, "oplog fetcher shutting down");
         }
+        // SERVER-130410: apply the node-local replicationNetworkCompression setting to this
+        // fetcher's sync-source connection before the handshake runs. This is a purely
+        // client-side decision: we simply narrow (or suppress) the "compression" array in the
+        // hello sent by DBClientConnection, so the connection is negotiated using the operator's
+        // chosen subset (or uncompressed). Because the same DBClientConnection instance (and
+        // therefore the same MessageCompressorManager instance) is reused across auto-reconnects,
+        // we re-apply the setting on every loop iteration to keep the manager state consistent;
+        // the setting itself is startup-only, so this is idempotent on a running mongod. This
+        // does not disable client-facing compression on this node, and it does not require any
+        // server-side change. The initial-sync collection cloner applies the very same helper on
+        // its own connection (AllDatabaseCloner::connectStage) so both replication client
+        // connections share one policy.
+        applyReplicationNetworkCompressionToManager(_conn->getCompressorManager());
         connectStatus = [&] {
             try {
                 if (!connectStatus.isOK()) {

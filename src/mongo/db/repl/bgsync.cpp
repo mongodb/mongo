@@ -25,6 +25,7 @@
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
+#include "mongo/db/repl/replication_network_compression.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_source_selector.h"
@@ -722,6 +723,15 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
     auto getConnection = [&connection, source]() -> DBClientBase* {
         if (!connection) {
             connection = std::make_unique<DBClientConnection>();
+            // SERVER-130410: the rollback common-point search reads the sync source's remote oplog
+            // over this connection (via OplogInterfaceRemote), so it is a replication data-plane
+            // connection just like the oplog fetcher and the initial-sync cloner. Apply the same
+            // node-local replicationNetworkCompression policy before the "hello" handshake runs so
+            // rollback traffic negotiates compression identically to those connections (and, in
+            // particular, honors replication.networkCompression.compressors even when
+            // net.compression.compressors is "disabled"). Must be set before connect() below, which
+            // is where DBClientConnection sends "hello".
+            applyReplicationNetworkCompressionToManager(connection->getCompressorManager());
             connection->setSoTimeout(durationCount<Milliseconds>(kRollbackOplogSocketTimeout) /
                                      1000.0);
             connection->connect(source, "Rollback"sv, boost::none);

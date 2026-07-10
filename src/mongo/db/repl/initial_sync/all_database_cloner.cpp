@@ -22,6 +22,7 @@
 #include "mongo/db/repl/replication_consistency_markers_gen.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_network_compression.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
@@ -106,6 +107,15 @@ Status AllDatabaseCloner::ensurePrimaryOrSecondary(
 
 BaseCloner::AfterStageBehavior AllDatabaseCloner::connectStage() {
     auto* client = getClient();
+    // SERVER-130410: apply the node-local replicationNetworkCompression setting to the cloner's
+    // sync-source connection before the handshake runs, using the exact same helper (and thus the
+    // exact same policy) as the oplog fetcher. This is what extends replication-only compressor
+    // negotiation to the bulk collection-data transfer of initial sync, not just the oplog stream.
+    // It must run before connect()/ensureConnection() below (which is where DBClientConnection
+    // sends "hello"). The setting is startup-only, so re-applying it on every connectStage()
+    // invocation is idempotent; doing so mirrors the fetcher and keeps the manager state
+    // consistent across in-attempt reconnects.
+    applyReplicationNetworkCompressionToManager(client->getCompressorManager());
     // If the client already has the address (from a previous attempt), we must allow it to
     // handle the reconnect itself. This is necessary to get correct backoff behavior.
     if (client->getServerHostAndPort() != getSource()) {

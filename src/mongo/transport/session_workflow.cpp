@@ -582,11 +582,24 @@ public:
     void decompressRequest() {
         if (_in.operation() != dbCompressed)
             return;
+        auto& mgr = compressorMgr();
+        if (!mgr.hasCompressorPermitListForThisSession()) {
+            // SERVER-130410: reject OP_COMPRESSED before the server has processed a hello and
+            // established this connection's compressor permit list. Historically decompression was
+            // negotiation-agnostic because the registry was the single net.compression.compressors
+            // set. With the registry now being net union replication, allowing pre-negotiation
+            // compressed frames would let an external connection use a replication-only compressor
+            // before it has been routed through serverNegotiate(). Apply this before-negotiation
+            // guard in auth-disabled and mongoBridge modes as well; compression negotiation, not
+            // authentication state, is the boundary for accepting OP_COMPRESSED.
+            uasserted(ErrorCodes::BadValue,
+                      "Compressed messages are not accepted before compression negotiation");
+        }
         MessageCompressorId cid;
         _in = isPreAuth(_swf->client())
-            ? uassertStatusOK(compressorMgr().decompressMessage(
-                  _in, &cid, gPreAuthMaximumMessageSizeBytes.loadRelaxed()))
-            : uassertStatusOK(compressorMgr().decompressMessage(_in, &cid));
+            ? uassertStatusOK(
+                  mgr.decompressMessage(_in, &cid, gPreAuthMaximumMessageSizeBytes.loadRelaxed()))
+            : uassertStatusOK(mgr.decompressMessage(_in, &cid));
         _compressorId = cid;
         MessageHooks::onMessageReceived(*_swf->session(), _in);
     }

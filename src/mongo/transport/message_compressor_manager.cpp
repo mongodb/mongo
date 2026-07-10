@@ -11,6 +11,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_compressed.h"
 #include "mongo/transport/message_compressor_registry.h"
@@ -19,10 +20,12 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/shared_buffer.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -49,6 +52,17 @@ StatusWith<Message> MessageCompressorManager::compressMessage(
     if (compressorId) {
         compressor = _registry->getCompressor(*compressorId);
         invariant(compressor);
+        // an explicit id is normally the echo-back id captured by
+        // decompressMessage(). Since the registry is now the net/repl union, a registered compressor
+        // may still be outside this connection's policy. Do not emit unpermitted compressors; legacy
+        // callers with no permit list keep the old behavior.
+        if (!_isCompressorPermittedForThisSession(*compressorId)) {
+            LOGV2_DEBUG(10130418,
+                        3,
+                        "Compressor not permitted for this connection; sending uncompressed",
+                        "compressorId"_attr = static_cast<int>(*compressorId));
+            return {msg};
+        }
     } else if (!_negotiated.empty()) {
         compressor = _negotiated[0];
     } else {
@@ -112,6 +126,15 @@ StatusWith<Message> MessageCompressorManager::decompressMessage(const Message& m
                 "Compression algorithm specified in message is not available"};
     }
 
+    // registry membership now means process capability, not per-connection policy.
+    // Once a permit list is engaged, reject compressed frames whose compressor was not permitted for
+    // this connection - otherwise an external connection could decompress a replication-only frame and
+    // net.compression.compressors: disabled would not truly disable it. Legacy callers without a permit
+    // list keep the old registry-wide behavior.
+    if (!_isCompressorPermittedForThisSession(compressionHeader.compressorId)) {
+        return {ErrorCodes::BadValue, "Compressor was not negotiated for this connection"};
+    }
+
     if (compressorId) {
         *compressorId = compressor->getId();
     }
@@ -165,15 +188,89 @@ void MessageCompressorManager::clientBegin(BSONObjBuilder* output) {
 
     // We're about to update the compressor list with the negotiation result from the server.
     _negotiated.clear();
+    _advertisedCompressors.clear();
+    // Until clientFinish() accepts the server's hello response, this client connection has not
+    // negotiated any inbound compressed response. Engage an empty permit list now so a malformed
+    // peer cannot send OP_COMPRESSED during the handshake and have it decoded via the process-wide
+    // union registry.
+    _permittedCompressorIds.emplace();
+    _permittedCompressorIds->fill(false);
 
-    auto& compressorList = _registry->getCompressorNames();
-    if (compressorList.size() == 0)
+    // tag replication data-plane connections (oplog fetcher, initial-sync cloner,
+    // rollback remote oplog reader) so the server applies the replication compression policy to this
+    // connection only. Emit the marker even when compression is suppressed or inherited, so other
+    // internal connections (heartbeats, shard RPC) continue to negotiate against net.compression.
+    if (_isReplicationClient) {
+        output->append(kReplicationCompressionClientFieldName, true);
+    }
+
+    // per-session opt-out used for replicationNetworkCompression: "disabled".
+    // Omit the "compression" array from hello so this connection negotiates uncompressed, without
+    // changing the process-wide net.compression.compressors policy or any other connection.
+    if (!_offerCompressionOnClientBegin) {
+        LOGV2_DEBUG(
+            10130410,
+            3,
+            "Compression advertisement suppressed for this connection; negotiating uncompressed");
+        return;
+    }
+
+    // replication data-plane clients may provide a per-session compressor allow-list.
+    // Advertise its intersection with the process-wide net/repl capability union. After normal
+    // startup finalization this is expected to be a no-op filter, but it keeps tests/direct callers
+    // from advertising compressors the process did not register. Preserve caller order as negotiation
+    // preference; an empty intersection means this connection negotiates uncompressed.
+    if (!_allowListedCompressors.empty()) {
+        const auto& compressorList = _registry->getCompressorNames();
+        std::vector<std::string_view> filtered;
+        filtered.reserve(_allowListedCompressors.size());
+        for (const auto& name : _allowListedCompressors) {
+            const auto it = std::find(compressorList.begin(), compressorList.end(), name);
+            if (it == compressorList.end()) {
+                LOGV2_DEBUG(10130411,
+                            3,
+                            "Ignoring per-session compressor not registered process-wide",
+                            "compressor"_attr = name);
+                continue;
+            }
+            filtered.push_back(*it);
+        }
+        if (filtered.empty()) {
+            static logv2::SeveritySuppressor logSeverity{
+                Seconds{60}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(3)};
+            LOGV2_DEBUG(10130412,
+                        logSeverity().toInt(),
+                        "Requested per-session compressors are not registered process-wide; this "
+                        "connection will be uncompressed",
+                        "requestedCompressors"_attr = _allowListedCompressors);
+            return;
+        }
+        BSONArrayBuilder sub(output->subarrayStart("compression"));
+        for (const auto& e : filtered) {
+            LOGV2_DEBUG(10130413,
+                        3,
+                        "Offering compressor to server (per-session allow-list)",
+                        "compressor"_attr = e);
+            sub.append(e);
+            _advertisedCompressors.emplace_back(e);
+        }
+        sub.doneFast();
+        return;
+    }
+
+    // Default path: advertise only the client-facing net set (net.compression.compressors). A
+    // connection without a per-session allow-list is treated as external, so it must not offer
+    // replication-only compressors. When net.compression.compressors: disabled this set is empty
+    // and nothing is advertised.
+    const auto& netCompressorList = _registry->getNetCompressorNames();
+    if (netCompressorList.empty())
         return;
 
     BSONArrayBuilder sub(output->subarrayStart("compression"));
-    for (const auto& e : _registry->getCompressorNames()) {
+    for (const auto& e : netCompressorList) {
         LOGV2_DEBUG(22929, 3, "Offering compressor to server", "compressor"_attr = e);
         sub.append(e);
+        _advertisedCompressors.push_back(e);
     }
     sub.doneFast();
 }
@@ -185,29 +282,84 @@ void MessageCompressorManager::clientFinish(const BSONObj& input) {
     // We've just called clientBegin, so the list of compressors should be empty.
     invariant(_negotiated.empty());
 
+    // Start from an empty inbound permit list. Only compressors accepted from the server's hello
+    // response below become legal for subsequent OP_COMPRESSED responses on this client connection.
+    _permittedCompressorIds.emplace();
+    auto& permitted = *_permittedCompressorIds;
+    permitted.fill(false);
+
+    auto logReplicationNegotiationResult = [&] {
+        if (!_isReplicationClient) {
+            return;
+        }
+        std::vector<std::string> negotiatedNames;
+        negotiatedNames.reserve(_negotiated.size());
+        for (const auto* compressor : _negotiated) {
+            negotiatedNames.emplace_back(compressor->getName());
+        }
+        LOGV2(10130422,
+              "Replication network compression negotiation completed",
+              "compressed"_attr = !_negotiated.empty(),
+              "negotiatedCompressors"_attr = negotiatedNames);
+    };
+
     // If the server didn't send back a "compression" array, then we assume compression is not
     // supported by this server and just return. We've already disabled compression by clearing
-    // out the _negotiated array above.
+    // out the _negotiated array above, and the empty permit list rejects any compressed response.
     if (elem.eoo()) {
         LOGV2_DEBUG(22931,
                     3,
                     "No compression algorithms were sent from the server. This connection will be "
                     "uncompressed");
+        logReplicationNegotiationResult();
         return;
     }
 
     LOGV2_DEBUG(22932, 3, "Received message compressors from server");
     for (const auto& e : elem.Obj()) {
-        auto algoName = e.checkAndGetStringData();
+        std::string algoName{e.checkAndGetStringData()};
+
+        // SERVER-130410: only accept a compressor this client actually advertised on the matching
+        // clientBegin(). A well-behaved server echoes back a subset of what we offered, but a
+        // malformed or malicious peer could name a compressor we never offered - including one we
+        // deliberately withheld via disableCompressionForThisSession() or a per-session allow-list
+        // (e.g. replicationNetworkCompression). Accepting it would let the peer override this
+        // connection's local compression policy. Names outside our advertised set are ignored.
+        const bool advertised = std::find(_advertisedCompressors.begin(),
+                                          _advertisedCompressors.end(),
+                                          algoName) != _advertisedCompressors.end();
+        if (!advertised) {
+            LOGV2_DEBUG(10130421,
+                        3,
+                        "Ignoring compressor not advertised by this client in server hello response",
+                        "compressor"_attr = algoName);
+            continue;
+        }
+
         auto ret = _registry->getCompressor(algoName);
+        // Defend against a malformed or malicious server response. getCompressor() returns nullptr
+        // for an unknown/unregistered name, and dereferencing it (ret->getName()) would crash the
+        // client. Skip unknown names so the connection simply negotiates the remaining understood
+        // compressors, or ends up uncompressed if none are understood. (An advertised name is
+        // normally registered, so this is a belt-and-suspenders guard.)
+        if (!ret) {
+            LOGV2_DEBUG(10130419,
+                        3,
+                        "Ignoring unknown compressor in server hello response",
+                        "compressor"_attr = algoName);
+            continue;
+        }
         LOGV2_DEBUG(22933, 3, "Adding compressor", "compressor"_attr = ret->getName());
         _negotiated.push_back(ret);
+        permitted[ret->getId()] = true;
     }
+    logReplicationNegotiationResult();
 }
 
 void MessageCompressorManager::serverNegotiate(
     const boost::optional<std::vector<std::string_view>>& clientCompressors,
-    BSONObjBuilder* result) {
+    BSONObjBuilder* result,
+    const boost::optional<std::vector<std::string>>& serverCompressorAllowList) {
     LOGV2_DEBUG(22934, 3, "Starting server-side compression negotiation");
 
     // No advertised compressions, just asking for the last negotiated result.
@@ -218,6 +370,15 @@ void MessageCompressorManager::serverNegotiate(
         std::vector<std::string> ret;
         if (_negotiated.empty()) {
             LOGV2_DEBUG(22935, 3, "Compression negotiation not requested by client");
+            // SERVER-130410: the client did not request compression and nothing has been negotiated
+            // on this connection. Engage an empty whitelist so any compressed frame that arrives
+            // anyway is rejected. Without this, _permittedCompressorIds stays disengaged and
+            // decompressMessage()/echo-back compressMessage() would fall back to the process-wide
+            // registry (net union replication) - letting an external client that never negotiated
+            // compression use a replication-only algorithm and bypass net.compression.compressors:
+            // disabled.
+            _permittedCompressorIds.emplace();
+            _permittedCompressorIds->fill(false);
         } else {
             BSONArrayBuilder sub(result->subarrayStart("compression"));
             for (const auto& algo : _negotiated) {
@@ -234,25 +395,98 @@ void MessageCompressorManager::serverNegotiate(
     // First we go through all the compressor names that the client has requested support for
     if (clientCompressors->empty()) {
         LOGV2_DEBUG(22936, 3, "No compressors provided");
+        // SERVER-130410: engage an empty whitelist so this (server) connection rejects any
+        // compressed frame; the client asked for no compression.
+        _permittedCompressorIds.emplace();
+        _permittedCompressorIds->fill(false);
         return;
     }
 
+    // SERVER-130410: determine the candidate set for this connection type. External, client-facing
+    // connections use net.compression.compressors; internal replica-set connections pass their own
+    // candidate list (replication.networkCompression.compressors). A client compressor is accepted
+    // only if it is BOTH in this candidate set AND registered process-wide. Filtering by the net
+    // set here (rather than the net union replication union) is what preserves
+    // net.compression.compressors: disabled for external clients even though the union registry may
+    // contain replication-only algorithms.
+    const std::vector<std::string>& allowed = serverCompressorAllowList
+        ? *serverCompressorAllowList
+        : _registry->getNetCompressorNames();
+
+    // SERVER-130410: engage this connection's compressor-id whitelist from the candidate set
+    // 'allowed' (NOT the net union replication union registry). This re-establishes the pre-change
+    // invariant "registry-visible == this connection's candidate set" so that decompressMessage()
+    // and the echo-back path in compressMessage() cannot use an out-of-domain algorithm (e.g. a
+    // replication-only compressor on an external connection). Populating from 'allowed' (rather than
+    // the negotiated subset) keeps in-domain behavior identical to before the change. When 'allowed'
+    // is empty (net.compression.compressors: disabled), the whitelist stays all-false and the
+    // connection is truly uncompressed.
+    _permittedCompressorIds.emplace();
+    auto& permitted = *_permittedCompressorIds;
+    permitted.fill(false);
+    for (const auto& name : allowed) {
+        if (auto* c = _registry->getCompressor(name)) {
+            permitted[c->getId()] = true;
+        }
+    }
+
+    // SERVER-130410: track whether the client advertised a compressor that this connection is
+    // permitted to use but that this build has NOT registered process-wide. This is a defensive
+    // guard: a compressor named in net.compression.compressors or
+    // replication.networkCompression.compressors that is not compiled into this build now fails
+    // startup outright (finalizeSupportedCompressors), so on a correctly started node this state
+    // should not arise. If it ever does (e.g. a registry inconsistency), the connection silently
+    // ends up uncompressed, so we still surface it below rather than fail the negotiation.
+    bool droppedPermittedButUnregistered = false;
     for (const auto& curName : *clientCompressors) {
-        MessageCompressorBase* cur;
+        // Note: named 'isCandidate' rather than 'permitted' to avoid shadowing the
+        // '_permittedCompressorIds' array reference bound above (would trip -Wshadow / -Werror).
+        const bool isCandidate = std::any_of(
+            allowed.begin(), allowed.end(), [&](const std::string& allowedName) {
+                return std::string_view(allowedName) == curName;
+            });
+        if (!isCandidate) {
+            LOGV2_DEBUG(10130415,
+                        3,
+                        "Rejecting compressor not permitted for this connection type",
+                        "compressor"_attr = curName);
+            continue;
+        }
         // If the MessageCompressorRegistry knows about a compressor with that name, then it is
         // valid and we add it to our list of negotiated compressors.
-        if ((cur = _registry->getCompressor(curName))) {
+        if (auto* cur = _registry->getCompressor(curName)) {
             LOGV2_DEBUG(22937, 3, "supported compressor", "compressor"_attr = cur->getName());
             _negotiated.push_back(cur);
         } else {  // Otherwise the compressor is not supported and we skip over it.
             LOGV2_DEBUG(22938, 3, "compressor is not supported", "compressor"_attr = curName);
+            droppedPermittedButUnregistered = true;
         }
     }
 
     // If the number of compressors that were eventually negotiated is greater than 0, then
     // we should send that back to the client.
     if (_negotiated.empty()) {
-        LOGV2_DEBUG(22939, 3, "Could not agree on compressor to use");
+        // SERVER-130410: When this is a replication connection (a candidate list was supplied) that
+        // permitted at least one advertised algorithm but none of them are registered in this
+        // build, the channel is silently uncompressed despite the operator having configured
+        // replicationNetworkCompression. Surface it at WARNING (rate-limited, since it recurs on
+        // every reconnect) so this is not only visible at DEBUG level 3. With uncompiled algorithms
+        // now rejected at startup, reaching this branch indicates an unexpected registry
+        // inconsistency rather than an ordinary misconfiguration.
+        if (serverCompressorAllowList && droppedPermittedButUnregistered) {
+            static logv2::SeveritySuppressor logSeverity{
+                Seconds{60}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(3)};
+            LOGV2_DEBUG(10130417,
+                        logSeverity().toInt(),
+                        "A replication connection advertised compressor(s) permitted by "
+                        "replicationNetworkCompression, but none are available in this build; the "
+                        "connection will be uncompressed. Only compressors present at startup can "
+                        "be used",
+                        "clientAdvertised"_attr = *clientCompressors,
+                        "permittedCandidates"_attr = allowed);
+        } else {
+            LOGV2_DEBUG(22939, 3, "Could not agree on compressor to use");
+        }
     } else {
         BSONArrayBuilder sub(result->subarrayStart("compression"));
         for (const auto& algo : _negotiated) {

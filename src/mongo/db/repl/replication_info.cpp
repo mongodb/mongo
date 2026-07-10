@@ -32,6 +32,7 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_network_compression.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/split_horizon/split_horizon.h"
 #include "mongo/db/server_options.h"
@@ -430,17 +431,47 @@ public:
             connectionTagsToSet |= Client::kKeepOpen;
         }
 
+        auto client = opCtx->getClient();
+        const auto internalClient = cmd.getInternalClient();
+        const bool isInternalClient = internalClient.has_value();
+
         // Negotiate compressors before logging metadata so we can include the result in the log
         // line.
         auto result = replyBuilder->getBodyBuilder();
         if (opCtx->getClient()->session()) {
+            // SERVER-130410: negotiate compression using a candidate set that depends on the
+            // connection type so that net.compression.compressors (client-facing) and
+            // replication.networkCompression.compressors negotiate independently. The oplog fetcher,
+            // initial-sync cloner, and rollback remote oplog reader tag their pre-auth hello with
+            // "replicationCompressionClient" so the sync-source data-plane connection uses the
+            // replication candidate set; other connections normally omit that marker and fall back
+            // to the net set inside serverNegotiate(),
+            // matching pre-SERVER-130410 behavior.
+            //
+            // This marker is a routing hint, not an authorization boundary: hello is pre-auth and
+            // the internalClient field is also client-supplied. A peer that spoofs both fields can
+            // at most select the compressor policy for its own connection; it still cannot access
+            // replication data without completing the normal internal (__system) authentication.
+            // The compressor-id permit list in MessageCompressorManager remains the wire-level
+            // guard that prevents out-of-domain compressors on a negotiated connection.
+            const bool isReplicationCompressionClient =
+                isInternalClient && cmd.getReplicationCompressionClient().value_or(false);
+            boost::optional<std::vector<std::string>> replCompressorAllowList;
+            if (isReplicationCompressionClient) {
+                auto setting = repl::getReplicationNetworkCompressionSetting();
+                if (setting.disabled) {
+                    // Force uncompressed for the replication connection regardless of
+                    // net.compression.
+                    replCompressorAllowList.emplace();
+                } else if (!setting.inheritProcessDefault) {
+                    replCompressorAllowList.emplace(std::move(setting.allowList));
+                }
+                // inheritProcessDefault: leave disengaged so serverNegotiate() uses the net set
+                // (the replication connection inherits net.compression.compressors).
+            }
             MessageCompressorManager::forSession(opCtx->getClient()->session())
-                .serverNegotiate(cmd.getCompression(), &result);
+                .serverNegotiate(cmd.getCompression(), &result, replCompressorAllowList);
         }
-
-        auto client = opCtx->getClient();
-        const auto internalClient = cmd.getInternalClient();
-        const bool isInternalClient = internalClient.has_value();
 
         bool isInitialHandshake = false;
         if (ClientMetadata::tryFinalize(client)) {

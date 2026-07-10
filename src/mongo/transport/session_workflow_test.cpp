@@ -88,6 +88,7 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -288,6 +289,14 @@ public:
         _session->getTransportLayerCb = [this] {
             return _transportLayer;
         };
+    }
+
+    void permitSnappyCompressionForCurrentSession() {
+        BSONObjBuilder out;
+        std::vector<std::string_view> clientCompressors{"snappy"};
+        std::vector<std::string> serverCompressors{"snappy"};
+        MessageCompressorManager::forSession(_session)
+            .serverNegotiate(clientCompressors, &out, serverCompressors);
     }
 
     /** Waits for the current Session and SessionWorkflow to end. */
@@ -1050,6 +1059,7 @@ TEST_F(IngressRequestRateLimiterTest, FireAndForgetResponse) {
 TEST_F(IngressRequestRateLimiterTest, FireAndForgetResponseCompressed) {
     enableRateOverrideBehaviorWithSpecifiedBurstSize(1.0);
 
+    permitSnappyCompressionForCurrentSession();
     startSession();
     auto msg = makeOpMsg();
     setMoreToCome(msg);
@@ -1060,6 +1070,7 @@ TEST_F(IngressRequestRateLimiterTest, FireAndForgetResponseCompressed) {
     expect<Event::sepEndSession>();
 
     initializeNewSession();
+    permitSnappyCompressionForCurrentSession();
     startSession();
     expect<Event::sessionSourceMessage>(msg);
     expect<Event::sessionSourceMessage>(kClosedSessionError);
@@ -1714,6 +1725,7 @@ TEST_F(SessionWorkflowTest, OversizedDecompressedMessage) {
 
     unittest::ServerParameterGuard maxSizeController{"preAuthMaximumMessageSizeBytes", 1024};
 
+    permitSnappyCompressionForCurrentSession();
     startSession();
 
     const size_t bufferSize = MsgData::MsgDataHeaderSize + CompressionHeader::size();

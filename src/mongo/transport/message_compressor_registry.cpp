@@ -81,6 +81,14 @@ const std::vector<std::string>& MessageCompressorRegistry::getCompressorNames() 
     return _compressorNames;
 }
 
+const std::vector<std::string>& MessageCompressorRegistry::getNetCompressorNames() const {
+    return _netCompressorNames;
+}
+
+const std::vector<std::string>& MessageCompressorRegistry::getReplCompressorNames() const {
+    return _replCompressorNames;
+}
+
 MessageCompressorBase* MessageCompressorRegistry::getCompressor(MessageCompressorId id) const {
     return _compressorsByIds.at(id).get();
 }
@@ -93,7 +101,31 @@ MessageCompressorBase* MessageCompressorRegistry::getCompressor(std::string_view
 }
 
 void MessageCompressorRegistry::setSupportedCompressors(std::vector<std::string>&& names) {
+    // Seed the client-facing net set and the process-wide capability set (union) to the same
+    // names, and reset the replication attribution set. addReplicationCompressors() folds in any
+    // replication-only algorithms afterwards, deduplicating names already present from net.
+    //
+    // Call ordering contract: this must run BEFORE addReplicationCompressors() and only once during
+    // startup. It overwrites _compressorNames wholesale and clears _replCompressorNames, so calling
+    // it after addReplicationCompressors() would silently discard the replication-only algorithms
+    // that were folded into the union.
+    _netCompressorNames = names;
     _compressorNames = std::move(names);
+    _replCompressorNames.clear();
+}
+
+void MessageCompressorRegistry::addReplicationCompressors(
+    const std::vector<std::string>& replCompressorNames) {
+    for (const auto& name : replCompressorNames) {
+        if (std::find(_replCompressorNames.begin(), _replCompressorNames.end(), name) ==
+            _replCompressorNames.end()) {
+            _replCompressorNames.push_back(name);
+        }
+        if (std::find(_compressorNames.begin(), _compressorNames.end(), name) ==
+            _compressorNames.end()) {
+            _compressorNames.push_back(name);
+        }
+    }
 }
 
 Status storeMessageCompressionOptions(const std::string& compressors) {

@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <string_view>
+
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
