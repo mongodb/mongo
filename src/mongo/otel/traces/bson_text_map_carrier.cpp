@@ -44,6 +44,10 @@ BSONTextMapCarrier::BSONTextMapCarrier(const BSONObj& bson) {
     }
 }
 
+BSONTextMapCarrier::BSONTextMapCarrier(const TelemetryContextSection& telemetryContext) {
+    _values[kTraceParentKey] = telemetryContext.getOtel().getTraceparent();
+}
+
 OtelStringView BSONTextMapCarrier::Get(OtelStringView key) const noexcept {
     auto it = _values.find(key);
     if (it == _values.end()) {

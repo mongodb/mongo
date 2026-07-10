@@ -354,8 +354,8 @@ TEST_F(ServiceEntryPointRouterRoleTest, TestWriteConcernClientUnspecifiedWithDef
     testWriteConcernClientUnspecifiedWithDefault();
 }
 
-TEST_F(ServiceEntryPointRouterRoleTest, SpanCreatedWhenTelemetryContextDeserializedFromRequest) {
-    testSpanCreatedWhenTelemetryContextDeserializedFromRequest();
+TEST_F(ServiceEntryPointRouterRoleTest, TelemetryContextDeserializedFromSection) {
+    testTelemetryContextDeserializedFromSection();
 }
 
 TEST_F(ServiceEntryPointRouterRoleTest, SpanNotCreatedWhenTelemetryContextNotSetInRequest) {

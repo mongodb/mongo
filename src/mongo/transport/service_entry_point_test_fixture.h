@@ -110,7 +110,7 @@ public:
     void testWriteConcernClientSpecified();
     void testWriteConcernClientUnspecifiedNoDefault();
     void testWriteConcernClientUnspecifiedWithDefault();
-    void testSpanCreatedWhenTelemetryContextDeserializedFromRequest();
+    void testTelemetryContextDeserializedFromSection();
     void testSpanNotCreatedWhenTelemetryContextNotSetInRequest();
 
 protected:

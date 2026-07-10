@@ -31,6 +31,7 @@
 
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/otel/traces/span/span.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
@@ -96,6 +97,23 @@ public:
         return _request.get();
     }
 
+    bool hasOtelSpan() const {
+        dassert(_isOnClientThread());
+        return _otelSpan.has_value();
+    }
+    void setOtelSpan(otel::traces::Span otelSpan) {
+        dassert(_isOnClientThread() && !_otelSpan);
+        _otelSpan = std::move(otelSpan);
+    }
+    const otel::traces::Span& getOtelSpan() const {
+        dassert(_isOnClientThread() && _otelSpan);
+        return *_otelSpan;
+    }
+    otel::traces::Span& getOtelSpan() {
+        dassert(_isOnClientThread() && _otelSpan);
+        return *_otelSpan;
+    }
+
     void setCommand(Command* command) {
         dassert(_isOnClientThread() && !_command);
         _command = command;
@@ -126,6 +144,7 @@ private:
     boost::optional<OpMsgRequest> _request;
     Command* _command = nullptr;
     std::unique_ptr<rpc::ReplyBuilderInterface> _replyBuilder;
+    boost::optional<otel::traces::Span> _otelSpan;
 };
 
 }  // namespace mongo

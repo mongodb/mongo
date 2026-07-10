@@ -35,6 +35,7 @@
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/bson_text_map_carrier.h"
 #include "mongo/otel/traces/span/span_telemetry_context_impl.h"
+#include "mongo/otel/traces/traceparent.h"
 #include "mongo/rpc/telemetry_context_section_gen.h"
 
 #include <opentelemetry/context/propagation/text_map_propagator.h>
@@ -61,16 +62,61 @@ namespace {
 HttpTraceContext getPropagator() {
     return HttpTraceContext{};
 }
+
+std::shared_ptr<TelemetryContext> fromBSON(const BSONObj& bson, TextMapPropagator& propagator) {
+    auto carrier = BSONTextMapCarrier{bson};
+    auto context = OtelContext{};
+    context = propagator.Extract(carrier, context);
+    return std::make_shared<traces::SpanTelemetryContextImpl>(std::move(context));
+}
+
+BSONObj toBSON(const TelemetryContext& context, TextMapPropagator& propagator) {
+    try {
+        auto carrier = BSONTextMapCarrier{};
+        const auto* typedContext = dynamic_cast<const traces::SpanTelemetryContextImpl*>(&context);
+        tassert(10012000, "Bad cast", typedContext);
+        typedContext->propagate(propagator, carrier);
+        return carrier.toBSON();
+    } catch (const AssertionException&) {
+        return {};
+    }
+}
+
+std::shared_ptr<TelemetryContext> fromSection(const TelemetryContextSection& section,
+                                              TextMapPropagator& propagator) {
+    auto mapCarrier = BSONTextMapCarrier{section};
+    auto context = OtelContext{};
+    context = propagator.Extract(mapCarrier, context);
+    return std::make_shared<SpanTelemetryContextImpl>(std::move(context));
+}
+
+boost::optional<mongo::TelemetryContextSection> toSection(const TelemetryContext& context,
+                                                          TextMapPropagator& propagator) {
+    try {
+        auto mapCarrier = BSONTextMapCarrier{};
+        const auto* typedContext = dynamic_cast<const SpanTelemetryContextImpl*>(&context);
+        tassert(10012001, "Bad cast", typedContext);
+        typedContext->propagate(propagator, mapCarrier);
+        auto traceParent = mapCarrier.Get(BSONTextMapCarrier::kTraceParentKey);
+        if (traceParent.empty() || traceParent == kMissingKeyReturnValue) {
+            return boost::none;
+        }
+        return mongo::TelemetryContextSection{OtelContextSection{std::string{traceParent}}};
+    } catch (const AssertionException&) {
+        return boost::none;
+    }
+}
+
 }  // namespace
 
 std::shared_ptr<TelemetryContext> TelemetryContextSerializer::fromBSON(const BSONObj& bson) {
     auto propagator = getPropagator();
-    return detail::fromBSON(bson, propagator);
+    return traces::fromBSON(bson, propagator);
 }
 
 BSONObj TelemetryContextSerializer::toBSON(const std::shared_ptr<TelemetryContext>& context) {
     auto propagator = getPropagator();
-    return detail::toBSON(*context, propagator);
+    return traces::toBSON(*context, propagator);
 }
 
 BSONObj TelemetryContextSerializer::appendTelemetryContext(OperationContext* opCtx, BSONObj bson) {
@@ -93,6 +139,25 @@ BSONObj TelemetryContextSerializer::appendTelemetryContext(OperationContext* opC
     return bob.obj();
 }
 
+std::shared_ptr<TelemetryContext> TelemetryContextSerializer::fromSection(
+    const boost::optional<mongo::TelemetryContextSection>& section) {
+    if (!section || section->getOtel().getTraceparent().empty() ||
+        !validateW3CTraceparent(section->getOtel().getTraceparent()).isOK()) {
+        return nullptr;
+    }
+    auto propagator = getPropagator();
+    return traces::fromSection(*section, propagator);
+}
+
+boost::optional<mongo::TelemetryContextSection> TelemetryContextSerializer::toSection(
+    const std::shared_ptr<TelemetryContext>& context) {
+    if (!context) {
+        return boost::none;
+    }
+    auto propagator = getPropagator();
+    return traces::toSection(*context, propagator);
+}
+
 boost::optional<TelemetryContextSection> toWireType(const TelemetryContext* ctx) {
     if (!ctx) {
         return boost::none;
@@ -101,7 +166,7 @@ boost::optional<TelemetryContextSection> toWireType(const TelemetryContext* ctx)
     // then pull the traceparent field off the result.
     // TODO(SERVER-130639): Separate the serialization from the propagator logic.
     auto propagator = getPropagator();
-    auto bson = detail::toBSON(*ctx, propagator);
+    auto bson = traces::toBSON(*ctx, propagator);
     auto traceparent = bson.getStringField(OtelContextSection::kTraceparentFieldName);
     if (traceparent.empty()) {
         return boost::none;
@@ -112,27 +177,6 @@ boost::optional<TelemetryContextSection> toWireType(const TelemetryContext* ctx)
     wireTc.setOtel(std::move(otelCtx));
     return wireTc;
 }
-
-namespace detail {
-std::shared_ptr<TelemetryContext> fromBSON(const BSONObj& bson, TextMapPropagator& propagator) {
-    BSONTextMapCarrier carrier{bson};
-    OtelContext context;
-    context = propagator.Extract(carrier, context);
-    return std::make_shared<traces::SpanTelemetryContextImpl>(std::move(context));
-}
-
-BSONObj toBSON(const TelemetryContext& context, TextMapPropagator& propagator) {
-    try {
-        BSONTextMapCarrier carrier;
-        const auto* typedContext = dynamic_cast<const traces::SpanTelemetryContextImpl*>(&context);
-        tassert(10012000, "Bad cast", typedContext);
-        typedContext->propagate(propagator, carrier);
-        return carrier.toBSON();
-    } catch (const AssertionException&) {
-        return {};
-    }
-}
-}  // namespace detail
 
 }  // namespace traces
 }  // namespace otel

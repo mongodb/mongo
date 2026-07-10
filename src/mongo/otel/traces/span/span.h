@@ -80,6 +80,14 @@ public:
      */
     static Span start(OperationContext* opCtx, SpanName name);
 
+    /**
+     * Starts a new Span from an ingress source, which may be sampled differently than an
+     * internally-started span (e.g. a separate rate limit).  This method uses the existence of a
+     * uses the existence of a TelemetryContext in the OperationContext to determine if the ingress
+     * span is part of an external trace.
+     */
+    static Span startIngressSpan(OperationContext* opCtx, SpanName name);
+
     static std::shared_ptr<TelemetryContext> createTelemetryContext();
 
     ~Span();
@@ -113,6 +121,14 @@ private:
     Span();
     Span(std::unique_ptr<SpanImpl> impl);
 
+    // Internal start functions that allow bypassing the sampling mechanism to create the span
+    // unconditonally. These are used by the public start functions to control whether the span
+    // should be sampled or not.
+    static Span _start(std::shared_ptr<TelemetryContext>& telemetryCtx,
+                       SpanName name,
+                       bool bypassSampling);
+    static Span _start(OperationContext* opCtx, SpanName name, bool bypassSampling);
+
     /** The actual span implementation. Null if this Span will not be part of an exported trace. */
     std::unique_ptr<SpanImpl> _impl;
 };
@@ -133,6 +149,9 @@ public:
         return Span{};
     }
     static Span start(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName) {
+        return Span{};
+    }
+    static Span startIngressSpan(OperationContext* opCtx, SpanName name) {
         return Span{};
     }
 

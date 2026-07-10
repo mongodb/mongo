@@ -175,10 +175,12 @@ public:
 using ScopedSamplerOverride [[MONGO_MOD_PUBLIC]] = std::unique_ptr<SamplerOverride>;
 
 /**
- * Replaces the global sampler with one that calls fn for `shouldSample`, for testing purposes.
+ * Replaces the global sampler with one that calls the provided functions for `shouldSample`
+ * and `shouldAcceptExternalTrace`, for testing purposes.
  * Returns a guard that restores the previous sampler on destruction. This is not thread-safe.
  */
 [[nodiscard]] [[MONGO_MOD_PUBLIC]] ScopedSamplerOverride setTraceSamplingFnForTest(
-    unique_function<bool(std::string_view, double)> fn);
+    unique_function<bool(std::string_view, double)> shouldSample,
+    unique_function<bool()> shouldAcceptExternalTrace = [] { return false; });
 
 }  // namespace mongo::otel::traces

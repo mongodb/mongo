@@ -179,15 +179,23 @@ namespace {
 
 class FunctionSampler : public TracingSampler {
 public:
-    explicit FunctionSampler(unique_function<bool(std::string_view, double)> fn)
-        : _fn(std::move(fn)) {}
+    explicit FunctionSampler(
+        unique_function<bool(std::string_view, double)> shouldSample,
+        unique_function<bool()> shouldAcceptExternalTrace = [] { return false; })
+        : _shouldSample(std::move(shouldSample)),
+          _shouldAcceptExternalTrace(std::move(shouldAcceptExternalTrace)) {}
 
     bool shouldSample(std::string_view spanName, double sampleValue) override {
-        return _fn(spanName, sampleValue);
+        return _shouldSample(spanName, sampleValue);
+    }
+
+    bool shouldAcceptExternalTrace() const override {
+        return _shouldAcceptExternalTrace();
     }
 
 private:
-    unique_function<bool(std::string_view, double)> _fn;
+    unique_function<bool(std::string_view, double)> _shouldSample;
+    unique_function<bool()> _shouldAcceptExternalTrace;
 };
 
 std::unique_ptr<TracingSampler>& globalSampler() {
@@ -218,8 +226,10 @@ private:
 };
 
 ScopedSamplerOverride setTraceSamplingFnForTest(
-    unique_function<bool(std::string_view, double)> fn) {
-    return std::make_unique<SamplerOverrideImpl>(std::make_unique<FunctionSampler>(std::move(fn)));
+    unique_function<bool(std::string_view, double)> shouldSample,
+    unique_function<bool()> shouldAcceptExternalTrace) {
+    return std::make_unique<SamplerOverrideImpl>(std::make_unique<FunctionSampler>(
+        std::move(shouldSample), std::move(shouldAcceptExternalTrace)));
 }
 
 TracingSampler& TracingSampler::get() {

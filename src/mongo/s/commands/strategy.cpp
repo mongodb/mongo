@@ -88,6 +88,7 @@
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/span/span.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
+#include "mongo/otel/traces/tracing_enablement.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/check_allowed_op_query_cmd.h"
 #include "mongo/rpc/factory.h"
@@ -495,6 +496,7 @@ void ParseAndRunCommand::_parseCommand() {
     }
 
     _rec->setCommand(command);
+    _rec->setOtelSpan(otel::traces::Span::startIngressSpan(opCtx, command->getTraceSpanName()));
 
     _isHello.emplace(command->getName() == "hello"sv || command->getName() == "isMaster"sv);
 
@@ -521,15 +523,6 @@ void ParseAndRunCommand::_parseCommand() {
     if (auto& commentField = _invocation->getGenericArguments().getComment()) {
         std::lock_guard<Client> lk(*client);
         opCtx->setComment(commentField->getElement().wrap());
-    }
-
-    // TODO(SERVER-107128): Remove this in favor of the context on OP_MSG
-    if (auto& traceCtx = _invocation->getGenericArguments().getTraceCtx()) {
-        auto telemetryCtx = otel::traces::TelemetryContextSerializer::fromBSON(*traceCtx);
-        if (telemetryCtx) {
-            auto& telemetryCtxHolder = otel::TelemetryContextHolder::getDecoration(opCtx);
-            telemetryCtxHolder.setTelemetryContext(telemetryCtx);
-        }
     }
 
     auto apiParams = parseAndValidateAPIParameters(*_invocation);
@@ -1121,8 +1114,6 @@ void ParseAndRunCommand::RunAndRetry::_onCannotImplicitlyCreateCollection(Status
 }
 
 void ParseAndRunCommand::RunAndRetry::run() {
-    auto otelSpan = otel::traces::Span::start(_parc->_rec->getOpCtx(),
-                                              _parc->_rec->getCommand()->getTraceSpanName());
     do {
         try {
             // Try gMaxNumStaleVersionRetries times. On the last try, exceptions are
@@ -1230,6 +1221,12 @@ void ClientCommand::_parseMessage() try {
         checkAllowedOpQueryCommand(*(_rec->getOpCtx()->getClient()), opMsgReq.getCommandName());
     }
     _rec->setRequest(opMsgReq);
+
+    if (otel::traces::isTracingEnabled(_rec->getOpCtx())) {
+        otel::TelemetryContextHolder::getDecoration(_rec->getOpCtx())
+            .setTelemetryContext(otel::traces::TelemetryContextSerializer::fromSection(
+                _rec->getRequest().telemetryContext));
+    }
 } catch (const DBException& ex) {
     // If this error needs to fail the connection, propagate it out.
     if (ErrorCodes::isConnectionFatalMessageParseError(ex.code()))

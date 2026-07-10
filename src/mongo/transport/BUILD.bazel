@@ -363,6 +363,7 @@ mongo_cc_library(
         "//src/mongo/otel/traces:tracing",
         "//src/mongo/otel/traces/sampler",
         "//src/mongo/rpc:client_metadata",
+        "//src/mongo/rpc:telemetry_context_section",
         "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/util:clock_source_mock",
     ],

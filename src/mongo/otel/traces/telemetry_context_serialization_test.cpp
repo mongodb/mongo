@@ -37,19 +37,16 @@
 #include "mongo/otel/traces/span/span.h"
 #include "mongo/otel/traces/span/span_names.h"
 #include "mongo/otel/traces/span/span_telemetry_context_impl.h"
+#include "mongo/rpc/telemetry_context_section_gen.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
 
-#include <opentelemetry/trace/propagation/http_trace_context.h>
-
 namespace mongo {
 namespace otel {
 namespace traces {
 namespace {
-
-using opentelemetry::trace::propagation::HttpTraceContext;
 
 class TelemetryContextSerializationTest : public traces::OtelTestFixture {
 protected:
@@ -60,22 +57,11 @@ protected:
         setTraceSamplingFnForTest([](std::string_view, double) { return true; });
 };
 
-BSONObj serializeTraceContextOnly(const std::shared_ptr<TelemetryContext>& context) {
-    HttpTraceContext propagator;
-    return detail::toBSON(*context, propagator);
-}
-
 TEST_F(TelemetryContextSerializationTest, SerializeTraceContext) {
     auto context = traces::Span::createTelemetryContext();
     auto span = traces::Span::start(context, traces::span_names::kTest1);
-    BSONObj fullBson = TelemetryContextSerializer::toBSON(context);
-    BSONObj traceContextBson = serializeTraceContextOnly(context);
-    ASSERT(!traceContextBson.isEmpty());
-    for (const auto& field : traceContextBson) {
-        const auto& name = field.fieldName();
-        ASSERT(fullBson.hasField(name));
-        ASSERT_EQ(fullBson.getStringField(name), traceContextBson.getStringField(name));
-    }
+    BSONObj bson = TelemetryContextSerializer::toBSON(context);
+    EXPECT_TRUE(bson.hasField(BSONTextMapCarrier::kTraceParentKey));
 }
 
 TEST_F(TelemetryContextSerializationTest, RoundTrip) {
@@ -98,8 +84,7 @@ TEST_F(TelemetryContextSerializationTest, AppendTelemetryContextAddsTelemetryCon
     BSONObj originalBson = BSON("key" << "value");
     auto opCtx = makeOperationContext();
     auto& telemetryContextHolder = TelemetryContextHolder::getDecoration(opCtx.get());
-    auto telemetryContext = traces::Span::createTelemetryContext();
-    telemetryContextHolder.setTelemetryContext(telemetryContext);
+    telemetryContextHolder.setTelemetryContext(traces::Span::createTelemetryContext());
     BSONObj resultBson =
         TelemetryContextSerializer::appendTelemetryContext(opCtx.get(), originalBson);
     ASSERT_BSONOBJ_NE(originalBson, resultBson);
@@ -112,12 +97,75 @@ TEST_F(TelemetryContextSerializationTest,
         BSON("key" << "value" << GenericArguments::kTraceCtxFieldName << "old_value");
     auto opCtx = makeOperationContext();
     auto& telemetryContextHolder = TelemetryContextHolder::getDecoration(opCtx.get());
-    auto telemetryContext = traces::Span::createTelemetryContext();
-    telemetryContextHolder.setTelemetryContext(telemetryContext);
+    telemetryContextHolder.setTelemetryContext(traces::Span::createTelemetryContext());
     BSONObj resultBson =
         TelemetryContextSerializer::appendTelemetryContext(opCtx.get(), originalBson);
     ASSERT_BSONOBJ_NE(originalBson, resultBson);
     ASSERT_TRUE(resultBson.hasField(GenericArguments::kTraceCtxFieldName));
+}
+
+TEST_F(TelemetryContextSerializationTest, FromSectionReturnsNulloptIfNoSection) {
+    auto section = boost::optional<TelemetryContextSection>{};
+    auto context = TelemetryContextSerializer::fromSection(section);
+    ASSERT(!context);
+}
+
+TEST_F(TelemetryContextSerializationTest, ToSectionReturnsNulloptIfNoContext) {
+    auto context = std::shared_ptr<TelemetryContext>{};
+    auto section = TelemetryContextSerializer::toSection(context);
+    ASSERT(!section);
+}
+
+TEST_F(TelemetryContextSerializationTest, FromSectionAndToSectionRoundTrip) {
+    auto context = traces::Span::createTelemetryContext();
+    auto span = traces::Span::start(context, traces::span_names::kTest1);
+    auto section = TelemetryContextSerializer::toSection(context);
+    ASSERT(section);
+    auto rehydratedContext = TelemetryContextSerializer::fromSection(section);
+    ASSERT(rehydratedContext);
+    auto rehydratedSection = TelemetryContextSerializer::toSection(rehydratedContext);
+    ASSERT(rehydratedSection);
+    EXPECT_THAT(section->getOtel().getTraceparent(), testing::Not(testing::Eq("")));
+    EXPECT_EQ(section->getOtel().getTraceparent(), rehydratedSection->getOtel().getTraceparent());
+}
+
+TEST_F(TelemetryContextSerializationTest, FromSectionReturnsNulloptIfNoTraceparent) {
+    auto section = TelemetryContextSection{OtelContextSection{""}};
+    auto context = TelemetryContextSerializer::fromSection(section);
+    ASSERT(!context);
+}
+
+TEST_F(TelemetryContextSerializationTest, ToSectionReturnsNulloptIfNoTraceparent) {
+    auto context = traces::Span::createTelemetryContext();
+    auto section = TelemetryContextSerializer::toSection(context);
+    ASSERT(!section);
+    auto rehydratedContext = TelemetryContextSerializer::fromSection(section);
+    ASSERT(!rehydratedContext);
+}
+
+TEST_F(TelemetryContextSerializationTest, FromSectionReturnsNulloptIfBadTraceparent) {
+    auto section = TelemetryContextSection{OtelContextSection{"not-a-valid-traceparent"}};
+    auto context = TelemetryContextSerializer::fromSection(section);
+    ASSERT(!context);
+}
+
+TEST_F(TelemetryContextSerializationTest, FromBSONMarksContextAsRemote) {
+    auto context = TelemetryContextSerializer::fromBSON(
+        BSON("traceparent" << "00-11111111111111111111111111111111-2222222222222222-01"));
+    ASSERT(context);
+    auto spanContext =
+        static_cast<SpanTelemetryContextImpl*>(context.get())->getSpan()->GetContext();
+    EXPECT_TRUE(spanContext.IsValid());
+    EXPECT_TRUE(spanContext.IsRemote());
+}
+
+TEST_F(TelemetryContextSerializationTest, LocallyCreatedContextIsNotRemote) {
+    auto context = traces::Span::createTelemetryContext();
+    auto span = traces::Span::start(context, traces::span_names::kTest1);
+    auto spanContext =
+        static_cast<SpanTelemetryContextImpl*>(context.get())->getSpan()->GetContext();
+    EXPECT_TRUE(spanContext.IsValid());
+    EXPECT_FALSE(spanContext.IsRemote());
 }
 
 TEST_F(TelemetryContextSerializationTest, ToWireTypeNullInputReturnsNull) {
@@ -145,7 +193,7 @@ TEST_F(TelemetryContextSerializationTest, ToWireTypeTraceparentMatchesBSONSerial
     ASSERT_TRUE(wireType.has_value());
 
     BSONObj bson = TelemetryContextSerializer::toBSON(context);
-    auto traceparentFromBson = bson.getStringField("traceparent");
+    auto traceparentFromBson = bson.getStringField(BSONTextMapCarrier::kTraceParentKey);
     ASSERT_EQ(wireType->getOtel().getTraceparent(), traceparentFromBson);
 }
 

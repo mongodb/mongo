@@ -121,7 +121,9 @@ void Span::setStatus(const Status& status) {
     }
 }
 
-Span Span::start(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName name) {
+Span Span::_start(std::shared_ptr<TelemetryContext>& telemetryCtx,
+                  SpanName name,
+                  bool bypassSampling) {
     TracerProviderService* tracerProviderService = getGlobalTracerProviderService();
     if (!tracerProviderService || !tracerProviderService->isEnabled()) {
         return Span{};
@@ -152,8 +154,12 @@ Span Span::start(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName name)
         hasParent = parentSpan->GetContext().IsValid();
     }
 
-    if (!hasParent) {
-        // Root span: drop if either feature flag is disabled or the sampler rejects it.
+    const auto hasRemoteParent = hasParent && parentSpan->GetContext().IsRemote();
+
+    // If the parent span is remote, we generally want to bypass the internal sampling mechanism
+    // to respect the sampling decision made by the remote system.
+    if (!hasParent || hasRemoteParent) {
+        // Drop if either feature flag is disabled or the sampler rejects it.
         // (Ignore FCV check) — no VersionContext is available in this path.
         if (!feature_flags::gFeatureFlagTracing.isEnabledAndIgnoreFCVUnsafe() ||
             !feature_flags::gFeatureFlagOtelTraceSampling.isEnabledAndIgnoreFCVUnsafe()) {
@@ -167,7 +173,8 @@ Span Span::start(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName name)
             parentSpan = spanCtx->getSpan();
         }
 
-        if (!TracingSampler::get().shouldSample(name.getName(), spanCtx->getSamplingValue())) {
+        if (!bypassSampling &&
+            !TracingSampler::get().shouldSample(name.getName(), spanCtx->getSamplingValue())) {
             return Span{};
         }
     }
@@ -181,7 +188,11 @@ Span Span::start(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName name)
                                          std::move(spanCtx)));
 }
 
-Span Span::start(OperationContext* opCtx, SpanName name) {
+Span Span::start(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName name) {
+    return _start(telemetryCtx, name, false);
+}
+
+Span Span::_start(OperationContext* opCtx, SpanName name, bool bypassSampling) {
     if (opCtx == nullptr) {
         return Span{};
     }
@@ -191,13 +202,29 @@ Span Span::start(OperationContext* opCtx, SpanName name) {
 
     bool hadTelemetryCtx = telemetryCtx != nullptr;
 
-    Span span = start(telemetryCtx, name);
+    Span span = _start(telemetryCtx, name, bypassSampling);
 
     // Start created a new TelemetryContext, so we need to store it for future use.
     if (!hadTelemetryCtx && telemetryCtx != nullptr) {
         telemetryCtxHolder.setTelemetryContext(telemetryCtx);
     }
     return span;
+}
+
+Span Span::start(OperationContext* opCtx, SpanName name) {
+    return _start(opCtx, name, false);
+}
+
+Span Span::startIngressSpan(OperationContext* opCtx, SpanName name) {
+    if (!opCtx) {
+        return Span{};
+    }
+
+    const auto& telemetryContext =
+        TelemetryContextHolder::getDecoration(opCtx).getTelemetryContext();
+    auto bypassSampling = telemetryContext && TracingSampler::get().shouldAcceptExternalTrace();
+
+    return _start(opCtx, name, bypassSampling);
 }
 
 std::shared_ptr<TelemetryContext> Span::createTelemetryContext() {

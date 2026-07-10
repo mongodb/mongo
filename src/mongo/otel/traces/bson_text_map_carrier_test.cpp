@@ -130,6 +130,27 @@ TEST(BSONTextMapCarrier, NonStringFieldsIgnored) {
     ASSERT_EQ(carrier.Get("uuid"), kMissingKeyReturnValue);
 }
 
+TEST(BSONTextMapCarrier, ConstructorWithTelemetryContextSection) {
+    auto section = TelemetryContextSection{
+        OtelContextSection{"00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"}};
+    auto carrier = BSONTextMapCarrier{section};
+    EXPECT_EQ(carrier.Get(BSONTextMapCarrier::kTraceParentKey),
+              "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01");
+}
+
+TEST(BSONTextMapCarrier, SetAndGet) {
+    constexpr auto keyA = "keyA";
+    constexpr auto valueA = "valueA";
+    constexpr auto keyB = "keyB";
+    constexpr auto valueB = "valueB";
+
+    auto carrier = BSONTextMapCarrier{};
+    carrier.Set(keyA, valueA);
+    EXPECT_EQ(carrier.Get(keyA), valueA);
+    carrier.Set(keyB, valueB);
+    EXPECT_EQ(carrier.Get(keyB), valueB);
+}
+
 }  // namespace
 }  // namespace traces
 }  // namespace otel

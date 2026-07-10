@@ -37,10 +37,6 @@
 
 #include <boost/optional.hpp>
 
-#ifdef MONGO_CONFIG_OTEL
-#include <opentelemetry/context/propagation/text_map_propagator.h>
-#endif
-
 namespace mongo {
 namespace [[MONGO_MOD_PUBLIC]] otel {
 namespace traces {
@@ -55,6 +51,10 @@ public:
     static std::shared_ptr<TelemetryContext> fromBSON(const BSONObj& bson);
     static BSONObj toBSON(const std::shared_ptr<TelemetryContext>& context);
     static BSONObj appendTelemetryContext(OperationContext* opCtx, BSONObj bson);
+    static std::shared_ptr<TelemetryContext> fromSection(
+        const boost::optional<mongo::TelemetryContextSection>& section);
+    static boost::optional<mongo::TelemetryContextSection> toSection(
+        const std::shared_ptr<TelemetryContext>& context);
 };
 
 /**
@@ -62,13 +62,6 @@ public:
  * Returns boost::none if ctx is null or if no active span is present in ctx.
  */
 boost::optional<TelemetryContextSection> toWireType(const TelemetryContext* ctx);
-
-namespace detail {
-using TextMapPropagator = opentelemetry::context::propagation::TextMapPropagator;
-using TextMapCarrier = opentelemetry::context::propagation::TextMapCarrier;
-std::shared_ptr<TelemetryContext> fromBSON(const BSONObj& bson, TextMapPropagator& propagator);
-BSONObj toBSON(const TelemetryContext& context, TextMapPropagator& propagator);
-}  // namespace detail
 
 #else
 
@@ -85,6 +78,14 @@ public:
     }
     static BSONObj appendTelemetryContext(OperationContext* opCtx, BSONObj bson) {
         return bson;
+    }
+    static std::shared_ptr<TelemetryContext> fromSection(
+        const boost::optional<mongo::TelemetryContextSection>& section) {
+        return std::make_shared<TelemetryContext>();
+    }
+    static boost::optional<mongo::TelemetryContextSection> toSection(
+        const std::shared_ptr<TelemetryContext>& context) {
+        return boost::none;
     }
 };
 

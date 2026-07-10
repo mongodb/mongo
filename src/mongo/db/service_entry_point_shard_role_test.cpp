@@ -502,8 +502,8 @@ TEST_F(ServiceEntryPointShardServerTest, QueuedAdmissionWithLargeMaxTimeMSSuccee
     ASSERT_LESS_THAN(CurOp::get(opCtx.get())->debug().workingTimeMillis, Milliseconds(1000));
 }
 
-TEST_F(ServiceEntryPointShardServerTest, SpanCreatedWhenTelemetryContextDeserializedFromRequest) {
-    testSpanCreatedWhenTelemetryContextDeserializedFromRequest();
+TEST_F(ServiceEntryPointShardServerTest, TelemetryContextDeserializedFromSection) {
+    testTelemetryContextDeserializedFromSection();
 }
 
 TEST_F(ServiceEntryPointShardServerTest, SpanNotCreatedWhenTelemetryContextNotSetInRequest) {
@@ -623,8 +623,8 @@ TEST_F(ServiceEntryPointReplicaSetTest, TestWriteConcernClientUnspecifiedWithDef
     testWriteConcernClientUnspecifiedWithDefault();
 }
 
-TEST_F(ServiceEntryPointReplicaSetTest, SpanCreatedWhenTelemetryContextDeserializedFromRequest) {
-    testSpanCreatedWhenTelemetryContextDeserializedFromRequest();
+TEST_F(ServiceEntryPointReplicaSetTest, TelemetryContextDeserializedFromSection) {
+    testTelemetryContextDeserializedFromSection();
 }
 
 TEST_F(ServiceEntryPointReplicaSetTest, SpanNotCreatedWhenTelemetryContextNotSetInRequest) {

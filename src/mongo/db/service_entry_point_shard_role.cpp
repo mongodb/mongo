@@ -130,6 +130,7 @@
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/span/span.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
+#include "mongo/otel/traces/tracing_enablement.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/rpc/check_allowed_op_query_cmd.h"
 #include "mongo/rpc/factory.h"
@@ -1685,15 +1686,6 @@ void ExecCommandDatabase::_initiateCommand() {
                 _isInternalClient());
     }
 
-    // TODO(SERVER-107128): Remove this in favor of the context on OP_MSG
-    if (auto& traceCtx = genericArgs.getTraceCtx()) {
-        auto telemetryCtx = otel::traces::TelemetryContextSerializer::fromBSON(*traceCtx);
-        if (telemetryCtx) {
-            auto& telemetryCtxHolder = otel::TelemetryContextHolder::getDecoration(opCtx);
-            telemetryCtxHolder.setTelemetryContext(telemetryCtx);
-        }
-    }
-
     if (MONGO_unlikely(genericArgs.getHelp().value_or(false))) {
         // We disable not-primary-error tracker for help requests due to SERVER-11492, because
         // config servers use help requests to determine which commands are database writes, and so
@@ -2010,8 +2002,6 @@ void ExecCommandDatabase::_initiateCommand() {
 void ExecCommandDatabase::_commandExec() {
     auto opCtx = _execContext.getOpCtx();
 
-    auto otelSpan = otel::traces::Span::start(opCtx, _execContext.getCommand()->getTraceSpanName());
-
     // If this command should start a new transaction, waitForReadConcern will be invoked
     // after invoking the TransactionParticipant, which will determine whether a transaction
     // is being started or continued.
@@ -2246,6 +2236,12 @@ void parseCommand(HandleRequest::ExecutionContext& execContext) try {
         checkAllowedOpQueryCommand(*client, opMsgReq.getCommandName());
     }
     execContext.setRequest(opMsgReq);
+
+    if (otel::traces::isTracingEnabled(execContext.getOpCtx())) {
+        otel::TelemetryContextHolder::getDecoration(execContext.getOpCtx())
+            .setTelemetryContext(otel::traces::TelemetryContextSerializer::fromSection(
+                execContext.getRequest().telemetryContext));
+    }
 } catch (const DBException& ex) {
     // Need to set request as `makeCommandResponse` expects an empty request on failure.
     execContext.setRequest({});
@@ -2276,6 +2272,8 @@ void executeCommand(HandleRequest::ExecutionContext& execContext) {
     }
 
     Command* c = execContext.getCommand();
+    execContext.setOtelSpan(otel::traces::Span::startIngressSpan(opCtx, c->getTraceSpanName()));
+
     LOGV2_DEBUG(
         21965,
         2,

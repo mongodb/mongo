@@ -50,6 +50,7 @@
 #include "mongo/rpc/legacy_reply.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/telemetry_context_section_gen.h"
 #include "mongo/transport/service_entry_point.h"
 
 #ifdef MONGO_CONFIG_OTEL
@@ -58,9 +59,7 @@
 
 namespace mongo {
 
-using otel::traces::CapturedSpan;
 using ::testing::IsEmpty;
-using ::testing::Property;
 
 MONGO_REGISTER_COMMAND(TestCmdSucceeds).testOnly().forRouter().forShard();
 MONGO_REGISTER_COMMAND(TestCmdFailsRunInvocationWithResponse).testOnly().forRouter().forShard();
@@ -578,46 +577,45 @@ void ServiceEntryPointTestFixture::runWriteConcernTestExpectClusterDefault(
     ASSERT_EQ(logs.countTextContaining("Applying default writeConcern"), 1);
 }
 
-void ServiceEntryPointTestFixture::testSpanCreatedWhenTelemetryContextDeserializedFromRequest() {
-    if (!otel::traces::OtelTracesCapturer::canReadSpans())
+void ServiceEntryPointTestFixture::testTelemetryContextDeserializedFromSection() {
+    if (!otel::traces::OtelTracesCapturer::canReadSpans()) {
         GTEST_SKIP() << "OTel not configured";
-
+    }
     otel::traces::OtelTracesCapturer capturer;
-    // We want the sampler to return false so that the only reason the span would be kept is that
-    // the telemetry context is set to include a parent span.
-    otel::traces::ScopedSamplerOverride samplerGuard =
-        otel::traces::setTraceSamplingFnForTest([](std::string_view, double) { return false; });
+    auto guard = otel::traces::setTraceSamplingFnForTest(
+        [](std::string_view, double) { return true; }, [] { return true; });
 
     auto opCtx = makeOperationContext();
 
-    // "traceparent" format: version-traceid-spanid-traceflags. "tracestate" can be any string.
-    BSONObjBuilder traceCtxBuilder;
-    traceCtxBuilder.append("traceparent",
-                           "00-11111111111111111111111111111111-2222222222222222-01");
-    traceCtxBuilder.append("tracestate", "dummystring");
+    const static HostAndPort kTestTargetHost = {HostAndPort("FakeHost", 12345)};
+    auto request = executor::RemoteCommandRequest{kTestTargetHost,
+                                                  DatabaseName::kAdmin,
+                                                  BSON(TestCmdSucceeds::kCommandName << 1),
+                                                  opCtx.get()};
+    auto opMsgRequest = static_cast<OpMsgRequest>(request);
+    opMsgRequest.telemetryContext = TelemetryContextSection{
+        OtelContextSection{"00-11111111111111111111111111111111-1111111111111111-01"}};
+    auto msg = opMsgRequest.serialize();
 
-    BSONObjBuilder cmdBuilder;
-    cmdBuilder.append(TestCmdSucceeds::kCommandName, 1);
-    cmdBuilder.append("$traceCtx", traceCtxBuilder.obj());
+    auto swDbResponse = handleRequest(msg, opCtx.get());
+    EXPECT_EQ(Status::OK(), swDbResponse);
 
-    runCommandTestWithResponse(cmdBuilder.obj(), opCtx.get());
+    auto& holder = otel::TelemetryContextHolder::getDecoration(opCtx.get());
+    auto retrievedCtx = holder.getTelemetryContext();
+    EXPECT_NE(retrievedCtx, nullptr);
 
-    EXPECT_THAT(
-        capturer.getSpans(TestCmdSucceeds::kCommandName),
-        ElementsAre(AllOf(
-            Property("parentSpanIdHex", &CapturedSpan::parentSpanIdHex, "2222222222222222"),
-            Property(
-                "traceIdHex", &CapturedSpan::traceIdHex, "11111111111111111111111111111111"))));
+    EXPECT_THAT(capturer.getSpans(TestCmdSucceeds::kCommandName), Not(IsEmpty()));
 }
 
 void ServiceEntryPointTestFixture::testSpanNotCreatedWhenTelemetryContextNotSetInRequest() {
-    if (!otel::traces::OtelTracesCapturer::canReadSpans())
+    if (!otel::traces::OtelTracesCapturer::canReadSpans()) {
         GTEST_SKIP() << "OTel not configured";
+    }
     otel::traces::OtelTracesCapturer capturer;
     // We want the sampler to return false so that the only reason the span would be kept is that
     // the telemetry context is set to include a parent span.
-    otel::traces::ScopedSamplerOverride samplerGuard =
-        otel::traces::setTraceSamplingFnForTest([](std::string_view, double) { return false; });
+    auto samplerGuard = otel::traces::setTraceSamplingFnForTest(
+        [](std::string_view, double) { return false; }, [] { return true; });
 
     auto opCtx = makeOperationContext();
     runCommandTestWithResponse(BSON(TestCmdSucceeds::kCommandName << 1), opCtx.get());

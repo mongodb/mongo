@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/otel/traces/tracing_utils.h"
+#include "mongo/rpc/telemetry_context_section_gen.h"
 #include "mongo/util/modules.h"
 
 #include <opentelemetry/context/propagation/text_map_propagator.h>
@@ -51,6 +52,8 @@ using opentelemetry::nostd::function_ref;
  */
 class [[MONGO_MOD_PARENT_PRIVATE]] BSONTextMapCarrier : public TextMapCarrier {
 public:
+    constexpr static auto kTraceParentKey = "traceparent";
+
     /**
      * Default constructor with an empty initial BSONObj. Intended to be used when using a
      * Propagator to Inject
@@ -67,6 +70,14 @@ public:
      * present in the bson argument will be ignored.
      */
     BSONTextMapCarrier(const BSONObj& bson);
+
+    /**
+     * Constructor which wraps an existing TelemetryContextSection. Intended to be used when using
+     * a Propagator to Extract
+     * (https://opentelemetry.io/docs/specs/otel/context/api-propagators/#extract) data from a
+     * TelemetryContextSection into a SpanContext.
+     */
+    BSONTextMapCarrier(const TelemetryContextSection& telemetryContext);
 
     /**
      * Gets a value from the underlying BSONObj.
