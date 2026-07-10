@@ -38,8 +38,12 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/ifr_flag_retry_info.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -99,6 +103,32 @@ constexpr auto kLargeString =
 const auto kOneKiBMatchStage = BSON("$match" << BSON("data" << kLargeString));
 const auto kTinyMatchStage = BSON("$match" << BSONObj());
 
+IncrementalRolloutFeatureFlag gTestIfrRetryTripFlag("testIfrRetryTripFlag",
+                                                    RolloutPhase::inDevelopment,
+                                                    true);
+class LiteParsedTestIfrRetryTripStage final
+    : public LiteParsedDocumentSourceDefault<LiteParsedTestIfrRetryTripStage> {
+public:
+    static constexpr auto kStageName = "$testIfrRetryTrip";
+
+    static std::unique_ptr<LiteParsedDocumentSource> parse(const NamespaceString& nss,
+                                                           const BSONElement& spec,
+                                                           const LiteParserOptions& options) {
+        if (options.ifrContext && options.ifrContext->getSavedFlagValue(gTestIfrRetryTripFlag)) {
+            uassertStatusOK(Status(IFRFlagRetryInfo(gTestIfrRetryTripFlag.getName()),
+                                   "LiteParsedTestIfrRetryTripStage kickback for test purposes"));
+        }
+        return std::make_unique<LiteParsedTestIfrRetryTripStage>(spec, options);
+    }
+
+    LiteParsedTestIfrRetryTripStage(const BSONElement& spec, const LiteParserOptions& options)
+        : LiteParsedDocumentSourceDefault(spec, options) {}
+
+    std::unique_ptr<StageParams> getStageParams() const override {
+        return std::make_unique<MatchStageParams>(_originalBson);
+    }
+};
+
 class ViewCatalogFixture : public CatalogTestFixture {
 public:
     ViewCatalogFixture()
@@ -112,6 +142,19 @@ public:
         _db = _createDatabase(_dbName);
         _createDatabase(DatabaseName::createDatabaseName_forTest(_dbName.tenantId(), "db1"));
         _createDatabase(DatabaseName::createDatabaseName_forTest(_dbName.tenantId(), "db2"));
+
+        static const bool kRegistered = [] {
+            gTestIfrRetryTripFlag.registerFlag();
+            LiteParsedDocumentSource::registerParser(
+                std::string{LiteParsedTestIfrRetryTripStage::kStageName},
+                {LiteParsedTestIfrRetryTripStage::parse,
+                 false,
+                 false,
+                 AllowedWithApiStrict::kAlways,
+                 AllowedWithClientType::kAny});
+            return true;
+        }();
+        (void)kRegistered;
     }
 
     void tearDown() override {
@@ -894,6 +937,41 @@ TEST_F(ServerlessViewCatalogFixture, ModifyViewBelongingToTenantFeatureFlagOn) {
     builder << kTinyMatchStage;
     ASSERT_OK(modifyView(operationContext(), viewName, viewOn, builder.arr()));
     ASSERT_EQ(lookup(operationContext(), viewName)->pipeline().size(), 1);
+}
+
+TEST_F(ViewCatalogFixture, CreateViewSucceedsAfterIfrFlagRetry) {
+    // LiteParsedTestIfrRetryTripStage throws IFRFlagRetry(gTestIfrRetryTripFlag) the first time it
+    // is lite-parsed with a fresh IFRContext (since gTestIfrRetryTripFlag defaults to enabled), and
+    // only stops throwing once the IFRContext reports the flag as disabled.
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
+
+    auto pipeline = BSON_ARRAY(BSON(LiteParsedTestIfrRetryTripStage::kStageName << BSONObj()));
+
+    ASSERT_OK(createView(operationContext(), viewName, viewOn, pipeline, emptyCollation));
+
+    auto viewDefinition = lookup(operationContext(), viewName);
+    ASSERT(viewDefinition);
+    ASSERT_EQ(viewDefinition->pipeline().size(), 1);
+}
+
+TEST_F(ViewCatalogFixture, ModifyViewSucceedsAfterIfrFlagRetry) {
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
+
+    // Start with a view that has an empty (trivially valid) pipeline.
+    ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
+
+    // Now modify it to use a pipeline that trips IFRFlagRetry on the first lite-parse attempt.
+    // validatePipeline() should retry internally (disabling gTestIfrRetryTripFlag on its
+    // IFRContext) and succeed rather than letting the exception propagate out of modifyView().
+    auto pipeline = BSON_ARRAY(BSON(LiteParsedTestIfrRetryTripStage::kStageName << BSONObj()));
+
+    ASSERT_OK(modifyView(operationContext(), viewName, viewOn, pipeline));
+
+    auto viewDefinition = lookup(operationContext(), viewName);
+    ASSERT(viewDefinition);
+    ASSERT_EQ(viewDefinition->pipeline().size(), 1);
 }
 
 }  // namespace

@@ -746,8 +746,10 @@ ResolvedViewAggExState::ResolvedViewAggExState(AggExState&& baseState,
           view.timeseries() ? _originalAggReqDerivatives->request.getCollation() : boost::none))),
       _resolvedViewRequest_DO_NOT_USE_DIRECTLY(PipelineResolver::buildRequestWithResolvedPipeline(
           _ifrContext, _resolvedNamespace, _originalAggReqDerivatives->request)),
-      _resolvedViewLiteParsedPipeline_DO_NOT_USE_DIRECTLY(_resolvedViewRequest_DO_NOT_USE_DIRECTLY,
-                                                          true) {
+      _resolvedViewLiteParsedPipeline_DO_NOT_USE_DIRECTLY(
+          _resolvedViewRequest_DO_NOT_USE_DIRECTLY,
+          true,
+          LiteParserOptions{.ifrContext = _ifrContext}) {
     bool isExplain = _originalAggReqDerivatives->request.getExplain().get_value_or(false);
     uassert(std::move(_resolvedNamespace),
             "Explain of a resolved view must be executed by mongos",

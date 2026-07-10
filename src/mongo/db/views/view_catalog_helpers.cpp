@@ -40,6 +40,8 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/ifr_flag_retry_info.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -50,6 +52,7 @@
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/util/retry.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
@@ -73,17 +76,39 @@
 namespace mongo {
 namespace view_catalog_helpers {
 
+namespace {
+LiteParsedPipeline liteParseAndValidateWithIfrRetry(const OperationContext* opCtx,
+                                                    const NamespaceString& nss,
+                                                    const std::vector<BSONObj>& pipeline,
+                                                    bool performApiVersionChecks) {
+    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
+
+    return retryOn<ErrorCodes::IFRFlagRetry>(
+        "validateViewPipeline",
+        [&] {
+            LiteParsedPipeline liteParsedPipeline(
+                nss, pipeline, false, LiteParserOptions{.ifrContext = ifrContext});
+            liteParsedPipeline.validate(opCtx, performApiVersionChecks);
+            return liteParsedPipeline;
+        },
+        kDefaultMaxRetries,
+        [&](const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex) {
+            auto* flag = IncrementalRolloutFeatureFlag::findByName(
+                ex.extraInfo<IFRFlagRetryInfo>()->getDisabledFlagName());
+            ifrContext->disableFlag(*flag);
+        });
+}
+}  // namespace
+
 StatusWith<stdx::unordered_set<NamespaceString>> validatePipeline(OperationContext* opCtx,
                                                                   const ViewDefinition& viewDef) {
-    const LiteParsedPipeline liteParsedPipeline(viewDef.viewOn(), viewDef.pipeline());
-
     // The API version pipeline validation should be skipped for time-series view because of
     // following reasons:
     //     - the view pipeline is not created by (or visible to) the end-user and should be skipped.
     //     - the view pipeline can have stages that are not allowed in stable API version '1' eg.
     //       '$_internalUnpackBucket'.
-    bool performApiVersionChecks = !viewDef.timeseries();
-    liteParsedPipeline.validate(opCtx, performApiVersionChecks);
+    const LiteParsedPipeline liteParsedPipeline = liteParseAndValidateWithIfrRetry(
+        opCtx, viewDef.viewOn(), viewDef.pipeline(), !viewDef.timeseries());
     liteParsedPipeline.checkStagesAllowedInViewDefinition();
 
     // Verify that this is a legitimate pipeline specification by making sure it parses
