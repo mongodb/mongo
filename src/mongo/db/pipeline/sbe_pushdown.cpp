@@ -150,7 +150,7 @@ SbeCompatibility determineSbeCompatibility(DocumentSourceLookUp* lookup) {
                 ->getQueryKnobConfiguration()
                 .getSbeDisableLookupUnwindPushdownForOp()) {
             sbeCompatibility = SbeCompatibility::notCompatible;
-        } else if (!feature_flags::gFeatureFlagSbeEqLookupUnwind.checkWithContext(
+        } else if (!feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.checkWithContext(
                        lookup->getExpCtx()->getVersionContext(),
                        *lookup->getExpCtx()->getIfrContext(),
                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
@@ -545,7 +545,7 @@ size_t getNumSbeCompatibleStagesForPushdown(
  *   - The foreign collection is fully local to this node, is not a view, and is not timeseries,
  *     since timeseries collections always require a pipeline.
  *   - Either there is no absorbed $unwind stage ('_unwindSrc' is null), or SBE $lookup-$unwind
- *     pushdown is enabled ('featureFlagSbeEqLookupUnwind' or 'trySbeEngine' is on and
+ *     pushdown is enabled ('featureFlagGetExecutorDeferredEngineChoice' or 'trySbeEngine' is on and
  *     'internalQuerySlotBasedExecutionDisableLookupUnwindPushdown' is false).
  *   - There is no absorbed $match stage ('_matchSrc').
  *

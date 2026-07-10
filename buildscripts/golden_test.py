@@ -506,7 +506,6 @@ class GoldenTestApp(object):
                     "--additionalFeatureFlags=featureFlagSbeFull",
                     "--disableFeatureFlags=featureFlagGetExecutorDeferredEngineChoice",
                 ],
-                ["--additionalFeatureFlags=featureFlagSbeEqLookupUnwind"],
             ]:
                 resmoke_invocations.append(["--suite", suites[0], *flag])
 

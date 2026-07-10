@@ -32,7 +32,6 @@
 
 rollout:
   featureFlagGetExecutorDeferredEngineChoice: {}
-  featureFlagSbeEqLookupUnwind: {}
   featureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin: {}
   featureFlagSbeEqLookupUnwindHashJoin: {}
   featureFlagSbeEqLookupUnwindIndexedLoopJoin: {}

@@ -80,19 +80,19 @@ function runAllExamples() {
     for (const flags of [
         {
             featureFlagSbeNonLeadingMatch: false,
-            featureFlagSbeEqLookupUnwind: false,
+            featureFlagGetExecutorDeferredEngineChoice: false,
             featureFlagSbeTransformStages: false,
         },
         {
             featureFlagSbeNonLeadingMatch: true,
-            featureFlagSbeEqLookupUnwind: true,
+            featureFlagGetExecutorDeferredEngineChoice: true,
             featureFlagSbeTransformStages: true,
         },
     ]) {
         const params = {internalQueryFrameworkControl: "trySbeRestricted", ...flags};
         const allOn = flags.featureFlagSbeNonLeadingMatch;
         const useSbe = sbeFull || allOn;
-        const useSbeForEx3Plan = useSbe && !isDeferredGetExecutor;
+        const useSbeForEx3Plan = sbeFull;
         const ctx = tojson(params);
 
         runWithParamsAllNonConfigNodes(db, params, () => {

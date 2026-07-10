@@ -27,12 +27,12 @@ import {
 import {
     checkSbeFullyEnabled,
     checkSbeRestrictedOrFullyEnabled,
-    checkSbeEqLookupUnwindEnabled,
+    isDeferredGetExecutorEnabled,
 } from "jstests/libs/query/sbe_util.js";
 
 const isSBEFullyEnabled = checkSbeFullyEnabled(db);
 const isSBELookupEnabled = checkSbeRestrictedOrFullyEnabled(db);
-const isSBEEqLookupUnwindEnabled = checkSbeEqLookupUnwindEnabled(db);
+const deferredGetExecutorEnabled = isDeferredGetExecutorEnabled(db);
 const testDB = db.getSiblingDB("lookup_query_stats");
 testDB.dropDatabase();
 
@@ -133,7 +133,7 @@ let checkExplainOutputForVerLevel = function (
     withUnwind,
 ) {
     // Only make SBE specific assertions when we know that our $lookup has been pushed down.
-    if (isSBEFullyEnabled || (isSBELookupEnabled && (isSBEEqLookupUnwindEnabled || !withUnwind))) {
+    if (isSBEFullyEnabled || (isSBELookupEnabled && (deferredGetExecutorEnabled || !withUnwind))) {
         // If the SBE lookup is enabled, the "$lookup" stage is pushed down to the SBE and it's
         // not visible in 'stages' field of the explain output. Instead, 'queryPlan.stage' must be
         // "EQ_LOOKUP" or "EQ_LOOKUP_UNWIND".
@@ -320,7 +320,7 @@ let testQueryExecutorStatsWithCollectionScan = function (params) {
 
     if (
         isSBEFullyEnabled ||
-        (isSBELookupEnabled && (isSBEEqLookupUnwindEnabled || !params.withUnwind))
+        (isSBELookupEnabled && (deferredGetExecutorEnabled || !params.withUnwind))
     ) {
         checkExplainOutputForAllVerbosityLevels(
             localColl,
@@ -433,7 +433,7 @@ let testQueryExecutorStatsWithIndexScan = function (params) {
 
     if (
         isSBEFullyEnabled ||
-        (isSBELookupEnabled && (isSBEEqLookupUnwindEnabled || !params.withUnwind))
+        (isSBELookupEnabled && (deferredGetExecutorEnabled || !params.withUnwind))
     ) {
         checkExplainOutputForAllVerbosityLevels(
             localColl,
@@ -515,7 +515,7 @@ let testQueryExecutorStatsWithDynamicIndexedLoopJoin = function (params) {
 
     if (
         isSBEFullyEnabled ||
-        (isSBELookupEnabled && (isSBEEqLookupUnwindEnabled || !params.withUnwind))
+        (isSBELookupEnabled && (deferredGetExecutorEnabled || !params.withUnwind))
     ) {
         checkExplainOutputForAllVerbosityLevels(
             localColl,

@@ -451,13 +451,6 @@ feature_flags:
         fcv_gated: false
         incremental_rollout_phase: release
 
-    featureFlagSbeEqLookupUnwind:
-        description: "Feature flag to enable $lookup-$unwind in SBE."
-        cpp_varname: gFeatureFlagSbeEqLookupUnwind
-        default: true
-        fcv_gated: false
-        incremental_rollout_phase: rollout
-
     featureFlagSbeEqLookupUnwindHashJoin:
         description: "Enables executing $lookup-$unwind in SBE using the hash join strategy."
         cpp_varname: gFeatureFlagSbeEqLookupUnwindHashJoin

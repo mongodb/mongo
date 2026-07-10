@@ -9,7 +9,7 @@
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeEqLookupUnwindEnabled} from "jstests/libs/query/sbe_util.js";
+import {isDeferredGetExecutorEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod({setParameter: {featureFlagPathArrayness: true}});
 const db = conn.getDB(`${jsTestName()}_db`);
@@ -112,8 +112,8 @@ setServerParameters({
     assertNonOptimizedLookups(
         coll,
         pipeline,
-        checkSbeEqLookupUnwindEnabled(db)
-            ? 1 /* need SBE fully enabled to pushdown lookup unwind*/
+        isDeferredGetExecutorEnabled(db)
+            ? 1 /* need deferred get executor enabled to pushdown lookup unwind*/
             : 0,
     );
 }
@@ -132,8 +132,8 @@ setServerParameters({
     assertNonOptimizedLookups(
         coll,
         pipeline,
-        checkSbeEqLookupUnwindEnabled(db)
-            ? 1 /* need SBE fully enabled to pushdown lookup unwind*/
+        isDeferredGetExecutorEnabled(db)
+            ? 1 /* need deferred get executor enabled to pushdown lookup unwind*/
             : 0,
     );
 }

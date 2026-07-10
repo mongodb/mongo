@@ -4,9 +4,9 @@
  * randomized permutation of the 7 flags, runs a set of queries and asserts that the engine
  * selection (SBE vs Classic) matches the expected outcome.
  *
- * Requires featureFlagSbeEqLookupUnwind and featureFlagGetExecutorDeferredEngineChoice to be on
- * since plan-based engine selection only fires when both are active. The test enables both flags
- * itself via MongoRunner.runMongod setParameter, so no suite-level flag is needed.
+ * Requires featureFlagGetExecutorDeferredEngineChoice to be on since plan-based engine selection
+ * only fires when the flag is active. The test enables the flag itself via MongoRunner.runMongod
+ * setParameter, so no suite-level flag is needed.
  *
  * @tags: [
  *  # This test expects join optimization to be off.
@@ -26,7 +26,6 @@ import {checkSbeCompletelyDisabled, checkSbeFullyEnabled} from "jstests/libs/que
 
 const conn = MongoRunner.runMongod({
     setParameter: {
-        featureFlagSbeEqLookupUnwind: true,
         featureFlagGetExecutorDeferredEngineChoice: true,
     },
 });

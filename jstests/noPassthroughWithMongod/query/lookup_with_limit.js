@@ -6,7 +6,7 @@ import {
     checkSbeFullFeatureFlagEnabled,
     checkSbeFullyEnabled,
     checkSbeRestrictedOrFullyEnabled,
-    checkSbeEqLookupUnwindEnabled,
+    isDeferredGetExecutorEnabled,
 } from "jstests/libs/query/sbe_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
@@ -20,7 +20,7 @@ const forceClassicEngineSet =
 const isFeatureFlagSbeFullEnabled = checkSbeFullFeatureFlagEnabled(db);
 const isSbeEnabled = checkSbeFullyEnabled(db);
 const isSbeGroupLookupOnly = checkSbeRestrictedOrFullyEnabled(db);
-const isSbeEqLookupUnwind = checkSbeEqLookupUnwindEnabled(db) && !forceClassicEngineSet;
+const isLookupUnwindPushdownEnabled = isDeferredGetExecutorEnabled(db) && !forceClassicEngineSet;
 const isSbeTransformStagesEnabled =
     FeatureFlagUtil.isPresentAndEnabled(db, "SbeTransformStages") && !forceClassicEngineSet;
 
@@ -142,7 +142,7 @@ if (isFeatureFlagSbeFullEnabled) {
 } else if (isSbeEnabled) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$limit"]);
     checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP_UNWIND", "LIMIT"]);
-} else if (isSbeEqLookupUnwind) {
+} else if (isLookupUnwindPushdownEnabled) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$limit"]);
     checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP_UNWIND", "$limit"]);
 } else if (isSbeGroupLookupOnly) {
@@ -215,7 +215,7 @@ if (isFeatureFlagSbeFullEnabled) {
 } else if (isSbeEnabled) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$sort", "$limit"]);
     checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP_UNWIND", "SORT"]);
-} else if (isSbeEqLookupUnwind) {
+} else if (isLookupUnwindPushdownEnabled) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$sort", "$limit"]);
     checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP_UNWIND", "$sort"]);
 } else if (isSbeGroupLookupOnly) {

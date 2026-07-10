@@ -27,16 +27,16 @@ if (checkSbeCompletelyDisabled(db) || checkSbeFullyEnabled(db)) {
     quit();
 }
 
-// featureFlagSbeEqLookupUnwind is an IFR rollout flag that controls whether $lookup-$unwind runs
-// in SBE. disableUnreleasedIFRFlags disables it even though this test doesn't set it explicitly,
+// featureFlagSbeEqLookupUnwindHashJoin is an IFR rollout flag that controls whether $lookup-$unwind runs
+// in SBE for hash joins. disableUnreleasedIFRFlags disables it even though this test doesn't set it explicitly,
 // which would cause the query to fall back to classic despite featureFlagGetExecutorDeferredEngineChoice
 // being on.
-const lookupUnwindFlagEnabled = assert.commandWorked(
-    db.adminCommand({getParameter: 1, featureFlagSbeEqLookupUnwind: 1}),
-).featureFlagSbeEqLookupUnwind.value;
-if (!lookupUnwindFlagEnabled) {
+const lookupUnwindHashJoinEnabled = assert.commandWorked(
+    db.adminCommand({getParameter: 1, featureFlagSbeEqLookupUnwindHashJoin: 1}),
+).featureFlagSbeEqLookupUnwindHashJoin.value;
+if (!lookupUnwindHashJoinEnabled) {
     jsTest.log(
-        "Exiting early because featureFlagSbeEqLookupUnwind is disabled " +
+        "Exiting early because featureFlagSbeEqLookupUnwindHashJoin is disabled " +
             "(e.g. by disableUnreleasedIFRFlags).",
     );
     MongoRunner.stopMongod(conn);
@@ -61,7 +61,7 @@ const explain = localColl
         {$lookup: {from: "foreignColl", as: "res", localField: "a", foreignField: "a"}},
         {$unwind: "$res"},
     ]);
-assert.eq(getEngine(explain), "sbe");
+assert.eq(getEngine(explain), "sbe", explain);
 
 const logs = assert.commandWorked(db.adminCommand({getLog: "global"})).log;
 const planSelectionLogs = logs.filter((log) => log.includes("11986305"));
