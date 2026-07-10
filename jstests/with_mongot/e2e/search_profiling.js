@@ -105,7 +105,13 @@ function checkLog(log, comment, ndocs) {
 
     assert.eq(slowQueryLog.attr.keysExamined, ndocs, slowQueryLog);
     assert.eq(slowQueryLog.attr.docsExamined, ndocs, slowQueryLog);
-    assert(slowQueryLog.attr.hasOwnProperty("mongot"), slowQueryLog);
+    // The extension reports the same metrics under extensionMetrics.$_extensionSearch, not `mongot`.
+    assert(
+        slowQueryLog.attr.hasOwnProperty("mongot") ||
+            (slowQueryLog.attr.extensionMetrics &&
+                slowQueryLog.attr.extensionMetrics.hasOwnProperty("$_extensionSearch")),
+        slowQueryLog,
+    );
 }
 const log = assert.commandWorked(db.adminCommand({getLog: "global"})).log;
 checkLog(log, queryComment, 2);
