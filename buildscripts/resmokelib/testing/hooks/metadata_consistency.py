@@ -30,7 +30,14 @@ class CheckMetadataConsistencyInBackground(jsfile.PerClusterDataConsistencyHook)
         # checkMetadataConsistency fail with QueryExceededMemoryLimitNoDiskUseAllowed error.
         "jstests/aggregation/sources/unionWith/unionWith.js",
         "jstests/core/query/release_memory/group.js",
-        "jstests/core_sharding/ddl/check_metadata_consistency_basic.js",
+        # Skip tests that enable the 'simulateAvailableDiskSpace' failpoint on all primaries, which
+        # makes a concurrent checkMetadataConsistency aggregation fail with OutOfDiskSpace.
+        "jstests/core/query/release_memory/graph_lookup.js",
+        "jstests/core/query/release_memory/hash_lookup.js",
+        "jstests/core/query/release_memory/hash_lookup_unwind.js",
+        "jstests/core/query/release_memory/set_window_fields.js",
+        "jstests/core/query/release_memory/sort.js",
+        "jstests/core/query/release_memory/text_or.js",
     ]
 
     if _IS_WINDOWS:
