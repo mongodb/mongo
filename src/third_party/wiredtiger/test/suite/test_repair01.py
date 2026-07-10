@@ -31,10 +31,8 @@ from helper_disagg import DisaggConfigMixin, gen_disagg_storages
 from wtscenario import make_scenarios
 
 # test_repair01.py
-#    Exercise the wiredtiger_repair() API for config-error paths, fetch_database_size, and
-#    fetch_metadata. All run in non-disaggregated and disaggregated scenarios; the disagg scenario
-#    additionally cross-validates the reported size against the disagg_database_size connection
-#    statistic and exercises the shared (page-server-durable) metadata read.
+#    Exercise the wiredtiger_repair() API (config errors, fetch_database_size, fetch_metadata) and
+#    the related operations, in both non-disaggregated and disaggregated scenarios.
 class test_repair01(wttest.WiredTigerTestCase, DisaggConfigMixin):
     conn_base_config = 'statistics=(all),'
     scenarios = make_scenarios(gen_disagg_storages(disagg_only=False))
@@ -67,17 +65,34 @@ class test_repair01(wttest.WiredTigerTestCase, DisaggConfigMixin):
         result = self.repair('fetch_database_size=(local=true)')
         return int(re.search(r': (\d+)$', result).group(1))
 
+    def checkpoint_size_fix(self, expect_triggered=False):
+        pattern = r'disagg database size fix: recomputed database size -> \d+'
+        assertion = self.assertRegex if expect_triggered else self.assertNotRegex
+
+        self.conn.reconfigure('verbose=[disaggregated_storage:1]')
+        try:
+            with self.customStdoutPattern(lambda output: assertion(output, pattern)):
+                self.session.checkpoint('debug=(database_size_fix=true)')
+        finally:
+            self.conn.reconfigure('verbose=[disaggregated_storage:0]')
+
     def test_config_errors(self):
         self.assertIn('wiredtiger_repair: empty config', self.repair(''))
         self.assertIn('No command found', self.repair('uri="table:tbl"'))
-        # local=false so the collision is what fires, not the (now local=true-only) disagg guard.
+
+        if not self.is_disagg_scenario():
+            return
+
+        # fetch_database_size is checked first regardless of scenario, and always requires a
+        # disagg connection with a picked-up checkpoint, so populate() first to get past that
+        # guard and reach the collision check.
+        self.populate()
         self.assertIn('Only one command is allowed', self.repair(
-            'fetch_database_size=(local=false),fetch_metadata=(local=true)'))
+            'fetch_database_size=(local=true),fetch_metadata=(local=true)'))
 
     def test_fetch_metadata(self):
         self.populate()
 
-        # A whole-value local fetch equals the metadata cursor's value for the same uri.
         cursor = self.session.open_cursor('metadata:')
         cursor.set_key(self.uri)
         self.assertEqual(cursor.search(), 0)
@@ -85,8 +100,6 @@ class test_repair01(wttest.WiredTigerTestCase, DisaggConfigMixin):
             self.repair(f'fetch_metadata=(local=true,uri="{self.uri}")'))
         cursor.close()
 
-        # A key-scoped fetch returns just that value; absent keys and uris are reported, not
-        # errors.
         self.assertIn(f'{self.uri}: key_format=S',
             self.repair(f'fetch_metadata=(local=true,uri="{self.uri}",key="key_format")'))
         self.assertIn(f'{self.uri}: <no "nope">',
@@ -94,9 +107,7 @@ class test_repair01(wttest.WiredTigerTestCase, DisaggConfigMixin):
         self.assertIn('<no matching metadata entry for uri:"table:missing">',
             self.repair('fetch_metadata=(local=true,uri="table:missing")'))
 
-        # An empty uri/key is treated as absent, not as a literal target that matches nothing:
-        # empty (or absent) uri means all URIs, empty (or absent) key means the whole value. The
-        # empty and absent spellings must produce byte-identical reports.
+        # Absent and empty uri/key must be equivalent, not "matches nothing".
         all_uris = self.repair('fetch_metadata=(local=true)')
         self.assertIn(f'{self.uri}: ', all_uris)
         self.assertNotIn('<no matching metadata entry', all_uris)
@@ -106,7 +117,6 @@ class test_repair01(wttest.WiredTigerTestCase, DisaggConfigMixin):
         self.assertEqual(whole_value,
             self.repair(f'fetch_metadata=(local=true,uri="{self.uri}",key="")'))
 
-        # The shared (page-server-durable) metadata read is disaggregated-only.
         if self.is_disagg_scenario():
             self.assertIn(self.uri,
                 self.repair(f'fetch_metadata=(local=false,uri="{self.uri}")'))
@@ -117,17 +127,68 @@ class test_repair01(wttest.WiredTigerTestCase, DisaggConfigMixin):
     def test_fetch_database_size(self):
         self.populate()
 
-        # local=false is not yet implemented (FIXME-WT-17945); unlike local=true it does not
-        # require a disaggregated connection just to attempt the command.
-        self.assertIn('not yet supported', self.repair('fetch_database_size=(local=false)'))
-
         if not self.is_disagg_scenario():
             self.assertIn('requires a disaggregated connection',
                 self.repair('fetch_database_size=(local=true)'))
+            self.assertIn('requires a disaggregated connection',
+                self.repair('fetch_database_size=(local=false)'))
             return
 
-        # Cross-validate against the disagg_database_size connection statistic.
         reported = self.reported_size()
         stat_size = self.get_stat(wiredtiger.stat.conn.disagg_database_size)
         self.assertEqual(reported, stat_size)
         self.assertGreater(reported, 0)
+
+        # local=false recomputes from the metadata; absent drift it matches local=true exactly.
+        self.assertIn(f'fetch_database_size(recompute): {stat_size}',
+            self.repair('fetch_database_size=(local=false)'))
+
+    def test_fix_size(self):
+        self.populate()
+
+        if not self.is_disagg_scenario():
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                lambda: self.checkpoint_size_fix(),
+                '/requires a disaggregated leader connection/')
+            return
+
+        stat_size = self.get_stat(wiredtiger.stat.conn.disagg_database_size)
+
+        # Absent any drift, the recompute matches the incrementally-tracked total.
+        self.checkpoint_size_fix(expect_triggered=True)
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.disagg_database_size), stat_size)
+
+        # Drop a second, already-checkpointed table and grow the main one before fixing, so the
+        # recompute has to reflect real change, not just replay the old total.
+        extra_uri = 'layered:tbl_fix_size_extra'
+        self.session.create(extra_uri, 'key_format=S,value_format=S')
+        cursor = self.session.open_cursor(extra_uri)
+        for i in range(50):
+            cursor['key%06d' % i] = 'v' * 500
+        cursor.close()
+        self.session.checkpoint()  # settle first, or dropping it can hit its own dirty data
+
+        pre_change_size = self.get_stat(wiredtiger.stat.conn.disagg_database_size)
+        cursor = self.session.open_cursor(self.uri)
+        for i in range(1000, 4000):
+            cursor['key%06d' % i] = 'v' * 200
+        cursor.close()
+        self.session.drop(extra_uri)
+
+        self.checkpoint_size_fix(expect_triggered=True)
+
+        changed = self.reported_size()
+        self.assertGreater(changed, pre_change_size)
+        self.assertEqual(changed, self.get_stat(wiredtiger.stat.conn.disagg_database_size))
+
+        # Cross-check against the independent __wt_verify_disagg_database_size path, only
+        # reachable via verify_metadata=true at open.
+        self.reopen_conn(config=self.conn_config() + 'verify_metadata=true,')
+        self.ignoreStdoutPatternIfExists('Removing local file due to disagg mode')
+
+        # A follower's session.checkpoint() is already a no-op skip at the session API layer
+        # (standby has nothing to checkpoint), so it never reaches the leader-only guard in
+        # __checkpoint_parse_config; it just needs to not raise or change the size.
+        self.conn.reconfigure('disaggregated=(role="follower")')
+        self.checkpoint_size_fix()
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.disagg_database_size), changed)

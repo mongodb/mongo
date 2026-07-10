@@ -67,13 +67,13 @@ class test_layered_checkpoint12(wttest.WiredTigerTestCase):
         self.close_conn()
         with self.customStdoutPattern(
             lambda output: self.assertNotRegex(
-                output, r'disagg database size verify: .*checkpoint size')):
+                output, r'disagg database size: .*checkpoint size')):
             self.open_conn(config=self._follower_config())
 
         # Reopen again with checkpoint metadata so startup picks up the latest
         # checkpoint and runs the database-size verification branch.
         with self.expectedStdoutPattern(
-            r'disagg database size verify: .*checkpoint size', maxchars=30000):
+            r'disagg database size: .*checkpoint size', maxchars=30000):
             self.reopen_conn(config=self._follower_config(checkpoint_meta))
 
         # test_layered*.py modules run layered verify during teardown. Ignore the

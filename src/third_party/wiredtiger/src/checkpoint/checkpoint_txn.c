@@ -35,6 +35,7 @@ typedef struct {
 
 typedef struct {
     bool can_skip;
+    bool database_size_fix;
     bool force;
     bool flush_tier_enabled;
     bool flush_tier_force;
@@ -882,15 +883,19 @@ __checkpoint_verbose_track(WT_SESSION_IMPL *session, const char *msg)
  * __checkpoint_update_disagg_database_size --
  *     On completion of the checkpoint, update the database size in disaggregated storage.
  */
-static void
-__checkpoint_update_disagg_database_size(WT_SESSION_IMPL *session, uint64_t drop_size)
+static int
+__checkpoint_update_disagg_database_size(
+  WT_SESSION_IMPL *session, uint64_t drop_size, bool database_size_fix)
 {
     WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
+    uint64_t recomputed_size;
+    bool recomputed;
 
     conn = S2C(session);
 
     if (!__wt_conn_is_disagg(session))
-        return;
+        return (0);
 
     /*
      * If this is a newly created database, add a 1MB buffer onto the database's size. This is done
@@ -902,12 +907,34 @@ __checkpoint_update_disagg_database_size(WT_SESSION_IMPL *session, uint64_t drop
         conn->disaggregated_storage.database_size = WT_DISAGG_CHECKPOINT_SIZE_BUFFER;
 
     /*
-     * Apply the accumulated size delta to the in-memory database_size now that the checkpoint has
-     * succeeded. Positive deltas occur when data is added during the checkpoint. Negative deltas
-     * occur when data is removed reducing the total storage footprint. Guard against
-     * overflow/underflow in both cases.
+     * The repair database flow asks us to recompute the database size from the metadata from
+     * scratch, superseding the incremental delta below, since the metadata already reflects this
+     * checkpoint's own sizes. A recompute error fails the checkpoint instead of falling back, since
+     * the caller explicitly asked for this recompute and needs to know.
      */
-    if (session->ckpt.ckpt_size_delta != 0) {
+    recomputed = false;
+    if (database_size_fix) {
+        if ((ret = __wt_disagg_get_database_size(session, &recomputed_size)) != 0) {
+            __wt_verbose_error(session, WT_VERB_DISAGGREGATED_STORAGE,
+              "disagg database size fix: failed to recompute database size: %s",
+              __wt_strerror(session, ret, NULL, 0));
+            return (ret);
+        }
+
+        recomputed_size += WT_DISAGG_CHECKPOINT_SIZE_BUFFER;
+        __wt_disagg_set_database_size(session, recomputed_size);
+        __wt_verbose(session, WT_VERB_DISAGGREGATED_STORAGE,
+          "disagg database size fix: recomputed database size -> %" PRIu64, recomputed_size);
+        recomputed = true;
+    }
+
+    /*
+     * Apply the accumulated size delta to the in-memory database_size now that the checkpoint has
+     * succeeded, unless the recompute above already replaced it. Positive deltas occur when data is
+     * added during the checkpoint. Negative deltas occur when data is removed reducing the total
+     * storage footprint. Guard against overflow/underflow in both cases.
+     */
+    if (!recomputed && session->ckpt.ckpt_size_delta != 0) {
         uint64_t db;
         int64_t delta;
 
@@ -930,6 +957,7 @@ __checkpoint_update_disagg_database_size(WT_SESSION_IMPL *session, uint64_t drop
      */
     WT_ASSERT(
       session, conn->disaggregated_storage.database_size >= WT_DISAGG_CHECKPOINT_SIZE_BUFFER);
+    return (0);
 }
 
 /*
@@ -1317,6 +1345,13 @@ __checkpoint_parse_config(
 
     WT_RET(__wt_config_gets(session, cfg, "drop", &cval));
     ckpt_cfg->drop = cval.len != 0;
+
+    WT_RET(__wt_config_gets(session, cfg, "debug.database_size_fix", &cval));
+    ckpt_cfg->database_size_fix = cval.val != 0;
+    if (ckpt_cfg->database_size_fix &&
+      !(__wt_conn_is_disagg(session) && S2C(session)->layered_table_manager.leader))
+        WT_RET_MSG(
+          session, ENOTSUP, "database_size_fix requires a disaggregated leader connection");
 
     return (0);
 }
@@ -1909,7 +1944,8 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
     }
 
     /* Disaggregated storage database size accounting. */
-    __checkpoint_update_disagg_database_size(session, drop_size);
+    WT_ERR(
+      __checkpoint_update_disagg_database_size(session, drop_size, ckpt_cfg.database_size_fix));
 
     WT_STAT_CONN_INCR(session, checkpoints_total_succeed);
 

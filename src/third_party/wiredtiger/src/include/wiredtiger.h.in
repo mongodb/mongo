@@ -1954,6 +1954,9 @@ struct __wt_session {
      * trigger a controlled crash during the checkpoint process.  Lower values will trigger crashes
      * in the initial phase of checkpoint\, while higher values will result in crashes in the final
      * phase of the checkpoint process., an integer between \c 0 and \c 1000; default \c 0.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;database_size_fix, if true\, recompute the disaggregated
+     * database size from the sum of all the collections' latest checkpoint sizes\, instead of
+     * applying the incremental delta., a boolean flag; default \c false.}
      * @config{ ),,}
      * @config{drop, specify a list of checkpoints to drop.  The list may additionally contain one
      * of the following keys: \c "from=all" to drop all checkpoints\, \c "from=<checkpoint>" to drop

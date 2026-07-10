@@ -18,8 +18,7 @@ struct __wt_repair_config {
     int command;
 
     struct {
-        /*
-         * FIXME-WT-17945: support local=false to dynamically recalculate the database size.
+        /* local=false recomputes the size from the metadata instead of reading the running total.
          */
         bool local;
     } fetch_database_size;
@@ -54,28 +53,24 @@ static int __repair_fetch_metadata(WT_SESSION_IMPL *, WT_ITEM *, const char *, c
         goto err;                                                     \
     } while (0)
 
-#define WT_RET_REPORT(session, v, ...)                                \
-    do {                                                              \
-        int __ret = (v);                                              \
-        WT_IGNORE_RET(__wt_buf_catfmt(session, report, __VA_ARGS__)); \
-        return (__ret);                                               \
-    } while (0)
-
 /*
  * __repair_fetch_database_size --
- *     Read-only database size inspection: return the in-memory database size.
+ *     Read-only database size inspection: local=true returns the maintained total; local=false
+ *     recomputes it from the metadata.
  */
 static int
 __repair_fetch_database_size(WT_SESSION_IMPL *session, WT_ITEM *report, bool is_local)
 {
-    /*
-     * FIXME-WT-17945: support local=false to dynamically recalculate the database size.
-     */
-    if (is_local == false)
-        WT_RET_REPORT(session, ENOTSUP, "fetch_database_size(local=false) is not yet supported");
+    uint64_t database_size;
 
-    WT_RET(__wt_buf_catfmt(session, report, "fetch_database_size(local): %" PRIu64,
-      S2C(session)->disaggregated_storage.database_size));
+    if (is_local)
+        WT_RET(__wt_buf_catfmt(session, report, "fetch_database_size(local): %" PRIu64,
+          S2C(session)->disaggregated_storage.database_size));
+    else {
+        WT_RET(__wt_disagg_get_database_size(session, &database_size));
+        WT_RET(__wt_buf_catfmt(session, report, "fetch_database_size(recompute): %" PRIu64,
+          database_size + WT_DISAGG_CHECKPOINT_SIZE_BUFFER));
+    }
     return (0);
 }
 
@@ -180,11 +175,10 @@ __repair_config_set_command(WT_SESSION_IMPL *session, WT_ITEM *report, WT_CONFIG
             repair_config->fetch_database_size.local = item.val != 0;
 
         /*
-         * local=true reads conn->disaggregated_storage.database_size, which is only maintained on a
-         * disaggregated connection. local=false (FIXME-WT-17945, not yet implemented) is not gated
-         * here -- whether its eventual recalculation needs disagg is that ticket's call.
+         * Both variants read or derive conn->disaggregated_storage.database_size, a concept that
+         * only exists on a disaggregated connection.
          */
-        require_disagg = repair_config->fetch_database_size.local;
+        require_disagg = true;
     } else if (repair_config->command == WT_REPAIR_COMMAND_FETCH_METADATA) {
         WT_ERR_NOTFOUND_OK(__wt_config_subgets(session, config_item, "local", &item), true);
         if (WT_CHECK_AND_RESET(ret, WT_NOTFOUND))
@@ -216,10 +210,10 @@ err:
  * __repair_config_decode --
  *     The config is parsed with the normal WT config parser:
  *
- * fetch_database_size=(local=<bool>) Read-only inspection: return the in-memory database size.
- *     local=true (default, disagg-only) reads conn->disaggregated_storage.database_size.
- *     FIXME-WT-17945: local=false to dynamically recalculate the database size is not yet
- *     supported.
+ * fetch_database_size=(local=<bool>) Read-only inspection: return the database size (disagg-only).
+ *     local=true (default) reads conn->disaggregated_storage.database_size, the maintained running
+ *     total. local=false recomputes the same total from scratch by walking the metadata (the same
+ *     computation session->checkpoint(debug=(database_size_fix=true)) uses to correct drift).
  *
  * fetch_metadata=(local=<bool>,uri="<uri>",key="<key>") Read-only inspection: return metadata
  *     values. local=true (default) reads the local metadata cursor; local=false (disagg-only) reads
@@ -279,7 +273,8 @@ wiredtiger_repair(WT_CONNECTION *connection, const char *config)
     conn = (WT_CONNECTION_IMPL *)connection;
     default_session = conn->default_session;
 
-    if (!__wt_atomic_cas_uint8(&conn->repair.op_lock, 0, 1))
+    if (!__wt_atomic_cas_uint8(
+          &conn->repair.state, WT_REPAIR_STATE_IDLE, WT_REPAIR_STATE_OPERATING))
         return ("wiredtiger_repair: another repair operation is in progress");
 
     /*
@@ -297,12 +292,18 @@ wiredtiger_repair(WT_CONNECTION *connection, const char *config)
 
     WT_ERR(__repair_config_decode(session, report, config, &repair_config));
 
-    if (repair_config.command == WT_REPAIR_COMMAND_FETCH_DATABASE_SIZE)
+    switch (repair_config.command) {
+    case WT_REPAIR_COMMAND_FETCH_DATABASE_SIZE:
         WT_ERR(
           __repair_fetch_database_size(session, report, repair_config.fetch_database_size.local));
-    else if (repair_config.command == WT_REPAIR_COMMAND_FETCH_METADATA)
+        break;
+    case WT_REPAIR_COMMAND_FETCH_METADATA:
         WT_ERR(__repair_fetch_metadata(session, report, repair_config.fetch_metadata.uri,
           repair_config.fetch_metadata.key, repair_config.fetch_metadata.local));
+        break;
+    default:
+        WT_ERR(__wt_illegal_value(session, repair_config.command));
+    }
 
 err:
     if (ret != 0)
@@ -315,8 +316,8 @@ err:
     if (session != NULL)
         WT_IGNORE_RET(((WT_SESSION *)session)->close((WT_SESSION *)session, NULL));
 
-    /* Release the repair operation lock. */
-    __wt_atomic_store_uint8(&conn->repair.op_lock, 0);
+    WT_IGNORE_RET(
+      __wt_atomic_cas_uint8(&conn->repair.state, WT_REPAIR_STATE_OPERATING, WT_REPAIR_STATE_IDLE));
 
     return (report->size > 0 ? report->data : "");
 }

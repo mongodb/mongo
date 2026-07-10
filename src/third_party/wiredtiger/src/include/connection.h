@@ -258,10 +258,12 @@ typedef struct __wt_disagg_checkpoint_meta {
 #define WT_DISAGG_CHECKPOINT_SIZE_BUFFER WT_MEGABYTE
 
 struct __wt_repair {
+#define WT_REPAIR_STATE_IDLE 0
+#define WT_REPAIR_STATE_OPERATING 1
     /*
-     * Lock status to avoid concurrent repair operations.
+     * Tracks the status of a repair operation.
      */
-    uint8_t op_lock;
+    wt_shared uint8_t state;
 
     /*
      * Memory space for the last report string. Only hold one report string at a time as it's used
