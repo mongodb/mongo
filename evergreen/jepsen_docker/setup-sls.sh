@@ -22,9 +22,13 @@ aws ecr get-login-password --region us-east-1 |
 git clone --branch=v0.4.0-evergreen-master \
     "https://x-access-token:${jepsen_github_token}@github.com/10gen/jepsen.git" jepsen
 
-# Clone the 10gen/jepsen-io-mongodb SLS test-code release tag into the control
-# image build context so it gets COPYed into the container.
-git clone --branch=v0.4.0 \
+# Clone the 10gen/jepsen-io-mongodb SLS test-code into the control image build
+# context so it gets COPYed into the container. The branch is parameterized via
+# the jepsen_io_mongodb_branch expansion so the replica-set and sharded tasks
+# can pin different tags/branches; it defaults to the sharded feature branch
+# until that work is tagged.
+JEPSEN_IO_MONGODB_BRANCH="${jepsen_io_mongodb_branch:-v0.4.0}"
+git clone --branch="${JEPSEN_IO_MONGODB_BRANCH}" \
     "https://x-access-token:${jepsen_io_github_token}@github.com/10gen/jepsen-io-mongodb.git" \
     jepsen/docker/control/mongodb
 

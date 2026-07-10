@@ -34,8 +34,10 @@ for i in {1..30}; do
     cd ../../
 
     # copy files to expected locations for archiving
+    # store accumulates across iterations; archive only this run (store/latest,
+    # -L to deref the symlink) instead of the whole store to avoid duplication.
     mkdir -p src/jepsen-mongodb/store/test-index${i}
-    sudo docker cp jepsen-control:/jepsen/mongodb/store src/jepsen-mongodb/store/test-index${i}
+    sudo docker cp -L jepsen-control:/jepsen/mongodb/store/latest src/jepsen-mongodb/store/test-index${i}
     cp jepsen/docker/jepsen_test_${i}.log src/jepsen-mongodb/
     sudo docker cp jepsen-control:/jepsen/mongodb src/jepsen-workdir
 

@@ -37,9 +37,9 @@ for i in $(seq 1 ${TEST_COUNT}); do
     sudo docker exec jepsen-control bash --login -c "\
   cd /jepsen/mongodb && \
   lein run test-all -w list-append \
-  -n n1 -n n2 -n n3 -n n4 -n n5 -n n6 \
+  -n n1 -n n2 -n n3 -n n4 -n n5 -n n6 -n n7 -n n8 -n n9 -n n10 -n n11 -n n12 \
   --storage-engine sls \
-  --topology replica-set \
+  --topology sharded \
   --sls-node-count 3 \
   --sls-cell-count 3 \
   -r 1000 \
@@ -56,9 +56,10 @@ for i in $(seq 1 ${TEST_COUNT}); do
 
     cd ../../
 
-    # Copy Jepsen store and logs to archiving locations.
+    # store accumulates across iterations; archive only this run (store/latest,
+    # -L to deref the symlink) instead of the whole store to avoid duplication.
     mkdir -p src/jepsen-mongodb/store/test-index${i}
-    sudo docker cp jepsen-control:/jepsen/mongodb/store src/jepsen-mongodb/store/test-index${i}
+    sudo docker cp -L jepsen-control:/jepsen/mongodb/store/latest src/jepsen-mongodb/store/test-index${i}
     cp jepsen/docker/jepsen_test_${i}.log src/jepsen-mongodb/
     sudo docker cp jepsen-control:/jepsen/mongodb src/jepsen-workdir
     sudo chmod -R +r src/jepsen-workdir || true
@@ -72,13 +73,13 @@ for i in $(seq 1 ${TEST_COUNT}); do
         echo "Test is not successful."
     fi
 
-    # Collect mongod logs (n1-n3) for diagnostics. SLS logs (n4-n6) are
+    # Collect mongod logs (n1-n9) for diagnostics. SLS logs (n10-n12) are
     # gathered separately via Jepsen's log-files protocol (see below).
-    echo "Collecting mongod logs (n1-n3)."
+    echo "Collecting mongod logs (n1-n9)."
 
     mkdir -p src/jepsen-mongodb/mongodlogs/test_${i}
 
-    for n in {1..3}; do
+    for n in {1..9}; do
         # Prefer the mongod log file; fall back to the systemd journal which
         # captures output even when mongod crashes before opening the log.
         sudo docker cp jepsen-n${n}:/var/log/mongodb/mongod.log \
@@ -99,7 +100,7 @@ for i in $(seq 1 ${TEST_COUNT}); do
     done
     sudo chmod -R +r src/jepsen-mongodb/mongodlogs/test_${i}/ || true
 
-    # SLS service logs (n4-n6) are collected via Jepsen's log-files protocol,
+    # SLS service logs (n10-n12) are collected via Jepsen's log-files protocol,
     # which downloads /var/log/sls from each node into the Jepsen store.
     # The store is uploaded by save jepsen sls artifacts via tar_jepsen_results.
 done
