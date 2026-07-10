@@ -83,7 +83,7 @@ describe("OTel query performance counters in sharded cluster", function () {
     it("scanned increments on shard for index-scan queries", function () {
         assertCounterMetricIncreases({
             metricsDir: this.mongodMetricsDir,
-            metricName: "serverStatus.metrics.queryExecutor.scanned",
+            metricName: "mongodb.serverStatus.metrics.queryExecutor.scanned",
             minIncrease: 1,
             fn: () => this.coll.find({x: {$gte: 0, $lt: 5}}).toArray(),
         });
@@ -92,7 +92,7 @@ describe("OTel query performance counters in sharded cluster", function () {
     it("scannedObjects increments on shard for collection-scan queries", function () {
         assertCounterMetricIncreases({
             metricsDir: this.mongodMetricsDir,
-            metricName: "serverStatus.metrics.queryExecutor.scannedObjects",
+            metricName: "mongodb.serverStatus.metrics.queryExecutor.scannedObjects",
             minIncrease: 1,
             fn: () => this.coll.find({y: "value_0"}).toArray(),
         });
@@ -101,7 +101,7 @@ describe("OTel query performance counters in sharded cluster", function () {
     it("returned increments on shard for queries", function () {
         assertCounterMetricIncreases({
             metricsDir: this.mongodMetricsDir,
-            metricName: "serverStatus.metrics.document.returned",
+            metricName: "mongodb.serverStatus.metrics.document.returned",
             minIncrease: 1,
             fn: () => this.coll.find({x: {$gte: 0}}).toArray(),
         });
@@ -121,9 +121,9 @@ describe("OTel query performance counters in sharded cluster", function () {
             () => "fresh mongos metrics snapshot",
         );
         const counterNames = [
-            "serverStatus.metrics.queryExecutor.scanned",
-            "serverStatus.metrics.queryExecutor.scannedObjects",
-            "serverStatus.metrics.document.returned",
+            "mongodb.serverStatus.metrics.queryExecutor.scanned",
+            "mongodb.serverStatus.metrics.queryExecutor.scannedObjects",
+            "mongodb.serverStatus.metrics.document.returned",
         ];
         for (const name of counterNames) {
             assert.eq(

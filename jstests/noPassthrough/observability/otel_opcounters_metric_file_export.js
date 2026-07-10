@@ -51,62 +51,66 @@ describe("OTel opcounters metric file export", function () {
         MongoRunner.stopMongod(this.mongod);
     });
 
-    it("increments opcounters.inserts on insert operations", function () {
+    it("increments opcounters.insert on insert operations", function () {
         const start = new Date();
         const initial =
-            getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.inserts"]?.value ?? 0;
+            getLatestMetrics(this.metricsDir)?.["mongodb.serverStatus.opcounters.insert"]?.value ??
+            0;
 
         assert.commandWorked(this.coll.insert({a: 1}));
         assert.commandWorked(this.coll.insert([{b: 2}, {c: 3}]));
 
         waitForMetric({
             metricsDir: this.metricsDir,
-            metricName: "serverStatus.opcounters.inserts",
+            metricName: "mongodb.serverStatus.opcounters.insert",
             minValue: initial + 3,
             afterDate: start,
         });
     });
 
-    it("increments opcounters.queries on find operations", function () {
+    it("increments opcounters.query on find operations", function () {
         const start = new Date();
         const initial =
-            getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.queries"]?.value ?? 0;
+            getLatestMetrics(this.metricsDir)?.["mongodb.serverStatus.opcounters.query"]?.value ??
+            0;
 
         this.coll.find({}).toArray();
 
         waitForMetric({
             metricsDir: this.metricsDir,
-            metricName: "serverStatus.opcounters.queries",
+            metricName: "mongodb.serverStatus.opcounters.query",
             minValue: initial + 1,
             afterDate: start,
         });
     });
 
-    it("increments opcounters.updates on update operations", function () {
+    it("increments opcounters.update on update operations", function () {
         const start = new Date();
         const initial =
-            getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.updates"]?.value ?? 0;
+            getLatestMetrics(this.metricsDir)?.["mongodb.serverStatus.opcounters.update"]?.value ??
+            0;
 
         assert.commandWorked(this.coll.update({a: 1}, {$set: {a: 99}}));
 
         waitForMetric({
             metricsDir: this.metricsDir,
-            metricName: "serverStatus.opcounters.updates",
+            metricName: "mongodb.serverStatus.opcounters.update",
             minValue: initial + 1,
             afterDate: start,
         });
     });
 
-    it("increments opcounters.deletes on remove operations", function () {
+    it("increments opcounters.delete on remove operations", function () {
         const start = new Date();
         const initial =
-            getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.deletes"]?.value ?? 0;
+            getLatestMetrics(this.metricsDir)?.["mongodb.serverStatus.opcounters.delete"]?.value ??
+            0;
 
         assert.commandWorked(this.coll.remove({a: 99}));
 
         waitForMetric({
             metricsDir: this.metricsDir,
-            metricName: "serverStatus.opcounters.deletes",
+            metricName: "mongodb.serverStatus.opcounters.delete",
             minValue: initial + 1,
             afterDate: start,
         });
@@ -120,7 +124,8 @@ describe("OTel opcounters metric file export", function () {
 
         const start = new Date();
         const initial =
-            getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.getMores"]?.value ?? 0;
+            getLatestMetrics(this.metricsDir)?.["mongodb.serverStatus.opcounters.getmore"]?.value ??
+            0;
 
         this.coll
             .find({x: {$exists: true}})
@@ -129,44 +134,46 @@ describe("OTel opcounters metric file export", function () {
 
         waitForMetric({
             metricsDir: this.metricsDir,
-            metricName: "serverStatus.opcounters.getMores",
+            metricName: "mongodb.serverStatus.opcounters.getmore",
             minValue: initial + 1,
             afterDate: start,
         });
     });
 
-    it("increments opcounters.commands on command operations", function () {
-        // opcounters.commands increments for recognized commands that have no specific counter of
+    it("increments opcounters.command on command operations", function () {
+        // opcounters.command increments for recognized commands that have no specific counter of
         // their own (e.g. ping, serverStatus). 'aggregate', 'find', getMore, and write ops all
         // suppress this counter and increment their own specific counters instead.
         const start = new Date();
         const initial =
-            getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.commands"]?.value ?? 0;
+            getLatestMetrics(this.metricsDir)?.["mongodb.serverStatus.opcounters.command"]?.value ??
+            0;
 
         assert.commandWorked(this.db.runCommand({ping: 1}));
 
         waitForMetric({
             metricsDir: this.metricsDir,
-            metricName: "serverStatus.opcounters.commands",
+            metricName: "mongodb.serverStatus.opcounters.command",
             minValue: initial + 1,
             afterDate: start,
         });
     });
 
-    it("increments opcounters.aggregates on aggregate operations", function () {
-        // opcounters.aggregates increments once per top-level aggregate call only.
+    it("increments opcounters.aggregate on aggregate operations", function () {
+        // opcounters.aggregate increments once per top-level aggregate call only.
         // 'find' increments 'queries' but NOT 'aggregates'; the two are fully exclusive.
         // Neither aggregate nor find increments 'commands'.
         const start = new Date();
         const initial =
-            getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.aggregates"]?.value ?? 0;
+            getLatestMetrics(this.metricsDir)?.["mongodb.serverStatus.opcounters.aggregate"]
+                ?.value ?? 0;
 
         this.coll.aggregate([{$match: {}}]).toArray();
         this.coll.aggregate([{$match: {}}, {$count: "n"}]).toArray();
 
         waitForMetric({
             metricsDir: this.metricsDir,
-            metricName: "serverStatus.opcounters.aggregates",
+            metricName: "mongodb.serverStatus.opcounters.aggregate",
             minValue: initial + 2,
             afterDate: start,
         });

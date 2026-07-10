@@ -36,7 +36,7 @@ function getConnectionsMetricValue(metricsDir, afterDate) {
         1000,
     );
 
-    return metrics["serverStatus.network.numRequests"]?.value ?? 0;
+    return metrics["mongodb.serverStatus.network.numRequests"]?.value ?? 0;
 }
 
 /**

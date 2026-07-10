@@ -84,98 +84,110 @@ describe("OTel opcounters metric file export in a sharded cluster", function () 
         this.st.stop();
     });
 
-    it("exports opcounters.inserts on both mongos and shard", function () {
+    it("exports opcounters.insert on both mongos and shard", function () {
         const start = new Date();
         const mongosInitial = currentValue(
             this.mongosMetricsDir,
-            "serverStatus.opcounters.inserts",
+            "mongodb.serverStatus.opcounters.insert",
         );
-        const shardInitial = currentValue(this.shardMetricsDir, "serverStatus.opcounters.inserts");
+        const shardInitial = currentValue(
+            this.shardMetricsDir,
+            "mongodb.serverStatus.opcounters.insert",
+        );
 
         assert.commandWorked(this.coll.insert({a: 1}));
         assert.commandWorked(this.coll.insert([{b: 2}, {c: 3}]));
 
         waitForMetric({
             metricsDir: this.mongosMetricsDir,
-            metricName: "serverStatus.opcounters.inserts",
+            metricName: "mongodb.serverStatus.opcounters.insert",
             minValue: mongosInitial + 3,
             afterDate: start,
         });
         waitForMetric({
             metricsDir: this.shardMetricsDir,
-            metricName: "serverStatus.opcounters.inserts",
+            metricName: "mongodb.serverStatus.opcounters.insert",
             minValue: shardInitial + 3,
             afterDate: start,
         });
     });
 
-    it("exports opcounters.queries on both mongos and shard", function () {
+    it("exports opcounters.query on both mongos and shard", function () {
         const start = new Date();
         const mongosInitial = currentValue(
             this.mongosMetricsDir,
-            "serverStatus.opcounters.queries",
+            "mongodb.serverStatus.opcounters.query",
         );
-        const shardInitial = currentValue(this.shardMetricsDir, "serverStatus.opcounters.queries");
+        const shardInitial = currentValue(
+            this.shardMetricsDir,
+            "mongodb.serverStatus.opcounters.query",
+        );
 
         this.coll.find({}).toArray();
 
         waitForMetric({
             metricsDir: this.mongosMetricsDir,
-            metricName: "serverStatus.opcounters.queries",
+            metricName: "mongodb.serverStatus.opcounters.query",
             minValue: mongosInitial + 1,
             afterDate: start,
         });
         waitForMetric({
             metricsDir: this.shardMetricsDir,
-            metricName: "serverStatus.opcounters.queries",
+            metricName: "mongodb.serverStatus.opcounters.query",
             minValue: shardInitial + 1,
             afterDate: start,
         });
     });
 
-    it("exports opcounters.updates on both mongos and shard", function () {
+    it("exports opcounters.update on both mongos and shard", function () {
         const start = new Date();
         const mongosInitial = currentValue(
             this.mongosMetricsDir,
-            "serverStatus.opcounters.updates",
+            "mongodb.serverStatus.opcounters.update",
         );
-        const shardInitial = currentValue(this.shardMetricsDir, "serverStatus.opcounters.updates");
+        const shardInitial = currentValue(
+            this.shardMetricsDir,
+            "mongodb.serverStatus.opcounters.update",
+        );
 
         assert.commandWorked(this.coll.update({a: 1}, {$set: {a: 99}}));
 
         waitForMetric({
             metricsDir: this.mongosMetricsDir,
-            metricName: "serverStatus.opcounters.updates",
+            metricName: "mongodb.serverStatus.opcounters.update",
             minValue: mongosInitial + 1,
             afterDate: start,
         });
         waitForMetric({
             metricsDir: this.shardMetricsDir,
-            metricName: "serverStatus.opcounters.updates",
+            metricName: "mongodb.serverStatus.opcounters.update",
             minValue: shardInitial + 1,
             afterDate: start,
         });
     });
 
-    it("exports opcounters.deletes on both mongos and shard", function () {
+    it("exports opcounters.delete on both mongos and shard", function () {
         const start = new Date();
         const mongosInitial = currentValue(
             this.mongosMetricsDir,
-            "serverStatus.opcounters.deletes",
+            "mongodb.serverStatus.opcounters.delete",
         );
-        const shardInitial = currentValue(this.shardMetricsDir, "serverStatus.opcounters.deletes");
+        const shardInitial = currentValue(
+            this.shardMetricsDir,
+            "mongodb.serverStatus.opcounters.delete",
+        );
 
         assert.commandWorked(this.coll.remove({a: 99}));
 
         waitForMetric({
             metricsDir: this.mongosMetricsDir,
-            metricName: "serverStatus.opcounters.deletes",
+            metricName: "mongodb.serverStatus.opcounters.delete",
             minValue: mongosInitial + 1,
             afterDate: start,
         });
         waitForMetric({
             metricsDir: this.shardMetricsDir,
-            metricName: "serverStatus.opcounters.deletes",
+            metricName: "mongodb.serverStatus.opcounters.delete",
             minValue: shardInitial + 1,
             afterDate: start,
         });
@@ -190,9 +202,12 @@ describe("OTel opcounters metric file export in a sharded cluster", function () 
         const start = new Date();
         const mongosInitial = currentValue(
             this.mongosMetricsDir,
-            "serverStatus.opcounters.getMores",
+            "mongodb.serverStatus.opcounters.getmore",
         );
-        const shardInitial = currentValue(this.shardMetricsDir, "serverStatus.opcounters.getMores");
+        const shardInitial = currentValue(
+            this.shardMetricsDir,
+            "mongodb.serverStatus.opcounters.getmore",
+        );
 
         this.coll
             .find({x: {$exists: true}})
@@ -201,30 +216,30 @@ describe("OTel opcounters metric file export in a sharded cluster", function () 
 
         waitForMetric({
             metricsDir: this.mongosMetricsDir,
-            metricName: "serverStatus.opcounters.getMores",
+            metricName: "mongodb.serverStatus.opcounters.getmore",
             minValue: mongosInitial + 1,
             afterDate: start,
         });
         waitForMetric({
             metricsDir: this.shardMetricsDir,
-            metricName: "serverStatus.opcounters.getMores",
+            metricName: "mongodb.serverStatus.opcounters.getmore",
             minValue: shardInitial + 1,
             afterDate: start,
         });
     });
 
-    it("exports opcounters.aggregates on both mongos and shard", function () {
-        // opcounters.aggregates increments once per top-level aggregate call only.
+    it("exports opcounters.aggregate on both mongos and shard", function () {
+        // opcounters.aggregate increments once per top-level aggregate call only.
         // 'find' increments 'queries' but NOT 'aggregates'; the two are fully exclusive.
         // Neither aggregate nor find increments 'commands'.
         const start = new Date();
         const mongosInitial = currentValue(
             this.mongosMetricsDir,
-            "serverStatus.opcounters.aggregates",
+            "mongodb.serverStatus.opcounters.aggregate",
         );
         const shardInitial = currentValue(
             this.shardMetricsDir,
-            "serverStatus.opcounters.aggregates",
+            "mongodb.serverStatus.opcounters.aggregate",
         );
 
         this.coll.aggregate([{$match: {}}]).toArray();
@@ -232,26 +247,26 @@ describe("OTel opcounters metric file export in a sharded cluster", function () 
 
         waitForMetric({
             metricsDir: this.mongosMetricsDir,
-            metricName: "serverStatus.opcounters.aggregates",
+            metricName: "mongodb.serverStatus.opcounters.aggregate",
             minValue: mongosInitial + 2,
             afterDate: start,
         });
         waitForMetric({
             metricsDir: this.shardMetricsDir,
-            metricName: "serverStatus.opcounters.aggregates",
+            metricName: "mongodb.serverStatus.opcounters.aggregate",
             minValue: shardInitial + 2,
             afterDate: start,
         });
     });
 
-    it("exports opcounters.commands on both mongos and shard", function () {
-        // opcounters.commands increments for recognized commands that have no specific counter of
+    it("exports opcounters.command on both mongos and shard", function () {
+        // opcounters.command increments for recognized commands that have no specific counter of
         // their own (e.g. ping, serverStatus). 'aggregate', 'find', getMore, and write ops all
         // suppress this counter and increment their own specific counters instead.
         const start = new Date();
         const mongosInitial = currentValue(
             this.mongosMetricsDir,
-            "serverStatus.opcounters.commands",
+            "mongodb.serverStatus.opcounters.command",
         );
         // No assertion/expectation on the shard.
 
@@ -261,7 +276,7 @@ describe("OTel opcounters metric file export in a sharded cluster", function () 
         // and other background commands, so we only assert mongos here.
         waitForMetric({
             metricsDir: this.mongosMetricsDir,
-            metricName: "serverStatus.opcounters.commands",
+            metricName: "mongodb.serverStatus.opcounters.command",
             minValue: mongosInitial + 1,
             afterDate: start,
         });
@@ -269,8 +284,8 @@ describe("OTel opcounters metric file export in a sharded cluster", function () 
         // Verify the shard's command counter is also being exported (value may vary due to
         // background replication commands, so just check the metric is present and non-zero).
         assert.soon(
-            () => currentValue(this.shardMetricsDir, "serverStatus.opcounters.commands") > 0,
-            "opcounters.commands should be present and non-zero on shard",
+            () => currentValue(this.shardMetricsDir, "mongodb.serverStatus.opcounters.command") > 0,
+            "opcounters.command should be present and non-zero on shard",
             30000,
             300,
         );

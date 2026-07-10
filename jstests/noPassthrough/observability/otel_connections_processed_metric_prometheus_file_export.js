@@ -41,7 +41,7 @@ function getConnectionsMetricValue(metricsDir, metricsFileName, afterDate) {
         1000,
     );
 
-    return extractPrometheusMetricIntValue(metricsText, "serverStatus.network.numRequests");
+    return extractPrometheusMetricIntValue(metricsText, "mongodb.serverStatus.network.numRequests");
 }
 
 /**

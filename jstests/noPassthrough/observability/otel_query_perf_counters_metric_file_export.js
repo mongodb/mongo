@@ -51,7 +51,7 @@ describe("OTel query perf counter metrics file export", function () {
     it("scanned increments on index-scan query", function () {
         assertCounterMetricIncreases({
             metricsDir: this.metricsDir,
-            metricName: "serverStatus.metrics.queryExecutor.scanned",
+            metricName: "mongodb.serverStatus.metrics.queryExecutor.scanned",
             minIncrease: 1,
             fn: () => this.coll.find({x: {$gte: 0}}).toArray(),
         });
@@ -60,7 +60,7 @@ describe("OTel query perf counter metrics file export", function () {
     it("scannedObjects increments on collection-scan query", function () {
         assertCounterMetricIncreases({
             metricsDir: this.metricsDir,
-            metricName: "serverStatus.metrics.queryExecutor.scannedObjects",
+            metricName: "mongodb.serverStatus.metrics.queryExecutor.scannedObjects",
             minIncrease: 1,
             fn: () => this.coll.find({y: {$exists: true}}).toArray(),
         });
@@ -69,7 +69,7 @@ describe("OTel query perf counter metrics file export", function () {
     it("returned increments on any query", function () {
         assertCounterMetricIncreases({
             metricsDir: this.metricsDir,
-            metricName: "serverStatus.metrics.document.returned",
+            metricName: "mongodb.serverStatus.metrics.document.returned",
             minIncrease: 1,
             fn: () => this.coll.find({}).toArray(),
         });

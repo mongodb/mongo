@@ -123,8 +123,8 @@ const DEFAULT_MAX_INDEX_BUILD_MEM_MB = DEFAULT_INDEX_COUNT;
 // during load".
 const DEFAULT_LOAD_RESUME_STATE_WRITE_INTERVAL_KEYS = 100;
 
-const RESUME_SUCCEEDED_METRIC = "index_builds.resume.succeeded";
-const RESUME_FAILED_METRIC = "index_builds.resume.failed";
+const RESUME_SUCCEEDED_METRIC = "mongodb.serverStatus.indexBuilds.resume.succeeded";
+const RESUME_FAILED_METRIC = "mongodb.serverStatus.indexBuilds.resume.failed";
 
 // Server-side phase strings emitted as the `phase` attribute on index_builds.resume.succeeded.
 const RESUME_PHASE_INITIALIZED = "initialized";

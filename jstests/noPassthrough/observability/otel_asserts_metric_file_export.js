@@ -1,5 +1,5 @@
 /**
- * Tests that the OTel counter `serverStatus.asserts` increments — broken down by the `kind`
+ * Tests that the OTel counter `mongodb.serverStatus.asserts` increments — broken down by the `kind`
  * attribute — when assertions fire, and does not increment for successful commands.
  *
  * @tags: [requires_otel_build]
@@ -13,7 +13,7 @@ import {
     otelFileExportParams,
 } from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
 
-const kMetricName = "serverStatus.asserts";
+const kMetricName = "mongodb.serverStatus.asserts";
 const kKinds = ["regular", "msg", "user", "tripwire"];
 
 function readAllKinds(metricsDir) {

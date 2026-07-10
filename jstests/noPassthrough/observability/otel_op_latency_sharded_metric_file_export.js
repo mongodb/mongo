@@ -17,7 +17,7 @@ import {
 function assertOpLatencyIncreases(metricsDir, opType, fn) {
     assertHistogramMetricIncreases({
         metricsDir,
-        metricName: "serverStatus.opLatencies.latency",
+        metricName: "mongodb.serverStatus.opLatencies.latency",
         attrKey: "op_type",
         attrValue: opType,
         fn,
