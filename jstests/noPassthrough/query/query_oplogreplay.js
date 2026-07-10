@@ -25,16 +25,26 @@ function longToTs(i) {
 
 // The first object is just a dummy element in order to make both index and id match in the tests
 // and avoid off-by-1 errors
-let timestamps = [{}];
-
-for (let i = 1; i <= 100; i++) {
-    let res = testDB.runCommand({insert: jsTestName(), documents: [{_id: i, ts: makeTS(i)}]});
-    let ts = res.opTime.ts;
-    timestamps.push(ts);
-    assert.commandWorked(res);
-}
+let timestamps;
 
 const collNs = `test.${jsTestName()}`;
+
+// Internal writers triggered by step-up (e.g. key generation, query analysis setup) may interleave
+// their oplog entries with ours, breaking the docsExamined expectations below. Retry until our
+// inserts form a contiguous window of oplog entries.
+assert.soon(function () {
+    testDB[jsTestName()].drop();
+    timestamps = [{}];
+
+    for (let i = 1; i <= 100; i++) {
+        let res = testDB.runCommand({insert: jsTestName(), documents: [{_id: i, ts: makeTS(i)}]});
+        let ts = res.opTime.ts;
+        timestamps.push(ts);
+        assert.commandWorked(res);
+    }
+
+    return oplog.find({ts: {$gte: timestamps[1], $lte: timestamps[100]}}).itcount() === 100;
+}, "timed out waiting for an oplog window without interleaved entries");
 
 // A $gt query on just the 'ts' field should return the next document after the timestamp.
 let cursor = oplog.find({ns: collNs, ts: {$gt: timestamps[20]}});
