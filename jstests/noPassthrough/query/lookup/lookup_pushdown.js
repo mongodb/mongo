@@ -403,14 +403,17 @@ function setLookupPushdownDisabled(value) {
     assert.commandWorked(foreignColl.dropIndexes());
 })();
 
-// Construct an index with a partial filter expression. In this case, we should use Classic.
-(function testPartialFilterExpressionIndexesAreIgnored() {
+// Construct an index with a partial filter expression with 'allowDiskUse' false. In this case,
+// we should use DynamicIndexedLoopJoin.
+(function testPartialFilterExpressionIndexesCanUseDynamicIndexedJoin() {
     assert.commandWorked(foreignColl.dropIndexes());
     assert.commandWorked(foreignColl.createIndex({b: 1}, {partialFilterExpression: {b: 1}}));
     runTest(
         coll,
         [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-        JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
+        JoinAlgorithm.DILJ /* expectedJoinAlgorithm */,
+        {b: 1} /* indexKeyPattern */,
+        {allowDiskUse: false},
     );
 
     // If we add an index that is not a partial index, we should then use INLJ.

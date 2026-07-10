@@ -177,18 +177,18 @@ public:
      * - A nested loop join is chosen in all other cases.
      */
     static Strategy determineLookupStrategy(
-        const QueryKnobConfiguration& knobs,
+        const CanonicalQuery& query,
         const NamespaceString& foreignCollName,
         const std::string& foreignField,
-        const std::map<NamespaceString, CollectionInfo>& collectionsInfo,
-        bool allowDiskUse,
-        const CollatorInterface* collator);
+        const std::map<NamespaceString, CollectionInfo>& collectionsInfo);
 
     /**
      * Returns true if the available indexes can only be used in classic engine.
      */
     static bool canUseIndexForRightSideOfLookupOnlyInClassic(
-        const std::string& foreignField, const std::vector<IndexEntry>& fullIndexList);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const std::string& foreignField,
+        const std::vector<IndexEntry>& fullIndexList);
 
     /**
      * Checks if the foreign collection is eligible for the hash join algorithm. We conservatively

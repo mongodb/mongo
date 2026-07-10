@@ -399,6 +399,7 @@ mongo_cc_library(
         "query_planner.cpp",
         "query_planner_common.cpp",
         "query_settings.cpp",
+        "//src/mongo/db/pipeline:sbe_pushdown_util.cpp",
         "//src/mongo/db/query/plan_cache:plan_cache_indexability.cpp",
         "//src/mongo/db/query/plan_enumerator:enumerator_memo.cpp",
         "//src/mongo/db/query/plan_enumerator:memo_prune.cpp",

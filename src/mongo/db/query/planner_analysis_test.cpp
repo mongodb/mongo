@@ -33,6 +33,7 @@
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
@@ -73,6 +74,12 @@ IndexEntry buildSimpleIndexEntry(const BSONObj& kp,
 }
 
 TEST(QueryPlannerAnalysis, CanUseIndexForRightSideOfLookupOnlyInClassic) {
+    QueryTestServiceContext testServiceContext;
+    auto opCtx = testServiceContext.makeOperationContext();
+    const auto kNss = NamespaceString::createNamespaceString_forTest("test.test");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx =
+        new ExpressionContextForTest(opCtx.get(), kNss);
+
     std::string foreignField = "b";
     std::vector<IndexEntry> indexList;
     BSONObj keyPattern = BSON("$**" << 1);
@@ -87,45 +94,45 @@ TEST(QueryPlannerAnalysis, CanUseIndexForRightSideOfLookupOnlyInClassic) {
     auto sbeIndex = buildSimpleIndexEntry(BSON("b" << 1));
 
     // There are no indexes.
-    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(foreignField,
-                                                                                    indexList));
+    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
+        expCtx, foreignField, indexList));
     // A single index that is wildcard index that can be used only in classic.
     indexList.push_back(compatibleWcIndex);
-    ASSERT_TRUE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(foreignField,
-                                                                                   indexList));
+    ASSERT_TRUE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
+        expCtx, foreignField, indexList));
 
     // A single index that is a  wildcard index that excludes the foreignField, thus it is not
     // eligible for the query.
     indexList.clear();
     indexList.push_back(incompatibleWcIndex);
-    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(foreignField,
-                                                                                    indexList));
+    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
+        expCtx, foreignField, indexList));
 
     // A second index that can be used in SBE.
     indexList.push_back(sbeIndex);
-    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(foreignField,
-                                                                                    indexList));
+    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
+        expCtx, foreignField, indexList));
 
     // A wildcard index that can be used in classic and a second index that can be used in SBE.
     indexList.clear();
     indexList.push_back(compatibleWcIndex);
     indexList.push_back(sbeIndex);
-    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(foreignField,
-                                                                                    indexList));
+    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
+        expCtx, foreignField, indexList));
 
     // A single index that can be used in SBE.
     indexList.clear();
     indexList.push_back(sbeIndex);
-    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(foreignField,
-                                                                                    indexList));
+    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
+        expCtx, foreignField, indexList));
 
     // A sparse (non-partial) index on the foreign field can now be used in SBE via the dynamic
     // indexed loop join, so it must NOT force the $lookup into the classic engine.
     auto sparseIndex = buildSimpleIndexEntry(BSON("b" << 1), nullptr, true /* sparse */);
     indexList.clear();
     indexList.push_back(sparseIndex);
-    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(foreignField,
-                                                                                    indexList));
+    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
+        expCtx, foreignField, indexList));
 }
 
 TEST(QueryPlannerAnalysis, GetSortPatternBasic) {

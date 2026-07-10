@@ -30,28 +30,14 @@
 #pragma once
 
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/query_planner_params.h"
-#include "mongo/util/modules.h"
 
 namespace mongo {
-class CanonicalQuery;
-class MultipleCollectionAccessor;
-class Pipeline;
-
 /**
- * Removes the first 'stagesToRemove' stages from the pipeline. This function is meant to be paired
- * with a call to attachPipelineStages() - the caller must first get the stages for push down, add
- * them to the canonical query, and only then remove them from the pipeline.
+ * Set the minimum required compatibility based on the 'featureFlagSbeFull' and the
+ * query framework control knob. If 'featureFlagSbeFull' is true, set the compatibility to
+ * 'requiresSbeFull'; otherwise,  if query framework control knob is 'trySbeEngine', set
+ * compatibility to 'requiresTrySbe'; otherwise set it to 'noRequirements'.
  */
-void finalizePipelineStages(Pipeline* pipeline, const CanonicalQuery* canonicalQuery);
-
-/**
- * Identifies the prefix of the 'pipeline' that is eligible for running in SBE and adds it to the
- * provided 'canonicalQuery'.
- */
-void attachPipelineStages(const MultipleCollectionAccessor& collections,
-                          const Pipeline* pipeline,
-                          bool needsMerge,
-                          CanonicalQuery* canonicalQuery,
-                          std::unique_ptr<QueryPlannerParams> plannerParams);
+SbeCompatibility getMinRequiredSbeCompatibility(QueryFrameworkControlEnum currentQueryKnobFramework,
+                                                bool sbeFullEnabled);
 }  // namespace mongo

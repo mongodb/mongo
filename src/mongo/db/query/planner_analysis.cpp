@@ -51,8 +51,12 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/matcher/match_expression_walker.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/sbe_pushdown_util.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
@@ -821,28 +825,81 @@ void removeInclusionProjectionBelowGroupRecursive(QuerySolutionNode* solnRoot) {
     }
 }
 
+// Returns true if the partial filter expression of 'index' (if any) is compatible with using the
+// index for the right side of a $lookup pushed into SBE. At runtime the Dynamic Indexed Loop Join
+// decides per local key whether the index covers it by evaluating the filter against the foreign
+// field. For this to be sound, the filter must reference exactly the foreign field and the foreign
+// field is constrained to be non-dotted. The reasons are below.
+bool isPartialFilterCompatibleWithLookupPushdown(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                                 const IndexEntry& index,
+                                                 const std::string& foreignField) {
+    // Not a partial index, no constraint needed.
+    if (!index.filterExpr) {
+        return true;
+    }
+
+    // The foreign field must be non-dotted. To evaluate the partial filter against a dotted foreign
+    // field, we have to materialize a nested object matching the path at runtime for each local
+    // key; we avoid that cost and complexity, so dotted foreign fields fall back to the classic
+    // engine.
+    if (foreignField.find('.') != std::string::npos) {
+        return false;
+    }
+
+    // The DILJ evaluates the partial filter at runtime via generateFilter(), so the filter must be
+    // an expression SBE can compile. The partial-index grammar permits operators that the SBE
+    // filter builder does not support (notably $geoWithin / $geoIntersects). Such indexes fall back
+    // to the classic engine.
+    auto matchExpCtx = ExpressionContextBuilder{}.build();
+    auto swMatchExp = MatchExpressionParser::parse(index.filterExpr->serialize(), matchExpCtx);
+    tassert(11651501, "Match expression should be parsable.", swMatchExp.isOK());
+
+    const auto& queryKnob = expCtx->getQueryKnobConfiguration();
+    const bool sbeFullEnabled = feature_flags::gFeatureFlagSbeFull.isEnabled();
+    const SbeCompatibility minRequiredCompatibility = getMinRequiredSbeCompatibility(
+        queryKnob.getInternalQueryFrameworkControlForOp(), sbeFullEnabled);
+    if (matchExpCtx->getSbeCompatibility() < minRequiredCompatibility) {
+        return false;
+    }
+
+    // If the filter referenced any other field, two foreign documents sharing the same
+    // foreign-field value could differ on index membership, and the per-key decision would be
+    // unsound.
+    DepsTracker deps;
+    dependency_analysis::addDependencies(index.filterExpr, &deps);
+    return !deps.needWholeDocument && deps.fields.size() == 1 &&
+        *deps.fields.begin() == foreignField;
+}
+
 // Determines whether 'index' is eligible for executing the right side of a pushed down $lookup over
 // 'foreignField'. If this function returns true, i.e. the index is eligible, the collation of the
-// index should also be checked using 'isIndexCollationCompatible'. An eligible,
-// collation-compatible, non-sparse index can be used in INLJ in SBE. A sparse or
-// collation-incompatible index must instead use DILJ, which decides at run time (per local key)
-// whether the sparse index is safe or a collection scan is required.
-bool isIndexEligibleForRightSideOfLookupPushdown(const IndexEntry& index,
+// index should also be checked using 'isIndexCollationCompatible'. An eligible index that is
+// non-sparse, has a compatible collation, and has no partial filter can be used in INLJ in SBE. An
+// eligible index that is sparse, has an incompatible collation, and/or has a compatible partial
+// filter must instead use DILJ, which decides at run time (per local key) whether the index can be
+// used or a collection scan is required.
+bool isIndexEligibleForRightSideOfLookupPushdown(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                                 const IndexEntry& index,
                                                  const std::string& foreignField) {
     return (index.type == INDEX_BTREE || index.type == INDEX_HASHED) &&
-        index.keyPattern.firstElement().fieldName() == foreignField && !index.filterExpr;
+        index.keyPattern.firstElement().fieldName() == foreignField &&
+        isPartialFilterCompatibleWithLookupPushdown(expCtx, index, foreignField);
 }
 
 // Returns true if 'index' can be used for the right side of a $lookup in the classic engine but
-// not in SBE. This applies to two cases:
-//   - Partial B-tree/hashed indexes on the foreign field: SBE does not support these and would fall
-//     back to a collection scan, so classic should be preferred.
+// not in SBE. This applies to:
+//   - Partial B-tree/hashed indexes on the foreign field whose filter references a field other
+//     than the foreign field: SBE's DILJ can only evaluate a partial filter that depends solely on
+//     the foreign-field value, so these are handled by classic.
 //   - Wildcard indexes that cover the foreign field: classic can leverage them but SBE cannot.
 //     TODO SERVER-130024: extend SBE to support wildcard indexes for $lookup pushdown.
-bool isIndexEligibleForRightSideOfLookupOnlyInClassic(const IndexEntry& index,
-                                                      const std::string& foreignField) {
+bool isIndexEligibleForRightSideOfLookupOnlyInClassic(
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    const IndexEntry& index,
+    const std::string& foreignField) {
     if ((index.type == INDEX_BTREE || index.type == INDEX_HASHED) &&
-        index.keyPattern.firstElement().fieldName() == foreignField && index.filterExpr) {
+        index.keyPattern.firstElement().fieldName() == foreignField && index.filterExpr &&
+        !isPartialFilterCompatibleWithLookupPushdown(expCtx, index, foreignField)) {
         return true;
     }
     if (index.type == INDEX_WILDCARD) {
@@ -940,10 +997,12 @@ void QueryPlannerAnalysis::removeImpreciseInternalExprFilters(const QueryPlanner
 
 // Checks if there is an index that can be used if the $lookup is pushed to SBE. It returns a tuple
 // {boost::optional<IndexEntry>, bool}. The left side contains an eligible index or boost::none if
-// no such index exits. The right side is true if the chosen index has a collation compatible with
-// the query. An eligible index that is non-sparse and collation-compatible uses INLJ; one that is
-// sparse and/or collation-incompatible must use DILJ instead.
+// no such index exists. The right side is a flag denoting whether the eligible index has a
+// compatible collation. An non-sparse eligible index with a compatible collation and no partial
+// filter can be used in the INLJ strategy, while an eligible index that is sparse and/or has a
+// partial filter and/or has an incompatible collation must use the DILJ strategy instead.
 std::tuple<boost::optional<IndexEntry>, bool> determineForeignIndexForRightSideOfLookupPushdown(
+    boost::intrusive_ptr<ExpressionContext> expCtx,
     const std::string& foreignField,
     std::vector<IndexEntry> indexes,
     const CollatorInterface* collator) {
@@ -956,6 +1015,16 @@ std::tuple<boost::optional<IndexEntry>, bool> determineForeignIndexForRightSideO
                 return false;
             }
         }
+
+        // Prefer non-partial indexes, so that when a full index is available it is chosen and the
+        // more efficient Indexed Loop Join strategy can be used instead of Dynamic Indexed Loop
+        // Join.
+        const bool leftPartial = static_cast<bool>(left.filterExpr);
+        const bool rightPartial = static_cast<bool>(right.filterExpr);
+        if (leftPartial != rightPartial) {
+            return !leftPartial;
+        }
+
         // Prefer a non-sparse index over a sparse one: a non-sparse index can use the faster INLJ,
         // whereas a sparse index is constrained to DILJ. This preserves INLJ when a
         // non-sparse index on the foreign field is also available.
@@ -976,7 +1045,7 @@ std::tuple<boost::optional<IndexEntry>, bool> determineForeignIndexForRightSideO
     });
     // Indexes with compatible collation are at the front.
     for (const auto& index : indexes) {
-        if (isIndexEligibleForRightSideOfLookupPushdown(index, foreignField)) {
+        if (isIndexEligibleForRightSideOfLookupPushdown(expCtx, index, foreignField)) {
             return {index, isIndexCollationCompatible(index, collator)};
         }
     }
@@ -986,7 +1055,9 @@ std::tuple<boost::optional<IndexEntry>, bool> determineForeignIndexForRightSideO
 
 // static
 bool QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
-    const std::string& foreignField, const std::vector<IndexEntry>& fullIndexList) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const std::string& foreignField,
+    const std::vector<IndexEntry>& fullIndexList) {
 
     bool foundClassicOnlyIndex = false;
 
@@ -995,13 +1066,13 @@ bool QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
         LOGV2_DEBUG(
             6408200, 3, "Relevant index", "indexNumber"_attr = i, "index"_attr = index.toString());
 
-        if (isIndexEligibleForRightSideOfLookupPushdown(index, foreignField)) {
+        if (isIndexEligibleForRightSideOfLookupPushdown(expCtx, index, foreignField)) {
             // SBE can use this index (via INLJ, DINLJ, or HJ), so there is no reason to prefer
             // classic.
             return false;
         }
 
-        if (isIndexEligibleForRightSideOfLookupOnlyInClassic(index, foreignField)) {
+        if (isIndexEligibleForRightSideOfLookupOnlyInClassic(expCtx, index, foreignField)) {
             foundClassicOnlyIndex = true;
         }
     }
@@ -1010,12 +1081,14 @@ bool QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
 
 // static
 QueryPlannerAnalysis::Strategy QueryPlannerAnalysis::determineLookupStrategy(
-    const QueryKnobConfiguration& knobs,
+    const CanonicalQuery& query,
     const NamespaceString& foreignCollName,
     const std::string& foreignField,
-    const std::map<NamespaceString, CollectionInfo>& collectionsInfo,
-    bool allowDiskUse,
-    const CollatorInterface* collator) {
+    const std::map<NamespaceString, CollectionInfo>& collectionsInfo) {
+    auto allowDiskUse = query.getExpCtx()->getAllowDiskUse();
+    auto collator = query.getCollator();
+    const auto& knobs = query.getExpCtx()->getQueryKnobConfiguration();
+
     auto foreignCollItr = collectionsInfo.find(foreignCollName);
     if (foreignCollItr == collectionsInfo.end() || !foreignCollItr->second.exists) {  // NOLINT
         return {EqLookupNode::LookupStrategy::kNonExistentForeignCollection, boost::none};
@@ -1027,13 +1100,15 @@ QueryPlannerAnalysis::Strategy QueryPlannerAnalysis::determineLookupStrategy(
     // Check if an eligible index exists for indexed loop join strategy.
     const auto [foreignIndex, collationCompatibleForDilj] =
         determineForeignIndexForRightSideOfLookupPushdown(
-            foreignField, foreignCollItr->second.indexes, collator);
+            query.getExpCtx(), foreignField, foreignCollItr->second.indexes, collator);
 
     const auto lookupStrategy = [&]() -> EqLookupNode::LookupStrategy {
-        // A non-sparse index with compatible collation can be used directly via INLJ. A sparse
-        // index cannot (it omits missing-field foreign docs), so it must fall through to HashJoin
-        // or the dynamic indexed loop join, which decide safety at run time.
-        if (foreignIndex && collationCompatibleForDilj && !foreignIndex->sparse) {
+        // A non-sparse index with compatible collation and without a partial filter can be used
+        // directly via INLJ. A sparse index or an index with partial filter cannot (both omit
+        // some foreign docs in the index), so it must fall through to HashJoin or the dynamic
+        // indexed loop join, which decide safety at run time.
+        if (foreignIndex && collationCompatibleForDilj && !foreignIndex->sparse &&
+            !foreignIndex->filterExpr) {
             return EqLookupNode::LookupStrategy::kIndexedLoopJoin;
         }
         // Reject all remaining strategies (kDynamicIndexedLoopJoin, kHashJoin,
@@ -1059,10 +1134,11 @@ QueryPlannerAnalysis::Strategy QueryPlannerAnalysis::determineLookupStrategy(
         }
 
         if (foreignIndex) {
-            // The eligible index either has an incompatible collation or is sparse (or both). Use
-            // the dynamic indexed loop join, which decides per local key at run time whether the
-            // index can be used (collation-independent type, and non-null/-missing key for a sparse
-            // index) or a collection scan is required.
+            // The eligible index has an incompatible collation, is sparse, and/or has a partial
+            // filter. Use the dynamic indexed loop join, which decides per local key at run time
+            // whether the index can be used (collation-independent type, non-null/-missing key for
+            // a sparse index, and/or a local value that satisfies the partial filter expression) or
+            // a collection scan is required.
             return EqLookupNode::LookupStrategy::kDynamicIndexedLoopJoin;
         }
 

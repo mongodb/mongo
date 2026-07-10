@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/sbe_pushdown_util.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/pipeline/search/document_source_search_meta.h"
@@ -183,7 +184,7 @@ SbeCompatibility determineSbeCompatibility(DocumentSourceLookUp* lookup) {
 // Determine if 'stage' is eligible for SBE. Return false if 'stage' is ineligible, either because
 // it is disallowed by 'allowedStages' or because it requires functionality that cannot be
 // translated to SBE.
-bool pipelineStageIsCompatible(const OperationContext* opCtx,
+bool pipelineStageIsCompatible(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                const boost::intrusive_ptr<DocumentSource>& stage,
                                SbeCompatibility minRequiredCompatibility,
                                const CompatiblePipelineStages& allowedStages,
@@ -225,7 +226,9 @@ bool pipelineStageIsCompatible(const OperationContext* opCtx,
         auto foreignCollItr = collectionsInfo.find(lookupStage->getFromNs());
         if (foreignCollItr != collectionsInfo.end() && foreignCollItr->second.exists &&
             QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
-                lookupStage->getForeignField()->fullPath(), foreignCollItr->second.indexes)) {
+                expCtx,
+                lookupStage->getForeignField()->fullPath(),
+                foreignCollItr->second.indexes)) {
             LOGV2_DEBUG(6408202,
                         3,
                         "Lookup is not pushed to SBE because classic can use index",
@@ -490,7 +493,7 @@ size_t getNumSbeCompatibleStagesForPushdown(
                 false /* includeSizeStats */);
         }
 
-        if (!pipelineStageIsCompatible(pipeline->getContext()->getOperationContext(),
+        if (!pipelineStageIsCompatible(pipeline->getContext(),
                                        *itr,
                                        minRequiredCompatibility,
                                        allowedStages,
@@ -763,15 +766,4 @@ void attachPipelineStages(const MultipleCollectionAccessor& collections,
                                                                   stagesForPushdown);
     canonicalQuery->setCqPipeline(std::move(stagesForPushdown), allStagesPushedDown);
 };
-
-SbeCompatibility getMinRequiredSbeCompatibility(QueryFrameworkControlEnum currentQueryKnobFramework,
-                                                bool sbeFullEnabled) {
-    if (sbeFullEnabled) {
-        return SbeCompatibility::requiresSbeFull;
-    } else if (currentQueryKnobFramework == QueryFrameworkControlEnum::kTrySbeEngine) {
-        return SbeCompatibility::requiresTrySbe;
-    }
-    return SbeCompatibility::noRequirements;
-}
-
 }  // namespace mongo

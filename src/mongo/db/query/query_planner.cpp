@@ -1998,12 +1998,10 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
         if (lookupStage) {
             auto [strategy, idxEntry, scanDirection, collationCompatibleForDilj] =
                 QueryPlannerAnalysis::determineLookupStrategy(
-                    query.getExpCtx()->getQueryKnobConfiguration(),
+                    query,
                     lookupStage->getFromNs(),
                     lookupStage->getForeignField()->fullPath(),
-                    secondaryCollInfos,
-                    query.getExpCtx()->getAllowDiskUse(),
-                    query.getCollator());
+                    secondaryCollInfos);
 
             std::vector<std::unique_ptr<QuerySolutionNode>> children;
             children.emplace_back(std::move(solnForAgg));

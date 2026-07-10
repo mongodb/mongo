@@ -27,31 +27,21 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/pipeline/sbe_pushdown_util.h"
 
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/query_planner_params.h"
-#include "mongo/util/modules.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/util/assert_util.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
-class CanonicalQuery;
-class MultipleCollectionAccessor;
-class Pipeline;
-
-/**
- * Removes the first 'stagesToRemove' stages from the pipeline. This function is meant to be paired
- * with a call to attachPipelineStages() - the caller must first get the stages for push down, add
- * them to the canonical query, and only then remove them from the pipeline.
- */
-void finalizePipelineStages(Pipeline* pipeline, const CanonicalQuery* canonicalQuery);
-
-/**
- * Identifies the prefix of the 'pipeline' that is eligible for running in SBE and adds it to the
- * provided 'canonicalQuery'.
- */
-void attachPipelineStages(const MultipleCollectionAccessor& collections,
-                          const Pipeline* pipeline,
-                          bool needsMerge,
-                          CanonicalQuery* canonicalQuery,
-                          std::unique_ptr<QueryPlannerParams> plannerParams);
+SbeCompatibility getMinRequiredSbeCompatibility(QueryFrameworkControlEnum currentQueryKnobFramework,
+                                                bool sbeFullEnabled) {
+    if (sbeFullEnabled) {
+        return SbeCompatibility::requiresSbeFull;
+    } else if (currentQueryKnobFramework == QueryFrameworkControlEnum::kTrySbeEngine) {
+        return SbeCompatibility::requiresTrySbe;
+    }
+    return SbeCompatibility::noRequirements;
+}
 }  // namespace mongo

@@ -30,6 +30,7 @@
 #include "mongo/db/query/engine_selection.h"
 
 #include "mongo/db/pipeline/sbe_pushdown.h"
+#include "mongo/db/pipeline/sbe_pushdown_util.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/engine_selection_plan.h"
 #include "mongo/db/query/planner_analysis.h"

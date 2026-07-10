@@ -1247,6 +1247,7 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
     const IndexBoundsEvaluationInfo& indexBoundsEvaluationInfo,
     bool collationCompatibleForDilj,
     bool indexIsSparse,
+    const MatchExpression* partialFilterExpr,
     const PlanNodeId nodeId,
     boost::optional<UnwindNode::UnwindSpec> unwindSpec,
     boost::optional<sbe::value::SlotId> indexSlot) {
@@ -1284,8 +1285,16 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
     //   - Sparse index: a null or missing local key (both encoded as 'null' in the local key set
     //     by buildKeySetForLocal) must use the scan, since a sparse index omits foreign documents
     //     that are missing the field.
-    // 'traverseF' returns true if any key in the set matches the type mask, so the guard is the
-    // negation: "no local key matches the disallowed types".
+    //   - Partial index: the index only contains foreign docs satisfying its filter, so the index
+    //     branch is safe for a local key only if that key satisfies the filter (handled separately
+    //     below, since it requires evaluating the filter rather than a type check).
+    // The collation/sparse checks are folded into a single type mask: 'traverseF' returns true if
+    // any key in the set matches the mask, so the guard is the negation, "no local key matches the
+    // disallowed types".
+    SbExpr::Vector gateConditions;
+    // Single local key materialized for the partial filter condition (see below).
+    boost::optional<SbSlot> localKeySlot;
+
     auto makeNoLocalKeyMatchesGuard = [&](uint32_t typeMask) {
         sbe::FrameId frameId = state.frameId();
         auto lambda = b.makeLocalLambda(frameId,
@@ -1306,9 +1315,62 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
     if (indexIsSparse) {
         typeMask |= getBSONTypeMask(BSONType::null);
     }
-    // DILJ is only chosen when at least one of the above reasons holds; if neither does, default to
-    // always taking the index branch.
-    auto filter = typeMask ? makeNoLocalKeyMatchesGuard(typeMask) : b.makeBoolConstant(true);
+    if (typeMask) {
+        gateConditions.push_back(makeNoLocalKeyMatchesGuard(typeMask));
+    }
+
+    // Partial condition (only when the chosen index is partial): the index only contains foreign
+    // docs satisfying its filter. The planner guarantees the filter references nothing but the
+    // (non-dotted) foreign field, so we evaluate it against the local key directly.
+    //
+    // generateFilter needs the value in a materialized slot, which we cannot obtain per element of
+    // the key set. We therefore restrict this optimization to the single-key case: we require
+    // |localKeysSet| == 1, project that single key into a slot, register it as the foreign field's
+    // kField, and evaluate the filter against it. A local document that produces multiple keys
+    // conservatively takes the collection-scan fallback, which is always correct.
+    if (partialFilterExpr) {
+        // Project the first key unconditionally; getElement() returns Nothing for an empty set, and
+        // for a multi-key set the size guard below rejects the document regardless of this value.
+        auto [keyStage, keySlots] = b.makeProject(std::move(localKeysSetStage),
+                                                  b.makeFunction(sbe::EFn::kGetElement,
+                                                                 SbExpr{localKeysSetSlot},
+                                                                 b.makeInt32Constant(0)));
+        localKeysSetStage = std::move(keyStage);
+        localKeySlot = keySlots[0];
+
+        PlanStageSlots filterSlots;
+        tassert(11651500,
+                "Partial index pushdown requires a non-dotted foreign field",
+                foreignFieldName.getPathLength() == 1);
+        filterSlots.set(std::make_pair(PlanStageSlots::SlotType::kField, foreignFieldName.front()),
+                        *localKeySlot);
+        SbExpr satisfiesPartial =
+            generateFilter(state, partialFilterExpr, boost::none /*rootSlot*/, filterSlots);
+
+        if (!satisfiesPartial.isNull()) {
+            // Use the index branch only if the document has exactly one key AND that key satisfies
+            // the partial filter. The size guard enforces the forall: a multi-key document where
+            // only some keys satisfy the filter must NOT use the index (it would drop the foreign
+            // matches of the uncovered keys), so such documents fall to the collection-scan
+            // fallback.
+            SbExpr singleKeyCond =
+                b.makeBinaryOp(abt::Operations::Eq,
+                               b.makeFunction(sbe::EFn::kGetArraySize, SbExpr{localKeysSetSlot}),
+                               b.makeInt32Constant(1));
+            gateConditions.push_back(b.makeBooleanOpTree(
+                abt::Operations::And,
+                SbExpr::makeSeq(std::move(singleKeyCond), std::move(satisfiesPartial))));
+        }
+    }
+
+    // DILJ is only chosen when at least one reason (incompatible collation, sparse, or partial)
+    // holds. If none produced a gate condition, default to always taking the index branch. When
+    // multiple apply they are AND-ed: the index branch is safe only if every reason permits it.
+    auto filter = gateConditions.empty()
+        ? b.makeBoolConstant(true)
+        : (gateConditions.size() == 1
+               ? std::move(gateConditions[0])
+               : b.makeBooleanOpTree(abt::Operations::And, std::move(gateConditions)));
 
     auto nestedLoopFallbackRecordSlot = nestedLoopFallbackSlots.getResultObj();
     auto nestedLoopFallbackFieldNameSlot = nestedLoopFallbackSlots.get(
@@ -1345,14 +1407,17 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
     const auto joinType = unwindSpec.has_value() && unwindSpec->preserveNullAndEmptyArrays
         ? sbe::JoinType::Left
         : sbe::JoinType::Inner;
-    SbStage nlj =
-        b.makeLoopJoin(std::move(localKeysSetStage),
-                       std::move(finalForeignStage),
-                       buildLocalSlots(state, localRecordSlot),
-                       SbExpr::makeSV(localKeysSetSlot, localRecordSlot) /* outerCorrelated */,
-                       std::move(innerProj) /* innerProjects */,
-                       SbExpr{} /* predicate */,
-                       joinType);
+    auto outerCorrelated = SbExpr::makeSV(localKeysSetSlot, localRecordSlot);
+    if (localKeySlot) {
+        outerCorrelated.push_back(*localKeySlot);
+    }
+    SbStage nlj = b.makeLoopJoin(std::move(localKeysSetStage),
+                                 std::move(finalForeignStage),
+                                 buildLocalSlots(state, localRecordSlot),
+                                 std::move(outerCorrelated),
+                                 std::move(innerProj) /* innerProjects */,
+                                 SbExpr{} /* predicate */,
+                                 joinType);
 
     return {finalForeignSlot, std::move(nlj)};
 
@@ -1633,6 +1698,9 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildEqLookup(
                               reqs.copyForChild().setResultObj().setFields(std::vector<std::string>{
                                   std::string(eqLookupNode->joinFieldForeign.front())}));
 
+                    // DILJ was chosen because the index has incompatible collation, or it is
+                    // sparse, or it has a partial filter. We pass these flags down the DILJ
+                    // builder in order to avoid unnecessary SBE filter code.
                     return buildDynamicIndexedLoopJoinLookupStage(
                         _state,
                         std::move(localStage),
@@ -1647,6 +1715,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildEqLookup(
                         indexInfo,
                         eqLookupNode->collationCompatibleForDilj,
                         indexScan->index.sparse,
+                        indexScan->index.filterExpr,
                         eqLookupNode->nodeId(),
                         eqLookupNode->unwindSpec,
                         indexSlotId);
