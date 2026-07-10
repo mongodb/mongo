@@ -504,6 +504,7 @@ const skippedStages = [
     // Internal stages produced during search pipeline expansion.
     "$_internalDocumentResultsAndMetadata",
     "$_internalSearchIdLookup",
+    "$_internalStreamTerminator",
 
     // Stages tested in 'agg_stage_coverage_internal_client.js', since they require extra setup.
     "$mergeCursors",

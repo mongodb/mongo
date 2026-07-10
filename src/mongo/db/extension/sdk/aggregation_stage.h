@@ -920,6 +920,15 @@ public:
         return ExtensionGetNextResult::advanced(ExtensionBSONObj::makeAsByteBuf(envelopeBob.obj()));
     }
 
+    // Emits an EOS sentinel detected by $_internalStreamTerminator to dispose the Exchange
+    // consumer.
+    ExtensionGetNextResult advancedMetaStreamEOS() {
+        BSONObjBuilder envelopeBob;
+        envelopeBob.append("_streamType", static_cast<int>(StreamType::kMetaResult));
+        envelopeBob.appendBool("_eos", true);
+        return ExtensionGetNextResult::advanced(ExtensionBSONObj::makeAsByteBuf(envelopeBob.obj()));
+    }
+
     /**
      * Certain stages (e.g. $searchScore) produce per-document metadata that require this overload.
      */

@@ -54,6 +54,15 @@ export function expandEachPerShard(nShards, docs) {
 }
 
 /**
+ * A metadata merge pipeline that sums count.lowerBound across every input metadata document into a
+ * single {count: {lowerBound: <sum>}} document.
+ */
+export const sumLowerBoundMergePipeline = [
+    {$group: {_id: null, count: {$sum: "$count.lowerBound"}}},
+    {$project: {_id: 0, count: {lowerBound: "$count"}}},
+];
+
+/**
  * Builds a two-shard byShard map (lowerBound 10 + 32 = 42) and a merge pipeline that sums
  * count.lowerBound across shards. Returns {byShard, mergePipeline, expectedMeta} where expectedMeta
  * is kSimpleExpectedMeta, the merged result.
@@ -64,10 +73,7 @@ export function makeCountMergeSetup(shardIds) {
             [shardIds[0]]: {meta: {count: {lowerBound: 10}}},
             [shardIds[1]]: {meta: {count: {lowerBound: 32}}},
         },
-        mergePipeline: [
-            {$group: {_id: null, count: {$sum: "$count.lowerBound"}}},
-            {$project: {_id: 0, count: {lowerBound: "$count"}}},
-        ],
+        mergePipeline: sumLowerBoundMergePipeline,
         expectedMeta: kSimpleExpectedMeta,
     };
 }

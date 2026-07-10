@@ -197,6 +197,10 @@ public:
             ++_metaEmitted;
             return advanced(_metaConfig.meta, StreamType::kMetaResult);
         }
+        if (!_metaConfig.skip && _metaConfig.isActive() && !_metaEosSent) {
+            _metaEosSent = true;
+            return advancedMetaStreamEOS();
+        }
         if (_nextDoc >= _docConfig.numDocs) {
             return extension::ExtensionGetNextResult::eof();
         }
@@ -241,6 +245,7 @@ private:
     MetaEmitConfig _metaConfig;
     int _nextDoc = 0;
     int _metaEmitted = 0;
+    bool _metaEosSent = false;
 };
 
 class MultiStreamSourceLogicalStage : public sdk::LogicalAggStage {

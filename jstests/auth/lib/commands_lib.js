@@ -262,6 +262,7 @@ const skippedAuthTestingAggStages = [
     "$_internalHybridSearch", // Already covered in
     // jstests/aggregation/sources/internal_hybrid_search_rejected_in_user_request.js.
     "$_internalDocumentResultsAndMetadata", // Internal-only and rejected in all user requests.
+    "$_internalStreamTerminator", // Internal-only and rejected in all user requests.
 ];
 
 // The following commands are skipped in 'authCommandsLib' because they are unable to be

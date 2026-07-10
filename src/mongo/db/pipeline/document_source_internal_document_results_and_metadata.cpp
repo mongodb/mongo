@@ -33,7 +33,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_exchange.h"
 #include "mongo/db/pipeline/document_source_internal_document_results_and_metadata_gen.h"
-#include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/pipeline/document_source_internal_stream_terminator.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_set_variable_from_subpipeline.h"
 #include "mongo/db/pipeline/expression.h"
@@ -136,12 +136,11 @@ exec::agg::StageExpansion documentSourceInternalDocumentResultsAndMetadataToStag
         return stages;
 
     auto metaConsumer = make_intrusive<DocumentSourceExchange>(metaExpCtx, exchange, 1, nullptr);
-    // Bound the metadata sub-pipeline with $limit:1. Each source emits exactly one metadata
-    // document, so nothing is dropped; when sharded, the router still merges one metadata document
-    // per shard via its merge pipeline.
+    // Terminates the meta consumer when the extension emits an EOS sentinel, unblocking the
+    // Exchange before the doc consumer's buffer fills.
+    auto streamTerminator = make_intrusive<DocumentSourceInternalStreamTerminator>(metaExpCtx);
     auto metaPipeline = Pipeline::create(
-        {metaConsumer, makeReplaceRootDs(metaExpCtx), DocumentSourceLimit::create(metaExpCtx, 1)},
-        metaExpCtx);
+        {metaConsumer, streamTerminator, makeReplaceRootDs(metaExpCtx)}, metaExpCtx);
     metaPipeline->pipelineType = CursorTypeEnum::SearchMetaResult;
 
     // Sharded path: stash the meta pipeline on the DS so run_aggregate.cpp can retrieve it and

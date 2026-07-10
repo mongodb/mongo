@@ -110,6 +110,7 @@ const kInternalClientTypeStages = new Set([
     "$_internalDocumentResultsAndMetadata",
     "$_internalHybridSearch",
     "$_internalSearchIdLookup",
+    "$_internalStreamTerminator",
     // Resharding
     "$_addReshardingResumeId",
     "$_internalReshardingIterateTransaction",

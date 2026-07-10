@@ -16,6 +16,7 @@ import {
     getDrmShardInfo,
     makeCountMergeSetup,
     setupDrmCollection,
+    sumLowerBoundMergePipeline,
 } from "jstests/extensions/libs/document_results_and_metadata_utils.js";
 
 const expectedMeta = {
@@ -323,6 +324,61 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
         assert.sameMembers(result, expected, {result, nShards});
     });
 
+    it("[sharded] preserves every metadata document per shard when merging", function () {
+        if (nShards < 2) return;
+        const numMeta = 3;
+        const lowerBound = 7;
+        const result = coll
+            .aggregate([
+                {
+                    $extensionMultiStream: {
+                        numDocs: 3,
+                        numMeta,
+                        meta: {count: {lowerBound}},
+                        mergePipeline: sumLowerBoundMergePipeline,
+                    },
+                },
+                {$project: {_id: 0, name: 1, meta: "$$SEARCH_META"}},
+            ])
+            .toArray();
+        const mergedMeta = {count: {lowerBound: lowerBound * numMeta * nShards}};
+        const perShardDocs = Array.from({length: 3}, (_, i) => ({
+            name: `doc_${i}`,
+            meta: mergedMeta,
+        }));
+        const expected = expandPerShard(nShards, perShardDocs);
+        assert.sameMembers(result, expected, {result, nShards});
+    });
+
+    it("[sharded] preserves all metadata when the document stream exceeds the Exchange buffer", function () {
+        if (nShards < 2) return;
+        const numDocs = 40;
+        const docPad = 512 * 1024;
+        const numMeta = 3;
+        const lowerBound = 7;
+        const result = coll
+            .aggregate([
+                {
+                    $extensionMultiStream: {
+                        numDocs,
+                        docPad,
+                        numMeta,
+                        meta: {count: {lowerBound}},
+                        mergePipeline: sumLowerBoundMergePipeline,
+                    },
+                },
+                {$project: {_id: 0, name: 1, meta: "$$SEARCH_META"}},
+            ])
+            .toArray();
+        const mergedMeta = {count: {lowerBound: lowerBound * numMeta * nShards}};
+        const perShardDocs = Array.from({length: numDocs}, (_, i) => ({
+            name: `doc_${i}`,
+            meta: mergedMeta,
+        }));
+        const expected = expandPerShard(nShards, perShardDocs);
+        assert.sameMembers(result, expected, {result, nShards});
+    });
+
     it("[sharded] default merge pipeline unions metadata fields across shards", function () {
         if (nShards < 2) return;
         // Give two shards disjoint slices of the metadata document and supply no explicit
@@ -368,5 +424,29 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
         assert.eq(result.length, 1, {result});
         assert.docEq(result[0].meta, [expectedMeta], {result});
         assert.sameMembers(result[0].docs, expectedDocs, {result, nShards});
+    });
+
+    it("completes without deadlock when doc results exceed 16MB buffer", function () {
+        // 100 docs * 200KB padding = ~20MB per shard, which overflows the 16MB Exchange buffer.
+        // Without the $_internalStreamTerminator fix this would deadlock: loading fills consumer 0's
+        // buffer, blocking consumer 1 (meta) from ever seeing EOF.
+        const numDocs = 100;
+        const paddingSize = 200 * 1024;
+        const result = coll
+            .aggregate([
+                {
+                    $extensionMultiStream: {
+                        numDocs,
+                        meta: expectedMeta,
+                        docPad: paddingSize,
+                    },
+                },
+                {$project: {name: 1, meta: "$$SEARCH_META"}},
+            ])
+            .toArray();
+        assert.eq(result.length, numDocs * nShards, {resultLen: result.length, nShards});
+        for (const doc of result) {
+            assert.docEq(doc.meta, expectedMeta, {doc: {name: doc.name}});
+        }
     });
 });
