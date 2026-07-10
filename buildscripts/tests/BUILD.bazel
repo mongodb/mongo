@@ -84,6 +84,15 @@ py_test(
 )
 
 py_test(
+    name = "test_mongolint",
+    srcs = ["test_mongolint.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/linter",
+    ],
+)
+
+py_test(
     name = "test_codeowners_auto_approver",
     srcs = ["test_codeowners_auto_approver.py"],
     visibility = ["//visibility:public"],
