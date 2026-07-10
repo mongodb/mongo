@@ -146,7 +146,7 @@ public:
               _options(options),
               _expanded([&] {
                   auto expandedList = expand();
-                  tassert(10905600,
+                  tassert(ErrorCodes::ExtensionError,
                           "LiteParsedExpandable must not have an empty expanded pipeline",
                           !expandedList.empty());
 
@@ -345,7 +345,7 @@ public:
             if (const auto& requiredPrivileges = _properties.getRequiredPrivileges()) {
                 for (const auto& rp : *requiredPrivileges) {
                     tassert(
-                        11350602,
+                        ErrorCodes::ExtensionError,
                         "Only 'namespace' resourcePattern is supported for extension privileges",
                         rp.getResourcePattern() ==
                             MongoExtensionPrivilegeResourcePatternEnum::kNamespace);
@@ -355,7 +355,7 @@ public:
                         actions.addAction(static_properties_util::toActionType(entry.getAction()));
                     }
 
-                    tassert(11350600,
+                    tassert(ErrorCodes::ExtensionError,
                             "requiredPrivileges.actions must not be empty.",
                             !actions.empty());
                     Privilege::addPrivilegeToPrivilegeVector(

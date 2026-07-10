@@ -250,7 +250,7 @@ struct ExtensionGetNextResult {
                 break;
             }
             default:
-                tasserted(10956803,
+                tasserted(ErrorCodes::ExtensionError,
                           str::stream()
                               << "Invalid MongoExtensionGetNextResultCode: " << apiResult.code);
         }
@@ -272,7 +272,7 @@ struct ExtensionGetNextResult {
                 break;
             }
             case GetNextCode::kPauseExecution: {
-                tassert(10956802,
+                tassert(ErrorCodes::ExtensionError,
                         str::stream()
                             << "If the ExtensionGetNextResult code is kPauseExecution, then "
                                "there are currently no results to return so "
@@ -286,7 +286,7 @@ struct ExtensionGetNextResult {
                 break;
             }
             case GetNextCode::kEOF: {
-                tassert(10956805,
+                tassert(ErrorCodes::ExtensionError,
                         str::stream()
                             << "If the ExtensionGetNextResult code is kEOF, then there are no "
                                "results to return so ExtensionGetNextResult shouldn't have a "
@@ -307,7 +307,7 @@ struct ExtensionGetNextResult {
 private:
     // Internal helper for populating an output ::MongoExtensionGetNextResult.
     void _toAdvancedApiResult(::MongoExtensionGetNextResult& outputResult) {
-        tassert(10956801,
+        tassert(ErrorCodes::ExtensionError,
                 "If the ExtensionGetNextResult code is kAdvanced, then ExtensionGetNextResult "
                 "should have a result to return.",
                 resultDocument.has_value());

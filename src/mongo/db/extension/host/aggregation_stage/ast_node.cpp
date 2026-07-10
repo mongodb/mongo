@@ -108,7 +108,7 @@ DPLCallbackOwner::getOrInvoke(ExpressionContext* expCtx) const {
         BSONObj arr = ownedValidatedBson(mergeHandle->getByteView());
         std::vector<BSONObj> pipeline;
         for (auto&& elem : arr) {
-            uassert(12728601,
+            tassert(ErrorCodes::ExtensionError,
                     "DPL metaMergePipeline elements must be objects",
                     elem.type() == BSONType::object);
             pipeline.push_back(elem.Obj().getOwned());
@@ -207,12 +207,12 @@ DocumentResultsAndMetadataAstNode::expandToDocumentSource(
     if (!provider) {
         return stages;
     }
-    tassert(12728602,
+    tassert(ErrorCodes::ExtensionError,
             "$_internalDocumentResultsAndMetadata must expand to exactly one stage",
             stages.size() == 1);
     auto* drm =
         dynamic_cast<DocumentSourceInternalDocumentResultsAndMetadata*>(stages.front().get());
-    tassert(12728603,
+    tassert(ErrorCodes::ExtensionError,
             "expanded $_internalDocumentResultsAndMetadata stage has unexpected type",
             drm != nullptr);
     drm->setShardedPlan(std::move(provider));

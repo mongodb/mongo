@@ -244,7 +244,7 @@ DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsExplain, "
     ExecAggStageAPI::assertVTableConstraints(vtable);
 }
 
-DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidExtensionGetNextResultAdvanced, "10956801") {
+DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidExtensionGetNextResultAdvanced, "519") {
     auto invalidExtensionExecAggStageAdvancedState =
         new extension::sdk::ExtensionExecAggStageAdapter(
             InvalidExtensionExecAggStageAdvancedState::make());
@@ -253,9 +253,7 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidExtensionGetNextResultAdvance
     [[maybe_unused]] auto getNext = handle->getNext(_execCtx.get());
 };
 
-DEATH_TEST_F(AggStageErrorFixtureDeathTest,
-             InvalidExtensionGetNextResultPauseExecution,
-             "10956802") {
+DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidExtensionGetNextResultPauseExecution, "519") {
     auto invalidExtensionExecAggStagePauseExecutionState =
         new extension::sdk::ExtensionExecAggStageAdapter(
             InvalidExtensionExecAggStagePauseExecutionState::make());
@@ -264,7 +262,7 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest,
     [[maybe_unused]] auto getNext = handle->getNext(_execCtx.get());
 };
 
-DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidExtensionGetNextResultEOF, "10956805") {
+DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidExtensionGetNextResultEOF, "519") {
     auto invalidExtensionExecAggStageEofState = new extension::sdk::ExtensionExecAggStageAdapter(
         InvalidExtensionExecAggStageEofState::make());
 
@@ -272,7 +270,7 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidExtensionGetNextResultEOF, "1
     [[maybe_unused]] auto getNext = handle->getNext(_execCtx.get());
 };
 
-DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidMongoExtensionGetNextResultCode, "10956803") {
+DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidMongoExtensionGetNextResultCode, "519") {
     ::MongoExtensionGetNextResult result = {.code =
                                                 static_cast<::MongoExtensionGetNextResultCode>(10),
                                             .resultDocument = createEmptyByteContainer()};
@@ -333,7 +331,7 @@ public:
 
 DEATH_TEST_F(AggStageErrorFixtureDeathTest,
              InvalidExtensionGetNextResultAdvancedFromCompiledExecAggStage,
-             "10956801") {
+             "519") {
     auto logicalStage = new extension::sdk::ExtensionLogicalAggStageAdapter(
         TestLogicalStageCompileWithInvalidExtensionExecAggStageAdvancedState::make());
     auto handle = extension::LogicalAggStageHandle{logicalStage};
@@ -345,7 +343,7 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest,
 
 DEATH_TEST_F(AggStageErrorFixtureDeathTest,
              InvalidExtensionGetNextResultPauseExecutionFromCompiledExecAggStage,
-             "10956802") {
+             "519") {
     auto logicalStage = new extension::sdk::ExtensionLogicalAggStageAdapter(
         TestLogicalStageCompileWithInvalidExtensionExecAggStagePauseExecutionState::make());
     auto handle = extension::LogicalAggStageHandle{logicalStage};
@@ -357,7 +355,7 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest,
 
 DEATH_TEST_F(AggStageErrorFixtureDeathTest,
              InvalidExtensionGetNextResultEOFFromCompiledExecAggStage,
-             "10956805") {
+             "519") {
     auto logicalStage = new extension::sdk::ExtensionLogicalAggStageAdapter(
         TestLogicalStageCompileWithInvalidExtensionExecAggStageEofState::make());
     auto handle = extension::LogicalAggStageHandle{logicalStage};

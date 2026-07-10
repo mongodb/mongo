@@ -38,10 +38,10 @@ void validateDocsNeededBoundsInfo(const MongoExtensionDocsNeededBoundsInfo* info
     const bool requiresValue =
         info->getEffect() == MongoExtensionDocsNeededBoundsEffectEnum::kLimit ||
         info->getEffect() == MongoExtensionDocsNeededBoundsEffectEnum::kSkip;
-    uassert(11842302,
+    tassert(ErrorCodes::ExtensionError,
             "'value' must be specified when 'effect' is 'limit' or 'skip'",
             !requiresValue || info->getValue().has_value());
-    uassert(11842303,
+    tassert(ErrorCodes::ExtensionError,
             "'value' must only be specified when 'effect' is 'limit' or 'skip'",
             requiresValue || !info->getValue().has_value());
 }

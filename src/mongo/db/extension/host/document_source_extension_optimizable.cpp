@@ -90,12 +90,12 @@ public:
     ExpansionValidationFrame(ExpansionState& state, std::string stageName)
         : _state(state), _stageName(std::move(stageName)) {
         const auto newDepth = _state.currDepth + 1;
-        tassert(10955800,
+        tassert(ErrorCodes::ExtensionError,
                 str::stream() << "Stage expansion exceeded maximum depth of " << kMaxExpansionDepth,
                 newDepth <= kMaxExpansionDepth);
 
         const auto inserted = _state.seenStages.insert(_stageName).second;
-        tassert(10955801,
+        tassert(ErrorCodes::ExtensionError,
                 str::stream() << "Cycle detected during stage expansion for stage " << _stageName
                               << ": " << _formatCyclePath(_state, _stageName),
                 inserted);
@@ -439,7 +439,7 @@ DocumentSourceExtensionOptimizable::distributedPlanLogic(const DistributedPlanCo
 
                         // Validate that the host parse node does not contain an extension stage.
                         auto stageName = bsonSpec.firstElementFieldNameStringData();
-                        uassert(11882000,
+                        tassert(ErrorCodes::ExtensionError,
                                 str::stream() << "Extension stage '" << getSourceName()
                                               << "' returned an invalid distributedPlanLogic: the "
                                                  "host parse node contains extension stage '"
@@ -458,7 +458,7 @@ DocumentSourceExtensionOptimizable::distributedPlanLogic(const DistributedPlanCo
                     // originating stage. Because of this assumption, we can pass in the static
                     // properties from the originating stage. Otherwise we would not have access to
                     // the new stage's properties here, since they live on the ASTNode.
-                    uassert(11513800,
+                    tassert(ErrorCodes::ExtensionError,
                             "an extension logical stage in a distributed plan pipeline must be the "
                             "same type as its originating stage",
                             dplLogicalStage->getName() == _logicalStage->getName());
@@ -474,11 +474,11 @@ DocumentSourceExtensionOptimizable::distributedPlanLogic(const DistributedPlanCo
     // Convert shardsPipeline.
     auto shardsPipeline = dplHandle->extractShardsPipeline();
     if (!shardsPipeline.empty()) {
-        tassert(11420601,
+        tassert(ErrorCodes::ExtensionError,
                 "Shards pipeline must have exactly one element per API specification",
                 shardsPipeline.size() == 1);
         auto shardsStages = convertDPLHandleToDocumentSources(shardsPipeline[0]);
-        tassert(11420602,
+        tassert(ErrorCodes::ExtensionError,
                 "Single shardsStage must expand to exactly one DocumentSource",
                 shardsStages.size() == 1);
         logic.shardsStage = shardsStages.front();
@@ -512,20 +512,24 @@ boost::intrusive_ptr<DocumentSourceExtensionOptimizable> DocumentSourceExtension
     const AggStageParseNodeHandle& parseNodeHandle) {
     auto expanded = parseNodeHandle->expand();
 
-    tassert(
-        11623000, "Expected parseNode to only expand into a single node.", expanded.size() == 1);
+    tassert(ErrorCodes::ExtensionError,
+            "Expected parseNode to only expand into a single node.",
+            expanded.size() == 1);
 
     boost::intrusive_ptr<DocumentSourceExtensionOptimizable> optimizable = nullptr;
     helper::visitExpandedNodes(
         expanded,
         [&](const HostAggStageParseNodeAdapter& host) {
-            tasserted(11623001, "Expected extension AST node, got host parse node.");
+            tasserted(ErrorCodes::ExtensionError,
+                      "Expected extension AST node, got host parse node.");
         },
         [&](const AggStageParseNodeHandle& handle) {
-            tasserted(11623002, "Expected extension AST node, got extension parse node.");
+            tasserted(ErrorCodes::ExtensionError,
+                      "Expected extension AST node, got extension parse node.");
         },
         [&](const HostAggStageAstNodeAdapter& hostAst) {
-            tasserted(11623003, "Expected extension AST node, got host AST node.");
+            tasserted(ErrorCodes::ExtensionError,
+                      "Expected extension AST node, got host AST node.");
         },
         [&](AggStageAstNodeHandle handle) {
             optimizable = DocumentSourceExtensionOptimizable::create(expCtx, std::move(handle));

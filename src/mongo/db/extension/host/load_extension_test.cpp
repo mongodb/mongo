@@ -424,7 +424,7 @@ TEST_F(LoadExtensionsTest, LoadExtensionInitializeVersionFails) {
                        10726600);
 }
 
-DEATH_TEST_F(LoadExtensionsTestDeathTest, LoadExtensionNullStageDescriptor, "10596400") {
+DEATH_TEST_F(LoadExtensionsTestDeathTest, LoadExtensionNullStageDescriptor, "519") {
     ExtensionLoader::load(
         "null_stage_descriptor_bad_extension",
         test_util::makeEmptyExtensionConfig("libnull_stage_descriptor_bad_extension.so"));

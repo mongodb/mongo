@@ -947,7 +947,7 @@ TEST_F(AggStageTest, ValidateStructStateAfterConvertingStructToGetNextResult) {
         }(),
         AssertionException,
         [](const AssertionException& ex) {
-            ASSERT_EQ(ex.code(), 10956803);
+            ASSERT_EQ(ex.code(), ErrorCodes::ExtensionError);
             ASSERT_STRING_CONTAINS(
                 ex.reason(), str::stream() << "Invalid MongoExtensionGetNextResultCode: " << 10);
             assertionCount.tripwire.subtractAndFetch(1);

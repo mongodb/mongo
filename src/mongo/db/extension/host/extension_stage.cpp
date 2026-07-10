@@ -127,7 +127,7 @@ GetNextResult ExtensionStage::doGetNext() {
     _lastGetNextResult = _execAggStageHandle->getNext(&ctxAdapter);
     switch (_lastGetNextResult.code) {
         case GetNextCode::kAdvanced: {
-            tassert(11357602,
+            tassert(ErrorCodes::ExtensionError,
                     "No result BSONObj returned even though the result is in the advanced state.",
                     _lastGetNextResult.resultDocument.has_value());
 

@@ -56,8 +56,9 @@ public:
 
         invokeCAndConvertStatusToException([&]() { return _vtable().serialize(get(), &buf); });
 
-        tassert(
-            11265503, "buffer returned from serialize function must not be null", buf != nullptr);
+        tassert(ErrorCodes::ExtensionSerializationError,
+                "buffer returned from serialize function must not be null",
+                buf != nullptr);
 
         // Take ownership of the returned buffer so that it gets cleaned up, then copy the memory
         // into a BSON object to be returned.

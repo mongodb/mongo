@@ -55,7 +55,9 @@ OwnedOperationMetricsHandle ExecAggStageAPI::createMetrics() const {
     MongoExtensionOperationMetrics* metrics = nullptr;
     invokeCAndConvertStatusToException([&]() { return _vtable().create_metrics(get(), &metrics); });
 
-    tassert(11213505, "Result of `create_metrics` was nullptr", metrics != nullptr);
+    tassert(ErrorCodes::ExtensionSerializationError,
+            "Result of `create_metrics` was nullptr",
+            metrics != nullptr);
 
     // Take ownership of the created metrics and return the result.
     return OwnedOperationMetricsHandle(metrics);
@@ -81,7 +83,9 @@ BSONObj ExecAggStageAPI::explain(MongoExtensionQueryExecutionContext& execCtx,
             get(), &execCtx, convertHostVerbosityToExtVerbosity(verbosity), &buf);
     });
 
-    tassert(11239500, "buffer returned from explain must not be null", buf);
+    tassert(ErrorCodes::ExtensionSerializationError,
+            "buffer returned from explain must not be null",
+            buf);
 
     // Take ownership of the returned buffer so that it gets cleaned up, then retrieve an owned
     // BSONObj to return to the host.

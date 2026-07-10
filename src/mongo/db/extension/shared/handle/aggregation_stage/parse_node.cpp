@@ -46,7 +46,9 @@ BSONObj AggStageParseNodeAPI::getQueryShape(const ::MongoExtensionHostQueryShape
     invokeCAndConvertStatusToException(
         [&]() { return _vtable().get_query_shape(get(), &opts, &buf); });
 
-    tassert(11188203, "buffer returned from get_query_shape must not be null", buf != nullptr);
+    tassert(ErrorCodes::ExtensionSerializationError,
+            "buffer returned from get_query_shape must not be null",
+            buf != nullptr);
 
     // Take ownership of the returned buffer so that it gets cleaned up, then retrieve an owned
     // BSONObj to return to the host.
@@ -80,7 +82,7 @@ struct ArrayElemAsRaii<::MongoExtensionExpandedArrayElement> {
                 break;
             }
             default:
-                tasserted(11113804, "ExpandedArray element has invalid type tag");
+                tasserted(ErrorCodes::ExtensionError, "ExpandedArray element has invalid type tag");
                 break;
         }
         return handle;
@@ -90,7 +92,9 @@ struct ArrayElemAsRaii<::MongoExtensionExpandedArrayElement> {
 std::vector<VariantNodeHandle> AggStageParseNodeAPI::expand() const {
     ::MongoExtensionExpandedArrayContainer* container = nullptr;
     invokeCAndConvertStatusToException([&]() { return _vtable().expand(get(), &container); });
-    tassert(11113803, "Container cannot be null after expand()", container != nullptr);
+    tassert(ErrorCodes::ExtensionError,
+            "Container cannot be null after expand()",
+            container != nullptr);
     ExpandedArrayContainerHandle handle(container);
     return handle->transfer();
 }
@@ -113,7 +117,7 @@ BSONObj AggStageParseNodeAPI::toBsonForLog() const {
     ::MongoExtensionByteBuf* buf{nullptr};
     invokeCAndConvertStatusToException([&]() { return _vtable().to_bson_for_log(get(), &buf); });
 
-    tassert(11906800,
+    tassert(ErrorCodes::ExtensionSerializationError,
             "Extension implementation of `to_bson_for_log` encountered nullptr",
             buf != nullptr);
 
@@ -147,7 +151,7 @@ struct ArrayElemAsRaii<::MongoExtensionDPLArrayElement> {
                 break;
             }
             default:
-                tasserted(11365500, "DPLArray element has invalid type tag");
+                tasserted(ErrorCodes::ExtensionError, "DPLArray element has invalid type tag");
                 break;
         }
         return handle;

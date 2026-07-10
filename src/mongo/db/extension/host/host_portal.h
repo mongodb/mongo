@@ -47,7 +47,7 @@ class HostPortal : public host_connector::HostPortalBase {
 public:
     void registerStageDescriptor(
         const ::MongoExtensionAggStageDescriptor* descriptor) const override {
-        tassert(10596400,
+        tassert(ErrorCodes::ExtensionError,
                 "Got null stage descriptor during extension registration",
                 descriptor != nullptr);
         host::DocumentSourceExtensionOptimizable::registerStage(

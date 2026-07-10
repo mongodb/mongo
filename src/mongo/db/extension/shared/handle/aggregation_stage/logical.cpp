@@ -48,7 +48,7 @@ BSONObj LogicalAggStageAPI::serialize() const {
     ::MongoExtensionByteBuf* buf{nullptr};
     invokeCAndConvertStatusToException([&]() { return _vtable().serialize(get(), &buf); });
 
-    tassert(11173700,
+    tassert(ErrorCodes::ExtensionSerializationError,
             "Extension implementation of `serialize` encountered nullptr inside the output buffer.",
             buf != nullptr);
 
@@ -66,7 +66,9 @@ BSONObj LogicalAggStageAPI::explain(MongoExtensionQueryExecutionContext& execCtx
             get(), &execCtx, convertHostVerbosityToExtVerbosity(verbosity), &buf);
     });
 
-    tassert(11239400, "buffer returned from explain must not be null", buf);
+    tassert(ErrorCodes::ExtensionSerializationError,
+            "buffer returned from explain must not be null",
+            buf);
 
     // Take ownership of the returned buffer so that it gets cleaned up, then retrieve an owned
     // BSONObj to return to the host.

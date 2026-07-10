@@ -91,7 +91,7 @@ TEST(ByteBufTest, RoundTripBSONWorks) {
     ASSERT_EQ(from.toString(), doc.toString());
 }
 
-DEATH_TEST(ByteBufDeathTest, AssignNullWithPositiveLenFails, "10806300") {
+DEATH_TEST(ByteBufDeathTest, AssignNullWithPositiveLenFails, "518") {
     ByteBuf buf;
     buf.assign(nullptr, 4);
 }

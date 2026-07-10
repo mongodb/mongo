@@ -48,7 +48,9 @@ void ByteBuf::assign(const uint8_t* data, size_t len) {
         _buffer.clear();
         return;
     }
-    tassert(10806300, "Data pointer cannot be null when length is non-zero", data != nullptr);
+    tassert(ErrorCodes::ExtensionSerializationError,
+            "Data pointer cannot be null when length is non-zero",
+            data != nullptr);
     _buffer.assign(data, data + len);
 }
 
