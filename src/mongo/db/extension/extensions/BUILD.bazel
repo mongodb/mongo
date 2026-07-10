@@ -51,8 +51,6 @@ package(default_visibility = ["//visibility:public"])
         "rerank_extension",
     ]
     for variant in [
-        "amazon2-x86_64",
-        "amazon2-aarch64",
         "amazon2023-x86_64",
         "amazon2023-aarch64",
     ]
