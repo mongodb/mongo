@@ -1,5 +1,9 @@
-import {ConcurrentOperation} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/chunk_operation_errors.js";
-
+import {
+    ConcurrentOperation,
+    isCommonChunkOpContentionError,
+    isErrorAcceptable,
+    isErrorAcceptableWithSplitOrMerge,
+} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/chunk_operation_errors.js";
 const acceptabilityHandlers = new Map([
     [ConcurrentOperation.MoveChunk, isErrorAcceptableWithMoveChunk],
     [ConcurrentOperation.RemoveShard, isErrorAcceptableWithRemoveShard],
@@ -8,6 +12,8 @@ const acceptabilityHandlers = new Map([
     [ConcurrentOperation.RefineShardKey, isErrorAcceptableWithRefineShardKey],
     [ConcurrentOperation.CoordinatedMultiWrite, isErrorAcceptableWithCoordinatedMultiWrite],
     [ConcurrentOperation.ValidationLevelChange, isErrorAcceptableWithValidationLevelChange],
+    [ConcurrentOperation.SplitChunk, isErrorAcceptableWithSplitOrMerge],
+    [ConcurrentOperation.MergeChunks, isErrorAcceptableWithSplitOrMerge],
 ]);
 
 function getConcurrentOperationsFromConfig() {
@@ -31,20 +37,29 @@ export function isMoveChunkErrorAcceptableWithConcurrent(operations, error) {
     return acceptable;
 }
 
-function isErrorAcceptable(error, acceptableCodes, acceptableReasons) {
-    if (acceptableCodes.includes(error.code)) {
-        return true;
-    }
-    const fullMessage = formatErrorMsg(error.message, error.extraAttr);
-    return acceptableReasons.some((reason) => fullMessage.includes(reason));
-}
-
 function isErrorAcceptableWithMoveChunk(error) {
     // When the balancer is enabled, manual chunk migrations might conflict with the operations
     // being done by the balancer.
     const acceptableCodes = [656452, 11089203];
-    const acceptableReasons = [];
-    return isErrorAcceptable(error, acceptableCodes, acceptableReasons);
+    const acceptableReasons = [
+        // A concurrent migration or an interrupt during the commit-clone phase aborts an in-flight
+        // moveChunk before it commits. The command surfaces CommandFailed; the migration rolls back
+        // cleanly (chunk stays on the donor, orphans cleaned up), so no document is moved or lost.
+        "startCommit failed",
+        // The donor migrates config.transactions entries for retryable writes; an entry older than
+        // what the recipient already has uasserts TransactionTooOld. No document is lost or
+        // duplicated.
+        "migrate failed: TransactionTooOld",
+        // A migration recipient rejects the move when its local shard catalog still holds a chunk
+        // overlapping the incoming range that is reachable by point-in-time reads. This is a
+        // by-design rejection; the move can succeed later, once the stale entry ages past the
+        // snapshot-history window.
+        "point-in-time reachable ownership history",
+    ];
+    return (
+        isCommonChunkOpContentionError(error) ||
+        isErrorAcceptable(error, acceptableCodes, acceptableReasons)
+    );
 }
 
 function isErrorAcceptableWithRemoveShard(error) {
@@ -109,12 +124,20 @@ function isErrorAcceptableWithCoordinatedMultiWrite(error) {
 }
 
 function isErrorAcceptableWithValidationLevelChange(error) {
-    // collMod operations that change the validation level acquire an X lock on the collection,
-    // which can interrupt an in-progress migration. A full document scan during constraint-level
-    // upgrade can also hold collection resources long enough for a concurrent migration's
-    // waitForClean() to observe metadata in a transitional state ("metadata reset"). Orphan
-    // cleanup from a previous migration may also cause the next migration into that range to fail.
-    const acceptableCodes = [ErrorCodes.Interrupted];
-    const acceptableReasons = ["orphans cleanup", "metadata reset"];
+    const acceptableCodes = [
+        // collMod acquires an X lock on the collection, which can interrupt a migration mid-flight.
+        ErrorCodes.Interrupted,
+    ];
+    const acceptableReasons = [
+        // Orphan cleanup from a prior migration can block the next inbound migration from
+        // receiving a range that overlaps with documents still being deleted.
+        "orphans cleanup",
+        // The document scan inside upgradeToConstraint holds collection resources long enough for
+        // a concurrent migration's waitForClean() to observe metadata in a transitional state.
+        "metadata reset",
+        // The collMod holds the collection critical section while scanning, preventing a concurrent
+        // migration from entering its commit phase.
+        "startCommit failed",
+    ];
     return isErrorAcceptable(error, acceptableCodes, acceptableReasons);
 }
