@@ -108,6 +108,8 @@ parameters:
     description: "Enable test selection using Evergreen API"
   - key: test_selection_strategies_array
     description: "Array of test selection strategies"
+  - key: runtime_params_json
+    description: 'JSON of runtime params (e.g. {"enable_linux_perf":true}) to enable on-CPU profiling on benchmark tasks.'
 
 commit_queue_aliases:
   - variant: "^(commit-queue)$"

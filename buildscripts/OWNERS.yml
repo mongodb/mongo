@@ -62,3 +62,6 @@ filters:
   - "bazel_burn_in.py":
     approvers:
       - 10gen/devprod-correctness
+  - "benchmark_profiler.py":
+    approvers:
+      - 10gen/performance

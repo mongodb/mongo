@@ -556,3 +556,9 @@ py_binary(
         ),
     ],
 )
+
+py_library(
+    name = "benchmark_profiler",
+    srcs = ["benchmark_profiler.py"],
+    visibility = ["//visibility:public"],
+)
