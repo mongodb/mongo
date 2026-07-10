@@ -82,16 +82,14 @@ server_parameters:
             Maximum amount of memory in bytes that all memory-tracked stages of a single query
             operation may collectively use. SimpleMemoryUsageTracker::withinMemoryLimit() walks
             the base chain on each check, so per-stage trackers enforce their own limit and the
-            OperationMemoryUsageTracker root enforces this operation-wide cap. The default is
-            max(1GB, 20% of the memory available to the process), evaluated once at startup.
+            OperationMemoryUsageTracker root enforces this operation-wide cap. The default of
+            std::numeric_limits<long long>::max() leaves the operation-wide limit effectively
+            unbounded, preserving existing per-stage behavior.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxMemoryUsageBytesPerOperation"
         cpp_vartype: AtomicWord<long long>
         default:
-            expr: "defaultInternalQueryMaxMemoryUsageBytesPerOperation()"
-            # The default depends on runtime-available memory (ProcessInfo::getMemSizeBytes()), so
-            # it cannot be evaluated as a constant expression.
-            is_constexpr: false
+            expr: std::numeric_limits<long long>::max()
         validator:
             gt: 0
         redact: false
