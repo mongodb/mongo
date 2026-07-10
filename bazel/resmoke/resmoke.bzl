@@ -105,12 +105,23 @@ def _resmoke_config_impl(ctx):
                 python_path.append(ctx.expand_make_variables("python_library_imports", "$(BINDIR)/external/" + path, ctx.var))
         generator_deps = [ctx.attr.generator[PyInfo].transitive_sources]
 
-        # Directory artifacts (e.g. from jstestfuzz_generate) can't be enumerated
-        # so record them as a glob.
-        test_list = [
-            (test.short_path + "/*.js") if test.is_directory else test.short_path
-            for test in ctx.files.srcs
-        ]
+        if ctx.attr.test_root_granularity == "directory":
+            # The test kind treats each directory as a single test case (e.g.
+            # query_tester). Track the individual files as inputs for hermeticity
+            # but write the deduped parent directories as roots. A directory tree
+            # artifact is already the test-case root; a plain file contributes its
+            # parent directory.
+            test_list = sorted({
+                (test.short_path if test.is_directory else test.short_path.rsplit("/", 1)[0]): None
+                for test in ctx.files.srcs
+            }.keys())
+        else:
+            # Directory artifacts (e.g. from jstestfuzz_generate) can't be enumerated
+            # so record them as a glob.
+            test_list = [
+                (test.short_path + "/*.js") if test.is_directory else test.short_path
+                for test in ctx.files.srcs
+            ]
         ctx.actions.write(test_list_file, "\n".join(test_list))
 
         deps = depset([test_list_file, base_config_file] + ctx.files.srcs, transitive = [python.files] + generator_deps)
@@ -143,6 +154,13 @@ resmoke_config = rule(
             default = "//bazel/resmoke:resmoke_config_generator",
         ),
         "srcs": attr.label_list(allow_files = True, doc = "Tests to write as the 'roots' of the selector"),
+        "test_root_granularity": attr.string(
+            default = "file",
+            values = ["file", "directory"],
+            doc = "Granularity of a test case: 'file' (default, one root per src file) or " +
+                  "'directory' (one root per src's parent directory, for test kinds like " +
+                  "query_tester that treat each directory as a test case).",
+        ),
         "passthrough": attr.bool(default = False, doc = "If true, copy the base config verbatim instead of generating."),
         "base_config": attr.label(
             allow_files = True,
@@ -191,6 +209,7 @@ def resmoke_suite_test(
         srcs = [],
         tags = [],
         target_compatible_with = [],
+        test_root_granularity = "file",
         timeout = "eternal",
         exec_properties = {},
         multiversion_deps = [],
@@ -211,6 +230,10 @@ def resmoke_suite_test(
         resmoke_args: Additional command-line arguments for resmoke.
         size: Bazel test size.
         srcs: Override for test source files. If empty, auto-derived from config.
+        test_root_granularity: Granularity of a test case: "file" (default, one
+            root per src file) or "directory" (one root per src's parent
+            directory). Use "directory" for test kinds that treat each directory
+            as a single test case (e.g. query_tester_server_test).
         tags: Bazel tags.
         target_compatible_with: Compatibility constraints forwarded to py_test.
             Suites whose multiversion_deps consist solely of last-continuous
@@ -239,6 +262,7 @@ def resmoke_suite_test(
         srcs = srcs,
         base_config = config,
         passthrough = passthrough,
+        test_root_granularity = test_root_granularity,
         tags = ["resmoke_config"],
     )
 
