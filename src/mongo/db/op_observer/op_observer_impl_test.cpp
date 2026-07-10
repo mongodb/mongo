@@ -494,6 +494,29 @@ protected:
         return entry.getDocHash();
     }
 
+    boost::optional<int64_t> updateAndGetDocHash(OperationContext* opCtx,
+                                                 const NamespaceString& ns,
+                                                 const BSONObj& preImageDoc,
+                                                 const BSONObj& update,
+                                                 const BSONObj& updatedDoc,
+                                                 RecordId recordId) {
+        OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
+
+        CollectionUpdateArgs updateArgs{preImageDoc};
+        updateArgs.criteria = preImageDoc;
+        updateArgs.updatedDoc = updatedDoc;
+        updateArgs.update = update;
+        updateArgs.replicatedRecordId = recordId;
+
+        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
+        WriteUnitOfWork wuow(opCtx);
+        OplogUpdateEntryArgs updateEntryArgs(&updateArgs, *autoColl);
+        opObserver.onUpdate(opCtx, updateEntryArgs);
+        wuow.commit();
+        auto entry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx)));
+        return entry.getDocHash();
+    }
+
     int64_t calculateDocHash(const BSONObj& doc) {
         const SHA256Block sha =
             SHA256Block::computeHash({ConstDataRange(doc.objdata(), doc.objsize())});
@@ -520,6 +543,12 @@ protected:
     const NamespaceString kNssUnderTenantId = NamespaceString::createNamespaceString_forTest(
         boost::none, kTenantId.toString() + "_db", "testColl");
     const UUID kNssUnderTenantIdUUID{UUID::gen()};
+
+    const BSONObj kPreImageDoc = BSON("_id" << 0 << "data"
+                                            << "x");
+    const BSONObj kUpdatedDoc = BSON("_id" << 0 << "data"
+                                           << "y");
+    const BSONObj kUpdate = BSON("$set" << BSON("data" << "y"));
 
     ReadWriteConcernDefaultsLookupMock _lookupMock;
 
@@ -1873,6 +1902,35 @@ TEST_F(OpObserverTest, CheckHashDoesNotExistOnInsertWithoutFlag) {
     EXPECT_FALSE(insertAndGetDocHash(opCtx, nss, doc, {RecordId(1)}).has_value());
 }
 
+TEST_F(OpObserverTest, CheckHashExistsOnUpdateWithFlagAndRecordId) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const int64_t expectedHash = calculateDocHash(kUpdatedDoc);
+    const boost::optional<int64_t> hash =
+        updateAndGetDocHash(opCtx, nss, kPreImageDoc, kUpdate, kUpdatedDoc, RecordId(1));
+    ASSERT(hash);
+    EXPECT_EQ(*hash, expectedHash);
+}
+
+TEST_F(OpObserverTest, CheckHashDoesNotExistOnUpdateWithoutFlag) {
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const boost::optional<int64_t> hash =
+        updateAndGetDocHash(opCtx, nss, kPreImageDoc, kUpdate, kUpdatedDoc, RecordId(1));
+    EXPECT_FALSE(hash.has_value());
+}
+
+TEST_F(OpObserverTest, CheckHashDoesNotExistOnUpdateWithoutRecordId) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    EXPECT_FALSE(updateAndGetDocHash(opCtx, nss, kPreImageDoc, kUpdate, kUpdatedDoc, RecordId{})
+                     .has_value());
+}
+
 /**
  * Test fixture for testing OpObserver behavior specific to the SessionCatalog.
  */
@@ -2195,6 +2253,27 @@ protected:
         auto oplogEntry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx())));
         return getInnerEntryFromApplyOpsOplogEntry(oplogEntry).getDocHash();
     }
+
+    // Performs a transactional update and returns the docHash from the inner oplog entry.
+    boost::optional<int64_t> txnUpdateAndGetDocHash(const NamespaceString& ns,
+                                                    const BSONObj& preImageDoc,
+                                                    const BSONObj& updatedDoc,
+                                                    RecordId recordId) {
+        txnParticipant().unstashTransactionResources(opCtx(), "update");
+        AutoGetCollection autoColl(opCtx(), ns, MODE_IX);
+
+        CollectionUpdateArgs updateArgs{preImageDoc};
+        updateArgs.criteria = preImageDoc;
+        updateArgs.updatedDoc = updatedDoc;
+        updateArgs.update = BSON("$set" << updatedDoc);
+        updateArgs.replicatedRecordId = recordId;
+        OplogUpdateEntryArgs updateEntryArgs(&updateArgs, *autoColl);
+
+        opObserver().onUpdate(opCtx(), updateEntryArgs);
+        commitUnpreparedTransaction<OpObserverImpl>(opCtx(), opObserver());
+        auto oplogEntry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx())));
+        return getInnerEntryFromApplyOpsOplogEntry(oplogEntry).getDocHash();
+    }
 };
 
 TEST_F(OpObserverTransactionTest, checkIsTimeseriesOnMultiDocTransaction) {
@@ -2236,6 +2315,26 @@ TEST_F(OpObserverTransactionTest, CheckHashDoesNotExistOnTransactionInsertWithou
         "featureFlagContinuousInternodeValidationPerDocument", true};
     const BSONObj doc = BSON("_id" << 0 << "data" << "x");
     EXPECT_FALSE(txnInsertAndGetDocHash(nss1, doc, {}).has_value());
+}
+
+TEST_F(OpObserverTransactionTest, CheckHashExistsOnTransactionUpdateWithFlagAndRecordId) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    const int64_t expectedHash = calculateDocHash(kUpdatedDoc);
+    const boost::optional<int64_t> hash =
+        txnUpdateAndGetDocHash(nss1, kPreImageDoc, kUpdatedDoc, RecordId(1));
+    ASSERT(hash);
+    EXPECT_EQ(*hash, expectedHash);
+}
+
+TEST_F(OpObserverTransactionTest, CheckHashDoesNotExistOnTransactionUpdateWithoutFlag) {
+    EXPECT_FALSE(txnUpdateAndGetDocHash(nss1, kPreImageDoc, kUpdatedDoc, RecordId(1)).has_value());
+}
+
+TEST_F(OpObserverTransactionTest, CheckHashDoesNotExistOnTransactionUpdateWithoutRecordId) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    EXPECT_FALSE(txnUpdateAndGetDocHash(nss1, kPreImageDoc, kUpdatedDoc, RecordId{}).has_value());
 }
 
 TEST_F(OpObserverTransactionTest, TransactionOpsIncludeVersionContext) {
@@ -3783,6 +3882,50 @@ protected:
             recordIds,
             /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
             /*defaultFromMigrate=*/false);
+        wuow.commit();
+        auto oplogEntry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx)));
+        ASSERT(oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
+        std::vector<repl::OplogEntry> innerEntries;
+        repl::ApplyOps::extractOperationsTo(
+            oplogEntry, oplogEntry.getEntry().toBSON(), &innerEntries);
+        ASSERT_GTE(innerEntries.size(), 1u);
+        return {innerEntries[0].getDocHash(),
+                innerEntries.size() > 1 ? innerEntries[1].getDocHash() : boost::none};
+    }
+
+    // Performs a batched update of two documents and returns a pair of docHashes (first and
+    // second document) from the inner applyOps entry.
+    std::pair<boost::optional<int64_t>, boost::optional<int64_t>> batchedUpdateAndGetDocHash(
+        OperationContext* opCtx,
+        const NamespaceString& ns,
+        const BSONObj& preImageDoc1,
+        const BSONObj& updatedDoc1,
+        const BSONObj& preImageDoc2,
+        const BSONObj& updatedDoc2,
+        const RecordId recordId1,
+        const RecordId recordId2) {
+        reset(opCtx, ns);
+        reset(opCtx, NamespaceString::kRsOplogNamespace);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+        ASSERT(BatchedWriteContext::get(opCtx).writesAreBatched());
+        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
+
+        CollectionUpdateArgs updateArgs1{preImageDoc1};
+        updateArgs1.criteria = preImageDoc1;
+        updateArgs1.updatedDoc = updatedDoc1;
+        updateArgs1.update = BSON("$set" << updatedDoc1);
+        updateArgs1.replicatedRecordId = recordId1;
+        OplogUpdateEntryArgs updateEntryArgs1(&updateArgs1, *autoColl);
+        opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, updateEntryArgs1);
+
+        CollectionUpdateArgs updateArgs2{preImageDoc2};
+        updateArgs2.criteria = preImageDoc2;
+        updateArgs2.updatedDoc = updatedDoc2;
+        updateArgs2.update = BSON("$set" << updatedDoc2);
+        updateArgs2.replicatedRecordId = recordId2;
+        OplogUpdateEntryArgs updateEntryArgs2(&updateArgs2, *autoColl);
+        opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, updateEntryArgs2);
+
         wuow.commit();
         auto oplogEntry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx)));
         ASSERT(oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
@@ -5608,6 +5751,58 @@ TEST_F(BatchedWriteOutputsTest, CheckHashDoesNotExistOnBatchedInsertWithoutRecor
     const BSONObj doc1 = BSON("_id" << 0 << "data" << "x");
     const BSONObj doc2 = BSON("_id" << 1 << "data" << "y");
     const auto hash = batchedInsertAndGetDocHash(opCtx, _nss, doc1, doc2, {});
+    EXPECT_FALSE(hash.first.has_value());
+    EXPECT_FALSE(hash.second.has_value());
+}
+
+TEST_F(BatchedWriteOutputsTest, CheckHashExistsOnBatchedUpdateWithFlagAndRecordId) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    const BSONObj preImageDoc1 = BSON("_id" << 0 << "data" << "x");
+    const BSONObj updatedDoc1 = BSON("_id" << 0 << "data" << "y");
+    const BSONObj preImageDoc2 = BSON("_id" << 1 << "data" << 1);
+    const BSONObj updatedDoc2 = BSON("_id" << 1 << "data" << 2);
+    const int64_t expectedHash1 = calculateDocHash(updatedDoc1);
+    const int64_t expectedHash2 = calculateDocHash(updatedDoc2);
+    const std::pair<boost::optional<int64_t>, boost::optional<int64_t>> hash =
+        batchedUpdateAndGetDocHash(opCtx,
+                                   _nss,
+                                   preImageDoc1,
+                                   updatedDoc1,
+                                   preImageDoc2,
+                                   updatedDoc2,
+                                   RecordId(1),
+                                   RecordId(2));
+    ASSERT(hash.first);
+    EXPECT_EQ(*hash.first, expectedHash1);
+    ASSERT(hash.second);
+    EXPECT_EQ(*hash.second, expectedHash2);
+    EXPECT_NE(*hash.first, *hash.second);
+}
+
+TEST_F(BatchedWriteOutputsTest, CheckHashDoesNotExistOnBatchedUpdateWithoutFlag) {
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    const BSONObj doc1 = BSON("_id" << 0 << "data" << "x");
+    const BSONObj doc2 = BSON("_id" << 1 << "data" << 1);
+    const auto hash =
+        batchedUpdateAndGetDocHash(opCtx, _nss, doc1, doc1, doc2, doc2, RecordId(1), RecordId(2));
+    EXPECT_FALSE(hash.first.has_value());
+    EXPECT_FALSE(hash.second.has_value());
+}
+
+TEST_F(BatchedWriteOutputsTest, CheckHashDoesNotExistOnBatchedUpdateWithoutRecordId) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    const BSONObj doc1 = BSON("_id" << 0 << "data" << "x");
+    const BSONObj doc2 = BSON("_id" << 1 << "data" << 1);
+    const auto hash =
+        batchedUpdateAndGetDocHash(opCtx, _nss, doc1, doc1, doc2, doc2, RecordId(), RecordId());
     EXPECT_FALSE(hash.first.has_value());
     EXPECT_FALSE(hash.second.has_value());
 }

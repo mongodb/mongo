@@ -1055,6 +1055,10 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
     }
 
     auto shardingWriteRouter = std::make_unique<ShardingWriteRouter>(opCtx, nss);
+
+    const bool useValidationHash = isContinuousInternodeValidationPerDocumentEnabled(opCtx) &&
+        !args.updateArgs->replicatedRecordId.isNull();
+
     OpTimeBundle opTime;
     if (inBatchedWrite) {
         repl::ReplOperation operation = MutableOplogEntry::makeUpdateOperation(
@@ -1064,6 +1068,9 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
         operation.setDestinedRecipient(
             shardingWriteRouter->getReshardingDestinedRecipient(args.updateArgs->updatedDoc));
         operation.setFromMigrateIfTrue(args.updateArgs->source == OperationSource::kFromMigrate);
+        if (useValidationHash) {
+            operation.setDocHash(computeDocValidationHash(args.updateArgs->updatedDoc));
+        }
         if (args.replicatedSizeDelta) {
             operation.setSizeMetadata(makeOperationSizeMetadata(*args.replicatedSizeDelta));
         }
@@ -1141,6 +1148,9 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
             operation.setRecordId(args.updateArgs->replicatedRecordId);
         }
 
+        if (useValidationHash) {
+            operation.setDocHash(computeDocValidationHash(args.updateArgs->updatedDoc));
+        }
         if (args.replicatedSizeDelta) {
             operation.setSizeMetadata(makeOperationSizeMetadata(*args.replicatedSizeDelta));
         }
@@ -1191,6 +1201,9 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
             oplogEntry.setRecordId(args.updateArgs->replicatedRecordId);
         }
 
+        if (useValidationHash) {
+            oplogEntry.setDocHash(computeDocValidationHash(args.updateArgs->updatedDoc));
+        }
         if (args.replicatedSizeDelta) {
             oplogEntry.setSizeMetadata(makeOperationSizeMetadata(*args.replicatedSizeDelta));
         }
