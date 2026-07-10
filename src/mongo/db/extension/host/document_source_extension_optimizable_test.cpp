@@ -1170,6 +1170,34 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest,
+       LiteParsedExpandedIsScoreDetailsStageWithScoreDetailsInProvidedMetadataFields) {
+    auto lp = makeLiteParsedExpandedFromProperties(
+        BSON("providedMetadataFields" << BSON_ARRAY("scoreDetails")), "$scoreDetailsStage");
+    ASSERT_TRUE(lp.isScoreDetailsStage());
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       LiteParsedExpandedIsScoreDetailsStageWithSearchScoreDetailsInProvidedMetadataFields) {
+    auto lp = makeLiteParsedExpandedFromProperties(
+        BSON("providedMetadataFields" << BSON_ARRAY("searchScoreDetails")),
+        "$searchScoreDetailsStage");
+    ASSERT_TRUE(lp.isScoreDetailsStage());
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       LiteParsedExpandedIsNotScoreDetailsStageWithSearchScoreInProvidedMetadataFields) {
+    auto lp = makeLiteParsedExpandedFromProperties(
+        BSON("providedMetadataFields" << BSON_ARRAY("searchScore")), "$nonScoreDetailsStage");
+    ASSERT_FALSE(lp.isScoreDetailsStage());
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       LiteParsedExpandedIsNotScoreDetailsStageWithOmittedProvidedMetadataFields) {
+    auto lp = makeLiteParsedExpandedFromProperties(BSONObj(), "$omittedStage");
+    ASSERT_FALSE(lp.isScoreDetailsStage());
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
        LiteParsedExpandedIsSelectionStageWhenIsSelectionStageTrue) {
     auto lp =
         makeLiteParsedExpandedFromProperties(BSON("isSelectionStage" << true), "$selectionStage");
@@ -1226,6 +1254,20 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
     // Scored even when only a non-front expanded stage produces the score metadata.
     ASSERT_TRUE(makeLiteParsedExpandableFromPropertiesList({nonScored, scored}).isScoredStage());
     ASSERT_TRUE(makeLiteParsedExpandableFromPropertiesList({scored, nonScored}).isScoredStage());
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       LiteParsedExpandableIsScoreDetailsStageWhenAnyExpandedStageIsScoreDetails) {
+    const BSONObj scoreDetails = BSON("providedMetadataFields" << BSON_ARRAY("scoreDetails"));
+    const BSONObj nonScoreDetails = BSON("providedMetadataFields" << BSON_ARRAY("searchScore"));
+
+    ASSERT_FALSE(makeLiteParsedExpandableFromPropertiesList({nonScoreDetails, nonScoreDetails})
+                     .isScoreDetailsStage());
+    // scoreDetails even when only a non-front expanded stage produces the scoreDetails metadata.
+    ASSERT_TRUE(makeLiteParsedExpandableFromPropertiesList({nonScoreDetails, scoreDetails})
+                    .isScoreDetailsStage());
+    ASSERT_TRUE(makeLiteParsedExpandableFromPropertiesList({scoreDetails, nonScoreDetails})
+                    .isScoreDetailsStage());
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest,

@@ -137,5 +137,48 @@ TEST_F(LiteParsedInternalDocumentResultsAndMetadataTest,
     ASSERT_EQ(idLookup->getSpec().getViewPipeline()->size(), 1u);
 }
 
+TEST_F(LiteParsedInternalDocumentResultsAndMetadataTest, ForwardsRankedFromNestedSource) {
+    // $sort is a ranked (but not scored) stage.
+    auto lp =
+        parse(fromjson(R"({$_internalDocumentResultsAndMetadata: {source: {$sort: {x: 1}}}})"));
+    ASSERT_TRUE(lp->isRankedStage());
+    ASSERT_FALSE(lp->isScoredStage());
+}
+
+TEST_F(LiteParsedInternalDocumentResultsAndMetadataTest,
+       ForwardsScoredAndSelectionFromNestedSource) {
+    // $score is a scored + selection stage, but not ranked.
+    auto lp = parse(
+        fromjson(R"({$_internalDocumentResultsAndMetadata: {source: {$score: {score: 1.0}}}})"));
+    ASSERT_TRUE(lp->isScoredStage());
+    ASSERT_TRUE(lp->isSelectionStage());
+    ASSERT_FALSE(lp->isRankedStage());
+}
+
+TEST_F(LiteParsedInternalDocumentResultsAndMetadataTest,
+       ForwardsScoreDetailsFromNestedSourceWhenRequested) {
+    // $score reports scoreDetails only when the "scoreDetails" option is set.
+    auto lp = parse(fromjson(
+        R"({$_internalDocumentResultsAndMetadata: {source: {$score: {score: 1.0, scoreDetails: true}}}})"));
+    ASSERT_TRUE(lp->isScoreDetailsStage());
+}
+
+TEST_F(LiteParsedInternalDocumentResultsAndMetadataTest,
+       DoesNotForwardScoreDetailsWhenNestedSourceOmitsIt) {
+    auto lp = parse(
+        fromjson(R"({$_internalDocumentResultsAndMetadata: {source: {$score: {score: 1.0}}}})"));
+    ASSERT_FALSE(lp->isScoreDetailsStage());
+}
+
+TEST_F(LiteParsedInternalDocumentResultsAndMetadataTest, ReportsNoHybridPropertiesForPlainSource) {
+    // A source that is neither ranked, scored, scoreDetails, nor selection-only forwards all false.
+    auto lp =
+        parse(fromjson(R"({$_internalDocumentResultsAndMetadata: {source: {$collStats: {}}}})"));
+    ASSERT_FALSE(lp->isRankedStage());
+    ASSERT_FALSE(lp->isScoredStage());
+    ASSERT_FALSE(lp->isScoreDetailsStage());
+    ASSERT_FALSE(lp->isSelectionStage());
+}
+
 }  // namespace
 }  // namespace mongo

@@ -126,6 +126,11 @@ static const std::set<DocumentMetadataFields::MetaType> kScoreMetadataFields = {
     DocumentMetadataFields::MetaType::kVectorSearchScore,
     DocumentMetadataFields::MetaType::kTextScore,
 };
+
+static const std::set<DocumentMetadataFields::MetaType> kScoreDetailsMetadataFields = {
+    DocumentMetadataFields::MetaType::kScoreDetails,
+    DocumentMetadataFields::MetaType::kSearchScoreDetails,
+};
 }  // namespace
 
 DocumentMetadataFields::DocumentMetadataFields(const DocumentMetadataFields& other)
@@ -169,6 +174,10 @@ std::string_view DocumentMetadataFields::serializeMetaType(MetaType type) {
 
 bool DocumentMetadataFields::isScoreProducingMetaType(std::string_view name) {
     return kScoreMetadataFields.contains(DocumentMetadataFields::parseMetaType(name));
+}
+
+bool DocumentMetadataFields::isScoreDetailsProducingMetaType(std::string_view name) {
+    return kScoreDetailsMetadataFields.contains(DocumentMetadataFields::parseMetaType(name));
 }
 
 void DocumentMetadataFields::setMetaFieldFromValue(MetaType type, Value val) {

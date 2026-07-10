@@ -52,6 +52,10 @@ constexpr std::string_view kNumMetaField = "numMeta"sv;
 constexpr std::string_view kNumDocsField = "numDocs"sv;
 constexpr std::string_view kDocPadField = "docPad"sv;
 constexpr std::string_view kAddStreamTypeField = "addStreamTypeField"sv;
+constexpr std::string_view kAdvertiseSortKeyField = "advertiseSortKey"sv;
+constexpr std::string_view kSuppressScoreField = "suppressScore"sv;
+constexpr std::string_view kAdvertiseScoreDetailsField = "advertiseScoreDetails"sv;
+constexpr std::string_view kIsSelectionStageField = "isSelectionStage"sv;
 constexpr std::string_view kSortPatternField = "sortPattern"sv;
 constexpr std::string_view kMergePipelineField = "mergePipeline"sv;
 
@@ -65,7 +69,14 @@ constexpr std::string_view kSearchMetaName = "SEARCH_META"sv;
 constexpr std::string_view kScoreField = "score"sv;
 constexpr std::string_view kSortKeyField = "$sortKey"sv;
 constexpr std::string_view kSearchScoreField = "$searchScore"sv;
+constexpr std::string_view kScoreDetailsMetaField = "$scoreDetails"sv;
 constexpr std::string_view kStreamTypeField = "_streamType"sv;
+
+// Marker embedded in the emitted $scoreDetails metadata. Hybrid fusion merges a scoreDetails-
+// generating input pipeline's per-doc scoreDetails into its output scoreDetails, so a test can
+// assert this marker survives the fusion to confirm the DRM source was recognized as
+// scoreDetails-generating.
+constexpr std::string_view kScoreDetailsMarker = "extensionMultiStreamScoreDetails"sv;
 
 // True if 'field' is present at the top level or inside any per-shard override.
 bool fieldPresentInAnyShard(const BSONObj& args, std::string_view field) {
@@ -103,12 +114,15 @@ struct DocEmitConfig {
     // inflate the document stream past the Exchange's per-consumer buffer with fewer documents.
     int docPad = 0;
     bool addStreamTypeField = false;
+    // When set, each document result also carries $scoreDetails metadata (see kScoreDetailsMarker).
+    bool scoreDetails = false;
 
     static DocEmitConfig parse(const BSONObj& args) {
         return {
             args[kNumDocsField].isNumber() ? args[kNumDocsField].safeNumberInt() : 0,
             args[kDocPadField].isNumber() ? args[kDocPadField].safeNumberInt() : 0,
             args[kAddStreamTypeField].booleanSafe(),
+            args[kAdvertiseScoreDetailsField].booleanSafe(),
         };
     }
 };
@@ -199,10 +213,17 @@ public:
             builder.append(kStreamTypeField, -1);
         }
         // $sortKey drives merge-sort across shards. $searchScore is score * 0.125.
-        return advanced(
-            builder.obj(),
-            StreamType::kDocResult,
-            BSON(kSortKeyField << BSON_ARRAY(score) << kSearchScoreField << score * 0.125));
+        BSONObjBuilder metaBuilder;
+        metaBuilder.append(kSortKeyField, BSON_ARRAY(score));
+        metaBuilder.append(kSearchScoreField, score * 0.125);
+        if (_docConfig.scoreDetails) {
+            // Tagged with kScoreDetailsMarker so a hybrid fusion test can confirm the source's
+            // scoreDetails flowed through fusion (only happens when it is recognized as
+            // scoreDetails-generating).
+            metaBuilder.append(kScoreDetailsMetaField,
+                               BSON("marker" << kScoreDetailsMarker << "score" << score));
+        }
+        return advanced(builder.obj(), StreamType::kDocResult, metaBuilder.obj());
     }
 
     void open() override {}
@@ -275,7 +296,20 @@ public:
         properties.setRequiresInputDocSource(false);
         properties.setPosition(extension::MongoExtensionPositionRequirementEnum::kFirst);
         properties.setHostType(extension::MongoExtensionHostTypeRequirementEnum::kTargetedShards);
-        properties.setProvidedMetadataFields(std::vector<std::string>{"searchScore"});
+
+        std::vector<std::string> provided;
+        if (!_arguments[kSuppressScoreField].booleanSafe()) {
+            provided.emplace_back("searchScore");
+        }
+        if (_arguments[kAdvertiseSortKeyField].booleanSafe()) {
+            provided.emplace_back("sortKey");
+        }
+        if (_arguments[kAdvertiseScoreDetailsField].booleanSafe()) {
+            provided.emplace_back("scoreDetails");
+        }
+        properties.setProvidedMetadataFields(std::move(provided));
+        properties.setIsSelectionStage(_arguments[kIsSelectionStageField].booleanSafe());
+
         BSONObjBuilder builder;
         properties.serialize(&builder);
         return builder.obj();
@@ -352,14 +386,18 @@ extension::AggStageAstNodeHandle expandToDrm(const BSONObj& args) {
  * mergePipeline) is supplied.
  *
  * Arguments (all optional, also accepted under byShard.<shardId> overrides):
- *   numDocs:            <int>   number of document results to emit
- *   docPad:             <int>   filler bytes appended to each document (inflates stream size)
- *   numMeta:            <int>   number of metadata docs (0/1/2 exercise DRM edge cases)
- *   meta:               <obj>   metadata payload; presence activates the metadata stream
- *   addStreamTypeField: <bool>  append a debug _streamType field to each document
- *   sortPattern:        <obj>   merge-sort pattern for the DPL callback
- *   mergePipeline:      <array> metadata merge pipeline for the DPL callback
- *   byShard:            <obj>   { <shardId>: { ...per-shard overrides... } }
+ *   numDocs:               <int>   number of document results to emit
+ *   docPad:                <int>   filler bytes appended to each document (inflates stream size)
+ *   numMeta:               <int>   number of metadata docs (0/1/2 exercise DRM edge cases)
+ *   meta:                  <obj>   metadata payload; presence activates the metadata stream
+ *   addStreamTypeField:    <bool>  append a debug _streamType field to each document
+ *   advertiseSortKey:      <bool>  advertise sortKey metadata (marks the source as ranked)
+ *   suppressScore:         <bool>  drop searchScore from advertised metadata (marks it non-scored)
+ *   advertiseScoreDetails: <bool> advertise + emit $scoreDetails metadata (see kScoreDetailsMarker)
+ *   isSelectionStage:      <bool>  mark the source as a selection stage
+ *   sortPattern:           <obj>   merge-sort pattern for the DPL callback
+ *   mergePipeline:         <array> metadata merge pipeline for the DPL callback
+ *   byShard:               <obj>   { <shardId>: { ...per-shard overrides... } }
  */
 class ExtensionMultiStreamParseNode : public sdk::AggStageParseNode {
 public:

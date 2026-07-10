@@ -136,6 +136,22 @@ public:
         _shardedPlan = std::move(source);
     }
 
+    bool isRankedStage() const final {
+        return _pipelines.front()->isRankedPipeline();
+    }
+
+    bool isScoredStage() const final {
+        return _pipelines.front()->isScoredPipeline();
+    }
+
+    bool isScoreDetailsStage() const final {
+        return _pipelines.front()->isScoreDetailsPipeline();
+    }
+
+    bool isSelectionStage() const final {
+        return _pipelines.front()->isSelectionPipeline();
+    }
+
     FirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy() const override {
         // $_internalDocumentResultsAndMetadata is a source stage; the view (if any) must NOT be
         // prepended in front of it. Any view application happens via bindResolvedNamespace() below,

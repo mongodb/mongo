@@ -232,6 +232,12 @@ public:
             });
         }
 
+        bool isScoreDetailsStage() const override {
+            return std::any_of(_expanded.begin(), _expanded.end(), [](const auto& stage) {
+                return stage->isScoreDetailsStage();
+            });
+        }
+
         bool isSelectionStage() const override {
             return std::all_of(_expanded.begin(), _expanded.end(), [](const auto& stage) {
                 return stage->isSelectionStage();
@@ -403,6 +409,8 @@ public:
         bool isRankedStage() const override;
 
         bool isScoredStage() const override;
+
+        bool isScoreDetailsStage() const override;
 
         bool isSelectionStage() const override;
 

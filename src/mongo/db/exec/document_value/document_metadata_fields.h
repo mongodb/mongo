@@ -112,6 +112,11 @@ public:
     static bool isScoreProducingMetaType(std::string_view name);
 
     /**
+     * Returns true if this metadata value produces scoreDetails metadata.
+     */
+    static bool isScoreDetailsProducingMetaType(std::string_view name);
+
+    /**
      * Reads serialized metadata out of 'buf', and uses it to populate 'out'. Expects 'buf' to have
      * been written to by a previous call to serializeForSorter(). It is illegal to pass a null
      * pointer for 'out'.

@@ -291,6 +291,16 @@ bool DocumentSourceExtensionOptimizable::LiteParsedExpanded::isScoredStage() con
         provided->begin(), provided->end(), DocumentMetadataFields::isScoreProducingMetaType);
 }
 
+bool DocumentSourceExtensionOptimizable::LiteParsedExpanded::isScoreDetailsStage() const {
+    const auto& provided = _properties.getProvidedMetadataFields();
+    if (!provided || provided->empty()) {
+        return false;
+    }
+    return std::any_of(provided->begin(),
+                       provided->end(),
+                       DocumentMetadataFields::isScoreDetailsProducingMetaType);
+}
+
 bool DocumentSourceExtensionOptimizable::LiteParsedExpanded::isSelectionStage() const {
     return _properties.getIsSelectionStage();
 }
