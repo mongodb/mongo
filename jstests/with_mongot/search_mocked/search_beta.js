@@ -1,5 +1,6 @@
 /**
  * Verify that `$searchBeta` works as an alias for `$search`.
+ * TODO (SERVER-131069): Remove this mocked test file now that this test has been migrated to an e2e suite. Note that the deprecation-warning log assertion below is not covered by the e2e version (the warning is emitted through a `Rarely` sampler, so log-based assertions are unreliable on shared e2e fixtures).
  */
 import {getMatchingLoglinesCount} from "jstests/libs/log.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";

@@ -1,5 +1,6 @@
 /**
  * Verify the query shape that is outputted by $queryStats for $search and $searchMeta queries.
+ * TODO (SERVER-131069): Remove this mocked test file now that this test has been migrated to an e2e suite.
  */
 import {
     assertAggregatedMetricsSingleExec,

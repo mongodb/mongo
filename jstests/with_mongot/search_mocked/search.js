@@ -1,5 +1,6 @@
 /**
  * Test the basic operation of a `$search` aggregation stage.
+ * TODO (SERVER-131069): Remove this mocked test file now that this test has been migrated to an e2e suite.
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
