@@ -4,6 +4,7 @@
 
 import {assertArrayEq, documentEq} from "jstests/aggregation/extras/utils.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {isPlanCosted} from "jstests/libs/query/cbr_utils.js";
 
 /**
  * Returns query planner part of explain for every node in the explain report.
@@ -149,6 +150,78 @@ export function getWinningPlanFromExplain(explain, isSBEPlan = false) {
         queryPlanner = getQueryPlanner(explain);
     }
     return isSBEPlan ? getWinningSBEPlan(queryPlanner) : getWinningPlan(queryPlanner);
+}
+
+/**
+ * The ranker that produced the winning plan.
+ *   kCostBased     - the cost-based ranker (CBR) ranked the plan (it carries a cost estimate).
+ *   kMultiPlanning - the multi-planner (MP) ranked the plan (no cost estimate). This includes the
+ *                    case where CBR was engaged but could not cost the plans and fell back to MP.
+ *   kNone          - no ranking was needed (e.g. a single candidate plan).
+ */
+export const ChosenRanker = {
+    kMultiPlanning: "multiPlanning",
+    kCostBased: "costBased",
+    kNone: "none",
+};
+
+/**
+ * The reason a particular ranker was chosen for a query. These document the intended planner
+ * decision for a test case. Not all reasons apply to every plan ranker or CE strategy.
+ */
+export const PlanRankerReason = {
+    kSinglePlan: "singlePlan",
+    kFeatureFlag: "featureFlag",
+    kQueryKnob: "queryKnob",
+    kInestimableNode: "inestimableNode",
+    kHistogramCEInternalColl: "histogramCEInternalColl",
+    kSmallCollection: "smallCollection",
+    kMpEarlyExitOrResult: "mpEarlyExitOrResult",
+    kNoMultiplanningResults: "noMultiplanningResults",
+    kMpEarlyExitEofOrFullBatch: "mpEarlyExitEofOrFullBatch",
+    kInestimableMP: "inestimableMP",
+    kMpCheaperThanCbr: "mpCheaperThanCbr",
+    kCbrCheaperThanMp: "cbrCheaperThanMp",
+};
+
+/**
+ * Asserts that the winning plan in 'explain' was produced by 'chosenRanker' for 'reason'.
+ *
+ * Today the only observable signal is whether the winning plan carries a cost estimate (the
+ * 'costEstimate' field): CBR (kCostBased) costs the plan, while the multi-planner (kMultiPlanning)
+ * and the single-plan path (kNone) do not.
+ *
+ * 'reason' must be passed and is validated against 'PlanRankerReason', but it is not yet asserted
+ * against the explain output because the explain format does not surface it.
+ * TODO SERVER-130875: assert 'chosenRanker' and 'reason' directly against the v3 explain output.
+ */
+export function assertChosenRanker(explain, {chosenRanker, reason}) {
+    assert(Object.values(ChosenRanker).includes(chosenRanker), "Unknown chosenRanker", {
+        chosenRanker,
+    });
+    assert(Object.values(PlanRankerReason).includes(reason), "Unknown reason", {reason});
+
+    const winningPlan = getWinningPlanFromExplain(explain);
+    const isCosted = isPlanCosted(winningPlan);
+    switch (chosenRanker) {
+        case ChosenRanker.kCostBased:
+            assert(isCosted, "Expected CBR to have costed the winning plan", {
+                chosenRanker,
+                reason,
+                winningPlan,
+            });
+            break;
+        case ChosenRanker.kMultiPlanning:
+            assert(!isCosted, "Expected the winning plan to not be costed", {
+                chosenRanker,
+                reason,
+                winningPlan,
+            });
+            break;
+        case ChosenRanker.kNone:
+            assert(getRejectedPlans(explain).length === 0, "Expected no rejected plans", {explain});
+            break;
+    }
 }
 
 /**
