@@ -1297,6 +1297,7 @@ error_codes:
       name: WriteConflictRetryLimitExceeded,
       categories: [SystemOverloadedError, RetriableError],
     }
+
   # A retryable user error from the stream processor's target Atlas cluster.
   - {
       code: 513,
@@ -1304,16 +1305,6 @@ error_codes:
       categories: [StreamProcessorUserError, StreamProcessorRetryableError],
     }
   - {code: 514, name: LightweightStepdownConflict}
-  - {
-      code: 515,
-      name: ConnectionClosedByPeer,
-      categories: [NetworkError, RetriableError],
-    }
-  - {
-      code: 516,
-      name: ConnectionEstablishmentTimeout,
-      categories: [NetworkError, RetriableError],
-    }
 
   # Extensions API errors that flag an error due to the extension itself.
   # Extension has a malformed vtable.

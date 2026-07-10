@@ -97,15 +97,7 @@ rs.getPrimary().adminCommand({
         try {
             new Mongo(`mongodb://${nonExemptIP}:${ingressPort}`);
         } catch (e) {
-            // The rejected establishment is normally a graceful FIN ("Connection closed by peer"),
-            // but depending on socket timing/buffering the OS may deliver it as a reset or abort.
-            // Accept any of these, matching the sibling exemption tests.
-            return (
-                e.message.includes("Connection closed by peer") ||
-                e.message.includes("Connection reset by peer") ||
-                e.message.includes("established connection was aborted") ||
-                e.message.includes("Broken pipe")
-            );
+            return e.message.includes("Connection closed by peer");
         }
         return false;
     });

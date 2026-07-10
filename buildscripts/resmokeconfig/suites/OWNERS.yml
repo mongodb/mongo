@@ -120,9 +120,6 @@ filters:
   - "no_passthrough_network*":
     approvers:
       - 10gen/server-networking-and-observability
-  - "integration_tests_replset_tls.yml":
-    approvers:
-      - 10gen/server-networking-and-observability
   - "cwrwc*":
     approvers:
       - 10gen/server-rw-concerns
