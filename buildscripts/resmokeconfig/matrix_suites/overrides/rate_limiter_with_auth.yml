@@ -291,7 +291,9 @@
       - jstests/core/timeseries/query/timeseries_raw_data_queries.js
       - jstests/core/timeseries/write/timeseries_raw_data_writes.js
       - jstests/core/timeseries/query/timeseries_out_non_sharded.js
-      # TODO SERVER-130473: Enable this test.
+      # This test closes cursors between test cases, expecting this to always kill open cursors, but
+      # killing cursors uses fireAndForget commands within mongos, so killing will not be retried
+      # after getting load shed, leaving cursors open and failing the test.
       - jstests/core/administrative/current_op/currentop_find.js
 
 - name: auth_exclude_files_core_sharding
