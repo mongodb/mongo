@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
@@ -141,6 +142,11 @@ private:
      * non-advanced result (control event, pause, or EOF), which is cached in
      * '_bufferedNonAdvancedResult'. Entered only in kBuffer (all buffers empty) and hands off to
      * kEnrich. Holds no resources. Foreign upstream stage code runs here.
+     *
+     * A 'ChangeStreamInvalidated' or 'CloseChangeStream' from upstream signals normal change stream
+     * closure, not an error, via a queue-then-throw protocol: upstream returns a data event (e.g.
+     * "invalidate") and only throws on the following call. Such exception is buffered and the
+     * batch will no further be filled.
      */
     void fillBatch();
 
@@ -153,8 +159,8 @@ private:
     void enrichBatch();
 
     /**
-     * Returns one enriched document from '_outputBuffer'. When empty, the buffered non-advanced
-     * result (then clears it).
+     * Returns one enriched document from '_outputBuffer'. When empty, rethrows the buffered
+     * exception if one is stashed, else returns the buffered non-advanced result.
      */
     GetNextResult emit();
 
@@ -189,6 +195,13 @@ private:
      * the buffers drain.
      */
     boost::optional<GetNextResult> _bufferedNonAdvancedResult;
+
+    /**
+     * A "normal cursor lifecycle" exception caught by fillBatch() after at least one event was
+     * already buffered. Deferred so those already-buffered events are enriched and emitted first.
+     * Rethrown by emit() once both buffers are fully drained.
+     */
+    boost::optional<Status> _bufferedException;
 
     /**
      * The phase doGetNext() resumes at. Starts at kBuffer (empty).

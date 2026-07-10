@@ -37,32 +37,53 @@
 #include "mongo/db/exec/single_doc_lookup/local_lookup_eligibility_factory_impl.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_stats.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/pipeline/change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/util/assert_util.h"
 
+#include <cstddef>
 #include <memory>
 
 namespace mongo {
 namespace {
 /**
+ * Computes the batch limits for the updateLookup stage. Batching only pays off behind a caching
+ * executor, which is the collection-level SBE path; database- and cluster-wide streams run Express
+ * (acquires per event, so a larger batch buys nothing) and stay batch-of-one. With the optimization
+ * off the stage runs batch-of-one too, so its resume and latency behaviour stays byte-for-byte
+ * master regardless of the batch-size knob (raised only by tests). The byte budgets always come
+ * from their knobs.
+ */
+exec::agg::BatchedEnrichmentStage::Limits buildUpdateLookupLimits(
+    const QueryKnobConfiguration& queryKnobsConfig, bool isOptimized, bool isCollectionStream) {
+    const bool shouldBatch = isOptimized && isCollectionStream;
+    return exec::agg::BatchedEnrichmentStage::Limits{
+        .maxInputEvents = shouldBatch
+            ? static_cast<size_t>(queryKnobsConfig.getChangeStreamUpdateLookupMaxBatchSize())
+            : 1,
+        .maxInputBytes =
+            static_cast<size_t>(queryKnobsConfig.getChangeStreamUpdateLookupMaxInputBytes()),
+        .maxOutputBytes =
+            static_cast<size_t>(queryKnobsConfig.getChangeStreamUpdateLookupMaxOutputBytes())};
+}
+
+/**
  * Builds the SingleDocumentLookupExecutor for the updateLookup stage.
  */
 std::unique_ptr<exec::agg::SingleDocumentLookupExecutor> buildUpdateLookupExecutor(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    OperationContext* opCtx, bool isOptimized) {
     using namespace exec::agg;
     auto aggExecutor = std::make_unique<AggregationSingleDocumentLookupExecutor>(
         exec::SingleDocumentLookupStatsRecorder::makeUpdateLookupAggregationRecorder());
 
-    const auto& ifrContext = expCtx->getIfrContext();
-    const bool optimizedLookupEnabled = ifrContext &&
-        ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagChangeStreamOptimizedUpdateLookup);
-    if (!optimizedLookupEnabled) {
+    if (!isOptimized) {
         return aggExecutor;
     }
-
-    OperationContext* opCtx = expCtx->getOperationContext();
 
     // Record the effective wiring on this operation so it rides onto the ClientCursor. The getMore
     // precondition uses it to kill-and-resume the cursor if the flag is later turned off.
@@ -89,16 +110,25 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamAddPostImageToS
     const boost::intrusive_ptr<DocumentSource>& documentSource) {
     auto* changeStreamAddPostImageDS =
         dynamic_cast<DocumentSourceChangeStreamAddPostImage*>(documentSource.get());
-
     tassert(10561301,
             "expected 'DocumentSourceChangeStreamAddPostImage' type",
             changeStreamAddPostImageDS);
 
     if (changeStreamAddPostImageDS->isUpdateLookup()) {
+        const auto& expCtx = changeStreamAddPostImageDS->getExpCtx();
+        auto ifrCtx = expCtx->getIfrContext();
+        const bool isOptimized = ifrCtx &&
+            ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagChangeStreamOptimizedUpdateLookup);
+        const bool isCollectionStream =
+            ChangeStream::buildFromExpressionContext(expCtx).getChangeStreamType() ==
+            ChangeStreamType::kCollection;
+
         return make_intrusive<exec::agg::ChangeStreamUpdateLookupStage>(
             changeStreamAddPostImageDS->kStageName,
-            changeStreamAddPostImageDS->getExpCtx(),
-            buildUpdateLookupExecutor(changeStreamAddPostImageDS->getExpCtx()));
+            expCtx,
+            buildUpdateLookupExecutor(expCtx->getOperationContext(), isOptimized),
+            buildUpdateLookupLimits(
+                expCtx->getQueryKnobConfiguration(), isOptimized, isCollectionStream));
     }
 
     return make_intrusive<exec::agg::ChangeStreamAddPostImageStage>(

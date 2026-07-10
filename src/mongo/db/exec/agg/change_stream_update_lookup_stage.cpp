@@ -41,6 +41,7 @@
 #include "mongo/util/str.h"
 
 #include <string_view>
+#include <utility>
 
 namespace mongo::exec::agg {
 namespace {
@@ -145,11 +146,20 @@ boost::optional<UUID> getCollectionUUID(const Document& updateOp, bool shouldMat
 ChangeStreamUpdateLookupStage::ChangeStreamUpdateLookupStage(
     std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-    std::unique_ptr<SingleDocumentLookupExecutor> lookupExecutor)
-    : Stage(stageName, pExpCtx),
+    std::unique_ptr<SingleDocumentLookupExecutor> lookupExecutor,
+    Limits limits)
+    : BatchedEnrichmentStage(stageName, pExpCtx, limits),
       _lookupExecutor(std::move(lookupExecutor)),
       _changeStream(ChangeStream::buildFromExpressionContext(pExpCtx)) {
     tassert(12841000, "SingleDocumentLookupExecutor must be provided", _lookupExecutor);
+}
+
+void ChangeStreamUpdateLookupStage::beginBatch() {
+    _batch.emplace(*_lookupExecutor);
+}
+
+void ChangeStreamUpdateLookupStage::closeBatch() noexcept {
+    _batch.reset();
 }
 
 boost::optional<Document> ChangeStreamUpdateLookupStage::performPostImageLookup(
@@ -175,20 +185,15 @@ boost::optional<Document> ChangeStreamUpdateLookupStage::performPostImageLookup(
     }
 }
 
-GetNextResult ChangeStreamUpdateLookupStage::doGetNext() {
-    auto input = pSource->getNext();
-    if (!input.isAdvanced()) {
-        return input;
-    }
-
+Document ChangeStreamUpdateLookupStage::enrich(Document event) {
     auto opTypeVal = assertFieldHasType(
-        input.getDocument(), DocumentSourceChangeStream::kOperationTypeField, BSONType::string);
+        event, DocumentSourceChangeStream::kOperationTypeField, BSONType::string);
     if (opTypeVal.getStringData() != DocumentSourceChangeStream::kUpdateOpType) {
-        return input;
+        return event;
     }
 
     // Create a mutable output document from the input document.
-    MutableDocument output(input.releaseDocument());
+    MutableDocument output(std::move(event));
     const auto postImageDoc = performPostImageLookup(output.peek());
 
     // Even if no post-image was found, we have to populate the 'fullDocument' field.

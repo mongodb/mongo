@@ -76,7 +76,7 @@ void BatchedEnrichmentStage::fillBatch() {
     tassert(12916805,
             "fillBatch() runs only in the kBuffer phase with nothing buffered or pending",
             _phase == Phase::kBuffer && _outputBuffer.empty() && _inputBuffer.empty() &&
-                !_bufferedNonAdvancedResult.has_value());
+                !_bufferedNonAdvancedResult.has_value() && !_bufferedException.has_value());
 
     while (_inputBuffer.size() < _limits.maxInputEvents) {
         // Stop once the buffered input crosses the byte budget, so a few large events cannot blow
@@ -86,17 +86,29 @@ void BatchedEnrichmentStage::fillBatch() {
             break;
         }
 
-        auto upstream = pSource->getNext();
-        if (!upstream.isAdvanced()) {
-            // Only data events are buffered. Anything else (a control event, pause, or EOF) ends
-            // the batch: cache it to surface in order once the buffered data drains, then stop
-            // filling. A non-advanced event is thus a natural boundary, never buffered or enriched.
-            _bufferedNonAdvancedResult = std::move(upstream);
+        // Catch change stream specific exceptions, which need to be emitted after all buffered
+        // events.
+        boost::optional<GetNextResult> upstream;
+        try {
+            upstream = pSource->getNext();
+        } catch (const ExceptionFor<ErrorCodes::ChangeStreamInvalidated>& ex) {
+            _bufferedException = ex.toStatus();
+            break;
+        } catch (const ExceptionFor<ErrorCodes::CloseChangeStream>& ex) {
+            _bufferedException = ex.toStatus();
             break;
         }
 
-        trackPush(upstream.getDocument());
-        _inputBuffer.push_back(std::move(upstream));
+        if (!upstream->isAdvanced()) {
+            // Only data events are buffered. Anything else (a control event, pause, or EOF) ends
+            // the batch: cache it to surface in order once the buffered data drains, then stop
+            // filling. A non-advanced event is thus a natural boundary, never buffered or enriched.
+            _bufferedNonAdvancedResult = std::move(*upstream);
+            break;
+        }
+
+        trackPush(upstream->getDocument());
+        _inputBuffer.push_back(std::move(*upstream));
     }
 
     _phase = Phase::kEnrich;
@@ -146,14 +158,21 @@ void BatchedEnrichmentStage::enrichBatch() {
 GetNextResult BatchedEnrichmentStage::emit() {
     tassert(12916807, "emit() runs only in the kEmit phase", _phase == Phase::kEmit);
 
-    // The output buffer is empty only when fill stopped on a non-advanced result: fill always
-    // yields at least one buffered event or a non-advanced result (EOF included), so one must be
-    // pending here.
+    // When entering kEmit phase the output buffer is empty only when fill stopped on a non-advanced
+    // result or a buffered exception, so one of the two must be set here.
     if (_outputBuffer.empty()) {
+        _phase = Phase::kBuffer;
+
+        if (_bufferedException.has_value()) {
+            // Rethrow the buffered exception. Every event buffered ahead of it has been emitted.
+            auto status = std::move(*_bufferedException);
+            _bufferedException.reset();
+            uassertStatusOK(status);
+        }
+
         tassert(12916808,
                 "a buffered non-advanced result must exist when the output buffer is empty",
                 _bufferedNonAdvancedResult.has_value());
-        _phase = Phase::kBuffer;
         auto result = std::move(*_bufferedNonAdvancedResult);
         _bufferedNonAdvancedResult.reset();
         return result;
@@ -164,13 +183,13 @@ GetNextResult BatchedEnrichmentStage::emit() {
     trackPop(next.getDocument());
 
     // Resume the next call from what is still buffered: more output to drain, a window
-    // suspended by the output-byte cap, a buffered non-advanced result to surface, or nothing
-    // left so refill.
+    // suspended by the output-byte cap, a buffered non-advanced result or exception to surface, or
+    // nothing left so refill.
     if (!_outputBuffer.empty()) {
         _phase = Phase::kEmit;
     } else if (!_inputBuffer.empty()) {
         _phase = Phase::kEnrich;
-    } else if (_bufferedNonAdvancedResult.has_value()) {
+    } else if (_bufferedNonAdvancedResult.has_value() || _bufferedException.has_value()) {
         _phase = Phase::kEmit;
     } else {
         _phase = Phase::kBuffer;
@@ -185,6 +204,7 @@ void BatchedEnrichmentStage::doDispose() {
     _outputBuffer.clear();
     _memTracker.set(0);
     _bufferedNonAdvancedResult.reset();
+    _bufferedException.reset();
     _phase = Phase::kBuffer;
 }
 

@@ -304,6 +304,16 @@ private:
     // timestamp seen while scanning the oplog, as well as the most recent PBRT.
     Timestamp _latestOplogTimestamp;
     BSONObj _postBatchResumeToken;
+
+    // For change streams only: the timestamp actually captured in '_postBatchResumeToken', kept
+    // separate from '_latestOplogTimestamp' (which tracks the raw upstream scan position and can
+    // run ahead of it when a stage buffers events ahead of emitting them, e.g.
+    // BatchedEnrichmentStage batching > 1). Used only to detect whether the oplog has genuinely
+    // advanced since '_postBatchResumeToken' was last set.
+    //
+    // 'boost::none' means the cached value is stale and must be recomputed by decoding
+    // '_postBatchResumeToken' before use.
+    boost::optional<Timestamp> _postBatchResumeTokenTimestamp;
 };
 
 }  // namespace mongo

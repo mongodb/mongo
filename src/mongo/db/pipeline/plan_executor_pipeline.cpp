@@ -192,9 +192,17 @@ void PlanExecutorPipeline::_performChangeStreamsAccounting(const boost::optional
     if (doc) {
         // While we have more results to return, we track both the timestamp and the resume token of
         // the latest event observed in the oplog, the latter via its sort key metadata field.
+        // '_latestOplogTimestamp' is the raw upstream scan position, which a stage that buffers
+        // events ahead of emitting them (e.g. BatchedEnrichmentStage batching > 1) can advance past
+        // this document before it is emitted here.
         _validateChangeStreamsResumeToken(*doc);
         _latestOplogTimestamp = PipelineD::getLatestOplogTimestamp(_execPipeline.get());
         _postBatchResumeToken = doc->metadata().getSortKey().getDocument().toBson();
+
+        // Reseting '_postBatchResumeTokenTimestamp' value to avoid recomputing it by parsing
+        // ResumeToken. The value is needed to determine the PBRT advanced past 'highWaterMark'.
+        _postBatchResumeTokenTimestamp = boost::none;
+
         _setSpeculativeReadTimestamp();
     } else {
         // We ran out of results to return. Check whether the oplog cursor has moved forward since
@@ -202,12 +210,17 @@ void PlanExecutorPipeline::_performChangeStreamsAccounting(const boost::optional
         // return, if the new time is higher than the last then we are guaranteed not to have
         // already returned any events at this timestamp. We can set _postBatchResumeToken to a new
         // high-water-mark token at the current clusterTime.
+        if (!_postBatchResumeTokenTimestamp) {
+            _postBatchResumeTokenTimestamp =
+                ResumeToken::parse(_postBatchResumeToken).getData().clusterTime;
+        }
         auto highWaterMark = PipelineD::getLatestOplogTimestamp(_execPipeline.get());
-        if (highWaterMark > _latestOplogTimestamp) {
+        if (highWaterMark > *_postBatchResumeTokenTimestamp) {
             auto token = ResumeToken::makeHighWaterMarkToken(
                 highWaterMark, _pipeline->getContext()->getChangeStreamTokenVersion());
             _postBatchResumeToken = token.toDocument().toBson();
             _latestOplogTimestamp = highWaterMark;
+            _postBatchResumeTokenTimestamp = highWaterMark;
             _setSpeculativeReadTimestamp();
         }
     }
@@ -268,7 +281,9 @@ void PlanExecutorPipeline::_initializeResumableScanState() {
                     "expected initialPostBatchResumeToken to be not empty",
                     !_expCtx->getInitialPostBatchResumeToken().isEmpty());
             _postBatchResumeToken = _expCtx->getInitialPostBatchResumeToken().getOwned();
-            _latestOplogTimestamp = ResumeToken::parse(_postBatchResumeToken).getData().clusterTime;
+            _postBatchResumeTokenTimestamp =
+                ResumeToken::parse(_postBatchResumeToken).getData().clusterTime;
+            _latestOplogTimestamp = *_postBatchResumeTokenTimestamp;
             break;
         case ResumableScanType::kOplogScan:
             // Initialize the oplog timestamp and postBatchResumeToken here in case the request has
