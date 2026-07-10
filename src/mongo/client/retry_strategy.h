@@ -96,7 +96,7 @@ public:
         Status s,
         const boost::optional<HostAndPort>& origin,
         std::span<const std::string> errorLabels,
-        boost::optional<Milliseconds> baseBackoffMS = boost::none) = 0;
+        boost::optional<Milliseconds> baseBackoffMS) = 0;
 
     /**
      * Records a successful request. Should be called at the end of successful request even if no
@@ -176,7 +176,8 @@ public:
         explicit(!std::convertible_to<U, T>) constexpr Result(const Result<U>& result)
             : _status{result._status},
               _valueOrError{convert_variant(result._valueOrError)},
-              _origin{result._origin} {}
+              _origin{result._origin},
+              _baseBackoffMS{result._baseBackoffMS} {}
 
         /**
          * Converting move constructor from another result type.
@@ -186,7 +187,8 @@ public:
         explicit(!std::convertible_to<U, T>) constexpr Result(Result<U>&& result)
             : _status{std::exchange(result._status, Status::OK())},
               _valueOrError{convert_variant(std::exchange(result._valueOrError, {}))},
-              _origin{std::exchange(result._origin, {})} {}
+              _origin{std::exchange(result._origin, {})},
+              _baseBackoffMS{std::exchange(result._baseBackoffMS, {})} {}
 
         /**
          * Converting constructor from status for error cases.
@@ -211,10 +213,14 @@ public:
          * This constructor is not constexpr only because HostAndPort cannot be used in constexpr
          * context.
          */
-        Result(Status s, std::vector<std::string> errorLabels, boost::optional<HostAndPort> origin)
+        Result(Status s,
+               std::vector<std::string> errorLabels,
+               boost::optional<HostAndPort> origin,
+               boost::optional<Milliseconds> baseBackoffMS)
             : _status{std::move(s)},
               _valueOrError{std::in_place_type<ErrorLabels>, std::move(errorLabels)},
-              _origin{std::move(origin)} {
+              _origin{std::move(origin)},
+              _baseBackoffMS{baseBackoffMS} {
             dassert(!_status.isOK());
         }
 
@@ -256,6 +262,10 @@ public:
 
         constexpr const boost::optional<HostAndPort>& getOrigin() const {
             return _origin;
+        }
+
+        boost::optional<Milliseconds> getBaseBackoffMS() const {
+            return _baseBackoffMS;
         }
 
         constexpr bool operator==(const T& value) const {
@@ -355,6 +365,7 @@ public:
         Status _status;
         ValueOrErrorLabels _valueOrError;
         boost::optional<HostAndPort> _origin;
+        boost::optional<Milliseconds> _baseBackoffMS;
     };
 
     using ResultStatus = Result<std::monostate>;
@@ -405,11 +416,10 @@ public:
           _maxRetryAttempts{retryParameters.maxRetryAttempts} {}
 
     [[nodiscard]]
-    bool recordFailureAndEvaluateShouldRetry(
-        Status s,
-        const boost::optional<HostAndPort>& target,
-        std::span<const std::string> errorLabels,
-        boost::optional<Milliseconds> baseBackoffMS = boost::none) override;
+    bool recordFailureAndEvaluateShouldRetry(Status s,
+                                             const boost::optional<HostAndPort>& target,
+                                             std::span<const std::string> errorLabels,
+                                             boost::optional<Milliseconds> baseBackoffMS) override;
 
     void recordSuccess(const boost::optional<HostAndPort>& target) override {
         // Noop, as there's nothing to cleanup on success.
@@ -453,11 +463,10 @@ public:
      * regardless of the failure status or error labels.
      */
     [[nodiscard]]
-    bool recordFailureAndEvaluateShouldRetry(
-        Status s,
-        const boost::optional<HostAndPort>& target,
-        std::span<const std::string> errorLabels,
-        boost::optional<Milliseconds> baseBackoffMS = boost::none) override {
+    bool recordFailureAndEvaluateShouldRetry(Status s,
+                                             const boost::optional<HostAndPort>& target,
+                                             std::span<const std::string> errorLabels,
+                                             boost::optional<Milliseconds> baseBackoffMS) override {
         return false;
     }
 
@@ -578,11 +587,10 @@ public:
      * delegates to the underlying strategy.
      */
     [[nodiscard]]
-    bool recordFailureAndEvaluateShouldRetry(
-        Status s,
-        const boost::optional<HostAndPort>& target,
-        std::span<const std::string> errorLabels,
-        boost::optional<Milliseconds> baseBackoffMS = boost::none) override;
+    bool recordFailureAndEvaluateShouldRetry(Status s,
+                                             const boost::optional<HostAndPort>& target,
+                                             std::span<const std::string> errorLabels,
+                                             boost::optional<Milliseconds> baseBackoffMS) override;
 
     /**
      * Replenishes the retry budget to allow more retries.
@@ -619,11 +627,10 @@ struct RetryStrategyWithFailureRetryHook : RetryStrategy {
         : _underlyingStrategy{std::move(underlyingStrategy)},
           _onRetryFunction{std::move(onRetry)} {}
 
-    bool recordFailureAndEvaluateShouldRetry(
-        Status s,
-        const boost::optional<HostAndPort>& target,
-        std::span<const std::string> errorLabels,
-        boost::optional<Milliseconds> baseBackoffMS = boost::none) override {
+    bool recordFailureAndEvaluateShouldRetry(Status s,
+                                             const boost::optional<HostAndPort>& target,
+                                             std::span<const std::string> errorLabels,
+                                             boost::optional<Milliseconds> baseBackoffMS) override {
         const bool shouldRetry = _underlyingStrategy.recordFailureAndEvaluateShouldRetry(
             s, target, errorLabels, baseBackoffMS);
 
@@ -705,8 +712,10 @@ StatusWith<T> runWithRetryStrategy(Interruptible* interruptible,
     auto result = run();
 
     while (!result.isOK() &&
-           strategy.recordFailureAndEvaluateShouldRetry(
-               result.getStatus(), result.getOrigin(), result.getErrorLabels())) {
+           strategy.recordFailureAndEvaluateShouldRetry(result.getStatus(),
+                                                        result.getOrigin(),
+                                                        result.getErrorLabels(),
+                                                        result.getBaseBackoffMS())) {
         const auto delay = strategy.getNextRetryDelay();
 
         try {

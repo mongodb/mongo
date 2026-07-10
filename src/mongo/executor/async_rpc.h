@@ -251,42 +251,44 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommandWithRun
                                     options->cmd.getGenericArguments().getClientOperationKey());
     };
 
-    auto resultStatusFromRemote =
-        [token = options->token](StatusWith<detail::AsyncRPCInternalResponse> swResponse) {
-            if (token.isCanceled()) {
-                return RetryStrategy::ResultStatus{
-                    Status{ErrorCodes::CallbackCanceled, "AsyncRPC send command retry cancelled"}};
-            }
+    auto resultStatusFromRemote = [token = options->token](
+                                      StatusWith<detail::AsyncRPCInternalResponse> swResponse) {
+        if (token.isCanceled()) {
+            return RetryStrategy::ResultStatus{
+                Status{ErrorCodes::CallbackCanceled, "AsyncRPC send command retry cancelled"}};
+        }
 
-            if (swResponse.isOK()) {
-                return RetryStrategy::ResultStatus::makeOKResult(swResponse.getValue().targetUsed);
-            }
+        if (swResponse.isOK()) {
+            return RetryStrategy::ResultStatus::makeOKResult(swResponse.getValue().targetUsed);
+        }
 
-            auto s = swResponse.getStatus();
-            if (s.code() != ErrorCodes::RemoteCommandExecutionError) {
-                return RetryStrategy::ResultStatus{s};
-            }
+        auto s = swResponse.getStatus();
+        if (s.code() != ErrorCodes::RemoteCommandExecutionError) {
+            return RetryStrategy::ResultStatus{s};
+        }
 
-            auto extraInfo = s.extraInfo<AsyncRPCErrorInfo>();
-            auto target = extraInfo->getTargetAttempted();
+        auto extraInfo = s.extraInfo<AsyncRPCErrorInfo>();
+        auto target = extraInfo->getTargetAttempted();
 
-            if (extraInfo->isLocal()) {
-                return RetryStrategy::ResultStatus{extraInfo->asLocal()};
-            }
+        if (extraInfo->isLocal()) {
+            return RetryStrategy::ResultStatus{extraInfo->asLocal()};
+        }
 
-            auto errorLabels = executor::extractErrorLabels(extraInfo->asRemote().getResponseObj());
+        auto errorLabels = executor::extractErrorLabels(extraInfo->asRemote().getResponseObj());
+        auto baseBackoffMS = executor::extractBaseBackoffMS(extraInfo->asRemote().getResponseObj());
 
-            if (auto remoteStatus = extraInfo->asRemote().getRemoteCommandResult();
-                remoteStatus.isOK()) {
-                return RetryStrategy::ResultStatus::makeOKResult(target);
-            } else {
-                return RetryStrategy::ResultStatus{
-                    remoteStatus,
-                    std::move(errorLabels),
-                    target,
-                };
-            }
-        };
+        if (auto remoteStatus = extraInfo->asRemote().getRemoteCommandResult();
+            remoteStatus.isOK()) {
+            return RetryStrategy::ResultStatus::makeOKResult(target);
+        } else {
+            return RetryStrategy::ResultStatus{
+                remoteStatus,
+                std::move(errorLabels),
+                target,
+                baseBackoffMS,
+            };
+        }
+    };
 
     auto resFuture = AsyncTry{std::move(tryBody)}
                          .withRetryStrategy(options->retryStrategy, resultStatusFromRemote)

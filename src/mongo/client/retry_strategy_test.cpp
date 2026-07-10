@@ -626,7 +626,7 @@ TEST_F(RetryStrategyTest, RunWithRetryStrategyTargetingMetadata) {
             if (std::ranges::find(targetingMetadata.deprioritizedServers, target1) ==
                 targetingMetadata.deprioritizedServers.end()) {
                 return RetryStrategy::Result<std::string_view>{
-                    statusNonRetriable, errorLabelsSystemOverloaded, target1};
+                    statusNonRetriable, errorLabelsSystemOverloaded, target1, boost::none};
             }
 
             // At the second try, there is target1, but no target2 in the list of deprioritized
@@ -634,7 +634,7 @@ TEST_F(RetryStrategyTest, RunWithRetryStrategyTargetingMetadata) {
             if (std::ranges::find(targetingMetadata.deprioritizedServers, target2) ==
                 targetingMetadata.deprioritizedServers.end()) {
                 return RetryStrategy::Result<std::string_view>{
-                    statusNonRetriable, errorLabelsSystemOverloaded, target2};
+                    statusNonRetriable, errorLabelsSystemOverloaded, target2, boost::none};
             }
 
             // At the third try, we return a success on target3.
@@ -766,7 +766,8 @@ TEST_F(RetryStrategyResultTest, ErrorLabels) {
 }
 
 TEST_F(RetryStrategyResultTest, OriginError) {
-    auto rWithOrigin = RetryStrategy::Result<std::string_view>{statusNonRetriable, {}, target1};
+    auto rWithOrigin =
+        RetryStrategy::Result<std::string_view>{statusNonRetriable, {}, target1, boost::none};
     ASSERT_EQ(rWithOrigin.getOrigin(), target1);
     auto rNoOrigin = RetryStrategy::Result<std::string_view>{statusNonRetriable, {}};
     ASSERT_EQ(rNoOrigin.getOrigin(), boost::none);
@@ -799,7 +800,7 @@ TEST_F(RetryStrategyResultTest, ConvertingMoveOK) {
 
 TEST_F(RetryStrategyResultTest, ConvertingCopyError) {
     auto r1 = RetryStrategy::Result<std::string_view>{
-        statusNonRetriable, errorLabelsNonRetriable, target1};
+        statusNonRetriable, errorLabelsNonRetriable, target1, boost::none};
     auto r2 = RetryStrategy::Result<std::string>{r1};
 
     ASSERT_FALSE(r2.isOK());
@@ -810,7 +811,7 @@ TEST_F(RetryStrategyResultTest, ConvertingCopyError) {
 
 TEST_F(RetryStrategyResultTest, ConvertingMoveError) {
     auto r1 = RetryStrategy::Result<std::string_view>{
-        statusNonRetriable, errorLabelsNonRetriable, target1};
+        statusNonRetriable, errorLabelsNonRetriable, target1, boost::none};
     auto r2 = RetryStrategy::Result<std::string>{std::move(r1)};
 
     ASSERT_FALSE(r2.isOK());

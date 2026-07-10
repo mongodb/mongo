@@ -25,6 +25,7 @@ mongo_cc_library(
         "//src/mongo/client:retry_strategy",
         "//src/mongo/db:server_base",
         "//src/mongo/db/sharding_environment:shard_shared_state_cache",
+        "//src/mongo/executor:remote_command",
         "//src/mongo/s/write_ops:batch_write_types",
     ],
 )

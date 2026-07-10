@@ -50,6 +50,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+#include <cmath>
 #include <cstddef>
 #include <set>
 #include <string_view>
@@ -143,6 +144,17 @@ protected:
         }
     }
 
+    void runRetryBackoffTestExpectingExponentialDelay(auto networkCommand, Milliseconds baseDelay) {
+        for (int i = 0; i < kMaxCommandExecutions; ++i) {
+            onCommand(networkCommand);
+
+            if (i < kDefaultClientMaxRetryAttemptsDefault) {
+                ASSERT_GTE(advanceUntilReadyRequest(),
+                           baseDelay * static_cast<std::int64_t>(std::exp2(i + 1)));
+            }
+        }
+    }
+
     inline static auto errorLabelsSystemOverloaded =
         std::vector{std::string{ErrorLabel::kSystemOverloadedError}};
 
@@ -226,7 +238,7 @@ TEST_F(ShardRemoteTest, GridSetRetryBudgetReturnRateServerParameter) {
         // We consume some tokens in order to be able to observe the return rate.
         for (int i = 0; i < 2; ++i) {
             ASSERT(retryStrategy.recordFailureAndEvaluateShouldRetry(
-                error, firstShardHostAndPort, errorLabelsSystemOverloaded));
+                error, firstShardHostAndPort, errorLabelsSystemOverloaded, boost::none));
         }
 
         // We test that the return rate was changed by observing how many tokens were returned by
@@ -254,7 +266,7 @@ TEST_F(ShardRemoteTest, ShardRetryStrategy) {
     auto error = Status(ErrorCodes::PrimarySteppedDown, "Interrupted at shutdown");
 
     ASSERT(retryStrategy.recordFailureAndEvaluateShouldRetry(
-        error, firstShardHostAndPort, errorLabelsSystemOverloaded));
+        error, firstShardHostAndPort, errorLabelsSystemOverloaded, boost::none));
     ASSERT_LT(retryBudget.getBalance_forTest(), initialBalance);
     ASSERT_NE(std::ranges::find(retryStrategy.getTargetingMetadata().deprioritizedServers,
                                 firstShardHostAndPort),
@@ -268,7 +280,7 @@ TEST_F(ShardRemoteTest, ShardRetryStrategy) {
     ASSERT_EQ(stats.totalBackoffTimeMillis.loadRelaxed(), 0);
 
     ASSERT(retryStrategy.recordFailureAndEvaluateShouldRetry(
-        error, firstShardHostAndPort, errorLabelsSystemOverloaded));
+        error, firstShardHostAndPort, errorLabelsSystemOverloaded, boost::none));
 
     ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 2);
     ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 1);
@@ -302,7 +314,7 @@ TEST_F(ShardRemoteTest, ShardRetryStrategyZeroBudgetNoRetries) {
     auto error = Status(kSystemOverloadedErrorCode, "System overloaded");
 
     ASSERT_FALSE(retryStrategy.recordFailureAndEvaluateShouldRetry(
-        error, firstShardHostAndPort, errorLabelsSystemOverloaded));
+        error, firstShardHostAndPort, errorLabelsSystemOverloaded, boost::none));
 
     ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
     ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 1);
@@ -333,11 +345,11 @@ TEST_F(ShardRemoteTest, ShardRetryStrategyCapExhaustedTwoRetries) {
     // First kRetryAttempts (2) calls succeed
     for (int i = 0; i < kRetryAttempts; ++i) {
         ASSERT_TRUE(retryStrategy.recordFailureAndEvaluateShouldRetry(
-            error, firstShardHostAndPort, errorLabelsSystemOverloaded));
+            error, firstShardHostAndPort, errorLabelsSystemOverloaded, boost::none));
     }
     // Cap exhausted, no retry occurs
     ASSERT_FALSE(retryStrategy.recordFailureAndEvaluateShouldRetry(
-        error, firstShardHostAndPort, errorLabelsSystemOverloaded));
+        error, firstShardHostAndPort, errorLabelsSystemOverloaded, boost::none));
 
     ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
     ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), kRetryAttempts + 1);
@@ -364,7 +376,7 @@ TEST_F(ShardRemoteTest, ShardRetryStrategyInterleavedNonOverloadError) {
 
     // First attempt: fails with SystemOverloadedError — no retry metrics yet.
     ASSERT_TRUE(retryStrategy.recordFailureAndEvaluateShouldRetry(
-        overloadError, firstShardHostAndPort, errorLabelsSystemOverloaded));
+        overloadError, firstShardHostAndPort, errorLabelsSystemOverloaded, boost::none));
 
     ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
     ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 1);
@@ -376,7 +388,7 @@ TEST_F(ShardRemoteTest, ShardRetryStrategyInterleavedNonOverloadError) {
     // numRetriesDueToOverloadAttempted incremented to 1 — this is the first retry after overload.
     // AndSucceeded stays 0 because no command success has occurred yet.
     ASSERT_TRUE(retryStrategy.recordFailureAndEvaluateShouldRetry(
-        connectionError, firstShardHostAndPort, {}));
+        connectionError, firstShardHostAndPort, {}, boost::none));
 
     ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
     ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 1);
@@ -414,7 +426,7 @@ TEST_F(ShardRemoteTest, ShardRetryStrategyInterleavedNonOverloadErrorThenOverloa
 
     // First attempt: fails with SystemOverloadedError — no retry metrics yet.
     ASSERT_TRUE(retryStrategy.recordFailureAndEvaluateShouldRetry(
-        overloadError, firstShardHostAndPort, errorLabelsSystemOverloaded));
+        overloadError, firstShardHostAndPort, errorLabelsSystemOverloaded, boost::none));
 
     ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
     ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 1);
@@ -426,7 +438,7 @@ TEST_F(ShardRemoteTest, ShardRetryStrategyInterleavedNonOverloadErrorThenOverloa
     // numRetriesDueToOverloadAttempted incremented to 1 — this is the first retry after overload.
     // AndSucceeded stays 0 because no command success has occurred yet.
     ASSERT_TRUE(retryStrategy.recordFailureAndEvaluateShouldRetry(
-        connectionError, firstShardHostAndPort, {}));
+        connectionError, firstShardHostAndPort, {}, boost::none));
 
     ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
     ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 1);
@@ -438,7 +450,7 @@ TEST_F(ShardRemoteTest, ShardRetryStrategyInterleavedNonOverloadErrorThenOverloa
     // numRetriesDueToOverloadAttempted stays at 1 because the previous attempt was not an overload.
     // numOperationsRetriedAtLeastOnceDueToOverload stays at 1 — counted at most once per operation.
     ASSERT_TRUE(retryStrategy.recordFailureAndEvaluateShouldRetry(
-        overloadError, firstShardHostAndPort, errorLabelsSystemOverloaded));
+        overloadError, firstShardHostAndPort, errorLabelsSystemOverloaded, boost::none));
 
     ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
     ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 2);
@@ -465,6 +477,21 @@ TEST_F(ShardRemoteTest, RunCommandResponseErrorOverloaded) {
     runExhaustiveRetryBackoffTest([](const executor::RemoteCommandRequest&) {
         return createErrorSystemOverloaded(kSystemOverloadedErrorCode);
     });
+
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, kSystemOverloadedErrorCode);
+}
+
+TEST_F(ShardRemoteTest, RunCommandHonorsServerBaseBackoffMS) {
+    constexpr auto kBaseBackoffMS = Milliseconds{500};
+
+    auto future =
+        launchAsync([&] { runDummyCommandOnShard(kConfigShard, Shard::RetryPolicy::kIdempotent); });
+
+    runRetryBackoffTestExpectingExponentialDelay(
+        [kBaseBackoffMS](const executor::RemoteCommandRequest&) {
+            return createErrorSystemOverloaded(kSystemOverloadedErrorCode, kBaseBackoffMS);
+        },
+        kBaseBackoffMS);
 
     ASSERT_THROWS_CODE(future.default_timed_get(), DBException, kSystemOverloadedErrorCode);
 }
@@ -505,6 +532,29 @@ TEST_F(ShardRemoteTest, RunExhaustiveCursorCommandErrorOverloadedRetry) {
     ASSERT_THROWS_CODE(future.default_timed_get(), DBException, kSystemOverloadedErrorCode);
 }
 
+TEST_F(ShardRemoteTest, RunExhaustiveCursorCommandHonorsServerBaseBackoffMS) {
+    constexpr auto kBaseBackoffMS = Milliseconds{500};
+
+    auto future = launchAsync([&] {
+        auto shard =
+            unittest::assertGet(shardRegistry()->getShard(operationContext(), kConfigShard));
+        auto result = uassertStatusOK(shard->runExhaustiveCursorCommand(
+            operationContext(),
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            DatabaseName::createDatabaseName_forTest(boost::none, "unusedDb"),
+            BSON("unused" << "cmd"),
+            Minutes{1}));
+    });
+
+    runRetryBackoffTestExpectingExponentialDelay(
+        [kBaseBackoffMS](const executor::RemoteCommandRequest&) {
+            return createErrorSystemOverloaded(kSystemOverloadedErrorCode, kBaseBackoffMS);
+        },
+        kBaseBackoffMS);
+
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, kSystemOverloadedErrorCode);
+}
+
 TEST_F(ShardRemoteTest, RunAggregationWithResultErrorOverloadedRetry) {
     auto future = launchAsync([&] {
         auto shard =
@@ -519,6 +569,29 @@ TEST_F(ShardRemoteTest, RunAggregationWithResultErrorOverloadedRetry) {
     runExhaustiveRetryBackoffTest([](const executor::RemoteCommandRequest&) {
         return createErrorSystemOverloaded(kSystemOverloadedErrorCode);
     });
+
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, kSystemOverloadedErrorCode);
+}
+
+TEST_F(ShardRemoteTest, RunAggregationHonorsServerBaseBackoffMS) {
+    constexpr auto kBaseBackoffMS = Milliseconds{500};
+
+    auto future = launchAsync([&] {
+        auto shard =
+            unittest::assertGet(shardRegistry()->getShard(operationContext(), kConfigShard));
+        auto result = uassertStatusOK(shard->runAggregationWithResult(
+            operationContext(),
+            AggregateCommandRequest(NamespaceString::createNamespaceString_forTest(kNamespaceName),
+                                    std::vector<mongo::BSONObj>()),
+            Shard::RetryPolicy::kIdempotent));
+    });
+
+
+    runRetryBackoffTestExpectingExponentialDelay(
+        [kBaseBackoffMS](const executor::RemoteCommandRequest&) {
+            return createErrorSystemOverloaded(kSystemOverloadedErrorCode, kBaseBackoffMS);
+        },
+        kBaseBackoffMS);
 
     ASSERT_THROWS_CODE(future.default_timed_get(), DBException, kSystemOverloadedErrorCode);
 }

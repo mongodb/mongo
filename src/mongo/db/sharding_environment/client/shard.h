@@ -109,6 +109,13 @@ public:
         static std::vector<std::string> getErrorLabels(
             const StatusWith<CommandResponse>& swResponse);
 
+        /**
+         * Returns the server-hinted retry backoff from the response, if present. If an error
+         * status is received instead of a CommandResponse, boost::none is returned.
+         */
+        static boost::optional<Milliseconds> getBaseBackoffMS(
+            const StatusWith<CommandResponse>& swResponse);
+
         boost::optional<HostAndPort> hostAndPort;
         BSONObj response;
         Status commandStatus;
@@ -205,7 +212,7 @@ public:
             Status s,
             const boost::optional<HostAndPort>& target,
             std::span<const std::string> errorLabels,
-            boost::optional<Milliseconds> baseBackoffMS = boost::none) override;
+            boost::optional<Milliseconds> baseBackoffMS) override;
 
         void recordSuccess(const boost::optional<HostAndPort>& target) override;
         void recordBackoff(Milliseconds backoff) override;
@@ -289,7 +296,7 @@ public:
             Status s,
             const boost::optional<HostAndPort>& target,
             std::span<const std::string> errorLabels,
-            boost::optional<Milliseconds> baseBackoffMS = boost::none) override {
+            boost::optional<Milliseconds> baseBackoffMS) override {
             return _underlyingStrategy.recordFailureAndEvaluateShouldRetry(
                 s, target, errorLabels, baseBackoffMS);
         }

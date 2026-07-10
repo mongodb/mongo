@@ -233,8 +233,9 @@ RetryStrategy::Result<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCom
     // TODO: SERVER-104141 Use host and port and error labels from status
     std::vector<std::string> errorLabels;
     boost::optional<HostAndPort> hostAndPort;
+    boost::optional<Milliseconds> baseBackoffMS;
 
-    auto fetcherCallback = [&status, &errorLabels, &hostAndPort, &response](
+    auto fetcherCallback = [&status, &errorLabels, &hostAndPort, &baseBackoffMS, &response](
                                const Fetcher::QueryResponseStatus& dataStatus,
                                Fetcher::NextAction* nextAction,
                                BSONObjBuilder* getMoreBob) {
@@ -244,6 +245,7 @@ RetryStrategy::Result<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCom
             status = dataStatus.getStatus();
             auto labelsFromStatus = dataStatus.getErrorLabels();
             errorLabels.assign(labelsFromStatus.begin(), labelsFromStatus.end());
+            baseBackoffMS = dataStatus.getBaseBackoffMS();
             response.docs.clear();
             return;
         }
@@ -316,7 +318,8 @@ RetryStrategy::Result<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCom
         if (ErrorCodes::isExceededTimeLimitError(status.code())) {
             LOGV2(22740, "Operation timed out", "error"_attr = status);
         }
-        return RetryStrategy::Result<QueryResponse>{status, std::move(errorLabels), hostAndPort};
+        return RetryStrategy::Result<QueryResponse>{
+            status, std::move(errorLabels), hostAndPort, baseBackoffMS};
     }
 
     return RetryStrategy::Result{response, hostAndPort};
@@ -439,8 +442,9 @@ RetryStrategy::Result<std::monostate> ShardRemote::_runAggregation(
     // TODO: SERVER-104141 Use host and port and error labels from status
     boost::optional<HostAndPort> hostAndPort;
     std::vector<std::string> errorLabels;
+    boost::optional<Milliseconds> baseBackoffMS;
 
-    auto fetcherCallback = [&status, &hostAndPort, &errorLabels, callback](
+    auto fetcherCallback = [&status, &hostAndPort, &errorLabels, &baseBackoffMS, callback](
                                const Fetcher::QueryResponseStatus& dataStatus,
                                Fetcher::NextAction* nextAction,
                                BSONObjBuilder* getMoreBob) {
@@ -450,6 +454,7 @@ RetryStrategy::Result<std::monostate> ShardRemote::_runAggregation(
             status = dataStatus.getStatus();
             auto labels = dataStatus.getErrorLabels();
             errorLabels.assign(labels.begin(), labels.end());
+            baseBackoffMS = dataStatus.getBaseBackoffMS();
             return;
         }
 
@@ -524,7 +529,8 @@ RetryStrategy::Result<std::monostate> ShardRemote::_runAggregation(
     updateReplSetMonitor(host, status);
 
     if (!status.isOK()) {
-        return RetryStrategy::Result<std::monostate>{status, std::move(errorLabels), hostAndPort};
+        return RetryStrategy::Result<std::monostate>{
+            status, std::move(errorLabels), hostAndPort, baseBackoffMS};
     }
 
     return RetryStrategy::Result{std::monostate{}, hostAndPort};

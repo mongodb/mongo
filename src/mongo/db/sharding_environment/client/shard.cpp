@@ -37,6 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/shard_shared_state_cache.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
@@ -149,7 +150,8 @@ StatusWith<Shard::CommandResponse> runCommandWithRetryStrategy(Interruptible* in
                 return RetryStrategy::Result<Shard::CommandResponse>{
                     status,
                     Shard::CommandResponse::getErrorLabels(swResponse),
-                    swResponse.isOK() ? swResponse.getValue().hostAndPort : boost::none};
+                    swResponse.isOK() ? swResponse.getValue().hostAndPort : boost::none,
+                    Shard::CommandResponse::getBaseBackoffMS(swResponse)};
             }
 
             const auto& response = swResponse.getValue();
@@ -305,6 +307,22 @@ std::vector<std::string> Shard::CommandResponse::getErrorLabels(
     }
 
     return {};
+}
+
+boost::optional<Milliseconds> Shard::CommandResponse::getBaseBackoffMS(
+    const StatusWith<Shard::CommandResponse>& swResponse) {
+    // Check if the request even reached the shard.
+    if (!swResponse.isOK()) {
+        return boost::none;
+    }
+
+    auto& response = swResponse.getValue();
+
+    if (response.commandStatus.isOK()) {
+        return boost::none;
+    }
+
+    return executor::extractBaseBackoffMS(response.response);
 }
 
 Status Shard::CommandResponse::processBatchWriteResponse(

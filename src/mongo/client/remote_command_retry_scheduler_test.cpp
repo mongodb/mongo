@@ -248,7 +248,8 @@ TEST_F(RemoteCommandRetrySchedulerTest, MakeSingleShotRetryStrategy) {
             continue;
         }
         const auto status = Status(error, ""sv);
-        ASSERT_FALSE(strategy.recordFailureAndEvaluateShouldRetry(status, boost::none, {}));
+        ASSERT_FALSE(
+            strategy.recordFailureAndEvaluateShouldRetry(status, boost::none, {}, boost::none));
     }
 }
 
@@ -263,13 +264,16 @@ TEST_F(RemoteCommandRetrySchedulerTest, MakeRetryStrategyMaxResponse) {
         if (ErrorCodes::isA<ErrorCategory::RetriableError>(error)) {
             errorCounter++;
             if (errorCounter <= 15) {
-                ASSERT_TRUE(strategy.recordFailureAndEvaluateShouldRetry(status, boost::none, {}));
+                ASSERT_TRUE(strategy.recordFailureAndEvaluateShouldRetry(
+                    status, boost::none, {}, boost::none));
             } else {
-                ASSERT_FALSE(strategy.recordFailureAndEvaluateShouldRetry(status, boost::none, {}));
+                ASSERT_FALSE(strategy.recordFailureAndEvaluateShouldRetry(
+                    status, boost::none, {}, boost::none));
             }
             continue;
         }
-        ASSERT_FALSE(strategy.recordFailureAndEvaluateShouldRetry(status, boost::none, {}));
+        ASSERT_FALSE(
+            strategy.recordFailureAndEvaluateShouldRetry(status, boost::none, {}, boost::none));
     }
 }
 
@@ -281,11 +285,13 @@ TEST_F(RemoteCommandRetrySchedulerTest, MakeRetryStrategy) {
         }
         auto status = Status(error, "test");
         if (ErrorCodes::isA<ErrorCategory::RetriableError>(error)) {
-            ASSERT_TRUE(strategy->recordFailureAndEvaluateShouldRetry(status, boost::none, {}));
+            ASSERT_TRUE(strategy->recordFailureAndEvaluateShouldRetry(
+                status, boost::none, {}, boost::none));
             strategy->recordSuccess(boost::none);
             continue;
         }
-        ASSERT_FALSE(strategy->recordFailureAndEvaluateShouldRetry(status, boost::none, {}));
+        ASSERT_FALSE(
+            strategy->recordFailureAndEvaluateShouldRetry(status, boost::none, {}, boost::none));
     }
 }
 

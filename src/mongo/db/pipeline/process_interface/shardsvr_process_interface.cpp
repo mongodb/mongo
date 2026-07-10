@@ -136,7 +136,10 @@ void writeToLocalShard(OperationContext* opCtx,
             const auto status = getStatusFromCommandResult(cmdResponse);
 
             if (!status.isOK()) {
-                return {status, executor::extractErrorLabels(cmdResponse), primaryHostAndPort};
+                return {status,
+                        executor::extractErrorLabels(cmdResponse),
+                        primaryHostAndPort,
+                        executor::extractBaseBackoffMS(cmdResponse)};
             }
 
             return RetryStrategy::Result{cmdResponse, primaryHostAndPort};

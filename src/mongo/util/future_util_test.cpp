@@ -589,6 +589,9 @@ struct TestRetryStrategy : RetryStrategy {
                                              const boost::optional<HostAndPort>& origin,
                                              std::span<const std::string> errorLabels,
                                              boost::optional<Milliseconds> baseBackoffMS) override {
+        // Record the most recent server-hinted retry delay so tests can assert that AsyncTry
+        // extracted it from the result and forwarded it to the strategy.
+        lastBaseBackoffMS = baseBackoffMS;
         return shouldRetry(s, origin, errorLabels);
     }
 
@@ -616,6 +619,7 @@ struct TestRetryStrategy : RetryStrategy {
     Milliseconds totalBackoff;
     Milliseconds retryDelay;
     bool successRecorded = false;
+    boost::optional<Milliseconds> lastBaseBackoffMS;
 
     TargetingMetadata metadata;
 };
@@ -689,6 +693,27 @@ TEST_F(AsyncTryWithRetryStrategyTest, RetryLoopExecutesUntilConditionIsTrue) {
     resultFut.wait();
 
     ASSERT_EQ(i, numLoops);
+}
+
+TEST_F(AsyncTryWithRetryStrategyTest, RetryStrategyReceivesBaseBackoffMSFromResult) {
+    auto strategy = std::make_shared<TestRetryStrategy>();
+    constexpr auto kBaseBackoffMS = Milliseconds{250};
+
+    auto i = 0;
+    auto resultFut =
+        AsyncTry([&](const TargetingMetadata&) -> RetryStrategy::Result<int> {
+            if (++i < 2) {
+                return RetryStrategy::Result<int>{
+                    Status{ErrorCodes::CommandFailed, "retry"}, {}, boost::none, kBaseBackoffMS};
+            }
+            return RetryStrategy::Result<int>{i};
+        })
+            .withRetryStrategy(strategy)
+            .on(executor(), CancellationToken::uncancelable());
+    resultFut.wait();
+
+    ASSERT_EQ(i, 2);
+    ASSERT_EQ(strategy->lastBaseBackoffMS, kBaseBackoffMS);
 }
 
 TEST_F(AsyncTryWithRetryStrategyTest, RetryLoopExecutesUntilConditionIsTrueWithStatusFromValue) {

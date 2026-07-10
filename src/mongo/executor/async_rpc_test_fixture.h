@@ -63,6 +63,10 @@ public:
                                              const boost::optional<HostAndPort>& target,
                                              std::span<const std::string> errorLabels,
                                              boost::optional<Milliseconds> baseBackoffMS) override {
+        // Record the most recent server-hinted retry delay so tests can assert that async_rpc
+        // extracted it from the remote response and passed it through to the strategy.
+        _lastBaseBackoffMS = baseBackoffMS;
+
         if (_numRetriesPerformed == _maxRetries) {
             return false;
         }
@@ -110,11 +114,16 @@ public:
         return _totalBackoff;
     }
 
+    boost::optional<Milliseconds> getLastBaseBackoffMS() const {
+        return _lastBaseBackoffMS;
+    }
+
 private:
     int _numRetriesPerformed, _maxRetries = 0;
     Milliseconds _nextRetryDelay{0};  // Current retry delay
     std::deque<Milliseconds> _retryDelays;
     Milliseconds _totalBackoff;
+    boost::optional<Milliseconds> _lastBaseBackoffMS;
 };
 
 class AsyncRPCTestFixture : public ServiceContextTest {

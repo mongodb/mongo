@@ -95,14 +95,16 @@ TEST_F(PrimaryOnlyServiceRetryStrategyTest, InitialDelayIsZero) {
 
 TEST_F(PrimaryOnlyServiceRetryStrategyTest, RetriableErrorCausesRetry) {
     auto strategy = makeStrategy();
-    ASSERT_TRUE(strategy.recordFailureAndEvaluateShouldRetry(kRetriableError, kTarget1, {}));
+    ASSERT_TRUE(
+        strategy.recordFailureAndEvaluateShouldRetry(kRetriableError, kTarget1, {}, boost::none));
     ASSERT_EQ(transientErrorCount(), 1);
     ASSERT_EQ(unrecoverableErrorCount(), 0);
 }
 
 TEST_F(PrimaryOnlyServiceRetryStrategyTest, NonRetriableErrorDoesNotRetry) {
     auto strategy = makeNeverRetryStrategy();
-    ASSERT_FALSE(strategy.recordFailureAndEvaluateShouldRetry(kNonRetriableError, kTarget1, {}));
+    ASSERT_FALSE(strategy.recordFailureAndEvaluateShouldRetry(
+        kNonRetriableError, kTarget1, {}, boost::none));
     ASSERT_EQ(transientErrorCount(), 0);
     ASSERT_EQ(unrecoverableErrorCount(), 1);
 }
@@ -111,7 +113,8 @@ TEST_F(PrimaryOnlyServiceRetryStrategyTest, BackoffNonZeroAfterRetriableError) {
     auto strategy = makeStrategy();
     FailPointEnableBlock fp{"returnMaxBackoffDelay"};
 
-    ASSERT_TRUE(strategy.recordFailureAndEvaluateShouldRetry(kRetriableError, kTarget1, {}));
+    ASSERT_TRUE(
+        strategy.recordFailureAndEvaluateShouldRetry(kRetriableError, kTarget1, {}, boost::none));
 
     auto delay = strategy.getNextRetryDelay();
     ASSERT_EQ(delay, Milliseconds{200});
@@ -124,7 +127,8 @@ TEST_F(PrimaryOnlyServiceRetryStrategyTest, BackoffGrowsWithSuccessiveRetriableE
 
     const auto baseBackoff = gDefaultClientBaseBackoffMillis.loadRelaxed();
     for (int i = 0; i < 5; ++i) {
-        ASSERT_TRUE(strategy.recordFailureAndEvaluateShouldRetry(kRetriableError, kTarget1, {}));
+        ASSERT_TRUE(strategy.recordFailureAndEvaluateShouldRetry(
+            kRetriableError, kTarget1, {}, boost::none));
         auto delay = strategy.getNextRetryDelay();
         auto expectedDelay = Milliseconds{static_cast<int64_t>(baseBackoff * std::exp2(i + 1))};
         ASSERT_EQ(delay, expectedDelay);
@@ -137,7 +141,7 @@ TEST_F(PrimaryOnlyServiceRetryStrategyTest, BackoffNonZeroAfterSystemOverloadedE
     FailPointEnableBlock fp{"returnMaxBackoffDelay"};
 
     ASSERT_TRUE(strategy.recordFailureAndEvaluateShouldRetry(
-        kSystemOverloadedError, kTarget1, kSystemOverloadedErrorLabels));
+        kSystemOverloadedError, kTarget1, kSystemOverloadedErrorLabels, boost::none));
 
     auto delay = strategy.getNextRetryDelay();
     ASSERT_GT(delay, Milliseconds{0});

@@ -386,7 +386,10 @@ void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batch
     const BSONObj& queryResponseObj = rcbd.response.data;
     Status status = getStatusFromCommandResult(queryResponseObj);
     if (!status.isOK()) {
-        _work(QueryResponseStatus(status, rcbd.response.getErrorLabels(), rcbd.request.target),
+        _work(QueryResponseStatus(status,
+                                  rcbd.response.getErrorLabels(),
+                                  rcbd.request.target,
+                                  rcbd.response.getBaseBackoffMS()),
               nullptr,
               nullptr);
         return;

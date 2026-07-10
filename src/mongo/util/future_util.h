@@ -504,8 +504,10 @@ struct DefaultExtractRetryParameters {
             errorLabels.resize(resultErrorLabels.size());
             std::ranges::copy(resultErrorLabels, errorLabels.begin());
 
-            return RetryStrategy::ResultStatus{
-                result.getStatus(), std::move(errorLabels), result.getOrigin()};
+            return RetryStrategy::ResultStatus{result.getStatus(),
+                                               std::move(errorLabels),
+                                               result.getOrigin(),
+                                               result.getBaseBackoffMS()};
         }
 
         return RetryStrategy::ResultStatus::makeOKResult(result.getOrigin());
@@ -639,8 +641,10 @@ public:
                     return true;
                 }
 
-                return !strategy->recordFailureAndEvaluateShouldRetry(
-                    result.getStatus(), result.getOrigin(), result.getErrorLabels());
+                return !strategy->recordFailureAndEvaluateShouldRetry(result.getStatus(),
+                                                                      result.getOrigin(),
+                                                                      result.getErrorLabels(),
+                                                                      result.getBaseBackoffMS());
             })
             .withBackoffBetweenIterations(RetryDelayAsBackoff{strategy});
     }

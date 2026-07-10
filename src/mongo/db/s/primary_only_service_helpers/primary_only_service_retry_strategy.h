@@ -45,11 +45,10 @@ public:
                                     unique_function<void(const Status&)> onTransientError,
                                     unique_function<void(const Status&)> onUnrecoverableError);
     [[nodiscard]]
-    bool recordFailureAndEvaluateShouldRetry(
-        Status s,
-        const boost::optional<HostAndPort>& origin,
-        std::span<const std::string> errorLabels,
-        boost::optional<Milliseconds> baseBackoffMS = boost::none) override;
+    bool recordFailureAndEvaluateShouldRetry(Status s,
+                                             const boost::optional<HostAndPort>& origin,
+                                             std::span<const std::string> errorLabels,
+                                             boost::optional<Milliseconds> baseBackoffMS) override;
     void recordSuccess(const boost::optional<HostAndPort>& origin) override;
     Milliseconds getNextRetryDelay() const override;
     const TargetingMetadata& getTargetingMetadata() const override;

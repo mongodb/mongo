@@ -101,6 +101,7 @@ protected:
     Status status;
     boost::optional<HostAndPort> target;
     std::vector<std::string> errorLabels;
+    boost::optional<Milliseconds> baseBackoffMS;
     CursorId cursorId;
     NamespaceString nss;
     Fetcher::Documents documents;
@@ -153,6 +154,7 @@ void FetcherTest::clear() {
     elapsedMillis = Milliseconds(0);
     first = false;
     nextAction = Fetcher::NextAction::kInvalid;
+    baseBackoffMS = boost::none;
 }
 
 void FetcherTest::processNetworkResponse(const BSONObj& obj,
@@ -208,6 +210,7 @@ void FetcherTest::_callback(const Fetcher::QueryResponseStatus& result,
     }
 
     target = result.getOrigin();
+    baseBackoffMS = result.getBaseBackoffMS();
 
     if (callbackHook) {
         callbackHook(result, nextActionFromFetcher, getMoreBob);
@@ -662,6 +665,30 @@ TEST_F(FetcherTest, FindCommandFailedWithErrorLabels) {
     ASSERT_EQUALS(ErrorCodes::AdmissionQueueOverflow, status.code());
     ASSERT_EQUALS(source, target);
     ASSERT(std::ranges::equal(responseErrorLabels, errorLabels));
+}
+
+TEST_F(FetcherTest, FindCommandFailedForwardsBaseBackoffMS) {
+    ASSERT_OK(fetcher->schedule());
+    processNetworkResponse(BSON("ok" << 0 << "errmsg"
+                                     << "please back off"
+                                     << "code" << int(ErrorCodes::AdmissionQueueOverflow)
+                                     << "baseBackoffMS" << 100),
+                           ReadyQueueState::kEmpty,
+                           FetcherState::kInactive);
+    ASSERT_EQUALS(ErrorCodes::AdmissionQueueOverflow, status.code());
+    ASSERT(baseBackoffMS);
+    ASSERT_EQUALS(Milliseconds(100), *baseBackoffMS);
+}
+
+TEST_F(FetcherTest, FindCommandFailedWithoutBaseBackoffMS) {
+    ASSERT_OK(fetcher->schedule());
+    processNetworkResponse(BSON("ok" << 0 << "errmsg"
+                                     << "bad hint"
+                                     << "code" << int(ErrorCodes::BadValue)),
+                           ReadyQueueState::kEmpty,
+                           FetcherState::kInactive);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status.code());
+    ASSERT_FALSE(baseBackoffMS);
 }
 
 TEST_F(FetcherTest, CursorFieldMissing) {

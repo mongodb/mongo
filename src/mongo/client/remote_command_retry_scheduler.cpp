@@ -187,8 +187,8 @@ void RemoteCommandRetryScheduler::_remoteCommandCallback(
 
     auto retryDelay = [&]() -> boost::optional<Milliseconds> {
         auto _ = std::lock_guard{_mutex};
-        auto shouldRetry =
-            _retryStrategy->recordFailureAndEvaluateShouldRetry(status, rcba.request.target, {});
+        auto shouldRetry = _retryStrategy->recordFailureAndEvaluateShouldRetry(
+            status, rcba.request.target, {}, boost::none);
         return shouldRetry ? boost::make_optional(_retryStrategy->getNextRetryDelay())
                            : boost::none;
     }();

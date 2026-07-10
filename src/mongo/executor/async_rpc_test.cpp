@@ -380,6 +380,55 @@ TEST_F(AsyncRPCTestFixture, DynamicDelayBetweenRetries) {
 }
 
 /*
+ * Tests that 'sendCommand' extracts the server-hinted 'baseBackoffMS' field from a remote error
+ * response and threads it through to the retry strategy's 'recordFailureAndEvaluateShouldRetry'.
+ */
+TEST_F(AsyncRPCTestFixture, BaseBackoffMSExtractedFromRemoteError) {
+    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
+    HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
+    HelloCommand helloCmd;
+    initializeCommand(helloCmd);
+
+    std::shared_ptr<TestRetryStrategy> testStrategy = std::make_shared<TestRetryStrategy>();
+    const auto baseBackoffMS = Milliseconds(250);
+    testStrategy->setMaxNumRetries(1);
+    testStrategy->pushRetryDelay(baseBackoffMS);
+
+    auto opCtxHolder = makeOperationContext();
+    auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
+        getExecutorPtr(), _cancellationToken, helloCmd, testStrategy);
+    ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture =
+        sendCommand(options, opCtxHolder.get(), std::move(targeter));
+
+    // The initial attempt fails with a remote error whose response body carries a 'baseBackoffMS'
+    // server hint. async_rpc should extract this and pass it to the retry strategy.
+    const auto onCommandErrorFunc = [&](const auto& request) {
+        ASSERT(request.cmdObj["hello"]);
+        ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), request.target);
+        BSONObjBuilder result(helloReply.toBSON());
+        CommandHelpers::appendCommandStatusNoThrow(
+            result, Status(ErrorCodes::Overflow, "test error code for retry"));
+        result.append("baseBackoffMS", baseBackoffMS.count());
+        return result.obj();
+    };
+    const auto onCommandOKFunc = [&](const auto& request) {
+        ASSERT(request.cmdObj["hello"]);
+        ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), request.target);
+        return helloReply.toBSON();
+    };
+
+    scheduleRequestAndAdvanceClockForRetry(testStrategy, onCommandErrorFunc, baseBackoffMS);
+    onCommand(onCommandOKFunc);
+    AsyncRPCResponse res = resultFuture.get();
+
+    ASSERT_BSONOBJ_EQ(res.response.toBSON(), helloReply.toBSON());
+    ASSERT_EQ(1, testStrategy->getNumRetriesPerformed());
+    // The server-hinted retry delay must have been extracted from the remote response and handed
+    // to the retry strategy.
+    ASSERT_EQ(testStrategy->getLastBaseBackoffMS(), baseBackoffMS);
+}
+
+/*
  * Tests that 'sendCommand' will not retry when the retry policy indicates accordingly.
  */
 TEST_F(AsyncRPCTestFixture, DoNotRetryOnErrorAccordingToStrategy) {
@@ -727,8 +776,10 @@ TEST_F(AsyncRPCTestFixture, HostAndPortTargeter) {
 TEST_F(AsyncRPCTestFixture, NoRetry) {
     NoRetryStrategy p;
 
-    ASSERT_FALSE(p.recordFailureAndEvaluateShouldRetry(
-        Status(ErrorCodes::BadValue, "mock"), boost::none, std::span<const std::string>{}));
+    ASSERT_FALSE(p.recordFailureAndEvaluateShouldRetry(Status(ErrorCodes::BadValue, "mock"),
+                                                       boost::none,
+                                                       std::span<const std::string>{},
+                                                       boost::none));
     ASSERT_EQUALS(p.getNextRetryDelay(), Milliseconds::zero());
 }
 
