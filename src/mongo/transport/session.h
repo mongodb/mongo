@@ -146,6 +146,7 @@ public:
 
     /**
      * Waits for the availability of incoming data.
+     * This function must be invoked from the session workflow thread only.
      */
     virtual Status waitForData() = 0;
     virtual Future<void> asyncWaitForData() = 0;

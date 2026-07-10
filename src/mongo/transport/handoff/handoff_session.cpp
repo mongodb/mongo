@@ -849,6 +849,12 @@ Status HandoffSession::waitForData() {
     // This function is called from the service executor thread only. It may access any data members
     // except _isShutDown without holding a lock on _mutex. To modify data members, or to access
     // _isShutDown, it must hold a lock on _mutex.
+
+    // Note: If we ever `s2n_connection_set_recv_buffering` to `true`, we might need to check
+    // `s2n_peek_buffered` here, too.
+    if (_state == State::TLS && (!_unconsumedBytes.empty() || s2n_peek(_s2nConnection) > 0)) {
+        return Status::OK();
+    }
     const int noTimeout = -1;
     return pollForRead(_posix, _fd, noTimeout);
 }
