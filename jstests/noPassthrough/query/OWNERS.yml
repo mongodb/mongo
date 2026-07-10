@@ -45,6 +45,9 @@ filters:
   - "search_hybrid_scoring_feature_flag_test.js":
     approvers:
       - 10gen/query-integration-search
+  - "internal_search_id_lookup*.js":
+    approvers:
+      - 10gen/query-integration-search
   - "set_window_fields_read_concern_snapshot.js":
     approvers:
       - 10gen/query-integration-features
