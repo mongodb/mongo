@@ -25,6 +25,16 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const st = new ShardingTest({shards: 2});
 const testName = jsTestName();
 
+// This test verifies the SERVER-121533 migration fix: MaxKey-prefixed documents are cloned during
+// migration and their orphans are cleaned up by the range deleter. Disable the delete-guard
+// which when enabled would instead preserve those orphans.
+for (const shard of [st.shard0, st.shard1]) {
+    assert.commandWorkedOrFailedWithCode(
+        shard.adminCommand({setParameter: 1, skipRangeDeletionForMaxKeyChunks: false}),
+        ErrorCodes.InvalidOptions,
+    );
+}
+
 function setupCollection(suffix, shardKey) {
     const dbName = testName + "_" + suffix;
     const ns = dbName + ".coll";

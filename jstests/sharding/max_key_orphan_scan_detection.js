@@ -9,7 +9,7 @@
  *   3. Already-orphan single-field shard key: flagged, WARNING fires, alertEmitted=true.
  *   4. Already-orphan compound shard key (all fields MaxKey): flagged.
  *   5. Already-orphan compound shard key with only the leading field MaxKey (e.g. {a: MaxKey,
- *      b: 10}): flagged. Guards against matching only all-MaxKey shard keys.
+ *      b: 10}): not flagged, because it is below the global max and migrated normally.
  *   6. Owned partial-MaxKey doc behind a split inside the leading-MaxKey region: not flagged,
  *      because this shard owns the chunk holding the document.
  *   7. Partial-MaxKey orphan covered by an ordinary (non-global-max) range-deletion task: not
@@ -372,8 +372,8 @@ assertOrphanScanStats(
 resetClusterState([compoundColl]);
 
 // --- Case 5: already-orphan compound shard key with only the leading field MaxKey ---------------
-// {a: MaxKey, b: 10} lives in the global-max chunk but is not all-MaxKey, so this verifies detection
-// keys off the leading field rather than requiring every field to be MaxKey.
+// {a: MaxKey, b: 10} lives in the global-max chunk but is not all-MaxKey, so it is migrated normally
+// and detection does not flag it.
 jsTest.log.info("Case 5: already-orphan compound doc with a partial-MaxKey leading field");
 
 const partialColl = "partial_maxkey_coll";
@@ -403,7 +403,7 @@ assert.soon(
 assert.commandWorked(rangeDeletionsOnPrimary(st.rs0).deleteMany({}));
 st.rs0.awaitReplication();
 
-// Confirm the partial-MaxKey doc remains on shard0 and there is no all-MaxKey doc to fall back on.
+// Confirm the partial-MaxKey doc remains on shard0 and there is no all-MaxKey doc present.
 assert.eq(
     1,
     st.rs0.getPrimary().getDB(dbName).getCollection(partialColl).find({a: MaxKey, b: 10}).itcount(),
@@ -418,8 +418,8 @@ stepUpAndAwaitScanState(
 );
 assertOrphanScanStats(
     st.rs0,
-    {foundMaxKey: true, alertEmitted: true},
-    "Detector should flag an orphan whose leading shard-key field is MaxKey but trailing field is not",
+    {foundMaxKey: false, alertEmitted: false},
+    "Detector should not flag an orphan whose leading shard-key field is MaxKey but trailing field is not",
 );
 
 resetClusterState([partialColl]);

@@ -114,6 +114,11 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardingStatistics {
     admission::execution_control::InProgressTimeAccumulator rangeDeleterTicketQueueTime;
     admission::execution_control::InProgressTimeAccumulator rangeDeleterTicketProcessingTime;
 
+    // Cumulative counter of range-deletion tasks for which the guard preserved (did not delete)
+    // MaxKey-prefixed documents. One increment per task; the number of preserved documents may be
+    // higher.
+    AtomicWord<long long> countRangeDeletionTasksPreservingMaxKeyOrphans{0};
+
     // Cumulative, always-increasing counter of how many chunks this node started to receive
     // (whether the receiving succeeded or not)
     AtomicWord<long long> countRecipientMoveChunkStarted{0};

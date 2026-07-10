@@ -53,7 +53,8 @@ structs:
                 default: '"scanState"'
             scanStartedAt:
                 type: date
-                description: "Wallclock time when the scan started on the current primary."
+                description: "Wallclock time when the detection scan started on the current primary."
+                optional: true
             scanCompletedAt:
                 type: date
                 description:
@@ -63,12 +64,14 @@ structs:
             foundMaxKey:
                 type: bool
                 description: "True if any unowned MaxKey doc is found on this shard."
+                optional: true
             alertEmitted:
                 type: bool
                 description:
                     "Gates the one-shot WARNING log emitted when foundMaxKey transitions
                     to true. Replicated so new primaries do not re-alert for an already
                     surfaced finding."
+                optional: true
             binaryVersionAtScan:
                 type: string
                 description: "Server binary version that performed the scan."
@@ -76,4 +79,13 @@ structs:
             fcvAtScan:
                 type: string
                 description: "Feature compatibility version at the time of the scan."
+                optional: true
+            blockedTasks:
+                type: array<uuid>
+                description:
+                    "The _id of every pre-upgrade range-deletion task classified as containing
+                    an unrecoverable MaxKey orphan by the range-deletion guard. While
+                    skipRangeDeletionForMaxKeyChunks is enabled the range deleter deletes the
+                    ordinary documents in these tasks' ranges but preserves those whose leading
+                    shard-key field is MaxKey (left on disk for out-of-band recovery)."
                 optional: true

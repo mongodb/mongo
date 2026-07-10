@@ -45,6 +45,7 @@
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/max_key_orphan_detection.h"
 #include "mongo/db/s/range_deleter_service_op_observer.h"
 #include "mongo/db/s/range_deletion.h"
 #include "mongo/db/s/range_deletion_util.h"
@@ -53,6 +54,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -308,6 +310,9 @@ void RangeDeleterService::_stopService() {
 
     // Clear range deletion tasks map in order to notify potential waiters on completion futures
     _rangeDeletionTasks.clear();
+
+    // Drop the MaxKey guard classification; it is rehydrated (or recomputed) on the next step-up.
+    _blockedMaxKeyTasks.clear();
 }
 
 void RangeDeleterService::onStepDown() {
@@ -317,6 +322,25 @@ void RangeDeleterService::onStepDown() {
 void RangeDeleterService::onShutdown() {
     _stopService();
     _joinAndResetState();
+}
+
+bool RangeDeleterService::isMaxKeyBlocked(const UUID& taskId) {
+    auto lock = _acquireMutexUnconditionally();
+    return _blockedMaxKeyTasks.find(taskId) != _blockedMaxKeyTasks.end();
+}
+
+void RangeDeleterService::setBlockedMaxKeyTasks(std::vector<UUID> blockedTaskIds) {
+    auto lock = _acquireMutexUnconditionally();
+    _blockedMaxKeyTasks =
+        stdx::unordered_set<UUID, UUID::Hash>(std::make_move_iterator(blockedTaskIds.begin()),
+                                              std::make_move_iterator(blockedTaskIds.end()));
+}
+
+void RangeDeleterService::classifyBlockedMaxKeyTasks(OperationContext* opCtx) {
+    if (!feature_flags::gMaxKeyOrphanGuard.isEnabled()) {
+        return;
+    }
+    setBlockedMaxKeyTasks(loadOrComputeBlockedMaxKeyRangeDeletionTasks(opCtx));
 }
 
 BSONObj RangeDeleterService::dumpState() {

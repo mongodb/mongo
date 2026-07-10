@@ -18,6 +18,15 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 
+for (const rs of [st.rs0, st.rs1]) {
+    for (const node of rs.nodes) {
+        assert.commandWorkedOrFailedWithCode(
+            node.adminCommand({setParameter: 1, skipRangeDeletionForMaxKeyChunks: false}),
+            ErrorCodes.InvalidOptions,
+        );
+    }
+}
+
 const dbName = jsTestName();
 const mongos = st.s0;
 const adminDB = mongos.getDB("admin");

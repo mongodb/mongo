@@ -107,7 +107,8 @@ StatusWith<std::pair<int, int>> deleteNextBatch(OperationContext* opCtx,
                                                 const CollectionAcquisition& collection,
                                                 BSONObj const& keyPattern,
                                                 ChunkRange const& range,
-                                                int numDocsToRemovePerBatch) {
+                                                int numDocsToRemovePerBatch,
+                                                bool preserveMaxKeyPrefixedDocs) {
     invariant(collection.exists());
 
     auto const nss = collection.nss();
@@ -133,13 +134,21 @@ StatusWith<std::pair<int, int>> deleteNextBatch(OperationContext* opCtx,
     }
 
     // Extend bounds to match the index we found.
+    const KeyPattern indexKeyPattern(shardKeyIdx->keyPattern());
+    const auto min = Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(range.getMin(), false));
+
+    if (preserveMaxKeyPrefixedDocs) {
+        tassert(13018020,
+                "preserveMaxKeyPrefixedDocs requires a global-max range",
+                indexKeyPattern.isGlobalMax(range.getMax()));
+    }
+
     // When the range max is the global max (all fields MaxKey), extend with
     // makeUpperInclusive=true and use inclusive upper bound so the range deleter can reach
-    // documents whose shard key is exactly MaxKey.
-    const KeyPattern indexKeyPattern(shardKeyIdx->keyPattern());
-    const bool isMaxGlobal = indexKeyPattern.isGlobalMax(range.getMax());
-
-    const auto min = Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(range.getMin(), false));
+    // documents whose shard key is exactly MaxKey. When those documents must be preserved, use an
+    // exclusive upper bound instead so they are left in place.
+    const bool isMaxGlobal =
+        !preserveMaxKeyPrefixedDocs && indexKeyPattern.isGlobalMax(range.getMax());
     const auto max =
         Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(range.getMax(), isMaxGlobal));
     const auto boundInclusion = isMaxGlobal ? BoundInclusion::kIncludeBothStartAndEndKeys
@@ -351,7 +360,8 @@ StatusWith<std::pair<int, int>> deleteRangeInBatches(OperationContext* opCtx,
                                                      const DatabaseName& dbName,
                                                      const UUID& collectionUuid,
                                                      const BSONObj& keyPattern,
-                                                     const ChunkRange& range) {
+                                                     const ChunkRange& range,
+                                                     bool preserveMaxKeyPrefixedDocs) {
     admission::execution_control::ScopedTaskTypeBackground backgroundTask(opCtx);
 
     suspendRangeDeletion.pauseWhileSet(opCtx);
@@ -394,8 +404,13 @@ StatusWith<std::pair<int, int>> deleteRangeInBatches(OperationContext* opCtx,
                                 "numDocsToRemovePerBatch"_attr = numDocsToRemovePerBatch,
                                 "delayBetweenBatches"_attr = delayBetweenBatches);
 
-                    auto numDocsAndBytesDeleted = uassertStatusOK(deleteNextBatch(
-                        opCtx, collection, keyPattern, range, numDocsToRemovePerBatch));
+                    auto numDocsAndBytesDeleted =
+                        uassertStatusOK(deleteNextBatch(opCtx,
+                                                        collection,
+                                                        keyPattern,
+                                                        range,
+                                                        numDocsToRemovePerBatch,
+                                                        preserveMaxKeyPrefixedDocs));
                     numDeleted = numDocsAndBytesDeleted.first;
                     totalNumDeleted += numDeleted;
                     totalBytesDeleted += numDocsAndBytesDeleted.second;

@@ -55,12 +55,18 @@ inline constexpr std::string_view kRangeDeletionThreadName{"range-deleter"};
 /**
  * Delete the range in a sequence of batches until there are no more documents to delete or deletion
  * returns an error. If successful, returns the number of deleted documents and bytes.
+ *
+ * When 'preserveMaxKeyPrefixedDocs' is true, documents whose leading shard-key field is MaxKey are
+ * left in place: the deletion upper bound is the smallest MaxKey-prefixed shard key (exclusive),
+ * rather than the global max inclusive. Used by the MaxKey orphan guard to clean ordinary orphans
+ * in the global-max chunk while preserving potentially-never-cloned MaxKey docs.
  */
 StatusWith<std::pair<int, int>> deleteRangeInBatches(OperationContext* opCtx,
                                                      const DatabaseName& dbName,
                                                      const UUID& collectionUuid,
                                                      const BSONObj& keyPattern,
-                                                     const ChunkRange& range);
+                                                     const ChunkRange& range,
+                                                     bool preserveMaxKeyPrefixedDocs = false);
 
 
 /**

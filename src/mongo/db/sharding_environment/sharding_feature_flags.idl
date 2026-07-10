@@ -220,6 +220,16 @@ feature_flags:
         cpp_varname: feature_flags::gMaxKeyDetection
         default: true
         fcv_gated: false
+    featureFlagMaxKeyOrphanGuard:
+        description: >-
+            Feature flag protecting the MaxKey orphan delete-guard. When enabled together with the
+            skipRangeDeletionForMaxKeyChunks server parameter, the range deleter (for tasks
+            pre-classified at step-up and recorded in config.maxKeyOrphanScanState.blockedTasks)
+            deletes ordinary documents in the range but preserves documents whose leading shard-key
+            field is MaxKey, leaving them for out-of-band recovery.
+        cpp_varname: feature_flags::gMaxKeyOrphanGuard
+        default: false
+        fcv_gated: false
     featureFlagHashedShardKeyIndexOptionalUponShardingCollection:
         description:
             "Feature flag to make shardCollection and reshardCollection not require a hashed

@@ -102,17 +102,49 @@ constexpr std::string_view kMaxKeyOrphanScanStateId = "scanState";
  */
 bool isScanFatalError(ErrorCodes::Error code) {
     return ErrorCodes::isShutdownError(code) || ErrorCodes::isCancellationError(code) ||
-        ErrorCodes::isNotPrimaryError(code) || code == ErrorCodes::InterruptedDueToReplStateChange;
+        ErrorCodes::isNotPrimaryError(code) || ErrorCodes::isA<ErrorCategory::Interruption>(code);
 }
 
 /**
- * Returns the largest shard-key value present in the collection if its leading field is MaxKey,
- * else boost::none.
+ * Runs a backward shard-key index scan over [minKey, maxKey] (both bounds inclusive) and returns
+ * the largest shard-key value present, reshuffled to 'shardKeyPattern' (dropping any trailing
+ * fields of a wider index), or boost::none if the scan is empty. Callers resolve the acquisition,
+ * the index, and the bounds, and apply their own missing-index policy.
  */
-boost::optional<BSONObj> rightmostMaxKeyPrefixedShardKey(OperationContext* opCtx,
-                                                         const DatabaseName& dbName,
-                                                         const UUID& collUuid,
-                                                         const ShardKeyPattern& shardKeyPattern) {
+boost::optional<BSONObj> rightmostShardKeyInBounds(OperationContext* opCtx,
+                                                   const CollectionAcquisition& acquisition,
+                                                   const ShardKeyIndex& shardKeyIdx,
+                                                   const ShardKeyPattern& shardKeyPattern,
+                                                   const BSONObj& minKey,
+                                                   const BSONObj& maxKey) {
+    auto exec = InternalPlanner::shardKeyIndexScan(opCtx,
+                                                   acquisition,
+                                                   shardKeyIdx,
+                                                   maxKey,
+                                                   minKey,
+                                                   BoundInclusion::kIncludeBothStartAndEndKeys,
+                                                   PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                                   InternalPlanner::BACKWARD);
+    BSONObj indexKey;
+    if (exec->getNext(&indexKey, nullptr) == PlanExecutor::IS_EOF) {
+        return boost::none;
+    }
+    // The scan yields index keys with stripped field names; rename to the shard-key pattern and
+    // drop any trailing fields of a wider index.
+    return BSONObjBuilder()
+        .appendElementsRenamed(indexKey, shardKeyPattern.toBSON(), false)
+        .obj()
+        .getOwned();
+}
+
+/**
+ * Returns the largest shard-key value present in the collection if it is the global maximum (every
+ * shard-key field is MaxKey), else boost::none.
+ */
+boost::optional<BSONObj> rightmostGlobalMaxShardKey(OperationContext* opCtx,
+                                                    const DatabaseName& dbName,
+                                                    const UUID& collUuid,
+                                                    const ShardKeyPattern& shardKeyPattern) {
     const auto acquisition = acquireCollection(
         opCtx,
         CollectionAcquisitionRequest::fromOpCtx(
@@ -136,34 +168,65 @@ boost::optional<BSONObj> rightmostMaxKeyPrefixedShardKey(OperationContext* opCtx
         return boost::none;
     }
 
-    // Scan the shard-key index backwards over the whole keyspace and take the first entry, i.e. the
-    // largest shard-key value present. Inclusive bounds so a shard key that is exactly the global
-    // max is returned.
+    // Scan the whole keyspace: the largest shard-key value present is the global maximum iff the
+    // collection holds a document whose shard key is the global max. Inclusive bounds so a key
+    // exactly at the global max is returned.
     const KeyPattern kp(shardKeyIdx->keyPattern());
-    const BSONObj minKey = Helpers::toKeyFormat(kp.globalMin());
-    const BSONObj maxKey = Helpers::toKeyFormat(kp.globalMax());
-    auto exec = InternalPlanner::shardKeyIndexScan(opCtx,
-                                                   acquisition,
-                                                   *shardKeyIdx,
-                                                   maxKey,
-                                                   minKey,
-                                                   BoundInclusion::kIncludeBothStartAndEndKeys,
-                                                   PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                                   InternalPlanner::BACKWARD);
-
-    BSONObj indexKey;
-    if (exec->getNext(&indexKey, nullptr) == PlanExecutor::IS_EOF) {
+    auto shardKey = rightmostShardKeyInBounds(opCtx,
+                                              acquisition,
+                                              *shardKeyIdx,
+                                              shardKeyPattern,
+                                              Helpers::toKeyFormat(kp.globalMin()),
+                                              Helpers::toKeyFormat(kp.globalMax()));
+    if (!shardKey || !isGlobalMaxShardKey(*shardKey)) {
         return boost::none;
     }
+    return shardKey;
+}
 
-    // Reshuffle fields according to the shard key pattern (the scan yields index keys with stripped
-    // field names; drop any trailing fields of a wider index).
-    const BSONObj shardKey =
-        BSONObjBuilder().appendElementsRenamed(indexKey, shardKeyPattern.toBSON(), false).obj();
-    if (!isMaxKeyPrefixedShardKey(shardKey)) {
-        return boost::none;
+/**
+ * Returns true iff a document whose shard key is the global maximum (every shard-key field is
+ * MaxKey) exists locally within 'range'. The global-max key sorts to the very top of the keyspace,
+ * so a single backward scan of the range that returns it answers the question. Throws IndexNotFound
+ * when no shard-key-prefixed index is available to run the scan.
+ */
+bool hasGlobalMaxDocInRange(OperationContext* opCtx,
+                            const DatabaseName& dbName,
+                            const UUID& collUuid,
+                            const ShardKeyPattern& shardKeyPattern,
+                            const ChunkRange& range) {
+    const auto acquisition = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, NamespaceStringOrUUID{dbName, collUuid}, AcquisitionPrerequisites::kRead),
+        MODE_IS);
+    if (!acquisition.exists()) {
+        return false;
     }
-    return shardKey.getOwned();
+
+    const auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
+                                                       acquisition.getCollectionPtr(),
+                                                       shardKeyPattern.toBSON(),
+                                                       /*requireSingleKey=*/false);
+    uassert(ErrorCodes::IndexNotFound,
+            str::stream() << "Unable to find shard key index for "
+                          << acquisition.nss().toStringForErrorMsg() << " and key pattern `"
+                          << shardKeyPattern.toBSON() << "'",
+            shardKeyIdx);
+
+    // Extend the task range to the (possibly wider) index key pattern. The caller has already
+    // verified the upper bound is the global max, so extend it inclusively and use inclusive bounds
+    // so a shard key that is exactly MaxKey is reachable (mirrors deleteRangeInBatches' isMaxGlobal
+    // handling).
+    const KeyPattern indexKeyPattern(shardKeyIdx->keyPattern());
+    auto shardKey = rightmostShardKeyInBounds(
+        opCtx,
+        acquisition,
+        *shardKeyIdx,
+        shardKeyPattern,
+        Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(range.getMin(), false)),
+        Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(range.getMax(), true)));
+    return shardKey && isGlobalMaxShardKey(*shardKey);
 }
 
 /**
@@ -218,7 +281,7 @@ bool detectMaxKeyOrphanForCollection(OperationContext* opCtx,
     }
 
     // Cheap pre-check before taking the migration-blocking guard.
-    if (!rightmostMaxKeyPrefixedShardKey(opCtx, nss.dbName(), collUuid, shardKeyPattern)) {
+    if (!rightmostGlobalMaxShardKey(opCtx, nss.dbName(), collUuid, shardKeyPattern)) {
         return false;
     }
 
@@ -229,8 +292,7 @@ bool detectMaxKeyOrphanForCollection(OperationContext* opCtx,
 
     // Re-check authoritatively now that migrations are blocked; the doc may have been migrated or
     // deleted between the pre-check and acquiring the guard.
-    auto candidateKey =
-        rightmostMaxKeyPrefixedShardKey(opCtx, nss.dbName(), collUuid, shardKeyPattern);
+    auto candidateKey = rightmostGlobalMaxShardKey(opCtx, nss.dbName(), collUuid, shardKeyPattern);
     if (!candidateKey) {
         return false;
     }
@@ -332,8 +394,16 @@ MaxKeyOrphanDetectionCoordinator& MaxKeyOrphanDetectionCoordinator::get(
 
 }  // namespace
 
-bool isMaxKeyPrefixedShardKey(const BSONObj& shardKeyValue) {
-    return !shardKeyValue.isEmpty() && shardKeyValue.firstElement().type() == BSONType::maxKey;
+bool isGlobalMaxShardKey(const BSONObj& shardKeyValue) {
+    if (shardKeyValue.isEmpty()) {
+        return false;
+    }
+    for (auto&& elem : shardKeyValue) {
+        if (elem.type() != BSONType::maxKey) {
+            return false;
+        }
+    }
+    return true;
 }
 
 void runMaxKeyOrphanDetection(OperationContext* opCtx, long long term) {
@@ -392,7 +462,8 @@ void runMaxKeyOrphanDetection(OperationContext* opCtx, long long term) {
     }
 
     if (priorState && priorState->getScanCompletedAt().has_value()) {
-        publishOrphanScanStats(priorState->getFoundMaxKey(), priorState->getAlertEmitted());
+        publishOrphanScanStats(priorState->getFoundMaxKey().value_or(false),
+                               priorState->getAlertEmitted().value_or(false));
         LOGV2_DEBUG(12799006,
                     2,
                     "Skipping MaxKey orphan detection: prior sweep already completed",
@@ -400,7 +471,8 @@ void runMaxKeyOrphanDetection(OperationContext* opCtx, long long term) {
         return;
     }
 
-    const bool priorAlertEmitted = priorState ? priorState->getAlertEmitted() : false;
+    const bool priorAlertEmitted =
+        priorState ? priorState->getAlertEmitted().value_or(false) : false;
     const auto myShardId = ShardingState::get(opCtx)->shardId();
     const auto scanStartedAt = opCtx->fastClockSource().now();
 
@@ -497,6 +569,140 @@ void launchMaxKeyOrphanDetectionOnStepUp(OperationContext* opCtx, long long term
 
 void cancelMaxKeyOrphanDetection(ServiceContext* serviceContext) {
     MaxKeyOrphanDetectionCoordinator::get(serviceContext).cancelAndJoin();
+}
+
+bool shouldSkipRangeDeletionForMaxKeyOrphans(OperationContext* opCtx,
+                                             const DatabaseName& dbName,
+                                             const UUID& collUuid,
+                                             const BSONObj& shardKeyPattern,
+                                             const ChunkRange& range) {
+    const ShardKeyPattern skPattern(shardKeyPattern);
+    // Hashed shard keys never produce MaxKey-prefixed values.
+    if (skPattern.isHashedPattern()) {
+        return false;
+    }
+    // Cheap short-circuit: only a global-max upper bound can cover MaxKey-prefixed documents.
+    if (!skPattern.getKeyPattern().isGlobalMax(range.getMax())) {
+        return false;
+    }
+    return hasGlobalMaxDocInRange(opCtx, dbName, collUuid, skPattern, range);
+}
+
+namespace {
+
+/**
+ * Reads the singleton config.maxKeyOrphanScanState document, or boost::none if it does not exist. A
+ * read failure is propagated so the caller retries.
+ */
+boost::optional<MaxKeyOrphanScanState> readScanStateDoc(OperationContext* opCtx) {
+    DBDirectClient client(opCtx);
+    FindCommandRequest findCmd(NamespaceString::kConfigMaxKeyOrphanScanStateNamespace);
+    findCmd.setFilter(BSON("_id" << kMaxKeyOrphanScanStateId));
+    findCmd.setLimit(1);
+    auto cursor = client.find(std::move(findCmd));
+    if (cursor && cursor->more()) {
+        return MaxKeyOrphanScanState::parse(cursor->next(), IDLParserContext("readScanStateDoc"));
+    }
+    return boost::none;
+}
+
+/**
+ * Persists the classified blocked-task id set to config.maxKeyOrphanScanState. 'blockedTasks' is
+ * written unconditionally (even when empty) so its presence marks the classification complete for
+ * this epoch.
+ */
+void persistBlockedTasks(OperationContext* opCtx, const std::vector<UUID>& blocked) {
+    BSONObjBuilder update;
+    {
+        BSONObjBuilder setBob(update.subobjStart("$set"));
+        BSONArrayBuilder arr(setBob.subarrayStart(MaxKeyOrphanScanState::kBlockedTasksFieldName));
+        for (const auto& id : blocked) {
+            id.appendToArrayBuilder(&arr);
+        }
+    }
+
+    PersistentTaskStore<MaxKeyOrphanScanState> store(
+        NamespaceString::kConfigMaxKeyOrphanScanStateNamespace);
+    store.upsert(opCtx, BSON("_id" << kMaxKeyOrphanScanStateId), update.obj());
+}
+
+bool rangeMaxIsAllMaxKey(const ChunkRange& range) {
+    const auto& max = range.getMax();
+    if (max.isEmpty()) {
+        return false;
+    }
+    for (auto&& elem : max) {
+        if (elem.type() != BSONType::maxKey) {
+            return false;
+        }
+    }
+    return true;
+}
+
+}  // namespace
+
+std::vector<UUID> loadOrComputeBlockedMaxKeyRangeDeletionTasks(OperationContext* opCtx) {
+    auto existing = readScanStateDoc(opCtx);
+
+    // A present 'blockedTasks' field (even empty) means classification already ran this epoch.
+    if (existing && existing->getBlockedTasks().has_value()) {
+        const auto& blocked = *existing->getBlockedTasks();
+        LOGV2_DEBUG(13018002,
+                    2,
+                    "MaxKey orphan guard: rehydrated blocked range-deletion tasks from state doc",
+                    "blockedTaskCount"_attr = blocked.size());
+        return blocked;
+    }
+
+    std::vector<UUID> blocked;
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+    store.forEach(opCtx, BSONObj{}, [&](const RangeDeletionTask& task) {
+        opCtx->checkForInterrupt();
+
+        // Only a global-max upper bound can cover MaxKey-prefixed docs, so a task whose range max
+        // is not all-MaxKey is deletable and needs neither its key pattern resolved nor an index
+        // probe.
+        if (!rangeMaxIsAllMaxKey(task.getRange())) {
+            return true;
+        }
+
+        const auto& dbName = task.getNss().dbName();
+        const auto& collUuid = task.getCollectionUuid();
+        try {
+            const auto shardKeyPattern = task.getKeyPattern()
+                ? task.getKeyPattern()->toBSON()
+                : Grid::get(opCtx)
+                      ->catalogClient()
+                      ->getCollection(opCtx, task.getNss())
+                      .getKeyPattern()
+                      .toBSON();
+            if (shouldSkipRangeDeletionForMaxKeyOrphans(
+                    opCtx, dbName, collUuid, shardKeyPattern, task.getRange())) {
+                blocked.push_back(task.getId());
+            }
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+            // Collection dropped since the task was written: nothing to preserve, leave it
+            // deletable.
+        } catch (const DBException& ex) {
+            if (isScanFatalError(ex.code())) {
+                throw;
+            }
+            LOGV2_WARNING(13018003,
+                          "MaxKey orphan guard: conservatively blocking unclassifiable task",
+                          "taskId"_attr = task.getId(),
+                          "collectionUUID"_attr = collUuid,
+                          "error"_attr = redact(ex.toStatus()));
+            blocked.push_back(task.getId());
+        }
+        return true;
+    });
+
+    persistBlockedTasks(opCtx, blocked);
+
+    LOGV2_INFO(13018004,
+               "MaxKey orphan guard: completed range-deletion task classification",
+               "blockedTaskCount"_attr = blocked.size());
+    return blocked;
 }
 
 }  // namespace mongo

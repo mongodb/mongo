@@ -88,6 +88,8 @@ void ShardingStatistics::report(BSONObjBuilder* builder) const {
     builder->append("rangeDeleterLowPriorityTicketAdmissions",
                     rangeDeleterLowPriorityTicketAdmissions.loadRelaxed());
     builder->append("rangeDeleterQueuedForTickets", rangeDeleterTicketQueueTime.currentCount());
+    builder->append("countRangeDeletionTasksPreservingMaxKeyOrphans",
+                    countRangeDeletionTasksPreservingMaxKeyOrphans.loadRelaxed());
     builder->append("countDonorMoveChunkLockTimeout", countDonorMoveChunkLockTimeout.loadRelaxed());
     builder->append("countDonorMoveChunkAbortConflictingIndexOperation",
                     countDonorMoveChunkAbortConflictingIndexOperation.loadRelaxed());

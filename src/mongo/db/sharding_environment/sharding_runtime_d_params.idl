@@ -292,3 +292,21 @@ server_parameters:
         cpp_varname: forceUnconditionalInvalidateCollectionMetadata
         default: false
         redact: false
+
+    skipRangeDeletionForMaxKeyChunks:
+        description: >-
+            Escape hatch for the MaxKey orphan delete-guard. When true (the default, and while
+            featureFlagMaxKeyOrphanGuard is enabled), for every range deletion task classified at
+            step-up as containing a pre-upgrade MaxKey orphan (see
+            config.maxKeyOrphanScanState.blockedTasks) the range deleter deletes the ordinary
+            documents in the range but PRESERVES those whose leading shard-key field is MaxKey (the
+            possibly-never-cloned orphans), leaving them on disk for out-of-band recovery. The task
+            then completes normally. Only tasks in that pre-classified set are affected; tasks
+            created afterwards (post-upgrade, by the fixed cloner) delete normally. An operator can
+            set this to false to force full deletion of the classified tasks (e.g. once the affected
+            documents have been recovered, or for testing).
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: skipRangeDeletionForMaxKeyChunks
+        default: true
+        redact: false

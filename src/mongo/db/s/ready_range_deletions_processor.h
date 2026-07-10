@@ -121,6 +121,15 @@ private:
     /* Pointer to the (one and only) operation context used by the thread */
     ServiceContext::UniqueOperationContext _threadOpCtxHolder;
 
+    /*
+     * Raw pointer to the operation context of the alternate client ("range-deleter-batch")
+     * currently executing a batch deletion, or nullptr when no batch is in flight. Owned by the
+     * range-deleter thread; only ever set/cleared by it under `_mutex`. Tracked so that shutdown()
+     * can interrupt the in-flight batch directly rather than relying on cancellation delivered via
+     * the executor, which may already be shutting down on stepdown.
+     */
+    OperationContext* _batchOpCtx{nullptr};
+
     SharedPromise<void> _beginProcessingSignal;
 
     /* Thread consuming the range deletions queue */

@@ -38,6 +38,8 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
@@ -139,6 +141,11 @@ void ReadyRangeDeletionsProcessor::shutdown() {
     if (_threadOpCtxHolder) {
         std::lock_guard<Client> scopedClientLock(*_threadOpCtxHolder->getClient());
         _threadOpCtxHolder->markKilled(ErrorCodes::Interrupted);
+    }
+
+    if (_batchOpCtx) {
+        std::lock_guard<Client> scopedClientLock(*_batchOpCtx->getClient());
+        _batchOpCtx->markKilled(ErrorCodes::Interrupted);
     }
 }
 
@@ -262,6 +269,11 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
     HierarchicalCancelableOperationContextFactory opCtxFactory(opCtx->getCancellationToken(),
                                                                _executor);
 
+    // The MaxKey orphan guard's blocked set must be populated before any task is deleted (see
+    // RangeDeleterService::classifyBlockedMaxKeyTasks). Classify lazily below, after the disabled
+    // gate and before processing the first task, retrying on transient failure.
+    bool classifiedBlockedMaxKeyTasks = false;
+
     while (!_stopRequested()) {
         {
             std::unique_lock<std::mutex> lock(_mutex);
@@ -279,6 +291,26 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
             MONGO_IDLE_THREAD_BLOCK;
             sleepFor(kCheckForEnabledServiceInterval);
             continue;
+        }
+
+        if (!classifiedBlockedMaxKeyTasks) {
+            try {
+                RangeDeleterService::get(opCtx)->classifyBlockedMaxKeyTasks(opCtx);
+                classifiedBlockedMaxKeyTasks = true;
+            } catch (const DBException& e) {
+                LOGV2_WARNING(13018005,
+                              "MaxKey orphan guard: classification failed; retrying before "
+                              "processing range deletions",
+                              "error"_attr = redact(e.toStatus()));
+                // Interruptible backoff so a stepdown/shutdown during the retry is observed
+                // promptly instead of blocking the join for the full interval.
+                try {
+                    opCtx->sleepFor(kCheckForEnabledServiceInterval);
+                } catch (const DBException&) {
+                    break;
+                }
+                continue;
+            }
         }
 
         const RangeDeletionTask task = _peekFront();
@@ -321,6 +353,23 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
                     // but we still need to delete the persistent range deletion task
                     orphansRemovalCompleted = true;
                 }
+
+                // MaxKey orphan guard: for a task classified at step-up as blocked, delete the
+                // ordinary docs in the global-max chunk but preserve those whose leading shard-key
+                // field is MaxKey (potentially never cloned). The task then completes normally.
+                bool preserveMaxKeyPrefixedDocs = false;
+                if (!orphansRemovalCompleted && feature_flags::gMaxKeyOrphanGuard.isEnabled() &&
+                    skipRangeDeletionForMaxKeyChunks.load() &&
+                    RangeDeleterService::get(opCtx)->isMaxKeyBlocked(task.getId())) {
+                    LOGV2(
+                        13018000,
+                        "Preserving MaxKey-prefixed documents while deleting the rest of the range",
+                        "namespace"_attr = possiblyStaleNss,
+                        "collectionUUID"_attr = collectionUuid.toString(),
+                        "range"_attr = redact(range.toString()));
+                    preserveMaxKeyPrefixedDocs = true;
+                }
+
                 // Perform the actual range deletion
                 while (!orphansRemovalCompleted) {
                     try {
@@ -344,6 +393,25 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
                             auto batchOpCtxHolder = opCtxFactory.makeOperationContext(&cc());
                             auto* batchOpCtx = batchOpCtxHolder.get();
 
+                            // Publish the batch opCtx so shutdown()/stepdown can interrupt it
+                            // directly, and clear it when the batch scope exits.
+                            {
+                                std::lock_guard<std::mutex> lock(_mutex);
+                                if (_state == kStopped) {
+                                    // A stepdown raced us between the last check and here; the
+                                    // registration would never be observed by shutdown(). Kill this
+                                    // opCtx now so the batch does not block indefinitely.
+                                    std::lock_guard<Client> clientLock(*batchOpCtx->getClient());
+                                    batchOpCtx->markKilled(ErrorCodes::Interrupted);
+                                } else {
+                                    _batchOpCtx = batchOpCtx;
+                                }
+                            }
+                            ON_BLOCK_EXIT([this] {
+                                std::lock_guard<std::mutex> lock(_mutex);
+                                _batchOpCtx = nullptr;
+                            });
+
                             // Keep the serverStatus ticket metrics up to date as the deletion
                             // acquires and releases execution tickets, so a range deletion
                             // stalled on ticket admission is visible in serverStatus/FTDC while
@@ -356,7 +424,12 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
 
                             auto numDocsAndBytesDeleted =
                                 uassertStatusOK(rangedeletionutil::deleteRangeInBatches(
-                                    batchOpCtx, dbName, collectionUuid, shardKeyPattern, range));
+                                    batchOpCtx,
+                                    dbName,
+                                    collectionUuid,
+                                    shardKeyPattern,
+                                    range,
+                                    preserveMaxKeyPrefixedDocs));
                             const auto& ticketStats = ticketStatsRecorder.stats();
                             LOGV2_INFO(9239400,
                                        "Finished deletion of documents in orphan range",
@@ -448,6 +521,11 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
                                 "range"_attr = redact(range.toString()),
                                 "error"_attr = e);
                     throw;
+                }
+
+                if (preserveMaxKeyPrefixedDocs) {
+                    ShardingStatistics::get(opCtx)
+                        .countRangeDeletionTasksPreservingMaxKeyOrphans.fetchAndAdd(1);
                 }
             } catch (const ExceptionFor<ErrorCodes::IndexNotFound>&) {
                 // We cannot complete this range deletion right now because we do not have an index

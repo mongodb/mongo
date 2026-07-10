@@ -198,6 +198,16 @@ export const $config = (function () {
     function setup(db, collName, cluster) {
         const ns = db[collName].getFullName();
 
+        // This test verifies the SERVER-121533 migration fix: MaxKey-prefixed documents are cloned during
+        // migration and their orphans are cleaned up by the range deleter. Disable the delete-guard
+        // which when enabled would instead preserve those orphans.
+        cluster.executeOnMongodNodes((adminDb) => {
+            assert.commandWorkedOrFailedWithCode(
+                adminDb.adminCommand({setParameter: 1, skipRangeDeletionForMaxKeyChunks: false}),
+                ErrorCodes.InvalidOptions,
+            );
+        });
+
         const bulk = db[collName].initializeUnorderedBulkOp();
         for (let i = 0; i < kNumInitialRegularDocs; i++) {
             bulk.insert({_id: i, skey: i, otherKey: i, tid: i % 5, counter: 0});
@@ -264,6 +274,14 @@ export const $config = (function () {
     }
 
     function teardown(db, collName, cluster) {
+        // Restore the guard's default before finishing (see setup).
+        cluster.executeOnMongodNodes((adminDb) => {
+            assert.commandWorkedOrFailedWithCode(
+                adminDb.adminCommand({setParameter: 1, skipRangeDeletionForMaxKeyChunks: true}),
+                ErrorCodes.InvalidOptions,
+            );
+        });
+
         const counterDoc = db[collName + kCounterCollSuffix].findOne({_id: "maxKeyCount"});
         assert.neq(counterDoc, null, "MaxKey counter document not found");
         const expectedCount = counterDoc.count;

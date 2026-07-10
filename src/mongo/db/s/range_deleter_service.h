@@ -46,6 +46,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
@@ -60,6 +61,7 @@
 #include <string>
 #include <thread>
 #include <utility>
+#include <vector>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/smart_ptr.hpp>
@@ -82,6 +84,10 @@ private:
 
     // Keeping track of per-collection registered range deletion tasks.
     RangeDeletionTaskTracker _rangeDeletionTasks;
+
+    // Range-deletion task ids classified by the MaxKey orphan guard. Populated at step-up before
+    // processing begins, cleared on step-down/shutdown.
+    stdx::unordered_set<UUID, UUID::Hash> _blockedMaxKeyTasks;
 
     // Mono-threaded executor processing range deletion tasks
     std::shared_ptr<executor::TaskExecutor> _executor;
@@ -160,6 +166,23 @@ public:
      * Checks if the range deleter service is disabled.
      */
     bool isDisabled();
+
+    /*
+     * Returns true iff 'taskId' was classified as a blocked MaxKey orphan task at step-up.
+     */
+    bool isMaxKeyBlocked(const UUID& taskId);
+
+    /*
+     * Replaces the blocked MaxKey task set. Called once per term at step-up, before processing.
+     */
+    void setBlockedMaxKeyTasks(std::vector<UUID> blockedTaskIds);
+
+    /*
+     * Classifies pre-existing range-deletion tasks and stores the blocked set (no-op when the guard
+     * flag is off). Called by the range-deletion processor before it deletes any task, so a blocked
+     * task is never deleted before classification. May throw; the caller retries.
+     */
+    void classifyBlockedMaxKeyTasks(OperationContext* opCtx);
 
     /* ReplicaSetAwareServiceShardSvr implemented methods */
     void onStartup(OperationContext* opCtx) override;
