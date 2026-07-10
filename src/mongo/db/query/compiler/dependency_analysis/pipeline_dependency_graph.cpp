@@ -966,16 +966,22 @@ private:
         auto [existingBaseField, existingBaseFieldType] = lookupField(scope, basePath);
 
         // Under an array-preserving operation, when declaring a new base field (the prefix is
-        // missing here) and we have a parent scope and we are in an exhaustive scope, we need to
-        // consider the parent scope's base field instead. This is because a kPreserveArrays
-        // modification does array-traversal of the previous value.
+        // missing here) and we have a parent scope and we are in an exhaustive scope, we look up
+        // the parent scope's base field. This is because a kPreserveArrays modification does
+        // array-traversal of the previous value, so the new base keeps the prior arrayness, and
+        // nested declarations recover the prior arrayness of each deeper prefix component the
+        // same way. The prior base field must not contribute its subfields though: an exhaustive
+        // stage rebuilds its output from the paths it declares, so prior subfields do not pass
+        // through implicitly.
+        FieldId priorBaseField;
+        bool redeclaresBaseInExhaustiveScope = false;
         if (prefixPolicy == ModifiedPrefixPolicy::kPreserveArrays &&
             existingBaseFieldType == FieldMatchType::kMissing && parentScope &&
             _scopes[scope].exhaustiveScope == scope) {
             auto parentMatch = lookupField(parentScope, basePath);
             if (parentMatch.type != FieldMatchType::kShadowed) {
-                existingBaseField = parentMatch.fieldId;
-                existingBaseFieldType = parentMatch.type;
+                priorBaseField = parentMatch.fieldId;
+                redeclaresBaseInExhaustiveScope = true;
             }
         }
 
@@ -1001,6 +1007,20 @@ private:
             // We already have such base field in the current scope. We can mutate the scope in this
             // case.
             newBaseField = existingBaseField;
+        } else if (redeclaresBaseInExhaustiveScope) {
+            // The base is redeclared by an exhaustive stage: its embedded scope starts empty and
+            // is exhaustive on itself, since only the paths this stage declares survive.
+            auto embeddedScope = _scopes.getNextId();
+            newBaseField = _fields.append(Field{scope, embeddedScope});
+            declareScope(_scopes[scope].stage, embeddedScope /*exhaustiveScope*/, ScopeId::none());
+            // Nested declarations recover prior arrayness through the prior base field's scope.
+            parentEmbeddedScope =
+                priorBaseField ? _fields[priorBaseField].embeddedScope : ScopeId::none();
+            // The output's array shape still derives from the prior value that is traversed.
+            _fields[newBaseField].dependencies.insert(priorBaseField);
+            _scopes[scope].fields[basePath.front()] = newBaseField;
+            populateBaseFieldMetadata(
+                newBaseField, priorBaseField, collectionPathPrefix, basePath.front());
         } else {
             // No such field, we need to declare it and an embedded scope;
             // OR existing base field from previous scope, we need to re-declare the base here with

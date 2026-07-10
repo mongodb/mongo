@@ -299,6 +299,22 @@ TEST_F(PipelineDependencyGraphGoldenTest, InclusionDottedKnownSubfields) {
     });
 }
 
+TEST_F(PipelineDependencyGraphGoldenTest, InclusionAndModificationOfSubfields) {
+    runVariation({
+        .name = "InclusionAndModificationOfSubfields",
+        .pipeline = "[{$set: { 'a.b.c': 1 }},"
+                    " {$project: { 'a.str': 'value', 'a.b.c': 1 }}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, ModificationOfSubfieldDropsPriorSiblings) {
+    runVariation({
+        .name = "ModificationOfSubfieldDropsPriorSiblings",
+        .pipeline = "[{$set: { 'a.b.c': 1 }},"
+                    " {$project: { 'a.str': 'value' }}]",
+    });
+}
+
 TEST_F(PipelineDependencyGraphGoldenTest, ChainedInclusionProjections) {
     runVariation({
         .name = "ChainedInclusionProjections",

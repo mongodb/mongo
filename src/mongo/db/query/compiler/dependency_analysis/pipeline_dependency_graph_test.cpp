@@ -1293,6 +1293,48 @@ TEST_F(PipelineDependencyGraphTest, InclusionDottedAfterExhaustive) {
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, InclusionAndModificationOfSubfields) {
+    setPipeline(
+        "[{$set: { 'a.b.c': 1 }},"
+        " {$project: { 'a.str': 'value', 'a.b.c': 1 }}]");
+    runTest([&] {
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a"), stages[1]);
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a.b"), stages[1]);
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a.b.c"), stages[0]);
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a.str"), stages[1]);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ModificationOfSubfieldDropsPriorSiblings) {
+    setPipeline(
+        "[{$set: { 'a.b.c': 1 }},"
+        " {$project: { 'a.str': 'value' }}]");
+    runTest([&] {
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a"), stages[1]);
+        // 'a.b' is not included by the projection, so it does not pass through from $set.
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a.b"), stages[1]);
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a.b.c"), stages[1]);
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a.str"), stages[1]);
+        // The constant from $set must not survive the projection.
+        ASSERT_FALSE(graph->getConstant(nullptr, "a.b.c").has_value());
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ModificationOfNestedSubfieldDropsPriorSiblings) {
+    setPipeline(
+        "[{$set: { 'a.b.c': 1, 'a.b.d': 2 }},"
+        " {$project: { 'a.b.str': 'value', 'a.b.c': 1 }}]");
+    runTest([&] {
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a"), stages[1]);
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a.b"), stages[1]);
+        // 'a.b.c' is included, so it passes through from $set.
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a.b.c"), stages[0]);
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a.b.str"), stages[1]);
+        // 'a.b.d' is not included, so it does not pass through from $set.
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a.b.d"), stages[1]);
+    });
+}
+
 TEST_F(PipelineDependencyGraphTest, SetFieldThenIncludeDottedPath) {
     setPipeline(
         "[{$set: { a: 1 }},"

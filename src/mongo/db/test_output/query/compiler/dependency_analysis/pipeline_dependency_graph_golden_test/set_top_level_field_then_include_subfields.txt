@@ -118,6 +118,7 @@ output: {
                         "array": false
                     },
                     "dependencies": [
+                        "a:1",
                         "x:8"
                     ]
                 },
