@@ -279,33 +279,11 @@ StatusWith<std::vector<DatabaseName>> ShardingCatalogManager::_getDBNamesListFro
     }
 }
 
-Status ShardingCatalogManager::createIndexForConfigShards(OperationContext* opCtx,
-                                                          bool checkPreconditions) {
-    const auto performCreation = [&]() {
-        if (!checkPreconditions) {
-            return true;
-        }
-
-        // TODO SERVER-128162 use the proper feature flag to perform the check.
-        const auto featureFlagEnabled =
-            feature_flags::gFeatureFlagUniqueShardIdentifiers
-                .isEnabledUseLatestFCVWhenUninitialized(
-                    VersionContext::getDecoration(opCtx),
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-        if (!featureFlagEnabled) {
-            return false;
-        }
-
-        // A regular index can only be created once the FCV upgrade has generated a UUID value for
-        // each existing document in the collection. This can be indirectly verified by inspecting
-        // the content of the config server's shard identity, which only receives a UUID value on a
-        // later stage.
-        PersistentTaskStore<ShardType> store(NamespaceString::kServerConfigurationNamespace);
-        return store.count(opCtx,
-                           BSON("_id" << ShardIdentityType::IdName
-                                      << ShardIdentityType::kUuidFieldName
-                                      << BSON("$exists" << true))) > 0;
-    }();
+Status ShardingCatalogManager::createIndexOnUuidForConfigShards(OperationContext* opCtx) {
+    const auto performCreation =
+        feature_flags::gFeatureFlagAssignUUIDToShard.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
     if (performCreation) {
         const bool unique = true;
@@ -328,14 +306,14 @@ void ShardingCatalogManager::installConfigShardIdentityDocument(OperationContext
     // Note that we can check the feature flag here without a fixed FCV region because the caller
     // is part of onStepUpComplete in which the primary is not yet writable, thus setFCV cannot run.
     // TODO (SERVER-126212): Always generate a UUID for the config server.
-    const bool uniqueShardIdsEnabled = feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabled(
+    const bool generateShardUuid = feature_flags::gFeatureFlagAssignUUIDToShard.isEnabled(
         VersionContext::getDecoration(opCtx),
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     invariant(!ShardingState::get(opCtx)->enabled());
     auto identity = topology_change_helpers::createShardIdentity(
         opCtx,
         ShardId::kConfigServerId,
-        uniqueShardIdsEnabled ? boost::make_optional(UUID::gen()) : boost::none);
+        generateShardUuid ? boost::make_optional(ShardType::kConfigServerUuid) : boost::none);
     if (deferShardingInitialization) {
         identity.setDeferShardingInitialization(true);
     }

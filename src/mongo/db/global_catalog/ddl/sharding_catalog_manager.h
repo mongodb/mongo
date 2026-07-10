@@ -763,12 +763,12 @@ public:
     Status createIndexesForConfigPlacementHistory(OperationContext* opCtx);
 
     /**
-     * Creates a secondary index on config.shards.
-     * When checkPreconditions is true, the methods verifies whether the persisted state of the
-     * config server is compatible with the request - and skips the operation if not. Returns OK
-     * when the operation succeeds or is skipped, and an error status otherwise.
+     * Creates a secondary index on the uuid field of config.shards.
+     * When checkFCVState is true, the method additionally verifies if the
+     * gFeatureFlagAssignUUIDToShard is enabled (and skips the request if not).
+     * Returns OK when the operation succeeds or is skipped, and an error status otherwise.
      */
-    Status createIndexForConfigShards(OperationContext* opCtx, bool checkPreconditions = true);
+    Status createIndexOnUuidForConfigShards(OperationContext* opCtx);
 
     /**
      * (Re)builds the content config.placementHistory based on a snapshot read of the global catalog

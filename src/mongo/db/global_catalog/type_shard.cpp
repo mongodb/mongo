@@ -47,6 +47,11 @@
 
 namespace mongo {
 
+// The UUID is the word "config" in hex (636f6e66-6967) plus the v4
+// required bits.
+const UUID ShardType::kConfigServerUuid =
+    UUID::parse("636f6e66-6967-4000-8000-000000000000").getValue();
+
 const BSONField<std::string> ShardType::name("_id");
 const BSONField<UUID> ShardType::uuid("uuid");
 const BSONField<std::string> ShardType::host("host");
@@ -224,6 +229,12 @@ const std::string& ShardType::getName() const {
 const boost::optional<UUID>& ShardType::getUuid() const {
     invariant(_handle);
     return _handle->uuid();
+}
+
+void ShardType::setUuid(boost::optional<UUID> uuid) {
+    invariant(_handle);
+    ShardHandle newHandle(_handle->name(), std::move(uuid));
+    _handle = std::move(newHandle);
 }
 
 const ShardHandle& ShardType::getHandle() const {

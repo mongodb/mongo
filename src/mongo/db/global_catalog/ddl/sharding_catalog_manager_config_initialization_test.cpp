@@ -130,13 +130,14 @@ protected:
     /* Generate and insert an entry into the config.shards collection using the received shard ID
      * and an auto generated value for the host port.
      */
-    ShardType createShardMetadata(OperationContext* opCtx, const ShardId& shardId) {
-        static uint32_t numInvocations = 0;
-        const std::string host("localhost:" + std::to_string(30000 + numInvocations++));
-        ShardType shard(shardId.toString(), host);
-        ASSERT_OK(insertToConfigCollection(
-            opCtx, NamespaceString::kConfigsvrShardsNamespace, shard.toBSON()));
-        return shard;
+    void createShardMetadata(const std::vector<ShardId>& shardIds) {
+        uint32_t portOffset = 0;
+        std::vector<ShardType> shards;
+        for (const auto& shardId : shardIds) {
+            const std::string host("localhost:" + std::to_string(30000 + portOffset++));
+            shards.emplace_back(shardId.toString(), host);
+        }
+        setupShards(std::move(shards));
     }
 
 
@@ -344,7 +345,9 @@ TEST_F(ConfigInitializationTest, BuildsNecessaryIndexes) {
         BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
                  << "collation" << BSON("locale" << "simple")),
         BSON("v" << 2 << "unique" << true << "key" << BSON("host" << 1) << "name"
-                 << "host_1" << "collation" << BSON("locale" << "simple"))};
+                 << "host_1" << "collation" << BSON("locale" << "simple")),
+        BSON("v" << 2 << "unique" << true << "key" << BSON("uuid" << 1) << "name"
+                 << "uuid_1" << "collation" << BSON("locale" << "simple"))};
     auto expectedTagsIndexes = std::vector<BSONObj>{
         BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
                  << "collation" << BSON("locale" << "simple")),
@@ -387,9 +390,7 @@ TEST_F(ConfigInitializationTest, InitializePlacementHistory) {
     // - Three sharded collections (one with corrupted placement data)
     const std::vector<ShardId> allShardIds = {
         ShardId("shard1"), ShardId("shard2"), ShardId("shard3"), ShardId("shard4")};
-    for (const auto& id : allShardIds) {
-        createShardMetadata(operationContext(), id);
-    }
+    createShardMetadata(allShardIds);
 
     // (dbname, primaryShard, timestamp field of DatabaseVersion)
     const std::vector<std::tuple<DatabaseName, ShardId, Timestamp>> databaseInfos{

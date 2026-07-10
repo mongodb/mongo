@@ -78,7 +78,7 @@ structs:
             shardUuid:
                 description:
                     "A unique reference for the new shard. Populated in kCheckShardPreconditions when
-                    featureFlagUniqueShardIdentifiers is enabled. The field is optional for backward compatibility."
+                    featureFlagAssignUUIDToShard is enabled. The field is optional for backward compatibility."
                 type: uuid
                 optional: true
             originalUserWriteBlockingLevel:

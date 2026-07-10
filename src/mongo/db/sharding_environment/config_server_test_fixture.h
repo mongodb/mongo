@@ -153,6 +153,8 @@ protected:
 
     /**
      * Setup the config.shards collection to contain the given shards.
+     * Note: the method will auto-generate the uuid field of each passed-in ShardType object (when
+     * `boost::none`) before persisting it.
      */
     virtual void setupShards(const std::vector<ShardType>& shards);
 

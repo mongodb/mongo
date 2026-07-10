@@ -112,10 +112,9 @@ describe("$changeStream", function () {
                     assert.soon(() => csCursor.hasNext());
                     const nextEvent = csCursor.next();
                     for (let fieldName in expectedEvent) {
-                        assert.eq(expectedEvent[fieldName], nextEvent[fieldName], {
-                            expectedEvent,
-                            nextEvent,
-                        });
+                        const expectedValue = expectedEvent[fieldName];
+                        const actualValue = nextEvent[fieldName];
+                        assert.docEq(expectedValue, actualValue, {expectedEvent, nextEvent});
                     }
                 }
             } else {

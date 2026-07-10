@@ -292,9 +292,24 @@ StatusWith<BSONObj> ConfigServerTestFixture::findOneOnConfigCollection(Operation
 }
 
 void ConfigServerTestFixture::setupShards(const std::vector<ShardType>& shards) {
+    const auto decorateWithUuid = [](const ShardType& shard) {
+        if (shard.getUuid()) {
+            return shard;
+        }
+
+        auto decoratedShard = shard;
+        if (shard.getName() == ShardId::kConfigServerId) {
+            decoratedShard.setUuid(ShardType::kConfigServerUuid);
+        } else {
+            decoratedShard.setUuid(UUID::gen());
+        }
+        return decoratedShard;
+    };
+
     const NamespaceString shardNS(NamespaceString::kConfigsvrShardsNamespace);
-    for (const auto& shard : shards) {
-        ASSERT_OK(insertToConfigCollection(operationContext(), shardNS, shard.toBSON()));
+    for (auto& shard : shards) {
+        ASSERT_OK(insertToConfigCollection(
+            operationContext(), shardNS, decorateWithUuid(shard).toBSON()));
     }
 }
 

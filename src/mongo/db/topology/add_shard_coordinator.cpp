@@ -131,7 +131,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
 
                 // Assign a UUID for the new shard when the feature flag is enabled.
                 if (!_doc.getShardUuid().has_value() &&
-                    feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabled(
+                    feature_flags::gFeatureFlagAssignUUIDToShard.isEnabled(
                         VersionContext::getDecoration(opCtx),
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                     if (_doc.getIsConfigShard()) {

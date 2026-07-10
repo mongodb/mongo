@@ -65,6 +65,9 @@ public:
         kShardAware,
     };
 
+    // Hardcoded UUID for the config server.
+    static const UUID kConfigServerUuid;
+
     // Field names and types in the shards collection type.
     static const BSONField<std::string> name;
     static const BSONField<UUID> uuid;
@@ -107,6 +110,8 @@ public:
     const std::string& getName() const;
 
     const boost::optional<UUID>& getUuid() const;
+
+    void setUuid(boost::optional<UUID> uuid);
 
     const ShardHandle& getHandle() const;
     void setHandle(ShardHandle handle);

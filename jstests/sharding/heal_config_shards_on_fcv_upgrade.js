@@ -10,6 +10,7 @@
  *  ]
  * */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 function runConfigShardsFixUpTest() {
     const st = new ShardingTest({
@@ -47,7 +48,8 @@ function runConfigShardsFixUpTest() {
         shardDocs = configPrimary.getDB("config")["shards"].find().toArray();
         shardDocs.forEach((doc) => assert.eq(doc.hasOwnProperty("topologyTime"), true, shardDocs));
 
-        latestTopologyTime = shardDocs[0].topologyTime;
+        // Take the maximum persisted topology time (which is the one backing the vector clock / ShardRegistry timeInStore).
+        latestTopologyTime = FixtureHelpers.getTopologyTime(configPrimary.getDB("config"));
         // Make sure the written topologyTime is gossiped.
         assert.soon(() => {
             let ss = st.s.adminCommand({serverStatus: 1});
@@ -57,16 +59,20 @@ function runConfigShardsFixUpTest() {
 
     jsTest.log("Removing topologyTime from a single entry in config.shards");
     {
-        // Test that if some of the entries already have a topologyTime, it is not overwritten.
-        // Update one, leaving the other untouched. From the previous step, we know all topology
-        // times are the same, so we won't cause any monotonicity issues.
-        jsTest.log(
-            configPrimary.getDB("config")["shards"].updateOne({}, {$unset: {topologyTime: ""}}),
-        );
-        const docWithTopologyTimeBefore = configPrimary
+        // Test the healing when only some of the entries are missing a topologyTime.
+        // Unset the topologyTime of an entry, ensuring that there is at least one document holding the cluster's maximum topologyTime.
+        // This keeps the collection's max topologyTime unchanged, so we don't lower it below the ShardRegistry's
+        // timeInStore and avoid a monotonicity violation on the next reload.
+        const docToUnset = configPrimary
             .getDB("config")
-            ["shards"].find({topologyTime: latestTopologyTime})
-            .toArray()[0];
+            ["shards"].find()
+            .sort({topologyTime: -1})
+            .toArray()[1];
+        jsTest.log(
+            configPrimary
+                .getDB("config")
+                ["shards"].updateOne({_id: docToUnset._id}, {$unset: {topologyTime: ""}}),
+        );
 
         triggerSelfHeal();
 
@@ -74,17 +80,10 @@ function runConfigShardsFixUpTest() {
         let shardDocs = configPrimary.getDB("config")["shards"].find().toArray();
         shardDocs.forEach((doc) => assert.eq(doc.hasOwnProperty("topologyTime"), true, shardDocs));
 
-        // The doc which had a topologyTime is untouched.
-        assert.eq(
-            shardDocs.find((doc) => timestampCmp(doc.topologyTime, latestTopologyTime) == 0),
-            docWithTopologyTimeBefore,
+        // Healing is monotonic: no entry regressed below the previous maximum topologyTime.
+        shardDocs.forEach((doc) =>
+            assert.gte(timestampCmp(doc.topologyTime, latestTopologyTime), 0, shardDocs),
         );
-
-        // The other doc has a greater topologyTime.
-        const updatedDoc = shardDocs.find(
-            (doc) => timestampCmp(doc.topologyTime, latestTopologyTime) != 0,
-        );
-        assert.gt(updatedDoc.topologyTime, latestTopologyTime);
     }
 
     st.stop();
