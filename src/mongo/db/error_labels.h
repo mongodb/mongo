@@ -113,6 +113,9 @@ private:
 
 /**
  * Returns the error labels for the given error.
+ *
+ * The returned document may also include other fields related to the error labels that should be
+ * appended to the final response returned to the client.
  */
 BSONObj getErrorLabels(OperationContext* opCtx,
                        const OperationSessionInfoFromClient& sessionOptions,

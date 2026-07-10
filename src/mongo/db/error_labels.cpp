@@ -64,6 +64,12 @@ const StringMap<int> commitOrAbortCommands = {{"abortTransaction", 1},
                                               {"commitTransaction", 1},
                                               {"coordinateCommitTransaction", 1}};
 
+void appendBaseBackoffMS(BSONObjBuilder& responseBuilder) {
+    if (auto retry = getExternalClientBaseBackoffMS(); retry > 0) {
+        responseBuilder.append(kBaseBackoffMSFieldName, retry);
+    }
+}
+
 }  // namespace
 
 bool ErrorLabelBuilder::isTransientTransactionError() const {
@@ -275,14 +281,32 @@ BSONObj getErrorLabels(OperationContext* opCtx,
                        bool isComingFromRouter,
                        const repl::OpTime& lastOpBeforeRun,
                        const repl::OpTime& lastOpAfterRun) {
-    if (MONGO_unlikely(errorLabelsOverride(opCtx))) {
+    if (auto labels = errorLabelsOverride(opCtx); MONGO_unlikely(labels)) {
         // This command was failed by a failCommand failpoint. Thus, we return the errorLabels
         // specified in the failpoint to suppress any other error labels that would otherwise be
         // returned by the ErrorLabelBuilder.
-        if (errorLabelsOverride(opCtx).value().isEmpty()) {
+        if (labels->isEmpty()) {
             return BSONObj();
         } else {
-            return BSON(kErrorLabelsFieldName << errorLabelsOverride(opCtx).value());
+            BSONObjBuilder responseBuilder;
+            responseBuilder.append(kErrorLabelsFieldName, *labels);
+
+            bool hasSystemOverloaded = false;
+            bool hasRetryableError = false;
+
+            for (auto&& elem : *labels) {
+                if (elem.valueStringDataSafe() == ErrorLabel::kSystemOverloadedError) {
+                    hasSystemOverloaded = true;
+                } else if (elem.valueStringDataSafe() == ErrorLabel::kRetryableError) {
+                    hasRetryableError = true;
+                }
+            }
+
+            if (hasSystemOverloaded && hasRetryableError) {
+                appendBaseBackoffMS(responseBuilder);
+            }
+
+            return responseBuilder.obj();
         }
     }
 
@@ -308,9 +332,7 @@ BSONObj getErrorLabels(OperationContext* opCtx,
 
     // TODO: SERVER-108898 Add a test for this behavior once this branch becomes possible.
     if (labelBuilder.isSystemOverloadedError() && labelBuilder.isOperationIdempotent()) {
-        if (auto retry = getExternalClientBaseBackoffMS(); retry > 0) {
-            responseBuilder.append(kBaseBackoffMSFieldName, retry);
-        }
+        appendBaseBackoffMS(responseBuilder);
     }
 
     return responseBuilder.obj();

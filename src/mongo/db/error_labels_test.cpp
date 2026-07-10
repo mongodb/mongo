@@ -30,8 +30,10 @@
 #include "mongo/db/error_labels.h"
 
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/error_labels_gen.h"
 #include "mongo/db/namespace_string.h"
@@ -861,6 +863,115 @@ TEST_F(ErrorLabelBuilderTest, NoWritesPerformedNotAppliedDuringTransientTransact
     BSONArrayBuilder expectedLabelArray;
     expectedLabelArray << ErrorLabel::kTransientTransaction;
     ASSERT_BSONOBJ_EQ(actualErrorLabels, BSON(kErrorLabelsFieldName << expectedLabelArray.arr()));
+}
+
+TEST_F(ErrorLabelBuilderTest, ErrorLabelsOverrideAppendsBaseBackoffMS) {
+    unittest::ServerParameterGuard backoffMsParameter("externalClientBaseBackoffMS", 123);
+    auto expectedErrorLabels =
+        BSON_ARRAY(ErrorLabel::kSystemOverloadedError << ErrorLabel::kRetryableError);
+    errorLabelsOverride(opCtx()).emplace(expectedErrorLabels);
+
+    OperationSessionInfoFromClient sessionInfo{LogicalSessionFromClient(UUID::gen())};
+    sessionInfo.setTxnNumber(1);
+    auto actualErrorLabels = getErrorLabels(opCtx(),
+                                            sessionInfo,
+                                            "find",
+                                            ErrorCodes::IngressRequestRateLimitExceeded,
+                                            boost::none,
+                                            false /* isInternalClient */,
+                                            false /* isMongos */,
+                                            false /* isComingFromRouter */,
+                                            kOpTime,
+                                            kOpTime);
+    ASSERT_BSONOBJ_EQ(actualErrorLabels.getObjectField(kErrorLabelsFieldName), expectedErrorLabels);
+    ASSERT_EQ(actualErrorLabels.getIntField(kBaseBackoffMSFieldName), 123);
+}
+
+TEST_F(ErrorLabelBuilderTest, ErrorLabelsOverrideSkipsBaseBackoffMSWithoutOverload) {
+    auto expectedErrorLabels = BSON_ARRAY(ErrorLabel::kRetryableError);
+
+    unittest::ServerParameterGuard backoffMsParameter("externalClientBaseBackoffMS", 123);
+    errorLabelsOverride(opCtx()).emplace(expectedErrorLabels);
+
+    OperationSessionInfoFromClient sessionInfo{LogicalSessionFromClient(UUID::gen())};
+    sessionInfo.setTxnNumber(1);
+    auto actualErrorLabels = getErrorLabels(opCtx(),
+                                            sessionInfo,
+                                            "find",
+                                            ErrorCodes::IngressRequestRateLimitExceeded,
+                                            boost::none,
+                                            false /* isInternalClient */,
+                                            false /* isMongos */,
+                                            false /* isComingFromRouter */,
+                                            kOpTime,
+                                            kOpTime);
+    ASSERT_BSONOBJ_EQ(actualErrorLabels.getObjectField(kErrorLabelsFieldName), expectedErrorLabels);
+    ASSERT_FALSE(actualErrorLabels.hasField(kBaseBackoffMSFieldName));
+}
+
+TEST_F(ErrorLabelBuilderTest, ErrorLabelsOverrideSkipsBaseBackoffMSWithoutRetryable) {
+    auto expectedErrorLabels = BSON_ARRAY(ErrorLabel::kSystemOverloadedError);
+
+    unittest::ServerParameterGuard backoffMsParameter("externalClientBaseBackoffMS", 123);
+    errorLabelsOverride(opCtx()).emplace(expectedErrorLabels);
+
+    OperationSessionInfoFromClient sessionInfo{LogicalSessionFromClient(UUID::gen())};
+    sessionInfo.setTxnNumber(1);
+    auto actualErrorLabels = getErrorLabels(opCtx(),
+                                            sessionInfo,
+                                            "find",
+                                            ErrorCodes::IngressRequestRateLimitExceeded,
+                                            boost::none,
+                                            false /* isInternalClient */,
+                                            false /* isMongos */,
+                                            false /* isComingFromRouter */,
+                                            kOpTime,
+                                            kOpTime);
+    ASSERT_BSONOBJ_EQ(actualErrorLabels.getObjectField(kErrorLabelsFieldName), expectedErrorLabels);
+    ASSERT_FALSE(actualErrorLabels.hasField(kBaseBackoffMSFieldName));
+}
+
+TEST_F(ErrorLabelBuilderTest, ErrorLabelsOverrideSkipsBaseBackoffMSByDefault) {
+    auto expectedErrorLabels = BSONArray();
+
+    unittest::ServerParameterGuard backoffMsParameter("externalClientBaseBackoffMS", 123);
+    errorLabelsOverride(opCtx()).emplace(expectedErrorLabels);
+
+    OperationSessionInfoFromClient sessionInfo{LogicalSessionFromClient(UUID::gen())};
+    sessionInfo.setTxnNumber(1);
+    auto actualErrorLabels = getErrorLabels(opCtx(),
+                                            sessionInfo,
+                                            "find",
+                                            ErrorCodes::IngressRequestRateLimitExceeded,
+                                            boost::none,
+                                            false /* isInternalClient */,
+                                            false /* isMongos */,
+                                            false /* isComingFromRouter */,
+                                            kOpTime,
+                                            kOpTime);
+    ASSERT_BSONOBJ_EQ(actualErrorLabels.getObjectField(kErrorLabelsFieldName), expectedErrorLabels);
+    ASSERT_FALSE(actualErrorLabels.hasField(kBaseBackoffMSFieldName));
+}
+
+TEST_F(ErrorLabelBuilderTest, ErrorLabelsOverrideSkipsBaseBackoffMSWithoutParameter) {
+    auto expectedErrorLabels =
+        BSON_ARRAY(ErrorLabel::kSystemOverloadedError << ErrorLabel::kRetryableError);
+    errorLabelsOverride(opCtx()).emplace(expectedErrorLabels);
+
+    OperationSessionInfoFromClient sessionInfo{LogicalSessionFromClient(UUID::gen())};
+    sessionInfo.setTxnNumber(1);
+    auto actualErrorLabels = getErrorLabels(opCtx(),
+                                            sessionInfo,
+                                            "find",
+                                            ErrorCodes::IngressRequestRateLimitExceeded,
+                                            boost::none,
+                                            false /* isInternalClient */,
+                                            false /* isMongos */,
+                                            false /* isComingFromRouter */,
+                                            kOpTime,
+                                            kOpTime);
+    ASSERT_BSONOBJ_EQ(actualErrorLabels.getObjectField(kErrorLabelsFieldName), expectedErrorLabels);
+    ASSERT_FALSE(actualErrorLabels.hasField(kBaseBackoffMSFieldName));
 }
 
 #ifdef MONGO_CONFIG_STREAMS
