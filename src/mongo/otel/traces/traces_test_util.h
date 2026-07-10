@@ -196,6 +196,11 @@ MATCHER_P(HasSpanName, name, "") {
     return arg.name() == traces_test_util_detail::toStringView(name);
 }
 
+/** Matches a CapturedSpan where isError() is true. */
+MATCHER(HasError, "") {
+    return arg.isError();
+}
+
 /** Matches a CapturedSpan that has an attribute with the given key and value. */
 MATCHER_P2(HasAttribute, key, value, "") {
     auto it = arg.attributes().find(std::string_view(key));

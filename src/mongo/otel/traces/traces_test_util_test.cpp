@@ -29,6 +29,8 @@
 
 #include "mongo/otel/traces/traces_test_util.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/otel/traces/span/span.h"
 #include "mongo/otel/traces/span/span_names.h"
@@ -259,6 +261,40 @@ TEST_F(AttributesMatcherTest, DistinguishesEmptyValueAndMissing) {
     std::vector<CapturedSpan> spans = capturer.getSpans(span_names::kTest1);
     EXPECT_THAT(spans,
                 ElementsAre(AllOf(HasAttribute("db", ""), Not(HasAttribute("missing", "")))));
+}
+
+using ErrorMatcherTest = OtelTracesCapturerTest;
+
+TEST_F(ErrorMatcherTest, MatchesSpanWithError) {
+    auto telemetryCtx = Span::createTelemetryContext();
+    {
+        Span span = Span::start(telemetryCtx, span_names::kTest1);
+        span.setStatus(Status{ErrorCodes::InternalError, "failed"});
+    }
+
+    std::vector<CapturedSpan> spans = capturer.getSpans(span_names::kTest1);
+    EXPECT_THAT(spans, ElementsAre(HasError()));
+}
+
+TEST_F(ErrorMatcherTest, DoesNotMatchSpanWithoutError) {
+    auto telemetryCtx = Span::createTelemetryContext();
+    {
+        Span span = Span::start(telemetryCtx, span_names::kTest1);
+    }
+
+    std::vector<CapturedSpan> spans = capturer.getSpans(span_names::kTest1);
+    EXPECT_THAT(spans, ElementsAre(Not(HasError())));
+}
+
+TEST_F(ErrorMatcherTest, DoesNotMatchSpanWithOkStatus) {
+    auto telemetryCtx = Span::createTelemetryContext();
+    {
+        Span span = Span::start(telemetryCtx, span_names::kTest1);
+        span.setStatus(Status::OK());
+    }
+
+    std::vector<CapturedSpan> spans = capturer.getSpans(span_names::kTest1);
+    EXPECT_THAT(spans, ElementsAre(Not(HasError())));
 }
 
 using ParentMatcherTest = OtelTracesCapturerTest;
