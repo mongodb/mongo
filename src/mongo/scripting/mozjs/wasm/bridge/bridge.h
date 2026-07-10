@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/config.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/scripting/mozjs/wasm/bridge/wasm_helpers.h"
 
@@ -159,6 +160,15 @@ public:
     void kill(ErrorCodes::Error reason = ErrorCodes::Interrupted);
 
     bool isKillPending() const;
+
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
+    // Test-only: bumps the shared engine epoch so this bridge's epoch-deadline callback fires.
+    // Paired with the 'wasmBridgeInjectEpochTrap' failpoint, this provokes a genuine non-kill
+    // wasmtime trap originating inside the guest, so the non-memory trap classification in
+    // _throwAfterTrap() can be tested (a real SpiderMonkey MOZ_CRASH is not deterministically
+    // reachable from guest JS). Compiled out of production (non-debug) builds.
+    void _testTriggerEpochInterrupt();
+#endif
 
     uint64_t createFunction(std::string_view source);
 
@@ -302,9 +312,14 @@ private:
     // until kill() is first called; never reset afterward -- a killed bridge is excluded from
     // the idle-bridge reuse pool via isHealthy(), so it is never reused and never needs clearing.
     Atomic<ErrorCodes::Error> _killReason{ErrorCodes::OK};
-    // Watermark updated by getMemoryStats(); read by _throwAfterTrap() to identify store-limiter
-    // OOM traps even when Wasmtime's trap message doesn't explicitly mention the store limit.
-    Atomic<uint64_t> _lastKnownLinearMemoryBytes{0};
+    // Set to true by the ResourceLimiter callback when memory.grow is denied.
+    // Read in _throwAfterTrap() to classify the resulting unreachable trap as
+    // ExceededMemoryLimit without needing string heuristics. Latched by the
+    // callback and cleared on reuse in resetEngine()/resetRealm().
+    Atomic<bool> _growDeniedByLimiter{false};
+    // Last size (bytes) requested of the limiter callback; logged on a trap so an
+    // OOM can be read against _storeLimitMB even without a live memory watermark.
+    Atomic<uint64_t> _growDeniedDesiredBytes{0};
     uint32_t _jsHeapLimitMB{0};
     uint32_t _storeLimitMB{0};
     bool _javascriptProtection{false};
@@ -316,6 +331,13 @@ private:
     // Each bridge owns its own _store and _instance for execution isolation.
     std::shared_ptr<WasmEngineContext> _ctx;
 
+    // WARNING: _store MUST be declared after every field its ResourceLimiter callback
+    // reads (_storeLimitMB, _growDeniedByLimiter, _growDeniedDesiredBytes). The callback
+    // captures `this`; members are destroyed in reverse declaration order, so _store (and
+    // the callback it owns) must tear down before those fields. Moving _store above them
+    // would create a use-after-free during destruction with no compiler diagnostic. An
+    // offsetof-based static_assert cannot guard this -- MozJSWasmBridge is not
+    // standard-layout, so offsetof would trip -Winvalid-offsetof under -Werror.
     boost::optional<wt::Store> _store;
     boost::optional<wc::Instance> _instance;
 

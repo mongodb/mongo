@@ -1,0 +1,28 @@
+--- a/include/wasmtime/store.hh
++++ b/include/wasmtime/store.hh
+@@ -228,6 +228,24 @@ public:
+     wasmtime_store_limiter(ptr.get(), memory_size, table_elements, instances,
+                            tables, memories);
+   }
+ 
++  /// \brief Registers a callback-based resource limiter on this store.
++  ///
++  /// The \p memory_growing callback is invoked before every `memory.grow`
++  /// instruction; returning false denies the grow (causes `memory.grow` to
++  /// return -1 in the guest).  Mutually exclusive with `limiter()` — the last
++  /// call wins.
++  ///
++  /// \p data is passed unchanged to every callback and to \p finalizer.
++  /// The caller must keep \p data alive for the lifetime of this store.
++  /// \p finalizer may be null.
++  void resource_limiter(
++      wasmtime_memory_growing_cb memory_growing_cb,
++      void *data,
++      void (*finalizer)(void *) = nullptr) {
++    wasmtime_store_resource_limiter(ptr.get(), memory_growing_cb, data,
++                                    finalizer);
++  }
++
+   /// \brief Configures epoch deadline callback to C function.
+   ///
+   /// This function configures a store-local callback function that will be

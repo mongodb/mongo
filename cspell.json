@@ -118,6 +118,7 @@
         "valgrind",
         "varname",
         "vartype",
+        "wasmtime",
         "wiredtiger",
         "WTCHKPT",
         "WTCMPCT",

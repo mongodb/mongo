@@ -1,5 +1,5 @@
 {
-  "checksum": "b01cc541b36e01fc3bdb689603bcc4967bc3f75d36e39e5f2ff96e7d45f306df",
+  "checksum": "716b69ac49cc99f9d8e6be8fd1927249709a94bc8d290cb82893271f8e26962d",
   "crates": {
     "addr2line 0.26.1": {
       "name": "addr2line",
@@ -17149,13 +17149,13 @@
         "Http": {
           "url": "https://static.crates.io/crates/wasmtime/44.0.1/download",
           "sha256": "372db8bbad8ec962038101f75ab2c3ffcd18797d7d3ae877a58ab9873cd0c4bd",
+          "patch_args": [
+            "-p1"
+          ],
           "patches": [
             "@@//bazel/wasmtime:val_bytes_fast_path.patch",
             "@@//bazel/wasmtime:val_bytes_lift_fast_path.patch",
             "@@//bazel/wasmtime:val_bytes_wave_fast_path.patch"
-          ],
-          "patch_args": [
-            "-p1"
           ]
         }
       },
@@ -17548,8 +17548,11 @@
           ],
           "patches": [
             "@@//bazel/wasmtime:store_h.patch",
+            "@@//bazel/wasmtime:store_h_resource_limiter.patch",
             "@@//bazel/wasmtime:store_hh.patch",
+            "@@//bazel/wasmtime:store_hh_resource_limiter.patch",
             "@@//bazel/wasmtime:store_rs.patch",
+            "@@//bazel/wasmtime:store_rs_resource_limiter.patch",
             "@@//bazel/wasmtime:val_raw_u8_list_h.patch",
             "@@//bazel/wasmtime:val_raw_u8_list_rs.patch"
           ]
@@ -20196,11 +20199,11 @@
         "Http": {
           "url": "https://static.crates.io/crates/wasmtime-wast/44.0.1/download",
           "sha256": "5db969fb0fbd4c3e4acfa73f768b2530b6cec43180902934599b1668480094c2",
-          "patches": [
-            "@@//bazel/wasmtime:val_bytes_wast_fast_path.patch"
-          ],
           "patch_args": [
             "-p1"
+          ],
+          "patches": [
+            "@@//bazel/wasmtime:val_bytes_wast_fast_path.patch"
           ]
         }
       },

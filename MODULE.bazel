@@ -403,8 +403,11 @@ crate.annotation(
     patch_args = ["-p1"],
     patches = [
         "//bazel/wasmtime:store_rs.patch",
+        "//bazel/wasmtime:store_rs_resource_limiter.patch",
         "//bazel/wasmtime:store_h.patch",
+        "//bazel/wasmtime:store_h_resource_limiter.patch",
         "//bazel/wasmtime:store_hh.patch",
+        "//bazel/wasmtime:store_hh_resource_limiter.patch",
         "//bazel/wasmtime:val_raw_u8_list_h.patch",
         "//bazel/wasmtime:val_raw_u8_list_rs.patch",
     ],

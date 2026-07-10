@@ -1,0 +1,121 @@
+--- a/src/store.rs
++++ b/src/store.rs
+@@ -1,8 +1,8 @@
+ use crate::{ForeignData, wasm_engine_t, wasmtime_error_t, wasmtime_val_t};
+ use std::cell::UnsafeCell;
+ use std::ffi::c_void;
+ use std::sync::Arc;
+ use wasmtime::{
+     AsContext, AsContextMut, Caller, Store, StoreContext, StoreContextMut, StoreLimits,
+-    StoreLimitsBuilder, UpdateDeadline, Val,
++    StoreLimitsBuilder, ResourceLimiter, UpdateDeadline, Val,
+ };
+@@ -84,3 +85,7 @@ pub struct WasmtimeStoreData {
+     /// Limits for the store.
+     pub store_limits: StoreLimits,
++
++    /// Optional callback-based resource limiter; set by
++    /// `wasmtime_store_resource_limiter`.  Mutually exclusive with `store_limits`.
++    pub callback_limiter: Option<CallbackLimiter>,
+ }
+@@ -127,6 +132,7 @@ pub extern "C" fn wasmtime_store_new(
+                 hostcall_val_storage: Vec::new(),
+                 wasm_val_storage: Vec::new(),
+                 store_limits: StoreLimits::default(),
++                callback_limiter: None,
+             },
+         ),
+     })
+@@ -212,6 +218,92 @@ pub extern "C" fn wasmtime_store_limiter(
+     store.store.limiter(|data| &mut data.store_limits);
+ }
+ 
++/// A [`ResourceLimiter`] that delegates `memory_growing` to a C callback.
++///
++/// The callback signature is:
++///   `bool callback(size_t current, size_t desired, int64_t maximum, void *data)`
++/// where `maximum` is the hard ceiling declared by the WASM module, or -1 if
++/// unbounded.  Returning `false` causes `memory.grow` to return -1 (failed).
++pub struct CallbackLimiter {
++    memory_growing_cb: extern "C" fn(usize, usize, i64, *mut c_void) -> bool,
++    data: *mut c_void,
++    finalizer: Option<extern "C" fn(*mut c_void)>,
++}
++
++// SAFETY: The C API contract requires the caller to ensure thread safety.
++// MozJSWasmBridge is single-threaded per store, matching Wasmtime's requirement
++// that a Store is accessed from at most one thread at a time.
++unsafe impl Send for CallbackLimiter {}
++unsafe impl Sync for CallbackLimiter {}
++
++impl Drop for CallbackLimiter {
++    fn drop(&mut self) {
++        if let Some(f) = self.finalizer {
++            f(self.data);
++        }
++    }
++}
++
++impl ResourceLimiter for CallbackLimiter {
++    fn memory_growing(
++        &mut self,
++        current: usize,
++        desired: usize,
++        maximum: Option<usize>,
++    ) -> wasmtime::Result<bool> {
++        let max = maximum.map(|m| m as i64).unwrap_or(-1i64);
++        Ok((self.memory_growing_cb)(current, desired, max, self.data))
++    }
++
++    fn table_growing(
++        &mut self,
++        _current: usize,
++        _desired: usize,
++        _maximum: Option<usize>,
++    ) -> wasmtime::Result<bool> {
++        Ok(true)
++    }
++}
++
++/// Registers a callback-based resource limiter on the store.
++///
++/// The `memory_growing_cb` callback is invoked before every `memory.grow`
++/// instruction; returning `false` denies the grow (causes `memory.grow` to
++/// return -1 in the guest).  This is mutually exclusive with
++/// `wasmtime_store_limiter` — calling both is allowed but the last call wins.
++///
++/// The `finalizer` is called when the store is dropped (may be NULL).
++/// The `data` pointer is passed to every callback invocation and to the
++/// finalizer; the caller retains ownership and must keep it alive for the
++/// lifetime of the store.
++///
++/// MUTUAL EXCLUSION: a Store has a single limiter closure. This function and
++/// `wasmtime_store_limiter` both overwrite it ("last call wins") and neither
++/// clears the other's backing state, so callers must use exactly one limiter
++/// API per store for its whole lifetime. Calling `wasmtime_store_limiter`
++/// after this reverts to the numeric `StoreLimits` and leaves
++/// `callback_limiter` set but unused; the reverse leaves the numeric limits
++/// unused. MongoDB's WASM bridge only ever calls this one.
++#[unsafe(no_mangle)]
++pub extern "C" fn wasmtime_store_resource_limiter(
++    store: &mut wasmtime_store_t,
++    memory_growing_cb: extern "C" fn(usize, usize, i64, *mut c_void) -> bool,
++    data: *mut c_void,
++    finalizer: Option<extern "C" fn(*mut c_void)>,
++) {
++    store.store.data_mut().callback_limiter = Some(CallbackLimiter {
++        memory_growing_cb,
++        data,
++        finalizer,
++    });
++    // SAFETY of unwrap(): the closure runs later, during execution, but reads the
++    // `callback_limiter` field just set to `Some` immediately above and never cleared
++    // by this API (see MUTUAL EXCLUSION). A `None` here would panic and abort across
++    // the extern "C" frame; that is unreachable as long as the numeric
++    // `wasmtime_store_limiter` is never mixed in on the same store.
++    store.store.limiter(|data| data.callback_limiter.as_mut().unwrap());
++}
++
+ #[unsafe(no_mangle)]
+ pub extern "C" fn wasmtime_context_get_data(store: WasmtimeStoreContext<'_>) -> *mut c_void {
+     store.data().foreign.data

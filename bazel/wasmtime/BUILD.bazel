@@ -1,7 +1,10 @@
 exports_files([
     "store_rs.patch",
+    "store_rs_resource_limiter.patch",
     "store_h.patch",
+    "store_h_resource_limiter.patch",
     "store_hh.patch",
+    "store_hh_resource_limiter.patch",
     "val_raw_u8_list_h.patch",
     "val_raw_u8_list_rs.patch",
     "val_bytes_fast_path.patch",

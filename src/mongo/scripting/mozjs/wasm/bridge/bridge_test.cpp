@@ -53,6 +53,7 @@
 #include "mongo/scripting/mozjs/wasm/bridge/wasm_helpers.h"
 #include "mongo/scripting/mozjs/wasm/embedded_wasm_resource.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point.h"
 
 #include <atomic>
 #include <chrono>
@@ -2641,6 +2642,39 @@ TEST_F(WasmMozJSBridgeTest, StoreLimiterTrapClassifiedAsExceededMemoryLimit) {
 }
 
 #endif  // !__has_feature(thread_sanitizer)
+
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
+// Core regression for this change: a trap that is NOT caused by a denied memory.grow (e.g. a
+// SpiderMonkey MOZ_ASSERT lowering to `unreachable`) must surface as the generic wasmtime trap
+// code, NOT ExceededMemoryLimit. Previously any unreachable trap was blanket-classified as OOM,
+// masking real internal crashes.
+//
+// Such a trap cannot be provoked deterministically from guest JS, so the
+// 'wasmBridgeInjectEpochTrap' failpoint makes this bridge's epoch-deadline callback return an
+// error, producing a genuine non-kill wasmtime trap inside the running guest. The epoch deadline is
+// armed at current+1 (see the constructor) and invokeFunction never re-arms it, so bumping the
+// epoch once *before* the invoke leaves the deadline already reached: the first epoch check inside
+// the guest fires the callback synchronously -- no second thread needed. The trap must surface as
+// kWasmtimeTrapErrorCode with no kill pending and memory.grow never denied. The complementary
+// memory-limit case (a real OOM classified as ExceededMemoryLimit) is covered by
+// StoreLimiterTrapClassifiedAsExceededMemoryLimit. Debug-build only: the hook does not exist in
+// production binaries.
+TEST_F(WasmMozJSBridgeTest, NonMemoryTrapClassifiedAsGenericTrapCode) {
+    auto fn = createFunction("function() { return 1; }");
+
+    FailPointEnableBlock injectTrap("wasmBridgeInjectEpochTrap");
+    // Pass the epoch deadline before invoking so the guest's first epoch check traps immediately.
+    _bridge->_testTriggerEpochInterrupt();
+
+    ASSERT_THROWS_CODE(
+        (void)_bridge->invokeFunction(fn, wasm_helpers::convertBsonToWcVal(BSONObj())),
+        DBException,
+        ErrorCodes::Error{kWasmtimeTrapErrorCode});
+    ASSERT_TRUE(_bridge->hasTrapped());
+    // The store is in a trapped state; discard without calling shutdown.
+    _bridge.reset();
+}
+#endif
 
 TEST_F(WasmMozJSBridgeTest, StoreLimiterAllowsWithinLimit) {
     // Shut down the default bridge and create one with an explicit memory limit.
