@@ -176,10 +176,7 @@ void HashAggBaseStage<Derived>::spill() {
         return;
     }
 
-    uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
-            "Exceeded memory limit for $group, but didn't allow external spilling;"
-            " pass allowDiskUse:true to opt in",
-            _allowDiskUse);
+    _memoryTracker.value().assertCanSpill(_allowDiskUse, _commonStats.stageType);
 
     // Ensure there is sufficient disk space for spilling
     uassertStatusOK(ensureSufficientDiskSpaceForSpilling(

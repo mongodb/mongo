@@ -101,10 +101,7 @@ void SpillableDocumentMapImpl::spillToDisk() {
 }
 
 void SpillableDocumentMapImpl::initDiskMap() {
-    uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
-            "Exceeded memory limit and can't spill to disk. Set allowDiskUse: true to allow "
-            "spilling",
-            _expCtx->getAllowDiskUse());
+    _memTracker.assertCanSpill(_expCtx->getAllowDiskUse(), "SPILLABLE_DOCUMENT_MAP");
 
     _diskMap = _expCtx->getMongoProcessInterface()->createSpillTable(_expCtx, KeyFormat::String);
     _diskMapSize = 0;

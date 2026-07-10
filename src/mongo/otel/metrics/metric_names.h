@@ -564,6 +564,26 @@ public:
     static constexpr MetricName kDocumentReturned =
         MetricNameMaker::make("mongodb.serverStatus.metrics.document.returned");
 
+    // Memory tracking — system-wide high-water mark of the largest amount of memory (in bytes) ever
+    // tracked for a single operation since process startup. Mirrors the serverStatus value at
+    // metrics.query.peakMemoryUsageOperation.
+    static constexpr MetricName kQueryPeakMemoryUsageOperation =
+        MetricNameMaker::make("serverStatus.metrics.query.peakMemoryUsageOperation");
+
+    // Memory tracking — current configured value of the
+    // internalQueryMaxMemoryUsageBytesPerOperation server parameter, i.e. the operation-wide cap
+    // (in bytes) on memory-tracked query stages. Mirrors the serverStatus value at
+    // metrics.query.configuredMaxMemoryUsageBytesPerOperation.
+    static constexpr MetricName kQueryConfiguredMaxMemoryUsageBytesPerOperation =
+        MetricNameMaker::make(
+            "serverStatus.metrics.query.configuredMaxMemoryUsageBytesPerOperation");
+
+    // Memory tracking — number of times a query operation was failed (via an ExceededMemoryLimit
+    // error) because it exceeded a memory-tracking limit. Mirrors the serverStatus value at
+    // metrics.query.operationsFailedDueToMemoryLimit.
+    static constexpr MetricName kQueryOperationsFailedDueToMemoryLimit =
+        MetricNameMaker::make("serverStatus.metrics.query.operationsFailedDueToMemoryLimit");
+
     // Plan cache counters — classic engine
     static constexpr MetricName kPlanCacheClassicHits =
         MetricNameMaker::make("mongodb.serverStatus.metrics.query.planCache.classic.hits");

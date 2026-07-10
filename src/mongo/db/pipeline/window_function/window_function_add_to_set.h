@@ -46,6 +46,8 @@ namespace mongo {
 
 class WindowFunctionAddToSet final : public WindowFunctionState {
 public:
+    static constexpr auto kName = "$addToSet"sv;
+
     static inline const Value kDefault = Value{std::vector<Value>()};
 
     static std::unique_ptr<WindowFunctionState> create(ExpressionContext* const expCtx) {
@@ -61,12 +63,7 @@ public:
     void add(Value value) override {
         _values.emplace(SimpleMemoryUsageToken{value.getApproximateSize(), &_memUsageTracker},
                         std::move(value));
-        uassert(ErrorCodes::ExceededMemoryLimit,
-                str::stream() << "$addToSet used too much memory and cannot spill to disk. Used: "
-                              << _memUsageTracker.inUseTrackedMemoryBytes()
-                              << " bytes. Memory limit: "
-                              << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
-                _memUsageTracker.withinMemoryLimit());
+        _memUsageTracker.assertWithinMemoryLimit(kName);
     }
 
     /**

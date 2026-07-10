@@ -93,6 +93,12 @@ public:
     void assertWithinMemoryLimit(std::string_view name, std::string_view stageName = {}) const;
 
     /**
+     * Checks that the caller can spill to disk if necessary.
+     * Throws QueryExceededMemoryLimitNoDiskUseAllowed if spilling to disk is not allowed.
+     */
+    void assertCanSpill(bool canSpill, std::string_view name = {}) const;
+
+    /**
      * Returns a new SimpleMemoryUsageTracker. The copy constructor for this class is purposefully
      * deleted - use this method instead. Note that the members _peakTrackedMemoryBytes and
      * _inUseTrackedMemoryBytes will be initialized to zero.
@@ -223,6 +229,8 @@ public:
     bool allowDiskUse() const {
         return _allowDiskUse;
     }
+
+    void assertCanSpill(std::string_view name) const;
 
     int64_t maxAllowedMemoryUsageBytes() const {
         return _baseTracker.maxAllowedMemoryUsageBytes();

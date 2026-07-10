@@ -222,6 +222,33 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(
+    name = "query_memory_metrics",
+    srcs = ["query_memory_metrics.cpp"],
+    hdrs = ["query_memory_metrics.h"],
+    deps = [
+        "//src/mongo/db:cluster_role",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+        "//src/mongo/util:periodic_runner",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "query_memory_metrics_test",
+    srcs = ["query_memory_metrics_test.cpp"],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":query_memory_metrics",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/db/shard_role:service_context_non_d",
+        "//src/mongo/otel/metrics:metrics_test_util",
+    ],
+)
+
+mongo_cc_library(
     name = "mongodb_build_info_metrics",
     srcs = ["mongodb_build_info_metrics.cpp"],
     hdrs = ["mongodb_build_info_metrics.h"],
@@ -268,6 +295,7 @@ mongo_cc_library(
         ":mongodb_build_info_metrics",
         ":observable_mutex_metrics",
         ":process_health_metrics",
+        ":query_memory_metrics",
         ":system_health_metrics",
         ":system_mount_metrics",
         "//src/mongo/db/admission:ingress_request_rate_limiter",

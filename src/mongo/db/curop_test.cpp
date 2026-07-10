@@ -36,12 +36,14 @@
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/admission/execution_control/execution_control_parameters_gen.h"
 #include "mongo/db/admission/execution_control/ticketing_system.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/operation_context_options_gen.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_stats/mock_key.h"
 #include "mongo/db/query/query_stats/plan_shape_counters/plan_shape_counts.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/death_test.h"
@@ -887,6 +889,66 @@ TEST(CurOpTest, ShouldUpdateMemoryStats) {
     curop->setMemoryTrackingStats(31 /*inUseTrackedMemoryBytes*/, 15 /*peakTrackedMemoryBytes*/);
     ASSERT_EQ(31, curop->getInUseTrackedMemoryBytes());
     ASSERT_EQ(20, curop->getPeakTrackedMemoryBytes());
+}
+
+TEST(CurOpTest, SystemWidePeakMemoryUsageOperationMetric) {
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+
+    // Reads the system-wide metrics.query.peakMemoryUsageOperation value out of the serverStatus
+    // metric tree. We navigate to and serialize only this one metric (rather than appending the
+    // entire tree) since other registered metrics may require a running global ServiceContext.
+    // Returns none when the metric is absent, e.g. on build variants without OpenTelemetry.
+    auto readSystemPeak = []() -> boost::optional<long long> {
+        const MetricTree::ChildMap* children = &globalMetricTreeSet()[ClusterRole::None].children();
+        const MetricTree::TreeNode* leaf = nullptr;
+        for (std::string_view component : {"metrics"sv, "query"sv, "peakMemoryUsageOperation"sv}) {
+            auto it = children->find(component);
+            if (it == children->end()) {
+                return boost::none;
+            }
+            if (component == "peakMemoryUsageOperation"sv) {
+                leaf = &it->second;
+                break;
+            }
+            if (!it->second.isSubtree()) {
+                return boost::none;
+            }
+            children = &it->second.getSubtree()->children();
+        }
+        if (!leaf || leaf->isSubtree()) {
+            return boost::none;
+        }
+
+        BSONObjBuilder bob;
+        leaf->getMetric()->appendTo(bob, "peakMemoryUsageOperation");
+        BSONObj obj = bob.obj();
+        BSONElement el = obj.getField("peakMemoryUsageOperation");
+        if (el.eoo()) {
+            return boost::none;
+        }
+        return el.Long();
+    };
+
+    auto before = readSystemPeak();
+    if (!before) {
+        // serverStatus surfacing of OpenTelemetry metrics is unavailable on this build variant.
+        return;
+    }
+
+    // The metric is process-wide and monotonically non-decreasing, so it may already reflect peaks
+    // observed by other operations/tests. Establish a new maximum well above anything else sets.
+    const int64_t newPeak = *before + (1LL << 30);
+    curop->setMemoryTrackingStats(1 /*inUseTrackedMemoryBytes*/,
+                                  newPeak /*peakTrackedMemoryBytes*/);
+    ASSERT_EQ(*readSystemPeak(), newPeak);
+
+    // A smaller per-operation peak must not lower the system-wide high-water mark.
+    curop->setMemoryTrackingStats(1 /*inUseTrackedMemoryBytes*/,
+                                  newPeak - 100 /*peakTrackedMemoryBytes*/);
+    ASSERT_EQ(*readSystemPeak(), newPeak);
 }
 
 TEST(CurOpTest, CanReadMemoryStatsWithoutFeatureFlag) {

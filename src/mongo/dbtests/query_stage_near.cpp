@@ -337,7 +337,8 @@ TEST_F(QueryStageNearTest, MemoryLimitExceeded) {
     MockNearStage nearStage(_expCtx.get(), &workingSet, *_coll, _mockGeoIndex);
     nearStage.addInterval({BSON("distance" << 1.0)}, 0.0, 2.0);
 
-    ASSERT_THROWS_CODE(advanceStage(&nearStage, &workingSet), DBException, 12227900);
+    ASSERT_THROWS_CODE(
+        advanceStage(&nearStage, &workingSet), DBException, ErrorCodes::ExceededMemoryLimit);
 }
 
 }  // namespace

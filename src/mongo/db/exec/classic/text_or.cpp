@@ -447,10 +447,7 @@ void TextOrStage::doForceSpill() {
 }
 
 void TextOrStage::initSorter() {
-    uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
-            "Exceeded memory limit for TEXT_OR, but didn't allow external sort."
-            " Pass allowDiskUse:true to opt in.",
-            expCtx()->getAllowDiskUse());
+    _memoryTracker.assertCanSpill(expCtx()->getAllowDiskUse(), "TEXT_OR");
 
     // We disable automatic spilling inside Sorter because we manually spill after adding the whole
     // batch to the _sorter.

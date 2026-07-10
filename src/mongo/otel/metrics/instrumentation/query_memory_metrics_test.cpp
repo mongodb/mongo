@@ -27,42 +27,59 @@
  *    it in the license file.
  */
 
-#include "mongo/otel/metrics/instrumentation/metrics_installer.h"
-
-#include "mongo/db/admission/ingress_request_rate_limiter.h"
-#include "mongo/otel/metrics/instrumentation/connections_metrics.h"
-#include "mongo/otel/metrics/instrumentation/disk_metrics.h"
-#include "mongo/otel/metrics/instrumentation/global_lock_metrics.h"
-#include "mongo/otel/metrics/instrumentation/index_build_metrics.h"
-#include "mongo/otel/metrics/instrumentation/mongodb_build_info_metrics.h"
-#include "mongo/otel/metrics/instrumentation/observable_mutex_metrics.h"
-#include "mongo/otel/metrics/instrumentation/process_health_metrics.h"
 #include "mongo/otel/metrics/instrumentation/query_memory_metrics.h"
-#include "mongo/otel/metrics/instrumentation/system_health_metrics.h"
-#include "mongo/otel/metrics/instrumentation/system_mount_metrics.h"
+
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
+#include "mongo/unittest/unittest.h"
+
+#include <cstdint>
+#include <limits>
 
 namespace mongo {
+namespace {
 
-void installCommonOtelMetrics(ServiceContext* svcCtx) {
-    installSystemMountOtelMetrics(svcCtx);
-    installDiskOtelMetrics(svcCtx);
-    installProcessHealthOtelMetrics(svcCtx);
-    installSystemHealthOtelMetrics(svcCtx);
-    installObservableMutexMetrics(svcCtx);
-    installMongoDBBuildInfoMetrics();
-    installQueryMemoryOtelMetrics(svcCtx);
-    admission::IngressRequestRateLimiter::get(svcCtx).installOtelMetrics(svcCtx);
+using otel::metrics::MetricNames;
+using otel::metrics::OtelMetricsCapturer;
+
+class QueryMemoryOtelMetricsTest : public unittest::Test {
+protected:
+    void setUp() override {
+        if (!OtelMetricsCapturer::canReadMetrics()) {
+            GTEST_SKIP() << "Skipping test: OTel metrics unavailable on this platform";
+        }
+    }
+
+    OtelMetricsCapturer _capturer;
+    QueryMemoryMetrics _metrics;
+};
+
+TEST_F(QueryMemoryOtelMetricsTest, UpdateSetsGauge) {
+    _metrics.update(1024 * 1024);
+
+    ASSERT_EQ(
+        1024 * 1024,
+        _capturer.readInt64Gauge(MetricNames::kQueryConfiguredMaxMemoryUsageBytesPerOperation));
 }
 
-void installMongodOtelMetrics(ServiceContext* svcCtx) {
-    installCommonOtelMetrics(svcCtx);
-    installGlobalLockOtelMetrics(svcCtx);
-    installIndexBuildOtelMetrics(svcCtx);
-    installConnectionsOtelMetrics(svcCtx);
+TEST_F(QueryMemoryOtelMetricsTest, GaugeTracksLatestValue) {
+    _metrics.update(5000);
+    _metrics.update(9000);
+
+    ASSERT_EQ(
+        9000,
+        _capturer.readInt64Gauge(MetricNames::kQueryConfiguredMaxMemoryUsageBytesPerOperation));
 }
 
-void installMongosOtelMetrics(ServiceContext* svcCtx) {
-    installCommonOtelMetrics(svcCtx);
+TEST_F(QueryMemoryOtelMetricsTest, GaugeReportsUnboundedDefault) {
+    // The server parameter defaults to std::numeric_limits<long long>::max(), which represents an
+    // effectively unbounded operation-wide memory limit.
+    _metrics.update(std::numeric_limits<int64_t>::max());
+
+    ASSERT_EQ(
+        std::numeric_limits<int64_t>::max(),
+        _capturer.readInt64Gauge(MetricNames::kQueryConfiguredMaxMemoryUsageBytesPerOperation));
 }
 
+}  // namespace
 }  // namespace mongo

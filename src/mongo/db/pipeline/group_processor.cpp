@@ -207,10 +207,7 @@ void GroupProcessor::spill() {
         return;
     }
 
-    uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
-            "Exceeded memory limit for $group, but didn't allow external sort."
-            " Pass allowDiskUse:true to opt in.",
-            _memoryTracker.allowDiskUse());
+    _memoryTracker.assertCanSpill("$group");
 
     // Ensure there is sufficient disk space for spilling
     uassertStatusOK(ensureSufficientDiskSpaceForSpilling(

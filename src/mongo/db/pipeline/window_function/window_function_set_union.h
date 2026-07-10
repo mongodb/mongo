@@ -37,6 +37,7 @@ namespace mongo {
 
 class WindowFunctionSetUnion final : public WindowFunctionState {
 public:
+    static constexpr auto kName = "$setUnion"sv;
     static inline const Value kDefault = Value{std::vector<Value>()};
 
     static std::unique_ptr<WindowFunctionState> create(ExpressionContext* expCtx) {
@@ -63,13 +64,7 @@ public:
         for (const auto& val : value.getArray()) {
             _values.emplace(SimpleMemoryUsageToken{val.getApproximateSize(), &_memUsageTracker},
                             val);
-            uassert(ErrorCodes::ExceededMemoryLimit,
-                    str::stream() << "$setUnion used too much memory and spilling to disk will not "
-                                     "reduce memory usage. Used: "
-                                  << _memUsageTracker.inUseTrackedMemoryBytes()
-                                  << "bytes. Memory limit: "
-                                  << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
-                    _memUsageTracker.withinMemoryLimit());
+            _memUsageTracker.assertWithinMemoryLimit(kName);
         }
     }
 

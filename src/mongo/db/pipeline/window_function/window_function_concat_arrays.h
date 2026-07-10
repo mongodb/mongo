@@ -38,6 +38,7 @@ namespace mongo {
 
 class WindowFunctionConcatArrays final : public WindowFunctionState {
 public:
+    static constexpr auto kName = "$concatArrays"sv;
     static inline const Value kDefaultEmptyArray = Value{std::vector<Value>()};
 
     static std::unique_ptr<WindowFunctionState> create(ExpressionContext* const expCtx) {
@@ -63,13 +64,7 @@ public:
         _count += value.getArrayLength();
         _values.emplace_back(SimpleMemoryUsageToken{value.getApproximateSize(), &_memUsageTracker},
                              std::move(value));
-        uassert(ErrorCodes::ExceededMemoryLimit,
-                str::stream() << "$concatArrays used too much memory and spilling to disk will not "
-                                 "reduce memory usage. Used: "
-                              << _memUsageTracker.inUseTrackedMemoryBytes()
-                              << " bytes. Memory limit: "
-                              << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
-                _memUsageTracker.withinMemoryLimit());
+        _memUsageTracker.assertWithinMemoryLimit(kName);
     }
 
     void remove(Value value) override {

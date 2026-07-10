@@ -89,10 +89,7 @@ std::unique_ptr<PlanStageStats> SpoolStage::getStats() {
 }
 
 void SpoolStage::spill() {
-    uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
-            "Exceeded memory limit for spool, but didn't allow external sort. Set "
-            "allowDiskUseByDefault:true to opt in.",
-            _memTracker.allowDiskUse());
+    _memTracker.assertCanSpill("spool");
     uassert(7443700,
             "Exceeded disk use limit for spool",
             _specificStats.spillingStats.getSpilledDataStorageSize() <

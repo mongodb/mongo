@@ -79,11 +79,7 @@ void AccumulatorConcatArrays::processInternal(const Value& input, bool merging) 
 void AccumulatorConcatArrays::addValuesFromArray(const Value& values) {
     _memUsageTracker.add(values.getApproximateSize());
 
-    uassert(ErrorCodes::ExceededMemoryLimit,
-            str::stream() << "$concatArrays used too much memory and spilling to disk will not "
-                             "reduce memory usage. Used: "
-                          << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
-            _memUsageTracker.withinMemoryLimit());
+    checkMemUsage();
 
     _array.insert(_array.end(), values.getArray().begin(), values.getArray().end());
 }

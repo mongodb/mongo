@@ -64,10 +64,7 @@ void SpillableDeque::addDocument(Document input) {
     _memCache.emplace_back(MemoryUsageToken{input.getApproximateSize(), &_memTracker},
                            std::move(input));
     if (!_memTracker.withinMemoryLimit()) {
-        uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
-                "Exceeded memory limit and can't spill to disk. Set allowDiskUse: true to allow "
-                "spilling",
-                _expCtx->getAllowDiskUse());
+        _memTracker.assertCanSpill(_expCtx->getAllowDiskUse(), "SPILLABLE_DEQUE");
         spillToDisk();
     }
     ++_nextIndex;

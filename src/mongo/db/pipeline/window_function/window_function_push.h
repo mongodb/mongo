@@ -47,6 +47,8 @@ namespace mongo {
 
 class WindowFunctionPush final : public WindowFunctionState {
 public:
+    static constexpr auto kName = "$push"sv;
+
     using ValueListConstIterator = std::list<Value>::const_iterator;
 
     static inline const Value kDefault = Value{std::vector<Value>()};
@@ -66,12 +68,7 @@ public:
         }
         _values.emplace_back(SimpleMemoryUsageToken{value.getApproximateSize(), &_memUsageTracker},
                              std::move(value));
-        uassert(ErrorCodes::ExceededMemoryLimit,
-                str::stream() << "$push used too much memory and cannot spill to disk. Used: "
-                              << _memUsageTracker.inUseTrackedMemoryBytes()
-                              << "bytes. Memory limit: "
-                              << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
-                _memUsageTracker.withinMemoryLimit());
+        _memUsageTracker.assertWithinMemoryLimit(kName);
     }
 
     /**

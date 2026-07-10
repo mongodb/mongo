@@ -73,7 +73,7 @@ runWithParamsAllNonConfigNodes(db, {internalNearStageMaxMemoryBytes: spillingLim
     } else {
         assert.commandFailedWithCode(
             db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}),
-            [12227900],
+            [ErrorCodes.ExceededMemoryLimit],
         );
     }
 });
@@ -84,7 +84,7 @@ if (isSpillingEnabled) {
     runWithParamsAllNonConfigNodes(db, {internalNearStageMaxMemoryBytes: 1000}, () => {
         assert.commandFailedWithCode(
             db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}),
-            [12227900],
+            [ErrorCodes.ExceededMemoryLimit],
         );
     });
 }

@@ -31,13 +31,56 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_capture.h"
 #include "mongo/unittest/unittest.h"
 
+#include <boost/optional.hpp>
+
 namespace mongo {
 namespace {
+
+using namespace std::literals::string_view_literals;
+
+// Reads the process-wide metrics.query.operationsFailedDueToMemoryLimit counter out of the
+// serverStatus metric tree. We navigate to and serialize only this one metric (rather than
+// appending the entire tree) since other registered metrics may require a running global
+// ServiceContext. Returns none when the metric is absent, e.g. on build variants without
+// OpenTelemetry.
+boost::optional<long long> readOperationsFailedDueToMemoryLimit() {
+    const MetricTree::ChildMap* children = &globalMetricTreeSet()[ClusterRole::None].children();
+    const MetricTree::TreeNode* leaf = nullptr;
+    for (std::string_view component :
+         {"metrics"sv, "query"sv, "operationsFailedDueToMemoryLimit"sv}) {
+        auto it = children->find(component);
+        if (it == children->end()) {
+            return boost::none;
+        }
+        if (component == "operationsFailedDueToMemoryLimit"sv) {
+            leaf = &it->second;
+            break;
+        }
+        if (!it->second.isSubtree()) {
+            return boost::none;
+        }
+        children = &it->second.getSubtree()->children();
+    }
+    if (!leaf || leaf->isSubtree()) {
+        return boost::none;
+    }
+
+    BSONObjBuilder bob;
+    leaf->getMetric()->appendTo(bob, "operationsFailedDueToMemoryLimit");
+    BSONObj obj = bob.obj();
+    BSONElement el = obj.getField("operationsFailedDueToMemoryLimit");
+    if (el.eoo()) {
+        return boost::none;
+    }
+    return el.Long();
+}
 
 class MemoryUsageTrackerTest : public unittest::Test {
 public:
@@ -743,6 +786,39 @@ TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitDoesNotLogWhenUnderLim
     ASSERT_DOES_NOT_THROW(tracker.assertWithinMemoryLimit("$testExpr", "$group"));
     logs.stop();
     ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 12932700)), 0);
+}
+
+TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitIncrementsFailureMetricWhenOverLimit) {
+    auto before = readOperationsFailedDueToMemoryLimit();
+    if (!before) {
+        // serverStatus surfacing of OpenTelemetry metrics is unavailable on this build variant.
+        return;
+    }
+
+    SimpleMemoryUsageTracker tracker{100};
+    tracker.add(200);
+    ASSERT_THROWS_CODE(tracker.assertWithinMemoryLimit("$testExpr"),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
+
+    // The counter is process-wide and monotonically non-decreasing, so assert it advanced by
+    // exactly one relative to the value observed before the failure.
+    ASSERT_EQ(*readOperationsFailedDueToMemoryLimit(), *before + 1);
+}
+
+TEST(SimpleMemoryUsageTrackerTest,
+     AssertWithinMemoryLimitDoesNotIncrementFailureMetricWhenUnderLimit) {
+    auto before = readOperationsFailedDueToMemoryLimit();
+    if (!before) {
+        // serverStatus surfacing of OpenTelemetry metrics is unavailable on this build variant.
+        return;
+    }
+
+    SimpleMemoryUsageTracker tracker{1000};
+    tracker.add(500);
+    ASSERT_DOES_NOT_THROW(tracker.assertWithinMemoryLimit("$testExpr"));
+
+    ASSERT_EQ(*readOperationsFailedDueToMemoryLimit(), *before);
 }
 
 }  // namespace

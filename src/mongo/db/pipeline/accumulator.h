@@ -189,14 +189,7 @@ protected:
 
     // Utility to check that memory limit isn't exceeded.
     void checkMemUsage() {
-        uassert(ErrorCodes::ExceededMemoryLimit,
-                str::stream() << getOpName()
-                              << " used too much memory and spilling to disk cannot reduce memory "
-                                 "consumption any further. Used: "
-                              << _memUsageTracker.inUseTrackedMemoryBytes()
-                              << " bytes. Memory limit: "
-                              << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
-                _memUsageTracker.withinMemoryLimit());
+        _memUsageTracker.assertWithinMemoryLimit(getOpName());
     }
 
     /// subclasses are expected to update this as necessary

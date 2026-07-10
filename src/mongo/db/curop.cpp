@@ -59,7 +59,13 @@
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/prepare_conflict_tracker.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metric_unit.h"
+#include "mongo/otel/metrics/metrics_service.h"
+#include "mongo/otel/metrics/server_status_options.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/metadata/audit_user_attrs.h"
@@ -125,6 +131,21 @@ auto& overdueInterruptApproxMaxTimeMillis =
 
 // The total number of slow queries logged.
 auto& totalSlowQueryLogs = *MetricBuilder<Counter64>("query.totalSlowQueryLogs");
+
+// System-wide high-water mark of the largest amount of memory (in bytes) ever tracked for a single
+// operation since process startup. This is a single metric exposed on two surfaces: the
+// `serverStatusOptions` below publishes it in serverStatus as
+// `metrics.query.peakMemoryUsageOperation`, and the same value is exported over OpenTelemetry.
+auto& peakMemoryUsageOperationBytes = otel::metrics::MetricsService::instance().createInt64Gauge(
+    otel::metrics::MetricNames::kQueryPeakMemoryUsageOperation,
+    "Largest amount of memory (in bytes) tracked for a single operation since process startup",
+    otel::metrics::MetricUnit::kBytes,
+    {.serverStatusOptions = otel::metrics::ServerStatusOptions{
+         .dottedPath = "query.peakMemoryUsageOperation", .role = ClusterRole::None}});
+
+// A plain gauge only supports set(), so we track the running maximum here and publish increases to
+// the gauge above. Persists for the life of the process.
+AtomicWord<int64_t> peakMemoryUsageOperationHighWaterMark{0};
 
 /*
  * Helper for reporting stats on an operation that was sampled for interrupt check tracking.
@@ -657,6 +678,15 @@ void CurOp::setMemoryTrackingStats(const int64_t inUseTrackedMemoryBytes,
     }
 
     _inUseTrackedMemoryBytes.store(inUseTrackedMemoryBytes);
+
+    // Advance the system-wide peak operation memory high-water mark if this operation has observed
+    // a new maximum, and publish the running max to the serverStatus/OpenTelemetry gauge.
+    auto observedPeak = peakMemoryUsageOperationHighWaterMark.loadRelaxed();
+    while (peakTrackedMemoryBytes > observedPeak &&
+           !peakMemoryUsageOperationHighWaterMark.compareAndSwap(&observedPeak,
+                                                                 peakTrackedMemoryBytes)) {
+    }
+    peakMemoryUsageOperationBytes.set(peakMemoryUsageOperationHighWaterMark.loadRelaxed());
 }
 
 void CurOp::setNS(WithLock, NamespaceString nss) {

@@ -231,13 +231,14 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
     _resultBuffer.add(SorterKey{memberDistance}, std::move(nextMember));
     _memoryTracker.add(static_cast<int64_t>(_resultBuffer.stats().memUsage()) -
                        static_cast<int64_t>(bufferBytesBefore));
+
     if (!_memoryTracker.withinMemoryLimit() &&
         feature_flags::gFeatureFlagExtendedAutoSpilling.isEnabled()) {
         spill();
     }
-    _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
-    uassert(12227900, "Near stage exceeded memory limit", _memoryTracker.withinMemoryLimit());
 
+    _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
+    _memoryTracker.assertWithinMemoryLimit(_commonStats.stageTypeStr);
     return PlanStage::NEED_TIME;
 }
 
@@ -315,11 +316,7 @@ void NearStage::updateSpillingStats() {
 }
 
 void NearStage::spill() {
-    uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
-            str::stream() << _commonStats.stageTypeStr
-                          << " stage exceeded memory limit and can't spill to disk. Set "
-                             "allowDiskUse: true to allow spilling",
-            expCtx()->getAllowDiskUse());
+    _memoryTracker.assertCanSpill(expCtx()->getAllowDiskUse(), _commonStats.stageTypeStr);
     const uint64_t bufferBytesBefore = _resultBuffer.stats().memUsage();
     _resultBuffer.forceSpill();
     _memoryTracker.add(static_cast<int64_t>(_resultBuffer.stats().memUsage()) -
