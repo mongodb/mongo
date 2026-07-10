@@ -45,10 +45,15 @@
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/fail_point.h"
 
 #include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
+namespace mongo::exec::agg {
+MONGO_FAIL_POINT_DEFINE(graphLookupStageKickbackFailpoint);
+}  // namespace mongo::exec::agg
 
 namespace mongo {
 
@@ -600,6 +605,15 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
         lpp.appendStage(LiteParsedDocumentSource::parse(_fromExpCtx->getNamespaceString(), match));
 
         try {
+            // Test-only: force a sharded-view kickback on every attempt so the retry loop runs to
+            // exhaustion. The kickback resolves the foreign namespace to itself (empty pipeline) so
+            // each attempt re-throws. At the top of the attempt so it fires wherever the stage runs
+            // (a shard node or the merging mongos).
+            if (MONGO_unlikely(graphLookupStageKickbackFailpoint.shouldFail())) {
+                uassertStatusOK(Status(
+                    ResolvedNamespace(_fromExpCtx->getNamespaceString(), std::vector<BSONObj>{}),
+                    "graphLookupStageKickbackFailpoint forced sharded view kickback"));
+            }
             return pExpCtx->getMongoProcessInterface()->finalizeAndMaybePreparePipelineForExecution(
                 _fromExpCtx,
                 mongo::Pipeline::parseFromLiteParsed(lpp, _fromExpCtx),
@@ -645,7 +659,8 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
                 "new_pipe"_attr = mongo::Pipeline::serializePipelineForLogging(resolvedViewPipe));
         }
     }
-    MONGO_UNREACHABLE_TASSERT(12511900);
+    uasserted(ErrorCodes::CollectionBecameView,
+              "view configuration changed too many times during $graphLookup execution");
 }
 
 }  // namespace exec::agg

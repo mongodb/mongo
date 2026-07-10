@@ -337,6 +337,60 @@ TEST(PipelineResolverTest, ResolvesInnerViewNestedUnderRepeatedBaseCollectionRef
     ASSERT_EQ(viewStages[0]->getParseTimeName(), "$match"sv);
 }
 
+TEST(PipelineResolverTest, DoesNotInfiniteLoopOnMutualGraphLookupViewCycle) {
+    // viewB has pipeline [{$graphLookup: {from: "viewE", ...}}]
+    // viewE has pipeline [{$graphLookup: {from: "viewB", ...}}]
+    // Both back the same base collection. Before the fix, resolveInvolvedNamespacesImpl would
+    // recurse infinitely because the materialized sub-pipeline uses the backing-collection NSS
+    // (not the view NSS), bypassing the inProgress cycle-detection guard.
+    const NamespaceString kViewBNss =
+        NamespaceString::createNamespaceString_forTest("testdb", "viewB");
+    const NamespaceString kViewENss =
+        NamespaceString::createNamespaceString_forTest("testdb", "viewE");
+    const NamespaceString kBaseColl =
+        NamespaceString::createNamespaceString_forTest("testdb", "fsmcoll0");
+
+    auto makeGraphLookupStage = [](std::string_view fromColl) {
+        return BSON("$graphLookup" << BSON("from" << fromColl << "startWith"
+                                                  << "$a"
+                                                  << "connectFromField"
+                                                  << "a"
+                                                  << "connectToField"
+                                                  << "b"
+                                                  << "as"
+                                                  << "result"));
+    };
+
+    // viewB: {viewOn: "fsmcoll0", pipeline: [{$graphLookup: {from: "viewE", ...}}]}
+    std::vector<BSONObj> viewBPipeline{makeGraphLookupStage("viewE")};
+    // viewE: {viewOn: "fsmcoll0", pipeline: [{$graphLookup: {from: "viewB", ...}}]}
+    std::vector<BSONObj> viewEPipeline{makeGraphLookupStage("viewB")};
+
+    ResolvedNamespaceViewOptions opts;
+    opts.involvedNamespaceIsAView = true;
+    opts.shouldParseLpp = true;
+
+    ResolvedNamespaceMap nsMap;
+    nsMap.emplace(kViewBNss,
+                  ResolvedNamespace(kViewBNss, kBaseColl, viewBPipeline, BSONObj{}, opts));
+    nsMap.emplace(kViewENss,
+                  ResolvedNamespace(kViewENss, kBaseColl, viewEPipeline, BSONObj{}, opts));
+
+    // User queries viewB (empty pipeline, like a find command).
+    LiteParsedPipeline userLpp(kViewBNss, std::vector<BSONObj>{}, true, LiteParserOptions{});
+
+    // This must complete without hanging or crashing (stack overflow).
+    bool result =
+        PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(&userLpp, kViewBNss, nsMap);
+
+    // A view was bound (viewB's pipeline was prepended).
+    ASSERT_TRUE(result);
+
+    // viewB's $graphLookup stage was prepended — exactly one stage.
+    ASSERT_EQ(userLpp.getStages().size(), 1U);
+    ASSERT_EQ(userLpp.getStages()[0]->getParseTimeName(), "$graphLookup"sv);
+}
+
 TEST(PipelineResolverTest, InsertTopLevelViewEntryStoresResolvedView) {
     // Build a ResolvedNamespace representing a view backed by kBackingNss.
     BSONObj viewStage = BSON("$match" << BSON("v" << 1));

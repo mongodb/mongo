@@ -373,14 +373,22 @@ bool resolveInvolvedNamespacesImpl(LiteParsedPipeline* lpp,
             }
             for (auto& sub : *subs) {
                 auto subNss = sub->getOriginalParseNss();
-                const bool isRunningAgainstAView = isView(subNss);
-                if (isRunningAgainstAView && !inProgress.insert(subNss).second) {
+                // For materialized view sub-pipelines (e.g. those created by
+                // materializeViewSubpipeline for $graphLookup {from: someView}), the
+                // _originalParseNss is the backing collection, not the view — and isView() on the
+                // backing collection returns false, bypassing cycle detection.  Use the tagged view
+                // NSS instead so mutual-view cycles (viewA.$graphLookup{from:viewB},
+                // viewB.$graphLookup{from:viewA}) are correctly detected.
+                const auto& taggedViewNss = sub.getViewNss();
+                const auto& cycleNss = taggedViewNss ? *taggedViewNss : subNss;
+                const bool isRunningAgainstAView = isView(cycleNss);
+                if (isRunningAgainstAView && !inProgress.insert(cycleNss).second) {
                     continue;
                 }
                 bound |= resolveInvolvedNamespacesImpl(
                     sub.operator->(), subNss, resolvedNamespaces, inProgress);
                 if (isRunningAgainstAView) {
-                    inProgress.erase(subNss);
+                    inProgress.erase(cycleNss);
                 }
             }
         }
