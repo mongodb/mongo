@@ -2918,6 +2918,61 @@ TEST_F(MakeInconsistencySeverityTest, SeverityRoundTripsViaBSON) {
     ASSERT_EQ(MetadataInconsistencySeverityEnum::kHigh, roundTripped.getSeverity().value());
 }
 
+TEST_F(MetadataConsistencyTest,
+       MisplacedCollectionOnEmptySessionsNamespaceIsIgnoredWhenNotDbPrimary) {
+    OperationContext* opCtx = operationContext();
+    const auto& nss = NamespaceString::kLogicalSessionsNamespace;
+    const ShardId primaryShardId = ShardId::kConfigServerId;
+
+    createTestCollection(opCtx, nss);
+
+    const auto [localCatalogSnapshot, localCatalogCollections] = getLocalCatalog(opCtx, nss);
+    ASSERT_EQ(1, localCatalogCollections.size());
+
+    const auto inconsistencies = metadata_consistency_util::checkCollectionMetadataConsistency(
+        opCtx,
+        _shardId,
+        primaryShardId,
+        {} /* shardingCatalogCollections */,
+        localCatalogSnapshot,
+        localCatalogCollections,
+        false /* checkRangeDeletionIndexes */,
+        false /* optionalCheckIndexes */);
+
+    ASSERT_TRUE(
+        std::none_of(inconsistencies.begin(), inconsistencies.end(), [](const auto& inconsistency) {
+            return inconsistency.getType() == MetadataInconsistencyTypeEnum::kMisplacedCollection;
+        }));
+}
+
+TEST_F(MetadataConsistencyTest,
+       MisplacedCollectionOnNonemptySessionsNamespaceIsReportedWhenNotDbPrimary) {
+    OperationContext* opCtx = operationContext();
+    const auto& nss = NamespaceString::kLogicalSessionsNamespace;
+    const ShardId primaryShardId = ShardId::kConfigServerId;
+
+    createTestCollection(opCtx, nss);
+    DBDirectClient client(opCtx);
+    write_ops::checkWriteErrors(
+        client.insert(write_ops::InsertCommandRequest{nss, {BSON("_id" << 1)}}));
+
+    const auto [localCatalogSnapshot, localCatalogCollections] = getLocalCatalog(opCtx, nss);
+    ASSERT_EQ(1, localCatalogCollections.size());
+
+    const auto inconsistencies = metadata_consistency_util::checkCollectionMetadataConsistency(
+        opCtx,
+        _shardId,
+        primaryShardId,
+        {} /* shardingCatalogCollections */,
+        localCatalogSnapshot,
+        localCatalogCollections,
+        false /* checkRangeDeletionIndexes */,
+        false /* optionalCheckIndexes */);
+
+    assertOneInconsistencyFound(MetadataInconsistencyTypeEnum::kMisplacedCollection,
+                                inconsistencies);
+}
+
 // Tests for low severity on config.system.sessions inconsistencies.
 
 TEST_F(MetadataConsistencyTest, CollectionUUIDMismatchOnSessionsNamespaceHasLowSeverity) {

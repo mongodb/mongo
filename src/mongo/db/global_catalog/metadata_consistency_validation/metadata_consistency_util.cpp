@@ -1405,10 +1405,19 @@ std::vector<MetadataInconsistencyItem> _checkLocalInconsistencies(
     std::vector<MetadataInconsistencyItem> inconsistencies;
 
     if (currentShard != primaryShard) {
-        inconsistencies.emplace_back(makeInconsistency(
-            MetadataInconsistencyTypeEnum::kMisplacedCollection,
-            MisplacedCollectionDetails{
-                nss, currentShard, localColl->uuid(), getNumDocs(opCtx, localColl.get())}));
+        const auto numDocs = getNumDocs(opCtx, localColl.get());
+        // config.system.sessions is created on the first data shard by CreateCollectionCoordinator,
+        // not on the config server (the database primary). Ignore the transient MisplacedCollection
+        // while the collection is being created and still empty.
+        if (nss == NamespaceString::kLogicalSessionsNamespace && numDocs == 0) {
+            LOGV2(13104700,
+                  "Ignoring misplaced collection inconsistency for empty sessions collection",
+                  logAttrs(nss));
+        } else {
+            inconsistencies.emplace_back(makeInconsistency(
+                MetadataInconsistencyTypeEnum::kMisplacedCollection,
+                MisplacedCollectionDetails{nss, currentShard, localColl->uuid(), numDocs}));
+        }
     } else {
         checkCollectionMetadataInShardCatalog(opCtx,
                                               nss,
