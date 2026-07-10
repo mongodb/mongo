@@ -1064,6 +1064,11 @@ public:
     virtual bool hasOngoingLiveRestore() = 0;
 
     /**
+     * Returns whether the storage engine is currently in leader mode.
+     */
+    virtual bool isInLeaderMode() = 0;
+
+    /**
      * Returns the total logical size in bytes of the given index tables as recorded in the most
      * recent checkpoint. 'indexIdents' are storage idents identifying the index tables to sum.
      * Indexes that have not yet been checkpointed contribute zero. Returns 0 for storage engines

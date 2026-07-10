@@ -758,6 +758,13 @@ public:
     }
 
     /**
+     * Returns whether the kv-engine is currently in leader mode.
+     */
+    virtual bool isInLeaderMode() {
+        return false;
+    }
+
+    /**
      * Returns an iterator that yields the prepared_id of unclaimed prepared transactions that exist
      * in the checkpoint on startup recovery. Callers can use these prepared_ids to reclaim the
      * prepared transactions through the storage engine.

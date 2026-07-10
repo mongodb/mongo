@@ -784,6 +784,8 @@ public:
 
     bool hasOngoingLiveRestore() override;
 
+    bool isInLeaderMode() override;
+
     static Status updateEvictionThreadsMax(const int32_t& threadsMax);
 
     static Status updateEvictionThreadsMin(const int32_t& threadsMin);

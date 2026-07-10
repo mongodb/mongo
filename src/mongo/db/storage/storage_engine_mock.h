@@ -327,6 +327,14 @@ public:
         return false;
     }
 
+    bool isInLeaderMode() final {
+        return _isInLeaderMode;
+    }
+
+    void setIsInLeaderMode(bool isLeader) {
+        _isInLeaderMode = isLeader;
+    }
+
     uint64_t getLastSetMaterializedLsn() const {
         return _lastSetMaterializedLsn;
     }
@@ -344,6 +352,7 @@ public:
     }
 
 private:
+    bool _isInLeaderMode = false;
     uint64_t _lastSetMaterializedLsn = 0;
     std::vector<std::string> _droppedSpillIdents;
     Timestamp _lastSetOldestTimestamp;

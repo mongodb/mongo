@@ -1286,6 +1286,10 @@ bool StorageEngineImpl::hasOngoingLiveRestore() {
     return _engine->hasOngoingLiveRestore();
 }
 
+bool StorageEngineImpl::isInLeaderMode() {
+    return _engine->isInLeaderMode();
+}
+
 StatusWith<int64_t> StorageEngineImpl::getIndexStorageSize(
     OperationContext* opCtx, const std::vector<std::string>& indexIdents) const {
     return _engine->getIndexStorageSize(opCtx, indexIdents);

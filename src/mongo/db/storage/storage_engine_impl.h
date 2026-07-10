@@ -331,6 +331,8 @@ public:
 
     bool hasOngoingLiveRestore() override;
 
+    bool isInLeaderMode() override;
+
     StatusWith<int64_t> getIndexStorageSize(
         OperationContext* opCtx, const std::vector<std::string>& indexIdents) const override;
 

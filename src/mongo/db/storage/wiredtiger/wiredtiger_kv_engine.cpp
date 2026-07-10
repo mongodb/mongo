@@ -3458,6 +3458,13 @@ bool WiredTigerKVEngine::hasOngoingLiveRestore() {
     return uassertStatusOK(result) == WT_LIVE_RESTORE_IN_PROGRESS;
 }
 
+bool WiredTigerKVEngine::isInLeaderMode() {
+    auto session = getConnection().getUninterruptibleSession();
+    auto result = WiredTigerUtil::getStatisticsValue(
+        *session, "statistics:", "statistics=(fast)", WT_STAT_CONN_DISAGG_ROLE_LEADER);
+    return uassertStatusOK(result) != 0;
+}
+
 StatusWith<int64_t> WiredTigerKVEngineBase::getIndexStorageSize(
     OperationContext*, const std::vector<std::string>& indexIdents) const {
     auto session = getConnection().getUninterruptibleSession();
