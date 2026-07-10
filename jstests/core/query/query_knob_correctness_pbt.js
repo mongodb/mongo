@@ -75,6 +75,17 @@ const excludeKnobs = [
     "internalSlotBasedExecutionAndHashStageMaxMemoryBytes",
     "internalUpdateStageMaxMemoryBytes",
     "internalCountScanStageMaxMemoryBytes",
+    // Accumulator and expression memory caps: small values uassert (ExceededMemoryLimit) instead
+    // of returning results, a server-side guardrail rather than a correctness divergence.
+    "internalQueryMaxPushBytes",
+    "internalQueryMaxAddToSetBytes",
+    "internalQueryMaxConcatArraysBytes",
+    "internalQueryMaxSetUnionBytes",
+    "internalQueryTopNAccumulatorBytes",
+    "internalQueryMaxPercentileAccumulatorBytes",
+    "internalQueryMaxSingleExpressionMemoryUsageBytes",
+    // Operation-wide memory cap: a small value fails every query outright.
+    "internalQueryMaxMemoryUsageBytesPerOperation",
 ];
 
 const knobSchema = db

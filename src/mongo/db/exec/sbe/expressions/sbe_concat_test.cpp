@@ -178,7 +178,7 @@ TEST_F(SBEConcatTest, ComputesManyMoreStringsConcat) {
 }
 
 TEST_F(SBEConcatTest, ConcatThrowsWhenMemoryLimitExceeded) {
-    SimpleMemoryUsageTracker tracker(5);
+    SimpleMemoryUsageTracker tracker(MemoryUsageLimit{5});
     _vm.setMemoryTracker(&tracker);
     ScopeGuard clearTracker([&] { _vm.setMemoryTracker(nullptr); });
 

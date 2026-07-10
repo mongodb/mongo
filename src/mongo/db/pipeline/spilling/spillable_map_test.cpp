@@ -47,7 +47,7 @@ void assertSpilledBytes(long long spilledBytes, long long totalAddedSize) {
 class SpillableDocumentHashMapTest : public SpillingTestFixture {
 public:
     SpillableDocumentMap createSpillableMap(size_t maxMemory = 100 * 1024 * 1024) {
-        _tracker.emplace(true /*allowDiskUse*/, maxMemory);
+        _tracker.emplace(true /*allowDiskUse*/, MemoryUsageLimit{static_cast<int64_t>(maxMemory)});
         return SpillableDocumentMap{_expCtx.get(), &_tracker.get()};
     }
 

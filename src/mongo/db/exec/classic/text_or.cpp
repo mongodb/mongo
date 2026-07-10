@@ -58,10 +58,10 @@ namespace mongo {
 
 namespace {
 
-int64_t getMemoryLimit() {
+MemoryUsageLimit getMemoryLimit() {
     return feature_flags::gFeatureFlagExtendedAutoSpilling.isEnabled()
         ? loadMemoryLimit(StageMemoryLimit::TextOrStageMaxMemoryBytes)
-        : std::numeric_limits<int64_t>::max();
+        : MemoryUsageLimit{std::numeric_limits<int64_t>::max()};
 }
 
 }  // namespace

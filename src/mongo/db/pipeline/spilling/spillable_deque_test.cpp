@@ -49,7 +49,8 @@ static const Value sortKeyVal = Value(1.0);
 class SpillableDequeTest : public SpillingTestFixture {
 public:
     std::unique_ptr<SpillableDeque> createSpillableDeque(size_t maxMem) {
-        _tracker = std::make_unique<MemoryUsageTracker>(false, maxMem);
+        _tracker = std::make_unique<MemoryUsageTracker>(
+            false, MemoryUsageLimit{static_cast<int64_t>(maxMem)});
         auto cache = std::make_unique<SpillableDeque>(_expCtx.get(), _tracker.get());
         return cache;
     }

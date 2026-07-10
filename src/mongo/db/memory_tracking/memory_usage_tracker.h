@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/memory_tracking/memory_usage_limit.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 
@@ -55,10 +56,11 @@ public:
     SimpleMemoryUsageTracker& operator=(SimpleMemoryUsageTracker&&) = default;
 
     SimpleMemoryUsageTracker(SimpleMemoryUsageTracker* base,
-                             int64_t maxAllowedMemoryUsageBytes,
+                             MemoryUsageLimit maxAllowedMemoryUsageBytes,
                              int64_t chunkSize = 0);
 
-    explicit SimpleMemoryUsageTracker(int64_t maxAllowedMemoryUsageBytes, int64_t chunkSize = 0);
+    explicit SimpleMemoryUsageTracker(MemoryUsageLimit maxAllowedMemoryUsageBytes,
+                                      int64_t chunkSize = 0);
 
     SimpleMemoryUsageTracker();
 
@@ -78,11 +80,19 @@ public:
      * respective limits.
      */
     bool withinMemoryLimit() const {
-        return _inUseTrackedMemoryBytes <= _maxAllowedMemoryUsageBytes &&
+        return _inUseTrackedMemoryBytes <= _maxAllowedMemoryUsageBytes.get() &&
             (!_base || _base->withinMemoryLimit());
     }
 
     int64_t maxAllowedMemoryUsageBytes() const {
+        return _maxAllowedMemoryUsageBytes.get();
+    }
+
+    /**
+     * Prefer this over 'maxAllowedMemoryUsageBytes()' when handing the limit to another tracker:
+     * copying the wrapper preserves how the limit is resolved, not just its current value.
+     */
+    const MemoryUsageLimit& maxAllowedMemoryUsageLimit() const {
         return _maxAllowedMemoryUsageBytes;
     }
 
@@ -131,7 +141,7 @@ private:
     // Tracks the current memory footprint.
     int64_t _inUseTrackedMemoryBytes = 0;
 
-    int64_t _maxAllowedMemoryUsageBytes;
+    MemoryUsageLimit _maxAllowedMemoryUsageBytes;
 
     // Allow for some extra bookkeeping to be done when add() is called. If set, this function will
     // be invoked with _inUseTrackedMemoryBytes and _peakTrackedMemoryBytes. This mechanism exists
@@ -174,10 +184,11 @@ public:
 
     MemoryUsageTracker(SimpleMemoryUsageTracker* baseParent,
                        bool allowDiskUse = false,
-                       int64_t maxMemoryUsageBytes = 0,
+                       MemoryUsageLimit maxMemoryUsageBytes = MemoryUsageLimit{0},
                        int64_t chunkSize = 0);
 
-    MemoryUsageTracker(bool allowDiskUse = false, int64_t maxMemoryUsageBytes = 0);
+    MemoryUsageTracker(bool allowDiskUse = false,
+                       MemoryUsageLimit maxMemoryUsageBytes = MemoryUsageLimit{0});
 
     /**
      * Sets the new total for 'name', and updates the current total memory usage.

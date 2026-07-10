@@ -31,9 +31,11 @@
 
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/memory_tracking/memory_usage_limit.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/memory_token_container_util.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
+#include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -58,7 +60,7 @@ public:
     }
 
     explicit WindowFunctionPush(ExpressionContext* const expCtx)
-        : WindowFunctionState(expCtx, internalQueryMaxPushBytes.load()) {
+        : WindowFunctionState(expCtx, MemoryUsageLimit{query_knobs::kMaxPushBytes}) {
         _memUsageTracker.set(sizeof(*this));
     }
 

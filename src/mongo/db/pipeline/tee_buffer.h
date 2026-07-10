@@ -60,7 +60,7 @@ public:
      */
     static boost::intrusive_ptr<TeeBuffer> create(
         size_t nConsumers,
-        int bufferSizeBytes = loadMemoryLimit(StageMemoryLimit::QueryFacetBufferSizeBytes));
+        int bufferSizeBytes = loadMemoryLimit(StageMemoryLimit::QueryFacetBufferSizeBytes).get());
 
     void setSource(exec::agg::Stage* source) {
         _source = source;

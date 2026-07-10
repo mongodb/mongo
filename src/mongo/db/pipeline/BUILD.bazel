@@ -1548,6 +1548,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/extension/host:extension_loader",
         "//src/mongo/db/memory_tracking",
         "//src/mongo/db/pipeline/optimization:pipeline_optimization",
+        "//src/mongo/db/query/query_knobs:query_knob_configuration",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/db/sharding_environment:shard_server_test_fixture",
         "//src/mongo/db/sharding_environment:sharding_mongos_test_fixture",

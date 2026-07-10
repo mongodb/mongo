@@ -70,16 +70,18 @@ auto& operationsFailedDueToMemoryLimit =
 }  // namespace
 
 SimpleMemoryUsageTracker::SimpleMemoryUsageTracker(SimpleMemoryUsageTracker* base,
-                                                   int64_t maxAllowedMemoryUsageBytes,
+                                                   MemoryUsageLimit maxAllowedMemoryUsageBytes,
                                                    int64_t chunkSize)
-    : _base(base), _maxAllowedMemoryUsageBytes(maxAllowedMemoryUsageBytes), _chunkSize(chunkSize) {}
+    : _base(base),
+      _maxAllowedMemoryUsageBytes(std::move(maxAllowedMemoryUsageBytes)),
+      _chunkSize(chunkSize) {}
 
-SimpleMemoryUsageTracker::SimpleMemoryUsageTracker(int64_t maxAllowedMemoryUsageBytes,
+SimpleMemoryUsageTracker::SimpleMemoryUsageTracker(MemoryUsageLimit maxAllowedMemoryUsageBytes,
                                                    int64_t chunkSize)
-    : SimpleMemoryUsageTracker(nullptr, maxAllowedMemoryUsageBytes, chunkSize) {}
+    : SimpleMemoryUsageTracker(nullptr, std::move(maxAllowedMemoryUsageBytes), chunkSize) {}
 
 SimpleMemoryUsageTracker::SimpleMemoryUsageTracker()
-    : SimpleMemoryUsageTracker(std::numeric_limits<int64_t>::max()) {}
+    : SimpleMemoryUsageTracker(MemoryUsageLimit{std::numeric_limits<int64_t>::max()}) {}
 
 void SimpleMemoryUsageTracker::set(int64_t total) {
     add(total - _inUseTrackedMemoryBytes);
@@ -91,12 +93,13 @@ void SimpleMemoryUsageTracker::setWriteToCurOp(std::function<void(int64_t, int64
 
 MemoryUsageTracker::MemoryUsageTracker(SimpleMemoryUsageTracker* baseParent,
                                        bool allowDiskUse,
-                                       int64_t maxMemoryUsageBytes,
+                                       MemoryUsageLimit maxMemoryUsageBytes,
                                        int64_t chunkSize)
-    : _allowDiskUse(allowDiskUse), _baseTracker(baseParent, maxMemoryUsageBytes, chunkSize) {}
+    : _allowDiskUse(allowDiskUse),
+      _baseTracker(baseParent, std::move(maxMemoryUsageBytes), chunkSize) {}
 
-MemoryUsageTracker::MemoryUsageTracker(bool allowDiskUse, int64_t maxMemoryUsageBytes)
-    : MemoryUsageTracker(nullptr, allowDiskUse, maxMemoryUsageBytes) {}
+MemoryUsageTracker::MemoryUsageTracker(bool allowDiskUse, MemoryUsageLimit maxMemoryUsageBytes)
+    : MemoryUsageTracker(nullptr, allowDiskUse, std::move(maxMemoryUsageBytes)) {}
 
 void MemoryUsageTracker::set(std::string_view name, int64_t total) {
     (*this)[name].set(total);
@@ -150,8 +153,10 @@ void SimpleMemoryUsageTracker::addInternal(int64_t diff, bool report) {
 }
 
 SimpleMemoryUsageTracker SimpleMemoryUsageTracker::makeFreshSimpleMemoryUsageTracker() const {
+    // Copy the limit holder itself rather than a resolved byte count, so that any future
+    // lazily-resolved limit stays lazy in the fresh tracker.
     SimpleMemoryUsageTracker memTracker =
-        SimpleMemoryUsageTracker{_base, maxAllowedMemoryUsageBytes(), _chunkSize};
+        SimpleMemoryUsageTracker{_base, _maxAllowedMemoryUsageBytes, _chunkSize};
     memTracker.setWriteToCurOp(_writeToCurOp);
     return memTracker;
 }
@@ -170,7 +175,7 @@ void MemoryUsageTracker::clear() {
 
 SimpleMemoryUsageTracker& MemoryUsageTracker::operator[](std::string_view name) {
     auto [it, _] = _functionMemoryTracker.try_emplace(
-        toKey(name), &_baseTracker, _baseTracker.maxAllowedMemoryUsageBytes());
+        toKey(name), &_baseTracker, _baseTracker.maxAllowedMemoryUsageLimit());
     return it->second;
 }
 
@@ -184,7 +189,8 @@ void MemoryUsageTracker::assertCanSpill(std::string_view name) const {
 }
 
 MemoryUsageTracker MemoryUsageTracker::makeFreshMemoryUsageTracker() const {
-    return MemoryUsageTracker(_baseTracker._base, allowDiskUse(), maxAllowedMemoryUsageBytes());
+    return MemoryUsageTracker(
+        _baseTracker._base, allowDiskUse(), _baseTracker.maxAllowedMemoryUsageLimit());
 }
 
 void DeduplicatorReporter::add(int64_t bytesDiff, int64_t recordsDiff) {
@@ -231,7 +237,7 @@ void SimpleMemoryUsageTracker::assertWithinMemoryLimit(std::string_view name,
         msg << " Stage: " << stageName << ".";
     }
     msg << " Needs: " << _inUseTrackedMemoryBytes
-        << " bytes. Local memory limit: " << _maxAllowedMemoryUsageBytes << " bytes.";
+        << " bytes. Local memory limit: " << _maxAllowedMemoryUsageBytes.get() << " bytes.";
     int level = 1;
     for (const SimpleMemoryUsageTracker* current = _base; current; current = current->_base) {
         if (current->_base) {

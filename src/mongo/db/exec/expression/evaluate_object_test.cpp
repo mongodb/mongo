@@ -147,7 +147,7 @@ TEST(ExpressionObjectEvaluate, TracksOutputMemoryAndReleasesAfterEvaluation) {
     auto expCtx = ExpressionContextForTest{};
     auto object = makeFieldPathObject(&expCtx);
 
-    SimpleMemoryUsageTracker tracker{4096};
+    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{4096}};
     EvaluationContext ctx{.tracker = &tracker};
 
     Document doc{{"a", "hello"sv}, {"b", "world"sv}};
@@ -162,7 +162,7 @@ TEST(ExpressionObjectEvaluate, ThrowsExceededMemoryLimitWhenOverLimit) {
     auto expCtx = ExpressionContextForTest{};
     auto object = makeFieldPathObject(&expCtx);
 
-    SimpleMemoryUsageTracker tracker{8};
+    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{8}};
     EvaluationContext ctx{.tracker = &tracker};
 
     Document doc{{"a", std::string(100, 'x')}, {"b", std::string(100, 'y')}};
@@ -181,8 +181,8 @@ TEST(ExpressionObjectEvaluate, ThrowsExceededMemoryLimitWhenQueryLimitExceeded) 
     auto expCtx = ExpressionContextForTest{};
     auto object = makeFieldPathObject(&expCtx);
 
-    SimpleMemoryUsageTracker operationTracker{8};
-    SimpleMemoryUsageTracker stageTracker{&operationTracker, 100 * 1024 * 1024};
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{8}};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
     EvaluationContext ctx{.tracker = &stageTracker};
 
     Document doc{{"a", std::string(100, 'x')}, {"b", std::string(100, 'y')}};

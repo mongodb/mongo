@@ -32,6 +32,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
+#include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
@@ -46,7 +47,7 @@ public:
     }
 
     explicit WindowFunctionConcatArrays(ExpressionContext* const expCtx)
-        : WindowFunctionState(expCtx, internalQueryMaxConcatArraysBytes.load()) {
+        : WindowFunctionState(expCtx, MemoryUsageLimit{query_knobs::kMaxConcatArraysBytes}) {
         _memUsageTracker.set(sizeof(*this));
     }
 

@@ -170,7 +170,7 @@ LookUpStage::LookUpStage(std::string_view stageName,
         // is a correlated prefix that will not be detected. Here, local/foreignFields are absent,
         // so we enable the cache.
         _cache = std::make_shared<SequentialDocumentCache>(
-            loadMemoryLimit(StageMemoryLimit::DocumentSourceLookupCacheSizeBytes));
+            loadMemoryLimit(StageMemoryLimit::DocumentSourceLookupCacheSizeBytes).get());
     }
     if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
         feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {

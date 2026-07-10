@@ -114,6 +114,38 @@
          kInternalChangeStreamUpdateLookupMaxOutputBytesName,                             \
          internalChangeStreamUpdateLookupMaxOutputBytes,                                  \
          getChangeStreamUpdateLookupMaxOutputBytes)                                       \
+    KNOB(kMaxPushBytes,                                                                   \
+         kInternalQueryMaxPushBytesName,                                                  \
+         internalQueryMaxPushBytes,                                                       \
+         getMaxPushBytes)                                                                 \
+    KNOB(kMaxAddToSetBytes,                                                               \
+         kInternalQueryMaxAddToSetBytesName,                                              \
+         internalQueryMaxAddToSetBytes,                                                   \
+         getMaxAddToSetBytes)                                                             \
+    KNOB(kMaxConcatArraysBytes,                                                           \
+         kInternalQueryMaxConcatArraysBytesName,                                          \
+         internalQueryMaxConcatArraysBytes,                                               \
+         getMaxConcatArraysBytes)                                                         \
+    KNOB(kMaxSetUnionBytes,                                                               \
+         kInternalQueryMaxSetUnionBytesName,                                              \
+         internalQueryMaxSetUnionBytes,                                                   \
+         getMaxSetUnionBytes)                                                             \
+    KNOB(kTopNAccumulatorBytes,                                                           \
+         kInternalQueryTopNAccumulatorBytesName,                                          \
+         internalQueryTopNAccumulatorBytes,                                               \
+         getTopNAccumulatorBytes)                                                         \
+    KNOB(kMaxPercentileAccumulatorBytes,                                                  \
+         kInternalQueryMaxPercentileAccumulatorBytesName,                                 \
+         internalQueryMaxPercentileAccumulatorBytes,                                      \
+         getMaxPercentileAccumulatorBytes)                                                \
+    KNOB(kMaxSingleExpressionMemoryUsageBytes,                                            \
+         kInternalQueryMaxSingleExpressionMemoryUsageBytesName,                           \
+         internalQueryMaxSingleExpressionMemoryUsageBytes,                                \
+         getMaxSingleExpressionMemoryUsageBytes)                                          \
+    KNOB(kMaxMemoryUsageBytesPerOperation,                                                \
+         kInternalQueryMaxMemoryUsageBytesPerOperationName,                               \
+         internalQueryMaxMemoryUsageBytesPerOperation,                                    \
+         getMaxMemoryUsageBytesPerOperation)                                              \
     /* End MONGO_EXPAND_QUERY_KNOBS_EXECUTION */
 // clang-format on
 

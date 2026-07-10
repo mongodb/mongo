@@ -45,7 +45,7 @@
 namespace mongo {
 
 GroupProcessor::GroupProcessor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                               int64_t maxMemoryUsageBytes)
+                               MemoryUsageLimit maxMemoryUsageBytes)
 
     : GroupProcessorBase(expCtx, maxMemoryUsageBytes) {}
 

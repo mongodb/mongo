@@ -33,10 +33,12 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/memory_tracking/memory_usage_limit.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
@@ -122,7 +124,7 @@ Value ExpressionFromAccumulatorN<AccumulatorLastN>::evaluate(const Document& roo
 }
 
 AccumulatorN::AccumulatorN(ExpressionContext* const expCtx)
-    : AccumulatorState(expCtx, internalQueryTopNAccumulatorBytes.load()) {}
+    : AccumulatorState(expCtx, MemoryUsageLimit{query_knobs::kTopNAccumulatorBytes}) {}
 
 long long AccumulatorN::validateN(const Value& input) {
     // Obtain the value for 'n' and error if it's not a positive integral.

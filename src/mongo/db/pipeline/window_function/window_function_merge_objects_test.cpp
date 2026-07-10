@@ -86,7 +86,8 @@ public:
         return _iter->advance();
     }
 
-    MemoryUsageTracker _tracker{false, 100 * 1024 * 1024 /* default memory limit */};
+    MemoryUsageTracker _tracker{false,
+                                MemoryUsageLimit{100 * 1024 * 1024} /* default memory limit */};
 
 private:
     boost::intrusive_ptr<exec::agg::MockStage> _docStage;

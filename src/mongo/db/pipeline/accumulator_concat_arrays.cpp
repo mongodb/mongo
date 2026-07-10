@@ -29,6 +29,7 @@
 
 #include "mongo/db/pipeline/window_function/window_function_concat_arrays.h"
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
+#include "mongo/db/query/query_knob_descriptors_execution.h"
 
 namespace mongo {
 
@@ -40,10 +41,11 @@ REGISTER_STABLE_REMOVABLE_WINDOW_FUNCTION(concatArrays,
                                           WindowFunctionConcatArrays);
 
 
-AccumulatorConcatArrays::AccumulatorConcatArrays(ExpressionContext* const expCtx,
-                                                 boost::optional<int> maxMemoryUsageBytes)
-    : AccumulatorState(expCtx,
-                       maxMemoryUsageBytes.value_or(internalQueryMaxConcatArraysBytes.load())) {
+AccumulatorConcatArrays::AccumulatorConcatArrays(
+    ExpressionContext* const expCtx, boost::optional<MemoryUsageLimit> maxMemoryUsageBytes)
+    : AccumulatorState(
+          expCtx,
+          maxMemoryUsageBytes.value_or(MemoryUsageLimit{query_knobs::kMaxConcatArraysBytes})) {
     _memUsageTracker.set(sizeof(*this));
 }
 

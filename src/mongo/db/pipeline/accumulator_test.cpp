@@ -1834,7 +1834,7 @@ TEST(Accumulators, AddToSetRespectsCollation) {
 
 TEST(Accumulators, AddToSetRespectsMaxMemoryConstraint) {
     auto expCtx = ExpressionContextForTest{};
-    const int maxMemoryBytes = 20ull;
+    const MemoryUsageLimit maxMemoryBytes{20};
     auto addToSet = AccumulatorAddToSet(&expCtx, maxMemoryBytes);
     ASSERT_THROWS_CODE(
         addToSet.process(
@@ -1845,7 +1845,7 @@ TEST(Accumulators, AddToSetRespectsMaxMemoryConstraint) {
 
 TEST(Accumulators, PushRespectsMaxMemoryConstraint) {
     auto expCtx = ExpressionContextForTest{};
-    const int maxMemoryBytes = 20ull;
+    const MemoryUsageLimit maxMemoryBytes{20};
     auto addToSet = AccumulatorPush(&expCtx, maxMemoryBytes);
     ASSERT_THROWS_CODE(
         addToSet.process(
@@ -2043,10 +2043,11 @@ TEST(Accumulators, AccumulatorExpMovingAvg) {
 /* ------------------------- AccumulatorPercentile ---------------------------------------------- */
 
 // Runs AccumulatorPercentile tests with the various different percentile algorithms.
-void accumulatorPercentileHelper(PercentileMethodEnum method,
-                                 const std::vector<double>& percentiles,
-                                 const std::string& mergeFalseExpected,
-                                 boost::optional<int> maxMemoryUsageBytes = 1024) {
+void accumulatorPercentileHelper(
+    PercentileMethodEnum method,
+    const std::vector<double>& percentiles,
+    const std::string& mergeFalseExpected,
+    boost::optional<MemoryUsageLimit> maxMemoryUsageBytes = MemoryUsageLimit{1024}) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx =
         make_intrusive<ExpressionContextForTest>();
     AccumulatorPercentile acc{expCtx.get(), percentiles, method, maxMemoryUsageBytes};
@@ -2100,22 +2101,28 @@ TEST(Accumulators, AccumulatorPercentileContinuous) {
 // Tests the AccumulatorPercentile class when it runs out of memory using
 // PercentileMethodEnum::kApproximate
 TEST(Accumulators, AccumulatorPercentileOOMApproximate) {
-    accumulatorPercentileHelper(
-        PercentileMethodEnum::kApproximate, std::vector<double>{0.5, 0.8}, "[0.5, 0.8]", 1);
+    accumulatorPercentileHelper(PercentileMethodEnum::kApproximate,
+                                std::vector<double>{0.5, 0.8},
+                                "[0.5, 0.8]",
+                                MemoryUsageLimit{1});
 }
 
 // Tests the AccumulatorPercentile class when it runs out of memory using
 // PercentileMethodEnum::kDiscrete
 TEST(Accumulators, AccumulatorPercentileOOMDiscrete) {
-    accumulatorPercentileHelper(
-        PercentileMethodEnum::kDiscrete, std::vector<double>{0.5, 0.8}, "[0.5, 0.8]", 1);
+    accumulatorPercentileHelper(PercentileMethodEnum::kDiscrete,
+                                std::vector<double>{0.5, 0.8},
+                                "[0.5, 0.8]",
+                                MemoryUsageLimit{1});
 }
 
 // Tests the AccumulatorPercentile class when it runs out of memory using
 // PercentileMethodEnum::kContinuous
 TEST(Accumulators, AccumulatorPercentileOOMContinuous) {
-    accumulatorPercentileHelper(
-        PercentileMethodEnum::kContinuous, std::vector<double>{0.5, 0.8}, "[0.55, 0.82]", 1);
+    accumulatorPercentileHelper(PercentileMethodEnum::kContinuous,
+                                std::vector<double>{0.5, 0.8},
+                                "[0.55, 0.82]",
+                                MemoryUsageLimit{1});
 }
 
 /* ------------------------- Other accumulators ------------------------------------------------- */
@@ -2516,7 +2523,7 @@ TEST(ExpressionMergeObjects, MergingNonObjectsShouldThrowException) {
 
 TEST(AccumulatorConcatArrays, ConcatArraysRespectsMaxMemoryContraint) {
     auto expCtx = ExpressionContextForTest{};
-    const int maxMemoryBytes = 20ull;
+    const MemoryUsageLimit maxMemoryBytes{20};
     auto concatArrays = AccumulatorConcatArrays(&expCtx, maxMemoryBytes);
     ASSERT_THROWS_CODE(concatArrays.process(
                            Value(std::vector<Value>{Value("A somewhat long string"sv),
@@ -2636,7 +2643,7 @@ static void assertSetUnionResults(
 
 TEST(AccumulatorSetUnion, SetUnionRespectsMaxMemoryContraint) {
     auto expCtx = ExpressionContextForTest{};
-    const int maxMemoryBytes = 20ull;
+    const MemoryUsageLimit maxMemoryBytes{20};
     auto setUnion = AccumulatorSetUnion(&expCtx, maxMemoryBytes);
     ASSERT_THROWS_CODE(
         setUnion.process(Value(std::vector<Value>{Value("A somewhat long string"sv),

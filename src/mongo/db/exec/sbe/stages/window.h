@@ -390,7 +390,7 @@ private:
     std::vector<std::vector<WindowStateMemoryEstimator>> _windowStateMemoryEstimators;
     // Memory threshold before spilling.
     const size_t _memoryThreshold =
-        loadMemoryLimit(StageMemoryLimit::DocumentSourceSetWindowFieldsMaxMemoryBytes);
+        loadMemoryLimit(StageMemoryLimit::DocumentSourceSetWindowFieldsMaxMemoryBytes).get();
 
     // The failpoint counter to force spilling, incremented for every window function update,
     // every document.

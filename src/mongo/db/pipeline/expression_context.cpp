@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/version_context.h"
@@ -67,7 +68,7 @@ SimpleMemoryUsageTracker& ExpressionContext::getExpressionFallbackTracker() {
             // Memory tracking is disabled, or there is no OperationContext: fall back to a
             // standalone tracker that just enforces the per-expression safety cap.
             _expressionFallbackTracker.emplace(
-                internalQueryMaxSingleExpressionMemoryUsageBytes.loadRelaxed());
+                MemoryUsageLimit{query_knobs::kMaxSingleExpressionMemoryUsageBytes});
         }
     }
     return *_expressionFallbackTracker;

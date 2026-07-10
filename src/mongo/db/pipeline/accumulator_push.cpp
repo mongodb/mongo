@@ -30,6 +30,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/memory_tracking/memory_usage_limit.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -37,6 +38,7 @@
 #include "mongo/db/pipeline/window_function/window_function_push.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
@@ -80,8 +82,9 @@ Value AccumulatorPush::getValue(bool toBeMerged) {
 }
 
 AccumulatorPush::AccumulatorPush(ExpressionContext* const expCtx,
-                                 boost::optional<int> maxMemoryUsageBytes)
-    : AccumulatorState(expCtx, maxMemoryUsageBytes.value_or(internalQueryMaxPushBytes.load())) {
+                                 boost::optional<MemoryUsageLimit> maxMemoryUsageBytes)
+    : AccumulatorState(expCtx,
+                       maxMemoryUsageBytes.value_or(MemoryUsageLimit{query_knobs::kMaxPushBytes})) {
     _memUsageTracker.set(sizeof(*this));
 }
 

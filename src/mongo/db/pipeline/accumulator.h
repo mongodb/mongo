@@ -88,7 +88,8 @@ public:
     using Factory = std::function<boost::intrusive_ptr<AccumulatorState>()>;
 
     AccumulatorState(ExpressionContext* const expCtx,
-                     int64_t maxAllowedMemoryUsageBytes = std::numeric_limits<int64_t>::max())
+                     MemoryUsageLimit maxAllowedMemoryUsageBytes =
+                         MemoryUsageLimit{std::numeric_limits<int64_t>::max()})
         : _memUsageTracker(maxAllowedMemoryUsageBytes), _expCtx(expCtx) {}
 
     /** Marks the beginning of a new group. The input is the result of evaluating
@@ -218,7 +219,7 @@ public:
      * the server parameter 'internalQueryMaxAddToSetBytes'.
      */
     AccumulatorAddToSet(ExpressionContext* expCtx,
-                        boost::optional<int> maxMemoryUsageBytes = boost::none);
+                        boost::optional<MemoryUsageLimit> maxMemoryUsageBytes = boost::none);
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
@@ -433,7 +434,7 @@ public:
      * server parameter 'internalQueryMaxPushBytes'.
      */
     AccumulatorPush(ExpressionContext* expCtx,
-                    boost::optional<int> maxMemoryUsageBytes = boost::none);
+                    boost::optional<MemoryUsageLimit> maxMemoryUsageBytes = boost::none);
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
@@ -570,7 +571,7 @@ public:
      * the value of the server parameter 'internalQueryMaxConcatArraysBytes'.
      */
     AccumulatorConcatArrays(ExpressionContext* expCtx,
-                            boost::optional<int> maxMemoryUsageBytes = boost::none);
+                            boost::optional<MemoryUsageLimit> maxMemoryUsageBytes = boost::none);
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool) final;
@@ -594,7 +595,7 @@ public:
      * value of the server parameter 'internalQueryMaxSetUnionBytes'.
      */
     AccumulatorSetUnion(ExpressionContext* expCtx,
-                        boost::optional<int> maxMemoryUsageBytes = boost::none);
+                        boost::optional<MemoryUsageLimit> maxMemoryUsageBytes = boost::none);
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;

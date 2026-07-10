@@ -824,7 +824,7 @@ TEST(ExpressionConcatTest, TracksOutputMemoryAndReleasesAfterEvaluation) {
     auto expCtx = ExpressionContextForTest{};
     auto expr = parseConcat(&expCtx, BSON("$concat" << BSON_ARRAY("$a"sv << "$b"sv)));
 
-    SimpleMemoryUsageTracker tracker{1024};
+    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{1024}};
     EvaluationContext ctx{.tracker = &tracker};
 
     Document doc{{"a", "hello"sv}, {"b", "world"sv}};
@@ -884,8 +884,8 @@ TEST(ExpressionConcatTest, ThrowsExceededMemoryLimitWhenQueryLimitExceeded) {
     auto expr = parseConcat(&expCtx, BSON("$concat" << BSON_ARRAY("$a"sv << "$b"sv)));
 
     const int64_t limit = 8;
-    SimpleMemoryUsageTracker operationTracker{limit};
-    SimpleMemoryUsageTracker stageTracker{&operationTracker, 100 * 1024 * 1024};
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
     EvaluationContext ctx{.tracker = &stageTracker};
 
     Document doc{{"a", std::string(10, 'x')}, {"b", std::string(10, 'y')}};

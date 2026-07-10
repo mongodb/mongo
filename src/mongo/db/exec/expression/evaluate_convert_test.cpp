@@ -100,7 +100,7 @@ TEST_F(EvaluateConvertTest, TracksOutputMemoryAndReleasesAfterEvaluation) {
                                                 << "array"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
-    SimpleMemoryUsageTracker tracker{1024};
+    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{1024}};
     EvaluationContext ctx{.tracker = &tracker};
 
     auto result = convertExp->evaluate({}, &expCtx->variables, ctx);
@@ -122,8 +122,8 @@ TEST_F(EvaluateConvertTest, ThrowsExceededMemoryLimitWhenQueryLimitExceeded) {
     // has a generous local limit, so the throw must come from the per-operation cap via the base
     // chain rollup, not the local stage limit.
     const int64_t limit = 4;
-    SimpleMemoryUsageTracker operationTracker{limit};
-    SimpleMemoryUsageTracker stageTracker{&operationTracker, 100 * 1024 * 1024};
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
     EvaluationContext ctx{.tracker = &stageTracker};
 
     try {

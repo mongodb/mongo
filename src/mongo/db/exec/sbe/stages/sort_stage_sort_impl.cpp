@@ -30,6 +30,7 @@
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/stages/sort.h"
 #include "mongo/db/exec/sbe/values/row.h"
+#include "mongo/db/memory_tracking/memory_usage_limit.h"
 #include "mongo/db/sorter/file_based_spiller.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_template_defs.h"  // IWYU pragma: keep
@@ -78,7 +79,8 @@ public:
         }
 
         _stage._memoryTracker = OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(
-            _stage._opCtx, _stage._specificStats.maxMemoryUsageBytes);
+            _stage._opCtx,
+            MemoryUsageLimit{static_cast<int64_t>(_stage._specificStats.maxMemoryUsageBytes)});
     }
 
     value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) override {

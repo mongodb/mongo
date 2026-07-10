@@ -315,7 +315,7 @@ private:
 
     // Memory tracking and spilling to disk.
     long long _memoryUseInBytesBeforeSpill =
-        loadMemoryLimit(StageMemoryLimit::QuerySBELookupApproxMemoryUseInBytesBeforeSpill);
+        loadMemoryLimit(StageMemoryLimit::QuerySBELookupApproxMemoryUseInBytesBeforeSpill).get();
 
     // The portion of the inner collection hash table that has spilled to disk.
     std::unique_ptr<SpillingStore> _recordStoreHt;

@@ -52,7 +52,7 @@ SortStage::SortStage(boost::intrusive_ptr<ExpressionContext> expCtx,
       _sortKeyGen(sortPattern, expCtx->getCollator()),
       _addSortKeyMetadata(addSortKeyMetadata),
       _memoryTracker{OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(
-          *expCtx, std::numeric_limits<int64_t>::max())} {
+          *expCtx, MemoryUsageLimit{std::numeric_limits<int64_t>::max()})} {
     _children.emplace_back(std::move(child));
 }
 
@@ -113,7 +113,7 @@ SortStageDefault::SortStageDefault(boost::intrusive_ptr<ExpressionContext> expCt
     : SortStage(expCtx, ws, sortPattern, addSortKeyMetadata, std::move(child)),
       _sortExecutor(std::move(sortPattern),
                     limit,
-                    maxMemoryUsageBytes,
+                    MemoryUsageLimit{static_cast<int64_t>(maxMemoryUsageBytes)},
                     expCtx->getTempDir().string(),
                     expCtx->getAllowDiskUse()) {}
 
@@ -158,7 +158,7 @@ SortStageSimple::SortStageSimple(boost::intrusive_ptr<ExpressionContext> expCtx,
     : SortStage(expCtx, ws, sortPattern, addSortKeyMetadata, std::move(child)),
       _sortExecutor(std::move(sortPattern),
                     limit,
-                    maxMemoryUsageBytes,
+                    MemoryUsageLimit{static_cast<int64_t>(maxMemoryUsageBytes)},
                     expCtx->getTempDir(),
                     expCtx->getAllowDiskUse()) {}
 

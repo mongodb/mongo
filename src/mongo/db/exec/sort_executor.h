@@ -35,6 +35,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sort_key_comparator.h"
+#include "mongo/db/memory_tracking/memory_usage_limit.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_stats.h"
@@ -79,22 +80,36 @@ public:
      */
     SortExecutor(SortPattern sortPattern,
                  uint64_t limit,
-                 uint64_t maxMemoryUsageBytes,
+                 MemoryUsageLimit maxMemoryUsageBytes,
                  boost::filesystem::path tempDir,
                  bool allowDiskUse,
                  bool moveSortedDataIntoIterator = false)
         : _sortPattern(std::move(sortPattern)),
           _tempDir(std::move(tempDir)),
           _diskUseAllowed(allowDiskUse),
-          _moveSortedDataIntoIterator(moveSortedDataIntoIterator) {
+          _moveSortedDataIntoIterator(moveSortedDataIntoIterator),
+          _maxAllowedMemoryUsageBytes(maxMemoryUsageBytes) {
         _stats.sortPattern =
             _sortPattern.serialize(SortPattern::SortKeySerialization::kForExplain).toBson();
         _stats.limit = limit;
-        _stats.maxMemoryUsageBytes = maxMemoryUsageBytes;
+        _stats.maxMemoryUsageBytes = static_cast<uint64_t>(maxMemoryUsageBytes.get());
         if (allowDiskUse) {
             _sorterFileStats = std::make_unique<SorterFileStats>(nullptr);
         }
     }
+
+    SortExecutor(SortPattern sortPattern,
+                 uint64_t limit,
+                 uint64_t maxMemoryUsageBytes,
+                 boost::filesystem::path tempDir,
+                 bool allowDiskUse,
+                 bool moveSortedDataIntoIterator = false)
+        : SortExecutor(std::move(sortPattern),
+                       limit,
+                       MemoryUsageLimit{static_cast<int64_t>(maxMemoryUsageBytes)},
+                       std::move(tempDir),
+                       allowDiskUse,
+                       moveSortedDataIntoIterator) {}
 
     const SortPattern& sortPattern() const {
         return _sortPattern;
@@ -208,8 +223,8 @@ public:
         return _output->next();
     }
 
-    uint64_t getMaxMemoryBytes() const {
-        return _stats.maxMemoryUsageBytes;
+    MemoryUsageLimit getMaxMemoryBytes() const {
+        return _maxAllowedMemoryUsageBytes;
     }
 
     /**
@@ -294,6 +309,8 @@ private:
     const boost::filesystem::path _tempDir;
     const bool _diskUseAllowed;
     const bool _moveSortedDataIntoIterator;
+
+    MemoryUsageLimit _maxAllowedMemoryUsageBytes;
 
     std::unique_ptr<SorterFileStats> _sorterFileStats;
     std::unique_ptr<DocumentSorter> _sorter;

@@ -31,9 +31,11 @@
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/memory_tracking/memory_usage_limit.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
@@ -196,7 +198,7 @@ public:
     using KeyOutPair = std::pair<long long, Value>;
 
     AccumulatorPushConcatArraysCommonForBucketAuto(ExpressionContext* expCtx,
-                                                   int maxMemoryUsageBytes)
+                                                   MemoryUsageLimit maxMemoryUsageBytes)
         : AccumulatorState(expCtx, maxMemoryUsageBytes) {}
 
     // Called by 'processInternal', it adds the incoming 'input' as is to
@@ -238,9 +240,9 @@ public:
     }
 
     AccumulatorPushForBucketAuto(ExpressionContext* expCtx,
-                                 boost::optional<int> maxMemoryUsageBytes)
+                                 boost::optional<MemoryUsageLimit> maxMemoryUsageBytes)
         : AccumulatorPushConcatArraysCommonForBucketAuto(
-              expCtx, maxMemoryUsageBytes.value_or(internalQueryMaxPushBytes.load())) {
+              expCtx, maxMemoryUsageBytes.value_or(MemoryUsageLimit{query_knobs::kMaxPushBytes})) {
         _memUsageTracker.set(sizeof(*this));
     }
 
@@ -266,9 +268,10 @@ public:
     }
 
     AccumulatorConcatArraysForBucketAuto(ExpressionContext* expCtx,
-                                         boost::optional<int> maxMemoryUsageBytes)
+                                         boost::optional<MemoryUsageLimit> maxMemoryUsageBytes)
         : AccumulatorPushConcatArraysCommonForBucketAuto(
-              expCtx, maxMemoryUsageBytes.value_or(internalQueryMaxConcatArraysBytes.load())) {
+              expCtx,
+              maxMemoryUsageBytes.value_or(MemoryUsageLimit{query_knobs::kMaxConcatArraysBytes})) {
         _memUsageTracker.set(sizeof(*this));
     }
 

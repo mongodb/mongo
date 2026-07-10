@@ -33,6 +33,7 @@ mongo_cc_library(
     local_defines = ["QUERY_STAGE_MEMORY_LIMITS_KNOBS_PRIVATE_OVERRIDE"],
     deps = [
         "//src/mongo/db:server_base",
+        "//src/mongo/db/memory_tracking:memory_usage_limit",
         "//src/mongo/db/query:on_parameter_change_updaters",
         "//src/mongo/db/query/query_knobs:query_knob",
     ],

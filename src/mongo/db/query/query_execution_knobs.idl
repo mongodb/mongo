@@ -93,6 +93,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: queryMaxMemoryUsageBytesPerOperation
 
     internalQueryMaxSingleExpressionMemoryUsageBytes:
         description: >-
@@ -109,6 +112,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: queryMaxSingleExpressionMemoryUsageBytes
 
     internalQueryMaxWriteToServerStatusMemoryUsageBytes:
         description: >-
@@ -260,12 +266,17 @@ server_parameters:
             $push accumulator.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxPushBytes"
-        cpp_vartype: Atomic<int>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
             gt: 0
+            # SBE bakes these caps into int32 plan constants; keep the pre-widening bound.
+            lte: 2147483647
         redact: false
+        annotations:
+            query_knob:
+                wire_name: queryMaxPushBytes
 
     internalQueryMaxRangeBytes:
         description: >-
@@ -303,6 +314,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: queryMaxAddToSetBytes
 
     internalQueryMaxConcatArraysBytes:
         description: >-
@@ -316,6 +330,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: queryMaxConcatArraysBytes
 
     internalQueryMaxSetUnionBytes:
         description: >-
@@ -329,6 +346,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: queryMaxSetUnionBytes
 
     internalQueryMaxPercentileAccumulatorBytes:
         description: "The maximum amount of memory that can be used by an individual $percentile accumulator."
@@ -340,6 +360,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: queryMaxPercentileAccumulatorBytes
 
     internalQueryJavaScriptHeapSizeLimitMB:
         description: >-
@@ -543,12 +566,17 @@ server_parameters:
             family of accumulators.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryTopNAccumulatorBytes"
-        cpp_vartype: Atomic<int>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
             gt: 0
+            # SBE bakes these caps into int32 plan constants; keep the pre-widening bound.
+            lte: 2147483647
         redact: false
+        annotations:
+            query_knob:
+                wire_name: queryTopNAccumulatorBytes
 
     internalQueryRegexHeapLimitKB:
         description: >-

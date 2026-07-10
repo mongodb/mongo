@@ -38,6 +38,7 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -66,7 +67,7 @@ Value evaluateExpression(const ExprMatchExpression* expr,
     //    shared fallback tracker would race. Use a per-call standalone tracker instead.
     if (!ctx.tracker && !expr->getExpressionContext()->getOperationContext()) {
         SimpleMemoryUsageTracker perCallFallbackTracker{
-            internalQueryMaxSingleExpressionMemoryUsageBytes.loadRelaxed()};
+            MemoryUsageLimit{query_knobs::kMaxSingleExpressionMemoryUsageBytes}};
         EvaluationContext localCtx = ctx;
         localCtx.tracker = &perCallFallbackTracker;
         return expr->getExpression()->evaluate(document, &variables, localCtx);

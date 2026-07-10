@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2025-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,49 +27,13 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/memory_tracking/memory_usage_limit.h"
-#include "mongo/util/modules.h"
+
+#include "mongo/db/query/query_knobs/query_knob_registry.h"
 
 namespace mongo {
 
-enum class StageMemoryLimit {
-    DocumentSourceLookupCacheSizeBytes,
-    DocumentSourceGraphLookupMaxMemoryBytes,
-    DocumentSourceGroupMaxMemoryBytes,
-    DocumentSourceSetWindowFieldsMaxMemoryBytes,
-    DocumentSourceBucketAutoMaxMemoryBytes,
-    DocumentSourceDensifyMaxMemoryBytes,
-    QueryFacetBufferSizeBytes,
-    TextOrStageMaxMemoryBytes,
-    QuerySBELookupApproxMemoryUseInBytesBeforeSpill,
-    QuerySBEAggApproxMemoryUseInBytesBeforeSpill,
-    QueryMaxSpoolMemoryUsageBytes,
-    QueryMaxBlockingSortMemoryUsageBytes,
-    OrStageMaxMemoryBytes,
-    NearStageMaxMemoryBytes,
-    MergeSortStageMaxMemoryBytes,
-    IndexScanStageMaxMemoryBytes,
-    SBEUniqueStageMaxMemoryBytes,
-    SBEMergeJoinStageMaxMemoryBytes,
-    SBEAndHashStageMaxMemoryBytes,
-    QuerySBEHashJoinApproxMemoryUseInBytesBeforeSpill,
-    UpdateStageMaxMemoryBytes,
-    CountScanStageMaxMemoryBytes,
-};
-
-/**
- * Returns the memory limit for the given stage according to the server parameters. Call 'get()' on
- * the result for a plain byte count.
- */
-MemoryUsageLimit loadMemoryLimit(StageMemoryLimit stage);
-
-/**
- * Adds values of the server parameters, responsible for the memory limits, to the explain command
- * output.
- */
-void appendStageMemoryLimitsToExplain(BSONObjBuilder& bob);
+MemoryUsageLimit::MemoryUsageLimit(MemoryKnob knob)
+    : _value(std::get<long long>(QueryKnobRegistry::instance().entry(knob.id).readGlobal())) {}
 
 }  // namespace mongo

@@ -61,7 +61,7 @@ TEST(ExpressionArrayTest, TracksOutputMemoryAndReleasesAfterEvaluation) {
     auto expCtx = ExpressionContextForTest{};
     auto expr = parseArrayLiteral(&expCtx, BSON_ARRAY("$a"sv << "$b"sv));
 
-    SimpleMemoryUsageTracker tracker{4096};
+    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{4096}};
     EvaluationContext ctx{.tracker = &tracker};
 
     Document doc{{"a", "hello"sv}, {"b", "world"sv}};
@@ -77,8 +77,8 @@ TEST(ExpressionArrayTest, MemoryTrackerThrowsWhenQueryLimitExceeded) {
     auto expr = parseArrayLiteral(&expCtx, BSON_ARRAY("$a"sv << "$b"sv));
 
     const int64_t limit = 8;
-    SimpleMemoryUsageTracker operationTracker{limit};
-    SimpleMemoryUsageTracker tracker{&operationTracker, 100 * 1024 * 1024};
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker tracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
     EvaluationContext ctx{.tracker = &tracker};
 
     Document doc{{"a", std::string(100, 'x')}, {"b", std::string(100, 'y')}};
@@ -335,7 +335,7 @@ TEST(ExpressionSortArrayTest, TrackerIsDeductedAfterPatternSort) {
     auto expressionSortArray =
         ExpressionSortArray::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
 
-    SimpleMemoryUsageTracker tracker{1024 * 1024};
+    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{1024 * 1024}};
     tracker.set(5);
     EvaluationContext ctx{.tracker = &tracker};
     Value val = expressionSortArray->evaluate(MutableDocument().freeze(), &expCtx.variables, ctx);
@@ -354,8 +354,8 @@ TEST(ExpressionSortArrayTest, TrackerDeductedAfterMemoryLimitException) {
         ExpressionSortArray::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
 
     const int64_t limit = 6;  // always exceeded by any key
-    SimpleMemoryUsageTracker operationTracker{limit};
-    SimpleMemoryUsageTracker tracker{&operationTracker, 100 * 1024 * 1024};
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker tracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
     tracker.set(5);
     EvaluationContext ctx{.tracker = &tracker};
 
@@ -1055,7 +1055,7 @@ TEST(ExpressionConcatArraysTest, MemoryTrackerAccumulatesOutputSize) {
         BSON("$concatArrays" << BSON_ARRAY(BSON_ARRAY(1 << 2 << 3) << BSON_ARRAY(4 << 5))),
         expCtx.variablesParseState);
 
-    SimpleMemoryUsageTracker tracker{1024 * 1024};
+    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{1024 * 1024}};
     EvaluationContext ctx{.tracker = &tracker};
     ASSERT_DOES_NOT_THROW(expr->evaluate({}, &expCtx.variables, ctx));
     // The token tracking $concatArrays's transient memory is released when evaluate() returns, so
@@ -1077,8 +1077,8 @@ TEST(ExpressionConcatArraysTest, MemoryTrackerThrowsWhenQueryLimitExceeded) {
     // Root (operation-wide) tracker carries the cap; the stage tracker reports into it but
     // has a large local limit of its own. Usage rolls up via the base chain.
     const int64_t limit = 100;
-    SimpleMemoryUsageTracker operationTracker{limit};
-    SimpleMemoryUsageTracker stageTracker{&operationTracker, 100 * 1024 * 1024};
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
     EvaluationContext ctx{.tracker = &stageTracker};
     try {
         expr->evaluate(doc, &expCtx.variables, ctx);
@@ -1159,7 +1159,7 @@ TEST(ExpressionSetUnionTest, MemoryTrackerAccumulatesOutputSize) {
         BSON("$setUnion" << BSON_ARRAY(BSON_ARRAY(1 << 2 << 3) << BSON_ARRAY(4 << 5))),
         expCtx.variablesParseState);
 
-    SimpleMemoryUsageTracker tracker{1024 * 1024};
+    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{1024 * 1024}};
     EvaluationContext ctx{.tracker = &tracker};
     ASSERT_DOES_NOT_THROW(expr->evaluate({}, &expCtx.variables, ctx));
     // The token tracking $setUnion's transient memory is released when evaluate() returns, so
@@ -1181,8 +1181,8 @@ TEST(ExpressionSetUnionTest, MemoryTrackerThrowsWhenQueryLimitExceeded) {
     // Root (operation-wide) tracker carries the cap; the stage tracker reports into it but
     // has a large local limit of its own. Usage rolls up via the base chain.
     const int64_t limit = 256;
-    SimpleMemoryUsageTracker operationTracker{limit};
-    SimpleMemoryUsageTracker stageTracker{&operationTracker, 100 * 1024 * 1024};
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
     EvaluationContext ctx{.tracker = &stageTracker};
     try {
         expr->evaluate(doc, &expCtx.variables, ctx);
@@ -1263,7 +1263,7 @@ TEST(ExpressionZipTest, MemoryTrackerAccumulatesOutputSize) {
                             << BSON_ARRAY(BSON_ARRAY(1 << 2 << 3) << BSON_ARRAY(4 << 5 << 6)))),
         expCtx.variablesParseState);
 
-    SimpleMemoryUsageTracker tracker{1024 * 1024};
+    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{1024 * 1024}};
     EvaluationContext ctx{.tracker = &tracker};
     ASSERT_DOES_NOT_THROW(expr->evaluate({}, &expCtx.variables, ctx));
     // The token tracking $zip's transient memory is released when evaluate() returns, so
@@ -1286,8 +1286,8 @@ TEST(ExpressionZipTest, MemoryTrackerThrowsWhenInputExceedsLimit) {
     Document doc{{"a", Value(arr1)}, {"b", Value(arr2)}};
 
     const int64_t limit = 100;
-    SimpleMemoryUsageTracker operationTracker{limit};
-    SimpleMemoryUsageTracker tracker{&operationTracker, 100 * 1024 * 1024};
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker tracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
     EvaluationContext ctx{.tracker = &tracker};
     try {
         expr->evaluate(doc, &expCtx.variables, ctx);
@@ -1317,8 +1317,8 @@ TEST(ExpressionZipTest, MemoryTrackerThrowsWhenQueryLimitExceeded) {
     // Root (operation-wide) tracker carries the limited cap; the stage tracker reports into it but
     // has a large local limit of its own. Usage rolls up via the base chain.
     const int64_t limit = 100;
-    SimpleMemoryUsageTracker operationTracker{limit};
-    SimpleMemoryUsageTracker stageTracker{&operationTracker, 100 * 1024 * 1024};
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
     EvaluationContext ctx{.tracker = &stageTracker};
     try {
         expr->evaluate(doc, &expCtx.variables, ctx);
@@ -1410,8 +1410,8 @@ TEST(ExpressionZipTest, MemoryTrackerThrowsWhenDefaultExceedsLimit) {
         {"b", Value(std::vector<Value>{Value(1), Value(2), Value(3), Value(4), Value(5)})}};
 
     const int64_t limit = 2000;
-    SimpleMemoryUsageTracker operationTracker{limit};
-    SimpleMemoryUsageTracker tracker{&operationTracker, 100 * 1024 * 1024};
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker tracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
     EvaluationContext ctx{.tracker = &tracker};
     try {
         expr->evaluate(doc, &expCtx.variables, ctx);
@@ -1455,8 +1455,8 @@ TEST(ExpressionZipTest, MemoryTrackerThrowsWhenInputAndDefaultCombinationExceeds
                                      << true)),
         expCtx.variablesParseState);
 
-    SimpleMemoryUsageTracker operationTracker{limit};
-    SimpleMemoryUsageTracker tracker{&operationTracker, 100 * 1024 * 1024};
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker tracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
     EvaluationContext ctx{.tracker = &tracker};
     try {
         expr->evaluate({}, &expCtx.variables, ctx);
@@ -1495,8 +1495,8 @@ TEST(ExpressionZipTest, MemoryTrackerThrowsWhenOutputExceedsLimit) {
     int64_t limit = inputsSize + 3 * nullSize;
 
     Document doc{{"a", Value(vArr1)}, {"b", Value(vArr2)}, {"c", Value(vArr3)}};
-    SimpleMemoryUsageTracker operationTracker{limit};
-    SimpleMemoryUsageTracker tracker{&operationTracker, 100 * 1024 * 1024};
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker tracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
     EvaluationContext ctx{.tracker = &tracker};
     try {
         expr->evaluate(doc, &expCtx.variables, ctx);

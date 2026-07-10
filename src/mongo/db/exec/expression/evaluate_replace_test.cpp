@@ -274,7 +274,7 @@ TEST(ExpressionEvaluateReplaceTest, TracksOutputMemoryAndReleasesAfterEvaluation
     auto [expCtx, expression] = parse(
         "$replaceAll", Document{{"input", "aaaa"sv}, {"find", ""sv}, {"replacement", "XY"sv}});
 
-    SimpleMemoryUsageTracker tracker{1024};
+    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{1024}};
     EvaluationContext ctx{.tracker = &tracker};
 
     ASSERT_VALUE_EQ(expression->evaluate({}, &expCtx->variables, ctx), Value("XYaXYaXYaXYaXY"sv));
@@ -292,8 +292,8 @@ TEST(ExpressionEvaluateReplaceTest, ThrowsExceededMemoryLimitWhenNonEmptyFindGro
     // Two-level tracker: a stage tracker with a generous local limit reporting into the
     // operation-wide tracker, which carries the small cap that the growing output exceeds.
     const int64_t limit = 256;
-    SimpleMemoryUsageTracker operationTracker{limit};
-    SimpleMemoryUsageTracker tracker{&operationTracker, 100 * 1024 * 1024};
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker tracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
     EvaluationContext ctx{.tracker = &tracker};
 
     try {
@@ -319,8 +319,8 @@ TEST(ExpressionEvaluateReplaceTest, ThrowsExceededMemoryLimitWhenQueryLimitExcee
     // generous local limit, so the throw must come from the per-operation cap via the base chain
     // rollup, not the local stage limit.
     const int64_t limit = 256;
-    SimpleMemoryUsageTracker operationTracker{limit};
-    SimpleMemoryUsageTracker stageTracker{&operationTracker, 100 * 1024 * 1024};
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
     EvaluationContext ctx{.tracker = &stageTracker};
 
     try {

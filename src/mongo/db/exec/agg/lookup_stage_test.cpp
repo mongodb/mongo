@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/exec/agg/lookup_stage.h"
 
 #include "mongo/bson/json.h"
@@ -41,7 +40,6 @@
 #include "mongo/db/pipeline/document_source_lookup_test_util.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -74,12 +72,9 @@ protected:
                 std::deque<DocumentSource::GetNextResult>{}));
     }
 };
-const long long kDefaultMaxCacheSize =
-    loadMemoryLimit(StageMemoryLimit::DocumentSourceLookupCacheSizeBytes);
 
 const auto kExplain = query_shape::SerializationOptions{
     .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
-
 
 TEST_F(LookupStageTest, ShouldPropagatePauses) {
     auto expCtx = getExpCtx();
@@ -182,7 +177,6 @@ TEST_F(LookupStageTest, ShouldPropagatePausesWhileUnwinding) {
     ASSERT_TRUE(lookupStage->getNext().isEOF());
     ASSERT_TRUE(lookupStage->getNext().isEOF());
 }
-
 
 TEST_F(LookupStageTest, ShouldReplaceNonCorrelatedPrefixWithCacheAfterFirstSubPipelineIteration) {
     auto expCtx = getExpCtx();

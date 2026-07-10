@@ -83,7 +83,7 @@ void BM_Concat_NoMemoryTracking(benchmark::State& state) {
 }
 
 void BM_Concat_WithMemoryTracking(benchmark::State& state) {
-    SimpleMemoryUsageTracker tracker(std::numeric_limits<int64_t>::max());
+    SimpleMemoryUsageTracker tracker(MemoryUsageLimit{std::numeric_limits<int64_t>::max()});
     runConcatBenchmark(state, &tracker);
 }
 

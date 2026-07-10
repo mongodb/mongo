@@ -10,12 +10,26 @@ exports_files(
 )
 
 mongo_cc_library(
+    name = "memory_usage_limit",
+    srcs = [
+        "memory_usage_limit.cpp",
+    ],
+    hdrs = [
+        "memory_usage_limit.h",
+    ],
+    deps = [
+        "//src/mongo/db/query/query_knobs:query_knob",
+    ],
+)
+
+mongo_cc_library(
     name = "memory_tracking",
     srcs = [
         "memory_usage_tracker.cpp",
         "operation_memory_usage_tracker.cpp",
     ],
     deps = [
+        ":memory_usage_limit",
         "//src/mongo/db:cluster_role",
         "//src/mongo/db:commands",
         "//src/mongo/db:server_feature_flags",

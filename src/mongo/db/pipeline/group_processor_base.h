@@ -49,7 +49,7 @@ public:
     using GroupsMap = ValueUnorderedMap<Accumulators>;
 
     GroupProcessorBase(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                       int64_t maxMemoryUsageBytes);
+                       MemoryUsageLimit maxMemoryUsageBytes);
 
     GroupProcessorBase(GroupProcessorBase&& other) = default;
     GroupProcessorBase(const GroupProcessorBase& other) = delete;

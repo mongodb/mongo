@@ -238,7 +238,7 @@ DocumentSourceGroupBase::DocumentSourceGroupBase(
       _groupProcessor(std::make_shared<GroupProcessor>(
           expCtx,
           maxMemoryUsageBytes
-              ? *maxMemoryUsageBytes
+              ? MemoryUsageLimit{*maxMemoryUsageBytes}
               : loadMemoryLimit(StageMemoryLimit::DocumentSourceGroupMaxMemoryBytes))),
       _sbeCompatibility(SbeCompatibility::notCompatible) {}
 

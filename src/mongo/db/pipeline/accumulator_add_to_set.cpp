@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
@@ -83,8 +84,9 @@ Value AccumulatorAddToSet::getValue(bool toBeMerged) {
 }
 
 AccumulatorAddToSet::AccumulatorAddToSet(ExpressionContext* const expCtx,
-                                         boost::optional<int> maxMemoryUsageBytes)
-    : AccumulatorState(expCtx, maxMemoryUsageBytes.value_or(internalQueryMaxAddToSetBytes.load())),
+                                         boost::optional<MemoryUsageLimit> maxMemoryUsageBytes)
+    : AccumulatorState(
+          expCtx, maxMemoryUsageBytes.value_or(MemoryUsageLimit{query_knobs::kMaxAddToSetBytes})),
       _set(expCtx->getValueComparator().makeFlatUnorderedValueSet()) {
     _memUsageTracker.set(sizeof(*this));
 }

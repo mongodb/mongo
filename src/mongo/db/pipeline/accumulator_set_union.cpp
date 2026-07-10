@@ -29,6 +29,7 @@
 
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
 #include "mongo/db/pipeline/window_function/window_function_set_union.h"
+#include "mongo/db/query/query_knob_descriptors_execution.h"
 
 namespace mongo {
 
@@ -37,8 +38,9 @@ REGISTER_ACCUMULATOR(setUnion, genericParseSingleExpressionAccumulator<Accumulat
 REGISTER_STABLE_REMOVABLE_WINDOW_FUNCTION(setUnion, AccumulatorSetUnion, WindowFunctionSetUnion);
 
 AccumulatorSetUnion::AccumulatorSetUnion(ExpressionContext* const expCtx,
-                                         boost::optional<int> maxMemoryUsageBytes)
-    : AccumulatorState(expCtx, maxMemoryUsageBytes.value_or(internalQueryMaxSetUnionBytes.load())),
+                                         boost::optional<MemoryUsageLimit> maxMemoryUsageBytes)
+    : AccumulatorState(
+          expCtx, maxMemoryUsageBytes.value_or(MemoryUsageLimit{query_knobs::kMaxSetUnionBytes})),
       _set(expCtx->getValueComparator().makeFlatUnorderedValueSet()) {
     _memUsageTracker.set(sizeof(*this));
 }

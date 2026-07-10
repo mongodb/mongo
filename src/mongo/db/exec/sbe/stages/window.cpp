@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/util/spilling.h"
+#include "mongo/db/memory_tracking/memory_usage_limit.h"
 #include "mongo/db/stats/counters.h"
 
 namespace mongo::sbe {
@@ -504,7 +505,7 @@ void WindowStage::prepare(CompileCtx& ctx) {
     _compiled = true;
 
     _memoryTracker = OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForSBE(
-        _opCtx, _memoryThreshold);
+        _opCtx, MemoryUsageLimit{static_cast<int64_t>(_memoryThreshold)});
 }
 
 value::SlotAccessor* WindowStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {

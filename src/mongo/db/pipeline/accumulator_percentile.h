@@ -93,7 +93,7 @@ public:
     AccumulatorPercentile(ExpressionContext* expCtx,
                           const std::vector<double>& ps,
                           PercentileMethodEnum method,
-                          boost::optional<int> maxMemoryUsageBytes = boost::none);
+                          boost::optional<MemoryUsageLimit> maxMemoryUsageBytes = boost::none);
 
     /**
      * Ingressing values and computing the requested percentiles.
@@ -183,7 +183,7 @@ public:
     AccumulatorMedian(ExpressionContext* expCtx,
                       const std::vector<double>& unused,
                       PercentileMethodEnum method,
-                      boost::optional<int> maxMemoryUsageBytes = boost::none);
+                      boost::optional<MemoryUsageLimit> maxMemoryUsageBytes = boost::none);
 
     /**
      * Necessary for supporting $median as window functions and/or as expression.

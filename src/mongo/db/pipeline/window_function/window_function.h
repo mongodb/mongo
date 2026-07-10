@@ -48,7 +48,8 @@ namespace mongo {
 class WindowFunctionState {
 public:
     WindowFunctionState(ExpressionContext* const expCtx,
-                        int64_t maxAllowedMemoryUsageBytes = std::numeric_limits<int64_t>::max())
+                        MemoryUsageLimit maxAllowedMemoryUsageBytes =
+                            MemoryUsageLimit{std::numeric_limits<int64_t>::max()})
         : _expCtx(expCtx), _memUsageTracker(maxAllowedMemoryUsageBytes) {}
     virtual ~WindowFunctionState() = default;
 

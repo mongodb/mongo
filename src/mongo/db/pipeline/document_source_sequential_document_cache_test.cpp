@@ -47,11 +47,12 @@ namespace {
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
 using DocumentSourceSequentialDocumentCacheTest = AggregationContextFixture;
 
-const long long kDefaultMaxCacheSize =
-    loadMemoryLimit(StageMemoryLimit::DocumentSourceLookupCacheSizeBytes);
+long long defaultMaxCacheSize() {
+    return loadMemoryLimit(StageMemoryLimit::DocumentSourceLookupCacheSizeBytes).get();
+}
 
 TEST_F(DocumentSourceSequentialDocumentCacheTest, ReturnsEOFOnSubsequentCallsAfterSourceExhausted) {
-    auto cache = std::make_shared<SequentialDocumentCache>(kDefaultMaxCacheSize);
+    auto cache = std::make_shared<SequentialDocumentCache>(defaultMaxCacheSize());
     auto documentSourceSequentialDocumentCache =
         DocumentSourceSequentialDocumentCache::create(getExpCtx(), cache);
     auto mockStage =
@@ -66,7 +67,7 @@ TEST_F(DocumentSourceSequentialDocumentCacheTest, ReturnsEOFOnSubsequentCallsAft
 }
 
 TEST_F(DocumentSourceSequentialDocumentCacheTest, ReturnsEOFAfterCacheExhausted) {
-    auto cache = std::make_shared<SequentialDocumentCache>(kDefaultMaxCacheSize);
+    auto cache = std::make_shared<SequentialDocumentCache>(defaultMaxCacheSize());
     cache->add(DOC("_id" << 0));
     cache->add(DOC("_id" << 1));
     cache->freeze();
@@ -84,7 +85,7 @@ TEST_F(DocumentSourceSequentialDocumentCacheTest, ReturnsEOFAfterCacheExhausted)
 }
 
 TEST_F(DocumentSourceSequentialDocumentCacheTest, Redaction) {
-    auto cache = std::make_shared<SequentialDocumentCache>(kDefaultMaxCacheSize);
+    auto cache = std::make_shared<SequentialDocumentCache>(defaultMaxCacheSize());
     cache->add(DOC("_id" << 0));
     cache->add(DOC("_id" << 1));
     auto documentCache = DocumentSourceSequentialDocumentCache::create(getExpCtx(), cache);

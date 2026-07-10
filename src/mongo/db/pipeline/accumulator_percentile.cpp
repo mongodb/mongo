@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/expression_from_accumulator_quantile.h"
 #include "mongo/db/pipeline/percentile_algo.h"
 #include "mongo/db/pipeline/percentile_algo_accurate.h"
+#include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/db/version_context.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
@@ -302,9 +303,10 @@ std::unique_ptr<PercentileAlgorithm> AccumulatorPercentile::createPercentileAlgo
 AccumulatorPercentile::AccumulatorPercentile(ExpressionContext* const expCtx,
                                              const std::vector<double>& ps,
                                              PercentileMethodEnum method,
-                                             boost::optional<int> maxMemoryUsageBytes)
-    : AccumulatorState(
-          expCtx, maxMemoryUsageBytes.value_or(internalQueryMaxPercentileAccumulatorBytes.load())),
+                                             boost::optional<MemoryUsageLimit> maxMemoryUsageBytes)
+    : AccumulatorState(expCtx,
+                       maxMemoryUsageBytes.value_or(
+                           MemoryUsageLimit{query_knobs::kMaxPercentileAccumulatorBytes})),
       _percentiles(ps),
       _algo(createPercentileAlgorithm(method)),
       _method(method) {
@@ -410,12 +412,11 @@ boost::intrusive_ptr<Expression> AccumulatorMedian::parseExpression(ExpressionCo
 AccumulatorMedian::AccumulatorMedian(ExpressionContext* expCtx,
                                      const std::vector<double>& /* unused */,
                                      PercentileMethodEnum method,
-                                     boost::optional<int> maxMemoryUsageBytes)
-    : AccumulatorPercentile(
-          expCtx,
-          {0.5} /* Median is equivalent to asking for the 50th percentile */,
-          method,
-          maxMemoryUsageBytes.value_or(internalQueryMaxPercentileAccumulatorBytes.load())) {}
+                                     boost::optional<MemoryUsageLimit> maxMemoryUsageBytes)
+    : AccumulatorPercentile(expCtx,
+                            {0.5} /* Median is equivalent to asking for the 50th percentile */,
+                            method,
+                            maxMemoryUsageBytes) {}
 
 Value AccumulatorMedian::formatFinalValue(int nPercentiles, const std::vector<double>& pctls) {
     if (pctls.empty()) {

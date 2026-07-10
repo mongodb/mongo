@@ -109,7 +109,8 @@ public:
         return _iter->advance();
     }
 
-    MemoryUsageTracker _tracker{false, 100 * 1024 * 1024 /* default memory limit */};
+    MemoryUsageTracker _tracker{false,
+                                MemoryUsageLimit{100 * 1024 * 1024} /* default memory limit */};
 
 private:
     boost::intrusive_ptr<exec::agg::MockStage> _docStage;
@@ -299,7 +300,8 @@ TEST_F(WindowFunctionExecRemovableDocumentTest, CanResetFunction) {
         auto mock = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
         auto key = ExpressionFieldPath::createPathFromString(
             getExpCtx().get(), "key", getExpCtx()->variablesParseState);
-        MemoryUsageTracker tracker{false, 100 * 1024 * 1024 /* default memory limit */};
+        MemoryUsageTracker tracker{false,
+                                   MemoryUsageLimit{100 * 1024 * 1024} /* default memory limit */};
         auto iter = PartitionIterator{
             getExpCtx().get(),
             mock.get(),
@@ -339,7 +341,8 @@ TEST_F(WindowFunctionExecRemovableDocumentTest, CanResetFunction) {
         auto mockTwo = exec::agg::MockStage::createForTest(std::move(docsTwo), getExpCtx());
         auto keyTwo = ExpressionFieldPath::createPathFromString(
             getExpCtx().get(), "key", getExpCtx()->variablesParseState);
-        MemoryUsageTracker tracker{false, 100 * 1024 * 1024 /* default memory limit */};
+        MemoryUsageTracker tracker{false,
+                                   MemoryUsageLimit{100 * 1024 * 1024} /* default memory limit */};
 
         auto iter = PartitionIterator{
             getExpCtx().get(),

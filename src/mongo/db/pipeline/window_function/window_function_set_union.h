@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/memory_token_container_util.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
+#include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
@@ -45,7 +46,7 @@ public:
     }
 
     explicit WindowFunctionSetUnion(ExpressionContext* const expCtx)
-        : WindowFunctionState(expCtx, internalQueryMaxSetUnionBytes.load()),
+        : WindowFunctionState(expCtx, MemoryUsageLimit{query_knobs::kMaxSetUnionBytes}),
           _values(MemoryTokenValueComparator(&_expCtx->getValueComparator())) {
         _memUsageTracker.set(sizeof(*this));
     }

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2025-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,47 +29,37 @@
 
 #pragma once
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/memory_tracking/memory_usage_limit.h"
+#include "mongo/db/query/query_knobs/query_knob.h"
 #include "mongo/util/modules.h"
+
+#include <cstdint>
 
 namespace mongo {
 
-enum class StageMemoryLimit {
-    DocumentSourceLookupCacheSizeBytes,
-    DocumentSourceGraphLookupMaxMemoryBytes,
-    DocumentSourceGroupMaxMemoryBytes,
-    DocumentSourceSetWindowFieldsMaxMemoryBytes,
-    DocumentSourceBucketAutoMaxMemoryBytes,
-    DocumentSourceDensifyMaxMemoryBytes,
-    QueryFacetBufferSizeBytes,
-    TextOrStageMaxMemoryBytes,
-    QuerySBELookupApproxMemoryUseInBytesBeforeSpill,
-    QuerySBEAggApproxMemoryUseInBytesBeforeSpill,
-    QueryMaxSpoolMemoryUsageBytes,
-    QueryMaxBlockingSortMemoryUsageBytes,
-    OrStageMaxMemoryBytes,
-    NearStageMaxMemoryBytes,
-    MergeSortStageMaxMemoryBytes,
-    IndexScanStageMaxMemoryBytes,
-    SBEUniqueStageMaxMemoryBytes,
-    SBEMergeJoinStageMaxMemoryBytes,
-    SBEAndHashStageMaxMemoryBytes,
-    QuerySBEHashJoinApproxMemoryUseInBytesBeforeSpill,
-    UpdateStageMaxMemoryBytes,
-    CountScanStageMaxMemoryBytes,
+/**
+ * Holder for a tracker's maximum allowed memory usage. Currently only a byte count fixed at
+ * construction time; the explicit constructor makes every site that snapshots a byte count into a
+ * limit visible.
+ *
+ * This is intentionally a thin strong typedef for now: it exists so that a follow-up change can
+ * teach it to resolve the limit lazily (e.g. against a per-operation QueryKnobConfiguration)
+ * without re-touching all of the call sites that construct and pass limits around.
+ */
+class [[MONGO_MOD_PUBLIC]] MemoryUsageLimit {
+public:
+    using MemoryKnob = QueryKnob<long long>;
+    explicit MemoryUsageLimit(MemoryKnob knob);
+
+    // TODO SERVER-131136: also accept a MemorySize so call sites can write
+    // MemoryUsageLimit{MemorySize{"100MB"}} instead of a raw byte count.
+    explicit MemoryUsageLimit(int64_t value) : _value(value) {}
+
+    int64_t get() const {
+        return _value;
+    }
+
+private:
+    int64_t _value;
 };
-
-/**
- * Returns the memory limit for the given stage according to the server parameters. Call 'get()' on
- * the result for a plain byte count.
- */
-MemoryUsageLimit loadMemoryLimit(StageMemoryLimit stage);
-
-/**
- * Adds values of the server parameters, responsible for the memory limits, to the explain command
- * output.
- */
-void appendStageMemoryLimitsToExplain(BSONObjBuilder& bob);
 
 }  // namespace mongo

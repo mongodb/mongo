@@ -109,9 +109,6 @@ public:
     }
 };
 
-const long long kDefaultMaxCacheSize =
-    loadMemoryLimit(StageMemoryLimit::DocumentSourceLookupCacheSizeBytes);
-
 // A 'let' variable defined in a $lookup stage is expected to be available to all sub-pipelines. For
 // sub-pipelines below the immediate one, they are passed to via ExpressionContext. This test
 // confirms that variables defined in the ExpressionContext are captured by the $lookup stage.

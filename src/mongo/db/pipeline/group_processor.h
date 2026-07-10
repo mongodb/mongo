@@ -56,7 +56,7 @@ namespace [[MONGO_MOD_PUBLIC]] mongo {
 class GroupProcessor : public GroupProcessorBase {
 public:
     GroupProcessor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                   int64_t maxMemoryUsageBytes);
+                   MemoryUsageLimit maxMemoryUsageBytes);
 
     /**
      * Adds the given document to the group corresponding to the specified group key.

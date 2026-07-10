@@ -132,7 +132,7 @@ void HashJoinStage::prepare(CompileCtx& ctx) {
                    innerChild());
 
     _joinImpl.emplace(
-        loadMemoryLimit(StageMemoryLimit::QuerySBEHashJoinApproxMemoryUseInBytesBeforeSpill),
+        loadMemoryLimit(StageMemoryLimit::QuerySBEHashJoinApproxMemoryUseInBytesBeforeSpill).get(),
         collator,
         _estimatedBuildCardinality,
         _stats);
