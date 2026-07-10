@@ -2279,6 +2279,11 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 "applyOps_imageInvalidation",
                 op.getNss(),
                 [&] {
+                    invariant(op.getSessionId().has_value(),
+                              "Oplog entry with `needsRetryImage` should also have a session id");
+                    invariant(
+                        op.getTxnNumber().has_value(),
+                        "Oplog entry with `needsRetryImage` should also have a transaction number");
                     WriteUnitOfWork wuow(opCtx);
                     writeToImageCollectionIfNeeded(
                         opCtx,
@@ -2912,6 +2917,12 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     }
 
                     if (op.getNeedsRetryImage()) {
+                        invariant(
+                            op.getSessionId().has_value(),
+                            "Oplog entry with `needsRetryImage` should also have a session id");
+                        invariant(op.getTxnNumber().has_value(),
+                                  "Oplog entry with `needsRetryImage` should also have a "
+                                  "transaction number");
                         writeToImageCollectionIfNeeded(
                             opCtx,
                             op.getSessionId().value(),
@@ -3045,6 +3056,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         // `config.transactions` table is responsible for whether to retry. The
                         // motivation here is to simply reduce the number of states related
                         // documents in the two collections can be in.
+                        invariant(op.getSessionId().has_value());
+                        invariant(op.getTxnNumber().has_value());
                         writeToImageCollectionIfNeeded(
                             opCtx,
                             op.getSessionId().value(),

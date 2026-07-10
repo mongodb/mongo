@@ -122,6 +122,11 @@ Status _applyOps(OperationContext* opCtx,
                     }
                     auto entry = uassertStatusOK(OplogEntry::parse(builder.done()));
 
+                    uassert(
+                        ErrorCodes::InvalidOptions,
+                        "applyOps command does not support the internal `needsRetryImage` field",
+                        !entry.getNeedsRetryImage());
+
                     // VersionContext fixes a FCV snapshot over the opCtx, making FCV-gated feature
                     // flags checks in secondaries behave as they did on the primary, thus ensuring
                     // correct application even if the FCV changed due to a concurrent setFCV.

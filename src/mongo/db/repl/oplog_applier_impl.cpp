@@ -246,7 +246,10 @@ public:
     bool shouldSkipOp(OplogEntry* op) {
         boost::optional<LogicalSessionId> retryImageKey;
         if (op->getNeedsRetryImage()) {
-            retryImageKey = *op->getSessionId();
+            auto sessionId = op->getSessionId();
+            invariant(sessionId.has_value(),
+                      "Oplog entry with `needsRetryImage` should also have a session id");
+            retryImageKey = *sessionId;
         } else if (_isSkippableDelete(op)) {
             try {
                 retryImageKey = LogicalSessionId::parse(

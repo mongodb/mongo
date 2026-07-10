@@ -170,14 +170,23 @@ TEST_F(ApplyOpsTest, CommandInNestedApplyOpsReturnsSuccess) {
 /**
  * Creates an applyOps command object with a single insert operation.
  */
-BSONObj makeApplyOpsWithInsertOperation(const NamespaceString& nss,
-                                        const boost::optional<UUID>& uuid,
-                                        const BSONObj& documentToInsert) {
-    auto insertOp = uuid
-        ? BSON("op" << "i"
-                    << "ns" << nss.ns_forTest() << "o" << documentToInsert << "ui" << *uuid)
-        : BSON("op" << "i"
-                    << "ns" << nss.ns_forTest() << "o" << documentToInsert);
+BSONObj makeApplyOpsWithInsertOperation(
+    const NamespaceString& nss,
+    const BSONObj& documentToInsert,
+    const boost::optional<UUID>& uuid = boost::none,
+    const boost::optional<RetryImageEnum>& needsRetryImage = boost::none) {
+    auto insertOp = BSON("op" << "i"
+                              << "ns" << nss.ns_forTest() << "o" << documentToInsert);
+    if (uuid.has_value()) {
+        insertOp = insertOp.addFields(BSON("ui" << *uuid));
+    }
+    if (needsRetryImage.has_value()) {
+        invariant(*needsRetryImage == RetryImageEnum::kPreImage ||
+                  *needsRetryImage == RetryImageEnum::kPostImage);
+        insertOp = insertOp.addFields(
+            BSON("needsRetryImage"
+                 << (*needsRetryImage == RetryImageEnum::kPreImage ? "preImage" : "postImage")));
+    }
     return BSON("applyOps" << BSON_ARRAY(insertOp));
 }
 
@@ -186,7 +195,7 @@ TEST_F(ApplyOpsTest, ApplyOpsInsertIntoNonexistentCollectionReturnsNamespaceNotF
     auto mode = OplogApplication::Mode::kApplyOpsCmd;
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     auto documentToInsert = BSON("_id" << 0);
-    auto cmdObj = makeApplyOpsWithInsertOperation(nss, boost::none, documentToInsert);
+    auto cmdObj = makeApplyOpsWithInsertOperation(nss, documentToInsert);
     BSONObjBuilder resultBuilder;
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
                   applyOps(opCtx.get(),
@@ -197,6 +206,34 @@ TEST_F(ApplyOpsTest, ApplyOpsInsertIntoNonexistentCollectionReturnsNamespaceNotF
     auto result = resultBuilder.obj();
     auto status = getStatusFromApplyOpsResult(result);
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
+}
+
+TEST_F(ApplyOpsTest, ApplyOpsCmdFailsIfNeedsRetryImagePresent) {
+    auto opCtx = cc().makeOperationContext();
+    constexpr auto mode = OplogApplication::Mode::kApplyOpsCmd;
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
+
+    auto documentToInsert = BSON("_id" << 0);
+    constexpr std::array<RetryImageEnum, 2> needsRetryImageOptions{
+        {RetryImageEnum::kPreImage, RetryImageEnum::kPostImage}};
+    constexpr std::string_view expectedErrorMessage =
+        "applyOps command does not support the internal `needsRetryImage` field";
+
+    for (const auto& needsRetryImage : needsRetryImageOptions) {
+        auto cmdObj =
+            makeApplyOpsWithInsertOperation(nss, documentToInsert, boost::none, needsRetryImage);
+        BSONObjBuilder resultBuilder;
+        ASSERT_EQUALS(ErrorCodes::InvalidOptions,
+                      applyOps(opCtx.get(),
+                               DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                               cmdObj,
+                               mode,
+                               &resultBuilder));
+        auto result = resultBuilder.obj();
+        auto status = getStatusFromApplyOpsResult(result);
+        ASSERT_EQUALS(ErrorCodes::InvalidOptions, status);
+        ASSERT_EQUALS(expectedErrorMessage, status.reason());
+    }
 }
 
 TEST_F(ApplyOpsTest, ApplyOpsInsertWithUuidIntoCollectionWithOtherUuid) {
@@ -215,7 +252,7 @@ TEST_F(ApplyOpsTest, ApplyOpsInsertWithUuidIntoCollectionWithOtherUuid) {
     // The applyOps returns an Unknown error because of the failed UUID lookup
     // even though a collection exists with the same namespace as the insert operation.
     auto documentToInsert = BSON("_id" << 0);
-    auto cmdObj = makeApplyOpsWithInsertOperation(nss, applyOpsUuid, documentToInsert);
+    auto cmdObj = makeApplyOpsWithInsertOperation(nss, documentToInsert, applyOpsUuid);
     BSONObjBuilder resultBuilder;
     ASSERT_EQUALS(ErrorCodes::UnknownError,
                   applyOps(opCtx.get(),
@@ -248,7 +285,7 @@ TEST_F(ApplyOpsTest, ApplyOpsPropagatesOplogApplicationMode) {
     unittest::LogCaptureGuard logs;
 
     auto docToInsert0 = BSON("_id" << 0);
-    auto cmdObj = makeApplyOpsWithInsertOperation(nss, uuid, docToInsert0);
+    auto cmdObj = makeApplyOpsWithInsertOperation(nss, docToInsert0, uuid);
 
     ASSERT_OK(applyOps(
         opCtx.get(), nss.dbName(), cmdObj, OplogApplication::Mode::kInitialSync, &resultBuilder));
@@ -257,7 +294,7 @@ TEST_F(ApplyOpsTest, ApplyOpsPropagatesOplogApplicationMode) {
                       BSON("attr" << BSON("oplogApplicationMode" << "InitialSync"))));
 
     auto docToInsert1 = BSON("_id" << 1);
-    cmdObj = makeApplyOpsWithInsertOperation(nss, uuid, docToInsert1);
+    cmdObj = makeApplyOpsWithInsertOperation(nss, docToInsert1, uuid);
 
     ASSERT_OK(applyOps(
         opCtx.get(), nss.dbName(), cmdObj, OplogApplication::Mode::kSecondary, &resultBuilder));
