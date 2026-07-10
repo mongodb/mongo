@@ -337,6 +337,46 @@ BSONObj explainVersionToBson(const PlanExplainer::ExplainVersion& version) {
     return BSON("explainVersion" << version);
 }
 
+/**
+ * The V3 analogue of generatePlannerInfo(): the hook where the new (version 3) "queryPlanner"
+ * output will be produced. It is invoked in place of generatePlannerInfo() when a V3 verbosity is
+ * requested.
+ *
+ * TODO SERVER-130529 Implement the V3 queryPlanner output format here. Until then this skeleton
+ * delegates to the legacy generatePlannerInfo() so the V3 modes produce meaningful (legacy-shaped)
+ * output while reporting "explainVersion: '3'".
+ * The legacy verbosity supplied by the caller is temporary until we reuse the legacy
+ * implementation.
+ */
+void generatePlannerInfoV3(PlanExecutor* exec,
+                           ExplainOptions::Verbosity legacyVerbosity,
+                           const BSONObj& cmd,
+                           const Explain::PlannerContext& plannerContext,
+                           BSONObj extraInfo,
+                           const SerializationContext& serializationContext,
+                           BSONObjBuilder* out) {
+    generatePlannerInfo(
+        exec, legacyVerbosity, cmd, plannerContext, extraInfo, serializationContext, out);
+}
+
+/**
+ * The V3 analogue of generateExecutionInfo(): the hook where the new (version 3) "executionStats"
+ * output will be produced. It is invoked in place of generateExecutionInfo() when a V3 verbosity
+ * that warrants execution statistics is requested.
+ *
+ * TODO SERVER-130529 Implement the V3 execution output format here. Until then this skeleton
+ * delegates to the legacy generateExecutionInfo().
+ * The legacy verbosity supplied by the caller is temporary until we reuse the legacy
+ * implementation.
+ */
+void generateExecutionInfoV3(PlanExecutor* exec,
+                             ExplainOptions::Verbosity legacyVerbosity,
+                             Status executePlanStatus,
+                             boost::optional<PlanExplainer::PlanStatsDetails> winningPlanTrialStats,
+                             BSONObjBuilder* out) {
+    generateExecutionInfo(exec, legacyVerbosity, executePlanStatus, winningPlanTrialStats, out);
+}
+
 template <typename EntryType>
 void appendBasicPlanCacheEntryInfoToBSON(const EntryType& entry, BSONObjBuilder* out) {
     // TODO SERVER-93305: Remove deprecated 'queryHash' usages.
@@ -396,15 +436,71 @@ void Explain::explainStages(PlanExecutor* exec,
     //
 
     auto&& explainer = exec->getPlanExplainer();
-    out->appendElements(explainVersionToBson(explainer.getVersion()));
+    out->appendElements(explainVersionToBson(explainer.getVerbosityVersion(verbosity)));
 
-    if (verbosity >= ExplainOptions::Verbosity::kQueryPlanner) {
-        generatePlannerInfo(
-            exec, verbosity, command, plannerContext, extraInfo, serializationContext, out);
-    }
-
-    if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-        generateExecutionInfo(exec, verbosity, executePlanStatus, winningPlanTrialStats, out);
+    // Dispatch on the verbosity. Each V3 verbosity is routed to the V3 section generators, which
+    // are the hooks for the future V3 output format; for now they reuse the legacy generators at
+    // the nearest legacy verbosity (passed explicitly here). The legacy verbosities keep the
+    // existing threshold-based behavior. This switch is intentionally exhaustive (no 'default') so
+    // that any future verbosity must be classified here.
+    // TODO SERVER-130529 Replace the legacy delegation in generatePlannerInfoV3()/
+    // generateExecutionInfoV3() with the real V3 output format.
+    switch (verbosity) {
+        case ExplainOptions::Verbosity::kPlanSummary:
+        case ExplainOptions::Verbosity::kPlannerChoice:
+            generatePlannerInfoV3(exec,
+                                  ExplainOptions::Verbosity::kQueryPlanner,
+                                  command,
+                                  plannerContext,
+                                  extraInfo,
+                                  serializationContext,
+                                  out);
+            break;
+        case ExplainOptions::Verbosity::kPlannerStats:
+            // plannerStats includes the per-plan trial statistics that V1/V2 report via the
+            // "allPlansExecution" section, so it reuses the legacy kExecAllPlans output.
+            generatePlannerInfoV3(exec,
+                                  ExplainOptions::Verbosity::kExecAllPlans,
+                                  command,
+                                  plannerContext,
+                                  extraInfo,
+                                  serializationContext,
+                                  out);
+            generateExecutionInfoV3(exec,
+                                    ExplainOptions::Verbosity::kExecAllPlans,
+                                    executePlanStatus,
+                                    winningPlanTrialStats,
+                                    out);
+            break;
+        case ExplainOptions::Verbosity::kExecStatsV3:
+            // execStats has the same meaning as the legacy "executionStats" verbosity, so it reuses
+            // the legacy kExecStats output.
+            generatePlannerInfoV3(exec,
+                                  ExplainOptions::Verbosity::kExecStats,
+                                  command,
+                                  plannerContext,
+                                  extraInfo,
+                                  serializationContext,
+                                  out);
+            generateExecutionInfoV3(exec,
+                                    ExplainOptions::Verbosity::kExecStats,
+                                    executePlanStatus,
+                                    winningPlanTrialStats,
+                                    out);
+            break;
+        case ExplainOptions::Verbosity::kQueryPlanner:
+        case ExplainOptions::Verbosity::kExecStats:
+        case ExplainOptions::Verbosity::kExecAllPlans:
+        case ExplainOptions::Verbosity::kInternal:
+            if (verbosity >= ExplainOptions::Verbosity::kQueryPlanner) {
+                generatePlannerInfo(
+                    exec, verbosity, command, plannerContext, extraInfo, serializationContext, out);
+            }
+            if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+                generateExecutionInfo(
+                    exec, verbosity, executePlanStatus, winningPlanTrialStats, out);
+            }
+            break;
     }
 
     explain_common::generateQueryShapeHash(exec->getOpCtx(), out);
@@ -423,16 +519,53 @@ void Explain::explainPipeline(PlanExecutor* exec,
     auto pipelineExec = dynamic_cast<PlanExecutorPipeline*>(exec);
     tassert(11320915, "expected 'exec' to be a PlanExecutorPipeline", pipelineExec);
 
-    // If we need execution stats, this runs the plan in order to gather the stats.
-    if (verbosity >= ExplainOptions::Verbosity::kExecStats && executePipeline) {
-        // TODO SERVER-32732: An execution error should be reported in explain, but should not
-        // cause the explain itself to fail.
-        executePlan(pipelineExec);
-    }
-
     auto&& explainer = pipelineExec->getPlanExplainer();
-    out->appendElements(explainVersionToBson(explainer.getVersion()));
-    *out << "stages" << Value(pipelineExec->writeExplainOps(verbosity));
+    out->appendElements(explainVersionToBson(explainer.getVerbosityVersion(verbosity)));
+
+    // Dispatch on the verbosity. Each V3 verbosity is routed to writeExplainOpsV3() (the hook for
+    // the future V3 pipeline format), which for now reuses the legacy writeExplainOps() at the
+    // nearest legacy verbosity passed explicitly here. Handing the stages a legacy verbosity keeps
+    // every DocumentSource's threshold checks (and DocumentSourceCursor's cross-check) consistent.
+    // The legacy verbosities keep the existing behavior. Exhaustive switch (no 'default') so any
+    // future verbosity must be classified here.
+    // TODO SERVER-130810 Replace the legacy delegation in writeExplainOpsV3() with the real V3
+    // pipeline format. (TODO SERVER-32732: an execution error should be reported in explain rather
+    // than failing the explain itself.)
+    switch (verbosity) {
+        case ExplainOptions::Verbosity::kPlanSummary:
+        case ExplainOptions::Verbosity::kPlannerChoice:
+            // Planner-only: do not execute the pipeline.
+            *out << "stages"
+                 << Value(
+                        pipelineExec->writeExplainOpsV3(ExplainOptions::Verbosity::kQueryPlanner));
+            break;
+        case ExplainOptions::Verbosity::kPlannerStats:
+            // plannerStats reuses the legacy kExecAllPlans output (see the find-path dispatch).
+            if (executePipeline) {
+                executePlan(pipelineExec);
+            }
+            *out << "stages"
+                 << Value(
+                        pipelineExec->writeExplainOpsV3(ExplainOptions::Verbosity::kExecAllPlans));
+            break;
+        case ExplainOptions::Verbosity::kExecStatsV3:
+            // execStats has the same meaning as the legacy "executionStats" verbosity.
+            if (executePipeline) {
+                executePlan(pipelineExec);
+            }
+            *out << "stages"
+                 << Value(pipelineExec->writeExplainOpsV3(ExplainOptions::Verbosity::kExecStats));
+            break;
+        case ExplainOptions::Verbosity::kQueryPlanner:
+        case ExplainOptions::Verbosity::kExecStats:
+        case ExplainOptions::Verbosity::kExecAllPlans:
+        case ExplainOptions::Verbosity::kInternal:
+            if (verbosity >= ExplainOptions::Verbosity::kExecStats && executePipeline) {
+                executePlan(pipelineExec);
+            }
+            *out << "stages" << Value(pipelineExec->writeExplainOps(verbosity));
+            break;
+    }
 
     explain_common::generateQueryShapeHash(exec->getOpCtx(), out);
     explain_common::generatePeakTrackedMemBytes(exec->getOpCtx(), out);
@@ -456,9 +589,29 @@ void Explain::explainStages(PlanExecutor* exec,
     Status executePlanStatus = Status::OK();
     const MultipleCollectionAccessor* collectionsPtr = &collections;
 
+    // Whether the plan must be executed to gather execution statistics. This mirrors the verbosity
+    // dispatch in the sibling explainStages() overload: the planner-only modes (legacy queryPlanner
+    // and the planner-only V3 modes) do not execute; everything else does. Exhaustive switch (no
+    // 'default') so a future verbosity must be classified here too.
+    const bool requiresExecution = [&] {
+        switch (verbosity) {
+            case ExplainOptions::Verbosity::kQueryPlanner:
+            case ExplainOptions::Verbosity::kPlanSummary:
+            case ExplainOptions::Verbosity::kPlannerChoice:
+                return false;
+            case ExplainOptions::Verbosity::kExecStats:
+            case ExplainOptions::Verbosity::kExecAllPlans:
+            case ExplainOptions::Verbosity::kInternal:
+            case ExplainOptions::Verbosity::kPlannerStats:
+            case ExplainOptions::Verbosity::kExecStatsV3:
+                return true;
+        }
+        MONGO_UNREACHABLE_TASSERT(10905002);
+    }();
+
     // If we need execution stats, then run the plan in order to gather the stats.
     const MultipleCollectionAccessor emptyCollections;
-    if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+    if (requiresExecution) {
         try {
             executePlan(exec);
         } catch (const DBException&) {

@@ -53,6 +53,12 @@ public:
     static constexpr std::string_view kVerbosityName = "verbosity"sv;
 
     /**
+     * Returns true if 'verbosity' is one of the "version 3" (V3) explain verbosity modes. When any
+     * of these is requested, explain reports "explainVersion: '3'".
+     */
+    static bool isV3Verbosity(ExplainOptions::Verbosity verbosity);
+
+    /**
      * Converts an explain verbosity to its string representation.
      */
     static std::string_view verbosityString(ExplainOptions::Verbosity verbosity);

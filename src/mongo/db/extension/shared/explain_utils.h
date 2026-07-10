@@ -46,6 +46,16 @@ inline ::MongoExtensionExplainVerbosity convertHostVerbosityToExtVerbosity(
             return ::MongoExtensionExplainVerbosity::kExecStats;
         case mongo::ExplainOptions::Verbosity::kExecAllPlans:
             return ::MongoExtensionExplainVerbosity::kExecAllPlans;
+        // The V3 verbosity modes have no distinct extension-facing representation yet, so map each
+        // to the nearest legacy verbosity, matching the host's V3 skeleton (see
+        // Explain::explainStages). TODO SERVER-130529 revisit when the V3 format is implemented.
+        case mongo::ExplainOptions::Verbosity::kPlanSummary:
+        case mongo::ExplainOptions::Verbosity::kPlannerChoice:
+            return ::MongoExtensionExplainVerbosity::kQueryPlanner;
+        case mongo::ExplainOptions::Verbosity::kPlannerStats:
+            return ::MongoExtensionExplainVerbosity::kExecAllPlans;
+        case mongo::ExplainOptions::Verbosity::kExecStatsV3:
+            return ::MongoExtensionExplainVerbosity::kExecStats;
         default:
             MONGO_UNREACHABLE_TASSERT(11239404);
     }

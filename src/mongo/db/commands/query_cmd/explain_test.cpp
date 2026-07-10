@@ -53,6 +53,13 @@ TEST(ExplainTest, VerbosityEnumToStringReturnsCorrectValues) {
     ASSERT_EQ(idl::serialize(Verbosity::kExecAllPlans), "allPlansExecution"sv);
 }
 
+TEST(ExplainTest, VerbosityEnumToStringReturnsCorrectValuesForV3) {
+    ASSERT_EQ(idl::serialize(Verbosity::kPlanSummary), "planSummary"sv);
+    ASSERT_EQ(idl::serialize(Verbosity::kPlannerChoice), "plannerChoice"sv);
+    ASSERT_EQ(idl::serialize(Verbosity::kPlannerStats), "plannerStats"sv);
+    ASSERT_EQ(idl::serialize(Verbosity::kExecStatsV3), "execStats"sv);
+}
+
 TEST(ExplainTest, ExplainSerializeToBSONCorrectly) {
     ASSERT_BSONOBJ_EQ(BSON("verbosity" << "queryPlanner"),
                       ExplainOptions::toBSON(Verbosity::kQueryPlanner));
@@ -78,6 +85,35 @@ TEST(ExplainTest, CanParseExplainVerbosity) {
                     IDLParserContext("explain"))
                     .getVerbosity();
     ASSERT(verbosity == Verbosity::kExecAllPlans);
+}
+
+TEST(ExplainTest, CanParseExplainVerbosityV3) {
+    auto parseVerbosity = [](const std::string& json) {
+        return ExplainCommandRequest::parse(fromjson(json), IDLParserContext("explain"))
+            .getVerbosity();
+    };
+    ASSERT(parseVerbosity("{explain: {}, verbosity: 'planSummary', $db: 'dummy'}") ==
+           Verbosity::kPlanSummary);
+    ASSERT(parseVerbosity("{explain: {}, verbosity: 'plannerChoice', $db: 'dummy'}") ==
+           Verbosity::kPlannerChoice);
+    ASSERT(parseVerbosity("{explain: {}, verbosity: 'plannerStats', $db: 'dummy'}") ==
+           Verbosity::kPlannerStats);
+    ASSERT(parseVerbosity("{explain: {}, verbosity: 'execStats', $db: 'dummy'}") ==
+           Verbosity::kExecStatsV3);
+}
+
+TEST(ExplainTest, IsV3VerbosityIsTrueOnlyForNewModes) {
+    // The new V3 verbosity modes are reported as V3.
+    ASSERT_TRUE(ExplainOptions::isV3Verbosity(Verbosity::kPlanSummary));
+    ASSERT_TRUE(ExplainOptions::isV3Verbosity(Verbosity::kPlannerChoice));
+    ASSERT_TRUE(ExplainOptions::isV3Verbosity(Verbosity::kPlannerStats));
+    ASSERT_TRUE(ExplainOptions::isV3Verbosity(Verbosity::kExecStatsV3));
+
+    // The legacy verbosity modes are not V3.
+    ASSERT_FALSE(ExplainOptions::isV3Verbosity(Verbosity::kQueryPlanner));
+    ASSERT_FALSE(ExplainOptions::isV3Verbosity(Verbosity::kExecStats));
+    ASSERT_FALSE(ExplainOptions::isV3Verbosity(Verbosity::kExecAllPlans));
+    ASSERT_FALSE(ExplainOptions::isV3Verbosity(Verbosity::kInternal));
 }
 
 TEST(ExplainTest, ParsingFailsIfVerbosityIsNotAString) {

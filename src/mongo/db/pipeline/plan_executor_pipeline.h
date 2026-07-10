@@ -202,6 +202,20 @@ public:
             : _pipeline->writeExplainOps(opts);
     }
 
+    /**
+     * The V3 analogue of writeExplainOps(): the hook where the new (version 3) pipeline "stages"
+     * output will be produced. It is invoked in place of writeExplainOps() when a V3 explain
+     * verbosity is requested; the caller supplies the legacy verbosity whose output V3 currently
+     * reuses.
+     *
+     * TODO SERVER-130810 Implement the V3 pipeline output format here. Until then this delegates to
+     * writeExplainOps(). Once implemented it should take the requested V3 verbosity rather than the
+     * legacy one (the legacy verbosity is a transitional artifact of the skeleton).
+     */
+    std::vector<Value> writeExplainOpsV3(ExplainOptions::Verbosity legacyVerbosity) const {
+        return writeExplainOps(legacyVerbosity);
+    }
+
     boost::optional<std::string_view> getExecutorType() const override {
         tassert(6253504, "Can't get type string without pipeline", _pipeline);
         return _pipeline->getTypeString();

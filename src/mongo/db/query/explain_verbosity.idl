@@ -50,6 +50,36 @@ enums:
             # well as the winning plan.
             kExecAllPlans: "allPlansExecution"
 
+            # V3 explain verbosity modes. They are additive: each one includes the contents of the
+            # previous. Supplying any of them causes explain to generate "explainVersion: '3'".
+            # They are intentionally ordered between kExecAllPlans and kInternal so that, until the
+            # V3 output format is implemented, they behave like the default (kExecAllPlans)
+            # verbosity for all existing content-generation logic while never being treated as
+            # kInternal.
+            #
+            # TODO SERVER-130812 This ordering is a transitional crutch: existing content-generation
+            # logic branches on ordinal comparisons (e.g. "verbosity >= kExecStats"), which are only
+            # correct for V3 modes because every V3 value is translated to a legacy verbosity before
+            # reaching those comparisons. Once the ordinal comparisons are replaced with semantic
+            # predicates, the ordering of these enum values will no longer carry meaning.
+
+            # A very compact representation of the plan structure with minimal stable structural
+            # information about the chosen plans.
+            kPlanSummary: "planSummary"
+
+            # Shows the plan structure with more detail than kPlanSummary. Excludes multi-planning,
+            # cost-based ranking, and execution statistics.
+            kPlannerChoice: "plannerChoice"
+
+            # Shows the plan structure with associated multi-planning and/or cost-based ranking
+            # statistics, including the trial-phase statistics currently reported via
+            # "allPlansExecution".
+            kPlannerStats: "plannerStats"
+
+            # In addition to kPlannerStats, also runs the winning plan and adds its execution
+            # statistics. This is the V3 counterpart of kExecStats.
+            kExecStatsV3: "execStats"
+
             # This verbosity is set aside for miscellaneous information. It includes virtual machine
             # bytecode for the slot-based execution engine.
             kInternal: "internal"

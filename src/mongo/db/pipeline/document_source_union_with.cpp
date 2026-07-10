@@ -430,6 +430,15 @@ DocumentSourceContainer::iterator DocumentSourceUnionWith::optimizeAt(
         _sharedState->_pipeline->addFinalSource(
             nextStage->clone(_sharedState->_pipeline->getContext()));
         // Apply the same rewrite to the cached pipeline if available.
+        // TODO SERVER-130812 This ordinal comparison reads the verbosity directly from the
+        // ExpressionContext, which holds the originally requested (possibly V3) verbosity. Because
+        // the V3 modes sort >= kExecStats, this is currently true even for the planner-only V3
+        // modes (planSummary/plannerChoice). This is harmless today: the emit side (serialize())
+        // still gates on the translated legacy verbosity, so the extra pushed-down stages recorded
+        // here are ignored for the planner-only modes (wasted work, not wrong output). It becomes a
+        // real bug once SERVER-130810 threads the real V3 verbosity into the aggregate serialize
+        // path, at which point the emit-side comparisons here misfire too. Replace with a semantic
+        // predicate so V3 verbosities are interpreted by meaning rather than enum order.
         if (getExpCtx()->getExplain() >= ExplainOptions::Verbosity::kExecStats) {
             _pushedDownStages.push_back(nextStage->serialize().getDocument().toBson());
         }
