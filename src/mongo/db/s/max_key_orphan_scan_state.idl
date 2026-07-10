@@ -29,8 +29,8 @@
 # Defines the singleton document stored in config.maxKeyOrphanScanState. The document
 # tracks the result of the per-primary-stepup MaxKey orphan inventory scan run on each
 # shard primary. The collection is replicated within the shard replica set so that
-# alertEmitted is preserved across stepups and new primaries do not re-alert for the same
-# finding.
+# unownedAlertEmitted is preserved across stepups and new primaries do not re-alert for the
+# same finding.
 
 global:
     cpp_namespace: "mongo"
@@ -61,14 +61,28 @@ structs:
                     "Wallclock time when the scan finished. Set only when the scan ran
                     to completion on the current primary; absent if the scan was abandoned."
                 optional: true
-            foundMaxKey:
+            foundUnownedMaxKey:
                 type: bool
                 description: "True if any unowned MaxKey doc is found on this shard."
                 optional: true
-            alertEmitted:
+            unownedAlertEmitted:
                 type: bool
                 description:
-                    "Gates the one-shot WARNING log emitted when foundMaxKey transitions
+                    "Gates the one-shot WARNING log emitted when foundUnownedMaxKey
+                    transitions to true. Replicated so new primaries do not re-alert for an
+                    already surfaced finding."
+                optional: true
+            foundOwnedMaxKey:
+                type: bool
+                description:
+                    "True if any accessible (owned) MaxKey doc is found on this shard. The
+                    shard legitimately owns the document, but its version could be stale if
+                    it was re-owned after some series of application operations."
+                optional: true
+            ownedAlertEmitted:
+                type: bool
+                description:
+                    "Gates the one-shot WARNING log emitted when foundOwnedMaxKey transitions
                     to true. Replicated so new primaries do not re-alert for an already
                     surfaced finding."
                 optional: true

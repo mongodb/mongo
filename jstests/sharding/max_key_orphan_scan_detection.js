@@ -3,10 +3,11 @@
  * and persists its outcome to config.maxKeyOrphanScanState.
  *
  * Cases:
- *   1. Clean cluster: foundMaxKey=false; a second stepup must not rewrite the doc (one-shot guard).
- *   2. Non-findings in a single sweep: an owned all-MaxKey doc, a hashed shard key, and an
- *      all-MaxKey doc covered by a pending range-deletion task. None are flagged.
- *   3. Already-orphan single-field shard key: flagged, WARNING fires, alertEmitted=true.
+ *   1. Clean cluster: foundUnownedMaxKey=false; a second stepup must not rewrite the doc (one-shot guard).
+ *   2. Single sweep with an owned all-MaxKey doc (flagged as the owned signal only), a hashed shard
+ *      key, and an all-MaxKey doc covered by a pending range-deletion task (neither flagged as an
+ *      orphan).
+ *   3. Already-orphan single-field shard key: flagged, WARNING fires, unownedAlertEmitted=true.
  *   4. Already-orphan compound shard key (all fields MaxKey): flagged.
  *   5. Already-orphan compound shard key with only the leading field MaxKey (e.g. {a: MaxKey,
  *      b: 10}): not flagged, because it is below the global max and migrated normally.
@@ -21,6 +22,10 @@
  *  10. Failover before persist: pause the scan just before it upserts the state doc, stepdown to
  *      interrupt it, disable the failpoint, and confirm the next primary re-runs the scan to
  *      completion (one-shot re-run after an interrupted sweep).
+ *  11. Non-retryable catalog read error: the sweep still completes and increments
+ *      maxKeyOrphanScanErrors.
+ *  12. Owned and unowned MaxKey docs together in one sweep: both signals set and both WARNING lines
+ *      fire.
  *
  * @tags: [
  *  featureFlagMaxKeyDetection,
@@ -38,6 +43,7 @@ TestData.skipCheckOrphans = true;
 
 const scanStateId = "scanState";
 const warningLogId = 12799008;
+const ownedWarningLogId = 13048900;
 
 function readScanState(shard) {
     return shard.getDB("config").getCollection("maxKeyOrphanScanState").findOne({_id: scanStateId});
@@ -55,15 +61,21 @@ function readOrphanScanStats(rs) {
 
 // Asserts the FTDC counters reflect a completed scan with the given outcome. Cases wait on the state
 // doc for completion (scanCompletedAt) and assert the classification here, so it is checked once.
-function assertOrphanScanStats(rs, {foundMaxKey, alertEmitted}, message) {
+function assertOrphanScanStats(
+    rs,
+    {foundUnownedMaxKey, unownedAlertEmitted, foundOwnedMaxKey = false, ownedAlertEmitted = false},
+    message,
+) {
     let stats;
     assert.soon(
         () => {
             stats = readOrphanScanStats(rs);
             return (
                 stats.maxKeyOrphanScanComplete == 1 &&
-                stats.maxKeyOrphanScanFoundMaxKey == (foundMaxKey ? 1 : 0) &&
-                stats.maxKeyOrphanScanAlertEmitted == (alertEmitted ? 1 : 0)
+                stats.maxKeyOrphanScanFoundUnownedMaxKey == (foundUnownedMaxKey ? 1 : 0) &&
+                stats.maxKeyOrphanScanUnownedAlertEmitted == (unownedAlertEmitted ? 1 : 0) &&
+                stats.maxKeyOrphanScanFoundOwnedMaxKey == (foundOwnedMaxKey ? 1 : 0) &&
+                stats.maxKeyOrphanScanOwnedAlertEmitted == (ownedAlertEmitted ? 1 : 0)
             );
         },
         () => `${message}; got ${tojson(stats)}`,
@@ -172,7 +184,7 @@ function resetClusterState(collNames) {
 }
 
 // --- Case 1: clean cluster ----------------------------------------------------------------------
-jsTest.log.info("Case 1: clean cluster, expect foundMaxKey=false after stepup");
+jsTest.log.info("Case 1: clean cluster, expect foundUnownedMaxKey=false after stepup");
 
 const cleanState = stepUpAndAwaitScanState(
     st.rs0,
@@ -181,7 +193,7 @@ const cleanState = stepUpAndAwaitScanState(
 );
 assertOrphanScanStats(
     st.rs0,
-    {foundMaxKey: false, alertEmitted: false},
+    {foundUnownedMaxKey: false, unownedAlertEmitted: false},
     "maxKeyOrphanScan stats must reflect clean scan outcome",
 );
 
@@ -203,13 +215,13 @@ assert.docEq(
 // The short-circuit path re-publishes the prior outcome to FTDC (distinct from the initial publish).
 assertOrphanScanStats(
     st.rs0,
-    {foundMaxKey: false, alertEmitted: false},
+    {foundUnownedMaxKey: false, unownedAlertEmitted: false},
     "short-circuit must republish the prior clean outcome to FTDC stats",
 );
 
-// --- Case 2: non-findings (owned all-MaxKey doc, hashed key, range-deletion-covered doc) --------
+// --- Case 2: owned all-MaxKey doc (owned signal), hashed key, range-deletion-covered doc ---------
 jsTest.log.info(
-    "Case 2: owned all-MaxKey doc, hashed shard key, and a covered doc must not be flagged",
+    "Case 2: owned all-MaxKey doc flagged as owned only; hashed and covered docs not flagged",
 );
 
 // (a) Owned all-MaxKey doc: shard0 keeps the (only) chunk so it legitimately owns {a: MaxKey}.
@@ -259,9 +271,15 @@ stepUpAndAwaitScanState(
 );
 assertOrphanScanStats(
     st.rs0,
-    {foundMaxKey: false, alertEmitted: false},
-    "Detector must not flag an owned all-MaxKey doc, a hashed shard key, or a covered doc",
+    {
+        foundUnownedMaxKey: false,
+        unownedAlertEmitted: false,
+        foundOwnedMaxKey: true,
+        ownedAlertEmitted: true,
+    },
+    "Detector must flag the owned all-MaxKey doc as the owned signal only",
 );
+checkLog.containsJson(st.rs0.getPrimary(), ownedWarningLogId);
 
 resetClusterState([ownedColl, hashedColl, coveredColl]);
 
@@ -317,8 +335,8 @@ stepUpAndAwaitScanState(
 );
 assertOrphanScanStats(
     st.rs0,
-    {foundMaxKey: true, alertEmitted: true},
-    "Detector should flag the already-orphan MaxKey doc and record alertEmitted=true",
+    {foundUnownedMaxKey: true, unownedAlertEmitted: true},
+    "Detector should flag the already-orphan MaxKey doc and record unownedAlertEmitted=true",
 );
 
 checkLog.containsJson(st.rs0.getPrimary(), warningLogId);
@@ -365,7 +383,7 @@ stepUpAndAwaitScanState(
 );
 assertOrphanScanStats(
     st.rs0,
-    {foundMaxKey: true, alertEmitted: true},
+    {foundUnownedMaxKey: true, unownedAlertEmitted: true},
     "Detector should flag the already-orphan compound-shard-key MaxKey doc",
 );
 
@@ -418,7 +436,7 @@ stepUpAndAwaitScanState(
 );
 assertOrphanScanStats(
     st.rs0,
-    {foundMaxKey: false, alertEmitted: false},
+    {foundUnownedMaxKey: false, unownedAlertEmitted: false},
     "Detector should not flag an orphan whose leading shard-key field is MaxKey but trailing field is not",
 );
 
@@ -481,7 +499,12 @@ stepUpAndAwaitScanState(
 );
 assertOrphanScanStats(
     st.rs0,
-    {foundMaxKey: false, alertEmitted: false},
+    {
+        foundUnownedMaxKey: false,
+        unownedAlertEmitted: false,
+        foundOwnedMaxKey: false,
+        ownedAlertEmitted: false,
+    },
     "Detector must not flag a partial-MaxKey doc this shard legitimately owns",
 );
 
@@ -569,7 +592,7 @@ stepUpAndAwaitScanState(
 );
 assertOrphanScanStats(
     st.rs0,
-    {foundMaxKey: false, alertEmitted: false},
+    {foundUnownedMaxKey: false, unownedAlertEmitted: false},
     "Detector must not flag a partial-MaxKey orphan covered by a pending range-deletion task",
 );
 
@@ -642,7 +665,7 @@ stepUpAndAwaitScanState(
 );
 assertOrphanScanStats(
     st.rs0,
-    {foundMaxKey: true, alertEmitted: true},
+    {foundUnownedMaxKey: true, unownedAlertEmitted: true},
     "Detector should flag an orphan whose shard key is read through a wider compound index",
 );
 
@@ -663,7 +686,7 @@ stepUpAndAwaitScanState(
 );
 assertOrphanScanStats(
     st.rs0,
-    {foundMaxKey: false, alertEmitted: false},
+    {foundUnownedMaxKey: false, unownedAlertEmitted: false},
     "Detector must not flag an empty sharded collection",
 );
 
@@ -696,7 +719,7 @@ hangFp.off();
 // Clear any doc written meanwhile so the next stepup re-runs from an absent doc.
 clearScanStateAndWaitMajority(st.rs0);
 
-// Earlier cases left MaxKey orphans on shard0, so foundMaxKey may be true; only require that
+// Earlier cases left MaxKey orphans on shard0, so foundUnownedMaxKey may be true; only require that
 // scanCompletedAt is persisted (the one-shot re-run succeeded after the interrupted sweep).
 stepUpAndAwaitScanState(
     st.rs0,
@@ -742,5 +765,70 @@ assert.soon(
 );
 
 configureFailCommandAllConfigNodes(st.configRS, {configureFailPoint: "failCommand", mode: "off"});
+
+// --- Case 12: both an owned and an unowned MaxKey doc in a single sweep -------------------------
+// One collection contributes the owned signal and another the orphan signal, so a single sweep must
+// set both flags and fire both WARNING log lines.
+jsTest.log.info("Case 12: owned and unowned MaxKey docs together must set both signals");
+
+// (a) Owned all-MaxKey doc: shard0 keeps the only chunk so it legitimately owns {a: MaxKey}.
+const bothOwnedColl = "both_owned_coll";
+const bothOwnedNs = `${dbName}.${bothOwnedColl}`;
+assert.commandWorked(adminDB.runCommand({shardCollection: bothOwnedNs, key: {a: 1}}));
+assert.commandWorked(testDB[bothOwnedColl].insert({a: MaxKey, payload: "both-owned-maxkey-doc"}));
+
+// (b) Orphan all-MaxKey doc: move the chunk holding {a: MaxKey} to shard1, then wipe shard0's
+// range-deletion tasks so the doc is left stranded (a true orphan) rather than cleaned up.
+const bothOrphanColl = "both_orphan_coll";
+const bothOrphanNs = `${dbName}.${bothOrphanColl}`;
+assert.commandWorked(adminDB.runCommand({shardCollection: bothOrphanNs, key: {a: 1}}));
+assert.commandWorked(testDB[bothOrphanColl].insert({a: MaxKey, payload: "both-orphan-maxkey-doc"}));
+assert.commandWorked(testDB[bothOrphanColl].insert({a: 50, payload: "normal-doc"}));
+assert.commandWorked(adminDB.runCommand({split: bothOrphanNs, middle: {a: 0}}));
+assert.commandWorked(
+    adminDB.runCommand({
+        moveChunk: bothOrphanNs,
+        find: {a: 50},
+        to: st.shard1.shardName,
+        _waitForDelete: false,
+    }),
+);
+const bothOrphanUUID = testDB.getCollectionInfos({name: bothOrphanColl})[0].info.uuid;
+assert.soon(
+    () =>
+        rangeDeletionsOnPrimary(st.rs0).findOne({
+            collectionUuid: bothOrphanUUID,
+            "range.max.a": MaxKey,
+        }) !== null,
+    "Expected the pending MaxKey-bounded range-deletion task to appear on the donor",
+);
+assert.commandWorked(rangeDeletionsOnPrimary(st.rs0).deleteMany({}));
+st.rs0.awaitReplication();
+assert.eq(
+    1,
+    st.rs0.getPrimary().getDB(dbName).getCollection(bothOrphanColl).find({a: MaxKey}).itcount(),
+    "Expected the orphan MaxKey doc to remain on shard0 after wiping the range-deletion task",
+);
+
+clearScanStateAndWaitMajority(st.rs0);
+stepUpAndAwaitScanState(
+    st.rs0,
+    (doc) => doc.foundUnownedMaxKey === true && doc.foundOwnedMaxKey === true,
+    "Detector should flag both the owned and the unowned MaxKey doc in a single sweep",
+);
+assertOrphanScanStats(
+    st.rs0,
+    {
+        foundUnownedMaxKey: true,
+        unownedAlertEmitted: true,
+        foundOwnedMaxKey: true,
+        ownedAlertEmitted: true,
+    },
+    "Detector must set both the unowned and owned signals when both docs are present",
+);
+checkLog.containsJson(st.rs0.getPrimary(), warningLogId);
+checkLog.containsJson(st.rs0.getPrimary(), ownedWarningLogId);
+
+resetClusterState([bothOwnedColl, bothOrphanColl]);
 
 st.stop();

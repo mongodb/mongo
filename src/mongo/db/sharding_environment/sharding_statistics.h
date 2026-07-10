@@ -192,13 +192,20 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardingStatistics {
     Atomic<long long> chunkMigrationWaitForReclaimedPreparedTxnsMillis{0};
 
     // FTDC metrics for the MaxKey orphan detection sweep run on shard primaries.
-    // The *Complete/*FoundMaxKey/*AlertEmitted fields are 0/1 flags describing the last published
-    // sweep outcome on this process. *Errors counts non-fatal per-collection errors encountered
-    // while running the sweep.
-    Atomic<long long> maxKeyOrphanScanComplete{0};
-    Atomic<long long> maxKeyOrphanScanFoundMaxKey{0};
-    Atomic<long long> maxKeyOrphanScanAlertEmitted{0};
-    Atomic<long long> maxKeyOrphanScanErrors{0};
+    // The *Complete/*FoundUnownedMaxKey/*UnownedAlertEmitted fields are 0/1 flags describing the
+    // last published sweep outcome on this process. *Errors counts non-fatal per-collection errors
+    // encountered while running the sweep.
+    AtomicWord<long long> maxKeyOrphanScanComplete{0};
+    AtomicWord<long long> maxKeyOrphanScanFoundUnownedMaxKey{0};
+    AtomicWord<long long> maxKeyOrphanScanUnownedAlertEmitted{0};
+    AtomicWord<long long> maxKeyOrphanScanErrors{0};
+
+    // An accessible (owned) MaxKey doc was found on this shard. Its version could be stale if it
+    // was re-owned after some series of application operations. The
+    // *FoundOwnedMaxKey/*OwnedAlertEmitted fields are 0/1 flags describing the last published sweep
+    // outcome.
+    AtomicWord<long long> maxKeyOrphanScanFoundOwnedMaxKey{0};
+    AtomicWord<long long> maxKeyOrphanScanOwnedAlertEmitted{0};
 
     // FTDC metrics for the MaxKey zone inventory scan run by the balancer on config primaries.
     // The *Complete/*FoundBuggyZone/*AlertEmitted fields are 0/1 flags describing the last

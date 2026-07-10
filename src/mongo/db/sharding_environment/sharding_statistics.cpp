@@ -116,9 +116,15 @@ void ShardingStatistics::report(BSONObjBuilder* builder) const {
     builder->append("chunkMigrationWaitForReclaimedPreparedTxnsMillis",
                     chunkMigrationWaitForReclaimedPreparedTxnsMillis.loadRelaxed());
     builder->append("maxKeyOrphanScanComplete", maxKeyOrphanScanComplete.loadRelaxed());
-    builder->append("maxKeyOrphanScanFoundMaxKey", maxKeyOrphanScanFoundMaxKey.loadRelaxed());
-    builder->append("maxKeyOrphanScanAlertEmitted", maxKeyOrphanScanAlertEmitted.loadRelaxed());
+    builder->append("maxKeyOrphanScanFoundUnownedMaxKey",
+                    maxKeyOrphanScanFoundUnownedMaxKey.loadRelaxed());
+    builder->append("maxKeyOrphanScanUnownedAlertEmitted",
+                    maxKeyOrphanScanUnownedAlertEmitted.loadRelaxed());
     builder->append("maxKeyOrphanScanErrors", maxKeyOrphanScanErrors.loadRelaxed());
+    builder->append("maxKeyOrphanScanFoundOwnedMaxKey",
+                    maxKeyOrphanScanFoundOwnedMaxKey.loadRelaxed());
+    builder->append("maxKeyOrphanScanOwnedAlertEmitted",
+                    maxKeyOrphanScanOwnedAlertEmitted.loadRelaxed());
     builder->append("maxKeyZoneScanComplete", maxKeyZoneScanComplete.loadRelaxed());
     builder->append("maxKeyZoneScanFoundBuggyZone", maxKeyZoneScanFoundBuggyZone.loadRelaxed());
     builder->append("maxKeyZoneScanAlertEmitted", maxKeyZoneScanAlertEmitted.loadRelaxed());

@@ -3,8 +3,8 @@
  * persisted result. hangDuringMaxKeyOrphanScan parks the scan after it pre-checks a collection for a
  * MaxKey document, before its authoritative re-check. Once released, the scan races a migration of
  * the global-max chunk off shard0. The MigrationBlockingGuard serializes them, so the migration
- * either wins (removes the document) or is rejected with ConflictingOperationInProgress; either way
- * the re-check reports foundMaxKey=false.
+ * either wins (removes the document) or is rejected with ConflictingOperationInProgress. Either way
+ * the doc is never left as an orphan on shard0, so foundUnownedMaxKey must stay false.
  *
  * @tags: [
  *  featureFlagMaxKeyDetection,
@@ -102,9 +102,9 @@ assert.soon(
 const finalState = readScanState();
 assert.eq(
     false,
-    finalState.foundMaxKey,
-    "Scan must not flag: the doc was removed by the migration or is still legitimately owned by shard0",
-    {finalState},
+    finalState.foundUnownedMaxKey,
+    "Scan must not flag an unowned/orphan MaxKey doc in this race",
+    {finalState, moveRes},
 );
 
 st.stop();
