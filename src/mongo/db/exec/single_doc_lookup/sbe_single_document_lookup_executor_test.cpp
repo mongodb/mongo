@@ -36,6 +36,8 @@
 #include "mongo/db/exec/single_doc_lookup/collection_acquirer.h"
 #include "mongo/db/exec/single_doc_lookup/mock_local_lookup_eligibility.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
+#include "mongo/db/exec/single_doc_lookup/single_document_lookup_stats.h"
+#include "mongo/db/exec/single_doc_lookup/single_document_lookup_stats_test_util.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/shard_role_transaction_resources_stasher_for_pipeline.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
@@ -47,6 +49,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
@@ -62,6 +65,7 @@ namespace mongo::exec::agg {
 namespace {
 
 using LookupResult = SingleDocumentLookupExecutor::LookupResult;
+using otel::metrics::OtelMetricsCapturer;
 
 const NamespaceString kNss =
     NamespaceString::createNamespaceString_forTest("SbeSingleDocumentLookupExecutorTest.testColl");
@@ -200,6 +204,17 @@ protected:
     SbeSingleDocumentLookupExecutor makeStrategy() {
         return SbeSingleDocumentLookupExecutor(makeOnDemandAcquirer(),
                                                std::make_unique<AlwaysLocalEligibility>());
+    }
+
+    // Same as makeStrategy(), but wired to the real process-global SBE cell so metrics tests can
+    // observe recording, and parameterized over eligibility so the not-handled path can be driven
+    // too.
+    SbeSingleDocumentLookupExecutor makeStrategyWithRealRecorder(
+        std::unique_ptr<LocalLookupEligibility> eligibility) {
+        return SbeSingleDocumentLookupExecutor(
+            makeOnDemandAcquirer(),
+            std::move(eligibility),
+            exec::SingleDocumentLookupStatsRecorder::makeUpdateLookupSbeRecorder());
     }
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
@@ -919,6 +934,72 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, PlanSummaryStatsSinkSurvivesPlanRebu
     strategy.releaseResources();
 
     ASSERT_GT(sink.totalKeysExamined, afterFirstWindow);
+}
+
+// --- Metrics recording --------------------------------------------------------------------------
+
+TEST_F(SbeSingleDocumentLookupExecutorTest, FoundDocumentRecordsFoundAndLatency) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    createCollection();
+    insertDocuments({fromjson("{_id: 1}")});
+    auto strategy = makeStrategyWithRealRecorder(std::make_unique<AlwaysLocalEligibility>());
+
+    const auto before = snapshotSbeCell(capturer);
+    auto result = doLookup(&strategy, fromjson("{_id: 1}"));
+    const auto after = snapshotSbeCell(capturer);
+
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
+    ASSERT_EQ(after.found, before.found + 1);
+    ASSERT_EQ(after.notFound, before.notFound);
+    ASSERT_EQ(after.notHandled, before.notHandled);
+    ASSERT_EQ(after.latencyCount, before.latencyCount + 1);
+}
+
+TEST_F(SbeSingleDocumentLookupExecutorTest, AbsentDocumentRecordsNotFoundAndLatency) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    createCollection();
+    insertDocuments({fromjson("{_id: 1}")});
+    auto strategy = makeStrategyWithRealRecorder(std::make_unique<AlwaysLocalEligibility>());
+
+    const auto before = snapshotSbeCell(capturer);
+    auto result = doLookup(&strategy, fromjson("{_id: 999}"));
+    const auto after = snapshotSbeCell(capturer);
+
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentNotFound);
+    ASSERT_EQ(after.found, before.found);
+    ASSERT_EQ(after.notFound, before.notFound + 1);
+    ASSERT_EQ(after.notHandled, before.notHandled);
+    ASSERT_EQ(after.latencyCount, before.latencyCount + 1);
+}
+
+TEST_F(SbeSingleDocumentLookupExecutorTest, UnknownDecisionRecordsNotHandledWithNoLatency) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    createCollection();
+    insertDocuments({fromjson("{_id: 1}")});
+    auto strategy = makeStrategyWithRealRecorder(MockLocalLookupEligibility::makeAlwaysUnknown());
+
+    const auto before = snapshotSbeCell(capturer);
+    auto result = doLookup(&strategy, fromjson("{_id: 1}"));
+    const auto after = snapshotSbeCell(capturer);
+
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kNotHandled);
+    ASSERT_EQ(after.found, before.found);
+    ASSERT_EQ(after.notFound, before.notFound);
+    ASSERT_EQ(after.notHandled, before.notHandled + 1);
+    // A declined lookup carries no meaningful latency.
+    ASSERT_EQ(after.latencyCount, before.latencyCount);
 }
 
 }  // namespace

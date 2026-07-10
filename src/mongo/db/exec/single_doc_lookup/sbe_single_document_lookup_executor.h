@@ -35,6 +35,7 @@
 #include "mongo/db/exec/single_doc_lookup/collection_acquirer.h"
 #include "mongo/db/exec/single_doc_lookup/local_lookup_eligibility.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
+#include "mongo/db/exec/single_doc_lookup/single_document_lookup_stats.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -55,10 +56,13 @@ namespace mongo::exec::agg {
  */
 class SbeSingleDocumentLookupExecutor : public SingleDocumentLookupExecutor {
 public:
-    SbeSingleDocumentLookupExecutor(std::unique_ptr<CollectionAcquirer> collectionAcquirer,
-                                    std::unique_ptr<LocalLookupEligibility> localEligibility)
+    SbeSingleDocumentLookupExecutor(
+        std::unique_ptr<CollectionAcquirer> collectionAcquirer,
+        std::unique_ptr<LocalLookupEligibility> localEligibility,
+        boost::optional<SingleDocumentLookupStatsRecorder> recorder = boost::none)
         : _collectionAcquirer(std::move(collectionAcquirer)),
-          _localEligibility(std::move(localEligibility)) {
+          _localEligibility(std::move(localEligibility)),
+          _recorder(std::move(recorder)) {
         tassert(12952800,
                 "SbeSingleDocumentLookupExecutor requires a non-null collection acquirer",
                 _collectionAcquirer);
@@ -293,6 +297,7 @@ private:
 
     std::unique_ptr<CollectionAcquirer> _collectionAcquirer;
     std::unique_ptr<LocalLookupEligibility> _localEligibility;
+    boost::optional<SingleDocumentLookupStatsRecorder> _recorder;
 
     /**
      * Cached executor and its state across calls. See PreparedExecutor::PlanState.

@@ -74,10 +74,6 @@ describe("change stream updateLookup single-document-lookup metrics", function (
 
     it("records found / notFound into the engine's single-document-lookup cell", function () {
         const engine = expectedEngine(isRunningOptimizedUpdateLookup);
-        // TODO:SERVER-129515 Wire updateLookup metrics into SbeSingleDocumentLookupExecutor.
-        if (engine == UpdateLookupExecutor.kSBE) {
-            return;
-        }
 
         const delta = ServerStatusMetrics.withServerStatusMetricsAcrossCluster(testDB, () => {
             withChangeStreamTest(testDB, (cst) => {

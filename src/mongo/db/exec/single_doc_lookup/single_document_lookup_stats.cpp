@@ -88,6 +88,24 @@ const SingleDocumentLookupStats kUpdateLookupAggregationStats{
         "changeStreams.updateLookup.aggregation.latencyMicros"),
 };
 
+const SingleDocumentLookupStats kUpdateLookupSbeStats{
+    .found = createUpdateLookupCounter(
+        otel::metrics::MetricNames::kChangeStreamUpdateLookupSbeFound,
+        "changeStreams.updateLookup.sbe.found",
+        "Number of change stream updateLookup SBE lookups that found the document."),
+    .notFound = createUpdateLookupCounter(
+        otel::metrics::MetricNames::kChangeStreamUpdateLookupSbeNotFound,
+        "changeStreams.updateLookup.sbe.notFound",
+        "Number of change stream updateLookup SBE lookups where the document was absent."),
+    .notHandled = createUpdateLookupCounter(
+        otel::metrics::MetricNames::kChangeStreamUpdateLookupSbeNotHandled,
+        "changeStreams.updateLookup.sbe.notHandled",
+        "Number of change stream updateLookup SBE lookups the engine declined."),
+    .latencyMicros =
+        createUpdateLookupLatency(otel::metrics::MetricNames::kChangeStreamUpdateLookupSbeLatency,
+                                  "changeStreams.updateLookup.sbe.latencyMicros"),
+};
+
 }  // namespace
 
 SingleDocumentLookupStatsRecorder
@@ -104,6 +122,13 @@ SingleDocumentLookupStatsRecorder::makeUpdateLookupExpressRecorder() {
                                              kUpdateLookupExpressStats.notFound,
                                              kUpdateLookupExpressStats.notHandled,
                                              kUpdateLookupExpressStats.latencyMicros);
+}
+
+SingleDocumentLookupStatsRecorder SingleDocumentLookupStatsRecorder::makeUpdateLookupSbeRecorder() {
+    return SingleDocumentLookupStatsRecorder(kUpdateLookupSbeStats.found,
+                                             kUpdateLookupSbeStats.notFound,
+                                             kUpdateLookupSbeStats.notHandled,
+                                             kUpdateLookupSbeStats.latencyMicros);
 }
 
 }  // namespace mongo::exec

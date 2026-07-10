@@ -54,6 +54,7 @@ public:
 
     static SingleDocumentLookupStatsRecorder makeUpdateLookupExpressRecorder();
     static SingleDocumentLookupStatsRecorder makeUpdateLookupAggregationRecorder();
+    static SingleDocumentLookupStatsRecorder makeUpdateLookupSbeRecorder();
 
     void recordFound(Microseconds elapsed) {
         _found.add(1);

@@ -229,6 +229,14 @@ public:
         MetricNameMaker::make("changeStreams.updateLookup.aggregation.notHandled");
     static constexpr MetricName kChangeStreamUpdateLookupAggregationLatency =
         MetricNameMaker::make("changeStreams.updateLookup.aggregation.latencyMicros");
+    static constexpr MetricName kChangeStreamUpdateLookupSbeFound =
+        MetricNameMaker::make("changeStreams.updateLookup.sbe.found");
+    static constexpr MetricName kChangeStreamUpdateLookupSbeNotFound =
+        MetricNameMaker::make("changeStreams.updateLookup.sbe.notFound");
+    static constexpr MetricName kChangeStreamUpdateLookupSbeNotHandled =
+        MetricNameMaker::make("changeStreams.updateLookup.sbe.notHandled");
+    static constexpr MetricName kChangeStreamUpdateLookupSbeLatency =
+        MetricNameMaker::make("changeStreams.updateLookup.sbe.latencyMicros");
     static constexpr MetricName kChangeStreamErrorNonRetriableHistoryLost = MetricNameMaker::make(
         "serverStatus.metrics.changeStreams.error.nonRetriable.changeStreamHistoryLost");
     static constexpr MetricName kChangeStreamErrorNonRetriableFatalError = MetricNameMaker::make(

@@ -173,6 +173,7 @@ inline otel::metrics::Histogram<int64_t>& createUpdateLookupLatency(otel::metric
                                       250000,
                                       500000,
                                       1000000}};
+    opts.serializationFormat = otel::metrics::HistogramSerializationFormat::kBucketCounts;
     return otel::metrics::MetricsService::instance().createInt64Histogram(
         name,
         "Latency of change stream updateLookup single-document lookups in microseconds.",

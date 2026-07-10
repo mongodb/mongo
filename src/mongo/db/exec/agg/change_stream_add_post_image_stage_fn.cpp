@@ -103,7 +103,8 @@ std::unique_ptr<exec::agg::SingleDocumentLookupExecutor> buildUpdateLookupExecut
     if (isCollectionStream) {
         primary = std::make_unique<SbeSingleDocumentLookupExecutor>(
             std::make_unique<OnDemandCollectionAcquirer>(),
-            eligibilityFactory.makeLocalLookupEligibility(opCtx));
+            eligibilityFactory.makeLocalLookupEligibility(opCtx),
+            exec::SingleDocumentLookupStatsRecorder::makeUpdateLookupSbeRecorder());
     } else {
         primary = std::make_unique<ExpressSingleDocumentLookupExecutor>(
             std::make_unique<OnDemandCollectionAcquirer>(),

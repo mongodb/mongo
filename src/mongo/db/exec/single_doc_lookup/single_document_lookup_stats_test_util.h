@@ -90,4 +90,15 @@ inline CellSnapshot snapshotAggregationCell(otel::metrics::OtelMetricsCapturer& 
     return snap;
 }
 
+inline CellSnapshot snapshotSbeCell(otel::metrics::OtelMetricsCapturer& c) {
+    using otel::metrics::MetricNames;
+    CellSnapshot snap;
+    snap.found = c.readInt64Counter(MetricNames::kChangeStreamUpdateLookupSbeFound);
+    snap.notFound = c.readInt64Counter(MetricNames::kChangeStreamUpdateLookupSbeNotFound);
+    snap.notHandled = c.readInt64Counter(MetricNames::kChangeStreamUpdateLookupSbeNotHandled);
+    std::tie(snap.latencyCount, snap.latencySum) =
+        readHistogramOrZero(c, MetricNames::kChangeStreamUpdateLookupSbeLatency);
+    return snap;
+}
+
 }  // namespace mongo::exec

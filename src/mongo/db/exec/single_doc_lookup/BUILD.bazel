@@ -238,6 +238,7 @@ mongo_cc_library(
         ":local_lookup_eligibility",
         ":local_lookup_util",
         ":single_document_lookup_executor",
+        ":single_document_lookup_stats",
         # sbe::RuntimeEnvironment, PlanStage, value helpers.
         "//src/mongo/db/exec/sbe:query_sbe",
         # record_id_helpers::keyForElem.
@@ -273,9 +274,11 @@ mongo_cc_unit_test(
     deps = [
         ":local_lookup_eligibility_test_util",
         ":sbe_single_document_lookup_executor",
+        ":single_document_lookup_stats_test_util",
         "//src/mongo/db:dbhelpers",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/otel/metrics:metrics_test_util",
     ],
 )
 
@@ -308,8 +311,7 @@ mongo_cc_unit_test(
 )
 
 # Per-(consumer x engine) OTEL metrics cells + recorder for change stream single-document lookups.
-# Infrastructure only: registers the landed updateLookup express/aggregation cells at load time; no
-# executor records into them yet.
+# Registers the updateLookup express/aggregation/sbe cells at load time.
 mongo_cc_library(
     name = "single_document_lookup_stats",
     srcs = [

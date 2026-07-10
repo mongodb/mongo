@@ -54,6 +54,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/timer.h"
 
 #include <string_view>
 
@@ -310,7 +311,12 @@ SingleDocumentLookupExecutor::LookupResult SbeSingleDocumentLookupExecutor::perf
     const Document& documentKey,
     boost::optional<Timestamp> afterClusterTime) {
     OperationContext* opCtx = expCtx->getOperationContext();
-    return _localEligibility->run(
+
+    // Timed around the whole eligibility run (not just the terminal attempt) so the recorded
+    // latency reflects what the caller actually waited, including any StaleConfig-triggered
+    // routing refresh + retry.
+    Timer timer;
+    LookupResult outcome = _localEligibility->run(
         expCtx,
         nss,
         documentKey,
@@ -373,6 +379,21 @@ SingleDocumentLookupExecutor::LookupResult SbeSingleDocumentLookupExecutor::perf
                 return result;
             });
         });
+
+    if (_recorder) {
+        switch (outcome.status) {
+            case LookupResult::HandledStatus::kDocumentFound:
+                _recorder->recordFound(timer.elapsed());
+                break;
+            case LookupResult::HandledStatus::kDocumentNotFound:
+                _recorder->recordNotFound(timer.elapsed());
+                break;
+            case LookupResult::HandledStatus::kNotHandled:
+                _recorder->recordNotHandled();
+                break;
+        }
+    }
+    return outcome;
 }
 
 CollectionAcquirer::Handle& SbeSingleDocumentLookupExecutor::getOrAcquireCollection(
