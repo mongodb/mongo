@@ -38,6 +38,14 @@ OwnedLiteParsedPipeline::OwnedLiteParsedPipeline(const NamespaceString& nss,
       // Subpipelines are never the top-level view pipeline; pass false for the hybrid-search flag.
       _pipeline(nss, _ownedStages, /*isRunningAgainstView_ForHybridSearch=*/false, options) {}
 
+OwnedLiteParsedPipeline::OwnedLiteParsedPipeline(NamespaceString nss, StageSpecs stages)
+    // No new BSON is parsed here, so there is nothing for _ownedStages to hold. The moved-in
+    // stages may still hold unowned BSONElement views into transient buffers (e.g. extension
+    // SDK objects destroyed once expand() returns), so force each stage to self-own its BSON now.
+    : _pipeline(std::move(nss), std::move(stages)) {
+    _pipeline.makeOwned();
+}
+
 OwnedLiteParsedPipeline::OwnedLiteParsedPipeline(const OwnedLiteParsedPipeline& other)
     // Each stage in the copy receives a fresh, independently-owned BSONObj: the pipeline is
     // cloned (copying each stage's parsed state), then makeOwned() calls _originalBson.wrap()

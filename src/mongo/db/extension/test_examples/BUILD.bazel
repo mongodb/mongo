@@ -56,6 +56,7 @@ extensions_with_config(
         ":idle_threads_mongo_extension_signed_lib",
         ":interrupt_mongo_extension_signed_lib",
         ":match_topN_mongo_extension_signed_lib",
+        ":match_top_n_with_metrics_mongo_extension_signed_lib",
         ":native_vector_search_mongo_extension_signed_lib",
         ":selection_optimization_mongo_extension_signed_lib",
         ":metrics_mongo_extension_signed_lib",
@@ -159,6 +160,7 @@ pkg_name = "//" + package_name() + "/"
     for extension_name in [
         "limit",
         "match_topN",
+        "match_top_n_with_metrics",
         "native_vector_search",
         "selection_optimization",
         "vector_search_optimization",

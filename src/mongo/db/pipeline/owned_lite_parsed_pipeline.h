@@ -52,6 +52,12 @@ public:
                             const std::vector<BSONObj>& pipelineStages,
                             const LiteParserOptions& options = {});
 
+    // Moves already-parsed stages directly, without reparsing. Use this instead of the BSON-vector
+    // constructor when the caller already holds StageSpecs (e.g. a desugarer re-assembling a
+    // subpipeline) — reparsing loses information for stages whose original BSON is only a
+    // placeholder (e.g. AST-only extension sub-stages), which can't round-trip through BSON.
+    OwnedLiteParsedPipeline(NamespaceString nss, StageSpecs stages);
+
     OwnedLiteParsedPipeline(OwnedLiteParsedPipeline&&) noexcept = default;
     OwnedLiteParsedPipeline& operator=(OwnedLiteParsedPipeline&&) noexcept = default;
 

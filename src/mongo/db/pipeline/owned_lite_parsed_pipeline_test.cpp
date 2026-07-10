@@ -83,7 +83,7 @@ TEST(OwnedLiteParsedPipelineTest, CopiedPipelineIsIndependent) {
 
 // An empty pipeline is a valid no-op construction.
 TEST(OwnedLiteParsedPipelineTest, EmptyPipelineIsValid) {
-    OwnedLiteParsedPipeline owned(kNss, {});
+    OwnedLiteParsedPipeline owned(kNss, std::vector<BSONObj>{});
     ASSERT_EQ(owned.pipeline().getInvolvedNamespaces().size(), 0U);
 }
 

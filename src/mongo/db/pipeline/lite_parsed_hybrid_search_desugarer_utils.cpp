@@ -251,7 +251,10 @@ void mutateRightmostSortToOutputSortKey(const NamespaceString& nss, StageSpecs& 
 std::unique_ptr<LiteParsedDocumentSource> buildUnionWithLPDS(const NamespaceString& nss,
                                                              std::string_view userCollName,
                                                              StageSpecs perPipelineStages) {
-    // Serialize the already-parsed (and sort-mutated) stages back to BSON. Each .wrap() call
+    // Serialize the already-parsed (and sort-mutated) stages back to BSON for the $unionWith's
+    // own serialization/explain output. This BSON is best-effort only — it is not used to
+    // rebuild the inner pipeline below, since stages whose original BSON is only a placeholder
+    // (e.g. AST-only extension sub-stages) cannot round-trip through BSON. Each .wrap() call
     // produces a self-owning copy, so rawPipeline does not alias any stage's internal buffer.
     std::vector<BSONObj> rawPipeline;
     rawPipeline.reserve(perPipelineStages.size());
@@ -261,9 +264,9 @@ std::unique_ptr<LiteParsedDocumentSource> buildUnionWithLPDS(const NamespaceStri
 
     NamespaceString foreignNss = NamespaceStringUtil::deserialize(nss.dbName(), userCollName);
 
-    // OwnedLiteParsedPipeline owns its backing BSON, so no manual setOwnedBson is needed for the
-    // inner pipeline.
-    OwnedLiteParsedPipeline innerLpp(foreignNss, rawPipeline);
+    // Move the already-parsed stages directly into the inner pipeline rather than reparsing the
+    // best-effort BSON above.
+    OwnedLiteParsedPipeline innerLpp(foreignNss, std::move(perPipelineStages));
 
     BSONObjBuilder bob;
     {
