@@ -9,11 +9,11 @@
  */
 
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
+import {getSlowQueryLogs} from "jstests/libs/query/query_stats_utils.js";
 import {
-    getQueryShapeHashFromSlowLogs,
-    getSlowQueryLogs,
-} from "jstests/libs/query/query_stats_utils.js";
-import {resetTestCollectionsShardedCluster} from "jstests/libs/query/query_stats_write_cmd_utils.js";
+    resetTestCollectionsShardedCluster,
+    testMongosHasQueryShapeHash,
+} from "jstests/libs/query/query_stats_write_cmd_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const testDocuments = [
@@ -26,15 +26,6 @@ const testDocuments = [
     {v: 7, x: 70, y: "a"},
     {v: 8, x: 80, y: "b"},
 ];
-
-function testMongosHasQueryShapeHash(routerDB, command, comment) {
-    assert.commandWorked(routerDB.runCommand(command));
-    const hash = getQueryShapeHashFromSlowLogs({
-        testDB: routerDB,
-        queryComment: comment,
-    });
-    assert.neq(hash, null, "queryShapeHash should be present on mongos for single write");
-}
 
 function testMongosHasNoQueryShapeHashBatch(routerDB, command, comment) {
     assert.commandWorked(routerDB.runCommand(command));

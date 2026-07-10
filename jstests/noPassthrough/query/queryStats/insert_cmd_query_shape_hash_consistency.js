@@ -6,62 +6,11 @@
  */
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {
-    getQueryShapeHashFromSlowLogs,
     getQueryStatsInsertCmd,
     resetQueryStatsStore,
 } from "jstests/libs/query/query_stats_utils.js";
+import {assertQueryStatsAndMongodHashesMatch} from "jstests/libs/query/query_stats_write_cmd_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-
-/**
- * Gets the latest queryShapeHash from $queryStats for a collection.
- */
-function getLatestQueryShapeHashFromQueryStats(mongosConn, collName) {
-    const entries = getQueryStatsInsertCmd(mongosConn, {
-        collName: collName,
-        customSort: {"metrics.latestSeenTimestamp": -1},
-    });
-    if (entries.length === 0) {
-        return null;
-    }
-    return entries[0].queryShapeHash;
-}
-
-/**
- * Asserts that the queryShapeHash from $queryStats matches the queryShapeHash from mongod slow
- * query logs for an insert command.
- */
-function assertQueryStatsAndMongodHashesMatch(
-    mongosConn,
-    collName,
-    comment,
-    mongodDB,
-    testDesc = "",
-) {
-    const queryStatsHash = getLatestQueryShapeHashFromQueryStats(mongosConn, collName);
-    assert.neq(
-        queryStatsHash,
-        null,
-        `queryShapeHash should be present in $queryStats${testDesc ? " for " + testDesc : ""}`,
-    );
-
-    const mongodHash = getQueryShapeHashFromSlowLogs({
-        testDB: mongodDB,
-        queryComment: comment,
-        options: {commandType: "insert"},
-    });
-    assert.neq(
-        mongodHash,
-        null,
-        `queryShapeHash should be present in mongod slow query logs${testDesc ? " for " + testDesc : ""}`,
-    );
-
-    assert.eq(
-        queryStatsHash,
-        mongodHash,
-        `queryShapeHash mismatch${testDesc ? " for " + testDesc : ""}: ` +
-            `$queryStats=${queryStatsHash}, mongod=${mongodHash}`,
-    );
-}
 
 describe("QueryShapeHash Consistency: mongos $queryStats vs mongod slow query logs (inserts)", function () {
     before(function () {
@@ -146,7 +95,10 @@ describe("QueryShapeHash Consistency: mongos $queryStats vs mongod slow query lo
                 this.collNames.unsharded,
                 comment,
                 this.shard0DB,
-                "insert on unsharded collection",
+                {
+                    getQueryStatsFn: getQueryStatsInsertCmd,
+                    testDesc: "insert on unsharded collection",
+                },
             );
         });
 
@@ -166,7 +118,10 @@ describe("QueryShapeHash Consistency: mongos $queryStats vs mongod slow query lo
                 this.collNames.sharded,
                 comment,
                 this.shard0DB,
-                "insert on sharded collection",
+                {
+                    getQueryStatsFn: getQueryStatsInsertCmd,
+                    testDesc: "insert on sharded collection",
+                },
             );
         });
     });
@@ -205,7 +160,10 @@ describe("QueryShapeHash Consistency: mongos $queryStats vs mongod slow query lo
                 this.collNames.unsharded,
                 comment,
                 this.shard0DB,
-                "insert on unsharded collection",
+                {
+                    getQueryStatsFn: getQueryStatsInsertCmd,
+                    testDesc: "insert on unsharded collection",
+                },
             );
         });
 
@@ -242,7 +200,10 @@ describe("QueryShapeHash Consistency: mongos $queryStats vs mongod slow query lo
                 this.collNames.sharded,
                 comment,
                 this.shard0DB,
-                "insert on sharded collection",
+                {
+                    getQueryStatsFn: getQueryStatsInsertCmd,
+                    testDesc: "insert on sharded collection",
+                },
             );
 
             // verify queryShapeHash of slow query log on shard1 match router's $queryStats
@@ -251,7 +212,10 @@ describe("QueryShapeHash Consistency: mongos $queryStats vs mongod slow query lo
                 this.collNames.sharded,
                 comment,
                 this.shard1DB,
-                "insert on sharded collection",
+                {
+                    getQueryStatsFn: getQueryStatsInsertCmd,
+                    testDesc: "insert on sharded collection",
+                },
             );
         });
     });

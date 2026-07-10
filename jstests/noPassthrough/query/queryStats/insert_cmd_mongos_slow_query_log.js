@@ -12,6 +12,7 @@ import {
     getQueryShapeHashFromSlowLogs,
     getSlowQueryLogs,
 } from "jstests/libs/query/query_stats_utils.js";
+import {testMongosHasQueryShapeHash} from "jstests/libs/query/query_stats_write_cmd_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 describe("Mongos - Insert Query Shape Hash in Slow Logs", function () {
@@ -65,45 +66,19 @@ describe("Mongos - Insert Query Shape Hash in Slow Logs", function () {
     describe("Single-document Inserts", function () {
         it("single-doc insert on unsharded collection: mongos has queryShapeHash", function () {
             const comment = `single_insert_mongos_unsharded_${UUID().toString()}`;
-
-            assert.commandWorked(
-                this.routerDB.runCommand({
-                    insert: this.collNames.unsharded,
-                    documents: [{v: 1}],
-                    comment: comment,
-                }),
-            );
-
-            const hash = getQueryShapeHashFromSlowLogs({
-                testDB: this.routerDB,
-                queryComment: comment,
-            });
-            assert.neq(
-                hash,
-                null,
-                "queryShapeHash should be present on mongos for single-doc insert on unsharded collection",
+            testMongosHasQueryShapeHash(
+                this.routerDB,
+                {insert: this.collNames.unsharded, documents: [{v: 1}], comment: comment},
+                comment,
             );
         });
 
         it("single-doc insert on sharded collection: mongos has queryShapeHash", function () {
             const comment = `single_insert_mongos_sharded_${UUID().toString()}`;
-
-            assert.commandWorked(
-                this.routerDB.runCommand({
-                    insert: this.collNames.sharded,
-                    documents: [{_id: 1, v: 1}],
-                    comment: comment,
-                }),
-            );
-
-            const hash = getQueryShapeHashFromSlowLogs({
-                testDB: this.routerDB,
-                queryComment: comment,
-            });
-            assert.neq(
-                hash,
-                null,
-                "queryShapeHash should be present on mongos for single-doc insert on sharded collection",
+            testMongosHasQueryShapeHash(
+                this.routerDB,
+                {insert: this.collNames.sharded, documents: [{_id: 1, v: 1}], comment: comment},
+                comment,
             );
         });
     });
@@ -141,26 +116,17 @@ describe("Mongos - Insert Query Shape Hash in Slow Logs", function () {
 
         it("multi-doc insert on sharded collection: mongos has queryShapeHash", function () {
             const comment = `multi_insert_mongos_sharded_${UUID().toString()}`;
-
-            assert.commandWorked(
-                this.routerDB.runCommand({
+            testMongosHasQueryShapeHash(
+                this.routerDB,
+                {
                     insert: this.collNames.sharded,
                     documents: [
                         {_id: 1, v: 1},
                         {_id: 2, v: 2},
                     ],
                     comment: comment,
-                }),
-            );
-
-            const hash = getQueryShapeHashFromSlowLogs({
-                testDB: this.routerDB,
-                queryComment: comment,
-            });
-            assert.neq(
-                hash,
-                null,
-                "queryShapeHash should be present on mongos for multi-doc insert on sharded collection",
+                },
+                comment,
             );
         });
     });

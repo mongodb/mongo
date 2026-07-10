@@ -11,7 +11,10 @@ import {
     queryShapeDeleteFieldsRequired,
     runCommandAndValidateQueryStats,
 } from "jstests/libs/query/query_stats_utils.js";
-import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {
+    shardedWriteCmdQueryStatsFixture,
+    standaloneWriteCmdQueryStatsFixture,
+} from "jstests/libs/query/query_stats_write_cmd_utils.js";
 
 const collName = jsTestName();
 
@@ -85,33 +88,8 @@ function runDeleteKeyTests(topologyName, setupFn, teardownFn) {
     });
 }
 
-runDeleteKeyTests(
-    "Standalone",
-    () => {
-        const conn = MongoRunner.runMongod({
-            setParameter: {
-                internalQueryStatsWriteCmdSampleRate: 1,
-            },
-        });
-        return {fixture: conn, testDB: conn.getDB("test")};
-    },
-    (conn) => MongoRunner.stopMongod(conn),
-);
+const standalone = standaloneWriteCmdQueryStatsFixture();
+runDeleteKeyTests("Standalone", standalone.setupFn, standalone.teardownFn);
 
-runDeleteKeyTests(
-    "Sharded",
-    () => {
-        const st = new ShardingTest({
-            shards: 2,
-            mongosOptions: {
-                setParameter: {
-                    internalQueryStatsWriteCmdSampleRate: 1,
-                },
-            },
-        });
-        const testDB = st.s.getDB("test");
-        st.shardColl(testDB[collName], {_id: 1}, {_id: 1});
-        return {fixture: st, testDB};
-    },
-    (st) => st.stop(),
-);
+const sharded = shardedWriteCmdQueryStatsFixture(collName, {moveChunk: false});
+runDeleteKeyTests("Sharded", sharded.setupFn, sharded.teardownFn);

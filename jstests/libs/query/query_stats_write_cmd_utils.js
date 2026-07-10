@@ -10,6 +10,8 @@ import {
     assertExpectedResults,
     getLatestQueryStatsEntry,
     getQueryExecMetrics,
+    getQueryShapeHashFromSlowLogs,
+    getQueryStatsInsertCmd,
     resetQueryStatsStore,
 } from "jstests/libs/query/query_stats_utils.js";
 import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
@@ -17,6 +19,67 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 
 const getDB = (primaryConnection) => primaryConnection.getDB(jsTestName());
+
+/**
+ * Returns the queryShapeHash of the most recent $queryStats entry for `collName` (null if none).
+ */
+export function getLatestQueryShapeHashFromQueryStats(mongosConn, collName, getQueryStatsFn) {
+    const entries = getQueryStatsFn(mongosConn, {
+        collName: collName,
+        customSort: {"metrics.latestSeenTimestamp": -1},
+    });
+    if (entries.length === 0) {
+        return null;
+    }
+    return entries[0].queryShapeHash;
+}
+
+/**
+ * Asserts that the queryShapeHash from mongos $queryStats matches the one in a mongod slow query log
+ * for the same command.
+ */
+export function assertQueryStatsAndMongodHashesMatch(
+    mongosConn,
+    collName,
+    comment,
+    mongodDB,
+    {getQueryStatsFn, testDesc = ""},
+) {
+    const queryStatsHash = getLatestQueryShapeHashFromQueryStats(
+        mongosConn,
+        collName,
+        getQueryStatsFn,
+    );
+    assert.neq(
+        queryStatsHash,
+        null,
+        `queryShapeHash should be present in $queryStats${testDesc ? " for " + testDesc : ""}`,
+    );
+
+    const mongodHash = getQueryShapeHashFromSlowLogs({testDB: mongodDB, queryComment: comment});
+    assert.neq(
+        mongodHash,
+        null,
+        `queryShapeHash should be present in mongod slow query logs${testDesc ? " for " + testDesc : ""}`,
+    );
+
+    assert.eq(
+        queryStatsHash,
+        mongodHash,
+        `queryShapeHash mismatch${testDesc ? " for " + testDesc : ""}: ` +
+            `$queryStats=${queryStatsHash}, mongod=${mongodHash}`,
+    );
+}
+
+/**
+ * Runs `command` through the router and asserts queryShapeHash is present in the mongos slow query
+ * log for it.
+ */
+export function testMongosHasQueryShapeHash(routerDB, command, comment) {
+    assert.commandWorked(routerDB.runCommand(command));
+    const hash = getQueryShapeHashFromSlowLogs({testDB: routerDB, queryComment: comment});
+    assert.neq(hash, null, "queryShapeHash should be present on mongos");
+}
 
 /**
  * Asserts that the most recent query stats entry for `coll` matches a single-execution write
@@ -47,6 +110,77 @@ export function assertWriteCmdQueryStatsSingleExec(
         expectedDocsReturnedMax: 0,
         expectedDocsReturnedMin: 0,
         expectedDocsReturnedSumOfSq: 0,
+    });
+}
+
+/**
+ * Standalone-mongod fixture for query stats tests, with write-command sampling on.
+ */
+export function standaloneWriteCmdQueryStatsFixture(extraSetParameters = {}) {
+    return {
+        setupFn: () => {
+            const conn = MongoRunner.runMongod({
+                setParameter: {internalQueryStatsWriteCmdSampleRate: 1, ...extraSetParameters},
+            });
+            return {fixture: conn, testDB: conn.getDB("test")};
+        },
+        teardownFn: (conn) => MongoRunner.stopMongod(conn),
+    };
+}
+
+/**
+ * Two-shard sharded-cluster fixture for query stats tests, with write-command sampling on.
+ * Shards `collName` on {_id: 1}; when `moveChunk` is true (the default) it also splits at {_id: 1}
+ * and moves the upper chunk to the second shard so data is distributed across both shards.
+ */
+export function shardedWriteCmdQueryStatsFixture(
+    collName,
+    {moveChunk = true, extraSetParameters = {}} = {},
+) {
+    return {
+        setupFn: () => {
+            const st = new ShardingTest({
+                shards: 2,
+                mongosOptions: {
+                    setParameter: {internalQueryStatsWriteCmdSampleRate: 1, ...extraSetParameters},
+                },
+            });
+            const testDB = st.s.getDB("test");
+            if (moveChunk) {
+                st.shardColl(testDB[collName], {_id: 1}, {_id: 1}, {_id: 1});
+            } else {
+                st.shardColl(testDB[collName], {_id: 1}, {_id: 1});
+            }
+            return {fixture: st, testDB};
+        },
+        teardownFn: (st) => st.stop(),
+    };
+}
+
+/**
+ * Asserts that `shardConn` has exactly one insert query stats entry recording a single execution.
+ */
+export function assertShardInsertMetricsSingleExec(shardConn, collName, {nInserted, keysInserted}) {
+    const shardEntries = getQueryStatsInsertCmd(shardConn, {collName});
+    assert.eq(shardEntries.length, 1, "Expected shard to have a query stats entry", {shardEntries});
+    assertAggregatedMetricsSingleExec(shardEntries[0], {
+        keysExamined: 0,
+        docsExamined: 0,
+        hasSortStage: false,
+        usedDisk: false,
+        fromMultiPlanner: false,
+        fromPlanCache: false,
+        writes: {
+            nMatched: 0,
+            nUpserted: 0,
+            nModified: 0,
+            nDeleted: 0,
+            nInserted: nInserted,
+            nUpdateOps: 0,
+            nDeleteOps: 0,
+            keysInserted: keysInserted,
+            keysDeleted: 0,
+        },
     });
 }
 

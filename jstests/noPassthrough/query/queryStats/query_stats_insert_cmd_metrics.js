@@ -7,11 +7,11 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {
-    assertAggregatedMetricsSingleExec,
     getQueryStatsInsertCmd,
     resetQueryStatsStore,
 } from "jstests/libs/query/query_stats_utils.js";
 import {
+    assertShardInsertMetricsSingleExec,
     assertWriteCmdQueryStatsSingleExec,
     describeWriteCmdQueryStatsCrossShardTests,
 } from "jstests/libs/query/query_stats_write_cmd_utils.js";
@@ -23,6 +23,7 @@ const kQueryStatsServerParams = {
 
 function testSingleDocInsert(testDB, coll, collName, shardConn = null) {
     assert.commandWorked(coll.deleteMany({}));
+    resetQueryStatsStore(testDB.getMongo(), "1MB");
     assert.commandWorked(testDB.runCommand({insert: collName, documents: [{v: 1}]}));
     // One _id index key is inserted per document. On a sharded cluster the shard reports this back
     // in its write response and mongos aggregates it into the router-side entry, so the count
@@ -45,35 +46,14 @@ function testSingleDocInsert(testDB, coll, collName, shardConn = null) {
     });
 
     if (shardConn) {
-        const shardEntries = getQueryStatsInsertCmd(shardConn, {collName: collName});
-        assert.eq(shardEntries.length, 1, "Expected shard to have a query stats entry", {
-            shardEntries,
-        });
-        assertAggregatedMetricsSingleExec(shardEntries[0], {
-            keysExamined: 0,
-            docsExamined: 0,
-            hasSortStage: false,
-            usedDisk: false,
-            fromMultiPlanner: false,
-            fromPlanCache: false,
-            writes: {
-                nMatched: 0,
-                nUpserted: 0,
-                nModified: 0,
-                nDeleted: 0,
-                nInserted: 1,
-                nUpdateOps: 0,
-                nDeleteOps: 0,
-                // One _id index key inserted on the shard for the single inserted document.
-                keysInserted: 1,
-                keysDeleted: 0,
-            },
-        });
+        // One _id index key inserted on the shard for the single inserted document.
+        assertShardInsertMetricsSingleExec(shardConn, collName, {nInserted: 1, keysInserted: 1});
     }
 }
 
 function testMultiDocInsert(testDB, coll, collName, shardConn = null) {
     assert.commandWorked(coll.deleteMany({}));
+    resetQueryStatsStore(testDB.getMongo(), "1MB");
     assert.commandWorked(
         testDB.runCommand({insert: collName, documents: [{v: 1}, {v: 2}, {v: 3}]}),
     );
@@ -99,30 +79,8 @@ function testMultiDocInsert(testDB, coll, collName, shardConn = null) {
     });
 
     if (shardConn) {
-        const shardEntries = getQueryStatsInsertCmd(shardConn, {collName: collName});
-        assert.eq(shardEntries.length, 1, "Expected shard to have a query stats entry", {
-            shardEntries,
-        });
-        assertAggregatedMetricsSingleExec(shardEntries[0], {
-            keysExamined: 0,
-            docsExamined: 0,
-            hasSortStage: false,
-            usedDisk: false,
-            fromMultiPlanner: false,
-            fromPlanCache: false,
-            writes: {
-                nMatched: 0,
-                nUpserted: 0,
-                nModified: 0,
-                nDeleted: 0,
-                nInserted: 3,
-                nUpdateOps: 0,
-                nDeleteOps: 0,
-                // One _id index key inserted on the shard for each of the three documents.
-                keysInserted: 3,
-                keysDeleted: 0,
-            },
-        });
+        // One _id index key inserted on the shard for each of the three documents.
+        assertShardInsertMetricsSingleExec(shardConn, collName, {nInserted: 3, keysInserted: 3});
     }
 }
 
@@ -145,28 +103,9 @@ function assertPartialInsertQueryStats(testDB, coll, collName, nInserted, shardC
     });
 
     if (shardConn) {
-        const shardEntries = getQueryStatsInsertCmd(shardConn, {collName: collName});
-        assert.eq(shardEntries.length, 1, "Expected shard to have a query stats entry", {
-            shardEntries,
-        });
-        assertAggregatedMetricsSingleExec(shardEntries[0], {
-            keysExamined: 0,
-            docsExamined: 0,
-            hasSortStage: false,
-            usedDisk: false,
-            fromMultiPlanner: false,
-            fromPlanCache: false,
-            writes: {
-                nMatched: 0,
-                nUpserted: 0,
-                nModified: 0,
-                nDeleted: 0,
-                nInserted: nInserted,
-                nUpdateOps: 0,
-                nDeleteOps: 0,
-                keysInserted: nInserted,
-                keysDeleted: 0,
-            },
+        assertShardInsertMetricsSingleExec(shardConn, collName, {
+            nInserted: nInserted,
+            keysInserted: nInserted,
         });
     }
 }

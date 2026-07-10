@@ -7,13 +7,11 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {
-    assertAggregatedMetricsSingleExec,
-    assertExpectedResults,
-    getLatestQueryStatsEntry,
     getQueryStatsInsertCmd,
     getQueryStatsUpdateCmd,
     resetQueryStatsStore,
 } from "jstests/libs/query/query_stats_utils.js";
+import {assertWriteCmdQueryStatsSingleExec} from "jstests/libs/query/query_stats_write_cmd_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 describe("query stats insert command metrics (mongos)", function () {
@@ -73,6 +71,7 @@ describe("query stats insert command metrics (mongos)", function () {
 
         beforeEach(function () {
             assert.commandWorked(coll.deleteMany({}));
+            resetQueryStatsStore(mongos, "1MB");
         });
 
         it("should aggregate nInserted from both shards when docs span multiple shards", function () {
@@ -91,16 +90,10 @@ describe("query stats insert command metrics (mongos)", function () {
             const result = assert.commandWorked(testDB.runCommand(cmd));
             assert.eq(result.n, 5);
 
-            const entry = getLatestQueryStatsEntry(mongos, {collName: coll.getName()});
-            assert.eq(entry.key.queryShape.command, "insert");
-
-            assertAggregatedMetricsSingleExec(entry, {
+            assertWriteCmdQueryStatsSingleExec(testDB, coll, {
+                command: "insert",
                 keysExamined: 0,
                 docsExamined: 0,
-                hasSortStage: false,
-                usedDisk: false,
-                fromMultiPlanner: false,
-                fromPlanCache: false,
                 writes: {
                     nMatched: 0,
                     nUpserted: 0,
@@ -114,16 +107,6 @@ describe("query stats insert command metrics (mongos)", function () {
                     keysInserted: 5,
                     keysDeleted: 0,
                 },
-            });
-
-            assertExpectedResults({
-                results: entry,
-                expectedQueryStatsKey: entry.key,
-                expectedExecCount: 1,
-                expectedDocsReturnedSum: 0,
-                expectedDocsReturnedMax: 0,
-                expectedDocsReturnedMin: 0,
-                expectedDocsReturnedSumOfSq: 0,
             });
         });
 
@@ -140,16 +123,10 @@ describe("query stats insert command metrics (mongos)", function () {
             const result = assert.commandWorked(testDB.runCommand(cmd));
             assert.eq(result.n, 2);
 
-            const entry = getLatestQueryStatsEntry(mongos, {collName: coll.getName()});
-            assert.eq(entry.key.queryShape.command, "insert");
-
-            assertAggregatedMetricsSingleExec(entry, {
+            assertWriteCmdQueryStatsSingleExec(testDB, coll, {
+                command: "insert",
                 keysExamined: 0,
                 docsExamined: 0,
-                hasSortStage: false,
-                usedDisk: false,
-                fromMultiPlanner: false,
-                fromPlanCache: false,
                 writes: {
                     nMatched: 0,
                     nUpserted: 0,
@@ -162,16 +139,6 @@ describe("query stats insert command metrics (mongos)", function () {
                     keysInserted: 2,
                     keysDeleted: 0,
                 },
-            });
-
-            assertExpectedResults({
-                results: entry,
-                expectedQueryStatsKey: entry.key,
-                expectedExecCount: 1,
-                expectedDocsReturnedSum: 0,
-                expectedDocsReturnedMax: 0,
-                expectedDocsReturnedMin: 0,
-                expectedDocsReturnedSumOfSq: 0,
             });
         });
 
@@ -246,16 +213,10 @@ describe("query stats insert command metrics (mongos)", function () {
                 "Expected 1 mongos query stats entry: " + tojson(mongosEntries),
             );
 
-            const entry = getLatestQueryStatsEntry(mongos, {collName: coll.getName()});
-            assert.eq(entry.key.queryShape.command, "insert");
-
-            assertAggregatedMetricsSingleExec(entry, {
+            assertWriteCmdQueryStatsSingleExec(testDB, coll, {
+                command: "insert",
                 keysExamined: 0,
                 docsExamined: 0,
-                hasSortStage: false,
-                usedDisk: false,
-                fromMultiPlanner: false,
-                fromPlanCache: false,
                 writes: {
                     nMatched: 0,
                     nUpserted: 0,
@@ -268,16 +229,6 @@ describe("query stats insert command metrics (mongos)", function () {
                     keysInserted: 1,
                     keysDeleted: 0,
                 },
-            });
-
-            assertExpectedResults({
-                results: entry,
-                expectedQueryStatsKey: entry.key,
-                expectedExecCount: 1,
-                expectedDocsReturnedSum: 0,
-                expectedDocsReturnedMax: 0,
-                expectedDocsReturnedMin: 0,
-                expectedDocsReturnedSumOfSq: 0,
             });
 
             fp.off();
@@ -414,16 +365,10 @@ describe("query stats insert command metrics (mongos)", function () {
             );
             assert.eq(result.n, 3);
 
-            const entry = getLatestQueryStatsEntry(mongos, {collName: collName});
-            assert.eq(entry.key.queryShape.command, "insert");
-
-            assertAggregatedMetricsSingleExec(entry, {
+            assertWriteCmdQueryStatsSingleExec(testDB, coll, {
+                command: "insert",
                 keysExamined: 0,
                 docsExamined: 0,
-                hasSortStage: false,
-                usedDisk: false,
-                fromMultiPlanner: false,
-                fromPlanCache: false,
                 writes: {
                     nMatched: 0,
                     nUpserted: 0,
