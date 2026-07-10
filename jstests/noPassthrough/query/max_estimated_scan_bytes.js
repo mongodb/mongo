@@ -275,6 +275,79 @@ describe("maxEstimatedScanBytes", function () {
         assert.commandWorked(heavyColl.dropIndex({a: 1}));
     });
 
+    it("13. aggregation pipeline with a leading $limit: allowed", function () {
+        withParam(belowHeavy, () => {
+            assert.commandWorked(
+                db.runCommand({aggregate: "heavy", pipeline: [{$limit: 5}], cursor: {}}),
+            );
+        });
+    });
+
+    it("14. aggregation pipeline with $match then $limit: allowed", function () {
+        withParam(belowHeavy, () => {
+            assert.commandWorked(
+                db.runCommand({
+                    aggregate: "heavy",
+                    pipeline: [{$match: {a: {$gte: 0}}}, {$limit: 5}],
+                    cursor: {},
+                }),
+            );
+        });
+    });
+
+    it("15. aggregation pipeline with $skip then $limit: allowed", function () {
+        withParam(belowHeavy, () => {
+            assert.commandWorked(
+                db.runCommand({
+                    aggregate: "heavy",
+                    pipeline: [{$skip: 3}, {$limit: 5}],
+                    cursor: {},
+                }),
+            );
+        });
+    });
+
+    it("16. aggregation pipeline with $sort then $limit: allowed", function () {
+        withParam(belowHeavy, () => {
+            assert.commandWorked(
+                db.runCommand({
+                    aggregate: "heavy",
+                    pipeline: [{$sort: {padding: 1}}, {$limit: 5}],
+                    cursor: {},
+                }),
+            );
+        });
+    });
+
+    // $unwind and $group can change the number of documents flowing out of the scan stage
+    // relative to the number scanned, so a trailing $limit does not bound the underlying
+    // COLLSCAN and these pipelines are correctly still rejected.
+    it("17. aggregation pipeline with $unwind then $limit: rejected", function () {
+        withParam(belowHeavy, () => {
+            assert.commandFailedWithCode(
+                db.runCommand({
+                    aggregate: "heavy",
+                    pipeline: [{$unwind: "$a"}, {$limit: 5}],
+                    cursor: {},
+                }),
+                ErrorCodes.NoQueryExecutionPlans,
+            );
+        });
+    });
+
+    it("18. aggregation pipeline with $group then $limit: rejected", function () {
+        withParam(belowHeavy, () => {
+            assert.commandFailedWithCode(
+                db.runCommand({
+                    aggregate: "heavy",
+                    pipeline: [{$group: {_id: "$a"}}, {$limit: 5}],
+                    cursor: {},
+                }),
+                ErrorCodes.NoQueryExecutionPlans,
+            );
+        });
+    });
+
     // TODO SERVER-130345: add integration tests for PQS $natural hint override path.
 });
 
