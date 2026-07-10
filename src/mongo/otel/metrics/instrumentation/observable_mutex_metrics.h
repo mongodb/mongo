@@ -27,40 +27,39 @@
  *    it in the license file.
  */
 
-#include "mongo/otel/metrics/instrumentation/metrics_installer.h"
+#pragma once
 
-#include "mongo/db/admission/ingress_request_rate_limiter.h"
-#include "mongo/otel/metrics/instrumentation/connections_metrics.h"
-#include "mongo/otel/metrics/instrumentation/disk_metrics.h"
-#include "mongo/otel/metrics/instrumentation/global_lock_metrics.h"
-#include "mongo/otel/metrics/instrumentation/index_build_metrics.h"
-#include "mongo/otel/metrics/instrumentation/mongodb_build_info_metrics.h"
-#include "mongo/otel/metrics/instrumentation/observable_mutex_metrics.h"
-#include "mongo/otel/metrics/instrumentation/process_health_metrics.h"
-#include "mongo/otel/metrics/instrumentation/system_health_metrics.h"
-#include "mongo/otel/metrics/instrumentation/system_mount_metrics.h"
+#include "mongo/db/service_context.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/observable_mutex.h"
+#include "mongo/util/string_map.h"
+
+#include <memory>
 
 namespace mongo {
 
-void installCommonOtelMetrics(ServiceContext* svcCtx) {
-    installSystemMountOtelMetrics(svcCtx);
-    installDiskOtelMetrics(svcCtx);
-    installProcessHealthOtelMetrics(svcCtx);
-    installSystemHealthOtelMetrics(svcCtx);
-    installObservableMutexMetrics(svcCtx);
-    installMongoDBBuildInfoMetrics();
-    admission::IngressRequestRateLimiter::get(svcCtx).installOtelMetrics(svcCtx);
-}
+/**
+ * Owns the OpenTelemetry counters for observable mutex contention metrics, grouped by mutex tag.
+ * Per-tag counters are created lazily on the first collection cycle in which a tag appears.
+ */
+class ObservableMutexMetrics {
+public:
+    ObservableMutexMetrics();
+    ~ObservableMutexMetrics();
 
-void installMongodOtelMetrics(ServiceContext* svcCtx) {
-    installCommonOtelMetrics(svcCtx);
-    installGlobalLockOtelMetrics(svcCtx);
-    installIndexBuildOtelMetrics(svcCtx);
-    installConnectionsOtelMetrics(svcCtx);
-}
+    // This is not thread-safe. It relies on the periodic runner only ever invoking it from a single
+    // thread; concurrent calls are not supported.
+    void update(const StringMap<MutexStats>& statsPerTag);
 
-void installMongosOtelMetrics(ServiceContext* svcCtx) {
-    installCommonOtelMetrics(svcCtx);
-}
+private:
+    class Impl;
+    static otel::metrics::DynamicMetricNameMaker::Passkey dyn_metric_passkey() {
+        return {};
+    }
+    std::unique_ptr<Impl> _impl;
+};
+
+[[MONGO_MOD_PUBLIC]] void installObservableMutexMetrics(ServiceContext* svcCtx);
 
 }  // namespace mongo

@@ -106,7 +106,7 @@ server_parameters:
         redact: false
 
     diagnosticDataCollectionFileSizeMB:
-        description: Specifies the maximum size, in megabytes, of each diagnostic file"
+        description: "Specifies the maximum size, in megabytes, of each diagnostic file"
         set_at: [startup, runtime]
         cpp_varname: "ftdcStartupParams.maxFileSizeMB"
         on_update: "onUpdateFTDCFileSize"
@@ -144,6 +144,14 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: "Atomic<bool>"
         cpp_varname: gDiagnosticDataCollectionEnableLatencyHistograms
+        redact: false
+
+    diagnosticDataCollectionEnableLockContentionMetrics:
+        description: "Enable the capture of lock contention metrics from ObservableMutex in FTDC."
+        default: true
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<bool>"
+        cpp_varname: gDiagnosticDataCollectionEnableLockContentionMetrics
         redact: false
 
     diagnosticDataCollectionVerboseTCMalloc:

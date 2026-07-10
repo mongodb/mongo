@@ -37,6 +37,7 @@
 namespace mongo {
 // Forward declarations needed for DynamicMetricNameMaker to declare Passkey friends
 class DiskMetrics;
+class ObservableMutexMetrics;
 class SystemMountMetrics;
 
 // Forward declarations needed for MetricName to declare Passkey friends.
@@ -100,6 +101,7 @@ public:
      */
     class Passkey {
         friend ::mongo::DiskMetrics;
+        friend ::mongo::ObservableMutexMetrics;
         friend ::mongo::SystemMountMetrics;
         // This allows us to create dynamic metric names in tests
         friend ::mongo::otel::metrics::DynamicMetricNameTestPasskeyMaker;

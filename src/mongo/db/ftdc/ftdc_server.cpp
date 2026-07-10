@@ -305,7 +305,6 @@ public:
         commandBuilder.append("timing", false);
         commandBuilder.append("defaultRWConcern", false);
         commandBuilder.append(MirrorMaestro::kServerStatusSectionName, true);
-        commandBuilder.append("lockContentionMetrics", BSON("listAll" << 0));
 
         // Avoid requesting metrics that aren't available during a shutdown.
         if (_serverShuttingDown) {
@@ -326,6 +325,10 @@ public:
         commandBuilder.append("metrics", BSON("apiVersions" << false));
 
         commandBuilder.append("spillWiredTiger", gSpillWiredTigerServerStatusVerbosity.load());
+
+        if (gDiagnosticDataCollectionEnableLockContentionMetrics.load()) {
+            commandBuilder.append("lockContentionMetrics", BSON("listAll" << 0));
+        }
 
         if (gDiagnosticDataCollectionEnableLatencyHistograms.load()) {
             BSONObjBuilder subObjBuilder(commandBuilder.subobjStart("opLatencies"));

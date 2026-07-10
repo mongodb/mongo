@@ -77,7 +77,8 @@ public:
 
     /**
      * Adds a mutex to the registry in order for its stats to be included in `report`.
-     * - `tag`: groups this mutex with others of the same tag; stats are aggregated per tag.
+     * - `tag`: groups this mutex with others of the same tag (stats are aggregated per tag); must
+     * form a valid OTel metric name segment (see `_validateTag`).
      * - `mutex`: the mutex instance to register.
      * - `instanceLabel`: optional human-readable label to distinguish individual instances under
      * the same tag; included in the "mutexes" list when `listAll` is enabled in `report`.
@@ -86,6 +87,7 @@ public:
     void add(std::string_view tag,
              const MutexType& mutex,
              boost::optional<std::string_view> instanceLabel = boost::none) {
+        _validateTag(tag);
 // TODO(SERVER-110898): Remove once TSAN works with ObservableMutex.
 #if !__has_feature(thread_sanitizer)
         std::list<NewMutexEntry> newNode;
@@ -143,6 +145,29 @@ public:
      */
     BSONObj report(bool listAll);
 
+    /**
+     * Returns the aggregated MutexStats for each registered mutex tag without serializing to BSON.
+     * Prefer this over report() when the caller needs plain MutexStats structs directly (e.g., for
+     * OTel metric collection).
+     *
+     * {
+     *     [TagName]: MutexStats{
+     *         exclusiveAcquisitions: {
+     *             total:      <uint64_t>,
+     *             contentions: <uint64_t>,
+     *             waitCycles: <uint64_t>,
+     *         },
+     *         sharedAcquisitions: {
+     *             total:      <uint64_t>,
+     *             contentions: <uint64_t>,
+     *             waitCycles: <uint64_t>,
+     *         },
+     *     },
+     *     ...
+     * }
+     */
+    StringMap<MutexStats> statsPerTag();
+
 private:
     // `MutexEntry` is what is stored for each registered mutex.
     struct MutexEntry {
@@ -167,6 +192,12 @@ private:
      * mapped by tag for all valid mutex entries along with stats stored in _removedTokensSnapshots.
      */
     StringMap<std::vector<StatsRecord>> _collectStats();
+
+    /**
+     * Asserts that `tag` is a valid OTel metric name segment: it starts with a lowercase letter and
+     * is either snake_case or camelCase (see otel::metrics::validateOtelMetricName).
+     */
+    static void _validateTag(std::string_view tag);
 
     /**
      * Adds stats from _removedTokensSnapshots into statsMap. Optional fields within a statsMap

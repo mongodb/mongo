@@ -247,7 +247,11 @@ private:
         cleanupGuard.dismiss();
 
         const auto t2 = timer.getTime();
-        stats.waitCycles.fetchAndAddRelaxed(t2 - t1);
+        // Safety check: drop the sample if the timer ran backwards to avoid underflowing
+        // waitCycles.
+        if (MONGO_likely(t2 >= t1)) {
+            stats.waitCycles.fetchAndAddRelaxed(t2 - t1);
+        }
     }
 
     mutable MutexType _mutex;
