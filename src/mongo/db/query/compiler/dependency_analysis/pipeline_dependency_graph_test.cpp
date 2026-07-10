@@ -3229,5 +3229,227 @@ TEST_F(PipelineDependencyGraphTest, AlivenessThreeLevelNestedPathSiblingDead) {
     runTest([&] { assertDeadFieldsEq({{stages[0].get(), "a.b.d"}}); });
 }
 
+void assertOrigin(const FieldOrigin& origin,
+                  FieldOriginKind expectedKind,
+                  const DocumentSource* expectedSource,
+                  const char* expectedName) {
+    ASSERT_EQ(origin.kind, expectedKind);
+    ASSERT_EQ(origin.modifyingStage.get(), expectedSource);
+    if (expectedName) {
+        ASSERT_NE(origin.inputField, boost::none);
+        ASSERT_EQ(*origin.inputField, std::string(expectedName));
+    } else {
+        ASSERT_EQ(origin.inputField, boost::none);
+    }
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginBaseDocumentPassthrough) {
+    setPipeline("[{$match: {x: 1}}]");
+    runTest([&] {
+        assertOrigin(
+            graph->resolveFieldOrigin(nullptr, "a"), FieldOriginKind::kBaseDocument, nullptr, "a");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginInclusionKeptBaseField) {
+    setPipeline("[{$project: {x: 1}}]");
+    runTest([&] {
+        assertOrigin(
+            graph->resolveFieldOrigin(nullptr, "x"), FieldOriginKind::kBaseDocument, nullptr, "x");
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "x.x"),
+                     FieldOriginKind::kBaseDocument,
+                     nullptr,
+                     "x.x");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginSimpleRename) {
+    setPipeline("[{$set: {a: '$b'}}]");
+    runTest([&] {
+        assertOrigin(
+            graph->resolveFieldOrigin(nullptr, "a"), FieldOriginKind::kAlias, stages[0].get(), "b");
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a.x"),
+                     FieldOriginKind::kAlias,
+                     stages[0].get(),
+                     "b.x");
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a.x.y"),
+                     FieldOriginKind::kAlias,
+                     stages[0].get(),
+                     "b.x.y");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginDottedRenameWithArrayFreePrefix) {
+    pathArrayness->addPath("b", {}, true);
+    setPipeline("[{$set: {a: '$b.c'}}]");
+    runTest([&] {
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a"),
+                     FieldOriginKind::kAlias,
+                     stages[0].get(),
+                     "b.c");
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a.x"),
+                     FieldOriginKind::kAlias,
+                     stages[0].get(),
+                     "b.c.x");
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a.x.y"),
+                     FieldOriginKind::kAlias,
+                     stages[0].get(),
+                     "b.c.x.y");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginDottedRenameWithPossibleArrayPrefix) {
+    setPipeline("[{$set: {a: '$b.c'}}]");
+    runTest([&] {
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a"),
+                     FieldOriginKind::kOther,
+                     stages[0].get(),
+                     nullptr);
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a.x"),
+                     FieldOriginKind::kOther,
+                     stages[0].get(),
+                     nullptr);
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a.x.y"),
+                     FieldOriginKind::kOther,
+                     stages[0].get(),
+                     nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginRenameReachedThroughArrayPrefixIsOther) {
+    setPipeline("[{$set: {a: '$b'}}, {$set: {'a.c': '$d'}}]");
+    runTest([&] {
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a.c"),
+                     FieldOriginKind::kOther,
+                     stages[1].get(),
+                     nullptr);
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a.c.x"),
+                     FieldOriginKind::kOther,
+                     stages[1].get(),
+                     nullptr);
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a.c.x.y"),
+                     FieldOriginKind::kOther,
+                     stages[1].get(),
+                     nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginAliasChainResolvesOneHopAtATime) {
+    setPipeline("[{$set: {b: '$a'}}, {$set: {c: '$b'}}]");
+    runTest([&] {
+        auto origin = graph->resolveFieldOrigin(nullptr, "c");
+        assertOrigin(origin, FieldOriginKind::kAlias, stages[1].get(), "b");
+
+        origin = graph->resolveFieldOrigin(origin.modifyingStage.get(), *origin.inputField);
+        assertOrigin(origin, FieldOriginKind::kAlias, stages[0].get(), "a");
+
+        origin = graph->resolveFieldOrigin(origin.modifyingStage.get(), *origin.inputField);
+        assertOrigin(origin, FieldOriginKind::kBaseDocument, nullptr, "a");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginComputedField) {
+    setPipeline("[{$set: {a: {$add: ['$x', 1]}}}]");
+    runTest([&] {
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a"),
+                     FieldOriginKind::kOther,
+                     stages[0].get(),
+                     nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginAliasOfComputedFieldIsStillAlias) {
+    setPipeline("[{$set: {a: {$add: ['$x', 1]}}}, {$set: {b: '$a'}}]");
+    runTest([&] {
+        assertOrigin(
+            graph->resolveFieldOrigin(nullptr, "b"), FieldOriginKind::kAlias, stages[1].get(), "a");
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "b.x"),
+                     FieldOriginKind::kAlias,
+                     stages[1].get(),
+                     "a.x");
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a"),
+                     FieldOriginKind::kOther,
+                     stages[0].get(),
+                     nullptr);
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a.x"),
+                     FieldOriginKind::kOther,
+                     stages[0].get(),
+                     nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginDroppedByInclusionProjectionIsOther) {
+    setPipeline("[{$project: {b: 1}}]");
+    runTest([&] {
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a"),
+                     FieldOriginKind::kOther,
+                     stages[0].get(),
+                     nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginRemovedByExclusionProjectionIsOther) {
+    setPipeline("[{$project: {a: 0}}]");
+    runTest([&] {
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a"),
+                     FieldOriginKind::kOther,
+                     stages[0].get(),
+                     nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginReplaceRootIsOther) {
+    setPipeline("[{$replaceRoot: {newRoot: {a: 1}}}]");
+    runTest([&] {
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a"),
+                     FieldOriginKind::kOther,
+                     stages[0].get(),
+                     nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginSubpipelineCrossing) {
+    setOptimizedPipeline(
+        "[{$lookup: {from: 'coll_b', localField: 'x', foreignField: 'y', as: 'e'}}, "
+        " {$unwind: '$e'}]");
+    runTest([&] {
+        // A path under the embedding crosses into the sub-pipeline with the prefix stripped.
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "e.y"),
+                     FieldOriginKind::kSubpipeline,
+                     stages[0].get(),
+                     "y");
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "e.y.x"),
+                     FieldOriginKind::kSubpipeline,
+                     stages[0].get(),
+                     "y.x");
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "e.y.x.z"),
+                     FieldOriginKind::kSubpipeline,
+                     stages[0].get(),
+                     "y.x.z");
+        // Referencing the whole embedded document is not a single collection field.
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "e"),
+                     FieldOriginKind::kOther,
+                     stages[0].get(),
+                     nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginAliasThenSubpipeline) {
+    setOptimizedPipeline(
+        "[{$lookup: {from: 'coll_b', localField: 'x', foreignField: 'y', as: 'e'}}, "
+        " {$unwind: '$e'}, "
+        " {$set: {f: '$e.y'}}]");
+    runTest([&] {
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "f"),
+                     FieldOriginKind::kAlias,
+                     stages[1].get(),
+                     "e.y");
+        assertOrigin(graph->resolveFieldOrigin(stages[1].get(), "e.y"),
+                     FieldOriginKind::kSubpipeline,
+                     stages[0].get(),
+                     "y");
+    });
+}
+
 }  // namespace
 }  // namespace mongo::pipeline::dependency_graph

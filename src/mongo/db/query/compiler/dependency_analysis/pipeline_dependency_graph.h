@@ -87,6 +87,63 @@ struct DeadField {
 };
 
 /**
+ * Classifies where a field path came from, resolved by a single hop (see resolveFieldOrigin).
+ */
+enum class FieldOriginKind : uint8_t {
+    /**
+     * The field path passed through unchanged from the pipeline input (the base document).
+     * The reported input path is the same as the queried path.
+     * Examples:
+     * 1. {$project: {a: 1}}
+     * 2. {$set: {b: 1}}
+     *    > the origin of 'a' is {kBaseDocument, inputField="a"}
+     */
+    kBaseDocument,
+    /**
+     * The field path is a value-preserving alias of another path (a "simple" rename). The aliased
+     * path is reported. Prefix-aliases are also applied.
+     * Examples:
+     * 1. {$set: {a: '$b'}}
+     *    > The origin of 'a' is {kAlias, inputField="b"}
+     *    > The origin of 'a.x' is {kAlias, inputField="b.x"}
+     *    > The origin of 'a.x.y' is {kAlias, inputField="b.x.y"}
+     * 2. {$set: {a: '$b.c'}} (requires canPathBeArray('b') == false to guard array traversal)
+     *    > The origin of 'a' is {kAlias, inputField="b.c"}
+     * 3. {$set: {'a.b': '$c'}} (requires canPathBeArray('a') == false to guard reshaping)
+     *    > The origin of 'a.b' is {kAlias, inputField="c"}
+     * If the requirements are not met, the origin kind is reported as kOther.
+     */
+    kAlias,
+    /**
+     * The field path is produced by a sub-pipeline (e.g. a $lookup "as" field). The path from the
+     * sub-pipeline is reported.
+     * Examples:
+     * 1. {$lookup: {as: 'a', pipeline: [{$set: 'b'}]}}, {$unwind: 'a'}
+     *    > The origin of 'a.b' is {kSubpipeline, inputField='b'}
+     *    > The origin of 'a.b.x' is {kSubpipeline, inputField='b.x'}
+     */
+    kSubpipeline,
+    /**
+     * The field path is modified in any other way which prevents further origin resolution.
+     * This could be because the path is removed, computed, reshaped, required array traversal of
+     * the source path and so on.
+     */
+    kOther,
+};
+
+/**
+ * Result of resolving a field path's origin.
+ */
+struct FieldOrigin {
+    /// The kind of operation which produced the path in the query.
+    FieldOriginKind kind;
+    /// The stage which modified the field. nullptr only for kBaseDocument.
+    boost::intrusive_ptr<mongo::DocumentSource> modifyingStage;
+    /// The prior path which produced the path in the query. none only for kOther.
+    boost::optional<std::string> inputField;
+};
+
+/**
  * Represents dependencies between fields and stages in a pipeline. Can be partially rebuilt when
  * the pipeline changes.
  */
@@ -165,6 +222,14 @@ public:
      * $unionWith), or nullptr if the stage has no sub-pipeline.
      */
     const DependencyGraph* getSubpipelineGraph(const DocumentSource* stage) const;
+
+    /**
+     * Resolves 'path', as seen at the input of 'stage', back by a single hop toward its origin. If
+     * 'stage' is nullptr, the path is resolved as it appears at the end of the pipeline.
+     *
+     * See FieldOrigin for more information.
+     */
+    FieldOrigin resolveFieldOrigin(const DocumentSource* stage, PathRef path) const;
 
     /**
      * Invalidate and recompute the graph from the stage pointed to by 'stageIt' onwards. If

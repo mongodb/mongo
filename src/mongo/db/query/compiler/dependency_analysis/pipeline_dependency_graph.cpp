@@ -460,6 +460,20 @@ std::string_view skipPathComponents(std::string_view path, size_t count) {
     return path.substr(pos);
 }
 
+/**
+ * Extracts the prefix from a dotted path.
+ * Examples:
+ * - a -> ""
+ * - a.b -> "a"
+ * - a.b.c -> "a.b"
+ */
+std::string_view getPathPrefix(std::string_view path) {
+    if (auto idx = path.rfind('.'); idx != std::string::npos) {
+        return path.substr(0, idx);
+    }
+    return {};
+}
+
 /// Result type used when looking up a field.
 enum class FieldMatchType : uint8_t {
     /**
@@ -736,6 +750,80 @@ public:
     const DependencyGraph* getSubpipelineGraph(const DocumentSource* ds) const {
         auto stageId = getStageId(ds);
         return _stages[stageId].subpipelineGraph;
+    }
+
+    FieldOrigin resolveFieldOrigin(const DocumentSource* ds, PathRef path) const {
+        auto stageId = getPreviousStageId(ds);
+        if (!stageId) {
+            return {FieldOriginKind::kBaseDocument, nullptr, std::string(path)};
+        }
+
+        auto scopeId = _stages[stageId].scope;
+        auto parsedPath = parsePath(path);
+
+        FieldList prefix;
+        auto [fieldId, type] = lookupField(scopeId, parsedPath, &prefix);
+
+        if (type == FieldMatchType::kBaseDocument) {
+            return {FieldOriginKind::kBaseDocument, nullptr, std::string(path)};
+        }
+
+        StageId declaringStageId = _scopes[_fields[fieldId].declaringScope].stage;
+        const auto& declaringStage = _stages[declaringStageId].documentSource;
+
+        // If the prefix of the path in question could contain arrays, we stop resolution, since
+        // that could require array traversal.
+        if (canPrefixContainArrays(prefix)) {
+            return {FieldOriginKind::kOther, declaringStage, boost::none};
+        }
+
+        // Helper to check if the prefix can be array. Used when resolving {$set: {a: '$b.c'}}
+        // we want to ensure 'b' is non-array (array traversal).
+        auto canPrefixRequireArrayTraversal = [&](PathRef path) {
+            if (auto prefix = getPathPrefix(path); !prefix.empty()) {
+                return canPathBeArray(declaringStage.get(), prefix);
+            }
+            return false;
+        };
+
+        switch (type) {
+            case FieldMatchType::kExact: {
+                // Exact match means we just need to check if there is no array-traversal.
+                if (auto* oldPath = getRenameOldPath(fieldId);
+                    oldPath && !canPrefixRequireArrayTraversal(*oldPath)) {
+                    return {FieldOriginKind::kAlias, declaringStage, *oldPath};
+                }
+                return {FieldOriginKind::kOther, declaringStage, boost::none};
+            }
+            case FieldMatchType::kShadowed: {
+                // Several cases to handle when shadowed.
+
+                // If the path comes from a $lookup, we need to ensure that the $lookup 'as' field
+                // was unwound.
+                if (auto* subpipeline = _stages[declaringStageId].subpipelineGraph;
+                    subpipeline && !_fields[fieldId].metadata.canFieldBeArray) {
+                    // Strip the 'as' path (shadowing portion).
+                    auto suffixPath = skipPathComponents(path, prefix.size() + 1);
+                    return {FieldOriginKind::kSubpipeline, declaringStage, std::string(suffixPath)};
+                }
+
+                // The path prefix is a rename. We need to check if it's aliasing and that the full
+                // path is array-free on the prefix.
+                if (auto* oldPath = getRenameOldPath(fieldId);
+                    oldPath && !canPrefixRequireArrayTraversal(*oldPath)) {
+                    auto suffixPath = skipPathComponents(path, prefix.size() + 1);
+                    auto aliasedPath = fmt::format("{}.{}", *oldPath, suffixPath);
+                    return {FieldOriginKind::kAlias, declaringStage, aliasedPath};
+                }
+                return {FieldOriginKind::kOther, declaringStage, boost::none};
+            }
+            case FieldMatchType::kMissing: {
+                return {FieldOriginKind::kOther, declaringStage, boost::none};
+            }
+            case FieldMatchType::kBaseDocument:
+                MONGO_UNREACHABLE_TASSERT(13052601);
+        }
+        MONGO_UNREACHABLE_TASSERT(13052602);
     }
 
     void recompute(boost::optional<DocumentSourceContainer::const_iterator> stageIt = {}) {
@@ -1296,6 +1384,14 @@ private:
         return it != _collectionAliases.end() ? &it->second : nullptr;
     }
 
+    /**
+     * Returns the old path from the rename for the given field, or nullptr if none.
+     */
+    const std::string* getRenameOldPath(FieldId fieldId) const {
+        auto it = _renames.find(fieldId);
+        return it != _renames.end() ? &it->second : nullptr;
+    }
+
     /// Record 'value' as the known constant for the leaf of 'path' in 'scope'. Must be called
     /// immediately after 'declareField(scope, path, ...)' — the leaf is read from
     /// '_fields.getLastId()' to avoid re-walking the path. The 'scope' / 'path' parameters are
@@ -1658,11 +1754,14 @@ private:
                                  std::move(metadata),
                                  {} /*collectionPathPrefix*/,
                                  parentScope);
+                    auto leafFieldId = _fields.getLastId();
+                    tassert(12193201, "Missing leafFieldId", leafFieldId);
+                    dassert(lookupField(scopeId, parsedNewPath).fieldId == leafFieldId);
 
+                    // Store old path for the rename.
+                    _renames[leafFieldId] = std::string(p.getOldPath());
                     // Store alias for the leaf field of the new path.
                     if (!aliasCollectionPath.empty()) {
-                        auto [leafFieldId, _] = lookupField(scopeId, parsedNewPath);
-                        tassert(12193201, "Missing leafFieldId", leafFieldId);
                         _collectionAliases[leafFieldId] = std::move(aliasCollectionPath);
                     }
                     if (constant) {
@@ -1905,6 +2004,8 @@ private:
         // Clean up constants and aliases for invalidated fields.
         absl::erase_if(_collectionAliases,
                        [invalidField](const auto& entry) { return entry.first >= invalidField; });
+        absl::erase_if(_renames,
+                       [invalidField](const auto& entry) { return entry.first >= invalidField; });
         absl::erase_if(_constants,
                        [invalidField](const auto& entry) { return entry.first >= invalidField; });
 
@@ -1983,6 +2084,9 @@ private:
     // (directly or transitively through other aliases).
     absl::flat_hash_map<FieldId, ParsedPath> _collectionAliases;
 
+    // Maps a FieldId created via RenamePath to the old path.
+    absl::flat_hash_map<FieldId, std::string> _renames;
+
     // Side table of known constant Values, keyed by FieldId.
     absl::flat_hash_map<FieldId, Value> _constants;
 
@@ -2028,6 +2132,10 @@ boost::optional<Value> DependencyGraph::getConstant(const DocumentSource* ds, Pa
 
 const DependencyGraph* DependencyGraph::getSubpipelineGraph(const DocumentSource* ds) const {
     return _impl->getSubpipelineGraph(ds);
+}
+
+FieldOrigin DependencyGraph::resolveFieldOrigin(const DocumentSource* ds, PathRef path) const {
+    return _impl->resolveFieldOrigin(ds, path);
 }
 
 void DependencyGraph::recompute_forTest(
