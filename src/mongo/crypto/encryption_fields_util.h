@@ -210,6 +210,27 @@ inline bool isFLE2TextQueryType(QueryTypeEnum qt) {
         qt == QueryTypeEnum::Prefix || isFLE2TextPreviewQueryType(qt);
 }
 
+/**
+ * Returns true iff the query type `qt` is for substring or its deprecated preview type.
+ */
+inline bool isFLE2SubstringQueryType(QueryTypeEnum qt) {
+    return qt == QueryTypeEnum::Substring || qt == QueryTypeEnum::SubstringPreviewDeprecated;
+}
+
+/**
+ * Returns true iff the query type `qt` is for suffix or its deprecated preview type.
+ */
+inline bool isFLE2SuffixQueryType(QueryTypeEnum qt) {
+    return qt == QueryTypeEnum::Suffix || qt == QueryTypeEnum::SuffixPreviewDeprecated;
+}
+
+/**
+ * Returns true iff the query type `qt` is for prefix or its deprecated preview type.
+ */
+inline bool isFLE2PrefixQueryType(QueryTypeEnum qt) {
+    return qt == QueryTypeEnum::Prefix || qt == QueryTypeEnum::PrefixPreviewDeprecated;
+}
+
 struct EncryptedFieldMatchResult {
     FieldRef encryptedField;
     bool keyIsPrefixOrEqual;

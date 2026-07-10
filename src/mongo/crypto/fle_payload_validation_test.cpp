@@ -69,10 +69,17 @@ QueryTypeConfig rangeQtc(int64_t contention,
     return q;
 }
 
-QueryTypeConfig textQtc(QueryTypeEnum qt, int64_t contention) {
+QueryTypeConfig textQtc(QueryTypeEnum qt,
+                        int64_t contention,
+                        boost::optional<int32_t> strMinQueryLength = boost::none,
+                        boost::optional<int32_t> strMaxQueryLength = boost::none,
+                        boost::optional<int32_t> strMaxLength = boost::none) {
     QueryTypeConfig q;
     q.setQueryType(qt);
     q.setContention(contention);
+    q.setStrMinQueryLength(strMinQueryLength);
+    q.setStrMaxQueryLength(strMaxQueryLength);
+    q.setStrMaxLength(strMaxLength);
     return q;
 }
 
@@ -254,6 +261,83 @@ TEST(FLEPayloadValidation, MatchAnyStringSearchType) {
     auto eqField = fieldWith("encrypted", equalityQtc(4));
     ASSERT_THROWS_CODE(
         validatePayloadAgainstQueryTypeConfig("encrypted", eqField, anyText), DBException, 9188704);
+}
+
+TEST(FLEPayloadValidation, TextSearchBoundsMatchAndMismatch) {
+    auto field =
+        fieldWith("encrypted", {textQtc(QueryTypeEnum::Suffix, 4, int32_t(2), int32_t(10))});
+    auto good = sampled(QueryTypeEnum::Suffix);
+    good.strMinQueryLength = int32_t(2);
+    good.strMaxQueryLength = int32_t(10);
+    validatePayloadAgainstQueryTypeConfig("encrypted", field, good);
+
+    auto badLb = sampled(QueryTypeEnum::Suffix);
+    badLb.strMinQueryLength = int32_t(3);
+    badLb.strMaxQueryLength = int32_t(10);
+    ASSERT_THROWS_CODE(
+        validatePayloadAgainstQueryTypeConfig("encrypted", field, badLb), DBException, 12778600);
+
+    auto badUb = sampled(QueryTypeEnum::Suffix);
+    badUb.strMinQueryLength = int32_t(2);
+    badUb.strMaxQueryLength = int32_t(11);
+    ASSERT_THROWS_CODE(
+        validatePayloadAgainstQueryTypeConfig("encrypted", field, badUb), DBException, 12778601);
+}
+
+TEST(FLEPayloadValidation, TextSearchMaxLengthMatchAndMismatch) {
+    auto field = fieldWith(
+        "encrypted", {textQtc(QueryTypeEnum::Substring, 4, int32_t(2), int32_t(10), int32_t(20))});
+    auto good = sampled(QueryTypeEnum::Substring);
+    good.strMinQueryLength = int32_t(2);
+    good.strMaxQueryLength = int32_t(10);
+    good.strMaxLength = int32_t(20);
+    validatePayloadAgainstQueryTypeConfig("encrypted", field, good);
+
+    auto bad = sampled(QueryTypeEnum::Substring);
+    bad.strMinQueryLength = int32_t(2);
+    bad.strMaxQueryLength = int32_t(10);
+    bad.strMaxLength = int32_t(30);
+    ASSERT_THROWS_CODE(
+        validatePayloadAgainstQueryTypeConfig("encrypted", field, bad), DBException, 12778602);
+}
+
+TEST(FLEPayloadValidation, TextSearchBoundsMissingFromConfigThrows) {
+    auto field = fieldWith("encrypted", {textQtc(QueryTypeEnum::Suffix, 4)});
+    auto payload = sampled(QueryTypeEnum::Suffix);
+    payload.strMinQueryLength = int32_t(2);
+    ASSERT_THROWS_CODE(
+        validatePayloadAgainstQueryTypeConfig("encrypted", field, payload), DBException, 12778600);
+}
+
+TEST(FLEPayloadValidation, TextSearchBoundsResolvedPerVariant) {
+    // Suffix and prefix are configured with different bounds on the same field; the validator
+    // must resolve the QTC matching the payload's specific variant rather than the first text QTC.
+    auto field = fieldWith("encrypted",
+                           {textQtc(QueryTypeEnum::Suffix, 4, int32_t(2), int32_t(10)),
+                            textQtc(QueryTypeEnum::Prefix, 4, int32_t(5), int32_t(20))});
+    auto suffixPayload = sampled(QueryTypeEnum::Suffix);
+    suffixPayload.strMinQueryLength = int32_t(2);
+    suffixPayload.strMaxQueryLength = int32_t(10);
+    validatePayloadAgainstQueryTypeConfig("encrypted", field, suffixPayload);
+
+    auto wrongBounds = sampled(QueryTypeEnum::Suffix);
+    wrongBounds.strMinQueryLength = int32_t(5);
+    wrongBounds.strMaxQueryLength = int32_t(20);
+    ASSERT_THROWS_CODE(validatePayloadAgainstQueryTypeConfig("encrypted", field, wrongBounds),
+                       DBException,
+                       12778600);
+}
+
+TEST(FLEPayloadValidation, TextSearchBoundsAcceptsDeprecatedPreviewVariant) {
+    auto substringPreview = fieldWith(
+        "encrypted",
+        {textQtc(
+            QueryTypeEnum::SubstringPreviewDeprecated, 4, int32_t(2), int32_t(10), int32_t(20))});
+    auto good = sampled(QueryTypeEnum::Substring);
+    good.strMinQueryLength = int32_t(2);
+    good.strMaxQueryLength = int32_t(10);
+    good.strMaxLength = int32_t(20);
+    validatePayloadAgainstQueryTypeConfig("encrypted", substringPreview, good);
 }
 
 }  // namespace mongo

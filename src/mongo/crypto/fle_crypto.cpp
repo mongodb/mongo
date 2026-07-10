@@ -3951,14 +3951,27 @@ ParsedFindTextSearchPayload::ParsedFindTextSearchPayload(
         edc = EDCDerivedFromDataToken{prefixTokens->getEdcDerivedToken().asPrfBlock()};
         esc = ESCDerivedFromDataToken{prefixTokens->getEscDerivedToken().asPrfBlock()};
         server = ServerDerivedFromDataToken{prefixTokens->getServerDerivedToken().asPrfBlock()};
+        if (const auto& spec = payload.getPrefixSpec(); spec) {
+            minQueryLength = spec->getMinQueryLength();
+            maxQueryLength = spec->getMaxQueryLength();
+        }
     } else if (suffixTokens) {
         edc = EDCDerivedFromDataToken{suffixTokens->getEdcDerivedToken().asPrfBlock()};
         esc = ESCDerivedFromDataToken{suffixTokens->getEscDerivedToken().asPrfBlock()};
         server = ServerDerivedFromDataToken{suffixTokens->getServerDerivedToken().asPrfBlock()};
+        if (const auto& spec = payload.getSuffixSpec(); spec) {
+            minQueryLength = spec->getMinQueryLength();
+            maxQueryLength = spec->getMaxQueryLength();
+        }
     } else if (substringTokens) {
         edc = EDCDerivedFromDataToken{substringTokens->getEdcDerivedToken().asPrfBlock()};
         esc = ESCDerivedFromDataToken{substringTokens->getEscDerivedToken().asPrfBlock()};
         server = ServerDerivedFromDataToken{substringTokens->getServerDerivedToken().asPrfBlock()};
+        if (const auto& spec = payload.getSubstringSpec(); spec) {
+            minQueryLength = spec->getMinQueryLength();
+            maxQueryLength = spec->getMaxQueryLength();
+            maxLength = spec->getMaxLength();
+        }
     } else {
         edc = EDCDerivedFromDataToken{exactTokens->getEdcDerivedToken().asPrfBlock()};
         esc = ESCDerivedFromDataToken{exactTokens->getEscDerivedToken().asPrfBlock()};
@@ -4042,6 +4055,32 @@ bool hasQueryTypeMatching(const EncryptedFieldConfig& config, const QueryTypeMat
                                  [&matcher](const EncryptedField&, const QueryTypeConfig& qtc) {
                                      return matcher(qtc.getQueryType());
                                  });
+}
+
+boost::optional<QueryTypeConfig> getQueryTypeMatching(const EncryptedField& field,
+                                                      const QueryTypeMatchFn& matcher) {
+    boost::optional<QueryTypeConfig> result;
+    visitQueryTypeConfigs(field, [&](const EncryptedField&, const QueryTypeConfig& qtc) {
+        if (matcher(qtc.getQueryType())) {
+            result = qtc;
+            return true;
+        }
+        return false;
+    });
+    return result;
+}
+
+boost::optional<QueryTypeConfig> getQueryTypeMatching(const EncryptedFieldConfig& config,
+                                                      const QueryTypeMatchFn& matcher) {
+    boost::optional<QueryTypeConfig> result;
+    visitQueryTypeConfigs(config, [&](const EncryptedField&, const QueryTypeConfig& qtc) {
+        if (matcher(qtc.getQueryType())) {
+            result = qtc;
+            return true;
+        }
+        return false;
+    });
+    return result;
 }
 
 bool hasQueryType(const EncryptedField& field, QueryTypeEnum queryType) {

@@ -1240,6 +1240,10 @@ struct ParsedFindTextSearchPayload {
     ESCDerivedFromDataToken esc;
 
     ServerDerivedFromDataToken server;
+
+    boost::optional<std::int32_t> minQueryLength;  // lb
+    boost::optional<std::int32_t> maxQueryLength;  // ub
+    boost::optional<std::int32_t> maxLength;       // mlen, substring only
 };
 
 
@@ -1401,6 +1405,12 @@ boost::optional<EncryptedBinDataType> getEncryptedBinDataType(const BSONElement&
 using QueryTypeMatchFn = std::function<bool(QueryTypeEnum)>;
 bool hasQueryTypeMatching(const EncryptedField& field, const QueryTypeMatchFn& matcher);
 bool hasQueryTypeMatching(const EncryptedFieldConfig& config, const QueryTypeMatchFn& matcher);
+
+// Returns the first QueryTypeConfig whose query type satisfies matcher, or none if no config does.
+boost::optional<QueryTypeConfig> getQueryTypeMatching(const EncryptedField& field,
+                                                      const QueryTypeMatchFn& matcher);
+boost::optional<QueryTypeConfig> getQueryTypeMatching(const EncryptedFieldConfig& config,
+                                                      const QueryTypeMatchFn& matcher);
 
 bool hasQueryType(const EncryptedField& field, QueryTypeEnum queryType);
 bool hasQueryType(const EncryptedFieldConfig& config, QueryTypeEnum queryType);

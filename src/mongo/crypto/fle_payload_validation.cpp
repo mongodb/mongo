@@ -40,26 +40,28 @@
 
 namespace mongo {
 namespace {
+// Same GA-or-preview equivalence as hasQueryTypeOrPreview, expressed as a two-argument predicate
+// so it can be used as a QueryTypeMatchFn for a specific requested type.
+bool matchesQueryTypeOrPreviewVariant(QueryTypeEnum requested, QueryTypeEnum actual) {
+    if (isFLE2SubstringQueryType(requested)) {
+        return isFLE2SubstringQueryType(actual);
+    }
+    if (isFLE2SuffixQueryType(requested)) {
+        return isFLE2SuffixQueryType(actual);
+    }
+    if (isFLE2PrefixQueryType(requested)) {
+        return isFLE2PrefixQueryType(actual);
+    }
+    return requested == actual;
+}
+
 // Like hasQueryType, but a payload's token variant maps to the GA String query type while
 // a field created before the GA types existed carries the deprecated preview variant. Accept
 // either: getAndValidateSchema blocks deprecated schemas once featureFlagQEPrefixSuffixSearch is
 // on, so a deprecated type only reaches here while the field is still legitimately operational.
 bool hasQueryTypeOrPreview(const EncryptedField& field, QueryTypeEnum t) {
-    return hasQueryTypeMatching(field, [&](QueryTypeEnum qt) {
-        if (qt == t) {
-            return true;
-        }
-        if (t == QueryTypeEnum::Substring) {
-            return qt == QueryTypeEnum::SubstringPreviewDeprecated;
-        }
-        if (t == QueryTypeEnum::Suffix) {
-            return qt == QueryTypeEnum::SuffixPreviewDeprecated;
-        }
-        if (t == QueryTypeEnum::Prefix) {
-            return qt == QueryTypeEnum::PrefixPreviewDeprecated;
-        }
-        return false;
-    });
+    return hasQueryTypeMatching(
+        field, [&](QueryTypeEnum qt) { return matchesQueryTypeOrPreviewVariant(t, qt); });
 }
 }  // namespace
 
@@ -101,6 +103,9 @@ FLE2PayloadParams::FLE2PayloadParams(const ParsedFindTextSearchPayload& p) {
         // QTC on the field, so any text QTC is acceptable.
         matchAnyStringSearchType = true;
     }
+    strMinQueryLength = p.minQueryLength;
+    strMaxQueryLength = p.maxQueryLength;
+    strMaxLength = p.maxLength;
 }
 
 void validatePayloadAgainstQueryTypeConfig(std::string_view fieldPath,
@@ -126,21 +131,18 @@ void validatePayloadAgainstQueryTypeConfig(std::string_view fieldPath,
                                   << "' but the field is not indexed for that query type",
                     hasQueryTypeOrPreview(field, expectedType));
         }
-        // Contention/sparsity/precision/min/max are shared across a field's QTCs (EFC validation
-        // enforces this), so reading the first expected type's config is sufficient. For text types
-        // the field may carry the deprecated preview variant, so resolve via
-        // findStringSearchQueryType (guaranteed non-none here: the loop above asserted the field
-        // has the text type).
+        // Contention/sparsity/precision/min/max/string-search bounds are shared across a field's
+        // QTCs for a given type (EFC validation enforces this), so reading the first expected
+        // type's config is sufficient. Resolve via the same GA-or-preview matching as the
+        // existence check above (guaranteed non-none here: that check already asserted a match).
         auto front = params.expectedTypes.front();
-        if (isFLE2TextQueryType(front)) {
-            auto configuredStringQuery = findStringSearchQueryType(field);
-            tassert(9188710,
-                    "field validated for a text query type must have a text QueryTypeConfig",
-                    configuredStringQuery);
-            qtc = getQueryType(field, *configuredStringQuery);
-        } else {
-            qtc = getQueryType(field, front);
-        }
+        auto matched = getQueryTypeMatching(field, [front](QueryTypeEnum qt) {
+            return matchesQueryTypeOrPreviewVariant(front, qt);
+        });
+        tassert(12778604,
+                str::stream() << "Field '" << fieldPath << "' must have a QueryTypeConfig",
+                matched);
+        qtc = *matched;
     }
     const auto configContention = qtc.getContention();
     if (params.contention) {
@@ -195,6 +197,38 @@ void validatePayloadAgainstQueryTypeConfig(std::string_view fieldPath,
                 str::stream() << "indexMax in payload for field '" << fieldPath
                               << "' does not match collection's configured indexMax",
                 Value::compare(Value{*params.indexMax}, *qtc.getMax(), nullptr) == 0);
+    }
+
+    if (params.strMinQueryLength) {
+        uassert(12778600,
+                str::stream() << "strMinQueryLength " << *params.strMinQueryLength
+                              << " in payload for field '" << fieldPath
+                              << "' does not match collection's configured strMinQueryLength "
+                              << (qtc.getStrMinQueryLength()
+                                      ? std::to_string(*qtc.getStrMinQueryLength())
+                                      : "(none)"),
+                qtc.getStrMinQueryLength() &&
+                    *params.strMinQueryLength == *qtc.getStrMinQueryLength());
+    }
+    if (params.strMaxQueryLength) {
+        uassert(12778601,
+                str::stream() << "strMaxQueryLength " << *params.strMaxQueryLength
+                              << " in payload for field '" << fieldPath
+                              << "' does not match collection's configured strMaxQueryLength "
+                              << (qtc.getStrMaxQueryLength()
+                                      ? std::to_string(*qtc.getStrMaxQueryLength())
+                                      : "(none)"),
+                qtc.getStrMaxQueryLength() &&
+                    *params.strMaxQueryLength == *qtc.getStrMaxQueryLength());
+    }
+    if (params.strMaxLength) {
+        uassert(12778602,
+                str::stream() << "strMaxLength " << *params.strMaxLength
+                              << " in payload for field '" << fieldPath
+                              << "' does not match collection's configured strMaxLength "
+                              << (qtc.getStrMaxLength() ? std::to_string(*qtc.getStrMaxLength())
+                                                        : "(none)"),
+                qtc.getStrMaxLength() && *params.strMaxLength == *qtc.getStrMaxLength());
     }
 }
 

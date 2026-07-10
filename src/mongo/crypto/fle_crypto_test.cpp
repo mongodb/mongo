@@ -5393,4 +5393,50 @@ TEST_F(ServiceContextTest, fleEncryptAndDecrypt) {
     ASSERT_EQ(decrypt1, plaintext);
 }
 
+namespace {
+QueryTypeConfig textQtcWithType(QueryTypeEnum qt) {
+    QueryTypeConfig q;
+    q.setQueryType(qt);
+    q.setContention(4);
+    return q;
+}
+
+EncryptedField fieldWithQueries(std::vector<QueryTypeConfig> qtcs) {
+    EncryptedField ef(UUID::gen(), "encrypted");
+    ef.setBsonType("string"sv);
+    ef.setQueries(std::variant<std::vector<QueryTypeConfig>, QueryTypeConfig>{std::move(qtcs)});
+    return ef;
+}
+}  // namespace
+
+TEST(FLECrypto, GetQueryTypeMatchingReturnsFirstMatch) {
+    auto field = fieldWithQueries(
+        {textQtcWithType(QueryTypeEnum::Suffix), textQtcWithType(QueryTypeEnum::Prefix)});
+
+    auto suffixResult =
+        getQueryTypeMatching(field, [](QueryTypeEnum qt) { return qt == QueryTypeEnum::Suffix; });
+    ASSERT(suffixResult);
+    ASSERT(suffixResult->getQueryType() == QueryTypeEnum::Suffix);
+
+    auto prefixResult =
+        getQueryTypeMatching(field, [](QueryTypeEnum qt) { return qt == QueryTypeEnum::Prefix; });
+    ASSERT(prefixResult);
+    ASSERT(prefixResult->getQueryType() == QueryTypeEnum::Prefix);
+}
+
+TEST(FLECrypto, GetQueryTypeMatchingNoMatchReturnsNone) {
+    auto field = fieldWithQueries({textQtcWithType(QueryTypeEnum::Prefix)});
+    auto result =
+        getQueryTypeMatching(field, [](QueryTypeEnum qt) { return qt == QueryTypeEnum::Suffix; });
+    ASSERT_FALSE(result);
+}
+
+TEST(FLECrypto, GetQueryTypeMatchingNoQueriesReturnsNone) {
+    EncryptedField field(UUID::gen(), "encrypted");
+    field.setBsonType("int"sv);
+    auto result =
+        getQueryTypeMatching(field, [](QueryTypeEnum qt) { return qt == QueryTypeEnum::Suffix; });
+    ASSERT_FALSE(result);
+}
+
 }  // namespace mongo

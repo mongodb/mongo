@@ -67,6 +67,9 @@ struct FLE2PayloadParams {
     boost::optional<std::int32_t> precision;
     boost::optional<BSONElement> indexMin;
     boost::optional<BSONElement> indexMax;
+    boost::optional<std::int32_t> strMinQueryLength;  // lb
+    boost::optional<std::int32_t> strMaxQueryLength;  // ub
+    boost::optional<std::int32_t> strMaxLength;       // mlen, substring only
     std::vector<QueryTypeEnum> expectedTypes;
     bool matchAnyStringSearchType = false;
 
