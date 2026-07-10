@@ -38,6 +38,7 @@
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/transaction_participant_failed_unyield_exception.h"
@@ -267,7 +268,9 @@ AsyncRequestsSender::RemoteData::RemoteData(AsyncRequestsSender* ars,
       _shardRef(std::move(shardRef)),
       _cmdObj(std::move(cmdObj)),
       _designatedHostAndPort(std::move(designatedHostAndPort)),
-      _shard(std::move(shard)) {}
+      _shard(std::move(shard)),
+      _telemetryCtx(
+          otel::TelemetryContextHolder::getDecoration(ars->_opCtx).cloneTelemetryContext()) {}
 
 SemiFuture<std::shared_ptr<Shard>> AsyncRequestsSender::RemoteData::getShard() {
     if (_shard) {
@@ -345,7 +348,12 @@ auto AsyncRequestsSender::RemoteData::scheduleRequest() -> SemiFuture<RemoteComm
 auto AsyncRequestsSender::RemoteData::scheduleRemoteCommand(const HostAndPort& hostAndPort)
     -> SemiFuture<RemoteCommandCallbackArgs> {
     executor::RemoteCommandRequest request(
-        hostAndPort, _ars->_db, _cmdObj, _ars->_metadataObj, _ars->_opCtx);
+        hostAndPort,
+        _ars->_db,
+        _cmdObj,
+        _ars->_metadataObj,
+        _ars->_opCtx,
+        executor::RemoteCommandRequest::Options{.telemetryContext = _telemetryCtx});
 
     // We have to make a promise future pair because the TaskExecutor doesn't currently support a
     // future returning variant of scheduleRemoteCommand

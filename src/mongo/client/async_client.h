@@ -44,6 +44,7 @@
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_interface.h"
+#include "mongo/rpc/telemetry_context_section_gen.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/transport/baton.h"
 #include "mongo/transport/message_compressor_manager.h"
@@ -143,6 +144,17 @@ public:
     const HostAndPort& remote() const;
     static constexpr Seconds kSlowConnAcquiredToWireLogSuppresionPeriod{5};
 
+    /**
+     * Returns the TelemetryContextSection to attach to the egress OpMsg for `request`, or
+     * boost::none if the target does not support it (wire version < WIRE_VERSION_90 or INT_MAX
+     * sentinel), if tracing is disabled for `request`'s OperationContext, or if no active span is
+     * present in the request's telemetry context.
+     *
+     * This is a static helper to allow unit testing without a live connection.
+     */
+    [[nodiscard]] static boost::optional<TelemetryContextSection> makeEgressTelemetrySection(
+        const executor::RemoteCommandRequest& request, int maxWireVersion);
+
 private:
     static const inline Status kCanceledStatus{ErrorCodes::CallbackCanceled,
                                                "Async network operation was canceled"};
@@ -233,6 +245,7 @@ private:
     ServiceContext* const _svcCtx;
     MessageCompressorManager _compressorManager;
     transport::ReactorHandle _reactor;
+    int _negotiatedMaxWireVersion = 0;
 };
 
 }  // namespace mongo

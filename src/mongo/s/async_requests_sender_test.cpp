@@ -45,8 +45,12 @@
 #include "mongo/db/sharding_environment/shard_shared_state_cache.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 #include "mongo/executor/network_test_env.h"
+#include "mongo/otel/traces/span/span.h"
+#include "mongo/otel/traces/span/span_names.h"
+#include "mongo/otel/traces/traces_test_util.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/unittest/barrier.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
@@ -54,9 +58,15 @@
 #include <functional>
 #include <system_error>
 
+#include <absl/container/flat_hash_map.h>
+
 namespace mongo {
 
 namespace {
+using otel::traces::HasSpanName;
+using otel::traces::Parent;
+using ::testing::ElementsAre;
+
 using namespace std::literals::string_view_literals;
 
 const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("testdb.testcoll");
@@ -618,6 +628,130 @@ TEST_P(AsyncRequestsSenderTest, MultipleRetriesSystemOverloaded) {
               backoffMillis * kDefaultClientMaxRetryAttemptsDefault);
 
     future.default_timed_get();
+}
+
+TEST_P(AsyncRequestsSenderTest, DifferentTelemetryContextsSentPerShard) {
+    otel::traces::OtelTracesCapturer capturer;
+    if (!otel::traces::OtelTracesCapturer::canReadSpans()) {
+        return;
+    }
+
+    std::vector<otel::traces::SpanName> childSpanNames = {
+        otel::traces::span_names::kTest2,
+        otel::traces::span_names::kTest3,
+        otel::traces::span_names::kTest4,
+    };
+    // Maps each shard's target host to the telemetry context that was sent along with its
+    // request, so we can verify every shard got its own distinct context.
+    absl::flat_hash_map<HostAndPort, otel::TelemetryContext*> telemetryContextsByTarget;
+    {  // Start a real span on the opCtx so that RemoteData's cloneTelemetryContext has an active
+        // trace to clone; otherwise, no telemetry context would be created at all. We will end the
+        // span so that we can test span parenthood.
+        auto span = otel::traces::Span::start(operationContext(), otel::traces::span_names::kTest1);
+
+        std::vector<AsyncRequestsSender::Request> requests;
+        requests.emplace_back(shardRef(0), BSON("find" << "bar"));
+        requests.emplace_back(shardRef(1), BSON("find" << "bar"));
+        requests.emplace_back(shardRef(2), BSON("find" << "bar"));
+
+        auto ars = AsyncRequestsSender(operationContext(),
+                                       executor(),
+                                       kTestNss.dbName(),
+                                       requests,
+                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                       Shard::RetryPolicy::kNoRetry,
+                                       nullptr /* no yielder */,
+                                       {} /* designatedHostsMap */);
+
+        auto future = launchAsync([&]() {
+            for (int i = 0; i < 3; ++i) {
+                auto response = ars.next();
+                ASSERT(response.swResponse.getStatus().isOK());
+            }
+        });
+
+        for (int i = 0; i < 3; ++i) {
+            onCommand([this, &telemetryContextsByTarget, &childSpanNames, i](const auto& request) {
+                ASSERT(request.cmdObj["find"]);
+                ASSERT_TRUE(static_cast<bool>(request.telemetryContext));
+                EXPECT_TRUE(request.telemetryContext->hasActiveTrace());
+                telemetryContextsByTarget[request.target] = request.telemetryContext.get();
+                // Start a span so we can verify the parent is correct.
+                auto span = otel::traces::Span::start(operationContext(), childSpanNames[i]);
+                return CursorResponse(kTestNss, 0LL, {BSON("x" << 1)})
+                    .toBSON(CursorResponse::ResponseType::InitialResponse);
+            });
+        }
+
+        future.default_timed_get();
+    }
+
+    ASSERT_EQ(telemetryContextsByTarget.size(), 3);
+    EXPECT_NE(telemetryContextsByTarget[kTestShardHosts[0].front()],
+              telemetryContextsByTarget[kTestShardHosts[1].front()]);
+    EXPECT_NE(telemetryContextsByTarget[kTestShardHosts[1].front()],
+              telemetryContextsByTarget[kTestShardHosts[2].front()]);
+    EXPECT_NE(telemetryContextsByTarget[kTestShardHosts[0].front()],
+              telemetryContextsByTarget[kTestShardHosts[2].front()]);
+
+    EXPECT_THAT(capturer.getSpans(childSpanNames[0]),
+                ElementsAre(Parent(HasSpanName(otel::traces::span_names::kTest1))));
+    EXPECT_THAT(capturer.getSpans(childSpanNames[1]),
+                ElementsAre(Parent(HasSpanName(otel::traces::span_names::kTest1))));
+    EXPECT_THAT(capturer.getSpans(childSpanNames[2]),
+                ElementsAre(Parent(HasSpanName(otel::traces::span_names::kTest1))));
+}
+
+TEST_P(AsyncRequestsSenderTest, SameTelemetryContextAcrossRetriesForSameShard) {
+    otel::traces::OtelTracesCapturer capturer;
+    if (!otel::traces::OtelTracesCapturer::canReadSpans()) {
+        return;
+    }
+
+    auto span = otel::traces::Span::start(operationContext(), otel::traces::span_names::kTest1);
+
+    std::vector<AsyncRequestsSender::Request> requests;
+    requests.emplace_back(shardRef(0), BSON("find" << "bar"));
+
+    auto ars = AsyncRequestsSender(operationContext(),
+                                   executor(),
+                                   kTestNss.dbName(),
+                                   requests,
+                                   ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                   Shard::RetryPolicy::kIdempotent,
+                                   nullptr /* no yielder */,
+                                   {} /* designatedHostsMap */);
+
+    std::shared_ptr<otel::TelemetryContext> firstAttemptCtx;
+    std::shared_ptr<otel::TelemetryContext> secondAttemptCtx;
+
+    auto future = launchAsync([&]() {
+        auto response = ars.next();
+        ASSERT(response.swResponse.getStatus().isOK());
+    });
+
+    // The first attempt fails with a retriable error; the retry should reuse the same telemetry
+    // context rather than creating a new one, since both attempts belong to the same RemoteData.
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["find"]);
+        ASSERT_TRUE(static_cast<bool>(request.telemetryContext));
+        firstAttemptCtx = request.telemetryContext;
+        return Status(ErrorCodes::HostUnreachable, "mock network error");
+    });
+
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["find"]);
+        ASSERT_TRUE(static_cast<bool>(request.telemetryContext));
+        secondAttemptCtx = request.telemetryContext;
+        return CursorResponse(kTestNss, 0LL, {BSON("x" << 1)})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    future.default_timed_get();
+
+    EXPECT_TRUE(static_cast<bool>(firstAttemptCtx));
+    EXPECT_TRUE(static_cast<bool>(secondAttemptCtx));
+    EXPECT_EQ(firstAttemptCtx, secondAttemptCtx);
 }
 
 }  // namespace

@@ -96,11 +96,6 @@ namespace span_names {
     [[MONGO_MOD_PUBLIC]] inline constexpr auto id = SpanName( \
         SpanName::passkeyForNetworkingAndObservabilityOnly, name, SampledByDefault{false})
 
-// Test-only
-SPAN_NAME_(kTest1, "test_only.span1");
-SPAN_NAME_(kTest2, "test_only.span2");
-SPAN_NAME_(kTest3, "test_only.span3");
-
 // Resharding spans
 SPAN_NAME_(kReshardCollectionCmdInvocationTypedRun, "ReshardCollectionCmd::Invocation::typedRun");
 SPAN_NAME_(kReshardingCoordinatorRun, "ReshardingCoordinator::run");
@@ -170,6 +165,12 @@ SPAN_NAME_(kReshardingRecipientRunUntilStrictConsistencyOrErrored,
            "ReshardingRecipientService::_runUntilStrictConsistencyOrErrored");
 SPAN_NAME_(kReshardingRecipientNotifyCoordinatorAndAwaitDecision,
            "ReshardingRecipientService::_notifyCoordinatorAndAwaitDecision");
+
+// Test-only
+SPAN_NAME_(kTest1, "test_only.span1");
+SPAN_NAME_(kTest2, "test_only.span2");
+SPAN_NAME_(kTest3, "test_only.span3");
+SPAN_NAME_(kTest4, "test_only.span4");
 
 #undef SPAN_NAME_
 }  // namespace span_names

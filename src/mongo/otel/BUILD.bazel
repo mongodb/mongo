@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 load("//src/mongo/otel:otel_rules.bzl", "OTEL_TARGET_COMPATIBLE_WITH")
 
 package(default_visibility = ["//visibility:public"])
@@ -14,6 +14,25 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "telemetry_context_holder_test",
+    srcs = ["telemetry_context_holder_test.cpp"],
+    tags = [
+        "mongo_unittest_third_group",
+        "tracing_test",
+    ],
+    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":otel_base",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/otel/traces:tracer_provider_service_factory",
+        "//src/mongo/otel/traces:tracing_test_util",
+        "//src/mongo/otel/traces/sampler",
+        "//src/mongo/otel/traces/span",
+        "//src/mongo/unittest:server_parameter_guard",
     ],
 )
 

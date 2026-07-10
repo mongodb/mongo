@@ -81,7 +81,8 @@ RemoteCommandRequest::RemoteCommandRequest(const HostAndPort& target_,
       opCtx(opCtx_),
       timeout(options_.timeout),
       fireAndForget(options_.fireAndForget),
-      operationKey(options_.operationKey) {
+      operationKey(options_.operationKey),
+      telemetryContext(options_.telemetryContext) {
 
     // If there is a comment associated with the current operation, append it to the command that we
     // are about to dispatch to the shards.

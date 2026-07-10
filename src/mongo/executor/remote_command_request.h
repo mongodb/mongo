@@ -32,6 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/otel/telemetry_context.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/duration.h"
@@ -43,6 +44,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <iosfwd>
+#include <memory>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -67,6 +69,10 @@ struct [[MONGO_MOD_PUBLIC]] RemoteCommandRequest {
         Milliseconds timeout = kNoTimeout;
         bool fireAndForget = false;
         boost::optional<UUID> operationKey = boost::none;
+
+        // When set, the telemetry context is carried on the request so that the transport layer can
+        // attach an OpMsg telemetry section to egress messages on capable peers.
+        std::shared_ptr<otel::TelemetryContext> telemetryContext;
     };
 
     RemoteCommandRequest();
@@ -174,6 +180,11 @@ struct [[MONGO_MOD_PUBLIC]] RemoteCommandRequest {
     boost::optional<Date_t> dateScheduled;
 
     transport::ConnectSSLMode sslMode = transport::kGlobalSSLMode;
+
+    // Telemetry context to propagate to the transport layer. Set by callers that have already
+    // created a child TelemetryContext (e.g. AsyncRequestsSender). The transport layer converts
+    // this to an OpMsg telemetry section when the target supports it (wire version >= 9.0).
+    std::shared_ptr<otel::TelemetryContext> telemetryContext;
 
 private:
     /**

@@ -320,6 +320,101 @@ TEST_F(SpanTest, SamplingFlagEnabledChildOfRealParentAlwaysExported) {
     EXPECT_NE(childRecord->parentId, opentelemetry::trace::SpanId());
 }
 
+TEST_F(SpanTest, ClonedContextCreatesChildOfCurrentSpan) {
+    auto opCtx = makeOperationContext();
+    {
+        auto rootSpan = Span::start(opCtx.get(), span_names::kTest1);
+        {
+            // Starting a span on the clone parents it under root. Export order mirrors destruction
+            // order (reverse of construction), so clonedSpan is exported before rootSpan.
+            auto clonedCtx =
+                TelemetryContextHolder::getDecoration(opCtx.get()).cloneTelemetryContext();
+            auto clonedSpan = Span::start(clonedCtx, span_names::kTest2);
+        }
+    }
+
+    ASSERT_FALSE(isEmpty());
+    auto rootSpanRecord = getSpan(1, span_names::kTest1);
+    EXPECT_EQ(rootSpanRecord->parentId, opentelemetry::trace::SpanId());
+    auto clonedSpanRecord = getSpan(0, span_names::kTest2);
+    EXPECT_EQ(clonedSpanRecord->parentId, rootSpanRecord->context.span_id());
+}
+
+TEST_F(SpanTest, MultipleClonedContextsSpans) {
+    auto opCtx = makeOperationContext();
+    {
+        auto rootSpan = Span::start(opCtx.get(), span_names::kTest1);
+        auto clonedCtx1 =
+            TelemetryContextHolder::getDecoration(opCtx.get()).cloneTelemetryContext();
+        auto clonedSpan1 = Span::start(clonedCtx1, span_names::kTest2);
+        auto clonedSpan1Child = Span::start(clonedCtx1, span_names::kTest3);
+        auto clonedCtx2 =
+            TelemetryContextHolder::getDecoration(opCtx.get()).cloneTelemetryContext();
+        auto clonedSpan2 = Span::start(clonedCtx2, span_names::kTest4);
+    }
+
+    ASSERT_FALSE(isEmpty());
+    auto rootSpanRecord = getSpan(3, span_names::kTest1);
+    auto clonedSpanRecord1 = getSpan(2, span_names::kTest2);
+    auto clonedSpanRecord1Child = getSpan(1, span_names::kTest3);
+    auto clonedSpanRecord2 = getSpan(0, span_names::kTest4);
+
+    EXPECT_EQ(clonedSpanRecord1->parentId, rootSpanRecord->context.span_id());
+    EXPECT_EQ(clonedSpanRecord1Child->parentId, clonedSpanRecord1->context.span_id());
+    EXPECT_EQ(clonedSpanRecord2->parentId, rootSpanRecord->context.span_id());
+}
+
+TEST_F(SpanTest, ClonedAndNonClonedSpans) {
+    auto opCtx = makeOperationContext();
+    {
+        auto rootSpan = Span::start(opCtx.get(), span_names::kTest1);
+        auto clonedCtx = TelemetryContextHolder::getDecoration(opCtx.get()).cloneTelemetryContext();
+        auto childSpan = Span::start(opCtx.get(), span_names::kTest2);
+        auto clonedSpan = Span::start(clonedCtx, span_names::kTest3);
+    }
+
+    ASSERT_FALSE(isEmpty());
+    auto rootSpanRecord = getSpan(2, span_names::kTest1);
+    auto childSpanRecord = getSpan(1, span_names::kTest2);
+    auto clonedSpanRecord = getSpan(0, span_names::kTest3);
+
+    EXPECT_EQ(childSpanRecord->parentId, rootSpanRecord->context.span_id());
+    EXPECT_EQ(clonedSpanRecord->parentId, rootSpanRecord->context.span_id());
+}
+
+TEST_F(SpanTest, ClonedContextSpanOutlivesOriginalContextSpan) {
+    auto opCtx = makeOperationContext();
+    {
+        std::optional<Span> rootSpan = Span::start(opCtx.get(), span_names::kTest1);
+        auto clonedCtx = TelemetryContextHolder::getDecoration(opCtx.get()).cloneTelemetryContext();
+        auto clonedSpan = Span::start(clonedCtx, span_names::kTest2);
+        rootSpan.reset();
+    }
+
+    ASSERT_FALSE(isEmpty());
+    auto rootSpanRecord = getSpan(0, span_names::kTest1);
+    auto clonedSpanRecord = getSpan(1, span_names::kTest2);
+
+    EXPECT_EQ(clonedSpanRecord->parentId, rootSpanRecord->context.span_id());
+}
+
+TEST_F(SpanTest, ClonedContextSpanOutlivesOriginalContext) {
+    {
+        std::optional<std::shared_ptr<TelemetryContext>> rootCtx = Span::createTelemetryContext();
+        std::optional<Span> rootSpan = Span::start(*rootCtx, span_names::kTest1);
+        auto clonedCtx = (*rootCtx)->clone();
+        auto clonedSpan = Span::start(clonedCtx, span_names::kTest2);
+        rootSpan.reset();
+        rootCtx.reset();
+    }
+
+    ASSERT_FALSE(isEmpty());
+    auto rootSpanRecord = getSpan(0, span_names::kTest1);
+    auto clonedSpanRecord = getSpan(1, span_names::kTest2);
+
+    EXPECT_EQ(clonedSpanRecord->parentId, rootSpanRecord->context.span_id());
+}
+
 }  // namespace
 }  // namespace traces
 }  // namespace otel

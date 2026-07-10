@@ -27,52 +27,26 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/otel/telemetry_context_holder.h"
 
-#include "mongo/db/client.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/otel/telemetry_context.h"
-#include "mongo/util/modules.h"
-
-#include <memory>
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace otel {
+namespace {
 
-/**
- * TelemetryContextHolder is a decoration on OperationContext that holds the current
- * TelemetryContext. TelemetryContext is a wrapper for OpenTelemetry's Context that is used to
- * propagate parent / child relationships between Spans as well as hold metadata to correlate
- * various telemetry data.
- */
-class [[MONGO_MOD_PUBLIC]] TelemetryContextHolder {
-public:
-    static TelemetryContextHolder& getDecoration(OperationContext* opCtx);
+TEST(TelemetryContextHolderTest, CloneTelemetryContextReturnsNullWhenNoContext) {
+    TelemetryContextHolder holder;
+    EXPECT_EQ(holder.cloneTelemetryContext(), nullptr);
+}
 
-    const std::shared_ptr<TelemetryContext>& getTelemetryContext() {
-        return _current;
-    }
-    void setTelemetryContext(std::shared_ptr<TelemetryContext> context) {
-        _current = std::move(context);
-    }
-    void clearTelemetryContext() {
-        _current.reset();
-    }
-    /**
-     * Clones the current TelemetryContext, and returns nullptr if no context is set. See
-     * TelemetryContext::clone() for more details. Note that it is safe to call Span::start with the
-     * returned value even if it is nullptr.
-     */
-    std::shared_ptr<TelemetryContext> cloneTelemetryContext() {
-        if (!_current) {
-            return nullptr;
-        }
-        return _current->clone();
-    }
+TEST(TelemetryContextHolderTest, CloneTelemetryContextReturnsDifferentInstance) {
+    TelemetryContextHolder holder;
+    holder.setTelemetryContext(std::make_shared<TelemetryContext>());
+    auto clone = holder.cloneTelemetryContext();
+    EXPECT_NE(clone.get(), holder.getTelemetryContext().get());
+}
 
-private:
-    std::shared_ptr<TelemetryContext> _current;
-};
-
+}  // namespace
 }  // namespace otel
 }  // namespace mongo

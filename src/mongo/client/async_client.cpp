@@ -52,6 +52,8 @@
 #include "mongo/executor/egress_connection_closer_manager.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/otel/traces/telemetry_context_serialization.h"
+#include "mongo/otel/traces/tracing_enablement.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -69,6 +71,7 @@
 #include "mongo/util/str.h"
 #include "mongo/util/version.h"
 
+#include <limits>
 #include <memory>
 #include <ratio>
 #include <type_traits>
@@ -93,6 +96,21 @@ auto& totalTimeForEgressConnectionAcquiredToWireMicros =
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(asyncConnectReturnsConnectionError);
+
+boost::optional<TelemetryContextSection> AsyncDBClient::makeEgressTelemetrySection(
+    const executor::RemoteCommandRequest& request, int maxWireVersion) {
+    if (!request.telemetryContext) {
+        return boost::none;
+    }
+    // std::numeric_limits<int>::max() is the StreamableReplicaSetMonitor sentinel for an unknown
+    // topology; do not send the telemetry section in that case.
+    if (maxWireVersion < WireVersion::WIRE_VERSION_90 ||
+        maxWireVersion == std::numeric_limits<int>::max() ||
+        !otel::traces::isTracingEnabled(request.opCtx)) {
+        return boost::none;
+    }
+    return otel::traces::toWireType(request.telemetryContext.get());
+}
 
 Future<std::shared_ptr<AsyncDBClient>> AsyncDBClient::connect(
     const HostAndPort& peer,
@@ -166,6 +184,8 @@ void AsyncDBClient::_parseHelloResponse(BSONObj request,
                   str::stream() << "remote host has incompatible wire version: "
                                 << validateStatus.reason());
     }
+
+    _negotiatedMaxWireVersion = replyWireVersion.maxWireVersion;
 
     auto& egressConnectionCloserManager = executor::EgressConnectionCloserManager::get(_svcCtx);
     // Mark outgoing connection to keep open so it can be kept open on FCV upgrade if it is
@@ -425,6 +445,8 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::runCommandRequest(
     const CancellationToken& token) {
     auto startTimer = Timer();
     auto opMsgRequest = static_cast<OpMsgRequest>(request);
+    // TODO(SERVER-130312): Start a span here.
+    opMsgRequest.telemetryContext = makeEgressTelemetrySection(request, _negotiatedMaxWireVersion);
 
     return runCommand(std::move(opMsgRequest),
                       baton,
@@ -484,6 +506,8 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::beginExhaustCommandReques
     const BatonHandle& baton,
     const CancellationToken& token) {
     auto opMsgRequest = static_cast<OpMsgRequest>(request);
+    // TODO(SERVER-130312): Start a span here.
+    opMsgRequest.telemetryContext = makeEgressTelemetrySection(request, _negotiatedMaxWireVersion);
     return runExhaustCommand(std::move(opMsgRequest), baton, token);
 }
 

@@ -167,6 +167,7 @@ mongo_cc_library(
         "//src/mongo/db/commands:test_commands_enabled",
         "//src/mongo/db/stats:counters",
         "//src/mongo/executor:egress_connection_closer_manager",
+        "//src/mongo/otel/traces:telemetry_context_serialization",
         "//src/mongo/rpc",
         "//src/mongo/rpc:command_status",
         "//src/mongo/transport:message_compressor",
@@ -632,6 +633,25 @@ mongo_cc_unit_test(
     ],
     deps = [
         ":clientdriver_minimal",
+        "//src/mongo/otel/traces:traces_test_util",
+        "//src/mongo/otel/traces:tracing",
+        "//src/mongo/otel/traces:tracing_initialization",
+        "//src/mongo/unittest:server_parameter_guard",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "async_client_test",
+    srcs = [
+        "async_client_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_third_group",
+        "tracing_test",
+    ],
+    deps = [
+        ":async_client",
+        "//src/mongo/executor:remote_command",
         "//src/mongo/otel/traces:traces_test_util",
         "//src/mongo/otel/traces:tracing",
         "//src/mongo/otel/traces:tracing_initialization",
