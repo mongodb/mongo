@@ -1,6 +1,7 @@
 /**
  * Verify that a `$search` query containing a `$unionWith` that sets
  * '$$SEARCH_META' succeeds on sharded collections.
+ * TODO (SERVER-131069): Remove this mocked test file now that its coverage is provided by e2e/search/search_meta_var.js running in the sharded e2e passthrough suites.
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {

@@ -1,5 +1,6 @@
 /**
  * Test that $searchMeta works correctly on an unsharded collection through mongos.
+ * TODO (SERVER-131069): Remove this mocked test file now that its coverage is provided by e2e/search/search_meta.js running in the sharded-cluster e2e passthrough suite.
  */
 import {hangTestToAttachGDB} from "jstests/libs/hang_test_to_attach_gdb.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
