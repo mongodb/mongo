@@ -38,6 +38,7 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/s/primary_only_service_helpers/all_shards_and_config_causality_barrier.h"
 #include "mongo/db/s/primary_only_service_helpers/operation_session_tracker.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/executor/scoped_task_executor.h"
@@ -94,6 +95,17 @@ protected:
 
     virtual ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                           const CancellationToken& token) noexcept = 0;
+
+    /**
+     * Invoked by `run()` at the start of every execution. Coordinators that persist a session
+     * override this to perform a causality barrier that invalidates any retryable writes issued by
+     * previous executions (an earlier attempt of this instance, or a previous primary) before doing
+     * any work. The override is expected to be a no-op when no session has been persisted yet, so
+     * it is safe to call unconditionally, including on the very first execution.
+     */
+    virtual void _performCausalityBarrier(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& token) {}
 
     virtual const ConfigsvrCoordinatorMetadata& metadata() const = 0;
 
@@ -214,6 +226,38 @@ protected:
             newMetadata.setSession(CoordinatorSession(*osi->getSessionId(), *osi->getTxnNumber()));
             doc.setConfigsvrCoordinatorMetadata(newMetadata);
         });
+    }
+
+    void _performCausalityBarrier(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                                  const CancellationToken& token) override {
+        {
+            // Only issue a barrier if a previous execution already established a session and may
+            // therefore have issued retryable writes to participants. If no session has been
+            // persisted yet there is nothing to invalidate.
+            std::lock_guard lk{_docMutex};
+            if (!_doc.getConfigsvrCoordinatorMetadata().getSession()) {
+                return;
+            }
+        }
+
+        // Bumps the session's txnNumber (persisting it with majority write concern) and performs a
+        // noop retryable write on all shards and the config server. Any retryable write issued by a
+        // previous execution (or by a rogue primary in a split-brain scenario) carries a lower
+        // txnNumber on the same session and will therefore be rejected by the participants.
+        auto opCtxHolder = makeOperationContext();
+        auto* opCtx = opCtxHolder.get();
+        auto barrier = _makeCausalityBarrier(executor, token);
+        _sessionTracker.performCausalityBarrier(opCtx, *barrier);
+    }
+
+    /**
+     * Builds the CausalityBarrier used by `_performCausalityBarrier`. Overridable so tests can
+     * inject a barrier that records invocations instead of contacting participants.
+     */
+    virtual std::unique_ptr<CausalityBarrier> _makeCausalityBarrier(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& token) {
+        return std::make_unique<AllShardsAndConfigCausalityBarrier>(**executor, token);
     }
 
     template <typename Func>

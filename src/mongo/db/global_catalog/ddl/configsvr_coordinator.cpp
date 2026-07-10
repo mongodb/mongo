@@ -115,7 +115,17 @@ SemiFuture<void> ConfigsvrCoordinator::run(std::shared_ptr<executor::ScopedTaskE
         .then([this, executor, token, anchor = shared_from_this()] {
             hangBeforeRunningConfigsvrCoordinatorInstance.pauseWhileSet();
 
-            return AsyncTry([this, executor, token] { return _runImpl(executor, token); })
+            return AsyncTry([this, executor, token] {
+                       // Perform a causality barrier to invalidate any retryable writes issued by
+                       // previous executions (an earlier attempt of this instance, or a previous
+                       // primary) before doing any work. Done here so individual coordinators don't
+                       // have to. This is a no-op on the first execution, when no session has been
+                       // persisted yet and thus there is nothing to invalidate.
+                       _performCausalityBarrier(executor, token);
+
+                       // Run the coordinator.
+                       return _runImpl(executor, token);
+                   })
                 .until([this, token](Status status) { return status.isOK() || token.isCanceled(); })
                 .withBackoffBetweenIterations(kExponentialBackoff)
                 .on(**executor, CancellationToken::uncancelable());
