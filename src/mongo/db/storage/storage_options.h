@@ -101,7 +101,7 @@ struct StorageGlobalParams {
 
     // --journalCommitInterval
     // This parameter is both a server parameter and a configuration parameter, and to resolve
-    // conflicts between the two the default must be set here.
+    // conflicts between the two, the default must be set here.
     static constexpr int kMaxJournalCommitIntervalMs = 500;
     Atomic<int> journalCommitIntervalMs{100};
 
@@ -117,14 +117,14 @@ struct StorageGlobalParams {
 
     // --syncdelay
     // Delay in seconds between triggering the next checkpoint after the completion of the previous
-    // one. A value of 0 indicates that checkpointing will be skipped. A value <0
-    // will result in using the default value for the configured persistence provider.
+    // one. A value of 0 indicates that checkpointing will be skipped.
     // Do not set this value on production systems.
     // In almost every situation, you should use the default setting.
     // This parameter is both a server parameter and a configuration parameter, and to resolve
-    // conflicts between the two, a default sentinel (<0) must be set here.
+    // conflicts between the two, the default must be set here.
+    static constexpr double kDefaultSyncDelaySecs = 60.0;
     static constexpr double kMaxSyncdelaySecs = 60 * 60;  // 1hr
-    Atomic<double> syncdelay{-1.0};                       // seconds between checkpoints
+    Atomic<double> syncdelay{kDefaultSyncDelaySecs};      // seconds between checkpoints
 
     // --queryableBackupMode
     // Prevents user-originating operations from performing writes to the server. Internally

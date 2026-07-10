@@ -46,8 +46,6 @@
 
 namespace mongo::rss {
 namespace {
-// Checkpoint every 60 seconds by default.
-constexpr double kDefaultAttachedSyncDelaySeconds = 60.0;
 
 ServiceContext::ConstructorActionRegisterer registerAttachedServiceLifecycle{
     "AttachedServiceLifecycle", [](ServiceContext* service) {
@@ -74,15 +72,6 @@ auto makeReplicationExecutor(ServiceContext* serviceContext) {
         executor::makeNetworkInterface("ReplNetwork", nullptr, std::move(hookList)));
 }
 }  // namespace
-
-AttachedServiceLifecycle::AttachedServiceLifecycle()
-    : _initializedUsingDefaultSyncDelay{[]() {
-          if (storageGlobalParams.syncdelay.load() < 0.0) {
-              storageGlobalParams.syncdelay.store(kDefaultAttachedSyncDelaySeconds);
-              return true;
-          }  // namespace mongo::rss
-          return false;
-      }()} {}
 
 void AttachedServiceLifecycle::initializeFlowControl(ServiceContext* svcCtx) {
     FlowControl::set(
@@ -116,10 +105,6 @@ void AttachedServiceLifecycle::initializeStateRequiredForStorageAccess(ServiceCo
 
 void AttachedServiceLifecycle::shutdownStateRequiredForStorageAccess(ServiceContext*,
                                                                      BSONObjBuilder*) {}
-
-bool AttachedServiceLifecycle::initializedUsingDefaultSyncDelay() const {
-    return _initializedUsingDefaultSyncDelay;
-}
 
 void AttachedServiceLifecycle::initializeStateRequiredForOfflineValidation(OperationContext*) {}
 

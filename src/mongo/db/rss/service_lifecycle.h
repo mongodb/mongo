@@ -84,12 +84,6 @@ public:
     virtual void shutdownStateRequiredForStorageAccess(ServiceContext*, BSONObjBuilder*) = 0;
 
     /**
-     * If true, this instance was initialized using the default syncdelay parameter rather than any
-     * user-configured value.
-     */
-    virtual bool initializedUsingDefaultSyncDelay() const = 0;
-
-    /**
      * Initializes any state required to run offline validation, also referred to as modal
      * validation. This is a special mode where the server validates its collections upon
      * startup and proceeds to shut down once the validation is complete. The validation

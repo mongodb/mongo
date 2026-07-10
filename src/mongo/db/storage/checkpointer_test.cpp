@@ -64,6 +64,10 @@ public:
         cv.wait(lock, std::move(shouldWake));
     }
 
+    bool accumulateOplogBytes(int64_t) override {
+        return false;
+    }
+
     Atomic<int64_t> enteredCount{0};
 };
 
@@ -86,6 +90,10 @@ public:
             _gateCv.wait(gateLock, [&] { return _gateOpen; });
         }
         lock.lock();
+    }
+
+    bool accumulateOplogBytes(int64_t) override {
+        return false;
     }
 
     void openGate() {

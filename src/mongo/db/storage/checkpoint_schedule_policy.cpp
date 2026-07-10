@@ -43,9 +43,16 @@
 namespace mongo {
 namespace {
 
+// Poll interval used when checkpointing is disabled via syncdelay=0.
+constexpr Seconds kSyncdelayDisabledPollInterval{3};
+
 class FixedIntervalPolicy final : public CheckpointSchedulePolicy {
 public:
     explicit FixedIntervalPolicy(ClockSource* clock) : _clock(clock) {}
+
+    bool accumulateOplogBytes(int64_t) override {
+        return false;
+    }
 
     void waitUntilReady(std::unique_lock<std::mutex>& lock,
                         stdx::condition_variable& cv,
@@ -66,9 +73,10 @@ public:
 
         // If the syncdelay is set to 0, that means we should skip checkpointing. However,
         // syncdelay is adjustable by a runtime server parameter, so we need to wake up to check
-        // periodically. The wakeup to check period is arbitrary.
+        // periodically.
         while (storageGlobalParams.syncdelay.load() == 0 && !shouldWake()) {
-            _clock->waitForConditionFor(cv, lock, Seconds(3), [&] { return shouldWake(); });
+            _clock->waitForConditionFor(
+                cv, lock, kSyncdelayDisabledPollInterval, [&] { return shouldWake(); });
         }
     }
 
