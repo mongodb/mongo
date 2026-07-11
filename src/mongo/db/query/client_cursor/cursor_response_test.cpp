@@ -45,7 +45,11 @@ static const BSONObj basicMetricsObj = fromjson(R"({
         "Code": {"$numberLong": "0"}
     },
     nDocsSampled: {"$numberLong": "4"},
-    planShapeCounts: {collscan: {"$numberLong": "2"}, ixscanFetch: {"$numberLong": "1"}},
+    planShapeCounts: {
+        patterns: {collscan: {"$numberLong": "2"}, ixscanFetch: {"$numberLong": "1"}},
+        nodes: {collscanWithFilter: {"$numberLong": "2"}},
+        accessPaths: {collscan: {"$numberLong": "2"}}
+    },
     cpuNanos: {"$numberLong": "18"},
     delinquentAcquisitions: {"$numberLong": "0"},
     totalAcquisitionDelinquencyMillis: {"$numberLong": "0"},
@@ -332,6 +336,12 @@ TEST(CursorResponseTest, parseFromBSONCursorMetrics) {
     ASSERT_EQ(
         metrics.getPlanShapeCounts()->getCount(plan_shape_counters::PlanShapeCounter::kIxscanFetch),
         1);
+    ASSERT_EQ(metrics.getPlanShapeCounts()->getCount(
+                  plan_shape_counters::QsnNodeCounter::kCollscanWithFilter),
+              2);
+    ASSERT_EQ(
+        metrics.getPlanShapeCounts()->getCount(plan_shape_counters::AccessPathCounter::kCollscan),
+        2);
     ASSERT_EQ(metrics.getCpuNanos(), 18);
     ASSERT_EQ(metrics.getDelinquentAcquisitions(), 0);
     ASSERT_EQ(metrics.getTotalAcquisitionDelinquencyMillis(), 0);

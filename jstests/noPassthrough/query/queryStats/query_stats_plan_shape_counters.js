@@ -45,12 +45,24 @@ function runPlanShapeCounterTest(coll) {
         resetQueryStatsStore(statsConn, "1MB");
     }
 
+    // Converts every value in '{[counterName]: [count]}' to a NumberLong.
+    function convertObjToNumberLong(counters) {
+        return Object.fromEntries(
+            Object.entries(counters).map(([name, count]) => [name, NumberLong(count)]),
+        );
+    }
+
     function assertCounters(expected) {
         if (expected !== undefined) {
-            // Each value must be a NumberLong
-            expected = Object.fromEntries(
-                Object.entries(expected).map(([shape, count]) => [shape, NumberLong(count)]),
-            );
+            if (expected.patterns) {
+                expected.patterns = convertObjToNumberLong(expected.patterns);
+            }
+            if (expected.nodes) {
+                expected.nodes = convertObjToNumberLong(expected.nodes);
+            }
+            if (expected.accessPaths) {
+                expected.accessPaths = convertObjToNumberLong(expected.accessPaths);
+            }
         }
         assert.eq(expected, getPlanShapeCounters());
     }
@@ -68,7 +80,19 @@ function runPlanShapeCounterTest(coll) {
     {
         reset();
         coll.find({a: 3}, {_id: 0, a: 1}).itcount();
-        assertCounters(isSharded ? {ixscanProject: 1} : {collscanProject: 1});
+        assertCounters(
+            isSharded
+                ? {
+                      patterns: {ixscanProject: 1},
+                      nodes: {ixscanNoFilter: 1, projectionCovered: 1},
+                      accessPaths: {coveredIxscan: 1, btreeIxscan: 1, boundsPoint: 1},
+                  }
+                : {
+                      patterns: {collscanProject: 1},
+                      nodes: {collscanWithFilter: 1, projectionSimple: 1},
+                      accessPaths: {collscan: 1},
+                  },
+        );
     }
 
     // A collection scan increments the COLLSCAN counter. When sharded the {a: 1} shard-key index
@@ -76,7 +100,19 @@ function runPlanShapeCounterTest(coll) {
     {
         reset();
         coll.find({a: {$gte: 0}}).itcount();
-        assertCounters(isSharded ? {ixscanFetch: 2} : {collscan: 1});
+        assertCounters(
+            isSharded
+                ? {
+                      patterns: {ixscanFetch: 2},
+                      nodes: {ixscanNoFilter: 2, fetchNoFilter: 2, shardingFilter: 2},
+                      accessPaths: {ixscanFetch: 2, btreeIxscan: 2, boundsBoundedRange: 2},
+                  }
+                : {
+                      patterns: {collscan: 1},
+                      nodes: {collscanWithFilter: 1},
+                      accessPaths: {collscan: 1},
+                  },
+        );
     }
 
     // Repeated executions of the same shape accumulate.
@@ -85,7 +121,19 @@ function runPlanShapeCounterTest(coll) {
         for (let i = 0; i < 3; i++) {
             coll.find({a: {$gte: 0}}).itcount();
         }
-        assertCounters(isSharded ? {ixscanFetch: 6} : {collscan: 3});
+        assertCounters(
+            isSharded
+                ? {
+                      patterns: {ixscanFetch: 6},
+                      nodes: {ixscanNoFilter: 6, fetchNoFilter: 6, shardingFilter: 6},
+                      accessPaths: {ixscanFetch: 6, btreeIxscan: 6, boundsBoundedRange: 6},
+                  }
+                : {
+                      patterns: {collscan: 3},
+                      nodes: {collscanWithFilter: 3},
+                      accessPaths: {collscan: 3},
+                  },
+        );
     }
 
     // A single query spanning multiple getMores is counted exactly once per shard.
@@ -94,7 +142,19 @@ function runPlanShapeCounterTest(coll) {
         coll.find({a: {$gte: 0}})
             .batchSize(2)
             .itcount();
-        assertCounters(isSharded ? {ixscanFetch: 2} : {collscan: 1});
+        assertCounters(
+            isSharded
+                ? {
+                      patterns: {ixscanFetch: 2},
+                      nodes: {ixscanNoFilter: 2, fetchNoFilter: 2, shardingFilter: 2},
+                      accessPaths: {ixscanFetch: 2, btreeIxscan: 2, boundsBoundedRange: 2},
+                  }
+                : {
+                      patterns: {collscan: 1},
+                      nodes: {collscanWithFilter: 1},
+                      accessPaths: {collscan: 1},
+                  },
+        );
     }
 
     // Multiple shapes work correctly.
@@ -103,10 +163,36 @@ function runPlanShapeCounterTest(coll) {
         const query = () => coll.find({a: 3}).itcount();
         query();
         // Only 1 count in the sharded case, since this predicate matches the shard key.
-        assertCounters(isSharded ? {ixscanFetch: 1} : {collscan: 1});
+        assertCounters(
+            isSharded
+                ? {
+                      patterns: {ixscanFetch: 1},
+                      nodes: {ixscanNoFilter: 1, fetchNoFilter: 1},
+                      // The index bounds are a point, [3,3]
+                      accessPaths: {ixscanFetch: 1, btreeIxscan: 1, boundsPoint: 1},
+                  }
+                : {
+                      patterns: {collscan: 1},
+                      nodes: {collscanWithFilter: 1},
+                      accessPaths: {collscan: 1},
+                  },
+        );
         assert.commandWorked(coll.createIndex({a: 1}));
         query();
-        assertCounters(isSharded ? {ixscanFetch: 2} : {collscan: 1, ixscanFetch: 1});
+        // Now that an index exists, both ixscan bounds are a point [3,3]
+        assertCounters(
+            isSharded
+                ? {
+                      patterns: {ixscanFetch: 2},
+                      nodes: {ixscanNoFilter: 2, fetchNoFilter: 2},
+                      accessPaths: {ixscanFetch: 2, btreeIxscan: 2, boundsPoint: 2},
+                  }
+                : {
+                      patterns: {collscan: 1, ixscanFetch: 1},
+                      nodes: {collscanWithFilter: 1, ixscanNoFilter: 1, fetchNoFilter: 1},
+                      accessPaths: {collscan: 1, ixscanFetch: 1, btreeIxscan: 1, boundsPoint: 1},
+                  },
+        );
     }
 
     // A COLLSCAN-SORT plan; when sharded, the shard-key index gives IXSCAN-FETCH-SORT on both
@@ -117,23 +203,84 @@ function runPlanShapeCounterTest(coll) {
         const query = () =>
             coll.aggregate([{$match: {a: {$in: [1, 2]}}}, {$sort: {b: 1}}]).itcount();
         query();
-        assertCounters(isSharded ? {ixscanFetchSort: 2} : {collscanSort: 1});
+        assertCounters(
+            isSharded
+                ? {
+                      patterns: {ixscanFetchSort: 2},
+                      nodes: {
+                          ixscanNoFilter: 2,
+                          fetchNoFilter: 2,
+                          shardingFilter: 2,
+                          sortSimpleNoLimit: 2,
+                      },
+                      accessPaths: {
+                          ixscanFetch: 2,
+                          btreeIxscan: 2,
+                          // The bounds are unioned points, [1,1]U[2,2]
+                          boundsPoint: 2,
+                          boundsUnionedSmall: 2,
+                      },
+                  }
+                : {
+                      patterns: {collscanSort: 1},
+                      nodes: {collscanWithFilter: 1, sortSimpleNoLimit: 1},
+                      accessPaths: {collscan: 1},
+                  },
+        );
         assert.commandWorked(coll.createIndex({a: 1, b: 1}));
         query();
         assertCounters(
             isSharded
-                ? {ixscanFetchSort: 2, ixscanSortMergeFetch: 2}
-                : {collscanSort: 1, ixscanSortMergeFetch: 1},
+                ? {
+                      patterns: {ixscanFetchSort: 2, ixscanSortMergeFetch: 2},
+                      nodes: {
+                          ixscanNoFilter: 4,
+                          fetchNoFilter: 4,
+                          // sort_merge is used with <=100 children
+                          sortMergeNoFilterLte100Children: 2,
+                          shardingFilter: 4,
+                          sortKeyGenerator: 2,
+                          sortSimpleNoLimit: 2,
+                      },
+                      accessPaths: {
+                          ixscanFetch: 4,
+                          btreeIxscan: 4,
+                          boundsPoint: 2,
+                          // The bounds are now categorized as a mixture, since they
+                          // are `{a: [1,1]U[2,2], b: [minkey, maxkey]}`
+                          boundsMixture: 2,
+                          boundsUnionedSmall: 2,
+                      },
+                  }
+                : {
+                      patterns: {collscanSort: 1, ixscanSortMergeFetch: 1},
+                      nodes: {
+                          collscanWithFilter: 1,
+                          ixscanNoFilter: 1,
+                          fetchNoFilter: 1,
+                          sortMergeNoFilterLte100Children: 1,
+                          sortSimpleNoLimit: 1,
+                      },
+                      accessPaths: {
+                          collscan: 1,
+                          ixscanFetch: 1,
+                          btreeIxscan: 1,
+                          boundsMixture: 1,
+                      },
+                  },
         );
     }
 
-    // A bare IXSCAN (returnKey) matches no tracked plan shape, so the planShapeCounters field is
-    // omitted entirely.
+    // A bare IXSCAN (returnKey) matches no tracked plan shape, so the patterns category is
+    // omitted, but the node and access path counters still report it.
     {
         reset();
         assert.commandWorked(coll.createIndex({a: 1}));
         coll.find({a: 3}).returnKey().itcount();
-        assertCounters(undefined);
+        assertCounters({
+            nodes: {ixscanNoFilter: 1, returnKey: 1},
+            accessPaths: {coveredIxscan: 1, btreeIxscan: 1, boundsPoint: 1},
+        });
     }
 }
 

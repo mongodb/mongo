@@ -3726,6 +3726,8 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         plan_shape_counters::PlanShapeCounts planShapeCounts;
         planShapeCounts.increment(plan_shape_counters::PlanShapeCounter::kCollscan, 2);
         planShapeCounts.increment(plan_shape_counters::PlanShapeCounter::kIxscanFetch, 1);
+        planShapeCounts.increment(plan_shape_counters::QsnNodeCounter::kCollscanWithFilter, 2);
+        planShapeCounts.increment(plan_shape_counters::AccessPathCounter::kCollscan, 2);
         metrics.setPlanShapeCounts(planShapeCounts);
         scheduleResponse(id, {fromjson("{_id: 1}")}, std::move(metrics));
     }
@@ -3779,6 +3781,12 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.planShapeCounts.getCount(
                       plan_shape_counters::PlanShapeCounter::kIxscanFetch),
                   1);
+        ASSERT_EQ(remoteMetrics.planShapeCounts.getCount(
+                      plan_shape_counters::QsnNodeCounter::kCollscanWithFilter),
+                  2);
+        ASSERT_EQ(remoteMetrics.planShapeCounts.getCount(
+                      plan_shape_counters::AccessPathCounter::kCollscan),
+                  2);
     }
 
     // Schedule a second response.
@@ -3818,6 +3826,8 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         plan_shape_counters::PlanShapeCounts planShapeCounts;
         planShapeCounts.increment(plan_shape_counters::PlanShapeCounter::kCollscan, 1);
         planShapeCounts.increment(plan_shape_counters::PlanShapeCounter::kIxscanProject, 1);
+        planShapeCounts.increment(plan_shape_counters::QsnNodeCounter::kCollscanWithFilter, 1);
+        planShapeCounts.increment(plan_shape_counters::AccessPathCounter::kBtreeIxscan, 1);
         metrics.setPlanShapeCounts(planShapeCounts);
         scheduleResponse(CursorId(0), {fromjson("{_id: 2}")}, std::move(metrics));
     }
@@ -3871,6 +3881,15 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
                   1);
         ASSERT_EQ(remoteMetrics.planShapeCounts.getCount(
                       plan_shape_counters::PlanShapeCounter::kIxscanProject),
+                  1);
+        ASSERT_EQ(remoteMetrics.planShapeCounts.getCount(
+                      plan_shape_counters::QsnNodeCounter::kCollscanWithFilter),
+                  3);
+        ASSERT_EQ(remoteMetrics.planShapeCounts.getCount(
+                      plan_shape_counters::AccessPathCounter::kCollscan),
+                  2);
+        ASSERT_EQ(remoteMetrics.planShapeCounts.getCount(
+                      plan_shape_counters::AccessPathCounter::kBtreeIxscan),
                   1);
     }
 

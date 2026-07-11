@@ -69,10 +69,8 @@ public:
             // Gate on shouldRequestRemoteMetrics, which checks if metrics are requested by
             // mongos or if the local query stats key exists.
             if (query_stats::shouldRequestRemoteMetrics(opDebug)) {
-                if (auto shape =
-                        plan_shape_counters::analyzePlanShapeForCounters(*solution).pattern) {
-                    opDebug.getAdditiveMetrics().planShapeCounts.increment(*shape);
-                }
+                plan_shape_counters::analyzePlanShapeForCounters(*solution).addTo(
+                    opDebug.getAdditiveMetrics().planShapeCounts);
             }
         }
 

@@ -15,6 +15,11 @@ struct PlanShapeAnalysisResult {
     boost::optional<PlanShapeCounter> pattern;
     AccessPathCounts accessPathCounts;
     QsnNodeCounts qsnNodeCounts;
+
+    /**
+     * Increments each counter this plan matched in 'counts' by one.
+     */
+    void addTo(PlanShapeCounts& counts) const;
 };
 
 /*

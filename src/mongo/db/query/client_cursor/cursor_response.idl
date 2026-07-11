@@ -43,7 +43,8 @@ types:
     PlanShapeCounts:
         description: >-
             Counts of winning plan shapes observed by query stats, in the form of
-            '{[counterName]: [count]}'. Counters with a zero count are omitted.
+            '{patterns: {[counterName]: [count]}, nodes: {...}, accessPaths: {...}}'.
+            Counters with a zero count and empty counter categories are omitted.
         bson_serialization_type: object
         cpp_type: "mongo::plan_shape_counters::PlanShapeCounts"
         serializer: "mongo::plan_shape_counters::PlanShapeCounts::toBSON"

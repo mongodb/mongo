@@ -5,52 +5,13 @@
 
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/query_solution_analyzer.h"
-#include "mongo/db/query/util/named_enum.h"
+#include "mongo/db/query/query_stats/plan_shape_counters/plan_shape_counts.h"
 
 #include <bitset>
 #include <cstddef>
 
 namespace mongo {
 namespace plan_shape_counters {
-
-/**
- * Identifies a data access path counter tracked by query stats. Unlike the specific plan shape
- * counters, these are not mutually exclusive: one plan can set several of them (e.g. an OR over
- * an ixscan-fetch and a covered ixscan).
- * TODO SERVER-131101 split enum into different subtypes.
- */
-#define ACCESS_PATH_COUNTER_TABLE(F) \
-    F(kCollscan)                     \
-    F(kClusteredCollscan)            \
-    F(kCoveredIxscan)                \
-    F(kCountScan)                    \
-    F(kDistinctScan)                 \
-    F(kIxscanFetch)                  \
-    F(kDistinctScanFetch)            \
-    F(kGeoNear2d)                    \
-    F(kGeoNear2dSphere)              \
-    F(kOtherAccessPath)              \
-    F(kTextMatch)                    \
-    F(kBtreeIxscan)                  \
-    F(kWildcardIxscan)               \
-    F(kSparseIxscan)                 \
-    F(kUniqueIxscan)                 \
-    F(kHashedIxscan)                 \
-    F(kMultikeyIxscan)               \
-    F(kBoundsFullScan)               \
-    F(kBoundsPoint)                  \
-    F(kBoundsBoundedRange)           \
-    F(kBoundsMinKeyToValue)          \
-    F(kBoundsValueToMaxKey)          \
-    F(kBoundsMixture)                \
-    F(kBoundsUnionedSmall)           \
-    F(kBoundsUnionedLarge)           \
-    F(kNumCounters)
-
-QUERY_UTIL_NAMED_ENUM_DEFINE(AccessPathCounter, ACCESS_PATH_COUNTER_TABLE)
-#undef ACCESS_PATH_COUNTER_TABLE
-
-constexpr size_t kNumAccessPathCounters = static_cast<size_t>(AccessPathCounter::kNumCounters);
 
 /**
  * Access path counters. Each counter follows "seen at least once" semantics: they are set either

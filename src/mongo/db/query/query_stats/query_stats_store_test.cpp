@@ -1830,12 +1830,20 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsageWithCBRMetrics) {
 }
 
 TEST_F(QueryStatsStoreTest, BasicPlanShapeCounters) {
+    using plan_shape_counters::AccessPathCounter;
     using plan_shape_counters::PlanShapeCounter;
     using plan_shape_counters::PlanShapeCounts;
+    using plan_shape_counters::QsnNodeCounter;
     PlanShapeCounts collscan;
     collscan.increment(PlanShapeCounter::kCollscan);
+    collscan.increment(QsnNodeCounter::kCollscanWithFilter);
+    collscan.increment(AccessPathCounter::kCollscan);
     PlanShapeCounts ixscanFetch;
     ixscanFetch.increment(PlanShapeCounter::kIxscanFetch);
+    ixscanFetch.increment(QsnNodeCounter::kIxscanNoFilter);
+    ixscanFetch.increment(QsnNodeCounter::kFetchNoFilter);
+    ixscanFetch.increment(AccessPathCounter::kIxscanFetch);
+    ixscanFetch.increment(AccessPathCounter::kBtreeIxscan);
     for (bool useSubsections : {false, true}) {
         QueryStatsStore queryStatsStore{5000000, 1000};
 
@@ -1880,13 +1888,24 @@ TEST_F(QueryStatsStoreTest, BasicPlanShapeCounters) {
         }
         {
             auto qse = getMetrics(query);
-            verifyQueryStatsBSON(
-                qse,
-                {
-                    .useSubsections = useSubsections,
-                    .execCount = 2LL,
-                    .planShapeCounters = BSON("collscan" << 2LL << "ixscanFetch" << 1LL),
-                });
+            verifyQueryStatsBSON(qse,
+                                 {
+                                     .useSubsections = useSubsections,
+                                     .execCount = 2LL,
+                                     .planShapeCounters = fromjson(R"({
+                        patterns: {collscan: NumberLong(2), ixscanFetch: NumberLong(1)},
+                        nodes: {
+                            collscanWithFilter: NumberLong(2),
+                            ixscanNoFilter: NumberLong(1),
+                            fetchNoFilter: NumberLong(1)
+                        },
+                        accessPaths: {
+                            collscan: NumberLong(2),
+                            ixscanFetch: NumberLong(1),
+                            btreeIxscan: NumberLong(1)
+                        }
+                    })"),
+                                 });
         }
     }
 }

@@ -52,7 +52,9 @@ TEST(CurOpTest, CopyConstructors) {
 }
 
 TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
+    using plan_shape_counters::AccessPathCounter;
     using plan_shape_counters::PlanShapeCounter;
+    using plan_shape_counters::QsnNodeCounter;
 
     OpDebug::AdditiveMetrics currentAdditiveMetrics = OpDebug::AdditiveMetrics();
     OpDebug::AdditiveMetrics additiveMetricsToAdd = OpDebug::AdditiveMetrics();
@@ -120,8 +122,12 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     additiveMetricsToAdd.clusterPeakTrackedMemBytes = 2000;
     currentAdditiveMetrics.planShapeCounts.increment(PlanShapeCounter::kCollscan, 3);
     currentAdditiveMetrics.planShapeCounts.increment(PlanShapeCounter::kIxscanFetch, 5);
+    currentAdditiveMetrics.planShapeCounts.increment(QsnNodeCounter::kCollscanWithFilter, 3);
+    currentAdditiveMetrics.planShapeCounts.increment(AccessPathCounter::kCollscan, 3);
     additiveMetricsToAdd.planShapeCounts.increment(PlanShapeCounter::kIxscanFetch, 2);
     additiveMetricsToAdd.planShapeCounts.increment(PlanShapeCounter::kIxscanProject, 7);
+    additiveMetricsToAdd.planShapeCounts.increment(QsnNodeCounter::kCollscanWithFilter, 4);
+    additiveMetricsToAdd.planShapeCounts.increment(AccessPathCounter::kBtreeIxscan, 6);
 
     // Save the current AdditiveMetrics object before adding.
     OpDebug::AdditiveMetrics additiveMetricsBeforeAdd;
@@ -209,6 +215,16 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     ASSERT_EQ(currentAdditiveMetrics.planShapeCounts.getCount(PlanShapeCounter::kIxscanProject),
               additiveMetricsBeforeAdd.planShapeCounts.getCount(PlanShapeCounter::kIxscanProject) +
                   additiveMetricsToAdd.planShapeCounts.getCount(PlanShapeCounter::kIxscanProject));
+    ASSERT_EQ(
+        currentAdditiveMetrics.planShapeCounts.getCount(QsnNodeCounter::kCollscanWithFilter),
+        additiveMetricsBeforeAdd.planShapeCounts.getCount(QsnNodeCounter::kCollscanWithFilter) +
+            additiveMetricsToAdd.planShapeCounts.getCount(QsnNodeCounter::kCollscanWithFilter));
+    ASSERT_EQ(currentAdditiveMetrics.planShapeCounts.getCount(AccessPathCounter::kCollscan),
+              additiveMetricsBeforeAdd.planShapeCounts.getCount(AccessPathCounter::kCollscan) +
+                  additiveMetricsToAdd.planShapeCounts.getCount(AccessPathCounter::kCollscan));
+    ASSERT_EQ(currentAdditiveMetrics.planShapeCounts.getCount(AccessPathCounter::kBtreeIxscan),
+              additiveMetricsBeforeAdd.planShapeCounts.getCount(AccessPathCounter::kBtreeIxscan) +
+                  additiveMetricsToAdd.planShapeCounts.getCount(AccessPathCounter::kBtreeIxscan));
 }
 
 TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
@@ -414,6 +430,8 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     plan_shape_counters::PlanShapeCounts planShapeCounts;
     planShapeCounts.increment(plan_shape_counters::PlanShapeCounter::kCollscan, 2);
     planShapeCounts.increment(plan_shape_counters::PlanShapeCounter::kIxscanFetch, 1);
+    planShapeCounts.increment(plan_shape_counters::QsnNodeCounter::kCollscanWithFilter, 2);
+    planShapeCounts.increment(plan_shape_counters::AccessPathCounter::kCollscan, 2);
     cursorMetrics.setPlanShapeCounts(planShapeCounts);
 
     // Assert that every field in cursor metrics is initialized.
@@ -469,6 +487,12 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     ASSERT_EQ(additiveMetrics.planShapeCounts.getCount(
                   plan_shape_counters::PlanShapeCounter::kIxscanFetch),
               1);
+    ASSERT_EQ(additiveMetrics.planShapeCounts.getCount(
+                  plan_shape_counters::QsnNodeCounter::kCollscanWithFilter),
+              2);
+    ASSERT_EQ(
+        additiveMetrics.planShapeCounts.getCount(plan_shape_counters::AccessPathCounter::kCollscan),
+        2);
 }
 
 TEST(CurOpTest, AdditiveMetricsShouldAggregateNegativeCpuNanos) {

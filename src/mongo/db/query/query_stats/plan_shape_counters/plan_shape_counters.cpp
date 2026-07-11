@@ -33,6 +33,22 @@ const QuerySolutionNode* getFindRoot(const QuerySolution& solution) {
 }
 }  // namespace
 
+void PlanShapeAnalysisResult::addTo(PlanShapeCounts& counts) const {
+    if (pattern) {
+        counts.increment(*pattern);
+    }
+    for (size_t i = 0; i < kNumQsnNodeCounters; ++i) {
+        if (auto counter = static_cast<QsnNodeCounter>(i); qsnNodeCounts.test(counter)) {
+            counts.increment(counter);
+        }
+    }
+    for (size_t i = 0; i < kNumAccessPathCounters; ++i) {
+        if (auto counter = static_cast<AccessPathCounter>(i); accessPathCounts.test(counter)) {
+            counts.increment(counter);
+        }
+    }
+}
+
 PlanShapeAnalysisResult analyzePlanShapeForCounters(const QuerySolution& solution) {
     const QuerySolutionNode* findRoot = getFindRoot(solution);
 
