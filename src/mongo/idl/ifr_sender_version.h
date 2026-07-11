@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/idl/generic_argument_gen.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/version.h"
 
 namespace mongo {
@@ -19,6 +20,7 @@ IFRSenderVersion makeIFRSenderVersion(const VersionInfoInterface& provider);
 /**
  * Convenience overload that uses the process-wide 'VersionInfoInterface::instance()'.
  */
+[[MONGO_MOD_PUBLIC]]
 IFRSenderVersion makeLocalIFRSenderVersion();
 
 }  // namespace mongo

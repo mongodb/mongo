@@ -14,8 +14,10 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/util/deferred.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/stats/direct_system_buckets_access.h"
 #include "mongo/db/stats/external_client_on_router.h"
@@ -23,6 +25,7 @@
 #include "mongo/db/topology/user_write_block/replica_set_write_block_bypass.h"
 #include "mongo/db/topology/user_write_block/user_write_block_bypass.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/rpc/metadata/audit_user_attrs.h"
 #include "mongo/rpc/metadata/client_metadata.h"
@@ -43,6 +46,8 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 namespace mongo {
 namespace rpc {
 MONGO_FAIL_POINT_DEFINE(failIfOperationKeyMismatch);
@@ -52,6 +57,14 @@ BSONObj makeEmptyMetadata() {
 }
 
 namespace {
+// True if the request's client holds the internal-cluster privilege required to propagate
+// internal-only generic arguments (operation key, write-blocking bypass, versionContext, ifrFlags).
+bool hasInternalAuthorization(OperationContext* opCtx) {
+    auto authSession = AuthorizationSession::get(opCtx->getClient());
+    return authSession->isAuthorizedForActionsOnResource(
+        ResourcePattern::forClusterResource(authSession->getUserTenantId()), ActionType::internal);
+}
+
 void readPrivilegedRequestMetadata(OperationContext* opCtx, const GenericArguments& requestArgs) {
     // If we are in direct client, privileged metadata should already be set by the initial request.
     if (opCtx->getClient()->isInDirectClient()) {
@@ -63,10 +76,7 @@ void readPrivilegedRequestMetadata(OperationContext* opCtx, const GenericArgumen
 
     // Check for authorization lazily, to optimize for the common case with no arguments present.
     Deferred hasInternalAuthorization{[&] {
-        auto authSession = AuthorizationSession::get(opCtx->getClient());
-        return authSession->isAuthorizedForActionsOnResource(
-            ResourcePattern::forClusterResource(authSession->getUserTenantId()),
-            ActionType::internal);
+        return rpc::hasInternalAuthorization(opCtx);
     }};
 
     if (requestArgs.getClientOperationKey() &&
@@ -121,8 +131,56 @@ void readPrivilegedRequestMetadata(OperationContext* opCtx, const GenericArgumen
             !requestArgs.getExecutionAdmissionContextType() || hasInternalAuthorization());
     ExecutionAdmissionContext::get(opCtx).setFromMetadata(
         opCtx, requestArgs.getExecutionAdmissionContextType());
+
+    // Typed commands which go through TypedCommand::InvocationBaseInternal will already have this
+    // installed, but we keep the install check here to ensure even legacy commands can benefit from
+    // a stable IFRContext.
+    installIfrContextFromWire(opCtx, requestArgs);
 }
 }  // namespace
+
+void installIfrContextFromWire(OperationContext* opCtx, const GenericArguments& requestArgs) {
+    if (opCtx->getClient()->isInDirectClient()) {
+        // Nested operations (DBDirectClient sub-commands) share the parent operation's opCtx and
+        // must never install: they inherit the parent's context once it is installed. Several
+        // flows run nested commands *before* the parent command is even parsed — e.g. the
+        // localhost-auth-bypass check. If such a nested command installed here, it would claim the
+        // decoration with a conservative no-flags context and the parent's later install would be
+        // skipped, silently discarding the wire-provided IFR flag values.
+        // TODO SERVER-131000 consider if we can get an IFRContext initialized earlier for this
+        // case.
+        return;
+    }
+    if (IncrementalFeatureRolloutContext::isInstalled(opCtx)) {
+        LOGV2_DEBUG(13002304,
+                    4,
+                    "Skipping IFRContext initialization since the given opCtx already has one");
+        return;
+    }
+
+    if (const auto& ifrFlags = requestArgs.getIfrFlags()) {
+        // Both ifrFlags and ifrSenderVersion are internal-only fields; check authorization once
+        // here rather than unconditionally on every command (the common path has no ifrFlags).
+        uassert(13002302,
+                "ifrFlags are an internal mechanism. Client is not properly authorized to "
+                "propagate ifrFlags",
+                hasInternalAuthorization(opCtx));
+
+        const auto& senderVersion = requestArgs.getIfrSenderVersion();
+        IncrementalFeatureRolloutContext::set(
+            opCtx,
+            IncrementalFeatureRolloutContext::fromWire(
+                *ifrFlags,
+                senderVersion ? std::make_unique<IFRSenderVersion>(*senderVersion) : nullptr));
+    } else {
+        // Sender didn't include the ifrFlags field at all — either a binary that predates the
+        // IFR wire protocol (e.g. a last-lts mongos forwarding to a latest shard) or a caller
+        // that isn't participating in the protocol. Conservatively disables kLatest-introduced
+        // flags on a shard server (no router coordinated a value) and uses local defaults on a
+        // standalone / plain replica set.
+        IncrementalFeatureRolloutContext::installForRequestWithoutIfrFlags(opCtx);
+    }
+}
 
 void readRequestMetadata(OperationContext* opCtx,
                          const GenericArguments& requestArgs,

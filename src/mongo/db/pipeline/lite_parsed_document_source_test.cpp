@@ -69,7 +69,7 @@ protected:
         if (ifrFlagValue) {
             std::vector<BSONObj> flagValues{
                 BSON("name" << mockFlag.getName() << "value" << *ifrFlagValue)};
-            options.ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+            options.ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
         }
         return {std::move(registration), std::move(options)};
     }
@@ -572,7 +572,7 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
         BSON("name" << feature_flags::gFeatureFlagExtensionsInsideHybridSearch.getName() << "value"
                     << true)};
     LiteParserOptions options;
-    options.ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+    options.ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
 
     // No `pipeline:` field — _pipelines stays empty and the view is materialized on bind.
     std::vector<BSONObj> pipelineStages = {

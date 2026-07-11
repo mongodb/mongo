@@ -144,7 +144,8 @@ function runIFRFlagPropagationTests(conn, shardingTest, flagName, pipeline) {
     assert.commandWorked(coll.runCommand("aggregate", {pipeline, comment: comment1, cursor: {}}));
     assertIfrFlagOnShards(shardingTest, comment1, flagName, /* expectedFlagValue */ true);
 
-    // Test 2: Direct shard request uses shard's flag value
+    // Test 2: Direct shard request is expected to set the flags to false, because it will assume
+    // (without 'ifrFlags' provided), that the router is old and wouldn't be using the features.
     if (shard0Admin) {
         assert.commandWorked(shard0Admin.runCommand({setParameter: 1, [flagName]: false}));
         const shard0Coll = shardingTest.rs0.getPrimary().getDB("test")[coll.getName()];
@@ -153,11 +154,17 @@ function runIFRFlagPropagationTests(conn, shardingTest, flagName, pipeline) {
             ErrorCodes.SearchNotEnabled,
         );
         assert.commandWorked(shard0Admin.runCommand({setParameter: 1, [flagName]: true}));
-        assert.commandWorked(shard0Coll.runCommand("aggregate", {pipeline, cursor: {}}));
+        assert.throwsWithCode(
+            () => shard0Coll.aggregate(pipeline).toArray(),
+            ErrorCodes.SearchNotEnabled,
+        );
         if (shard1Admin) {
             assert.commandWorked(shard1Admin.runCommand({setParameter: 1, [flagName]: true}));
             const shard1Coll = shardingTest.rs1.getPrimary().getDB("test")[coll.getName()];
-            assert.commandWorked(shard1Coll.runCommand("aggregate", {pipeline, cursor: {}}));
+            assert.throwsWithCode(
+                () => shard1Coll.aggregate(pipeline).toArray(),
+                ErrorCodes.SearchNotEnabled,
+            );
         }
     }
 

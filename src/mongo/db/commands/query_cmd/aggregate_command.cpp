@@ -14,6 +14,7 @@
 #include "mongo/db/commands/query_cmd/run_aggregate.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/database_name_util.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -97,34 +98,7 @@ public:
     public:
         Invocation(OperationContext* opCtx, Command* cmd, const OpMsgRequest& opMsgRequest)
             : MinimalInvocationBase(opCtx, cmd, opMsgRequest),
-              _ifrContext([&]() {
-                  // Build the IFR context based on how this aggregate arrived, distinguishing
-                  // "no request flag values from the router" from "no request flag values because
-                  // this is a standalone/direct request":
-                  //   - Flag values are present: use them. (An older router may omit newer flags;
-                  //     IncrementalFeatureRolloutContext treats those omitted serialize-on-outgoing
-                  //     flags as disabled rather than consulting this node's FCV.)
-                  //   - No flag values but the request came from a router: the router did not
-                  //     serialize any flags, so there are *implied* flag values -- all
-                  //     serialize-on-outgoing flags should be treated as disabled. Build from an
-                  //     empty flag set so those implied values are applied instead of falling back
-                  //     to this node's local FCV/state. See the IFRContext constructors for more
-                  //     detail.
-                  //   - No flag values and not from a router (standalone mongod / direct client):
-                  //     start from scratch and resolve each flag against this node's local state.
-                  const auto& requestFlagValues = request().getIfrFlags();
-                  if (requestFlagValues.has_value()) {
-                      return std::make_shared<IncrementalFeatureRolloutContext>(
-                          requestFlagValues.value());
-                  }
-
-                  if (aggregation_request_helper::getFromRouter(request()).value_or(false)) {
-                      return std::make_shared<IncrementalFeatureRolloutContext>(
-                          std::span<const BSONObj>{});
-                  }
-
-                  return std::make_shared<IncrementalFeatureRolloutContext>();
-              }()),
+              _ifrContext(IncrementalFeatureRolloutContext::get(opCtx)),
               _extensionMetrics(
                   static_cast<const AggregateCommand*>(cmd)->getExtensionMetricsAllocation()),
               _liteParsedPipeline(request(),

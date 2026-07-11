@@ -137,7 +137,7 @@ TEST_F(MakePipelineFromViewDefinitionIfrTest,
     NamespaceString backingNss =
         NamespaceString::createNamespaceString_forTest("testdb", "backingColl");
 
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(std::vector<BSONObj>{
+    auto ifrContext = IncrementalFeatureRolloutContext::fromWireForTest(std::vector<BSONObj>{
         BSON("name" << getMockGatedViewStageFlag().getName() << "value" << false)});
 
     auto expCtx =

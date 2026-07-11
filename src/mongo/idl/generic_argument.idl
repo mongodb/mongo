@@ -462,9 +462,8 @@ structs:
             # throughout the query's execution. Currently, used only in Agg command pipeline.
             ifrFlags:
                 type: array<object_owned>
-                # TODO SERVER-130136: update to false once we start conditionally propagating
-                # both senderVersion and flags.
-                forward_to_shards: true
+                # This is manually forwarded on appropriate operations.
+                forward_to_shards: false
                 optional: true
                 stability: "internal"
             # The sender's full binary version, decomposed into numeric components (see
@@ -477,6 +476,7 @@ structs:
             # versions instead of both reporting "9.0").
             ifrSenderVersion:
                 type: IFRSenderVersion
+                # This is manually forwarded on appropriate operations.
                 forward_to_shards: false
                 optional: true
                 stability: "internal"

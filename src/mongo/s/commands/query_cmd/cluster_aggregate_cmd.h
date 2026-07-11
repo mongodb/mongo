@@ -64,11 +64,7 @@ public:
             : TC::MinimalInvocationBase(opCtx, cmd, opMsgRequest),
               _extensionMetrics(static_cast<const ClusterAggregateCommandBase*>(cmd)
                                     ->getExtensionMetricsAllocation()),
-              // Create IFRContext early to ensure consistent flag values throughout the operation,
-              // including retries on view errors. Unlike mongod, mongos receives requests directly
-              // from clients (which cannot include ifrFlags), so we always create an empty context
-              // here.
-              _ifrContext(std::make_shared<IncrementalFeatureRolloutContext>()),
+              _ifrContext(IncrementalFeatureRolloutContext::get(opCtx)),
               _liteParsedPipeline(
                   request(),
                   false /* isRunningAgainstView_ForHybridSearch */,

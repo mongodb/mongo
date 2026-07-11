@@ -310,7 +310,7 @@ TEST_F(DocumentSourceUnionWithTest, ParseErrors) {
 TEST_F(DocumentSourceUnionWithTest, RejectsUserSuppliedIsHybridSearchWhenExtensionsFlagOn) {
     // When featureFlagExtensionsInsideHybridSearch is on, the stage-params dispatch path is taken
     // instead of createFromBson, and must equally reject a user-supplied $_internalIsHybridSearch.
-    auto ifrCtx = std::make_shared<IncrementalFeatureRolloutContext>(std::vector<BSONObj>{
+    auto ifrCtx = IncrementalFeatureRolloutContext::forTest(std::vector<BSONObj>{
         BSON("name" << "featureFlagExtensionsInsideHybridSearch" << "value" << true)});
 
     // A client with a transport session and no internal tag is an external (user) client.

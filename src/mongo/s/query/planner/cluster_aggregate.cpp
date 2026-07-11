@@ -137,22 +137,18 @@ Document serializeForPassthrough(const boost::intrusive_ptr<ExpressionContext>& 
     req.setAllowPartialResults(OptionalBool());
 
     // Reset all generic arguments besides those needed for the aggregation itself.
-    // Other generic arguments that need to be set like txnNumber, lsid, etc. will be attached
-    // later.
+    // Other generic arguments that need to be set like txnNumber, lsid, ifrFlags, etc. will be
+    // attached later.
     // TODO: SERVER-90827 Only reset arguments not suitable for passing through to shards.
     auto maxTimeMS = req.getMaxTimeMS();
     auto readConcern = req.getReadConcern();
     auto writeConcern = req.getWriteConcern();
     auto rawData = req.getRawData();
-    auto ifrSenderVersion = req.getIfrSenderVersion();
     req.setGenericArguments({});
     req.setMaxTimeMS(maxTimeMS);
     req.setReadConcern(std::move(readConcern));
     req.setWriteConcern(std::move(writeConcern));
     req.setRawData(rawData);
-    if (ifrSenderVersion) {
-        req.setIfrSenderVersion(std::move(*ifrSenderVersion));
-    }
 
     // If the wire RC has no level, fall back to opCtx so the dispatcher's CWRC-merged RC
     // reaches the shard. Otherwise keep the wire RC untouched (master semantics).
@@ -178,8 +174,6 @@ Document serializeForPassthrough(const boost::intrusive_ptr<ExpressionContext>& 
             req.setOriginalQueryShapeHash(queryShapeHash);
         }
     }
-
-    aggregation_request_helper::addIfrFlagsToRequest(req, expCtx->getIfrContext());
 
     auto cmdObj =
         isRawDataOperation(expCtx->getOperationContext()) && req.getNamespace() != executionNs

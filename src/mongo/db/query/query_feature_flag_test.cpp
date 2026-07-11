@@ -23,9 +23,7 @@ MATCHER_P(ShouldSerializeOnOutgoingRequests, m, "") {
 }
 
 auto outFlags() {
-    // (Generic FCV reference): Used for testing.
-    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
-    return IncrementalRolloutFeatureFlag::getFlagsForOutgoingRequests();
+    return IncrementalRolloutFeatureFlag::getFlagsIntroducedSinceLastLTS();
 }
 
 TEST(IDLFeatureFlag, GetFlagsForOutgoingRequests) {

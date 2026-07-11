@@ -60,3 +60,7 @@ filters:
   - "opcounters_aggregate.js":
     approvers:
       - 10gen/query-integration-observability
+  - "ifr_*.js":
+    approvers:
+      - 10gen/query-integration-features
+      - 10gen/query-execution

@@ -7,7 +7,10 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/idl/generic_argument_gen.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -139,6 +142,84 @@ TEST(Metadata, UpconvertUsesDocumentSequecesCorrectly) {
         ASSERT_BSONOBJ_EQ(converted.body, addDollarDB(cmd, "db"));
         ASSERT_EQ(converted.sequences.size(), 0u);
     }
+}
+
+class InstallIfrContextFromWireTest : public ServiceContextTest {
+public:
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _opCtx = cc().makeOperationContext();
+    }
+
+    static GenericArguments argsWithIfrFlags() {
+        GenericArguments args;
+        args.setIfrFlags(std::vector<BSONObj>{});
+        return args;
+    }
+
+    ServiceContext::UniqueOperationContext _opCtx;
+};
+
+TEST_F(InstallIfrContextFromWireTest, InstallsWireContextWhenIfrFlagsPresent) {
+    installIfrContextFromWire(_opCtx.get(), argsWithIfrFlags());
+
+    auto ctx = IncrementalFeatureRolloutContext::tryGet(_opCtx.get());
+    ASSERT_TRUE(ctx);
+    ASSERT_TRUE(ctx->isInstalledFromWire());
+}
+
+TEST_F(InstallIfrContextFromWireTest, NoContextInstalledWhenIfrFlagsAbsent) {
+    installIfrContextFromWire(_opCtx.get(), GenericArguments{});
+
+    auto ctx = IncrementalFeatureRolloutContext::tryGet(_opCtx.get());
+    ASSERT_FALSE(ctx);
+}
+
+TEST_F(InstallIfrContextFromWireTest, NoopInDirectClient) {
+    // Nested operations (DBDirectClient sub-commands) share the parent operation's opCtx and must
+    // never install, even when their request carries ifrFlags.
+    _opCtx->getClient()->setInDirectClient(true);
+    installIfrContextFromWire(_opCtx.get(), argsWithIfrFlags());
+
+    ASSERT_FALSE(IncrementalFeatureRolloutContext::tryGet(_opCtx.get()));
+}
+
+TEST_F(InstallIfrContextFromWireTest, NestedDirectClientDoesNotMaskOuterWireInstall) {
+    // Regression test: a nested operation without ifrFlags (e.g. the 'usersInfo' run by the
+    // localhost-auth-bypass check in AuthorizationSession::startRequest()) can run on the
+    // parent's opCtx before the parent command is parsed and installs. It must not claim the
+    // decoration with a conservative no-flags context, or the parent's wire-provided flag values
+    // would be silently discarded by the install-once check.
+    _opCtx->getClient()->setInDirectClient(true);
+    installIfrContextFromWire(_opCtx.get(), GenericArguments{});
+    ASSERT_FALSE(IncrementalFeatureRolloutContext::tryGet(_opCtx.get()));
+
+    _opCtx->getClient()->setInDirectClient(false);
+    installIfrContextFromWire(_opCtx.get(), argsWithIfrFlags());
+
+    auto ctx = IncrementalFeatureRolloutContext::tryGet(_opCtx.get());
+    ASSERT_TRUE(ctx);
+    ASSERT_TRUE(ctx->isInstalledFromWire());
+}
+
+TEST_F(InstallIfrContextFromWireTest, SecondInstallIsNoopAndPreservesExistingContext) {
+    installIfrContextFromWire(_opCtx.get(), argsWithIfrFlags());
+    auto first = IncrementalFeatureRolloutContext::tryGet(_opCtx.get());
+    ASSERT_TRUE(first);
+
+    installIfrContextFromWire(_opCtx.get(), GenericArguments{});
+    ASSERT_EQ(IncrementalFeatureRolloutContext::tryGet(_opCtx.get()), first);
+}
+
+TEST_F(InstallIfrContextFromWireTest, SecondInstallWithIfrFlagsIsNoopAndPreservesExistingContext) {
+    // Even when the second call carries ifrFlags, the install-once check prevents overwriting the
+    // existing context.
+    installIfrContextFromWire(_opCtx.get(), argsWithIfrFlags());
+    auto first = IncrementalFeatureRolloutContext::tryGet(_opCtx.get());
+    ASSERT_TRUE(first);
+
+    installIfrContextFromWire(_opCtx.get(), argsWithIfrFlags());
+    ASSERT_EQ(IncrementalFeatureRolloutContext::tryGet(_opCtx.get()), first);
 }
 
 }  // namespace

@@ -1669,7 +1669,6 @@ BSONObj finalizePipelineAndTargetShardsForExplain(
             // Generate the command object for the targeted shards with the finalized pipeline.
             AggregateCommandRequest aggRequest(expCtx->getNamespaceString(),
                                                pipelineToTarget->serializeToBson(wireOpts));
-            aggregation_request_helper::addIfrFlagsToRequest(aggRequest, expCtx->getIfrContext());
 
             aggregation_request_helper::addQuerySettingsToRequest(aggRequest, expCtx);
 
@@ -2006,8 +2005,6 @@ std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
 
             AggregateCommandRequest aggRequest(expCtx->getNamespaceString(),
                                                pipelineToTarget->serializeToBson(wireOpts));
-
-            aggregation_request_helper::addIfrFlagsToRequest(aggRequest, expCtx->getIfrContext());
 
             return targetShardsAndAddMergeCursorsWithRoutingCtx(
                 expCtx,

@@ -41,6 +41,15 @@ void readRequestMetadata(OperationContext* opCtx,
                          boost::optional<ImpersonatedClientSessionGuard>& clientSessionGuard);
 
 /**
+ * Installs the IFRContext on `opCtx` from a request's generic arguments (`ifrFlags` /
+ * `ifrSenderVersion`). Idempotent: if a context is already installed (e.g. a command installed
+ * one during parse), this is a no-op that preserves the existing shared_ptr. Safe to call before
+ * command->parse so that lite-parse and any IFR flag reads during parsing observe wire values,
+ * not local defaults. Enforces that only internally-authorized senders may propagate ifrFlags.
+ */
+void installIfrContextFromWire(OperationContext* opCtx, const GenericArguments& requestArgs);
+
+/**
  * A legacy command object and a corresponding query flags bitfield. The legacy command object
  * may contain metadata fields, so it cannot safely be passed to a command's run method.
  */

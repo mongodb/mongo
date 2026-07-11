@@ -39,6 +39,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/get_status_from_command_result_write_util.h"
 #include "mongo/rpc/message.h"
+#include "mongo/rpc/metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/stdx/unordered_set.h"
@@ -1388,7 +1389,17 @@ public:
                            const OpMsgRequest& opMsgRequest)
         : CommandInvocation(command),
           _request{_parseRequest(opCtx, command, opMsgRequest)},
-          _opMsgRequest{opMsgRequest} {}
+          _opMsgRequest{opMsgRequest} {
+        // Generic args are parsed as part of _request (which ran in the member-init list, before
+        // this ctor body). Install the IFRContext now so that IFR-flag-dependent parsing in a
+        // *derived* invocation (e.g. aggregate's lite-parse, which runs in the derived member-init
+        // list after this base ctor body) observes wire values. The window between _parseRequest
+        // and this call is intentional: _parseRequest must not consult IFR flags; if it ever
+        // needs to, this install would have to move into _parseRequest itself.
+        // Idempotent: the SEP's later readRequestMetadata call becomes a no-op for typed commands.
+        // For direct clients, tryGet() returns the parent opCtx's context and exits early.
+        rpc::installIfrContextFromWire(opCtx, request().getGenericArguments());
+    }
 
     const DatabaseName& db() const override {
         return request().getDbName();

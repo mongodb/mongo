@@ -51,7 +51,7 @@ TEST_F(DocumentSourceVectorSearchTest, NotAllowedInTransaction) {
 }
 
 TEST_F(DocumentSourceVectorSearchTest, NotAllowedInLookupWhenHybridSearchFlagDisabled) {
-    auto ifrCtx = std::make_shared<IncrementalFeatureRolloutContext>(std::vector<BSONObj>{
+    auto ifrCtx = IncrementalFeatureRolloutContext::forTest(std::vector<BSONObj>{
         BSON("name" << "featureFlagExtensionsInsideHybridSearch" << "value" << false)});
     auto expCtx = ExpressionContextBuilder{}
                       .opCtx(getOpCtx())
@@ -76,7 +76,7 @@ TEST_F(DocumentSourceVectorSearchTest, NotAllowedInLookupWhenHybridSearchFlagDis
 }
 
 TEST_F(DocumentSourceVectorSearchTest, AllowedInLookupWhenHybridSearchFlagEnabled) {
-    auto ifrCtx = std::make_shared<IncrementalFeatureRolloutContext>(std::vector<BSONObj>{
+    auto ifrCtx = IncrementalFeatureRolloutContext::forTest(std::vector<BSONObj>{
         BSON("name" << "featureFlagExtensionsInsideHybridSearch" << "value" << true)});
     auto expCtx = ExpressionContextBuilder{}
                       .opCtx(getOpCtx())
@@ -356,7 +356,7 @@ DEATH_TEST_F(DocumentSourceVectorSearchDeathTest,
     // Simulate router sending featureFlagVectorSearchExtension=true.
     auto& flag = feature_flags::gFeatureFlagVectorSearchExtension;
     std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << true)};
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+    auto ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
 
     auto spec = fromjson(R"({
         $vectorSearch: {
@@ -377,7 +377,7 @@ TEST_F(DocumentSourceVectorSearchTest,
        IsExtensionMongotPipelineReturnsTrueForVectorSearchWithReturnStoredSource) {
     auto& flag = feature_flags::gFeatureFlagVectorSearchExtension;
     std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << true)};
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+    auto ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
 
     // Simulate that the mongot extension is loaded.
     auto origExtensions = serverGlobalParams.extensions;
@@ -407,7 +407,7 @@ TEST_F(DocumentSourceVectorSearchTest,
        IsExtensionMongotPipelineReturnsTrueForVectorSearchWithoutReturnStoredSource) {
     auto& flag = feature_flags::gFeatureFlagVectorSearchExtension;
     std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << true)};
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+    auto ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
 
     // Simulate that the mongot extension is loaded.
     auto origExtensions = serverGlobalParams.extensions;
@@ -434,7 +434,7 @@ TEST_F(DocumentSourceVectorSearchTest,
        IsExtensionMongotPipelineReturnsTrueForVectorSearchWithReturnStoredSourceFalse) {
     auto& flag = feature_flags::gFeatureFlagVectorSearchExtension;
     std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << true)};
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+    auto ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
 
     // Simulate that the mongot extension is loaded.
     auto origExtensions = serverGlobalParams.extensions;

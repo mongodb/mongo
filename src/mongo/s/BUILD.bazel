@@ -693,6 +693,7 @@ mongo_cc_unit_test(
         "async_requests_sender_test.cpp",
         "async_rpc_shard_targeter_test.cpp",
         "balancer_configuration_test.cpp",
+        "client_metadata_propagation_egress_hook_test.cpp",
         "load_balancer_support_test.cpp",
         "query_analysis_sample_tracker_test.cpp",
         "query_analysis_sampler_test.cpp",
@@ -782,6 +783,7 @@ mongo_cc_unit_test(
         "//src/mongo/s/commands:cluster_commands",
         "//src/mongo/s/commands:cluster_commands_common",
         "//src/mongo/util:periodic_runner_factory",
+        "//src/mongo/util:version_impl",
         "//src/mongo/util/net:network",
     ],
 )

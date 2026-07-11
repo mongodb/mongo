@@ -1453,6 +1453,7 @@ mongo_cc_library(
         "//src/mongo/idl:command_generic_argument.cpp",
         "//src/mongo/idl:generic_argument.cpp",
         "//src/mongo/idl:generic_argument_gen",
+        "//src/mongo/idl:ifr_sender_version.cpp",
         "//src/mongo/rpc/metadata:audit_metadata_gen",
         "//src/mongo/util:fail_point_server_parameter_gen",
     ],

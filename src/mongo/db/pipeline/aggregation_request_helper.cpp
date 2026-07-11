@@ -78,16 +78,6 @@ void addQuerySettingsToRequest(AggregateCommandRequest& request,
     query_settings::addQuerySettingsToRequest(expCtx->getOperationContext(), request);
 }
 
-void addIfrFlagsToRequest(AggregateCommandRequest& request,
-                          std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
-    tassert(11565104, "IFRContext cannot be null", ifrContext);
-    auto flagsToSerialize = IncrementalRolloutFeatureFlag::getFlagsForOutgoingRequests();
-    if (!flagsToSerialize.empty()) {
-        request.setIfrFlags(ifrContext->serializeFlagValues(flagsToSerialize));
-    }
-    // TODO SERVER-130136: stamp ifrSenderVersion on outgoing requests.
-}
-
 void validate(const AggregateCommandRequest& aggregate,
               const BSONObj& cmdObj,
               const NamespaceString& nss,

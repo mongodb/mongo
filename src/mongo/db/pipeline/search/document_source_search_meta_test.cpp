@@ -77,7 +77,7 @@ DEATH_TEST_F(SearchMetaDeathTest,
     // Simulate router sending featureFlagSearchExtension=true.
     auto& flag = feature_flags::gFeatureFlagSearchExtension;
     std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << true)};
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+    auto ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
 
     auto spec = fromjson(R"({
         $searchMeta: {
@@ -100,7 +100,7 @@ TEST_F(SearchMetaTest, UsesFallbackLegacyParserWhenSearchExtensionFlagIsFalse) {
     // Simulate router sending featureFlagSearchExtension=false.
     auto& flag = feature_flags::gFeatureFlagSearchExtension;
     std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << false)};
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+    auto ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
 
     auto spec = fromjson(R"({
         $searchMeta: {

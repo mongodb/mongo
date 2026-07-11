@@ -10,16 +10,21 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/version/releases.h"
 
+#include <memory>
 #include <string_view>
 
 #include <absl/container/flat_hash_map.h>
+#include <absl/container/flat_hash_set.h>
 #include <boost/optional.hpp>
 
 [[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 using namespace std::literals::string_view_literals;
+class IFRSenderVersion;
 class IncrementalFeatureRolloutContext;
+class OperationContext;
+class IFRSenderVersion;
 
 class [[MONGO_MOD_OPEN]] FeatureFlag {
 public:
@@ -336,7 +341,12 @@ class [[MONGO_MOD_OPEN]] IncrementalRolloutFeatureFlag : public FeatureFlag {
 public:
     static IncrementalRolloutFeatureFlag* findByName(std::string_view flagName);
 
-    static std::vector<IncrementalRolloutFeatureFlag*> getFlagsForOutgoingRequests();
+    /**
+     * Returns every registered IFR flag whose declared `serialize_on_outgoing_requests` version is
+     * greater than `multiversion::GenericFCV::kLastLTS`, i.e. flags first introduced after our last
+     * supported mixed-version release.
+     */
+    static const std::vector<IncrementalRolloutFeatureFlag*>& getFlagsIntroducedSinceLastLTS();
 
     IncrementalRolloutFeatureFlag(std::string_view flagName,
                                   RolloutPhase phase,
@@ -377,6 +387,15 @@ public:
      */
     bool shouldSerializeOnOutgoingRequests() const {
         return _serializeOnOutgoingRequestsVersion.has_value();
+    }
+
+    /**
+     * Returns the FCV at which this flag began serializing on outgoing requests, or boost::none if
+     * the flag does not participate in wire serialization.
+     */
+    boost::optional<multiversion::FeatureCompatibilityVersion>
+    getSerializeOnOutgoingRequestsVersion() const {
+        return _serializeOnOutgoingRequestsVersion;
     }
 
     bool allowRuntimeToggle() const override {
@@ -440,13 +459,73 @@ private:
  */
 class IncrementalFeatureRolloutContext {
 public:
-    IncrementalFeatureRolloutContext() = default;
+    // Defined out-of-line so 'IFRSenderVersion' can be forward-declared in this header.
+    IncrementalFeatureRolloutContext();
+    ~IncrementalFeatureRolloutContext();
 
     /**
-     * Construct an IFRContext using flag values from a request. This is used on the shard side to
-     * update the IFRContext with flag values received from the router.
+     * Builds an IFRContext from a request's `ifrFlags` payload. Marks the new context as wire-
+     * installed so that downstream outgoing-request serializers can keep forwarding through
+     * shard-to-shard hops while suppressing serialization on internal-origin traffic.
+     *
+     * `senderVersion` is the sender's full binary version (from the `ifrSenderVersion` wire
+     * field). It may be null (as it will be for v8.3 senders)
      */
-    IncrementalFeatureRolloutContext(std::span<const BSONObj> flags);
+    static std::shared_ptr<IncrementalFeatureRolloutContext> fromWire(
+        std::span<const BSONObj> flags, std::unique_ptr<IFRSenderVersion> senderVersion);
+
+    /**
+     * Like above, but provides a default 'senderVersion' - the current version.
+     */
+    static std::shared_ptr<IncrementalFeatureRolloutContext> fromWireForTest(
+        std::span<const BSONObj> flags);
+
+    /**
+     * Builds an IFRContext for a request that arrived without any `ifrFlags` payload, and installs
+     * it on 'opCtx' for future use. This happens when the sender is on a binary that predates the
+     * IFR wire protocol (typical during a rolling upgrade: a last-lts router forwarding to a latest
+     * shard), when an old shard forwards to a newer shard, or when the deployment is only a replica
+     * set.
+     *
+     * The installed context is *not* marked as installed-from-wire.
+     */
+    static void installForRequestWithoutIfrFlags(OperationContext* opCtx);
+
+    /**
+     * `get()` returns the opCtx-decorated IFRContext, lazily constructing an empty one and
+     * installing it on first call. `tryGet()` is the read-only version: returns the installed
+     * context if there is one, otherwise nullptr. Use `tryGet()` from read paths that just want to
+     * ask "is an IFRContext installed yet?" without materializing one.
+     */
+    static std::shared_ptr<IncrementalFeatureRolloutContext> get(OperationContext* opCtx);
+    static std::shared_ptr<IncrementalFeatureRolloutContext> tryGet(OperationContext* opCtx);
+    static bool isInstalled(OperationContext* opCtx);
+    static void set(OperationContext* opCtx, std::shared_ptr<IncrementalFeatureRolloutContext> ctx);
+
+    /**
+     * Test-only factory: seeds an explicit set of flag values from a list of `{name, value}`
+     * documents, skipping the wire-protocol resolution (unknown-flag handling, sender-version
+     * scenarios, absent-flag defaulting) performed by `fromWire()`. The resulting context is
+     * *not* marked installed-from-wire. Use this to simulate a router that sent a particular flag
+     * value without exercising the full wire path.
+     */
+    static std::shared_ptr<IncrementalFeatureRolloutContext> forTest(
+        std::span<const BSONObj> flags);
+
+    /**
+     * Returns a deep copy of this context: copies the saved flag values and (if present) the
+     * sender version, but starts with no memoized egress metadata so the copy can be freshly
+     * installed on an opCtx. Used to reproduce a precomputed template context per request without
+     * rebuilding its flag map. See 'installForRequestWithoutIfrFlags()'.
+     */
+    std::shared_ptr<IncrementalFeatureRolloutContext> clone() const;
+
+    /**
+     * Builds the process-wide shard-server "no ifrFlags" template context. Invoked once at startup
+     * from the CacheIfrFlagsIntroducedSinceLastLTS initializer, after the flag list it reads is
+     * populated. Not for general use.
+     */
+    static void initShardServerDefaultTemplate();
 
     /**
      * Returns the saved value of a feature flag when there is one or queries the flag via
@@ -467,10 +546,71 @@ public:
      */
     void disableFlag(IncrementalRolloutFeatureFlag& flag);
 
-    std::vector<BSONObj> serializeFlagValues(
-        const std::vector<IncrementalRolloutFeatureFlag*>& flags);
+    /**
+     * Returns true if `IncrementalFeatureRolloutContext::fromWire()` produced this context.
+     */
+    bool isInstalledFromWire() const {
+        return _senderVersion != nullptr;
+    }
+
+    /**
+     * Returns the sender's full binary version captured when this context was built via
+     * `fromWire()`. Returns nullptr for contexts that did not originate from a wire payload. If the
+     * wire payload omitted `ifrSenderVersion`, `fromWire()` installs a sentinel (v8.3) version so
+     * egress serialization can omit the field while still treating the context as wire-installed.
+     */
+    const IFRSenderVersion* getWireSenderVersion() const {
+        return _senderVersion.get();
+    }
+
+    /**
+     * Serializes this context onto the outgoing sharding-request metadata builder as the
+     * `ifrSenderVersion` and `ifrFlags` wire fields, according to the forwarding rules:
+     *   - If installed-from-wire: forward the original sender's version verbatim (if any) and
+     *     re-serialize this binary's post-resolution flag values.
+     *   - Otherwise (router originating a fresh non-wire request): emit our current local version.
+     *
+     * The produced sub-object is memoized on first invocation and reused for subsequent calls on
+     * the same IFRContext instance, so restamping on a retry does not repeat the serialization
+     * work.
+     */
+    void appendToEgressMetadata(BSONObjBuilder* bob);
+
+    /**
+     * Test-only: reports whether the egress metadata has been cached yet. Used by the invariant
+     * on `set()` and by unit tests.
+     */
+    bool hasCachedEgressMetadataForTest() const {
+        return _cachedEgressMetadata.has_value();
+    }
 
 private:
+    /**
+     *  Constructor for the 'from wire' case. 'senderVersion' must not be null.
+     */
+    IncrementalFeatureRolloutContext(std::span<const BSONObj> flags,
+                                     std::unique_ptr<IFRSenderVersion> senderVersion);
+    explicit IncrementalFeatureRolloutContext(std::span<const BSONObj> flags);
+
+    // Process-wide template for the shard-server "arrived without ifrFlags" case: every release
+    // flag introduced since the last LTS pinned to false. Populated once at startup by
+    // 'initShardServerDefaultTemplate()' (invoked from the CacheIfrFlagsIntroducedSinceLastLTS
+    // initializer, after the flag list it reads is built) and cloned per request rather than
+    // rebuilt. Member function so it can reach the private map and constructor.
+    static IncrementalFeatureRolloutContext& mutableShardServerDefaultTemplate();
+
     absl::flat_hash_map<const IncrementalRolloutFeatureFlag*, bool> _savedFlagValues;
+
+    // Optional - set if this context was installed from the wire.
+    // Held by unique_ptr rather than boost::optional so this header can forward-declare
+    // 'IFRSenderVersion' rather than include 'generic_argument_gen.h' (which pulls a large
+    // transitive header set that would create re-entrant #include cycles for callers upstream in
+    // read_preference.h etc.). The destructor is defined out-of-line in the .cpp for the same
+    // reason.
+    std::unique_ptr<IFRSenderVersion> _senderVersion;
+
+    // Memoized serialization of this context's egress-metadata sub-object. The IFRContext is
+    // per-opCtx so there is no cross-context contention; simple lazy init suffices.
+    boost::optional<BSONObj> _cachedEgressMetadata;
 };
 }  // namespace mongo

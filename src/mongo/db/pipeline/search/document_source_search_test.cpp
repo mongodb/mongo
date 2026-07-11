@@ -128,7 +128,7 @@ DEATH_TEST_F(SearchDeathTest,
     // Simulate router sending featureFlagSearchExtension=true.
     auto& flag = feature_flags::gFeatureFlagSearchExtension;
     std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << true)};
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+    auto ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
 
     auto spec = fromjson(R"({
         $search: {
@@ -150,7 +150,7 @@ TEST_F(SearchTest, UsesFallbackLegacyParserWhenSearchExtensionFlagIsFalse) {
     // Simulate router sending featureFlagSearchExtension=false.
     auto& flag = feature_flags::gFeatureFlagSearchExtension;
     std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << false)};
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+    auto ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
 
     auto spec = fromjson(R"({
         $search: {
@@ -166,7 +166,7 @@ TEST_F(SearchTest, UsesFallbackLegacyParserWhenSearchExtensionFlagIsFalse) {
 TEST_F(SearchTest, IsExtensionMongotPipelineReturnsTrueForSearch) {
     auto& flag = feature_flags::gFeatureFlagSearchExtension;
     std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << true)};
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+    auto ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
 
     auto origExtensions = serverGlobalParams.extensions;
     ScopeGuard restoreExtensions([&] { serverGlobalParams.extensions = origExtensions; });
@@ -181,9 +181,10 @@ TEST_F(SearchTest, IsExtensionMongotPipelineReturnsTrueForSearch) {
 }
 
 TEST_F(SearchTest, IsExtensionMongotPipelineReturnsFalseForSearchFlagDisabled) {
+    // Disable extensions for this test.
     auto& flag = feature_flags::gFeatureFlagSearchExtension;
-    std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << false)};
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+    auto ifrContext = IncrementalFeatureRolloutContext::forTest(
+        std::vector<BSONObj>{BSON("name" << flag.getName() << "value" << false)});
 
     auto origExtensions = serverGlobalParams.extensions;
     ScopeGuard restoreExtensions([&] { serverGlobalParams.extensions = origExtensions; });
@@ -200,7 +201,7 @@ TEST_F(SearchTest, IsExtensionMongotPipelineReturnsFalseForSearchFlagDisabled) {
 TEST_F(SearchTest, IsExtensionMongotPipelineReturnsTrueForSearchMeta) {
     auto& flag = feature_flags::gFeatureFlagSearchExtension;
     std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << true)};
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+    auto ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
 
     auto origExtensions = serverGlobalParams.extensions;
     ScopeGuard restoreExtensions([&] { serverGlobalParams.extensions = origExtensions; });
@@ -217,7 +218,7 @@ TEST_F(SearchTest, IsExtensionMongotPipelineReturnsTrueForSearchMeta) {
 TEST_F(SearchTest, IsExtensionMongotPipelineReturnsFalseForSearchMetaFlagDisabled) {
     auto& flag = feature_flags::gFeatureFlagSearchExtension;
     std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << false)};
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+    auto ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
 
     auto origExtensions = serverGlobalParams.extensions;
     ScopeGuard restoreExtensions([&] { serverGlobalParams.extensions = origExtensions; });

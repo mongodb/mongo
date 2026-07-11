@@ -1643,6 +1643,7 @@ mongo_cc_unit_test(
         "//src/mongo/otel/metrics:metrics_test_util",
         "//src/mongo/unittest",
         "//src/mongo/util:clock_source_mock",
+        "//src/mongo/util:version_impl",
     ],
 )
 

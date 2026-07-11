@@ -80,14 +80,6 @@ void addQuerySettingsToRequest(AggregateCommandRequest& request,
                                const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 /**
- * Adds IFR flags from ifrContext to request. Serializes the current flag value for all IFR
- * flags that have 'serialize_on_outgoing_requests: true' and a 'version' that the current FCV
- * is >= to, so shards use the same value as the router/sender.
- */
-void addIfrFlagsToRequest(AggregateCommandRequest& request,
-                          std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext);
-
-/**
  * Validate the aggregate command object. If 'client' is provided, also validates that internal
  * fields such as 'querySettings' and 'originalQueryShapeHash' are only set by internal clients.
  */
