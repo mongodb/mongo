@@ -11,14 +11,28 @@ exports_files(
 
 mongo_cc_library(
     name = "memory_usage_limit",
-    srcs = [
-        "memory_usage_limit.cpp",
-    ],
     hdrs = [
         "memory_usage_limit.h",
     ],
     deps = [
+        "//src/mongo/db:service_context",
         "//src/mongo/db/query/query_knobs:query_knob",
+    ],
+)
+
+# Split out from ':memory_usage_limit' so that 'MemoryUsageLimit::get()' can resolve knob-backed
+# limits against QueryKnobConfiguration without dragging that dependency into the header target.
+# 'stage_memory_limit_knobs' depends only on the header target (it returns 'MemoryUsageLimit' by
+# value), which keeps the dependency graph acyclic: query_knob_configuration -> stage_memory_limit_knobs
+# -> memory_usage_limit (header), while only get()'s callers link this resolver.
+mongo_cc_library(
+    name = "memory_usage_limit_resolver",
+    srcs = [
+        "memory_usage_limit.cpp",
+    ],
+    deps = [
+        ":memory_usage_limit",
+        "//src/mongo/db/query/query_knobs:query_knob_configuration",
     ],
 )
 
@@ -30,6 +44,7 @@ mongo_cc_library(
     ],
     deps = [
         ":memory_usage_limit",
+        ":memory_usage_limit_resolver",
         "//src/mongo/db:cluster_role",
         "//src/mongo/db:commands",
         "//src/mongo/db:server_feature_flags",
@@ -53,5 +68,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/commands/server_status:server_status_metric",
         "//src/mongo/db/pipeline:aggregation_context_fixture",
         "//src/mongo/db/pipeline:document_source_mock",
+        "//src/mongo/db/query/query_knobs:query_knob_configuration_test_util",
+        "//src/mongo/db/query/stage_memory_limit_knobs",
     ],
 )

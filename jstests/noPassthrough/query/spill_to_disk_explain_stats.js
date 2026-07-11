@@ -28,7 +28,7 @@ assert.commandWorked(
     setParameter(
         db,
         "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
-        isSbeEnabled ? 129 : 424,
+        isSbeEnabled ? 129 : 440,
     ),
 );
 // Spilling memory threshold for $bucketAuto

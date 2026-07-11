@@ -11,6 +11,7 @@
 #include "mongo/db/exec/classic/mock_stage.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration_test_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -120,8 +121,11 @@ public:
             expCtx()->setAllowDiskUse(maxAllowedDiskUsageBytes.has_value());
         }
 
-        unittest::ServerParameterGuard maxMemoryUsage("internalQueryMaxSpoolMemoryUsageBytes",
-                                                      maxAllowedMemoryUsageBytes);
+        // The memory limit knob resolves lazily on first use, after this function returns, so
+        // the guard must outlive the returned stage.
+        _maxMemoryUsageGuard.emplace(expCtx()->getOperationContext(),
+                                     "internalQueryMaxSpoolMemoryUsageBytes",
+                                     maxAllowedMemoryUsageBytes);
         unittest::ServerParameterGuard maxDiskUsage("internalQueryMaxSpoolDiskUsageBytes",
                                                     maxAllowedDiskUsageBytes.value_or(1));
 
@@ -134,6 +138,7 @@ private:
     ServiceContext::UniqueOperationContext _opCtx;
     boost::intrusive_ptr<ExpressionContext> _expCtx;
     std::unique_ptr<unittest::TempDir> _tempDir;
+    boost::optional<QueryKnobGuardForTest> _maxMemoryUsageGuard;
 
     long _memUsage = 0;
 };

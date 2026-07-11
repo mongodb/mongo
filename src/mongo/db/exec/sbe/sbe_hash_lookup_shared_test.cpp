@@ -7,7 +7,7 @@
 
 #include "mongo/db/exec/sbe/sbe_hash_lookup_shared_test.h"
 
-#include "mongo/unittest/server_parameter_guard.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration_test_util.h"
 
 namespace mongo::sbe {
 void HashLookupSharedTest::prepareAndEvalStageWithReopen(
@@ -83,8 +83,10 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     }
 
     // Execute the stage with spilling to disk.
-    unittest::ServerParameterGuard maxMemoryLimit(
-        "internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill", 10);
+    QueryKnobGuardForTest maxMemoryLimit(
+        operationContext(),
+        "internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill",
+        10LL);
 
     // Run the stage after the knob is set and spill to disk. We need to hold a global IS lock
     // to read from WT.

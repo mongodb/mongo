@@ -20,6 +20,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration_test_util.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/temp_dir.h"
@@ -1199,8 +1200,9 @@ TEST_F(BucketAutoTests, BucketAutoWithPushRespectsMemoryLimit) {
     // an upper bound, while the infrastructure that processes each element in the accumulator takes
     // up ~120 bytes. We should require 136 * 100 + 120 bytes for this operation to succeed, but
     // we'll round up to the nearest 500 for buffer.
-    unittest::ServerParameterGuard queryKnobController("internalQueryMaxPushBytes",
-                                                       kDebugBuild ? 14000 : 11500);
+    QueryKnobGuardForTest queryKnobController(getExpCtx()->getOperationContext(),
+                                              "internalQueryMaxPushBytes",
+                                              kDebugBuild ? 14000LL : 11500LL);
     std::deque<Document> docs;
     for (size_t i = 0; i < 100; i++) {
         docs.push_back(
@@ -1211,7 +1213,8 @@ TEST_F(BucketAutoTests, BucketAutoWithPushRespectsMemoryLimit) {
     ASSERT_EQUALS(results.size(), 1UL);
 
     // Decrease the memory limit and run again, asserting that we hit an error.
-    unittest::ServerParameterGuard queryKnobController2("internalQueryMaxPushBytes", 9600);
+    QueryKnobGuardForTest queryKnobController2(
+        getExpCtx()->getOperationContext(), "internalQueryMaxPushBytes", 9600LL);
     ASSERT_THROWS_CODE(getResults(spec, docs), AssertionException, ErrorCodes::ExceededMemoryLimit);
 }
 
@@ -1232,8 +1235,9 @@ TEST_F(BucketAutoTests, BucketAutoWithConcatArraysRespectsMemoryLimit) {
     // an upper bound, while the infrastructure that processes each element in the accumulator takes
     // up ~120 bytes. We should require 136 * 100 + 120 bytes for this operation to succeed, but
     // we'll round up to the nearest 500 for buffer.
-    unittest::ServerParameterGuard queryKnobController("internalQueryMaxConcatArraysBytes",
-                                                       kDebugBuild ? 14000 : 11500);
+    QueryKnobGuardForTest queryKnobController(getExpCtx()->getOperationContext(),
+                                              "internalQueryMaxConcatArraysBytes",
+                                              kDebugBuild ? 14000LL : 11500LL);
     std::deque<Document> docs;
     for (size_t i = 0; i < 100; i++) {
         docs.push_back(
@@ -1244,7 +1248,8 @@ TEST_F(BucketAutoTests, BucketAutoWithConcatArraysRespectsMemoryLimit) {
     ASSERT_EQUALS(results.size(), 1UL);
 
     // Decrease the memory limit and run again, asserting that we hit an error.
-    unittest::ServerParameterGuard queryKnobController2("internalQueryMaxConcatArraysBytes", 9600);
+    QueryKnobGuardForTest queryKnobController2(
+        getExpCtx()->getOperationContext(), "internalQueryMaxConcatArraysBytes", 9600LL);
     ASSERT_THROWS_CODE(getResults(spec, docs), AssertionException, ErrorCodes::ExceededMemoryLimit);
 }
 

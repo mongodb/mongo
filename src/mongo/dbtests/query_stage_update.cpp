@@ -30,6 +30,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/eof_node_type.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration_test_util.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/record_id.h"
@@ -633,7 +634,9 @@ class QueryStageUpdateMemoryLimitExceeded : public QueryStageUpdateBase {
 public:
     void run() {
         // Set an absurdly small limit so the deduplicator overhead alone exceeds it.
-        unittest::ServerParameterGuard maxMemoryBytes{"internalUpdateStageMaxMemoryBytes", 1};
+        // The knob guard also resets the cached per-operation QueryKnobConfiguration, which may
+        // have materialized with the default limit earlier in this test.
+        QueryKnobGuardForTest maxMemoryBytes{&_opCtx, "internalUpdateStageMaxMemoryBytes", 1LL};
 
         for (int i = 0; i < 10; ++i) {
             insert(BSON("_id" << i << "x" << i));

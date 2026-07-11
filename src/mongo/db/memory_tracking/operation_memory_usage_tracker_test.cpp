@@ -8,6 +8,8 @@
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration_test_util.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/util/assert_util.h"
 
@@ -169,6 +171,80 @@ TEST_F(OperationMemoryUsageTrackerTest, CurOpStatsAreNotUpdatedIfFeatureFlagOff)
     ASSERT_EQ(peakTrackedMemBytes, 0);
 
     ASSERT_TRUE(mock->getNext().isEOF());
+}
+
+/**
+ * A knob-backed limit built via loadMemoryLimit() must resolve its value from the query knob (its
+ * backing server parameter) against the operation, not from any snapshot taken at construction.
+ */
+TEST_F(OperationMemoryUsageTrackerTest, KnobBackedLimitResolvesFromKnob) {
+    OperationContext* opCtx = getExpCtx()->getOperationContext();
+    QueryKnobGuardForTest knobGuard{opCtx, "internalDocumentSourceGroupMaxMemoryBytes", 100LL};
+
+    SimpleMemoryUsageTracker tracker{
+        loadMemoryLimit(StageMemoryLimit::DocumentSourceGroupMaxMemoryBytes)};
+    ASSERT_EQ(tracker.maxAllowedMemoryUsageBytes(opCtx), 100);
+}
+
+/**
+ * withinMemoryLimit()/assertWithinMemoryLimit() on a knob-backed tracker must enforce the knob's
+ * value, not a hard-coded default.
+ */
+TEST_F(OperationMemoryUsageTrackerTest, WithinMemoryLimitEnforcesKnobBackedLimit) {
+    OperationContext* opCtx = getExpCtx()->getOperationContext();
+    QueryKnobGuardForTest knobGuard{opCtx, "internalDocumentSourceGroupMaxMemoryBytes", 100LL};
+
+    SimpleMemoryUsageTracker tracker{
+        loadMemoryLimit(StageMemoryLimit::DocumentSourceGroupMaxMemoryBytes)};
+
+    tracker.add(50);
+    ASSERT_TRUE(tracker.withinMemoryLimit(opCtx));
+
+    tracker.add(51);
+    ASSERT_FALSE(tracker.withinMemoryLimit(opCtx));
+}
+
+/**
+ * The value is genuinely read from the knob: a different guarded value yields a different limit.
+ */
+TEST_F(OperationMemoryUsageTrackerTest, KnobBackedLimitTracksGuardedValue) {
+    OperationContext* opCtx = getExpCtx()->getOperationContext();
+    QueryKnobGuardForTest knobGuard{opCtx, "internalDocumentSourceGroupMaxMemoryBytes", 4242LL};
+
+    SimpleMemoryUsageTracker tracker{
+        loadMemoryLimit(StageMemoryLimit::DocumentSourceGroupMaxMemoryBytes)};
+    ASSERT_EQ(tracker.maxAllowedMemoryUsageBytes(opCtx), 4242);
+}
+
+/**
+ * With a null OperationContext a knob-backed limit returns the knob's global value without
+ * latching it: a later read that does have an operation resolves against that operation's
+ * QueryKnobConfiguration.
+ */
+TEST_F(OperationMemoryUsageTrackerTest, NullOpCtxReadsGlobalValueWithoutLatching) {
+    OperationContext* opCtx = getExpCtx()->getOperationContext();
+    MemoryUsageLimit limit = loadMemoryLimit(StageMemoryLimit::DocumentSourceGroupMaxMemoryBytes);
+    {
+        QueryKnobGuardForTest knobGuard{opCtx, "internalDocumentSourceGroupMaxMemoryBytes", 100LL};
+        ASSERT_EQ(limit.get(nullptr), 100);
+    }
+    QueryKnobGuardForTest knobGuard{opCtx, "internalDocumentSourceGroupMaxMemoryBytes", 4242LL};
+    ASSERT_EQ(limit.get(opCtx), 4242);
+}
+
+/**
+ * The first get() with an operation latches the resolved value: a second get() under a different
+ * configuration still returns the first-resolved value.
+ */
+TEST_F(OperationMemoryUsageTrackerTest, KnobBackedLimitLatchesFirstResolvedValue) {
+    OperationContext* opCtx = getExpCtx()->getOperationContext();
+    MemoryUsageLimit limit = loadMemoryLimit(StageMemoryLimit::DocumentSourceGroupMaxMemoryBytes);
+    {
+        QueryKnobGuardForTest knobGuard{opCtx, "internalDocumentSourceGroupMaxMemoryBytes", 100LL};
+        ASSERT_EQ(limit.get(opCtx), 100);
+    }
+    QueryKnobGuardForTest knobGuard{opCtx, "internalDocumentSourceGroupMaxMemoryBytes", 4242LL};
+    ASSERT_EQ(limit.get(opCtx), 100);
 }
 
 }  // namespace

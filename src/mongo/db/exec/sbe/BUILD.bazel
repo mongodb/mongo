@@ -377,6 +377,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/collation:collator_interface_mock",
+        "//src/mongo/db/query/query_knobs:query_knob_configuration_test_util",
         "//src/mongo/db/timeseries:bucket_compression",
         "//src/mongo/unittest",
         "//src/mongo/util:pcre_wrapper",
@@ -524,6 +525,7 @@ mongo_cc_benchmark(
     deps = [
         ":sbe_plan_stage_test",
         ":sbe_unittest_base",
+        "//src/mongo/db/query/query_knobs:query_knob_configuration_test_util",
         "//src/mongo/unittest",
     ],
 )

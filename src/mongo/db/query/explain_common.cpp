@@ -10,7 +10,6 @@
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
-#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/version_context.h"
@@ -59,7 +58,6 @@ void generateServerInfo(BSONObjBuilder* out) {
 void generateServerParameters(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               BSONObjBuilder* out) {
     BSONObjBuilder serverBob(out->subobjStart("serverParameters"));
-    appendStageMemoryLimitsToExplain(expCtx->getOperationContext(), serverBob);
     serverBob.appendNumber("internalQueryFacetMaxOutputDocSizeBytes",
                            internalQueryFacetMaxOutputDocSizeBytes.load());
     serverBob.appendNumber("internalLookupStageIntermediateDocumentMaxSizeBytes",

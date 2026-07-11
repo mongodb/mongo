@@ -15,10 +15,7 @@ assert.commandWorked(coll.createIndex({y: 1}));
 let result = coll.explain().aggregate([{$match: {x: 1, y: 1}}]);
 
 const expectedParamList = [
-    "internalQueryFacetBufferSizeBytes",
     "internalLookupStageIntermediateDocumentMaxSizeBytes",
-    "internalDocumentSourceGroupMaxMemoryBytes",
-    "internalQueryMaxBlockingSortMemoryUsageBytes",
     "internalQueryProhibitBlockingMergeOnMongoS",
     "internalQueryFacetMaxOutputDocSizeBytes",
     "internalQueryMaxAddToSetBytes",

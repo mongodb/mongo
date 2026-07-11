@@ -40,7 +40,7 @@ assert.commandWorked(
     setParameter(
         db,
         "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
-        isSbeEnabled ? 129 : 424,
+        isSbeEnabled ? 129 : 440,
     ),
 );
 // Spilling memory threshold for $bucketAuto
@@ -244,7 +244,7 @@ testSpillingMetrics({
 });
 testSpillingMetrics({
     stageName: "group",
-    expectedSpillingMetrics: {spills: 10, spilledBytes: 2080},
+    expectedSpillingMetrics: {spills: 10, spilledBytes: 2160},
     expectedSbeSpillingMetrics: {spills: 10, spilledBytes: 450},
 });
 testSpillingMetrics({

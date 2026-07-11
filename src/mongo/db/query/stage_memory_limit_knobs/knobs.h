@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/memory_tracking/memory_usage_limit.h"
 #include "mongo/util/modules.h"
 
@@ -39,11 +38,5 @@ enum class StageMemoryLimit {
  * the result for a plain byte count.
  */
 MemoryUsageLimit loadMemoryLimit(StageMemoryLimit stage);
-
-/**
- * Adds values of the server parameters, responsible for the memory limits, to the explain command
- * output, resolved against 'opCtx'.
- */
-void appendStageMemoryLimitsToExplain(OperationContext* opCtx, BSONObjBuilder& bob);
 
 }  // namespace mongo

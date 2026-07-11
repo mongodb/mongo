@@ -6,8 +6,6 @@
 #include "mongo/db/query/stage_memory_limit_knobs/query_knob_descriptors.h"
 #include "mongo/db/query/stage_memory_limit_knobs/stage_memory_limit_knobs_gen.h"
 
-#include <string_view>
-
 namespace mongo {
 
 namespace {
@@ -66,21 +64,6 @@ const QueryKnob<long long>& getMemoryLimitKnob(StageMemoryLimit stage) {
 
 MemoryUsageLimit loadMemoryLimit(StageMemoryLimit stage) {
     return MemoryUsageLimit{getMemoryLimitKnob(stage)};
-}
-
-void appendStageMemoryLimitsToExplain(OperationContext* opCtx, BSONObjBuilder& bob) {
-    // 'appendNumber' has no 'int64_t'-exact overload (on platforms where 'int64_t' is 'long' it is
-    // ambiguous between the 'int' and 'long long' overloads), so cast the resolved value.
-    auto append = [&](std::string_view name, StageMemoryLimit stage) {
-        bob.appendNumber(name, static_cast<long long>(loadMemoryLimit(stage).get(opCtx)));
-    };
-    append("internalQueryFacetBufferSizeBytes", StageMemoryLimit::QueryFacetBufferSizeBytes);
-    append("internalDocumentSourceGroupMaxMemoryBytes",
-           StageMemoryLimit::DocumentSourceGroupMaxMemoryBytes);
-    append("internalQueryMaxBlockingSortMemoryUsageBytes",
-           StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes);
-    append("internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
-           StageMemoryLimit::DocumentSourceSetWindowFieldsMaxMemoryBytes);
 }
 
 }  // namespace mongo
