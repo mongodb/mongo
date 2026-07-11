@@ -13,4 +13,8 @@ extern Counter64& maxEstimatedScanRejected;
 // (command-level or PQS) overrode the restriction.
 extern Counter64& maxEstimatedScanRejectedAndOverridden;
 
+// Incremented when maxEstimatedScanBytesDryRun is enabled and a query would have been rejected by
+// maxEstimatedScanBytes, but was allowed to proceed because dry-run mode is active.
+extern Counter64& maxEstimatedScanDryRunWouldReject;
+
 }  // namespace mongo::maxEstimatedScanBytesMetrics

@@ -914,6 +914,24 @@ TEST_F(QueryPlannerTest, NoLargeCollscanDoesNotRejectIndexedPlan) {
     assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1}}}}}");
 }
 
+TEST_F(QueryPlannerTest, MaxEstimatedScanBytesDryRunAllowsUnboundedCollscan) {
+    params.mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES |
+        QueryPlannerParams::MAX_ESTIMATED_SCAN_BYTES_DRY_RUN;
+    // Dry-run mode allows the COLLSCAN through instead of rejecting it.
+    runQuery(fromjson("{a: 1}"));
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerTest, MaxEstimatedScanBytesDryRunBitAloneHasNoEffect) {
+    // Without COLLECTION_EXCEEDS_SCAN_BYTES also set, the dry-run bit alone does nothing: there
+    // was never a rejection to suppress.
+    params.mainCollectionInfo.options |= QueryPlannerParams::MAX_ESTIMATED_SCAN_BYTES_DRY_RUN;
+    runQuery(fromjson("{a: 1}"));
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
 TEST_F(QueryPlannerTest, NoLargeCollscanFallsBackToIndexWhenCollscanBlocked) {
     params.mainCollectionInfo.options |=
         QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES | QueryPlannerParams::INCLUDE_COLLSCAN;

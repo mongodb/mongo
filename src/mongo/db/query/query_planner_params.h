@@ -71,6 +71,13 @@ struct CollectionInfo {
 
     // Histogram-based statistics for fields in the collection.
     std::unique_ptr<stats::CollectionStatistics> collStats{nullptr};
+
+    // The collection's estimated data size in bytes, captured when COLLECTION_EXCEEDS_SCAN_BYTES
+    // or its dry-run variant is set, for use in dry-run/rejection LOGV2 logging.
+    long long maxEstimatedScanBytesCollectionSize{0};
+
+    // The configured maxEstimatedScanBytes threshold, captured alongside the above.
+    long long maxEstimatedScanBytesThreshold{0};
 };
 
 
@@ -178,6 +185,11 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] QueryPlannerParams {
         // threshold. The planner will refuse to output an unbounded COLLSCAN. Cleared by a
         // $natural hint (command-level or PQS).
         COLLECTION_EXCEEDS_SCAN_BYTES = 1 << 15,
+
+        // Set when maxEstimatedScanBytesDryRun is enabled. Alongside COLLECTION_EXCEEDS_SCAN_BYTES,
+        // causes the planner to log and count a would-be rejection instead of actually rejecting
+        // the query.
+        MAX_ESTIMATED_SCAN_BYTES_DRY_RUN = 1 << 16,
     };
 
     /**

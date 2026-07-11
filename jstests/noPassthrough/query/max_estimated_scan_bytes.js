@@ -24,6 +24,10 @@ describe("maxEstimatedScanBytes", function () {
         return runWithParamsAllNonConfigNodes(db, {maxEstimatedScanBytes: val}, fn);
     }
 
+    function setDryRun(val) {
+        assert.commandWorked(db.adminCommand({setParameter: 1, maxEstimatedScanBytesDryRun: val}));
+    }
+
     function getCounters() {
         const ss = assert.commandWorked(db.adminCommand({serverStatus: 1}));
         return ss.metrics.query.maxEstimatedScanBytes;
@@ -57,6 +61,7 @@ describe("maxEstimatedScanBytes", function () {
     });
 
     after(function () {
+        setDryRun(false);
         MongoRunner.stopMongod(conn);
     });
 
@@ -348,6 +353,86 @@ describe("maxEstimatedScanBytes", function () {
         });
     });
 
+    it("19. dryRun: query that would be rejected succeeds, and dryRunWouldReject increments", function () {
+        withParam(belowHeavy, () => {
+            setDryRun(true);
+            const beforeDryRun = getCounters().dryRunWouldReject;
+            const beforeRejected = getCounters().rejected;
+            // Earlier tests may have cached a COLLSCAN plan for this exact query shape, which
+            // would replay via the plan-cache path (LOGV2 10130231) instead of the collScanRequired
+            // path (10130233) asserted on below. Clear the cache so the log ID is deterministic.
+            assert.commandWorked(db.runCommand({planCacheClear: "heavy"}));
+            assert.commandWorked(db.runCommand({find: "heavy", filter: {a: 1}}));
+            assert.eq(
+                getCounters().dryRunWouldReject,
+                beforeDryRun + 1,
+                "dryRunWouldReject should increment when dry-run mode is on",
+            );
+            assert.eq(
+                getCounters().rejected,
+                beforeRejected,
+                "rejected should NOT increment while dry-run mode is on",
+            );
+            checkLog.containsJson(conn, 10130233, {
+                "namespace": "test.heavy",
+            });
+            setDryRun(false);
+        });
+    });
+
+    it("20. dryRun: has no effect when maxEstimatedScanBytes is disabled", function () {
+        withParam(-1, () => {
+            setDryRun(true);
+            const beforeDryRun = getCounters().dryRunWouldReject;
+            assert.commandWorked(db.runCommand({find: "heavy", filter: {a: 1}}));
+            assert.eq(
+                getCounters().dryRunWouldReject,
+                beforeDryRun,
+                "dryRunWouldReject should not increment when maxEstimatedScanBytes is disabled",
+            );
+            setDryRun(false);
+        });
+    });
+
+    it("21. dryRun: $lookup foreign collection that would be rejected succeeds under dry-run", function () {
+        assertDropAndRecreateCollection(db, "local_lookup");
+        assert.commandWorked(
+            db["local_lookup"].insertMany([
+                {_id: 1, k: 1},
+                {_id: 2, k: 2},
+            ]),
+        );
+        withParam(belowHeavy, () => {
+            setDryRun(true);
+            const beforeDryRun = getCounters().dryRunWouldReject;
+            assert.commandWorked(
+                db.runCommand({
+                    aggregate: "local_lookup",
+                    pipeline: [
+                        {
+                            $lookup: {
+                                from: "heavy",
+                                localField: "k",
+                                foreignField: "a",
+                                as: "joined",
+                            },
+                        },
+                    ],
+                    cursor: {},
+                }),
+            );
+            // The classic NLJ replans the foreign collection scan once per outer document (2
+            // here), so dryRunWouldReject is recorded multiple times for one command; see the
+            // identical note on the PQS $natural override $lookup test below.
+            assert.gt(
+                getCounters().dryRunWouldReject,
+                beforeDryRun,
+                "dryRunWouldReject should increment for a $lookup foreign collection under dry-run",
+            );
+            setDryRun(false);
+        });
+    });
+
     // TODO SERVER-130345: add integration tests for PQS $natural hint override path.
 });
 
@@ -362,6 +447,10 @@ describe("maxEstimatedScanBytes with PQS $natural hint override", function () {
 
     function setParam(val) {
         assert.commandWorked(db.adminCommand({setParameter: 1, maxEstimatedScanBytes: val}));
+    }
+
+    function setDryRun(val) {
+        assert.commandWorked(db.adminCommand({setParameter: 1, maxEstimatedScanBytesDryRun: val}));
     }
 
     function getCounters() {
@@ -396,6 +485,7 @@ describe("maxEstimatedScanBytes with PQS $natural hint override", function () {
 
     after(function () {
         setParam(-1);
+        setDryRun(false);
         rst.stopSet();
     });
 
@@ -565,5 +655,27 @@ describe("maxEstimatedScanBytes with PQS $natural hint override", function () {
                 );
             },
         );
+    });
+
+    it("PQS $natural hint override also suppresses dry-run: dryRunWouldReject does not increment", function () {
+        setParam(belowHeavy);
+        setDryRun(true);
+        const query = qsutils.makeFindQueryInstance({filter: {a: 1}});
+        const ns = {db: db.getName(), coll: "heavy_pqs"};
+        qsutils.withQuerySettings(
+            query,
+            {indexHints: [{ns, allowedIndexes: [{$natural: 1}]}]},
+            () => {
+                const beforeDryRun = getCounters().dryRunWouldReject;
+                assert.commandWorked(db.runCommand({find: "heavy_pqs", filter: {a: 1}}));
+                assert.eq(
+                    getCounters().dryRunWouldReject,
+                    beforeDryRun,
+                    "dryRunWouldReject should NOT increment when the PQS $natural hint override " +
+                        "clears COLLECTION_EXCEEDS_SCAN_BYTES before the dry-run check runs",
+                );
+            },
+        );
+        setDryRun(false);
     });
 });

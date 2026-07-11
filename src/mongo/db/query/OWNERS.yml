@@ -188,6 +188,9 @@ filters:
   - "record_id_*":
     approvers:
       - 10gen/query-optimization
+  - "max_estimated_scan_bytes_metrics*":
+    approvers:
+      - 10gen/query-execution
   - "restore_context*":
     approvers:
       - 10gen/query-optimization

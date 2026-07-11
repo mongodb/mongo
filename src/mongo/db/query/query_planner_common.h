@@ -11,6 +11,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
@@ -99,6 +100,14 @@ public:
      */
     static bool hasEffectiveLimit(const CanonicalQuery& query) {
         return query.getFindCommandRequest().getLimit().value_or(0) > 0;
+    }
+
+    /**
+     * Returns true if 'collInfo' has the maxEstimatedScanBytesDryRun bit set, i.e. a would-be
+     * rejection for that collection should be logged and counted rather than enforced.
+     */
+    static bool isMaxEstimatedScanBytesDryRun(const CollectionInfo& collInfo) {
+        return (collInfo.options & QueryPlannerParams::MAX_ESTIMATED_SCAN_BYTES_DRY_RUN);
     }
 
     static bool providesSortRequirementForDistinct(

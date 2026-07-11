@@ -548,6 +548,23 @@ server_parameters:
                 fcv:
                     min: "9.0"
 
+    maxEstimatedScanBytesDryRun:
+        description: >-
+            When true, a query that maxEstimatedScanBytes would reject is instead logged and
+            counted (query.maxEstimatedScanBytes.dryRunWouldReject), but allowed to proceed. No-op
+            when maxEstimatedScanBytes is -1 (disabled).
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryMaxEstimatedScanBytesDryRun"
+        cpp_vartype: AtomicWord<bool>
+        default: false
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: maxEstimatedScanBytesDryRun
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
+
     internalQueryEnumerationPreferLockstepOrEnumeration:
         description: >-
             If set to true, instructs the plan enumerator to enumerate contained $ors in a

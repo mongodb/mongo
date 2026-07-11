@@ -96,6 +96,10 @@ inline Atomic<bool>& gKnobNoTableScan = storageGlobalParams.noTableScan;
          kMaxEstimatedScanBytesName,                                                      \
          internalQueryMaxEstimatedScanBytes,                                              \
          getMaxEstimatedScanBytes)                                                        \
+    KNOB(kMaxEstimatedScanBytesDryRun,                                                    \
+         kMaxEstimatedScanBytesDryRunName,                                                \
+         internalQueryMaxEstimatedScanBytesDryRun,                                        \
+         getMaxEstimatedScanBytesDryRun)                                                  \
     KNOB(kMaxScansToExplode,                                                              \
          kInternalQueryMaxScansToExplodeName,                                             \
          internalQueryMaxScansToExplode,                                                  \

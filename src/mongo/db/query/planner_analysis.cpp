@@ -1091,10 +1091,21 @@ QueryPlannerAnalysis::Strategy QueryPlannerAnalysis::determineLookupStrategy(
         // collection when local key values are strings/arrays/objects; we cannot rule that out at
         // plan time.
         if (foreignCollItr->second.options & QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES) {
-            maxEstimatedScanBytesMetrics::maxEstimatedScanRejected.increment();
-            uasserted(ErrorCodes::NoQueryExecutionPlans,
-                      "Query rejected by maxEstimatedScanBytes: plan requires an unbounded "
-                      "COLLSCAN on a collection that exceeds the configured size threshold");
+            if (QueryPlannerCommon::isMaxEstimatedScanBytesDryRun(foreignCollItr->second)) {
+                LOGV2(10130234,
+                      "maxEstimatedScanBytesDryRun: $lookup foreign collection scan would be "
+                      "rejected by maxEstimatedScanBytes",
+                      "namespace"_attr = foreignCollName.toStringForErrorMsg(),
+                      "estimatedSize"_attr =
+                          foreignCollItr->second.maxEstimatedScanBytesCollectionSize,
+                      "threshold"_attr = foreignCollItr->second.maxEstimatedScanBytesThreshold);
+                maxEstimatedScanBytesMetrics::maxEstimatedScanDryRunWouldReject.increment();
+            } else {
+                maxEstimatedScanBytesMetrics::maxEstimatedScanRejected.increment();
+                uasserted(ErrorCodes::NoQueryExecutionPlans,
+                          "Query rejected by maxEstimatedScanBytes: plan requires an unbounded "
+                          "COLLSCAN on a collection that exceeds the configured size threshold");
+            }
         }
         const bool tableScanForbidden = foreignCollItr->second.options &
             (QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::STRICT_NO_TABLE_SCAN);

@@ -282,7 +282,8 @@ void QueryPlannerParams::applyQuerySettingsNaturalHintsForCollection(
     constexpr auto strictNoTableScanFlags = (QueryPlannerParams::Options::NO_TABLE_SCAN |
                                              QueryPlannerParams::Options::STRICT_NO_TABLE_SCAN);
     constexpr auto clearCollscanFlags =
-        (strictNoTableScanFlags | QueryPlannerParams::Options::COLLECTION_EXCEEDS_SCAN_BYTES);
+        (strictNoTableScanFlags | QueryPlannerParams::Options::COLLECTION_EXCEEDS_SCAN_BYTES |
+         QueryPlannerParams::Options::MAX_ESTIMATED_SCAN_BYTES_DRY_RUN);
     if (!forwardAllowed && !backwardAllowed) {
         // No '$natural' or cluster key hint present. Ensure that table scans are forbidden.
         collectionInfo.options |= strictNoTableScanFlags;
@@ -441,6 +442,13 @@ void QueryPlannerParams::fillOutSecondaryCollectionsInfo(
                     if (!ignore && secondaryColl &&
                         secondaryColl->getRecordStore()->dataSize() > maxScanBytes) {
                         secondaryInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+                        secondaryInfo.maxEstimatedScanBytesCollectionSize =
+                            secondaryColl->getRecordStore()->dataSize();
+                        secondaryInfo.maxEstimatedScanBytesThreshold = maxScanBytes;
+                        if (QueryKnobConfiguration::get(opCtx).getMaxEstimatedScanBytesDryRun()) {
+                            secondaryInfo.options |=
+                                QueryPlannerParams::MAX_ESTIMATED_SCAN_BYTES_DRY_RUN;
+                        }
                     }
                 }
             }
@@ -523,6 +531,13 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
                 incrementRejectedAndOverriddenIfNoLimit(canonicalQuery);
             } else {
                 mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+                mainCollectionInfo.maxEstimatedScanBytesCollectionSize =
+                    mainColl->getRecordStore()->dataSize();
+                mainCollectionInfo.maxEstimatedScanBytesThreshold = maxScanBytes;
+                if (QueryKnobConfiguration::get(opCtx).getMaxEstimatedScanBytesDryRun()) {
+                    mainCollectionInfo.options |=
+                        QueryPlannerParams::MAX_ESTIMATED_SCAN_BYTES_DRY_RUN;
+                }
             }
         }
     }

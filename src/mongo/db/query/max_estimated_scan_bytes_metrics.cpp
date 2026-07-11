@@ -11,4 +11,7 @@ Counter64& maxEstimatedScanRejected =
 Counter64& maxEstimatedScanRejectedAndOverridden =
     *MetricBuilder<Counter64>{"query.maxEstimatedScanBytes.rejectedAndOverridden"};
 
+Counter64& maxEstimatedScanDryRunWouldReject =
+    *MetricBuilder<Counter64>{"query.maxEstimatedScanBytes.dryRunWouldReject"};
+
 }  // namespace mongo::maxEstimatedScanBytesMetrics
