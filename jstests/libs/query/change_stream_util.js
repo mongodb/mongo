@@ -2,6 +2,7 @@
  * A class with helper functions which operate on change streams. The class maintains a list of
  * opened cursors and kills them on cleanup.
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {indexAccessOpsByName} from "jstests/libs/index_stats_utils.js";
 import {getLocalReadCount} from "jstests/libs/local_reads.js";
@@ -1548,6 +1549,9 @@ export function ensureShardDistribution(db, coll, distributionConfig) {
  *   - localReadCount: legacy local-read log (id 5837600) scoped to `comment`. Omit `comment` to skip.
  *   - indexOpsDelta: {indexName: $indexStats accesses.ops delta across `fn`}, i.e. which index the
  *     lookup used.
+ *   - isRunningOptimizedUpdateLookup: whether *this node* runs the optimized local updateLookup.
+ *     Checked per node, not once globally, since in a multiversion cluster each node's binary (and
+ *     therefore its updateLookup behavior) can differ.
  */
 export function observePostImageLookup({nodes, ns, comment, fn}) {
     const opsBefore = nodes.map((node) => indexAccessOpsByName(node.getCollection(ns)));
@@ -1566,6 +1570,10 @@ export function observePostImageLookup({nodes, ns, comment, fn}) {
                     localReadCount:
                         comment === undefined ? undefined : getLocalReadCount(node, ns, comment),
                     indexOpsDelta: indexOpsDelta,
+                    isRunningOptimizedUpdateLookup: FeatureFlagUtil.isPresentAndEnabled(
+                        node.getDB("admin"),
+                        "ChangeStreamOptimizedUpdateLookup",
+                    ),
                 },
             ];
         }),

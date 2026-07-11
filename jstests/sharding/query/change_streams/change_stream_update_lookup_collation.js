@@ -7,7 +7,6 @@
 //   uses_change_streams,
 // ]
 // Shard key index has collation, which is not compatible with $min/$max
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {
     observePostImageLookup,
@@ -20,7 +19,6 @@ describe("change stream update lookup collation and shard targeting", function (
     let st;
     let db;
     let coll;
-    let isRunningOptimizedUpdateLookup;
     let oldSkipCheckOrphans;
 
     // Asserts the expected events and which index each shard's post-image lookup used. Legacy targets
@@ -45,7 +43,7 @@ describe("change stream update lookup collation and shard targeting", function (
         for (const [node, observation] of nodeObservationMap) {
             const idDelta = observation.indexOpsDelta["_id_"] ?? 0;
             const shardKeyDelta = observation.indexOpsDelta["shardKey_1"] ?? 0;
-            if (isRunningOptimizedUpdateLookup) {
+            if (observation.isRunningOptimizedUpdateLookup) {
                 assert.eq(idDelta, 1, `${node} did not use _id index`);
                 assert.eq(shardKeyDelta, 0, `${node} unexpectedly used shard-key index`);
             } else {
@@ -70,10 +68,6 @@ describe("change stream update lookup collation and shard targeting", function (
         });
 
         db = st.s0.getDB(jsTestName());
-        isRunningOptimizedUpdateLookup = FeatureFlagUtil.isPresentAndEnabled(
-            st.s.getDB("admin"),
-            "ChangeStreamOptimizedUpdateLookup",
-        );
 
         // Ensure the test db primary is st.shard0.shardName.
         assert.commandWorked(

@@ -44,6 +44,7 @@ rollout:
   featureFlagUnifiedWriteExecutor: {}
 
 release:
+  featureFlagChangeStreamOptimizedUpdateLookup: {}
   featureFlagChangeStreamReaderV2: {}
   featureFlagCostBasedRanker: {}
   featureFlagExtensionsInsideHybridSearch: {}

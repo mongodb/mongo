@@ -5,7 +5,6 @@
 //   requires_profiling,
 //   uses_change_streams,
 // ]
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {enableLocalReadLogs} from "jstests/libs/local_reads.js";
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {
@@ -25,7 +24,6 @@ describe("change stream and update lookup read preference", function () {
     let st;
     let db;
     let coll;
-    let isRunningOptimizedUpdateLookup;
 
     // Opens an updateLookup change stream with the given read preference, applies 'update' to both
     // documents, and asserts that both the stream and its post-image update lookup ran on the node
@@ -76,7 +74,7 @@ describe("change stream and update lookup read preference", function () {
                     // read on this node with a readConcern specified, which enforces shard version.
                     errCode: {$ne: ErrorCodes.StaleConfig},
                 };
-                if (isRunningOptimizedUpdateLookup) {
+                if (observation.isRunningOptimizedUpdateLookup) {
                     // Only non-clustered collections record _id use.
                     if (!ClusteredCollectionUtil.isCollectionClustered(coll)) {
                         // Optimized: read locally via an _id index scan, with no routed 'aggregate'.
@@ -115,10 +113,6 @@ describe("change stream and update lookup read preference", function () {
 
         db = st.s0.getDB(dbName);
         coll = db[jsTestName()];
-        isRunningOptimizedUpdateLookup = FeatureFlagUtil.isPresentAndEnabled(
-            st.s.getDB("admin"),
-            "ChangeStreamOptimizedUpdateLookup",
-        );
 
         // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
         assert.commandWorked(

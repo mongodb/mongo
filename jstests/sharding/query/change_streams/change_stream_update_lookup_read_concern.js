@@ -29,7 +29,6 @@ import {awaitRSClientHosts, reconfig} from "jstests/replsets/rslib.js";
 describe("change stream update lookup read concern and targeting", function () {
     let rst;
     let st;
-    let isRunningOptimizedUpdateLookup;
     let mongosDB;
     let mongosColl;
 
@@ -54,9 +53,19 @@ describe("change stream update lookup read concern and targeting", function () {
     // Asserts where the post-image update lookup ran. Legacy routes a separate 'aggregate' to the
     // read-preference-selected node, so we expect exactly one matching profiler entry there. The
     // optimized lookup reads locally on the stream's own node and never routes, so we expect none.
-    function assertUpdateLookupTargeting({profileDB, ns, comment, collName, extra = {}}) {
+    // 'streamNodeIsRunningOptimizedUpdateLookup' reflects the *stream's* node, not 'profileDB' (which
+    // may be a different node the legacy path would route to) -- that's what actually determines
+    // whether the lookup stays local or routes elsewhere.
+    function assertUpdateLookupTargeting({
+        profileDB,
+        ns,
+        comment,
+        collName,
+        extra = {},
+        streamNodeIsRunningOptimizedUpdateLookup,
+    }) {
         const filter = routedUpdateLookupFilter(ns, comment, collName, extra);
-        if (isRunningOptimizedUpdateLookup) {
+        if (streamNodeIsRunningOptimizedUpdateLookup) {
             profilerHasZeroMatchingEntriesOrThrow({profileDB, filter});
         } else {
             profilerHasSingleMatchingEntryOrThrow({
@@ -118,10 +127,6 @@ describe("change stream update lookup read concern and targeting", function () {
 
         mongosDB = st.s0.getDB(jsTestName());
         mongosColl = mongosDB[jsTestName()];
-        isRunningOptimizedUpdateLookup = FeatureFlagUtil.isPresentAndEnabled(
-            st.s.getDB("admin"),
-            "ChangeStreamOptimizedUpdateLookup",
-        );
 
         assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
         assert.commandWorked(
@@ -144,6 +149,15 @@ describe("change stream update lookup read concern and targeting", function () {
         const closestSecondary = rst.nodes[1];
         const closestSecondaryDB = closestSecondary.getDB(mongosDB.getName());
         assert.commandWorked(closestSecondaryDB.setProfilingLevel(2));
+
+        // The change stream we open below stays pinned to this node for the rest of the test, even
+        // after the reconfig moves the 'closestSecondary' tag elsewhere. Checked here (not via the
+        // router or globally), since in a multiversion cluster this node's binary determines whether
+        // its own update lookups are optimized, independent of any other node's binary.
+        const streamNodeIsRunningOptimizedUpdateLookup = FeatureFlagUtil.isPresentAndEnabled(
+            closestSecondaryDB.getSiblingDB("admin"),
+            "ChangeStreamOptimizedUpdateLookup",
+        );
 
         // Do a read concern "local" read so that the secondary refreshes its metadata.
         mongosColl.find().readPref("secondary", [{tag: "closestSecondary"}]);
@@ -191,6 +205,7 @@ describe("change stream update lookup read concern and targeting", function () {
             comment: changeStreamComment,
             collName: mongosColl.getName(),
             extra: {"command.pipeline.0.$match._id": 1},
+            streamNodeIsRunningOptimizedUpdateLookup,
         });
 
         // Now add a new secondary which is "closer" (add the "closestSecondary" tag to that
@@ -241,12 +256,12 @@ describe("change stream update lookup read concern and targeting", function () {
         // change. The optimized lookup reads locally on the original host and never targets the new
         // node, so its lag is irrelevant and there is nothing to unblock.
         let joinResumeReplicationShell;
-        if (!isRunningOptimizedUpdateLookup) {
+        if (!streamNodeIsRunningOptimizedUpdateLookup) {
             stopServerReplication(newClosestSecondary);
         }
         assert.commandWorked(mongosColl.update({_id: 1}, {$set: {updatedCount: 2}}));
 
-        if (!isRunningOptimizedUpdateLookup) {
+        if (!streamNodeIsRunningOptimizedUpdateLookup) {
             // Since we stopped replication, we expect the update lookup to block indefinitely until
             // we resume replication, so we resume replication in a parallel shell while this thread
             // is blocked getting the next change from the stream.
@@ -295,6 +310,7 @@ describe("change stream update lookup read concern and targeting", function () {
             ns,
             comment: changeStreamComment,
             collName: mongosColl.getName(),
+            streamNodeIsRunningOptimizedUpdateLookup,
         });
 
         changeStream.close();
