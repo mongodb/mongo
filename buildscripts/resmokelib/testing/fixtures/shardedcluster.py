@@ -11,12 +11,12 @@ import yaml
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib.extensions import (
-    MONGOT_EXTENSION_NAME,
     add_extensions_signature_pub_key_path,
     build_mongot_dynamic_options,
     delete_extension_configs,
     find_and_generate_all_extension_configs,
     find_and_generate_named_extension_configs,
+    get_mongot_extension_name,
     mongot_extension_requested,
     normalize_load_extensions,
 )
@@ -112,7 +112,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             )
         elif _load_exts:
             generate_now = (
-                [n for n in _load_exts if n != MONGOT_EXTENSION_NAME]
+                [n for n in _load_exts if n != get_mongot_extension_name()]
                 if self._defer_mongot_extension
                 else _load_exts
             )
@@ -302,12 +302,12 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                 # scratch dict because each mongos holds its own copy of mongos_options.
                 mongos_extension_options = {}
                 self._mongot_extension_conf_name = find_and_generate_named_extension_configs(
-                    extension_names=[MONGOT_EXTENSION_NAME],
+                    extension_names=[get_mongot_extension_name()],
                     is_evergreen=self.config.EVERGREEN_TASK_ID,
                     logger=self.logger,
                     mongod_options=mongos_extension_options,
                     dynamic_options={
-                        MONGOT_EXTENSION_NAME: build_mongot_dynamic_options(self.mongotHost)
+                        get_mongot_extension_name(): build_mongot_dynamic_options(self.mongotHost)
                     },
                 )
                 # Register the mongos conf for teardown cleanup alongside any mongod-side confs.

@@ -39,7 +39,7 @@ executor:
     class: ShardedClusterFixture
     launch_mongot: true
     load_extensions:
-      - mongot
+      - mongot-extension
     mongod_options:
       keyFile: jstests/with_mongot/keyfile_for_testing
       set_parameters:

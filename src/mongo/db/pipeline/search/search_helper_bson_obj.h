@@ -12,6 +12,7 @@
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/pipeline/search/document_source_search_meta.h"
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
+#include "mongo/db/pipeline/search/mongot_extension_name_gen.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
@@ -28,8 +29,10 @@ bool is(const BSONObj& spec) {
 }
 
 inline bool hasMongotExtension(const auto& extensionNames) {
+    // We must check prefix rather than exact equality because testing infrastructure uses uuid
+    // suffixes to differentiate between different mongot/d instances.
     return std::find_if(extensionNames.begin(), extensionNames.end(), [&](const auto& name) {
-               return name == "mongot-extension";
+               return std::string_view{name}.starts_with(kMongotExtensionName);
            }) != extensionNames.end();
 }
 

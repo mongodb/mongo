@@ -15,6 +15,9 @@ py_library(
     # Read at runtime via CONF_IN_PATH; needed in runfiles for sandboxed tests.
     data = [
         "//src/mongo/db/extension/test_examples:configurations.yml",
+        # Read at import time (find_and_generate_extension_configs.py) so the canonical mongot
+        # extension name stays in sync with the server's copy of the same constant.
+        "//src/mongo/db/pipeline/search:mongot_extension_name.json",
     ],
     visibility = ["//visibility:public"],
     deps = [

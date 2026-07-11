@@ -14,12 +14,12 @@ import yaml
 
 from buildscripts.resmokelib import logging
 from buildscripts.resmokelib.extensions import (
-    MONGOT_EXTENSION_NAME,
     add_extensions_signature_pub_key_path,
     build_mongot_dynamic_options,
     delete_extension_configs,
     find_and_generate_all_extension_configs,
     find_and_generate_named_extension_configs,
+    get_mongot_extension_name,
     mongot_extension_requested,
     normalize_load_extensions,
 )
@@ -135,7 +135,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             dynamic_options = None
             if mongot_extension_requested(_load_exts, self.launch_mongot_bool):
                 dynamic_options = {
-                    MONGOT_EXTENSION_NAME: build_mongot_dynamic_options(
+                    get_mongot_extension_name(): build_mongot_dynamic_options(
                         self.mongod_options["mongotHost"]
                     )
                 }

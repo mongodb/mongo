@@ -170,7 +170,8 @@ TEST_F(SearchTest, IsExtensionMongotPipelineReturnsTrueForSearch) {
 
     auto origExtensions = serverGlobalParams.extensions;
     ScopeGuard restoreExtensions([&] { serverGlobalParams.extensions = origExtensions; });
-    serverGlobalParams.extensions.push_back("mongot-extension");
+    serverGlobalParams.extensions.push_back(
+        std::string{search_helper_bson_obj::detail::kMongotExtensionName});
 
     auto pipeline = std::vector<BSONObj>{
         fromjson(R"({$search: {index: "idx", text: {query: "a", path: "b"}}})")};
@@ -186,7 +187,8 @@ TEST_F(SearchTest, IsExtensionMongotPipelineReturnsFalseForSearchFlagDisabled) {
 
     auto origExtensions = serverGlobalParams.extensions;
     ScopeGuard restoreExtensions([&] { serverGlobalParams.extensions = origExtensions; });
-    serverGlobalParams.extensions.push_back("mongot-extension");
+    serverGlobalParams.extensions.push_back(
+        std::string{search_helper_bson_obj::detail::kMongotExtensionName});
 
     auto pipeline = std::vector<BSONObj>{
         fromjson(R"({$search: {index: "idx", text: {query: "a", path: "b"}}})")};
@@ -202,7 +204,8 @@ TEST_F(SearchTest, IsExtensionMongotPipelineReturnsTrueForSearchMeta) {
 
     auto origExtensions = serverGlobalParams.extensions;
     ScopeGuard restoreExtensions([&] { serverGlobalParams.extensions = origExtensions; });
-    serverGlobalParams.extensions.push_back("mongot-extension");
+    serverGlobalParams.extensions.push_back(
+        std::string{search_helper_bson_obj::detail::kMongotExtensionName});
 
     auto pipeline = std::vector<BSONObj>{
         fromjson(R"({$searchMeta: {index: "idx", text: {query: "a", path: "b"}}})")};
@@ -218,7 +221,8 @@ TEST_F(SearchTest, IsExtensionMongotPipelineReturnsFalseForSearchMetaFlagDisable
 
     auto origExtensions = serverGlobalParams.extensions;
     ScopeGuard restoreExtensions([&] { serverGlobalParams.extensions = origExtensions; });
-    serverGlobalParams.extensions.push_back("mongot-extension");
+    serverGlobalParams.extensions.push_back(
+        std::string{search_helper_bson_obj::detail::kMongotExtensionName});
 
     auto pipeline = std::vector<BSONObj>{
         fromjson(R"({$searchMeta: {index: "idx", text: {query: "a", path: "b"}}})")};

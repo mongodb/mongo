@@ -382,7 +382,8 @@ TEST_F(DocumentSourceVectorSearchTest,
     // Simulate that the mongot extension is loaded.
     auto origExtensions = serverGlobalParams.extensions;
     ScopeGuard restoreExtensions([&] { serverGlobalParams.extensions = origExtensions; });
-    serverGlobalParams.extensions.push_back("mongot-extension");
+    serverGlobalParams.extensions.push_back(
+        std::string{search_helper_bson_obj::detail::kMongotExtensionName});
 
     auto pipeline = std::vector<BSONObj>{fromjson(R"({
         $vectorSearch: {
@@ -411,7 +412,8 @@ TEST_F(DocumentSourceVectorSearchTest,
     // Simulate that the mongot extension is loaded.
     auto origExtensions = serverGlobalParams.extensions;
     ScopeGuard restoreExtensions([&] { serverGlobalParams.extensions = origExtensions; });
-    serverGlobalParams.extensions.push_back("mongot-extension");
+    serverGlobalParams.extensions.push_back(
+        std::string{search_helper_bson_obj::detail::kMongotExtensionName});
 
     auto pipeline = std::vector<BSONObj>{fromjson(R"({
         $vectorSearch: {
@@ -437,7 +439,8 @@ TEST_F(DocumentSourceVectorSearchTest,
     // Simulate that the mongot extension is loaded.
     auto origExtensions = serverGlobalParams.extensions;
     ScopeGuard restoreExtensions([&] { serverGlobalParams.extensions = origExtensions; });
-    serverGlobalParams.extensions.push_back("mongot-extension");
+    serverGlobalParams.extensions.push_back(
+        std::string{search_helper_bson_obj::detail::kMongotExtensionName});
 
     auto pipeline = std::vector<BSONObj>{fromjson(R"({
         $vectorSearch: {

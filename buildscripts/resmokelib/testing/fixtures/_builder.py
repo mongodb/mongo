@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Optional
 
 from buildscripts.resmokelib import config, errors, logging
-from buildscripts.resmokelib.extensions import MONGOT_EXTENSION_NAME
+from buildscripts.resmokelib.extensions import get_mongot_extension_name
 from buildscripts.resmokelib.suitesconfig import _get_suite_config
 from buildscripts.resmokelib.testing import suite as _suite
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
@@ -35,7 +35,7 @@ def _deferred_mongot_extension_kwargs(parent_fixture) -> dict:
     """
     if getattr(parent_fixture, "_defer_mongot_extension", False):
         return {
-            "load_extensions": [MONGOT_EXTENSION_NAME],
+            "load_extensions": [get_mongot_extension_name()],
             "skip_extensions_signature_verification": parent_fixture._skip_extensions_signature_verification,
         }
     return {"load_extensions": []}

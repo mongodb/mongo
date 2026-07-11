@@ -17,11 +17,13 @@ from buildscripts.resmokelib.extensions.download_external_extensions import (
     download_external_extension,
 )
 from buildscripts.resmokelib.extensions.find_and_generate_extension_configs import (
-    MONGOT_EXTENSION_NAME,
     build_mongot_dynamic_options,
     find_and_generate_named_extension_configs,
+    get_mongot_extension_name,
     mongot_extension_requested,
 )
+
+MONGOT_EXTENSION_NAME = get_mongot_extension_name()
 
 
 class TestFindAndGenerateNamedExtensionConfigs(unittest.TestCase):
@@ -193,7 +195,7 @@ class TestDynamicExtensionOptions(unittest.TestCase):
         # should have no extensionOptions at all.
         self.assertNotIn("extensionOptions", self._read_conf(add_fields_name) or {})
 
-        mongot_name = next(n for n in generated_names if n.startswith("mongot_extension_"))
+        mongot_name = next(n for n in generated_names if n.startswith(f"{MONGOT_EXTENSION_NAME}_"))
         self.assertEqual(
             self._read_conf(mongot_name)["extensionOptions"]["mongotHost"], "localhost:1234"
         )

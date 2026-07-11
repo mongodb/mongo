@@ -12,12 +12,11 @@ from buildscripts.resmokelib.extensions.download_external_extensions import (
     download_external_extension,
 )
 from buildscripts.resmokelib.extensions.generate_extension_configs import (
+    MONGOT_EXTENSION_SO_STEM,
     generate_extension_configs,
     get_conf_out_dir,
+    get_mongot_extension_name,
 )
-
-# Fixtures special-case this extension: it needs a runtime-computed mongotHost.
-MONGOT_EXTENSION_NAME = "mongot"
 
 
 def build_mongot_dynamic_options(mongot_host: str) -> dict:
@@ -38,11 +37,11 @@ def mongot_extension_requested(load_extensions: list[str], launch_mongot: bool) 
     Raises if launch_mongot is unset: without a mongot to connect to, the extension would fail
     opaquely at mongod startup.
     """
-    if MONGOT_EXTENSION_NAME not in load_extensions:
+    if get_mongot_extension_name() not in load_extensions:
         return False
     if not launch_mongot:
         raise RuntimeError(
-            f"load_extensions includes '{MONGOT_EXTENSION_NAME}' but launch_mongot is not "
+            f"load_extensions includes '{get_mongot_extension_name()}' but launch_mongot is not "
             "enabled. The mongot extension requires a mongot to connect to; set "
             "launch_mongot: true on the fixture."
         )
@@ -147,6 +146,18 @@ def find_and_generate_all_extension_configs(
 _NAMED_EXTENSION_PATTERNS = ("lib{name}_mongo_extension.so", "lib{name}_extension.so")
 
 
+def _extension_so_lookup_name(name: str) -> str:
+    """Map an extension's canonical name to the file stem used to locate (or download) its .so.
+
+    The mongot extension's canonical name (get_mongot_extension_name(), "mongot-extension") is
+    deliberately decoupled from its .so filename: it is published/built as libmongot_extension.so
+    (file stem "mongot"), with its .conf pointing there via sharedLibraryPath. The name only
+    affects the request token, the dynamic_options key, and mongot_extension_requested() -- never
+    where the .so is found. Every other extension's .so is named after the extension itself.
+    """
+    return MONGOT_EXTENSION_SO_STEM if name == get_mongot_extension_name() else name
+
+
 def find_and_generate_named_extension_configs(
     extension_names: list[str],
     is_evergreen: bool,
@@ -166,15 +177,18 @@ def find_and_generate_named_extension_configs(
     manual_options_by_file: dict[str, dict] = {}
 
     for name in extension_names:
+        # The extension's canonical name and its .so filename can diverge (see the mongot
+        # extension), so locate/download the .so by its file stem, not the name.
+        lookup_name = _extension_so_lookup_name(name)
         # Escape the name so glob metacharacters in it (*, ?, [ ]) match literally.
-        patterns = [p.format(name=glob.escape(name)) for p in _NAMED_EXTENSION_PATTERNS]
+        patterns = [p.format(name=glob.escape(lookup_name)) for p in _NAMED_EXTENSION_PATTERNS]
         so_files = sorted(
             {f for pattern in patterns for f in glob.glob(os.path.join(ext_dir, pattern))}
         )
 
         if not so_files:
             # Externally-published extensions aren't installed by the build; download them.
-            downloaded = download_external_extension(name, logger)
+            downloaded = download_external_extension(lookup_name, logger)
             if downloaded is not None:
                 so_files = [downloaded]
 

@@ -12,11 +12,11 @@ import pymongo.errors
 import pymongo.write_concern
 
 from buildscripts.resmokelib.extensions import (
-    MONGOT_EXTENSION_NAME,
     add_extensions_signature_pub_key_path,
     delete_extension_configs,
     find_and_generate_all_extension_configs,
     find_and_generate_named_extension_configs,
+    get_mongot_extension_name,
     mongot_extension_requested,
     normalize_load_extensions,
 )
@@ -121,7 +121,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             )
         elif _load_exts:
             generate_now = (
-                [n for n in _load_exts if n != MONGOT_EXTENSION_NAME]
+                [n for n in _load_exts if n != get_mongot_extension_name()]
                 if self._defer_mongot_extension
                 else _load_exts
             )

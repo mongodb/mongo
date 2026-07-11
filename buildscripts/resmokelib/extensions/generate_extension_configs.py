@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import argparse
+import functools
+import json
 import logging
 import os
 import shutil
@@ -8,6 +10,41 @@ import sys
 import yaml
 
 from buildscripts.resmokelib.extensions.constants import CONF_IN_PATH
+
+# The mongot extension's canonical name is pinned in this git-tracked file so the server (which
+# compiles it into kMongotExtensionName) and resmoke agree on the value used on --loadExtensions.
+_MONGOT_EXTENSION_NAME_JSON = os.path.join(
+    os.path.dirname(__file__),
+    "..",
+    "..",
+    "..",
+    "src",
+    "mongo",
+    "db",
+    "pipeline",
+    "search",
+    "mongot_extension_name.json",
+)
+
+# The mongot extension's .so is published/built as libmongot_extension.so (file stem "mongot"),
+# independent of its canonical name; its .conf points there via sharedLibraryPath.
+MONGOT_EXTENSION_SO_STEM = "mongot"
+_MONGOT_EXTENSION_SO_BASENAMES = (
+    f"lib{MONGOT_EXTENSION_SO_STEM}_mongo_extension.so",
+    f"lib{MONGOT_EXTENSION_SO_STEM}_extension.so",
+)
+
+
+@functools.cache
+def get_mongot_extension_name() -> str:
+    """Return the mongot extension's canonical name, read lazily from the git-tracked JSON.
+
+    Read on first use rather than at import time so resmoke invocations that never build a mongot
+    fixture don't hard-depend on the file being present. Fixtures special-case this extension: it
+    needs a runtime-computed mongotHost.
+    """
+    with open(_MONGOT_EXTENSION_NAME_JSON) as f:
+        return json.load(f)["name"]
 
 
 def get_conf_out_dir() -> str:
@@ -76,12 +113,17 @@ def generate_extension_configs(
     os.chmod(conf_out_dir, 0o700)
 
     for so_file in so_files:
-        # path/to/libfoo_mongo_extension.so -> libfoo_mongo_extension
         file_name = os.path.basename(so_file)
-        extension_name = os.path.splitext(file_name)[0]
-
-        # libfoo_mongo_extension -> foo
-        extension_name = extension_name.removeprefix("lib").removesuffix("_mongo_extension")
+        if file_name in _MONGOT_EXTENSION_SO_BASENAMES:
+            # The mongot extension's name is pinned in mongot_extension_name.json and intentionally
+            # decoupled from its .so filename, so take it from there rather than deriving it from
+            # the filename. The server keys off the same pinned value (kMongotExtensionName).
+            extension_name = get_mongot_extension_name()
+        else:
+            # path/to/libfoo_mongo_extension.so -> libfoo_mongo_extension -> foo
+            extension_name = (
+                os.path.splitext(file_name)[0].removeprefix("lib").removesuffix("_mongo_extension")
+            )
         extension_name_with_suffix = f"{extension_name}_{with_suffix}"
 
         # Add the parsed extension name to the list.

@@ -54,7 +54,7 @@
     executor:
       fixture:
         load_extensions:
-          - "mongot"
+          - "mongot-extension"
 
 # Extension feature flags plus the gRPC-for-search parameters the mongot-extension requires.
 - name: extension_flags
