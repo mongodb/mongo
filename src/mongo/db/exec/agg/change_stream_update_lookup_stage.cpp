@@ -159,7 +159,7 @@ boost::optional<Document> ChangeStreamUpdateLookupStage::performPostImageLookup(
     }
 }
 
-Document ChangeStreamUpdateLookupStage::enrich(Document event) {
+boost::optional<Document> ChangeStreamUpdateLookupStage::enrich(Document event) {
     auto opTypeVal = assertFieldHasType(
         event, DocumentSourceChangeStream::kOperationTypeField, BSONType::string);
     if (opTypeVal.getStringData() != DocumentSourceChangeStream::kUpdateOpType) {
