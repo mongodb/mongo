@@ -198,7 +198,7 @@ PlanState MergeJoinStage::getNext() {
                     _memoryTracker.value().add(_outerProjectsBuffer.back().memUsageForSorter());
                     uassert(12321800,
                             "Exceeded memory limit for merge join",
-                            _memoryTracker.value().withinMemoryLimit());
+                            _memoryTracker.value().withinMemoryLimit(_opCtx));
                 } else {
                     break;
                 }

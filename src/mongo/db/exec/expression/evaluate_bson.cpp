@@ -27,7 +27,8 @@ Value evaluate(const ExpressionObject& expr,
 
         // Account for the evaluated value plus the field name
         memToken.add(static_cast<int64_t>(pair.first.size() + 1 + fieldVal.getApproximateSize()));
-        tracker.assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
+        tracker.assertWithinMemoryLimit(
+            expr.getExpressionContext()->getOperationContext(), expr.getOpName(), ctx.stageName);
 
         outputDoc.addField(pair.first, std::move(fieldVal));
     }

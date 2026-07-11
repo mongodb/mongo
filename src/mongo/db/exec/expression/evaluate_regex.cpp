@@ -553,12 +553,13 @@ Value evaluateReplace(
     return replaceOpStr(input.getStringData(), find.getStringData(), replacement.getStringData());
 }
 
-void trackReplaceOutput(const EvaluationContext& ctx,
+void trackReplaceOutput(OperationContext* opCtx,
+                        const EvaluationContext& ctx,
                         SimpleMemoryUsageToken& memToken,
                         int64_t currentLength,
                         std::string_view opName) {
     memToken.set(currentLength);
-    memToken.tracker()->assertWithinMemoryLimit(opName, ctx.stageName);
+    memToken.tracker()->assertWithinMemoryLimit(opCtx, opName, ctx.stageName);
 }
 }  // namespace
 
@@ -613,7 +614,11 @@ Value evaluate(const ExpressionReplaceAll& expr,
             const int64_t inputSize = static_cast<int64_t>(input.size());
             const int64_t replacementSize = static_cast<int64_t>(replacement.size());
             const int64_t expectedSize = (inputSize + 1) * replacementSize + inputSize;
-            trackReplaceOutput(ctx, memToken, expectedSize, expr.getOpName());
+            trackReplaceOutput(expr.getExpressionContext()->getOperationContext(),
+                               ctx,
+                               memToken,
+                               expectedSize,
+                               expr.getOpName());
 
             StringBuilder output;
             for (char c : input) {
@@ -634,12 +639,20 @@ Value evaluate(const ExpressionReplaceAll& expr,
             size_t endIndex = startIndex + find.size();
             output << input.substr(0, startIndex);
             output << replacement;
-            trackReplaceOutput(ctx, memToken, output.len(), expr.getOpName());
+            trackReplaceOutput(expr.getExpressionContext()->getOperationContext(),
+                               ctx,
+                               memToken,
+                               output.len(),
+                               expr.getOpName());
             // This step assumes 'find' is nonempty. If 'find' were empty then input.find would
             // always find a match at position 0, and the input would never shrink.
             input = input.substr(endIndex);
         }
-        trackReplaceOutput(ctx, memToken, output.len(), expr.getOpName());
+        trackReplaceOutput(expr.getExpressionContext()->getOperationContext(),
+                           ctx,
+                           memToken,
+                           output.len(),
+                           expr.getOpName());
         return Value(output.stringData());
     };
     auto replaceAllOpRegEx = [&](std::string_view input,
@@ -659,10 +672,18 @@ Value evaluate(const ExpressionReplaceAll& expr,
                 break;
             }
             output << beforeMatch << replacement;
-            trackReplaceOutput(ctx, memToken, output.len(), expr.getOpName());
+            trackReplaceOutput(expr.getExpressionContext()->getOperationContext(),
+                               ctx,
+                               memToken,
+                               output.len(),
+                               expr.getOpName());
         }
         output << input.substr(executionState.beforeMatchStrStart);
-        trackReplaceOutput(ctx, memToken, output.len(), expr.getOpName());
+        trackReplaceOutput(expr.getExpressionContext()->getOperationContext(),
+                           ctx,
+                           memToken,
+                           output.len(),
+                           expr.getOpName());
 
         return Value(output.stringData());
     };

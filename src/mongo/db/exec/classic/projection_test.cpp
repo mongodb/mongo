@@ -71,7 +71,7 @@ public:
         gLastStageName = std::string{ctx.stageName};
         if (ctx.tracker != nullptr) {
             ++gEvaluationsWithTracker;
-            gLastTrackerMaxBytes = ctx.tracker->maxAllowedMemoryUsageBytes();
+            gLastTrackerMaxBytes = ctx.tracker->maxAllowedMemoryUsageBytes(nullptr);
             ctx.tracker->add(kChargedBytes);
         }
         return Value(1);

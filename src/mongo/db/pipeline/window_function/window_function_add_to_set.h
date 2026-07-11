@@ -38,7 +38,7 @@ public:
     void add(Value value) override {
         _values.emplace(SimpleMemoryUsageToken{value.getApproximateSize(), &_memUsageTracker},
                         std::move(value));
-        _memUsageTracker.assertWithinMemoryLimit(kName);
+        _memUsageTracker.assertWithinMemoryLimit(_expCtx->getOperationContext(), kName);
     }
 
     /**

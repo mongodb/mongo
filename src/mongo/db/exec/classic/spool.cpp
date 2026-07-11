@@ -46,7 +46,8 @@ SpoolStage::SpoolStage(ExpressionContext* expCtx, WorkingSet* ws, std::unique_pt
           *expCtx,
           expCtx->getAllowDiskUse() && !expCtx->getInRouter(),
           loadMemoryLimit(StageMemoryLimit::QueryMaxSpoolMemoryUsageBytes))) {
-    _specificStats.maxMemoryUsageBytes = _memTracker.maxAllowedMemoryUsageBytes();
+    _specificStats.maxMemoryUsageBytes =
+        _memTracker.maxAllowedMemoryUsageBytes(expCtx->getOperationContext());
     _specificStats.maxDiskUsageBytes = internalQueryMaxSpoolDiskUsageBytes.load();
 }
 
@@ -123,7 +124,7 @@ PlanStage::StageState SpoolStage::doWork(WorkingSetID* out) {
 
             _buffer.emplace_back(std::move(member->recordId));
 
-            if (!_memTracker.withinMemoryLimit()) {
+            if (!_memTracker.withinMemoryLimit(opCtx())) {
                 spill();
             }
 

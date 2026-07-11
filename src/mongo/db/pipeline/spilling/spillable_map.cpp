@@ -14,7 +14,7 @@ void SpillableDocumentMapImpl::_add(Value id, Document document, size_t size) {
         std::move(id),
         MemoryUsageTokenWith<Document>{MemoryUsageToken{size, &_memTracker}, std::move(document)});
     tassert(2398003, "duplicate keys are not supported in SpillableDocumentMapImpl", inserted);
-    if (!_memTracker.withinMemoryLimit()) {
+    if (!_memTracker.withinMemoryLimit(_expCtx->getOperationContext())) {
         spillToDisk();
     }
 }
@@ -205,7 +205,8 @@ void SpillableDocumentMapImpl::IteratorImpl<IsConst>::readNextBatchFromDisk() {
         Document doc{bson->data.releaseToBson()};
         _diskDocuments.emplace_back(MemoryUsageToken{doc.getApproximateSize(), &_map->_memTracker},
                                     doc.getOwned());
-    } while (!_diskItExhausted && _map->_memTracker.withinMemoryLimit());
+    } while (!_diskItExhausted &&
+             _map->_memTracker.withinMemoryLimit(_map->_expCtx->getOperationContext()));
 }
 
 template <bool IsConst>

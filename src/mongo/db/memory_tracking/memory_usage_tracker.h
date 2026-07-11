@@ -53,13 +53,13 @@ public:
      * Returns true only if this tracker and every ancestor in the base chain are within their
      * respective limits.
      */
-    bool withinMemoryLimit() const {
-        return _inUseTrackedMemoryBytes <= _maxAllowedMemoryUsageBytes.get() &&
-            (!_base || _base->withinMemoryLimit());
+    bool withinMemoryLimit(OperationContext* opCtx) const {
+        return _inUseTrackedMemoryBytes <= _maxAllowedMemoryUsageBytes.get(opCtx) &&
+            (!_base || _base->withinMemoryLimit(opCtx));
     }
 
-    int64_t maxAllowedMemoryUsageBytes() const {
-        return _maxAllowedMemoryUsageBytes.get();
+    int64_t maxAllowedMemoryUsageBytes(OperationContext* opCtx) const {
+        return _maxAllowedMemoryUsageBytes.get(opCtx);
     }
 
     /**
@@ -74,7 +74,9 @@ public:
      * Throws ExceededMemoryLimit if the current usage exceeds the limit, including a
      * name, stageName (optional), current usage, and limit in the error message.
      */
-    void assertWithinMemoryLimit(std::string_view name, std::string_view stageName = {}) const;
+    void assertWithinMemoryLimit(OperationContext* opCtx,
+                                 std::string_view name,
+                                 std::string_view stageName = {}) const;
 
     /**
      * Checks that the caller can spill to disk if necessary.
@@ -207,8 +209,8 @@ public:
 
     int64_t peakTrackedMemoryBytes(std::string_view name) const;
 
-    bool withinMemoryLimit() const {
-        return _baseTracker.withinMemoryLimit();
+    bool withinMemoryLimit(OperationContext* opCtx) const {
+        return _baseTracker.withinMemoryLimit(opCtx);
     }
 
     bool allowDiskUse() const {
@@ -217,8 +219,8 @@ public:
 
     void assertCanSpill(std::string_view name) const;
 
-    int64_t maxAllowedMemoryUsageBytes() const {
-        return _baseTracker.maxAllowedMemoryUsageBytes();
+    int64_t maxAllowedMemoryUsageBytes(OperationContext* opCtx) const {
+        return _baseTracker.maxAllowedMemoryUsageBytes(opCtx);
     }
 
     /**

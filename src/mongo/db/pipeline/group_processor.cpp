@@ -154,10 +154,11 @@ void GroupProcessor::reset() {
 }
 
 bool GroupProcessor::shouldSpillWithAttemptToSaveMemory() {
-    if (!_memoryTracker.allowDiskUse() && !_memoryTracker.withinMemoryLimit()) {
+    if (!_memoryTracker.allowDiskUse() &&
+        !_memoryTracker.withinMemoryLimit(_expCtx->getOperationContext())) {
         freeMemory();
     }
-    return !_memoryTracker.withinMemoryLimit();
+    return !_memoryTracker.withinMemoryLimit(_expCtx->getOperationContext());
 }
 
 bool GroupProcessor::shouldSpillOnEveryDuplicateId(bool isNewGroup) {

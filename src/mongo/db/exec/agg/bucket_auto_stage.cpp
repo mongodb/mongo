@@ -73,7 +73,8 @@ BucketAutoStage::BucketAutoStage(
 
 SortOptions BucketAutoStage::makeSortOptions() {
     SortOptions opts;
-    opts.MaxMemoryUsageBytes(_memoryTracker.maxAllowedMemoryUsageBytes());
+    opts.MaxMemoryUsageBytes(
+        _memoryTracker.maxAllowedMemoryUsageBytes(pExpCtx->getOperationContext()));
     return opts;
 }
 

@@ -19,17 +19,20 @@ namespace {
 using TeeBufferTest = AggregationContextFixture;
 
 TEST_F(TeeBufferTest, ShouldRequireAtLeastOneConsumer) {
-    ASSERT_THROWS_CODE(TeeBuffer::create(0), AssertionException, 40309);
+    ASSERT_THROWS_CODE(
+        TeeBuffer::create(getExpCtx()->getOperationContext(), 0), AssertionException, 40309);
 }
 
 TEST_F(TeeBufferTest, ShouldRequirePositiveBatchSize) {
-    ASSERT_THROWS_CODE(TeeBuffer::create(1, 0), AssertionException, 40310);
-    ASSERT_THROWS_CODE(TeeBuffer::create(1, -2), AssertionException, 40310);
+    ASSERT_THROWS_CODE(
+        TeeBuffer::create(getExpCtx()->getOperationContext(), 1, 0), AssertionException, 40310);
+    ASSERT_THROWS_CODE(
+        TeeBuffer::create(getExpCtx()->getOperationContext(), 1, -2), AssertionException, 40310);
 }
 
 TEST_F(TeeBufferTest, ShouldBeExhaustedIfInputIsExhausted) {
     auto mock = exec::agg::MockStage::createForTest({}, getExpCtx());
-    auto teeBuffer = TeeBuffer::create(1);
+    auto teeBuffer = TeeBuffer::create(getExpCtx()->getOperationContext(), 1);
     teeBuffer->setSource(mock.get());
 
     ASSERT(teeBuffer->getNext(0).isEOF());
@@ -40,7 +43,7 @@ TEST_F(TeeBufferTest, ShouldBeExhaustedIfInputIsExhausted) {
 TEST_F(TeeBufferTest, ShouldProvideAllResultsWithoutPauseIfTheyFitInOneBatch) {
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"a", 1}}, Document{{"a", 2}}};
     auto mock = exec::agg::MockStage::createForTest(inputs, getExpCtx());
-    auto teeBuffer = TeeBuffer::create(1);
+    auto teeBuffer = TeeBuffer::create(getExpCtx()->getOperationContext(), 1);
     teeBuffer->setSource(mock.get());
 
     auto next = teeBuffer->getNext(0);
@@ -60,7 +63,7 @@ TEST_F(TeeBufferTest, ShouldProvideAllResultsWithoutPauseIfOnlyOneConsumer) {
     auto mock = exec::agg::MockStage::createForTest(inputs, getExpCtx());
 
     const size_t bufferBytes = 1;  // Both docs won't fit in a single batch.
-    auto teeBuffer = TeeBuffer::create(1, bufferBytes);
+    auto teeBuffer = TeeBuffer::create(getExpCtx()->getOperationContext(), 1, bufferBytes);
     teeBuffer->setSource(mock.get());
 
     auto next = teeBuffer->getNext(0);
@@ -81,7 +84,7 @@ TEST_F(TeeBufferTest, ShouldTellConsumerToPauseIfItFinishesBatchBeforeOtherConsu
 
     const size_t nConsumers = 2;
     const size_t bufferBytes = 1;  // Both docs won't fit in a single batch.
-    auto teeBuffer = TeeBuffer::create(nConsumers, bufferBytes);
+    auto teeBuffer = TeeBuffer::create(getExpCtx()->getOperationContext(), nConsumers, bufferBytes);
     teeBuffer->setSource(mock.get());
 
     auto next0 = teeBuffer->getNext(0);
@@ -124,7 +127,7 @@ TEST_F(TeeBufferTest, ShouldAllowOtherConsumersToAdvanceOnceTrailingConsumerIsDi
 
     const size_t nConsumers = 2;
     const size_t bufferBytes = 1;  // Both docs won't fit in a single batch.
-    auto teeBuffer = TeeBuffer::create(nConsumers, bufferBytes);
+    auto teeBuffer = TeeBuffer::create(getExpCtx()->getOperationContext(), nConsumers, bufferBytes);
     teeBuffer->setSource(mock.get());
 
     auto next0 = teeBuffer->getNext(0);

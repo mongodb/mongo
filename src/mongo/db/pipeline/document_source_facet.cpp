@@ -198,10 +198,13 @@ std::unique_ptr<DocumentSourceFacet::LiteParsed> DocumentSourceFacet::LiteParsed
 intrusive_ptr<DocumentSourceFacet> DocumentSourceFacet::create(
     std::vector<FacetPipeline> facetPipelines,
     const intrusive_ptr<ExpressionContext>& expCtx,
-    size_t bufferSizeBytes,
+    boost::optional<size_t> bufferSizeBytes,
     size_t maxOutputDocBytes) {
+    size_t resolvedBufferSizeBytes = bufferSizeBytes.value_or(
+        static_cast<size_t>(loadMemoryLimit(StageMemoryLimit::QueryFacetBufferSizeBytes)
+                                .get(expCtx->getOperationContext())));
     return new DocumentSourceFacet(
-        std::move(facetPipelines), expCtx, bufferSizeBytes, maxOutputDocBytes);
+        std::move(facetPipelines), expCtx, resolvedBufferSizeBytes, maxOutputDocBytes);
 }
 
 Value DocumentSourceFacet::serialize(const query_shape::SerializationOptions& opts) const {

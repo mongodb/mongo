@@ -164,7 +164,8 @@ protected:
 
     // Utility to check that memory limit isn't exceeded.
     void checkMemUsage() {
-        _memUsageTracker.assertWithinMemoryLimit(getOpName());
+        _memUsageTracker.assertWithinMemoryLimit(getExpressionContext()->getOperationContext(),
+                                                 getOpName());
     }
 
     /// subclasses are expected to update this as necessary

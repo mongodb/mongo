@@ -81,7 +81,7 @@ PlanStage::StageState OrStage::doWork(WorkingSetID* out) {
                 _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
                 uassert(11130302,
                         "Exceeded memory limit in record id deduplicator for OR stage",
-                        _memoryTracker.withinMemoryLimit());
+                        _memoryTracker.withinMemoryLimit(opCtx()));
             }
         }
 

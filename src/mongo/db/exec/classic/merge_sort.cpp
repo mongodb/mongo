@@ -95,7 +95,7 @@ PlanStage::StageState MergeSortStage::doWork(WorkingSetID* out) {
                         uassert(
                             11130303,
                             "Exceeded memory limit in record id deduplicator for SORT_MERGE stage",
-                            _memoryTracker.withinMemoryLimit());
+                            _memoryTracker.withinMemoryLimit(opCtx()));
                     }
                 }
             } else {

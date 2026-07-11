@@ -183,7 +183,7 @@ TEST_F(LookupStageTest, ShouldReplaceNonCorrelatedPrefixWithCacheAfterFirstSubPi
 
     auto expectedPipe = fromjson(
         str::stream() << "[{$mock: {}}, {$match: {x: {$gte: 0}}}, {$sort: {sortKey: {x: 1}}}, "
-                      << sequentialCacheStageObj("kBuilding")
+                      << sequentialCacheStageObj(getExpCtx()->getOperationContext(), "kBuilding")
                       << ", {$addFields: {varField: {$sum: ['$x', {$const: 0}]}}}]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
@@ -202,9 +202,10 @@ TEST_F(LookupStageTest, ShouldReplaceNonCorrelatedPrefixWithCacheAfterFirstSubPi
     subPipeline = lookupStage->buildPipeline(lookupDS->getSubpipelineExpCtx(), DOC("_id" << 1));
     ASSERT(subPipeline);
 
-    expectedPipe =
-        fromjson(str::stream() << "[" << sequentialCacheStageObj("kServing")
-                               << ", {$addFields: {varField: {$sum: ['$x', {$const: 1}]}}}]");
+    expectedPipe = fromjson(
+        str::stream() << "["
+                      << sequentialCacheStageObj(getExpCtx()->getOperationContext(), "kServing")
+                      << ", {$addFields: {varField: {$sum: ['$x', {$const: 1}]}}}]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
 
@@ -259,7 +260,8 @@ TEST_F(LookupStageTest, ShouldAbandonCacheIfMaxSizeIsExceededAfterFirstSubPipeli
 
     auto expectedPipe = fromjson(
         str::stream() << "[{$mock: {}}, {$match: {x: {$gte: 0}}}, {$sort: {sortKey: {x: 1}}}, "
-                      << sequentialCacheStageObj("kBuilding", 0ll)
+                      << sequentialCacheStageObj(
+                             getExpCtx()->getOperationContext(), "kBuilding", 0ll)
                       << ", {$addFields: {varField: {$sum: ['$x', {$const: 0}]}}}]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
@@ -368,7 +370,8 @@ public:
         ++gEvaluations;
         if (ctx.tracker != nullptr) {
             ++gEvaluationsWithTracker;
-            gLastTrackerMaxBytes = ctx.tracker->maxAllowedMemoryUsageBytes();
+            gLastTrackerMaxBytes = ctx.tracker->maxAllowedMemoryUsageBytes(
+                getExpressionContext()->getOperationContext());
         }
         gLastStageName = ctx.stageName;
         return Value(1);

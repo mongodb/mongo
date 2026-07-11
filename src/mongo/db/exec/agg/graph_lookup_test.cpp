@@ -874,7 +874,8 @@ public:
         ++gEvaluations;
         if (ctx.tracker != nullptr) {
             ++gEvaluationsWithTracker;
-            gLastTrackerMaxBytes = ctx.tracker->maxAllowedMemoryUsageBytes();
+            gLastTrackerMaxBytes = ctx.tracker->maxAllowedMemoryUsageBytes(
+                getExpressionContext()->getOperationContext());
         }
         gLastStageName = ctx.stageName;
         return Value(0);

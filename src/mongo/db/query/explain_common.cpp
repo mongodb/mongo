@@ -59,7 +59,7 @@ void generateServerInfo(BSONObjBuilder* out) {
 void generateServerParameters(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               BSONObjBuilder* out) {
     BSONObjBuilder serverBob(out->subobjStart("serverParameters"));
-    appendStageMemoryLimitsToExplain(serverBob);
+    appendStageMemoryLimitsToExplain(expCtx->getOperationContext(), serverBob);
     serverBob.appendNumber("internalQueryFacetMaxOutputDocSizeBytes",
                            internalQueryFacetMaxOutputDocSizeBytes.load());
     serverBob.appendNumber("internalLookupStageIntermediateDocumentMaxSizeBytes",

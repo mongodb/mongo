@@ -54,7 +54,8 @@ FacetStage::FacetStage(std::string_view stageName,
                        size_t maxOutputDocBytes,
                        const std::shared_ptr<DSFacetExecStatsWrapper>& execStatsWrapper)
     : Stage(stageName, expCtx),
-      _teeBuffer(TeeBuffer::create(facetPipelines.size(), bufferSizeBytes)),
+      _teeBuffer(
+          TeeBuffer::create(expCtx->getOperationContext(), facetPipelines.size(), bufferSizeBytes)),
       _maxOutputDocSizeBytes(maxOutputDocBytes),
       _execStatsWrapper(execStatsWrapper) {
     _facets.reserve(facetPipelines.size());

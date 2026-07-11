@@ -521,7 +521,7 @@ TEST_F(ExpressionContextTest,
 
         auto& tracker = expCtx->getExpressionFallbackTracker();
         tracker.add(100);  // Exceeds the per-query limit but stays under the per-expression cap.
-        ASSERT_EQ(!tracker.withinMemoryLimit(), c.expectPerQueryLimitEnforced)
+        ASSERT_EQ(!tracker.withinMemoryLimit(opCtx.get()), c.expectPerQueryLimitEnforced)
             << "queryTracking=" << c.queryTracking
             << " expressionTracking=" << c.expressionTracking;
         tracker.add(-100);  // Release so the tracker is left balanced.
@@ -547,7 +547,7 @@ TEST_F(ExpressionContextTest, ExpressionFallbackTrackerIgnoresPerExpressionCapWh
 
     auto& tracker = expCtx->getExpressionFallbackTracker();
     tracker.add(100);  // Far exceeds the per-expression cap but stays under the per-query limit.
-    ASSERT_TRUE(tracker.withinMemoryLimit());
+    ASSERT_TRUE(tracker.withinMemoryLimit(opCtx.get()));
     tracker.add(-100);  // Release so the tracker is left balanced.
 }
 
@@ -571,7 +571,7 @@ TEST_F(ExpressionContextTest, ExpressionFallbackTrackerRebuiltWhenOperationConte
     {
         auto& tracker = expCtx->getExpressionFallbackTracker();
         tracker.add(100);
-        ASSERT_TRUE(tracker.withinMemoryLimit());
+        ASSERT_TRUE(tracker.withinMemoryLimit(opCtx.get()));
         tracker.add(-100);  // Release so the operation tracker is left balanced.
     }
 
@@ -582,7 +582,7 @@ TEST_F(ExpressionContextTest, ExpressionFallbackTrackerRebuiltWhenOperationConte
 
     auto& rebuilt = expCtx->getExpressionFallbackTracker();
     rebuilt.add(100);
-    ASSERT_FALSE(rebuilt.withinMemoryLimit());  // 100 > per-expression cap of 4.
+    ASSERT_FALSE(rebuilt.withinMemoryLimit(opCtx.get()));  // 100 > per-expression cap of 4.
     rebuilt.add(-100);
 }
 

@@ -138,7 +138,8 @@ public:
      * Returns maximum allowed memory footprint.
      */
     size_t getMaxMemoryUsageBytes() const {
-        return _groupProcessor->getMemoryTracker().maxAllowedMemoryUsageBytes();
+        return _groupProcessor->getMemoryTracker().maxAllowedMemoryUsageBytes(
+            getExpCtx()->getOperationContext());
     }
 
     /**

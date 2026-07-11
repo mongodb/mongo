@@ -296,7 +296,11 @@ value::TagValueMaybeOwned ByteCode::builtinConcat(ArityType arity) {
         auto sv = sbe::value::getStringView(kv.tag, kv.value);
         if (_memoryTracker) {
             token.add(sv.size());
-            _memoryTracker->assertWithinMemoryLimit("SBE concat builtin");
+            // The SBE VM has no OperationContext; a null opCtx resolves knob-backed limits to
+            // their global value. Today only the concat unit test and benchmark install a tracker
+            // here, with fixed-value limits.
+            // TODO SERVER-131139: reconsider the null-opCtx fallback API.
+            _memoryTracker->assertWithinMemoryLimit(nullptr, "SBE concat builtin");
         }
         result << sv;
     }

@@ -196,8 +196,9 @@ private:
         _partitionTable[partitionKey] = {std::move(memoryToken), std::move(partitionVal)};
         uassert(6007200,
                 str::stream() << "$densify exceeded memory limit of "
-                              << _memTracker.maxAllowedMemoryUsageBytes(),
-                _memTracker.withinMemoryLimit());
+                              << _memTracker.maxAllowedMemoryUsageBytes(
+                                     getContext()->getOperationContext()),
+                _memTracker.withinMemoryLimit(getContext()->getOperationContext()));
     }
 
     void setPartitionValue(Document doc,

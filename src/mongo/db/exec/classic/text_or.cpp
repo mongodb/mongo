@@ -362,7 +362,7 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
     // Aggregate relevance score, term keys.
     textRecordData->score += documentTermScore;
 
-    if (!_memoryTracker.withinMemoryLimit()) {
+    if (!_memoryTracker.withinMemoryLimit(opCtx())) {
         doForceSpill();
     }
 

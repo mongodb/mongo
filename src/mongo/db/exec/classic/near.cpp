@@ -206,13 +206,13 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
     _memoryTracker.add(static_cast<int64_t>(_resultBuffer.stats().memUsage()) -
                        static_cast<int64_t>(bufferBytesBefore));
 
-    if (!_memoryTracker.withinMemoryLimit() &&
+    if (!_memoryTracker.withinMemoryLimit(opCtx()) &&
         feature_flags::gFeatureFlagExtendedAutoSpilling.isEnabled()) {
         spill();
     }
 
     _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
-    _memoryTracker.assertWithinMemoryLimit(_commonStats.stageTypeStr);
+    _memoryTracker.assertWithinMemoryLimit(opCtx(), _commonStats.stageTypeStr);
     return PlanStage::NEED_TIME;
 }
 

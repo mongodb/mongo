@@ -42,8 +42,8 @@ MemoryUsageLimit loadMemoryLimit(StageMemoryLimit stage);
 
 /**
  * Adds values of the server parameters, responsible for the memory limits, to the explain command
- * output.
+ * output, resolved against 'opCtx'.
  */
-void appendStageMemoryLimitsToExplain(BSONObjBuilder& bob);
+void appendStageMemoryLimitsToExplain(OperationContext* opCtx, BSONObjBuilder& bob);
 
 }  // namespace mongo

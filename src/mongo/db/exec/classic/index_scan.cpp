@@ -233,7 +233,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
         _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
         uassert(11130305,
                 "Exceeded memory limit in record id deduplicator for IXSCAN stage",
-                _memoryTracker.withinMemoryLimit());
+                _memoryTracker.withinMemoryLimit(opCtx()));
 
         // If we've seen the RecordId before
         if (duplicate) {
@@ -260,7 +260,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
         _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
         uassert(11130304,
                 "Exceeded memory limit in record id deduplicator for IXSCAN stage",
-                _memoryTracker.withinMemoryLimit());
+                _memoryTracker.withinMemoryLimit(opCtx()));
     }
 
     if (!kv->key.isOwned())

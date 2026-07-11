@@ -39,7 +39,7 @@ public:
         _count += value.getArrayLength();
         _values.emplace_back(SimpleMemoryUsageToken{value.getApproximateSize(), &_memUsageTracker},
                              std::move(value));
-        _memUsageTracker.assertWithinMemoryLimit(kName);
+        _memUsageTracker.assertWithinMemoryLimit(_expCtx->getOperationContext(), kName);
     }
 
     void remove(Value value) override {

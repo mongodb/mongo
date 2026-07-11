@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_knobs/query_knob.h"
 #include "mongo/util/modules.h"
 
@@ -41,9 +42,9 @@ namespace mongo {
  * construction time; the explicit constructor makes every site that snapshots a byte count into a
  * limit visible.
  *
- * This is intentionally a thin strong typedef for now: it exists so that a follow-up change can
- * teach it to resolve the limit lazily (e.g. against a per-operation QueryKnobConfiguration)
- * without re-touching all of the call sites that construct and pass limits around.
+ * 'get()' takes an OperationContext so that a follow-up change can teach a limit to resolve
+ * against the operation's QueryKnobConfiguration without re-touching callers. For now the value is
+ * fixed at construction and 'opCtx' is ignored.
  */
 class [[MONGO_MOD_PUBLIC]] MemoryUsageLimit {
 public:
@@ -54,7 +55,7 @@ public:
     // MemoryUsageLimit{MemorySize{"100MB"}} instead of a raw byte count.
     explicit MemoryUsageLimit(int64_t value) : _value(value) {}
 
-    int64_t get() const {
+    int64_t get(OperationContext*) const {
         return _value;
     }
 

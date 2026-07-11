@@ -110,7 +110,7 @@ DocumentSource::GetNextResult InternalSetWindowFieldsStage::doGetNext() {
             throw;
         }
 
-        bool inMemoryLimit = _memoryTracker.withinMemoryLimit();
+        bool inMemoryLimit = _memoryTracker.withinMemoryLimit(getContext()->getOperationContext());
         overrideMemoryLimitForSpill.execute([&](const BSONObj& data) {
             _numDocsProcessed++;
             inMemoryLimit = _numDocsProcessed <= data["maxDocsBeforeSpill"].numberInt();
@@ -121,14 +121,15 @@ DocumentSource::GetNextResult InternalSetWindowFieldsStage::doGetNext() {
             _iterator.spillToDisk();
             _stats.spillingStats = _iterator.getSpillingStats();
         }
-        if (!_memoryTracker.withinMemoryLimit()) {
+        if (!_memoryTracker.withinMemoryLimit(getContext()->getOperationContext())) {
             _iterator.finalize();
             uasserted(5414201,
                       str::stream()
                           << "Exceeded memory limit in DocumentSourceSetWindowFields, used "
                           << _memoryTracker.inUseTrackedMemoryBytes()
                           << " bytes but max allowed is "
-                          << _memoryTracker.maxAllowedMemoryUsageBytes());
+                          << _memoryTracker.maxAllowedMemoryUsageBytes(
+                                 getContext()->getOperationContext()));
         }
     }
 

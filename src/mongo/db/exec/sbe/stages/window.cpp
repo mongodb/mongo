@@ -478,8 +478,11 @@ void WindowStage::prepare(CompileCtx& ctx) {
 
     _compiled = true;
 
+    auto memoryLimit =
+        loadMemoryLimit(StageMemoryLimit::DocumentSourceSetWindowFieldsMaxMemoryBytes);
+    _memoryThreshold = static_cast<size_t>(memoryLimit.get(_opCtx));
     _memoryTracker = OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForSBE(
-        _opCtx, MemoryUsageLimit{static_cast<int64_t>(_memoryThreshold)});
+        _opCtx, memoryLimit);
 }
 
 value::SlotAccessor* WindowStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {

@@ -1364,7 +1364,8 @@ Value performConversion(const ExpressionConvert& expr,
                             view->dtype == convert_utils::dType::FLOAT32);
                 auto& tracker = getMemoryTracker(expr, ctx);
                 memToken = SimpleMemoryUsageToken(view->elementCount * sizeof(Value), &tracker);
-                tracker.assertWithinMemoryLimit("$convert", ctx.stageName);
+                tracker.assertWithinMemoryLimit(
+                    expr.getExpressionContext()->getOperationContext(), "$convert", ctx.stageName);
             }
         }
     }

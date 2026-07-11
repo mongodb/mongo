@@ -115,6 +115,7 @@ DocumentSourceSort::DocumentSourceSort(const boost::intrusive_ptr<ExpressionCont
     // API. Both fields are const, so they remain in sync for the lifetime of the object.
     : DocumentSource(kStageName, pExpCtx, sortOrder),
       _sortExecutor(std::make_shared<SortExecutor<Document>>(
+          pExpCtx->getOperationContext(),
           sortOrder,
           options.limit,
           loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes),
@@ -399,7 +400,8 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
 
     SortOptions opts;
     opts.maxMemoryUsageBytes =
-        loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes).get();
+        loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes)
+            .get(expCtx->getOperationContext());
 
     if (limit) {
         opts.Limit(limit.value());
@@ -488,8 +490,8 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
     auto ds = DocumentSourceSort::create(expCtx, pat);
 
     SortOptions opts;
-    opts.MaxMemoryUsageBytes(
-        loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes).get());
+    opts.MaxMemoryUsageBytes(loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes)
+                                 .get(expCtx->getOperationContext()));
     if (BSONElement limitElem = args["limit"]) {
         uassert(6588100,
                 "$_internalBoundedSort limit must be a non-negative number if specified",

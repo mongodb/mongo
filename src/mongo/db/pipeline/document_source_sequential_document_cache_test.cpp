@@ -22,7 +22,9 @@ namespace {
 using DocumentSourceSequentialDocumentCacheTest = AggregationContextFixture;
 
 long long defaultMaxCacheSize() {
-    return loadMemoryLimit(StageMemoryLimit::DocumentSourceLookupCacheSizeBytes).get();
+    // This test constructs the cache directly with no operation; the limit is a fixed
+    // startup value, so there is no OperationContext to resolve against.
+    return loadMemoryLimit(StageMemoryLimit::DocumentSourceLookupCacheSizeBytes).get(nullptr);
 }
 
 TEST_F(DocumentSourceSequentialDocumentCacheTest, ReturnsEOFOnSubsequentCallsAfterSourceExhausted) {

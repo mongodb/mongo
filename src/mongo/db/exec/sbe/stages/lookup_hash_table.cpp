@@ -373,8 +373,6 @@ boost::optional<value::TagValueView> LookupHashTable::getValueAtIndex(size_t ind
 }  // HashLookupUnwindStage::getValueAtIndex
 
 void LookupHashTable::reset(bool fromClose) {
-    _memoryUseInBytesBeforeSpill =
-        loadMemoryLimit(StageMemoryLimit::QuerySBELookupApproxMemoryUseInBytesBeforeSpill).get();
     _memoryHt = boost::none;
     _computedTotalMemUsage = 0;
 

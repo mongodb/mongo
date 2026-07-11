@@ -334,7 +334,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
                 _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
                 uassert(12227902,
                         "UpdateStage exceeded memory limit",
-                        _memoryTracker.withinMemoryLimit());
+                        _memoryTracker.withinMemoryLimit(opCtx()));
             }
         } catch (const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
             if (ShardVersion::isPlacementVersionIgnored(ex->getVersionReceived()) &&

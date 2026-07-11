@@ -131,7 +131,7 @@ public:
     static boost::intrusive_ptr<DocumentSourceFacet> create(
         std::vector<FacetPipeline> facetPipelines,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        size_t bufferSizeBytes = loadMemoryLimit(StageMemoryLimit::QueryFacetBufferSizeBytes).get(),
+        boost::optional<size_t> bufferSizeBytes = boost::none,
         size_t maxOutputDocBytes = internalQueryFacetMaxOutputDocSizeBytes.load());
 
     /**

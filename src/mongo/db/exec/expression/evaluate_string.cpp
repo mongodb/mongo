@@ -40,7 +40,8 @@ Value evaluate(const ExpressionConcat& expr,
 
         std::string_view str = val.getStringData();
         memToken.add(static_cast<int64_t>(str.size()));
-        tracker.assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
+        tracker.assertWithinMemoryLimit(
+            expr.getExpressionContext()->getOperationContext(), expr.getOpName(), ctx.stageName);
 
         result << str;
     }

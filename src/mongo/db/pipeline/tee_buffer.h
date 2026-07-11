@@ -16,6 +16,7 @@
 #include <vector>
 
 #include <boost/intrusive_ptr.hpp>
+#include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -33,8 +34,9 @@ public:
      * 'bufferSizeBytes' is a soft cap, and may be exceeded by one document's worth (~16MB).
      */
     static boost::intrusive_ptr<TeeBuffer> create(
+        OperationContext* opCtx,
         size_t nConsumers,
-        int bufferSizeBytes = loadMemoryLimit(StageMemoryLimit::QueryFacetBufferSizeBytes).get());
+        boost::optional<int> bufferSizeBytes = boost::none);
 
     void setSource(exec::agg::Stage* source) {
         _source = source;

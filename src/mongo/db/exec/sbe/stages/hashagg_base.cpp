@@ -253,7 +253,7 @@ void HashAggBaseStage<Derived>::checkMemoryUsageAndSpillIfNecessary(MemoryCheckD
     static_cast<Derived*>(this)->getHashAggStats()->peakTrackedMemBytes =
         _memoryTracker.value().peakTrackedMemoryBytes();
 
-    if (!_memoryTracker.value().withinMemoryLimit()) {
+    if (!_memoryTracker.value().withinMemoryLimit(_opCtx)) {
         // It is safe to set this to the begining because spilling outside the releaseMemory only
         // happens before any results have been consumed and every time data is spilled the _ht is
         // cleared.
@@ -274,7 +274,7 @@ void HashAggBaseStage<Derived>::checkMemoryUsageAndSpillIfNecessary(MemoryCheckD
 
         const long nextCheckpointCandidate = (estimatedGainPerChildAdvance > 0.1)
             ? mcd.checkpointMargin *
-                (_memoryTracker.value().maxAllowedMemoryUsageBytes() -
+                (_memoryTracker.value().maxAllowedMemoryUsageBytes(_opCtx) -
                  _memoryTracker.value().inUseTrackedMemoryBytes()) /
                 estimatedGainPerChildAdvance
             : mcd.nextMemoryCheckpoint * 2;

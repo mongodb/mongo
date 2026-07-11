@@ -39,7 +39,7 @@ public:
         for (const auto& val : value.getArray()) {
             _values.emplace(SimpleMemoryUsageToken{val.getApproximateSize(), &_memUsageTracker},
                             val);
-            _memUsageTracker.assertWithinMemoryLimit(kName);
+            _memUsageTracker.assertWithinMemoryLimit(_expCtx->getOperationContext(), kName);
         }
     }
 

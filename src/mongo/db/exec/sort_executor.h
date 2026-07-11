@@ -10,6 +10,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sort_key_comparator.h"
 #include "mongo/db/memory_tracking/memory_usage_limit.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_stats.h"
@@ -52,7 +53,8 @@ public:
     /**
      * If the passed in limit is 0, this is treated as no limit.
      */
-    SortExecutor(SortPattern sortPattern,
+    SortExecutor(OperationContext* opCtx,
+                 SortPattern sortPattern,
                  uint64_t limit,
                  MemoryUsageLimit maxMemoryUsageBytes,
                  boost::filesystem::path tempDir,
@@ -66,7 +68,7 @@ public:
         _stats.sortPattern =
             _sortPattern.serialize(SortPattern::SortKeySerialization::kForExplain).toBson();
         _stats.limit = limit;
-        _stats.maxMemoryUsageBytes = static_cast<uint64_t>(maxMemoryUsageBytes.get());
+        _stats.maxMemoryUsageBytes = static_cast<uint64_t>(maxMemoryUsageBytes.get(opCtx));
         if (allowDiskUse) {
             _sorterFileStats = std::make_unique<SorterFileStats>(nullptr);
         }
@@ -78,7 +80,11 @@ public:
                  boost::filesystem::path tempDir,
                  bool allowDiskUse,
                  bool moveSortedDataIntoIterator = false)
-        : SortExecutor(std::move(sortPattern),
+        // A fixed-value limit never consults the OperationContext.
+        // TODO SERVER-131141: thread an OperationContext through this constructor too; deferred
+        // for now to avoid call-site churn outside query-owned code.
+        : SortExecutor(nullptr,
+                       std::move(sortPattern),
                        limit,
                        MemoryUsageLimit{static_cast<int64_t>(maxMemoryUsageBytes)},
                        std::move(tempDir),

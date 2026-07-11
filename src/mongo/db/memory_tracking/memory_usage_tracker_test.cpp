@@ -56,6 +56,7 @@ boost::optional<long long> readOperationsFailedDueToMemoryLimit() {
     return el.Long();
 }
 
+
 class MemoryUsageTrackerTest : public unittest::Test {
 public:
     static constexpr auto kDefaultMax = 1 * 1024;  // 1KB max.
@@ -78,8 +79,8 @@ TEST_F(MemoryUsageTrackerTest, FreshMemoryUsageTrackerInitializedCorrectly) {
 
     ASSERT_EQ(freshMemoryUsageTracker.inUseTrackedMemoryBytes(), 0);
     ASSERT_EQ(freshMemoryUsageTracker.peakTrackedMemoryBytes(), 0);
-    ASSERT_EQ(freshMemoryUsageTracker.maxAllowedMemoryUsageBytes(),
-              _tracker.maxAllowedMemoryUsageBytes());
+    ASSERT_EQ(freshMemoryUsageTracker.maxAllowedMemoryUsageBytes(nullptr),
+              _tracker.maxAllowedMemoryUsageBytes(nullptr));
 }
 
 TEST_F(MemoryUsageTrackerTest, FreshSimpleMemoryUsageTrackerInitializedCorrectly) {
@@ -93,13 +94,13 @@ TEST_F(MemoryUsageTrackerTest, FreshSimpleMemoryUsageTrackerInitializedCorrectly
 
     ASSERT_EQ(freshSimpleMemoryUsageTracker.inUseTrackedMemoryBytes(), 0);
     ASSERT_EQ(freshSimpleMemoryUsageTracker.peakTrackedMemoryBytes(), 0);
-    ASSERT_EQ(freshSimpleMemoryUsageTracker.maxAllowedMemoryUsageBytes(),
-              _funcTracker.maxAllowedMemoryUsageBytes());
+    ASSERT_EQ(freshSimpleMemoryUsageTracker.maxAllowedMemoryUsageBytes(nullptr),
+              _funcTracker.maxAllowedMemoryUsageBytes(nullptr));
 }
 
 TEST_F(MemoryUsageTrackerTest, FreshMemoryUsageTrackerCopiesBaseCorrectly) {
-    SimpleMemoryUsageTracker memTrackerA =
-        SimpleMemoryUsageTracker(nullptr, MemoryUsageLimit{_tracker.maxAllowedMemoryUsageBytes()});
+    SimpleMemoryUsageTracker memTrackerA = SimpleMemoryUsageTracker(
+        nullptr, MemoryUsageLimit{_tracker.maxAllowedMemoryUsageBytes(nullptr)});
     MemoryUsageTracker memTrackerB =
         MemoryUsageTracker(&memTrackerA, false, MemoryUsageLimit{kDefaultMax});
     MemoryUsageTracker memTrackerC = memTrackerB.makeFreshMemoryUsageTracker();
@@ -355,15 +356,15 @@ TEST_F(MemoryUsageTrackerTest, WithinMemoryLimitChecksAncestorLimit) {
     SimpleMemoryUsageTracker stageTracker{&opTracker, MemoryUsageLimit{10 * 1024}};
 
     stageTracker.add(50);
-    ASSERT_TRUE(stageTracker.withinMemoryLimit());
+    ASSERT_TRUE(stageTracker.withinMemoryLimit(nullptr));
 
     // Stage usage exceeds the op limit but not its own stage limit. The chain check still
     // catches the breach at the ancestor level.
     stageTracker.add(51);
-    ASSERT_FALSE(stageTracker.withinMemoryLimit());
+    ASSERT_FALSE(stageTracker.withinMemoryLimit(nullptr));
 
     stageTracker.add(-51);
-    ASSERT_TRUE(stageTracker.withinMemoryLimit());
+    ASSERT_TRUE(stageTracker.withinMemoryLimit(nullptr));
 }
 
 TEST_F(MemoryUsageTrackerTest, WithinMemoryLimitAlsoChecksLocalLimit) {
@@ -373,19 +374,19 @@ TEST_F(MemoryUsageTrackerTest, WithinMemoryLimitAlsoChecksLocalLimit) {
     SimpleMemoryUsageTracker stageTracker{&opTracker, MemoryUsageLimit{100}};
 
     stageTracker.add(50);
-    ASSERT_TRUE(stageTracker.withinMemoryLimit());
+    ASSERT_TRUE(stageTracker.withinMemoryLimit(nullptr));
 
     stageTracker.add(51);
-    ASSERT_FALSE(stageTracker.withinMemoryLimit());
+    ASSERT_FALSE(stageTracker.withinMemoryLimit(nullptr));
 }
 
 TEST_F(MemoryUsageTrackerTest, WithinMemoryLimitOnStandaloneTrackerIsLocalOnly) {
     // No base: chain check collapses to the local check.
     SimpleMemoryUsageTracker tracker{MemoryUsageLimit{100}};
     tracker.add(50);
-    ASSERT_TRUE(tracker.withinMemoryLimit());
+    ASSERT_TRUE(tracker.withinMemoryLimit(nullptr));
     tracker.add(51);
-    ASSERT_FALSE(tracker.withinMemoryLimit());
+    ASSERT_FALSE(tracker.withinMemoryLimit(nullptr));
 }
 
 TEST_F(MemoryUsageTrackerTest, WithinMemoryLimitOnMemoryUsageTracker) {
@@ -398,11 +399,11 @@ TEST_F(MemoryUsageTrackerTest, WithinMemoryLimitOnMemoryUsageTracker) {
     SimpleMemoryUsageTracker& funcTracker = stageTracker["fn"];
 
     funcTracker.add(50);
-    ASSERT_TRUE(stageTracker.withinMemoryLimit());
+    ASSERT_TRUE(stageTracker.withinMemoryLimit(nullptr));
 
     funcTracker.add(51);
     // Stage's own roll-up is still within the stage limit; op tally exceeds the op limit.
-    ASSERT_FALSE(stageTracker.withinMemoryLimit());
+    ASSERT_FALSE(stageTracker.withinMemoryLimit(nullptr));
 }
 
 TEST_F(MemoryUsageTrackerTest, MemoryUsageTokenWith) {
@@ -624,20 +625,20 @@ TEST(SimpleMemoryUsageTrackerTest, ChunkingReportsZeroWhenFullyReleased) {
 TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitDoesNotThrowWhenUnderLimit) {
     SimpleMemoryUsageTracker tracker{MemoryUsageLimit{1000}};
     tracker.add(500);
-    ASSERT_DOES_NOT_THROW(tracker.assertWithinMemoryLimit("$testExpr"));
+    ASSERT_DOES_NOT_THROW(tracker.assertWithinMemoryLimit(nullptr, "$testExpr"));
 }
 
 TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitDoesNotThrowWhenAtLimit) {
     SimpleMemoryUsageTracker tracker{MemoryUsageLimit{1000}};
     tracker.add(1000);
-    ASSERT_DOES_NOT_THROW(tracker.assertWithinMemoryLimit("$testExpr"));
+    ASSERT_DOES_NOT_THROW(tracker.assertWithinMemoryLimit(nullptr, "$testExpr"));
 }
 
 TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitThrowsWhenOverLimit) {
     SimpleMemoryUsageTracker tracker{MemoryUsageLimit{100}};
     tracker.add(200);
     try {
-        tracker.assertWithinMemoryLimit("$testExpr");
+        tracker.assertWithinMemoryLimit(nullptr, "$testExpr");
         FAIL("Expected ExceededMemoryLimit to be thrown");
     } catch (const AssertionException& ex) {
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
@@ -652,7 +653,7 @@ TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitIncludesGlobalLimitWhe
     SimpleMemoryUsageTracker tracker{&base, MemoryUsageLimit{100}};
     tracker.add(200);
     try {
-        tracker.assertWithinMemoryLimit("$testExpr");
+        tracker.assertWithinMemoryLimit(nullptr, "$testExpr");
         FAIL("Expected ExceededMemoryLimit to be thrown");
     } catch (const AssertionException& ex) {
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
@@ -666,7 +667,7 @@ TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitThrowsWhenOnlyGlobalLi
     SimpleMemoryUsageTracker tracker{&base, MemoryUsageLimit{10 * 1024}};
     tracker.add(200);
     try {
-        tracker.assertWithinMemoryLimit("$testExpr");
+        tracker.assertWithinMemoryLimit(nullptr, "$testExpr");
         FAIL("Expected ExceededMemoryLimit to be thrown");
     } catch (const AssertionException& ex) {
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
@@ -686,7 +687,7 @@ TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitReportsUsageForInterme
     // add() propagates up the chain, so every tracker ends up holding 200 bytes.
     tracker.add(200);
     try {
-        tracker.assertWithinMemoryLimit("$testExpr");
+        tracker.assertWithinMemoryLimit(nullptr, "$testExpr");
         FAIL("Expected ExceededMemoryLimit to be thrown");
     } catch (const AssertionException& ex) {
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
@@ -704,7 +705,7 @@ TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitOmitsGlobalLimitWhenNo
     SimpleMemoryUsageTracker tracker{MemoryUsageLimit{100}};
     tracker.add(200);
     try {
-        tracker.assertWithinMemoryLimit("$testExpr");
+        tracker.assertWithinMemoryLimit(nullptr, "$testExpr");
         FAIL("Expected ExceededMemoryLimit to be thrown");
     } catch (const AssertionException& ex) {
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
@@ -717,7 +718,7 @@ TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitIncludesStageNameWhenP
     SimpleMemoryUsageTracker tracker{MemoryUsageLimit{100}};
     tracker.add(200);
     try {
-        tracker.assertWithinMemoryLimit("$testExpr", "$group");
+        tracker.assertWithinMemoryLimit(nullptr, "$testExpr", "$group");
         FAIL("Expected ExceededMemoryLimit to be thrown");
     } catch (const AssertionException& ex) {
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
@@ -730,7 +731,7 @@ TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitOmitsStageNameWhenNotP
     SimpleMemoryUsageTracker tracker{MemoryUsageLimit{100}};
     tracker.add(200);
     try {
-        tracker.assertWithinMemoryLimit("$testExpr");
+        tracker.assertWithinMemoryLimit(nullptr, "$testExpr");
         FAIL("Expected ExceededMemoryLimit to be thrown");
     } catch (const AssertionException& ex) {
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
@@ -742,7 +743,7 @@ TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitLogsErrorWhenOverLimit
     unittest::LogCaptureGuard logs{};
     SimpleMemoryUsageTracker tracker{MemoryUsageLimit{100}};
     tracker.add(200);
-    ASSERT_THROWS_CODE(tracker.assertWithinMemoryLimit("$testExpr", "$group"),
+    ASSERT_THROWS_CODE(tracker.assertWithinMemoryLimit(nullptr, "$testExpr", "$group"),
                        AssertionException,
                        ErrorCodes::ExceededMemoryLimit);
     logs.stop();
@@ -760,7 +761,7 @@ TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitDoesNotLogWhenUnderLim
     unittest::LogCaptureGuard logs{};
     SimpleMemoryUsageTracker tracker{MemoryUsageLimit{1000}};
     tracker.add(500);
-    ASSERT_DOES_NOT_THROW(tracker.assertWithinMemoryLimit("$testExpr", "$group"));
+    ASSERT_DOES_NOT_THROW(tracker.assertWithinMemoryLimit(nullptr, "$testExpr", "$group"));
     logs.stop();
     ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 12932700)), 0);
 }
@@ -774,7 +775,7 @@ TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitIncrementsFailureMetri
 
     SimpleMemoryUsageTracker tracker{MemoryUsageLimit{100}};
     tracker.add(200);
-    ASSERT_THROWS_CODE(tracker.assertWithinMemoryLimit("$testExpr"),
+    ASSERT_THROWS_CODE(tracker.assertWithinMemoryLimit(nullptr, "$testExpr"),
                        AssertionException,
                        ErrorCodes::ExceededMemoryLimit);
 
@@ -793,7 +794,7 @@ TEST(SimpleMemoryUsageTrackerTest,
 
     SimpleMemoryUsageTracker tracker{MemoryUsageLimit{1000}};
     tracker.add(500);
-    ASSERT_DOES_NOT_THROW(tracker.assertWithinMemoryLimit("$testExpr"));
+    ASSERT_DOES_NOT_THROW(tracker.assertWithinMemoryLimit(nullptr, "$testExpr"));
 
     ASSERT_EQ(*readOperationsFailedDueToMemoryLimit(), *before);
 }

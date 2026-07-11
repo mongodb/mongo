@@ -4,6 +4,7 @@
 #include "mongo/db/pipeline/tee_buffer.h"
 
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -17,13 +18,17 @@ namespace mongo {
 TeeBuffer::TeeBuffer(size_t nConsumers, size_t bufferSizeBytes)
     : _bufferSizeBytes(bufferSizeBytes), _consumers(nConsumers) {}
 
-boost::intrusive_ptr<TeeBuffer> TeeBuffer::create(size_t nConsumers, int bufferSizeBytes) {
+boost::intrusive_ptr<TeeBuffer> TeeBuffer::create(OperationContext* opCtx,
+                                                  size_t nConsumers,
+                                                  boost::optional<int> bufferSizeBytes) {
+    int resolvedBufferSizeBytes = bufferSizeBytes.value_or(
+        static_cast<int>(loadMemoryLimit(StageMemoryLimit::QueryFacetBufferSizeBytes).get(opCtx)));
     uassert(40309, "need at least one consumer for a TeeBuffer", nConsumers > 0);
     uassert(40310,
             str::stream() << "TeeBuffer requires a positive buffer size, was given "
-                          << bufferSizeBytes,
-            bufferSizeBytes > 0);
-    return new TeeBuffer(nConsumers, bufferSizeBytes);
+                          << resolvedBufferSizeBytes,
+            resolvedBufferSizeBytes > 0);
+    return new TeeBuffer(nConsumers, resolvedBufferSizeBytes);
 }
 
 DocumentSource::GetNextResult TeeBuffer::getNext(size_t consumerId) {

@@ -105,7 +105,7 @@ PlanState UniqueStage::getNext() {
             _prevSeenSizeBytes = newSeenSizeBytes;
             uassert(11130301,
                     "Exceeded memory limit in record id deduplicator for unique stage",
-                    _memoryTracker->withinMemoryLimit());
+                    _memoryTracker->withinMemoryLimit(_opCtx));
             return trackPlanState(PlanState::ADVANCED);
         } else {
             // This row has been seen already, so we skip it.
@@ -266,7 +266,7 @@ PlanState UniqueRoaringStage::getNext() {
             _prevSeenSizeBytes = newSeenSizeBytes;
             uassert(11130300,
                     "Exceeded memory limit in record id deduplicator for unique_roaring stage",
-                    _memoryTracker->withinMemoryLimit());
+                    _memoryTracker->withinMemoryLimit(_opCtx));
             return trackPlanState(PlanState::ADVANCED);
         } else {
             // This row has been seen already, so we skip it.

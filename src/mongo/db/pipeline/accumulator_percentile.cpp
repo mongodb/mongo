@@ -226,7 +226,7 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
         dynamic_cast<PartialPercentile<Value>*>(_algo.get())->combine(input);
 
         _memUsageTracker.set(sizeof(*this) + _algo->memUsageBytes());
-        if (!_memUsageTracker.withinMemoryLimit()) {
+        if (!_memUsageTracker.withinMemoryLimit(getExpressionContext()->getOperationContext())) {
             _algo->spill();
             _memUsageTracker.set(sizeof(*this) + _algo->memUsageBytes());
         }

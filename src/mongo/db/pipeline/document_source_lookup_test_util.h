@@ -64,10 +64,9 @@ boost::intrusive_ptr<DocumentSourceLookUp> makeLookUpFromBson(
 boost::intrusive_ptr<DocumentSourceLookUp> makeLookUpFromJson(
     std::string_view json, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-BSONObj sequentialCacheStageObj(
-    std::string_view status = "kBuilding"sv,
-    long long maxSizeBytes =
-        loadMemoryLimit(StageMemoryLimit::DocumentSourceLookupCacheSizeBytes).get());
+BSONObj sequentialCacheStageObj(OperationContext* opCtx,
+                                std::string_view status = "kBuilding"sv,
+                                boost::optional<long long> maxSizeBytes = boost::none);
 
 boost::intrusive_ptr<mongo::exec::agg::LookUpStage> buildLookUpStage(
     const boost::intrusive_ptr<DocumentSource>& ds);

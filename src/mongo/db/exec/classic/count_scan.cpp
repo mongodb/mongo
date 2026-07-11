@@ -163,8 +163,9 @@ PlanStage::StageState CountScan::doWork(WorkingSetID* out) {
         _dedupReporter.add(dedupBytesAdditional);
         _memoryTracker.add(dedupBytesAdditional);
         _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
-        uassert(
-            12227901, "CountScan stage exceeded memory limit", _memoryTracker.withinMemoryLimit());
+        uassert(12227901,
+                "CountScan stage exceeded memory limit",
+                _memoryTracker.withinMemoryLimit(opCtx()));
     }
 
     WorkingSetID id = _workingSet->allocate();

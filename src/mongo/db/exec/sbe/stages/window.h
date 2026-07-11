@@ -362,9 +362,9 @@ private:
     WindowBufferMemoryEstimator _windowBufferMemoryEstimator;
     // The memory size for each window accumulator state.
     std::vector<std::vector<WindowStateMemoryEstimator>> _windowStateMemoryEstimators;
-    // Memory threshold before spilling.
-    const size_t _memoryThreshold =
-        loadMemoryLimit(StageMemoryLimit::DocumentSourceSetWindowFieldsMaxMemoryBytes).get();
+    // Memory threshold before spilling. Resolved in prepare(), where an OperationContext is
+    // attached; there is none at construction time.
+    size_t _memoryThreshold = 0;
 
     // The failpoint counter to force spilling, incremented for every window function update,
     // every document.

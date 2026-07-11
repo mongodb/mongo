@@ -57,7 +57,8 @@ Value evaluate(const ExpressionArray& expr,
             values.emplace_back(elemVal.missing() ? Value(BSONNULL) : std::move(elemVal));
 
         memToken.add(static_cast<int64_t>(stored.getApproximateSize()));
-        tracker.assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
+        tracker.assertWithinMemoryLimit(
+            expr.getExpressionContext()->getOperationContext(), expr.getOpName(), ctx.stageName);
     }
     return Value(std::move(values));
 }
@@ -291,7 +292,8 @@ Value evaluate(const ExpressionConcatArrays& expr,
             valuesSize += v.getApproximateSize();
         }
         memToken.add(static_cast<int64_t>(valuesSize));
-        tracker.assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
+        tracker.assertWithinMemoryLimit(
+            expr.getExpressionContext()->getOperationContext(), expr.getOpName(), ctx.stageName);
         values.insert(values.end(), subValues.begin(), subValues.end());
     }
     return Value(std::move(values));
@@ -477,7 +479,9 @@ Value evaluate(const ExpressionSortArray& expr,
     for (int i = 0; i < std::ssize(array); ++i) {
         auto key = cmp.extractSortKey(array[i]);
         memToken.add(static_cast<int64_t>(key.objsize() + sizeof(int)));
-        tracker.assertWithinMemoryLimit(ExpressionSortArray::kName, ctx.stageName);
+        tracker.assertWithinMemoryLimit(expr.getExpressionContext()->getOperationContext(),
+                                        ExpressionSortArray::kName,
+                                        ctx.stageName);
         keysAndIdx.emplace_back(std::move(key), i);
     }
 
@@ -846,7 +850,8 @@ Value evaluate(const ExpressionSetUnion& expr,
             newEntriesSize += v.getApproximateSize();
         }
         memToken.add(static_cast<int64_t>(newEntriesSize));
-        tracker.assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
+        tracker.assertWithinMemoryLimit(
+            expr.getExpressionContext()->getOperationContext(), expr.getOpName(), ctx.stageName);
 
         unionedSet.insert(newEntries.getArray().begin(), newEntries.getArray().end());
     }
@@ -1467,7 +1472,8 @@ Value evaluate(const ExpressionZip& expr,
                 evalExpr.isArray());
 
         memToken.add(static_cast<int64_t>(evalExpr.getApproximateSize()));
-        tracker.assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
+        tracker.assertWithinMemoryLimit(
+            expr.getExpressionContext()->getOperationContext(), expr.getOpName(), ctx.stageName);
 
         inputValues.push_back(evalExpr.getArray());
 
@@ -1487,7 +1493,8 @@ Value evaluate(const ExpressionZip& expr,
     int64_t defaultsSize =
         inputs.size() ? static_cast<int64_t>(evaluatedDefaults[0].getApproximateSize()) : 0;
     memToken.add(static_cast<int64_t>(inputs.size()) * defaultsSize);
-    tracker.assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
+    tracker.assertWithinMemoryLimit(
+        expr.getExpressionContext()->getOperationContext(), expr.getOpName(), ctx.stageName);
 
     // If we need default values, evaluate each expression.
     if (minArraySize != maxArraySize) {
@@ -1496,7 +1503,9 @@ Value evaluate(const ExpressionZip& expr,
             evaluatedDefaults[i] = defaults[i].get()->evaluate(root, variables, ctx);
             memToken.add(static_cast<int64_t>(evaluatedDefaults[i].getApproximateSize()) -
                          defaultsSize);
-            tracker.assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
+            tracker.assertWithinMemoryLimit(expr.getExpressionContext()->getOperationContext(),
+                                            expr.getOpName(),
+                                            ctx.stageName);
         }
     }
 
@@ -1522,7 +1531,8 @@ Value evaluate(const ExpressionZip& expr,
     memToken.add(static_cast<int64_t>(outputLength) *
                  (static_cast<int64_t>(sizeof(Value) + sizeof(RCVector<Value>)) +
                   static_cast<int64_t>(inputs.size()) * static_cast<int64_t>(sizeof(Value))));
-    tracker.assertWithinMemoryLimit(expr.getOpName(), ctx.stageName);
+    tracker.assertWithinMemoryLimit(
+        expr.getExpressionContext()->getOperationContext(), expr.getOpName(), ctx.stageName);
     output.reserve(outputLength);
     outputChild.reserve(inputs.size());
 

@@ -150,7 +150,7 @@ void AndHashStage::open(bool reOpen) {
         _memoryTracker.value().add(memUsage);
         uassert(12321801,
                 "Exceeded memory limit for and_hash",
-                _memoryTracker.value().withinMemoryLimit());
+                _memoryTracker.value().withinMemoryLimit(_opCtx));
     }
 
     _children[0]->close();

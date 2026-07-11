@@ -200,9 +200,10 @@ void DeduplicatorReporter::add(int64_t bytesDiff, int64_t recordsDiff) {
     }
 }
 
-void SimpleMemoryUsageTracker::assertWithinMemoryLimit(std::string_view name,
+void SimpleMemoryUsageTracker::assertWithinMemoryLimit(OperationContext* opCtx,
+                                                       std::string_view name,
                                                        std::string_view stageName) const {
-    if (withinMemoryLimit()) {
+    if (withinMemoryLimit(opCtx)) {
         return;
     }
     str::stream msg;
@@ -211,17 +212,17 @@ void SimpleMemoryUsageTracker::assertWithinMemoryLimit(std::string_view name,
         msg << " Stage: " << stageName << ".";
     }
     msg << " Needs: " << _inUseTrackedMemoryBytes
-        << " bytes. Local memory limit: " << _maxAllowedMemoryUsageBytes.get() << " bytes.";
+        << " bytes. Local memory limit: " << _maxAllowedMemoryUsageBytes.get(opCtx) << " bytes.";
     int level = 1;
     for (const SimpleMemoryUsageTracker* current = _base; current; current = current->_base) {
         if (current->_base) {
             msg << " Level " << level << " memory used: " << current->inUseTrackedMemoryBytes()
                 << " bytes. Level " << level
-                << " memory limit: " << current->maxAllowedMemoryUsageBytes() << " bytes.";
+                << " memory limit: " << current->maxAllowedMemoryUsageBytes(opCtx) << " bytes.";
             ++level;
         } else {
             msg << " Global memory used: " << current->inUseTrackedMemoryBytes()
-                << " bytes. Global memory limit: " << current->maxAllowedMemoryUsageBytes()
+                << " bytes. Global memory limit: " << current->maxAllowedMemoryUsageBytes(opCtx)
                 << " bytes.";
         }
     }

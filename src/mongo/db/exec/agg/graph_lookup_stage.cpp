@@ -359,11 +359,12 @@ void GraphLookUpStage::doBreadthFirstSearch() {
 }
 
 void GraphLookUpStage::checkMemoryUsage() {
-    if (_memoryUsageTracker.withinMemoryLimit()) {
-        _cache.evictDownTo(_memoryUsageTracker.maxAllowedMemoryUsageBytes() -
-                           _memoryUsageTracker.inUseTrackedMemoryBytes());
+    if (_memoryUsageTracker.withinMemoryLimit(getContext()->getOperationContext())) {
+        _cache.evictDownTo(
+            _memoryUsageTracker.maxAllowedMemoryUsageBytes(getContext()->getOperationContext()) -
+            _memoryUsageTracker.inUseTrackedMemoryBytes());
     } else {
-        spill(_memoryUsageTracker.maxAllowedMemoryUsageBytes());
+        spill(_memoryUsageTracker.maxAllowedMemoryUsageBytes(getContext()->getOperationContext()));
     }
 }
 

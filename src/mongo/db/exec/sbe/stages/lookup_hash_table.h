@@ -182,6 +182,9 @@ public:
      * Opens a new, empty hash table, with a collator if one was provided.
      */
     void open() {
+        _memoryUseInBytesBeforeSpill =
+            loadMemoryLimit(StageMemoryLimit::QuerySBELookupApproxMemoryUseInBytesBeforeSpill)
+                .get(_opCtx);
         init();
     }
 
@@ -287,9 +290,9 @@ private:
     // buffered rows in '_buffer'.
     long long _computedTotalMemUsage = 0;
 
-    // Memory tracking and spilling to disk.
-    long long _memoryUseInBytesBeforeSpill =
-        loadMemoryLimit(StageMemoryLimit::QuerySBELookupApproxMemoryUseInBytesBeforeSpill).get();
+    // Memory tracking and spilling to disk. Resolved in open(), which runs before use (with an
+    // OperationContext attached); there is none at construction time.
+    long long _memoryUseInBytesBeforeSpill = 0;
 
     // The portion of the inner collection hash table that has spilled to disk.
     std::unique_ptr<SpillingStore> _recordStoreHt;
