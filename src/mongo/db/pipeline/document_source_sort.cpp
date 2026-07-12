@@ -17,6 +17,7 @@
 #include "mongo/db/pipeline/skip_and_limit.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/explain_policy.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/sorter/file_based_spiller.h"
@@ -173,7 +174,7 @@ void DocumentSourceSort::serializeForBoundedSort(
               {"limit"sv, opts.serializeLiteral(static_cast<long long>(_timeSorter->limit()))}}}},
     }}};
 
-    if (opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
+    if (opts.verbosity && explainPolicyFor(*opts.verbosity).hasExecStats()) {
         auto& stats = _timeSorter->stats();
 
         mutDoc["totalDataSizeSortedBytesEstimate"] =
@@ -223,7 +224,7 @@ void DocumentSourceSort::serializeWithVerbosity(
                                               : Value())
                 << "outputSortKeyMetadata" << (_outputSortKeyMetadata ? Value(true) : Value()))));
 
-    if (opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
+    if (opts.verbosity && explainPolicyFor(*opts.verbosity).hasExecStats()) {
         auto& stats = _sortExecutor->stats();
 
         mutDoc["totalDataSizeSortedBytesEstimate"] =

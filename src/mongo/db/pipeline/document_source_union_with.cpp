@@ -30,6 +30,7 @@
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/explain_policy.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/idl/idl_parser.h"
@@ -404,16 +405,18 @@ DocumentSourceContainer::iterator DocumentSourceUnionWith::optimizeAt(
         _sharedState->_pipeline->addFinalSource(
             nextStage->clone(_sharedState->_pipeline->getContext()));
         // Apply the same rewrite to the cached pipeline if available.
-        // TODO SERVER-130812 This ordinal comparison reads the verbosity directly from the
-        // ExpressionContext, which holds the originally requested (possibly V3) verbosity. Because
-        // the V3 modes sort >= kExecStats, this is currently true even for the planner-only V3
-        // modes (planSummary/plannerChoice). This is harmless today: the emit side (serialize())
-        // still gates on the translated legacy verbosity, so the extra pushed-down stages recorded
-        // here are ignored for the planner-only modes (wasted work, not wrong output). It becomes a
-        // real bug once SERVER-130810 threads the real V3 verbosity into the aggregate serialize
-        // path, at which point the emit-side comparisons here misfire too. Replace with a semantic
-        // predicate so V3 verbosities are interpreted by meaning rather than enum order.
-        if (getExpCtx()->getExplain() >= ExplainOptions::Verbosity::kExecStats) {
+        //
+        // This reads the verbosity directly from the ExpressionContext, which holds the originally
+        // requested (possibly V3) verbosity rather than the translated legacy verbosity.
+        //
+        // TODO SERVER-130529 The V3 verbosities currently map to the same policy as kExecAllPlans
+        // (see the transitional rows in explainPolicyFor()), so this predicate is true for every V3
+        // mode today. That reproduces the prior behavior exactly: the emit side (serialize()) still
+        // depends on the translated legacy verbosity, so any pushed-down stages recorded here for a
+        // planner-only V3 mode are ignored. Once the real V3 policies are implemented, the
+        // planner-only modes will correctly report hasExecStats() == false here.
+        const auto& explainVerbosity = getExpCtx()->getExplain();
+        if (explainVerbosity && explainPolicyFor(*explainVerbosity).hasExecStats()) {
             _pushedDownStages.push_back(nextStage->serialize().getDocument().toBson());
         }
         auto newStageItr = container->insert(itr, std::move(nextStage));
@@ -516,7 +519,7 @@ Value DocumentSourceUnionWith::serialize(const query_shape::SerializationOptions
         if (*opts.verbosity == ExplainOptions::Verbosity::kQueryPlanner) {
             pipeCopy = Pipeline::create(_sharedState->_pipeline->getSources(),
                                         _sharedState->_pipeline->getContext());
-        } else if (*opts.verbosity >= ExplainOptions::Verbosity::kExecStats &&
+        } else if (explainPolicyFor(*opts.verbosity).hasExecStats() &&
                    _sharedState->_executionState >
                        UnionWithSharedState::ExecutionProgress::kIteratingSource) {
             std::vector<BSONObj> recoveredPipeline;

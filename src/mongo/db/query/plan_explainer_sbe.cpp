@@ -20,6 +20,7 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/eof_node_type.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/db/query/explain_policy.h"
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_summary_stats_visitor.h"
@@ -176,9 +177,10 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     const cost_based_ranker::EstimateMap& _estimates = {}) {
     BSONObjBuilder bob;
 
-    if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+    const ExplainPolicy explainPolicy = explainPolicyFor(verbosity);
+    if (explainPolicy.hasExecStats()) {
         auto summary = sbe::collectExecutionStatsSummary(stats);
-        if (solution != nullptr && verbosity >= ExplainOptions::Verbosity::kExecAllPlans) {
+        if (solution != nullptr && explainPolicy.hasAllPlansStats()) {
             summary.score = solution->score;
             if (internalQueryAllowForcedPlanByHash.load()) {
                 bob.append("solutionHashUnstable", (long long)solution->hash());

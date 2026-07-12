@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/query/compiler/rewrites/matcher/expression_parameterization.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/explain_policy.h"
 #include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
@@ -557,8 +558,7 @@ std::vector<BSONObj> Pipeline::serializeToBson(
 std::vector<Value> Pipeline::writeExplainOps(const query_shape::SerializationOptions& opts) const {
     std::vector<Value> array;
     array.reserve(_sources.size());
-    const bool isExecStats =
-        opts.verbosity && *opts.verbosity >= ExplainOptions::Verbosity::kExecStats;
+    const bool isExecStats = opts.verbosity && explainPolicyFor(*opts.verbosity).hasExecStats();
     for (auto&& stage : _sources) {
         auto beforeSize = array.size();
         stage->serializeToArray(array, opts);

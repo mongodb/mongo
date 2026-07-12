@@ -8,6 +8,7 @@
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/explain_policy.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/serialization_context.h"
@@ -71,7 +72,7 @@ Value DocumentSourceCursor::serialize(const query_shape::SerializationOptions& o
     tassert(11294806, "Missing queryPlanner field in explain stats", explainStats["queryPlanner"]);
     out["queryPlanner"] = Value(explainStats["queryPlanner"]);
 
-    if (opts.verbosity.value() >= ExplainOptions::Verbosity::kExecStats) {
+    if (explainPolicyFor(opts.verbosity.value()).hasExecStats()) {
         tassert(11294805,
                 "Missing executionStats field in explain stats",
                 explainStats["executionStats"]);

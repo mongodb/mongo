@@ -3,6 +3,8 @@
 
 #include "mongo/db/query/plan_explainer_express.h"
 
+#include "mongo/db/query/explain_policy.h"
+
 namespace mongo {
 using namespace std::literals::string_view_literals;
 std::string PlanExplainerExpress::getPlanSummary() const {
@@ -30,6 +32,7 @@ void PlanExplainerExpress::getSummaryStats(PlanSummaryStats* statsOut) const {
 
 PlanExplainer::PlanStatsDetails PlanExplainerExpress::getWinningPlanStats(
     ExplainOptions::Verbosity verbosity) const {
+    const ExplainPolicy explainPolicy = explainPolicyFor(verbosity);
     BSONObjBuilder bob;
 
     bob.append("isCached", false);
@@ -52,7 +55,7 @@ PlanExplainer::PlanStatsDetails PlanExplainerExpress::getWinningPlanStats(
     PlanSummaryStats stats;
     getSummaryStats(&stats);
 
-    if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+    if (explainPolicy.hasExecStats()) {
         bob.appendNumber("nReturned", static_cast<long long>(stats.nReturned));
         if (_commonStats) {
             appendExecutionTimeFields(bob, _commonStats->executionTime);

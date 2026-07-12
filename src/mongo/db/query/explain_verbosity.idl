@@ -52,16 +52,16 @@ enums:
 
             # V3 explain verbosity modes. They are additive: each one includes the contents of the
             # previous. Supplying any of them causes explain to generate "explainVersion: '3'".
-            # They are intentionally ordered between kExecAllPlans and kInternal so that, until the
-            # V3 output format is implemented, they behave like the default (kExecAllPlans)
-            # verbosity for all existing content-generation logic while never being treated as
-            # kInternal.
             #
-            # TODO SERVER-130812 This ordering is a transitional crutch: existing content-generation
-            # logic branches on ordinal comparisons (e.g. "verbosity >= kExecStats"), which are only
-            # correct for V3 modes because every V3 value is translated to a legacy verbosity before
-            # reaching those comparisons. Once the ordinal comparisons are replaced with semantic
-            # predicates, the ordering of these enum values will no longer carry meaning.
+            # The order of these enum values is not content-significant. Explain content decisions
+            # go through ExplainPolicy / explainPolicyFor() (see explain_policy.h) rather than
+            # ordinal comparisons of this enum. Relational operators on the enum are deleted so that
+            # no such comparison can compile. Reordering or inserting values here can therefore
+            # never change explain content semantics.
+            #
+            # These values remain positioned between kExecAllPlans and kInternal only as a
+            # historical artifact and to keep the underlying integer serialization stable; the
+            # placement carries no meaning.
 
             # A very compact representation of the plan structure with minimal stable structural
             # information about the chosen plans.

@@ -15,6 +15,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/explain_common.h"
+#include "mongo/db/query/explain_policy.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_cache/plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_debug_info.h"
@@ -155,7 +156,7 @@ void generatePlannerInfo(PlanExecutor* exec,
     plannerBob.append("prunedSimilarIndexes", enumeratorInfo.prunedAnyIndexes);
 
     auto&& [winningStats, _] = explainer.getWinningPlanStatsQueryPlanner(
-        verbosity == ExplainOptions::Verbosity::kInternal /*printBytecode*/);
+        explainPolicyFor(verbosity).hasByteCode() /*printBytecode*/);
     plannerBob.append("winningPlan", winningStats);
 
     BSONArrayBuilder bab{plannerBob.subarrayStart("rejectedPlans")};
@@ -217,9 +218,11 @@ void generateSinglePlanExecutionInfo(const PlanExplainer::PlanStatsDetails& deta
 
 /**
  * Adds the "executionStats" field to out. Assumes that the PlanExecutor has already been executed
- * to the point of reaching EOF. Also assumes that verbosity >= kExecStats.
+ * to the point of reaching EOF. Also assumes the verbosity's policy has exec stats
+ * (ExplainPolicy::hasExecStats()).
  *
- * If verbosity >= kExecAllPlans, it will include the "allPlansExecution" array.
+ * If the policy also has all-plans stats (ExplainPolicy::hasAllPlansStats()), it will include the
+ * "allPlansExecution" array.
  *
  * - 'execPlanStatus' is OK if the query was exected successfully, or a non-OK status if there
  *   was a runtime error.
@@ -229,16 +232,16 @@ void generateExecutionInfo(PlanExecutor* exec,
                            Status executePlanStatus,
                            boost::optional<PlanExplainer::PlanStatsDetails> winningPlanTrialStats,
                            BSONObjBuilder* out) {
+    const ExplainPolicy explainPolicy = explainPolicyFor(verbosity);
     tassert(11320911,
-            fmt::format("The explain verbosity must be at least 'kExecStats' when generating "
-                        "execution info, but found {}",
+            fmt::format("The explain verbosity's policy must be 'executionStats' when generating "
+                        "execution info, but found verbosity {}",
                         idl::serialize(verbosity)),
-            verbosity >= ExplainOptions::Verbosity::kExecStats);
+            explainPolicy.hasExecStats());
 
     auto&& explainer = exec->getPlanExplainer();
 
-    if (verbosity >= ExplainOptions::Verbosity::kExecAllPlans &&
-        explainer.areThereRejectedPlansToExplain()) {
+    if (explainPolicy.hasAllPlansStats() && explainer.areThereRejectedPlansToExplain()) {
         tassert(11320912,
                 "winningPlanTrialStats must be present when requesting all execution stats",
                 winningPlanTrialStats);
@@ -264,7 +267,7 @@ void generateExecutionInfo(PlanExecutor* exec,
 
     // Also generate exec stats for all plans, if the verbosity level is high enough. These stats
     // reflect what happened during the trial period that ranked the plans.
-    if (verbosity >= ExplainOptions::Verbosity::kExecAllPlans) {
+    if (explainPolicy.hasAllPlansStats()) {
         // If we ranked multiple plans against each other, then add stats collected from the trial
         // period of the winning plan. The "allPlansExecution" section will contain an
         // apples-to-apples comparison of the winning plan's stats against all rejected plans' stats
@@ -419,6 +422,16 @@ void Explain::explainStages(PlanExecutor* exec,
     // that any future verbosity must be classified here.
     // TODO SERVER-130529 Replace the legacy delegation in generatePlannerInfoV3()/
     // generateExecutionInfoV3() with the real V3 output format.
+    // TODO SERVER-130529 Rewrite the switch as
+    // if (isV3(verbosity)) {
+    //     if (explainPolicy(verbosity).hasExecStats()) {
+    //         generateV3exec();
+    //     else ...
+    //  else {
+    //      if (explainPolicy(verbosity).hasExecStats()) {
+    //          generateExecStats();
+    //      else ...
+    // }
     switch (verbosity) {
         case ExplainOptions::Verbosity::kPlanSummary:
         case ExplainOptions::Verbosity::kPlannerChoice:
@@ -466,11 +479,11 @@ void Explain::explainStages(PlanExecutor* exec,
         case ExplainOptions::Verbosity::kExecStats:
         case ExplainOptions::Verbosity::kExecAllPlans:
         case ExplainOptions::Verbosity::kInternal:
-            if (verbosity >= ExplainOptions::Verbosity::kQueryPlanner) {
+            if (explainPolicyFor(verbosity).hasPlannerInfo()) {
                 generatePlannerInfo(
                     exec, verbosity, command, plannerContext, extraInfo, serializationContext, out);
             }
-            if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+            if (explainPolicyFor(verbosity).hasExecStats()) {
                 generateExecutionInfo(
                     exec, verbosity, executePlanStatus, winningPlanTrialStats, out);
             }
@@ -482,7 +495,7 @@ void Explain::explainStages(PlanExecutor* exec,
     // stats are reported. Memory consumed during planning/optimization is still counted in the
     // operation-wide total, but must not surface in a queryPlanner-verbosity explain (which does no
     // execution).
-    if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+    if (explainPolicyFor(verbosity).hasExecStats()) {
         explain_common::generatePeakTrackedMemBytes(exec->getOpCtx(), out);
     }
     explain_common::appendIfRoom(command, "command", out);
@@ -540,7 +553,7 @@ void Explain::explainPipeline(PlanExecutor* exec,
         case ExplainOptions::Verbosity::kExecStats:
         case ExplainOptions::Verbosity::kExecAllPlans:
         case ExplainOptions::Verbosity::kInternal:
-            if (verbosity >= ExplainOptions::Verbosity::kExecStats && executePipeline) {
+            if (explainPolicyFor(verbosity).hasExecStats() && executePipeline) {
                 executePlan(pipelineExec);
             }
             *out << "stages" << Value(pipelineExec->writeExplainOps(verbosity));
@@ -552,7 +565,7 @@ void Explain::explainPipeline(PlanExecutor* exec,
     // stats are reported. Memory consumed during planning/optimization is still counted in the
     // operation-wide total, but must not surface in a queryPlanner-verbosity explain (which does no
     // execution).
-    if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+    if (explainPolicyFor(verbosity).hasExecStats()) {
         explain_common::generatePeakTrackedMemBytes(exec->getOpCtx(), out);
     }
     explain_common::generateServerInfo(out);

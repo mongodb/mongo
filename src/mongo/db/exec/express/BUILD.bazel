@@ -29,6 +29,7 @@ mongo_cc_library(
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/matcher:expression_algo",
         "//src/mongo/db/pipeline",
+        "//src/mongo/db/query:explain_policy",
         "//src/mongo/db/query:plan_executor",
         "//src/mongo/db/query:query_knobs",
         "//src/mongo/db/query:query_planner",

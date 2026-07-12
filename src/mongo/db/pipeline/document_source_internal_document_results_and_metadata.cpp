@@ -15,6 +15,7 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/stage_params_to_document_source_registry.h"
+#include "mongo/db/query/explain_policy.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -265,7 +266,7 @@ void DocumentSourceInternalDocumentResultsAndMetadata::serializeToArray(
 
     // Below executionStats verbosity, PlanExecutorPipeline::writeExplainOps() does not merge in the
     // exec pipeline, so a single entry is correct.
-    if (!opts.verbosity || *opts.verbosity < ExplainOptions::Verbosity::kExecStats) {
+    if (!opts.verbosity || !explainPolicyFor(*opts.verbosity).hasExecStats()) {
         return;
     }
 

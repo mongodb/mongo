@@ -3,6 +3,7 @@
 
 #include "mongo/db/exec/agg/exec_pipeline.h"
 
+#include "mongo/db/query/explain_policy.h"
 #include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -104,8 +105,8 @@ void Pipeline::forceSpill() {
 
 std::vector<Value> Pipeline::writeExplainOps(const query_shape::SerializationOptions& opts) const {
     tassert(10908500,
-            "this method should not be called with explain verbosity below 'executionStats'",
-            *opts.verbosity >= ExplainOptions::Verbosity::kExecStats);
+            "this method should not be called unless the explain verbosity is 'executionStats'",
+            explainPolicyFor(*opts.verbosity).hasExecStats());
 
     std::vector<Value> execArray;
     execArray.reserve(_stages.size());

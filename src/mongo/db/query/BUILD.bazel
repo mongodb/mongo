@@ -168,6 +168,31 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "explain_policy",
+    srcs = [
+        "explain_policy.cpp",
+    ],
+    hdrs = [
+        "explain_policy.h",
+    ],
+    deps = [
+        ":common_query_enums_and_helpers",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "explain_policy_test",
+    srcs = [
+        "explain_policy_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":explain_policy",
+    ],
+)
+
+mongo_cc_library(
     name = "find_command_idl_utils",
     srcs = [
         "find_command_idl_utils.cpp",

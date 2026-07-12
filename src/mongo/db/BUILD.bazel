@@ -984,6 +984,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline/optimization:pipeline_optimization",
         "//src/mongo/db/query:collection_query_info",
         "//src/mongo/db/query:engine_selection",
+        "//src/mongo/db/query:explain_policy",
         "//src/mongo/db/query:plan_executor",
         "//src/mongo/db/query:plan_yield_policy",
         "//src/mongo/db/query:plan_yield_policy_release_memory",

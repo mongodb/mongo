@@ -21,6 +21,7 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates_storage.h"
+#include "mongo/db/query/explain_policy.h"
 #include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
@@ -203,6 +204,8 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
     tassert(9378602, "encountered unexpected nullptr for BSONObjBuilder", topLevelBob);
     tassert(9258801, "encountered unexpected nullptr for planStage", stats.common.planStage);
 
+    const ExplainPolicy explainPolicy = explainPolicyFor(verbosity);
+
     // Stop as soon as the BSON object we're building exceeds the limit.
     if (topLevelBob->len() > internalQueryExplainSizeThresholdBytes.load()) {
         bob->append("warning", "stats tree exceeded BSON size limit for explain");
@@ -266,7 +269,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
     }
 
     // Some top-level exec stats get pulled out of the root stage.
-    if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+    if (explainPolicy.hasExecStats()) {
         bob->appendNumber("nReturned", static_cast<long long>(stats.common.advanced));
         // Include the execution time if it was recorded.
         appendExecutionTimeFields(*bob, stats.common.executionTime);
@@ -286,7 +289,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
     if (STAGE_AND_HASH == stats.stageType) {
         AndHashStats* spec = static_cast<AndHashStats*>(stats.specific.get());
 
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             bob->appendNumber("memUsage", static_cast<long long>(spec->memUsage));
             bob->appendNumber("memLimit", static_cast<long long>(spec->memLimit));
 
@@ -298,7 +301,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
     } else if (STAGE_AND_SORTED == stats.stageType) {
         AndSortedStats* spec = static_cast<AndSortedStats*>(stats.specific.get());
 
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             for (size_t i = 0; i < spec->failedAnd.size(); ++i) {
                 bob->appendNumber(std::string(str::stream() << "failedAnd_" << i),
                                   static_cast<long long>(spec->failedAnd[i]));
@@ -325,21 +328,21 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         if (spec->rangeList.getRanges().size() != 1) {
             bob->appendArray("recordIdRanges", spec->rangeList.toBSONArray());
         }
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             bob->appendNumber("docsExamined", static_cast<long long>(spec->docsTested));
             bob->appendNumber("seeks", static_cast<long long>(spec->seeks));
         }
     } else if (STAGE_COUNT == stats.stageType) {
         CountStats* spec = static_cast<CountStats*>(stats.specific.get());
 
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             bob->appendNumber("nCounted", spec->nCounted);
             bob->appendNumber("nSkipped", spec->nSkipped);
         }
     } else if (STAGE_COUNT_SCAN == stats.stageType) {
         CountScanStats* spec = static_cast<CountScanStats*>(stats.specific.get());
 
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             bob->appendNumber("keysExamined", static_cast<long long>(spec->keysExamined));
             if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
                 bob->appendNumber("peakTrackedMemBytes",
@@ -374,7 +377,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
     } else if (STAGE_DELETE == stats.stageType || STAGE_BATCHED_DELETE == stats.stageType) {
         DeleteStats* spec = static_cast<DeleteStats*>(stats.specific.get());
 
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             bob->appendNumber("nWouldDelete", static_cast<long long>(spec->docsDeleted));
         }
     } else if (STAGE_DISTINCT_SCAN == stats.stageType) {
@@ -406,7 +409,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
             bob->append("indexBounds", spec->indexBounds);
         }
 
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             bob->appendNumber("keysExamined", static_cast<long long>(spec->keysExamined));
             if (spec->isShardFilteringDistinctScanEnabled) {
                 // Because we push FETCH and SHARD_FILTERING stages into the DISTINCT_SCAN stage
@@ -427,7 +430,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
                 "nss",
                 NamespaceStringUtil::serialize(qsnNode->nss, SerializationContext::stateDefault()));
         }
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             bob->appendNumber("docsExamined", static_cast<long long>(spec->docsExamined));
             bob->appendNumber("alreadyHasObj", static_cast<long long>(spec->alreadyHasObj));
         }
@@ -448,7 +451,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         bob->append("indexName", spec->indexName);
         bob->append("indexVersion", spec->indexVersion);
 
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             BSONArrayBuilder intervalsBob(bob->subarrayStart("searchIntervals"));
             for (std::vector<IntervalStats>::const_iterator it = spec->intervalStats.begin();
                  it != spec->intervalStats.end();
@@ -477,7 +480,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         }
     } else if (STAGE_IDHACK == stats.stageType) {
         IDHackStats* spec = static_cast<IDHackStats*>(stats.specific.get());
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             bob->appendNumber("keysExamined", static_cast<long long>(spec->keysExamined));
             bob->appendNumber("docsExamined", static_cast<long long>(spec->docsExamined));
         }
@@ -511,7 +514,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
             bob->append("indexBounds", spec->indexBounds);
         }
 
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             bob->appendNumber("keysExamined", static_cast<long long>(spec->keysExamined));
             bob->appendNumber("seeks", static_cast<long long>(spec->seeks));
             bob->appendNumber("dupsTested", static_cast<long long>(spec->dupsTested));
@@ -524,7 +527,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
     } else if (STAGE_OR == stats.stageType) {
         OrStats* spec = static_cast<OrStats*>(stats.specific.get());
 
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             bob->appendNumber("dupsTested", static_cast<long long>(spec->dupsTested));
             bob->appendNumber("dupsDropped", static_cast<long long>(spec->dupsDropped));
             if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
@@ -542,8 +545,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         // Only the default projection implementation evaluates expressions and tracks their memory.
         // Reporting also requires both the query and expression memory tracking feature flags, so
         // the peak isn't emitted as a misleading zero when tracking is off.
-        if (stats.stageType == STAGE_PROJECTION_DEFAULT &&
-            verbosity >= ExplainOptions::Verbosity::kExecStats &&
+        if (stats.stageType == STAGE_PROJECTION_DEFAULT && explainPolicy.hasExecStats() &&
             feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
             feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
             bob->appendNumber("peakTrackedMemBytes",
@@ -552,7 +554,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
     } else if (STAGE_RECORD_STORE_FAST_COUNT == stats.stageType) {
         CountStats* spec = static_cast<CountStats*>(stats.specific.get());
 
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             bob->appendNumber("nCounted", spec->nCounted);
             bob->appendNumber("nSkipped", spec->nSkipped);
         }
@@ -560,7 +562,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         SampleFromTimeseriesBucketStats* spec =
             static_cast<SampleFromTimeseriesBucketStats*>(stats.specific.get());
 
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             bob->appendNumber("nBucketsDiscarded", static_cast<long long>(spec->nBucketsDiscarded));
             bob->appendNumber("dupsTested", static_cast<long long>(spec->dupsTested));
             bob->appendNumber("dupsDropped", static_cast<long long>(spec->dupsDropped));
@@ -568,7 +570,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
     } else if (STAGE_SHARDING_FILTER == stats.stageType) {
         ShardingFilterStats* spec = static_cast<ShardingFilterStats*>(stats.specific.get());
 
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             bob->appendNumber("chunkSkips", static_cast<long long>(spec->chunkSkips));
         }
     } else if (STAGE_SKIP == stats.stageType) {
@@ -585,7 +587,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
 
         bob->append("type", stats.stageType == STAGE_SORT_SIMPLE ? "simple" : "default");
 
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             bob->appendNumber("totalDataSizeSorted",
                               static_cast<long long>(spec->totalDataSizeBytes));
             bob->appendBool("usedDisk", (spec->spillingStats.getSpills() > 0));
@@ -606,7 +608,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         MergeSortStats* spec = static_cast<MergeSortStats*>(stats.specific.get());
         bob->append("sortPattern", spec->sortPattern);
 
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             bob->appendNumber("dupsTested", static_cast<long long>(spec->dupsTested));
             bob->appendNumber("dupsDropped", static_cast<long long>(spec->dupsDropped));
             if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
@@ -627,13 +629,13 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         bob->append("parsedTextQuery", spec->parsedTextQuery);
         bob->append("textIndexVersion", spec->textIndexVersion);
 
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             bob->appendNumber("docsRejected", static_cast<long long>(spec->docsRejected));
         }
     } else if (STAGE_TEXT_OR == stats.stageType) {
         TextOrStats* spec = static_cast<TextOrStats*>(stats.specific.get());
 
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             bob->appendNumber("docsExamined", static_cast<long long>(spec->fetches));
             bob->appendBool("usedDisk", (spec->spillingStats.getSpills() > 0));
             bob->appendNumber("spills", static_cast<long long>(spec->spillingStats.getSpills()));
@@ -656,7 +658,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         bob->append("bucketFilter", spec->bucketFilter);
         bob->append("residualFilter", spec->residualFilter);
 
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             bob->appendNumber("nBucketsUnpacked", static_cast<long long>(spec->nBucketsUnpacked));
 
             bool isUpdate = spec->opType.starts_with("update");
@@ -676,13 +678,13 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         UnpackTimeseriesBucketStats* spec =
             static_cast<UnpackTimeseriesBucketStats*>(stats.specific.get());
 
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             bob->appendNumber("nBucketsUnpacked", static_cast<long long>(spec->nBucketsUnpacked));
         }
     } else if (STAGE_UPDATE == stats.stageType) {
         UpdateStats* spec = static_cast<UpdateStats*>(stats.specific.get());
 
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             bob->appendNumber("nMatched", static_cast<long long>(spec->nMatched));
             bob->appendNumber("nWouldModify", static_cast<long long>(spec->nModified));
             bob->appendNumber("nWouldUpsert", static_cast<long long>(spec->nUpserted));
@@ -701,7 +703,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         bob->appendNumber("memLimit", static_cast<long long>(spec->maxMemoryUsageBytes));
         bob->appendNumber("diskLimit", static_cast<long long>(spec->maxDiskUsageBytes));
 
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             bob->appendNumber("totalDataSizeSpooled",
                               static_cast<long long>(spec->totalDataSizeBytes));
             bob->appendBool("usedDisk", (spec->spillingStats.getSpills() > 0));
@@ -1003,10 +1005,11 @@ PlanExplainer::PlanStatsDetails PlanExplainerImpl::_formatPlanStats(
     ExplainOptions::Verbosity verbosity,
     boost::optional<size_t> planIdx,
     boost::optional<double> score) const {
+    const ExplainPolicy explainPolicy = explainPolicyFor(verbosity);
     boost::optional<PlanSummaryStats> summary;
-    if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+    if (explainPolicy.hasExecStats()) {
         summary = collectExecutionStatsSummary(stats, planIdx);
-        if (verbosity >= ExplainOptions::Verbosity::kExecAllPlans && score) {
+        if (explainPolicy.hasAllPlansStats() && score) {
             summary->score = *score;
         }
     }
@@ -1030,10 +1033,11 @@ PlanExplainer::PlanStatsDetails PlanExplainerImpl::_formatPlanStats(
 
 PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanStats(
     ExplainOptions::Verbosity verbosity) const {
+    const ExplainPolicy explainPolicy = explainPolicyFor(verbosity);
     const auto winningPlanIdx = getWinningPlanIdx(_root);
     auto stats = _root->getStats();
     boost::optional<double> score;
-    if (verbosity >= ExplainOptions::Verbosity::kExecAllPlans) {
+    if (explainPolicy.hasAllPlansStats()) {
         score = getWinningPlanScore(_root);
     }
 
@@ -1052,6 +1056,7 @@ PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanTrialStats() co
 
 std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlansStats(
     ExplainOptions::Verbosity verbosity) const {
+    const ExplainPolicy explainPolicy = explainPolicyFor(verbosity);
     std::vector<PlanStatsDetails> res;
     // TODO SERVER-117119. Delete to make plan explainer multiplanner unaware. Leverage
     // _explainsData's contents.
@@ -1084,9 +1089,9 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlans
                             &bob,
                             isCached);
                 auto summary = [&]() -> boost::optional<PlanSummaryStats> {
-                    if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+                    if (explainPolicy.hasExecStats()) {
                         auto summary = collectExecutionStatsSummary(stats.get(), i);
-                        if (verbosity >= ExplainOptions::Verbosity::kExecAllPlans) {
+                        if (explainPolicy.hasAllPlansStats()) {
                             summary.score = mps->getCandidateScore(i);
                         }
                         return summary;
@@ -1117,9 +1122,9 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlans
                     &bob,
                     isCached);
         auto summary = [&]() -> boost::optional<PlanSummaryStats> {
-            if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+            if (explainPolicy.hasExecStats()) {
                 auto summary = collectExecutionStatsSummary(stats.get(), i);
-                if (verbosity >= ExplainOptions::Verbosity::kExecAllPlans) {
+                if (explainPolicy.hasAllPlansStats()) {
                     summary.score = rejectedSoln->score;
                 }
                 return summary;
@@ -1150,6 +1155,7 @@ PlanStage* getStageByType(PlanStage* root, StageType type) {
 
 std::vector<PlanExplainer::PlanStatsDetails> getCachedPlanStats(
     const plan_cache_debug_info::DebugInfo& debugInfo, ExplainOptions::Verbosity verbosity) {
+    const ExplainPolicy explainPolicy = explainPolicyFor(verbosity);
     const auto& decision = *debugInfo.decision;
     std::vector<PlanExplainer::PlanStatsDetails> res;
     auto winningPlanIdx = getWinningPlanIdx(nullptr);
@@ -1158,7 +1164,7 @@ std::vector<PlanExplainer::PlanStatsDetails> getCachedPlanStats(
         BSONObjBuilder bob;
         statsToBSON({}, {}, *stats, verbosity, winningPlanIdx, &bob, &bob);
         res.push_back({bob.obj(),
-                       {verbosity >= ExplainOptions::Verbosity::kExecStats,
+                       {explainPolicy.hasExecStats(),
                         collectExecutionStatsSummary(stats.get(), winningPlanIdx)}});
     }
     return res;

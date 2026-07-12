@@ -17,6 +17,7 @@
 #include "mongo/db/pipeline/plan_explainer_pipeline.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/explain_policy.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
@@ -171,7 +172,7 @@ public:
      */
     std::vector<Value> writeExplainOps(ExplainOptions::Verbosity verbosity) const {
         auto opts = query_shape::SerializationOptions{.verbosity = verbosity};
-        return (verbosity >= ExplainOptions::Verbosity::kExecStats)
+        return explainPolicyFor(verbosity).hasExecStats()
             ? mergeExplains(*_pipeline, *_execPipeline, opts)
             : _pipeline->writeExplainOps(opts);
     }

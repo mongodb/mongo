@@ -15,6 +15,7 @@
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
+#include "mongo/db/query/explain_policy.h"
 #include "mongo/db/query/write_ops/single_write_result_gen.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_exec.h"
@@ -364,11 +365,12 @@ BSONObj NonShardServerProcessInterface::finalizePipelineAndExplain(
     std::vector<Value> pipelineVec;
     auto firstStage = pipeline->peekFront();
     auto opts = query_shape::SerializationOptions{.verbosity = verbosity};
+    const ExplainPolicy explainPolicy = explainPolicyFor(verbosity);
     // If the pipeline already has a cursor explain with that one, otherwise attach a new one like
     // we would for a normal execution and explain that.
     if (firstStage && typeid(*firstStage) == typeid(DocumentSourceCursor)) {
         // If we need execution stats, this runs the plan in order to gather the stats.
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             auto managedExecPipeline = exec::agg::buildPipeline(pipeline->freeze());
             pipelineVec = mergeExplains(*pipeline, *managedExecPipeline, opts);
         } else {
@@ -379,7 +381,7 @@ BSONObj NonShardServerProcessInterface::finalizePipelineAndExplain(
         auto pipelineWithCursor = finalizeAndAttachCursorToPipelineForLocalRead(
             pipelineCtx, std::move(pipeline), true, optimizePipeline);
         // If we need execution stats, this runs the plan in order to gather the stats.
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             auto execPipelineWithCursor = exec::agg::buildPipeline(pipelineWithCursor->freeze());
             while (execPipelineWithCursor->getNext()) {
             }
