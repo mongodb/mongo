@@ -8,7 +8,7 @@
 
 namespace mongo {
 
-enum class StageMemoryLimit {
+enum class [[MONGO_MOD_PARENT_PRIVATE]] StageMemoryLimit {
     DocumentSourceLookupCacheSizeBytes,
     DocumentSourceGraphLookupMaxMemoryBytes,
     DocumentSourceGroupMaxMemoryBytes,
@@ -37,6 +37,6 @@ enum class StageMemoryLimit {
  * Returns the memory limit for the given stage according to the server parameters. Call 'get()' on
  * the result for a plain byte count.
  */
-MemoryUsageLimit loadMemoryLimit(StageMemoryLimit stage);
+[[MONGO_MOD_PARENT_PRIVATE]] MemoryUsageLimit loadMemoryLimit(StageMemoryLimit stage);
 
 }  // namespace mongo

@@ -7,6 +7,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <concepts>
@@ -19,12 +20,13 @@
 namespace mongo {
 
 // Removal sentinel (null on wire, used during PQS merge).
-struct DeleteQueryKnobOverride {
+struct [[MONGO_MOD_PUBLIC]] DeleteQueryKnobOverride {
     friend constexpr auto operator<=>(DeleteQueryKnobOverride, DeleteQueryKnobOverride) = default;
 };
 
 // Enum-typed knobs are stored as int.
-using QueryKnobValue = std::variant<DeleteQueryKnobOverride, int, long long, double, bool>;
+using QueryKnobValue [[MONGO_MOD_PUBLIC]] =
+    std::variant<DeleteQueryKnobOverride, int, long long, double, bool>;
 
 using ReadGlobalFn = QueryKnobValue (*)(std::string_view);
 
@@ -41,9 +43,10 @@ concept EnumServerParameter = std::derived_from<S, ServerParameter> && requires(
 /**
  * Strong id type to identify query knobs. Defaults to 'kUninitialized'.
  */
-struct QueryKnobId {
+struct [[MONGO_MOD_PUBLIC]] QueryKnobId {
     using value_t = std::uint16_t;
-    friend auto operator<=>(const QueryKnobId& lhs, const QueryKnobId& rhs) = default;
+    [[MONGO_MOD_PUBLIC]] friend auto operator<=>(const QueryKnobId& lhs,
+                                                 const QueryKnobId& rhs) = default;
     value_t value;
 };
 
@@ -157,7 +160,7 @@ auto queryKnobValueType() -> std::remove_cvref_t<decltype(std::declval<SPT>()._d
  * `QueryKnobConfiguration::get<T>(const QueryKnob<T>&)` compile-time type safety.
  */
 template <typename T>
-struct QueryKnob {
+struct [[MONGO_MOD_PUBLIC]] QueryKnob {
     QueryKnobId id;
 };
 
@@ -190,7 +193,7 @@ struct QueryKnob {
 // Internal: emits one extern QueryKnob declaration per EXPAND row. The trailing getter
 // column is unused here.
 #define MONGO_DETAIL_DECLARE_QUERY_KNOB(var, name, global, ...) \
-    extern const QueryKnob<decltype(detail::queryKnobValueType<global>())> var;
+    [[MONGO_MOD_PARENT_PRIVATE]] extern const QueryKnob<decltype(detail::queryKnobValueType<global>())> var;
 
 #define MONGO_DETAIL_DEFINE_GETTER(var, name, global, getter) \
     auto getter() const {                                     \
@@ -199,7 +202,7 @@ struct QueryKnob {
 
 #define MONGO_DETAIL_DEFINE_ACCESSOR_MIXIN(group, EXPAND)   \
     template <typename Derived>                             \
-    class AccessorMixin##group {                            \
+    class [[MONGO_MOD_PUBLIC]] AccessorMixin##group {           \
     public:                                                 \
         EXPAND(MONGO_DETAIL_DEFINE_GETTER)                  \
     };

@@ -27,13 +27,12 @@
 #
 
 global:
-    mod_visibility: private
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/platform/atomic.h"
-        # TODO SERVER-129580: knobs_protector.h temporarily removed while the memory-limit knobs
-        # are migrated to be read through QueryKnobConfiguration; re-add the private-access guard
-        # afterward.
+    # Knob server parameters are implementation details of the query.knobs module: read
+    # them via QueryKnobConfiguration. Only the enums are part of the public API.
+    mod_visibility: private
 
 server_parameters:
     internalDocumentSourceLookupCacheSizeBytes:

@@ -22,7 +22,7 @@ namespace mongo {
  * A class for query-related knobs, it sets all the knob values on the first time a knob is accessed
  * and ensures the values are same though the whole lifetime of a query.
  */
-class QueryKnobConfiguration
+class [[MONGO_MOD_PUBLIC]] QueryKnobConfiguration
     : public query_knobs::AccessorMixinQueryOptimizationKnobs<QueryKnobConfiguration>,
       public query_knobs::AccessorMixinQueryExecutionKnobs<QueryKnobConfiguration>,
       public query_knobs::AccessorMixinQueryStageMemoryLimitKnobs<QueryKnobConfiguration> {

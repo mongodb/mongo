@@ -12,9 +12,6 @@ exports_files(
 idl_generator(
     name = "stage_memory_limit_knobs_gen",
     src = "stage_memory_limit_knobs.idl",
-    hdrs = [
-        "knobs_protector.h",
-    ],
     deps = [
         "//src/mongo/db:basic_types_gen",
     ],
@@ -30,7 +27,6 @@ mongo_cc_library(
     hdrs = [
         "query_knob_descriptors.h",
     ],
-    local_defines = ["QUERY_STAGE_MEMORY_LIMITS_KNOBS_PRIVATE_OVERRIDE"],
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db/memory_tracking:memory_usage_limit",

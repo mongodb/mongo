@@ -266,6 +266,20 @@ query:
     - src/mongo/dbtests/commandtests.cpp
     - src/mongo/s/would_change_owning_shard_exception*
 
+query.knobs:
+  meta:
+    description: >-
+      The query knob framework. Knob server parameters are implementation details: all per-query
+      knob reads must go through QueryKnobConfiguration so that QuerySettings overrides are
+      applied and the values stay stable for the operation's lifetime.
+    fully_marked: true
+  files:
+    - src/mongo/db/query/query_knobs/
+    - src/mongo/db/query/query_execution_knobs*
+    - src/mongo/db/query/query_optimization_knobs*
+    - src/mongo/db/query/query_knob_descriptors_*
+    - src/mongo/db/query/stage_memory_limit_knobs/
+
 catalog_and_routing:
   meta:
     description: >-

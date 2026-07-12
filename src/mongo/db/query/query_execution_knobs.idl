@@ -36,10 +36,13 @@ global:
         - "mongo/db/query/query_knobs/with_on_update_util.h"
         - "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
         - "mongo/platform/atomic.h"
-    mod_visibility: public
+    # Knob server parameters are implementation details of the query.knobs module: read
+    # them via QueryKnobConfiguration. Only the enums are part of the public API.
+    mod_visibility: private
 
 enums:
     QueryFrameworkControl:
+        mod_visibility: public
         description: "Enum for possible values of internalQueryFrameworkControl."
         type: string
         values:
@@ -54,6 +57,7 @@ enums:
             kTrySbeEngine: "trySbeEngine"
 
     SbeHashAggIncreasedSpillingMode:
+        mod_visibility: public
         description: "Enum for supported increased spilling mode for HashAgg"
         type: string
         values:
@@ -66,6 +70,7 @@ server_parameters:
     # Query execution
     #
     internalQueryMaxWriteToCurOpMemoryUsageBytes:
+        mod_visibility: needs_replacement
         description: >-
             Maximum amount of memory bytes tracked by a stage's memory tracker before writing to CurOp.
         set_at: [startup, runtime]
@@ -78,6 +83,7 @@ server_parameters:
         redact: false
 
     internalQueryMaxMemoryUsageBytesPerOperation:
+        mod_visibility: needs_replacement
         description: >-
             Maximum amount of memory in bytes that all memory-tracked stages of a single query
             operation may collectively use. SimpleMemoryUsageTracker::withinMemoryLimit() walks
@@ -117,6 +123,7 @@ server_parameters:
                 wire_name: queryMaxSingleExpressionMemoryUsageBytes
 
     internalQueryMaxWriteToServerStatusMemoryUsageBytes:
+        mod_visibility: needs_replacement
         description: >-
             Maximum amount of memory bytes tracked by a stage's memory tracker before writing to serverStatus.
         set_at: [startup, runtime]
@@ -129,6 +136,7 @@ server_parameters:
         redact: false
 
     internalQueryExecYieldIterations:
+        mod_visibility: needs_replacement
         description: 'Yield after this many "should yield?" checks.'
         set_at: [startup, runtime]
         cpp_varname: "internalQueryExecYieldIterations"
@@ -137,6 +145,7 @@ server_parameters:
         redact: false
 
     internalQueryExecYieldPeriodMS:
+        mod_visibility: needs_replacement
         description: "Yield if it's been at least this many milliseconds since we last yielded."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryExecYieldPeriodMS"
@@ -147,6 +156,7 @@ server_parameters:
         redact: false
 
     internalQueryExpressionInterruptIterations:
+        mod_visibility: needs_replacement
         description: "In some potentially long running expressions every n checks, we wake up and see if the query was killed."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryExpressionInterruptIterations"
@@ -155,6 +165,7 @@ server_parameters:
         redact: false
 
     internalQueryExpressionInterruptPeriodMS:
+        mod_visibility: needs_replacement
         description: "In some potentially long running expressions check if the query has been killed every time this period has elapsed."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryExpressionInterruptPeriodMS"
@@ -165,6 +176,7 @@ server_parameters:
         redact: false
 
     internalQueryFacetMaxOutputDocSizeBytes:
+        mod_visibility: needs_replacement
         description: "The maximum size of the result that will be returned from a document's $facet stage."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryFacetMaxOutputDocSizeBytes"
@@ -176,6 +188,7 @@ server_parameters:
         redact: false
 
     internalLookupStageIntermediateDocumentMaxSizeBytes:
+        mod_visibility: needs_replacement
         description: >-
             Maximum size of the result set that we cache from the foreign collection during a
             $lookup.
@@ -189,6 +202,7 @@ server_parameters:
         redact: false
 
     internalGraphLookupStageIntermediateDocumentMaxSizeBytes:
+        mod_visibility: needs_replacement
         description: >-
             Maximum size of the result set that we cache from the foreign collection during a
             $graphLookup.
@@ -202,6 +216,7 @@ server_parameters:
         redact: false
 
     internalDocumentSourceCursorBatchSizeBytes:
+        mod_visibility: needs_replacement
         description: >-
             Maximum amount of data that DocumentSourceCursor will cache from the underlying
             PlanExecutor before pipeline processing.
@@ -215,6 +230,7 @@ server_parameters:
         redact: false
 
     internalDocumentSourceCursorInitialBatchSize:
+        mod_visibility: needs_replacement
         description: >-
             The initial number of documents that DocumentSourceCursor will cache from the
             underlying PlanExecutor, the batch size will grow exponentially until reaching
@@ -228,6 +244,7 @@ server_parameters:
         redact: false
 
     internalQueryProhibitBlockingMergeOnMongoS:
+        mod_visibility: needs_replacement
         description: >-
             If true, blocking stages such as $group or non-merging $sort will be prohibited
             from running on mongoS.
@@ -238,6 +255,7 @@ server_parameters:
         redact: false
 
     internalQueryReuseCursorForExpressPathUpdates:
+        mod_visibility: needs_replacement
         description: >-
             Enables express updates to reuse the cursor from the find portion of the query for
             the update portion.
@@ -248,6 +266,7 @@ server_parameters:
         redact: false
 
     internalQueryMaxJsEmitBytes:
+        mod_visibility: needs_replacement
         description: >-
             Limits the vector of values emitted from a single document's call to JsEmit to the
             given size in bytes.
@@ -261,6 +280,7 @@ server_parameters:
         redact: false
 
     internalQueryMaxPushBytes:
+        mod_visibility: needs_replacement
         description: >-
             Limits the vector of values pushed into a single array while grouping with the
             $push accumulator.
@@ -279,6 +299,7 @@ server_parameters:
                 wire_name: queryMaxPushBytes
 
     internalQueryMaxRangeBytes:
+        mod_visibility: needs_replacement
         description: >-
             Limits the vector of values pushed into a single array while generating $range
             result.
@@ -292,6 +313,7 @@ server_parameters:
         redact: false
 
     internalQueryMaxMapReduceExpressionBytes:
+        mod_visibility: needs_replacement
         description: "Limits the amount of memory that can be used while constructing the result of a $map or $range expression"
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxMapFilterReduceBytes"
@@ -303,6 +325,7 @@ server_parameters:
         redact: false
 
     internalQueryMaxAddToSetBytes:
+        mod_visibility: needs_replacement
         description: >-
             Limits the vector of values pushed into a single array while grouping with the
             $addToSet accumulator.
@@ -319,6 +342,7 @@ server_parameters:
                 wire_name: queryMaxAddToSetBytes
 
     internalQueryMaxConcatArraysBytes:
+        mod_visibility: needs_replacement
         description: >-
             Limits the vector of values pushed into a single array while grouping with the
             $concatArrays accumulator.
@@ -335,6 +359,7 @@ server_parameters:
                 wire_name: queryMaxConcatArraysBytes
 
     internalQueryMaxSetUnionBytes:
+        mod_visibility: needs_replacement
         description: >-
             Limits the vector of values pushed into a single array while grouping with the
             $setUnion accumulator.
@@ -365,6 +390,7 @@ server_parameters:
                 wire_name: queryMaxPercentileAccumulatorBytes
 
     internalQueryJavaScriptHeapSizeLimitMB:
+        mod_visibility: needs_replacement
         description: >-
             Limits the JavaScript heap size used in aggregation. Will defer to the global
             'jsHeapLimitMB' limit if the global limit is smaller.
@@ -375,6 +401,7 @@ server_parameters:
         redact: false
 
     internalQueryJavaScriptFnTimeoutMillis:
+        mod_visibility: needs_replacement
         description: >-
             Limits the maximum allowed time a user-defined javascript function can run in a
             query.
@@ -388,6 +415,7 @@ server_parameters:
         redact: false
 
     internalQueryDesugarWhereToFunction:
+        mod_visibility: needs_replacement
         description: "When true, desugars $where to $expr/$function."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryDesugarWhereToFunction"
@@ -409,6 +437,7 @@ server_parameters:
         redact: false
 
     internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals:
+        mod_visibility: needs_replacement
         description: >-
             Limits the number of statically known intervals that SBE can decompose index
             bounds into when possible.
@@ -421,6 +450,7 @@ server_parameters:
         redact: false
 
     internalQueryMaxDocValidationErrorConsideredValues:
+        mod_visibility: needs_replacement
         description: >-
             Limits the number of values reported in the 'consideredValues' array when
             generating a descriptive document validation error.
@@ -433,6 +463,7 @@ server_parameters:
         redact: false
 
     internalQueryExplainSizeThresholdBytes:
+        mod_visibility: needs_replacement
         description: >-
             Number of bytes after which explain should start truncating portions of its
             output.
@@ -447,6 +478,7 @@ server_parameters:
         redact: false
 
     internalQuerySlotBasedExecutionHashAggMemoryUseCheckMargin:
+        mod_visibility: needs_replacement
         description: >-
             The memory check in HashAgg stage is done on every T'th processed record, where T
             is calculated adaptively based on the estimated memory used and its recent growth. This setting
@@ -463,6 +495,7 @@ server_parameters:
         redact: false
 
     internalQuerySlotBasedExecutionHashAggMemoryCheckPerAdvanceAtMost:
+        mod_visibility: needs_replacement
         description: >-
             The memory check in HashAgg stage is done on every T'th processed record, where T
             is calculated adaptively based on the estimated memory used and its recent growth. This setting
@@ -477,6 +510,7 @@ server_parameters:
         redact: false
 
     internalQuerySlotBasedExecutionHashAggMemoryCheckPerAdvanceAtLeast:
+        mod_visibility: needs_replacement
         description: >-
             The memory check in HashAgg stage is done on every T'th processed record, where T
             is calculated adaptively based on the estimated memory used and its recent growth. This setting
@@ -493,6 +527,7 @@ server_parameters:
         redact: false
 
     internalQuerySlotBasedExecutionHashAggIncreasedSpilling:
+        mod_visibility: public
         description: >-
             Define whether the HashAgg stage will perform increased spilling It supports 3 values: kAlways, kNever, kInDebug.
             When set to kAlways, increased spilling will be enabled. When set to kNever, increases spilling will be disabled.
@@ -551,6 +586,7 @@ server_parameters:
                     min: "9.0"
 
     internalQueryAppendIdToSetWindowFieldsSort:
+        mod_visibility: needs_replacement
         description: >-
             If true, appends _id to the sort stage generated by desugaring $setWindowFields to
             ensure deterministic sort order.
@@ -561,6 +597,7 @@ server_parameters:
         redact: false
 
     internalQueryTopNAccumulatorBytes:
+        mod_visibility: needs_replacement
         description: >-
             Limits the vector of values pushed into a single array while grouping with the 'N'
             family of accumulators.
@@ -579,6 +616,7 @@ server_parameters:
                 wire_name: queryTopNAccumulatorBytes
 
     internalQueryRegexHeapLimitKB:
+        mod_visibility: needs_replacement
         description: >-
             The limit in kilobytes on the amount of heap that pcre library can use during regex
             processing. If set to zero, the pcre2 library default value will be used instead.
@@ -592,6 +630,7 @@ server_parameters:
         redact: false
 
     internalQueryRegexMatchLimit:
+        mod_visibility: needs_replacement
         description: >-
             The limit on the amount of times that pcre library can call backtrack during regex
             matching. It protects from unbounded CPU usage. If set to zero, the pcre2 library
@@ -605,6 +644,7 @@ server_parameters:
         redact: false
 
     enableTimeoutOfInactiveSessionCursors:
+        mod_visibility: needs_replacement
         description: "If true, cursors opened within sessions are eligible for inactive cursor timeout."
         set_at: [startup, runtime]
         cpp_varname: "enableTimeoutOfInactiveSessionCursors"
@@ -613,6 +653,7 @@ server_parameters:
         redact: false
 
     internalQueryMaxAllowedDensifyDocs:
+        mod_visibility: needs_replacement
         description: "Limits the number of documents that $densify is allowed to generate."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxAllowedDensifyDocs"
@@ -623,6 +664,7 @@ server_parameters:
         redact: false
 
     internalQueryFrameworkControl:
+        mod_visibility: public
         description: "Knob to control the optimizer/execution engine to use."
         set_at: [startup, runtime]
         cpp_class:
@@ -650,6 +692,7 @@ server_parameters:
                     min: "9.0"
 
     internalQueryEnablePlanShapeAnalysis:
+        mod_visibility: needs_replacement
         description: "Knob to control whether we collect plan shape counters for query stats."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryEnablePlanShapeAnalysis"
@@ -747,6 +790,7 @@ server_parameters:
                 wire_name: measureQueryExecutionTimeInNanoseconds
 
     minAllocationToShardsPollPeriodSecs:
+        mod_visibility: needs_replacement
         description: >-
             Defines the minimum distance in time in seconds between two adjacent config server
             polls for the historical shard placement information when the change stream is opened
@@ -761,6 +805,7 @@ server_parameters:
         redact: false
 
     changeStreamsEmitFromMigrate:
+        mod_visibility: needs_replacement
         description: >-
             If enabled, exposes a 'fromMigrate' field with a value of 'true' in change stream
             events that originate from a migration. The field is only emitted for change streams
@@ -784,6 +829,8 @@ server_parameters:
         is_deprecated: true
 
     enableComputeMode:
+        # Process-level configuration read outside the query module; not a per-query knob.
+        mod_visibility: public
         description: >-
             Boolean flag to enable the compute mode in which mongod is used not as a
             persistent storage node, but as a worker node for executing queries.
@@ -794,6 +841,8 @@ server_parameters:
         redact: false
 
     externalPipeDir:
+        # Process-level configuration read outside the query module; not a per-query knob.
+        mod_visibility: public
         description: >-
             Absolute path to the directory where external named pipes can be found. The
             trailing '/' must be included.
@@ -803,6 +852,7 @@ server_parameters:
         redact: false
 
     internalQueryDisableExclusionProjectionFastPath:
+        mod_visibility: needs_replacement
         description: >-
             If true, then ExclusionProjectionExecutor won't use fast path implementation. This
             is needed for the generational fuzzers that are sensitive to field order and other corner cases
@@ -816,6 +866,7 @@ server_parameters:
         redact: false
 
     internalQueryAggMulticastTimeoutMS:
+        mod_visibility: needs_replacement
         description: "Timeout in MS for requests to shard servers when aggregations are sent to all shard servers"
         set_at: [startup, runtime]
         cpp_vartype: Atomic<int>
@@ -826,6 +877,7 @@ server_parameters:
         redact: false
 
     internalQueryAggMulticastMaxConcurrency:
+        mod_visibility: needs_replacement
         description: "Max number of concurrent requests when aggregations are sent to all shard servers"
         set_at: [startup, runtime]
         cpp_vartype: Atomic<int>
@@ -836,6 +888,7 @@ server_parameters:
         redact: false
 
     enableAccessToUserRoles:
+        mod_visibility: needs_replacement
         description: "Enables access to $$USER_ROLES in queries."
         set_at: [startup, runtime]
         cpp_varname: enableAccessToUserRoles
@@ -844,6 +897,7 @@ server_parameters:
         redact: false
 
     internalRoaringBitmapsThreshold:
+        mod_visibility: needs_replacement
         description: "The number of RecordIDs after which the hybrid container switches from hash table to Roaring Bitmaps."
         set_at: [startup, runtime]
         cpp_varname: internalRoaringBitmapsThreshold
@@ -852,6 +906,7 @@ server_parameters:
         redact: false
 
     internalRoaringBitmapsMinimalDensity:
+        mod_visibility: needs_replacement
         description: "The minimal density required for the hybrid container to switch from hash table to Roaring Bitmaps."
         set_at: [startup, runtime]
         cpp_varname: internalRoaringBitmapsMinimalDensity
@@ -860,6 +915,7 @@ server_parameters:
         redact: false
 
     internalRoaringBitmapsBatchSize:
+        mod_visibility: needs_replacement
         description: "The batch size used for the data migration in the hybrid container."
         set_at: [startup, runtime]
         cpp_varname: internalRoaringBitmapsBatchSize
@@ -868,6 +924,7 @@ server_parameters:
         redact: false
 
     internalQueryTdigestDelta:
+        mod_visibility: needs_replacement
         description: >-
             Compaction parameter the for t-digest algorithm. Increasing delta might improve
             accuracy of the computed percentiles at the cost of using more memory (about 12KB per 1000 of
@@ -884,6 +941,7 @@ server_parameters:
         redact: false
 
     internalQueryPercentileExprSelectToSortThreshold:
+        mod_visibility: needs_replacement
         description: >-
             The discrete percentile algorithm uses selection from unsorted data to find a
             single percentile and sorts the data when sufficiently many percentiles are requested as once.
@@ -897,6 +955,7 @@ server_parameters:
         redact: false
 
     internalQueryMaxSpoolDiskUsageBytes:
+        mod_visibility: needs_replacement
         description: >-
             The maximum amount of disk a query or command is willing to use to execute a
             spool, measured in bytes.
@@ -910,6 +969,7 @@ server_parameters:
         redact: false
 
     internalQueryDocumentSourceWriterBatchExtraReservedBytes:
+        mod_visibility: needs_replacement
         description: "Space to reserve in document source writer batches for miscellaneous metadata"
         set_at: [startup, runtime]
         cpp_vartype: Atomic<int>
@@ -922,6 +982,7 @@ server_parameters:
         redact: false
 
     internalQuerySlotBasedExecutionWindowBufferMemorySamplingAtLeast:
+        mod_visibility: needs_replacement
         description: >-
             The window buffer memory sampling in the window stage is performed in an exponential
             backoff way on the processed records. This setting defines the least sampling frequency.
@@ -934,6 +995,7 @@ server_parameters:
         redact: false
 
     internalQuerySlotBasedExecutionWindowStateMemorySamplingAtLeast:
+        mod_visibility: needs_replacement
         description: >-
             The window state memory sampling in the window stage is performed in an exponential
             backoff way for different window frame size. This setting defines the least sampling frequency.
@@ -972,6 +1034,7 @@ server_parameters:
         redact: false
 
     internalQuerySpillingMinAvailableDiskSpaceBytes:
+        mod_visibility: needs_replacement
         description: "Minimum disk space that should be available before spilling"
         set_at: [startup, runtime]
         cpp_vartype: Atomic<long long>
@@ -986,6 +1049,7 @@ server_parameters:
                 wire_name: spillingMinAvailableDiskSpaceBytes
 
     internalQueryFindCommandBatchSize:
+        mod_visibility: needs_replacement
         description: "The batch size used for find commands as a default if none is specified."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryFindCommandBatchSize"
@@ -997,6 +1061,7 @@ server_parameters:
         redact: false
 
     internalQueryEnableAggressiveSpillsInGroup:
+        mod_visibility: needs_replacement
         description: "Enable spilling in $group every time there is a duplicate id to stress merge logic."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryEnableAggressiveSpillsInGroup"
@@ -1005,6 +1070,7 @@ server_parameters:
         redact: false
 
     internalQueryGetMoreMaxCursorPinRetryAttempts:
+        mod_visibility: needs_replacement
         description: >-
             Max number of attempts to pin cursor by getMore command before failing in cases where
             cursor is already pinned by releaseMemory command.
@@ -1017,6 +1083,7 @@ server_parameters:
             gte: 1
 
     internalQuerySettingsDisableBackfill:
+        mod_visibility: needs_replacement
         description: "Disables the query settings backfill mechanism."
         set_at: [startup, runtime]
         cpp_vartype: Atomic<bool>
@@ -1025,6 +1092,7 @@ server_parameters:
         redact: false
 
     internalQuerySettingsBackfillDelaySeconds:
+        mod_visibility: needs_replacement
         description: >-
             The time delay in seconds to wait for representative queries to be buffered in between
             the first recorded query and the backfill operation.
@@ -1037,6 +1105,7 @@ server_parameters:
         redact: false
 
     internalQuerySettingsBackfillMemoryLimitBytes:
+        mod_visibility: needs_replacement
         description: >-
             Controlls the maximum amount of memory that the backfill operation can use while buffering.
             Surpasing this limit will cause subsequent queries to be skipped for the current period.
@@ -1049,6 +1118,7 @@ server_parameters:
         redact: false
 
     internalReduceAccumulatedValueDepthCheckInterval:
+        mod_visibility: needs_replacement
         description: >-
             Configures how frequently $reduce checks if its accumulated value has exceeded the maximum
             allowable nestedness. Arrays and subdocuments both count. If set to 0, no check is performed.
@@ -1062,6 +1132,7 @@ server_parameters:
         redact: false
 
     internalQueryAllowForcedPlanByHash:
+        mod_visibility: needs_replacement
         description: >-
             Using the forcedPlanSolution argument to find/aggregate commands, force selection of a given plan by solution hash.
         set_at: [startup, runtime]
@@ -1071,6 +1142,7 @@ server_parameters:
         redact: false
 
     internalQueryMergeMinInsertAttempts:
+        mod_visibility: needs_replacement
         description: >-
             When $merge stage is using a insert with backup strategy, a minimal number of insert
             attempts before it can switch to update permamently.
@@ -1081,6 +1153,7 @@ server_parameters:
         redact: false
 
     internalQueryMergeMaxInsertErrorRate:
+        mod_visibility: needs_replacement
         description: >-
             When $merge stage is using a insert with backup strategy, a max allowed insert error
             rate. If insert error rate is higher, than the stage will use update without trying
@@ -1108,6 +1181,7 @@ server_parameters:
                 wire_name: sbeMaxGroupAccumulators
 
     internalQueryEnableWriteConflictBackoffWithoutTicket:
+        mod_visibility: needs_replacement
         description: >-
             Enables behavior where the query engine will release resources before sleeping for write
             conflicts.
@@ -1118,6 +1192,7 @@ server_parameters:
         redact: false
 
     internalQueryWriteConflictBackoffMaxReleaseTicketCycles:
+        mod_visibility: needs_replacement
         description: >-
             When internalQueryEnableWriteConflictBackoffWithoutTicket is true, release-ticket WCE
             backoff is used for up to this many WriteConflicts-in-a-row per operation. After the
@@ -1136,6 +1211,7 @@ server_parameters:
         redact: false
 
     internalQueryWriteConflictRetryLimitMax:
+        mod_visibility: needs_replacement
         description: >-
             Maximum consecutive WriteConflictException retries per plan execution. 0 disables
             the limit. limitMax = N means "shed on retry N+1". Recommended floor when enabled:
@@ -1150,6 +1226,7 @@ server_parameters:
         redact: false
 
     internalQueryWriteConflictRetryLimitMin:
+        mod_visibility: needs_replacement
         description: >-
             Floor on the adaptive consecutive WCE retry limit when adaptive scaling is fully
             engaged (i.e. when the concurrent-waiter count reaches
@@ -1167,6 +1244,7 @@ server_parameters:
         redact: false
 
     internalQueryWriteConflictRetryLimitWaitersThreshold:
+        mod_visibility: needs_replacement
         description: >-
             Concurrent-waiter count at which the adaptive retry limit reaches its minimum.
             Linear interpolation between limitMax (at 0 waiters) and limitMin (at this value
@@ -1257,6 +1335,7 @@ server_parameters:
                     min: "9.0"
 
     internalQueryLegacyDottedPathNullSemantics:
+        mod_visibility: needs_replacement
         description: >-
             If true, disables the SERVER-36681 fix for null equality semantics on nonexistent
             dotted paths and reverts to the pre-fix behavior.

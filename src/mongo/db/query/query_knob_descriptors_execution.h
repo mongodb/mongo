@@ -9,6 +9,7 @@
 
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_knobs/query_knob.h"
+#include "mongo/util/modules.h"
 
 // clang-format off
 #define MONGO_EXPAND_QUERY_KNOBS_EXECUTION(KNOB)                                          \

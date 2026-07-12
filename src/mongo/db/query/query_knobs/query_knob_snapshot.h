@@ -7,6 +7,7 @@
 #include "mongo/db/query/query_knobs/query_knob_change_notifier.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -20,7 +21,7 @@ namespace mongo {
 /**
  * Identifies where a knob value in a QueryKnobSnapshot came from.
  */
-enum class KnobSource : uint8_t {
+enum class [[MONGO_MOD_PARENT_PRIVATE]] KnobSource : uint8_t {
     kDefault,       // Value read from global IDL default
     kSetParameter,  // Value overridden via setParameter command
     kQuerySettings  // Value overridden via Parameterized Query Settings (PQS)
@@ -40,7 +41,7 @@ static_assert(static_cast<uint8_t>(KnobSource::kDefault) == 0,
  *
  * Construct via QueryKnobSnapshotBuilder.
  */
-class QueryKnobSnapshot {
+class [[MONGO_MOD_PARENT_PRIVATE]] QueryKnobSnapshot {
     friend class QueryKnobSnapshotBuilder;
 
 public:
@@ -90,7 +91,7 @@ private:
  * Supports fluent chaining from a temporary: QueryKnobSnapshotBuilder{n}.set(...).build().
  * For a named builder, move it before building: std::move(builder).build().
  */
-class QueryKnobSnapshotBuilder {
+class [[MONGO_MOD_PARENT_PRIVATE]] QueryKnobSnapshotBuilder {
 public:
     explicit QueryKnobSnapshotBuilder(size_t size);
     explicit QueryKnobSnapshotBuilder(QueryKnobSnapshot snapshot);
@@ -114,7 +115,7 @@ private:
  * writes are serialized by _intentLock to prevent lost updates from concurrent callers.
  * The outgoing snapshot is swapped out under the write lock and destroyed after it is released.
  */
-class QueryKnobSnapshotCache {
+class [[MONGO_MOD_PARENT_PRIVATE]] QueryKnobSnapshotCache {
 public:
     explicit QueryKnobSnapshotCache(QueryKnobSnapshot defaults);
 

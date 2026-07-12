@@ -11,6 +11,7 @@
 #include "mongo/db/query/query_knobs/query_knob.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 // MSVC C1001 workaround: MSVC cannot use a member access expression (e.g.

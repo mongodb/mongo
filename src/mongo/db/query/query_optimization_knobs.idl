@@ -37,10 +37,13 @@ global:
         - "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
         - "mongo/db/query/util/memory_util.h"
         - "mongo/platform/atomic.h"
-    mod_visibility: public
+    # Knob server parameters are implementation details of the query.knobs module: read
+    # them via QueryKnobConfiguration. Only the enums are part of the public API.
+    mod_visibility: private
 
 enums:
     QueryPlanRankerMode:
+        mod_visibility: public
         description: "Enum for possible values for internalQueryCBRCEMode."
         type: string
         values:
@@ -52,6 +55,7 @@ enums:
             kHeuristicCE: "heuristicCE"
 
     QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode:
+        mod_visibility: public
         description: "Enum for possible values for QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode."
         type: string
         values:
@@ -60,6 +64,7 @@ enums:
             kHistogramCEWithHeuristicFallback: "HistogramCEWithHeuristicFallback"
 
     SamplingCEMethod:
+        mod_visibility: public
         description: "Enum for supported sampling methods."
         type: string
         values:
@@ -67,6 +72,7 @@ enums:
             kChunk: "chunk"
 
     SamplingSource:
+        mod_visibility: public
         description: >-
             Controls where CE samples come from. kPersistentSample attempts to read a
             previously persisted sample from the per-database system.stats.samples
@@ -78,6 +84,7 @@ enums:
             kOnTheFlySample: "onTheFlySample"
 
     SamplingConfidenceInterval:
+        mod_visibility: public
         description: "Enum for supported confidence intervals for sampling estimates."
         type: string
         values:
@@ -86,6 +93,7 @@ enums:
             k99: "99"
 
     JoinReorderMode:
+        mod_visibility: public
         description: "Enum for possible values for JoinReorderMode."
         type: string
         values:
@@ -93,6 +101,7 @@ enums:
             kRandom: "random"
 
     JoinPlanTreeShape:
+        mod_visibility: public
         description: "Enum for possible join plan shapes."
         type: string
         values:
@@ -101,6 +110,7 @@ enums:
             kZigZag: "zigZag"
 
     ForcedJoinMethod:
+        mod_visibility: public
         description: "Enum for forcing a specific join method."
         type: string
         values:
@@ -110,6 +120,7 @@ enums:
             kNLJ: "NLJ"
 
     TransformHoistPolicy:
+        mod_visibility: public
         description: "Controls when the independent prefix of a $project or $addFields is hoisted past the preceding stage."
         type: string
         values:
@@ -119,6 +130,7 @@ enums:
 
 structs:
     InternalQueryCutoffForSampleFromRandomCursorStorage:
+        mod_visibility: public
         description: "A specification for the 'internalQueryCutoffForSampleFromRandomCursor' cluster-wide configuration parameter type."
         inline_chained_structs: true
         chained_structs:
@@ -325,6 +337,7 @@ server_parameters:
                     min: "9.0"
 
     internalQueryConcurrentMultiPlanningThreshold:
+        mod_visibility: needs_replacement
         description: "The number of concurrent trialing multiplan candidates required to enable the MultiPlan rate limiter."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryConcurrentMultiPlanningThreshold"
@@ -338,6 +351,7 @@ server_parameters:
                 wire_name: concurrentMultiPlanningThreshold
 
     internalQueryMaxConcurrentMultiPlanJobsPerCacheKey:
+        mod_visibility: needs_replacement
         description: >-
             The maximum number of concurrent trialing multiplan candidates per plan cache key.
             If the MultiPlan rate limiter is enabled and we reach this number of trailing candidates
@@ -373,6 +387,7 @@ server_parameters:
                     min: "9.0"
 
     internalQueryCacheMaxEntriesPerCollection:
+        mod_visibility: needs_replacement
         description: >-
             The maximum number of entries allowed in a given collection's plan cache. Applies
             only to the classic plan cache, not to the SBE plan cache.
@@ -389,6 +404,7 @@ server_parameters:
                 wire_name: cacheMaxEntriesPerCollection
 
     internalQueryCacheMaxSizeBytesBeforeStripDebugInfo:
+        mod_visibility: needs_replacement
         description: >-
             Limits the amount of debug info stored across all plan caches in the system. Once
             the estimate of the number of bytes used across all plan caches exceeds this threshold, then
@@ -409,6 +425,7 @@ server_parameters:
                 wire_name: cacheMaxSizeBytesBeforeStripDebugInfo
 
     internalQueryCacheEvictionRatio:
+        mod_visibility: needs_replacement
         description: >-
             How many times more works must we perform in order to justify plan cache eviction
             and replanning?
@@ -424,6 +441,7 @@ server_parameters:
                 wire_name: cacheEvictionRatio
 
     internalQueryCacheWorksGrowthCoefficient:
+        mod_visibility: needs_replacement
         description: >-
             How quickly the the 'works' value in an inactive cache entry will grow. It grows
             exponentially. The value of this server parameter is the base.
@@ -439,6 +457,7 @@ server_parameters:
                 wire_name: cacheWorksGrowthCoefficient
 
     internalQueryCacheDisableInactiveEntries:
+        mod_visibility: needs_replacement
         description: "Whether or not cache entries can be marked as 'inactive'."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryCacheDisableInactiveEntries"
@@ -450,6 +469,7 @@ server_parameters:
                 wire_name: cacheDisableInactiveEntries
 
     planCacheSize:
+        mod_visibility: needs_replacement
         description: >-
             The maximum amount of memory that the system will allocate for the plan cache.
             It takes value value in one of the two formats:
@@ -469,6 +489,7 @@ server_parameters:
     #
 
     internalPipelineLengthLimit:
+        mod_visibility: needs_replacement
         description: "The maximum length allowed for an aggregation pipeline."
         set_at: [startup, runtime]
         cpp_varname: "internalPipelineLengthLimit"
@@ -483,6 +504,7 @@ server_parameters:
                 wire_name: pipelineLengthLimit
 
     internalMaxSubPipelineViewDepth:
+        mod_visibility: needs_replacement
         description: "The maximum length allowed for an aggregation sub-pipeline view."
         set_at: [startup, runtime]
         cpp_varname: "internalMaxSubPipelineViewDepth"
@@ -497,6 +519,7 @@ server_parameters:
                 wire_name: maxSubPipelineViewDepth
 
     internalPartialFilterExpressionMaxDepth:
+        mod_visibility: needs_replacement
         description: "The maximum depth allowed for a partialFilterExpression."
         set_at: [startup, runtime]
         cpp_varname: "internalPartialFilterExpressionMaxDepth"
@@ -689,6 +712,7 @@ server_parameters:
                     min: "9.0"
 
     internalQueryIgnoreUnknownJSONSchemaKeywords:
+        mod_visibility: needs_replacement
         description: "Ignore unknown JSON Schema keywords."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryIgnoreUnknownJSONSchemaKeywords"
@@ -700,6 +724,7 @@ server_parameters:
                 wire_name: ignoreUnknownJSONSchemaKeywords
 
     internalQueryPlannerIgnoreIndexWithCollationForRegex:
+        mod_visibility: needs_replacement
         description: "Do we want to leverage indexes with collation for regex predicates?"
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlannerIgnoreIndexWithCollationForRegex"
@@ -711,6 +736,7 @@ server_parameters:
                 wire_name: plannerIgnoreIndexWithCollationForRegex
 
     internalEnableJoinOptimization:
+        mod_visibility: needs_replacement
         description: "Enable cost-based reordering of $lookup-$unwind pairs producing SBE plans."
         set_at: [startup, runtime]
         cpp_varname: "internalEnableJoinOptimization"
@@ -722,6 +748,7 @@ server_parameters:
                 wire_name: enableJoinOptimization
 
     internalQueryExplainJoinCostComponents:
+        mod_visibility: needs_replacement
         description: >-
             When true, explain output for join embedding nodes includes a 'joinCostComponents'
             sub-object with the detailed cost breakdown (docsProcessed, docsOutput,
@@ -736,6 +763,7 @@ server_parameters:
                 wire_name: explainJoinCostComponents
 
     internalJoinReorderMode:
+        mod_visibility: public
         description: "Picks which method is used to reorder joins (when enabled)."
         set_at: [startup, runtime]
         cpp_class:
@@ -749,6 +777,7 @@ server_parameters:
                 wire_name: joinReorderMode
 
     internalJoinPlanTreeShape:
+        mod_visibility: public
         description: "Picks which tree shape to use for bottom-up join enumeration (when enabled)."
         set_at: [startup, runtime]
         cpp_class:
@@ -824,6 +853,7 @@ server_parameters:
                 wire_name: inferSingleTablePredicates
 
     internalQueryMaxPipelineRewrites:
+        mod_visibility: needs_replacement
         description: "Maximum number of pipeline rewrite rules to apply"
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxPipelineRewrites"
@@ -870,6 +900,7 @@ server_parameters:
                 wire_name: enableJoinOptimizationUseIndexUniqueness
 
     internalJoinMethod:
+        mod_visibility: public
         description: >-
             Forces all joins produced by the join optimizer to use the specified method.
             When set to "any" (default), the optimizer picks the method itself.
@@ -904,6 +935,7 @@ server_parameters:
         redact: false
 
     internalQueryAutoParameterizationMaxParameterCount:
+        mod_visibility: needs_replacement
         description: >-
             The maximum numbers of parameters that query auto-parameterization can extract from a query.
             If auto parameterizating a query would result in a greater number of parameters than the limit,
@@ -921,6 +953,7 @@ server_parameters:
                 wire_name: autoParameterizationMaxParameterCount
 
     internalQueryEnableBooleanExpressionsSimplifier:
+        mod_visibility: needs_replacement
         description: >-
             Boolean expression simplifier converts filter expression into Disjunctive Normal
             Form and applies some simplifications.
@@ -934,6 +967,7 @@ server_parameters:
                 wire_name: enableBooleanExpressionsSimplifier
 
     internalQueryMaximumNumberOfUniquePredicatesToSimplify:
+        mod_visibility: needs_replacement
         description: >-
             If the number of unique predicates in an expression is larger than
             'maximumNumberOfUniquePredicates' the expression is considered too big to be simplified.
@@ -947,6 +981,7 @@ server_parameters:
                 wire_name: maximumNumberOfUniquePredicatesToSimplify
 
     internalQueryMaximumNumberOfMintermsInSimplifier:
+        mod_visibility: needs_replacement
         description: "Maximum number of minterms allowed during boolean transformations."
         set_at: [startup, runtime]
         cpp_varname: internalQueryMaximumNumberOfMintermsInSimplifier
@@ -958,6 +993,7 @@ server_parameters:
                 wire_name: maximumNumberOfMintermsInSimplifier
 
     internalQueryMaxNumPrimeImplicants:
+        mod_visibility: needs_replacement
         description: "Threshold capping number of prime implicants generated by Petrick's method."
         set_at: [startup, runtime]
         cpp_varname: internalQueryMaxNumPrimeImplicants
@@ -969,6 +1005,7 @@ server_parameters:
                 wire_name: maxNumPrimeImplicants
 
     internalQueryMaxSizeFactorToSimplify:
+        mod_visibility: needs_replacement
         description: >-
             If the simplified expression is larger than the original expression's size times
             `internalQueryMaxSizeFactorToSimplify`, the simplified one will be rejected.
@@ -982,6 +1019,7 @@ server_parameters:
                 wire_name: maxSizeFactorToSimplify
 
     internalQueryDoNotOpenContainedOrsInSimplifier:
+        mod_visibility: needs_replacement
         description: >-
             If the original expression contains AND operator it is still simplified but the
             common predicate of the simplified conjunctive terms are taken out of brackets.
@@ -995,6 +1033,7 @@ server_parameters:
                 wire_name: doNotOpenContainedOrsInSimplifier
 
     internalQueryCBRCEMode:
+        mod_visibility: public
         description: "Cardinality estimation mode for the cost-based ranker."
         set_at: [startup, runtime]
         cpp_class:
@@ -1011,6 +1050,7 @@ server_parameters:
                     min: "9.0"
 
     automaticCEPlanRankingStrategy:
+        mod_visibility: public
         description: "Controls the plan ranking strategy to use when automaticCE is selected as internalQueryCBRCEMode"
         set_at: [startup, runtime]
         cpp_class:
@@ -1027,6 +1067,7 @@ server_parameters:
                     min: "9.0"
 
     samplingConfidenceInterval:
+        mod_visibility: public
         description: >-
             Define target confidence interval for sampling cardinality estimates used for
             cost-based optimization. Supported values are 90%, 95%, and 99%.
@@ -1086,6 +1127,7 @@ server_parameters:
                     min: "9.0"
 
     internalQuerySamplingCEMethod:
+        mod_visibility: public
         description: >-
             Control sampling CE method. There two supported sampling CE method, random and
             chunk-based.
@@ -1105,6 +1147,7 @@ server_parameters:
 
     # TODO SERVER-63949: Consolidate CBRSamplingCEMethod and JoinSamplingCEMethod.
     internalJoinOptimizationSamplingCEMethod:
+        mod_visibility: public
         description: Control sampling CE method for the join optimization codepath.
         set_at: [startup, runtime]
         cpp_class:
@@ -1118,6 +1161,7 @@ server_parameters:
                 wire_name: joinOptimizationSamplingCEMethod
 
     internalQueryNumChunksForChunkBasedSampling:
+        mod_visibility: needs_replacement
         description: >-
             The number of chunk for chunk-based sampling method to form a sample. The number
             of chunk does not affect the size of a sample but does affect the size of a chunk. The size of
@@ -1137,6 +1181,7 @@ server_parameters:
                 wire_name: numChunksForChunkBasedSampling
 
     internalQuerySamplingBySequentialScan:
+        mod_visibility: needs_replacement
         description:
             Indicate sampling CE to generate a repeatable sample by sequentially scanning
             documents from the start of the target collection. This sampling method is useful for testing
@@ -1152,6 +1197,7 @@ server_parameters:
 
     # TODO SERVER-127563: Revisit the naming and organization of CBR-related knobs
     internalQuerySamplingByStrides:
+        mod_visibility: needs_replacement
         description:
             Indicate sampling CE to generate a repeatable sample by sequentially scanning
             the target collection and filtering to documents whose _id satisfies
@@ -1267,6 +1313,7 @@ server_parameters:
                     min: "9.0"
 
     internalQueryExtraPredicateForReversedIn:
+        mod_visibility: needs_replacement
         description: >-
             Enable an optimization for queries like {$expr: {$in: [<const>, "$fieldpath"]}} that generates
             an extra predicate in order to allow indexes on $fieldpath to be used. This optimization
@@ -1281,6 +1328,7 @@ server_parameters:
                 wire_name: extraPredicateForReversedIn
 
     internalQueryPermitMatchSwappingForComplexRenames:
+        mod_visibility: needs_replacement
         description: >-
             Caution! This knob is used in production and must not be removed before consulting with
             the QO team.
@@ -1313,6 +1361,7 @@ server_parameters:
                 wire_name: enablePipelineOptimizationAdditionalTestingRules
 
     internalEnableDependencyGraphValidation:
+        mod_visibility: needs_replacement
         description: "Enable insertion of $_internalAssertDataAssumptions stages to validate dependency graph arrayness analysis."
         set_at: [startup, runtime]
         cpp_varname: "internalEnableDependencyGraphValidation"
@@ -1352,6 +1401,7 @@ server_parameters:
                     min: "9.0"
 
     internalQueryTransformHoistPolicy:
+        mod_visibility: public
         description: >-
             Controls when the independent prefix of a $project or $addFields is hoisted past the
             preceding stage. "never" disables hoisting entirely; "forMatchPushdown" hoists only
@@ -1368,6 +1418,7 @@ server_parameters:
                 wire_name: transformHoistPolicy
 
     internalQueryTransformHoistMaximumPaths:
+        mod_visibility: needs_replacement
         description: >-
             Maximum number of modified paths (computed fields and renames) in a $project or
             $addFields for which the hoist transformation will be attempted. Projections with more

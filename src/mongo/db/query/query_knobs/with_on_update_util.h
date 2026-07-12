@@ -6,6 +6,7 @@
 #include "mongo/base/status.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/modules.h"
 
 #include <type_traits>
 #include <utility>
@@ -21,7 +22,7 @@ namespace mongo {
  * uasserted, matching the behaviour of scalar server parameter on_update callbacks.
  */
 template <typename T>
-class WithOnUpdateHook : public T {
+class [[MONGO_MOD_PARENT_PRIVATE]] WithOnUpdateHook : public T {
 public:
     using value_t = std::remove_cvref_t<decltype(std::declval<const T&>().get())>;
     using OnUpdateFn = unique_function<Status(const value_t&)>;

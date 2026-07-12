@@ -7,6 +7,7 @@
 #include "mongo/db/query/query_knobs/query_knob.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 
 #include <type_traits>
 #include <vector>

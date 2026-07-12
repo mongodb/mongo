@@ -8,6 +8,7 @@
 #include "mongo/db/query/query_knobs/query_knob_change_notifier.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/server_parameter_with_storage.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/version/releases.h"
 
@@ -28,7 +29,7 @@ namespace mongo {
  * thereafter. Indexed by a dense id for the hot read path, and by wire name
  * for the rare setQuerySettings write path.
  */
-class QueryKnobRegistry {
+class [[MONGO_MOD_PARENT_PRIVATE]] QueryKnobRegistry {
 public:
     struct Entry {
         using ReadGlobalFn = std::function<QueryKnobValue()>;
