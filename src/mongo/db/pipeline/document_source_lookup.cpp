@@ -65,6 +65,7 @@ using namespace std::literals::string_view_literals;
 //   - config.cache.chunks.* (any database's chunk cache)
 //   - config.collections
 //   - config.chunks
+//   - config.queryShapeRepresentativeQueries
 //   - local.oplog.rs
 // The {db, coll} object form is otherwise rejected unless the 'allowGenericForeignDbLookup' is set.
 NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
@@ -92,10 +93,11 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
             elem.fieldNameStringData(), vts, tenantId, SerializationContext::stateDefault()});
     auto nss = NamespaceStringUtil::deserialize(spec.getDb().value_or(DatabaseName()),
                                                 spec.getColl().value_or(""));
-    // In the cases nss == config.collections and nss == config.chunks we can proceed with the
-    // lookup as the merge will be done on the config server
+    // In the cases nss == config.collections, config.chunks, or queryShapeRepresentativeQueries we
+    // can proceed with the lookup as the merge will be done on the config server.
     bool isConfigSvrSupportedCollection = nss == NamespaceString::kConfigsvrCollectionsNamespace ||
-        nss == NamespaceString::kConfigsvrChunksNamespace;
+        nss == NamespaceString::kConfigsvrChunksNamespace ||
+        nss == NamespaceString::kQueryShapeRepresentativeQueriesNamespace;
     uassert(
         ErrorCodes::FailedToParse,
         str::stream() << "$lookup with syntax {from: {db:<>, coll:<>},..} is not supported for db: "

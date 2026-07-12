@@ -10,11 +10,21 @@
 //
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
 const collName = jsTestName();
 const qsutils = new QuerySettingsUtils(db, collName);
 qsutils.removeAllQuerySettings();
+
+// The '$querySettings' desugar is a binary feature (not FCV-gated), so its debug query shape can
+// only be asserted when every node runs a binary that has it: a non-multiversion suite at FCV 9.0+.
+// In mixed-binary suites the shape may be computed on an older binary that lacks the desugar (e.g.
+// 'last-patch', where FCV is already 9.0), so 'isFCVgte' alone is insufficient.
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
+const desugarAssertable = !isMultiversion && isFCVgte(db, "9.0");
 
 const settings = {
     queryFramework: "classic",
@@ -140,18 +150,52 @@ runTest({
 });
 
 // Test the inception case: setting query settings on '$querySettings'.
-runTest({
-    queryInstance: qsutils.makeAggregateQueryInstance(
-        {
-            pipeline: [{$querySettings: {showDebugQueryShape: true}}],
+// Skipped unless the desugar is guaranteed present on every node (see 'desugarAssertable' above).
+if (desugarAssertable) {
+    runTest({
+        queryInstance: qsutils.makeAggregateQueryInstance(
+            {
+                pipeline: [{$querySettings: {showDebugQueryShape: true}}],
+            },
+            /* collectionless */ true,
+        ),
+        // '$querySettings' desugars at parse time into the pipeline that joins the in-memory query
+        // shape configurations with their representative queries, so its query shape reflects the
+        // desugared stages rather than the logical '$querySettings' stage.
+        expectedDebugQueryShape: {
+            cmdNs: {db: db.getName(), coll: "$cmd.aggregate"},
+            command: "aggregate",
+            pipeline: [
+                {$_internalListQuerySettings: {}},
+                {
+                    $lookup: {
+                        from: {db: "config", coll: "queryShapeRepresentativeQueries"},
+                        as: "__backfilledRepresentativeQuery",
+                        localField: "queryShapeHash",
+                        foreignField: "_id",
+                    },
+                },
+                {
+                    $unwind: {
+                        path: "$__backfilledRepresentativeQuery",
+                        preserveNullAndEmptyArrays: "?bool",
+                    },
+                },
+                {
+                    $addFields: {
+                        representativeQuery: {
+                            $ifNull: [
+                                "$__backfilledRepresentativeQuery.representativeQuery",
+                                "$representativeQuery",
+                            ],
+                        },
+                        __backfilledRepresentativeQuery: "$$REMOVE",
+                    },
+                },
+                {$_internalQuerySettingsDebugShape: {}},
+            ],
         },
-        /* collectionless */ true,
-    ),
-    expectedDebugQueryShape: {
-        cmdNs: {db: db.getName(), coll: "$cmd.aggregate"},
-        command: "aggregate",
-        pipeline: [{$querySettings: {showDebugQueryShape: true}}],
-    },
-    // Since it's a collectionless aggregate, the explain does not contain the 'queryPlanner' field.
-    shouldRunExplain: false,
-});
+        // Since it's a collectionless aggregate, the explain does not contain the 'queryPlanner' field.
+        shouldRunExplain: false,
+    });
+}

@@ -241,7 +241,8 @@ mongo_cc_library(
         # dependency. Generating the Debug Query Shape requires re-parsing the
         # query instance via `query_settings::createRepresentativeInfo()`
         # which internally uses `pipeline_factory::makePipeline()`.
-        "//src/mongo/db/exec/agg:query_settings_stage.cpp",
+        "//src/mongo/db/exec/agg:query_settings_debug_shape_stage.cpp",
+        "//src/mongo/db/pipeline:document_source_internal_query_settings_debug_shape.cpp",
         "//src/mongo/db/pipeline:document_source_query_settings.cpp",
         ":query_settings_cmds_gen",
         "query_settings_cmds.cpp",

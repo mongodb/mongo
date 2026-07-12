@@ -262,6 +262,9 @@ const skippedAuthTestingAggStages = [
     "$_internalHybridSearch", // Already covered in
     // jstests/aggregation/sources/internal_hybrid_search_rejected_in_user_request.js.
     "$_internalDocumentResultsAndMetadata", // Internal-only and rejected in all user requests.
+    "$_internalListQuerySettings", // Internal generator seeding the $querySettings desugar.
+    "$_internalQuerySettingsDebugShape", // Internal stage appended by the $querySettings desugar for
+    // showDebugQueryShape; covered via the '$querySettings' auth tests.
     "$_internalStreamTerminator", // Internal-only and rejected in all user requests.
 ];
 

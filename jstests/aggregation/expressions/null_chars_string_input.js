@@ -461,6 +461,8 @@ const skips = new Set([
     "$mergeCursors",
     "$planCacheStats",
     "$querySettings",
+    "$_internalListQuerySettings",
+    "$_internalQuerySettingsDebugShape",
     "$queryStats",
     "$queue",
     "$rankFusion",

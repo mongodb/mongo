@@ -27,7 +27,6 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
-#include <set>
 #include <string_view>
 
 #include <boost/none.hpp>
@@ -44,15 +43,13 @@ using QueryShapeConfigurationMap = stdx::unordered_map<query_shape::QueryShapeHa
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(QuerySettings);
 
 /**
- * The $querySettings stage returns all QueryShapeConfigurations stored in the cluster.
+ * The $querySettings stage returns all QueryShapeConfigurations stored in the cluster. It fully
+ * desugars at parse time into a pipeline that joins the in-memory configurations with their
+ * representative queries.
  */
-class DocumentSourceQuerySettings final : public DocumentSource {
+class DocumentSourceQuerySettings final {
 public:
-    static constexpr std::string_view kStageName = "$querySettings"sv;
-    static const Id& id;
-
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+    static constexpr std::string_view kStageName{"$querySettings"};
 
     class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
@@ -99,54 +96,13 @@ public:
         const PrivilegeVector _privileges;
     };
 
-    DocumentSourceQuerySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                bool showDebugQueryShape);
-
-    /**
-     * Returns the stage constraints used to override 'DocumentSourceQueue'. The
-     * 'kReceivingHostOnly' host type requirement is needed to ensure that the reported query
-     * settings are consistent with what's present on the current node. Without this, it's possible
-     * that '$querySettings' might report configurations which are present on 'mongod' instances,
-     * but not yet present on 'mongos' ones and consequently won't be enforced.
-     */
-    StageConstraints constraints(PipelineSplitState pipeState) const final {
-        StageConstraints constraints{DocumentSource::StreamType::kStreaming,
-                                     DocumentSource::PositionRequirement::kFirst,
-                                     DocumentSource::HostTypeRequirement::kReceivingHostOnly,
-                                     DocumentSource::DiskUseRequirement::kNoDiskUse,
-                                     DocumentSource::FacetRequirement::kNotAllowed,
-                                     DocumentSource::TransactionRequirement::kAllowed,
-                                     DocumentSource::LookupRequirement::kAllowed,
-                                     DocumentSource::UnionRequirement::kAllowed};
-        constraints.isIndependentOfAnyCollection = true;
-        constraints.setConstraintsForNoInputSources();
-        return constraints;
-    }
-
-    std::string_view getSourceName() const final {
-        return kStageName;
-    }
-
-    Id getId() const override {
-        return id;
-    }
-
-    bool getShowDebugQueryShape() const {
-        return _showDebugQueryShape;
-    }
-
-    boost::optional<DistributedPlanLogic> distributedPlanLogic(
-        const DistributedPlanContext* ctx) final {
-        return boost::none;
-    }
-
-    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
-
-    Value serialize(const query_shape::SerializationOptions& opts =
-                        query_shape::SerializationOptions{}) const final;
+    static DocumentSourceContainer createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
-    const bool _showDebugQueryShape;
+    // It is illegal to construct a DocumentSourceQuerySettings directly, use createFromBson()
+    // instead.
+    DocumentSourceQuerySettings() = default;
 };
 
 }  // namespace mongo

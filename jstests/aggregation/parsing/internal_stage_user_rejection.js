@@ -172,6 +172,9 @@ const kNeverInVersion1Stages = new Set([
     "$listSessions",
     "$planCacheStats",
     "$querySettings",
+    // $querySettings desugar internals
+    "$_internalListQuerySettings",
+    "$_internalQuerySettingsDebugShape",
     "$queryStats",
     "$shardedDataDistribution",
     // Scoring / ranking stages
