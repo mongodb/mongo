@@ -1,5 +1,5 @@
 /**
- * SERVER-130410: mixed-version (rolling upgrade) compatibility for the replication network
+ * mixed-version (rolling upgrade) compatibility for the replication network
  * compression feature (replication.networkCompression.compressors / setParameter
  * replicationNetworkCompression).
  *
@@ -108,6 +108,25 @@ function runMixedVersionScenario({label, primaryVersion, secondaryVersion, lates
     const primary = rst.getPrimary();
     const secondary = rst.getSecondary();
 
+    // Sanity that the orientation is what we asked for (so the "sync source is OLD" vs
+    // "fetcher is OLD" intent actually held and the test isn't silently trivial). node 0 was created
+    // with primaryVersion and node 1 (priority 0) with secondaryVersion, so HARD-assert that the
+    // elected primary is exactly node 0 and the secondary is node 1 before driving any writes. If a
+    // stray election ever flipped the orientation we must fail loudly here rather than run a
+    // version-swapped, silently meaningless scenario.
+    assert.eq(
+        primary.host,
+        rst.nodes[0].host,
+        `[${label}] expected node 0 (binVersion=${primaryVersion}) to be primary, but ` +
+            `${primary.host} is - orientation flipped, the scenario would be invalid`,
+    );
+    assert.eq(
+        secondary.host,
+        rst.nodes[1].host,
+        `[${label}] expected node 1 (binVersion=${secondaryVersion}) to be secondary, but ` +
+            `${secondary.host} is - orientation flipped, the scenario would be invalid`,
+    );
+
     // Baseline: some data already replicated during initiate; drive a fresh batch so we know the
     // steady-state oplog fetcher connection (whatever it negotiated) carries real traffic.
     driveReplication(primary, rst, "steady");
@@ -119,8 +138,6 @@ function runMixedVersionScenario({label, primaryVersion, secondaryVersion, lates
     // And the data must be identical on both the old and the new binary.
     assertDataConsistent(rst, kNumDocs);
 
-    // Sanity that the orientation is what we asked for (so the "sync source is OLD" vs
-    // "fetcher is OLD" intent actually held and the test isn't silently trivial).
     const primaryVer =
         assert.commandWorked(primary.adminCommand({buildInfo: 1})).version;
     const secondaryVer =

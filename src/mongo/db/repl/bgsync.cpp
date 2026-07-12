@@ -723,14 +723,9 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
     auto getConnection = [&connection, source]() -> DBClientBase* {
         if (!connection) {
             connection = std::make_unique<DBClientConnection>();
-            // SERVER-130410: the rollback common-point search reads the sync source's remote oplog
-            // over this connection (via OplogInterfaceRemote), so it is a replication data-plane
-            // connection just like the oplog fetcher and the initial-sync cloner. Apply the same
-            // node-local replicationNetworkCompression policy before the "hello" handshake runs so
-            // rollback traffic negotiates compression identically to those connections (and, in
-            // particular, honors replication.networkCompression.compressors even when
-            // net.compression.compressors is "disabled"). Must be set before connect() below, which
-            // is where DBClientConnection sends "hello".
+            // Rollback reads the sync source's remote oplog over this connection, so treat it as
+            // replication data-plane traffic. Apply the replication compression policy before
+            // connect(), where DBClientConnection sends hello and negotiates compression.
             applyReplicationNetworkCompressionToManager(connection->getCompressorManager());
             connection->setSoTimeout(durationCount<Milliseconds>(kRollbackOplogSocketTimeout) /
                                      1000.0);

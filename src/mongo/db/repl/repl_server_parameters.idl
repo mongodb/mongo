@@ -382,35 +382,18 @@ server_parameters:
 
     replicationNetworkCompression:
         description: >-
-            Controls whether, and with which algorithm(s), replication data-plane sync-source
-            connections (the oplog fetcher, the initial-sync collection cloner, and rollback remote
-            oplog reads) advertise wire compression. It affects ONLY those replication data-plane
-            connections: other internal connections such as replica-set heartbeats and
-            sharded-cluster RPC continue to use
-            net.compression.compressors, exactly as before this option existed. Accepted values:
-              ""         - (default) inherit process-wide net.compression.compressors; the
-                           replication data-plane connection is negotiated identically to any other
-                           outbound connection on this node.
-              "disabled" - do not advertise any compressor. The replication data-plane connection is
-                           negotiated uncompressed regardless of net.compression.compressors.
-              "<name>[,<name>...]" - advertise only the listed algorithms (e.g. "snappy",
-                           "zstd", "zlib", or "zstd,snappy"). Names must be part of the process-wide
-                           capability set (the union of net.compression.compressors and the
-                           replication.networkCompression.compressors provided at startup); names
-                           outside that union are dropped. If the filtered list is empty the
-                           connection is negotiated uncompressed. The listed order is the client
-                           preference order sent in the "hello" handshake.
-            This is a node-local replication data-plane policy: when this node fetches oplog or
-            cloned collection data from a sync source, it controls what the local replication client
-            advertises; when another replica set member fetches data from this node, it controls
-            what this node is willing to accept for that replication-marked connection. It does not
-            change the ability of this node to
-            accept ordinary client-facing compressed connections. This option is startup-only: it
-            can be set via the command line, the YAML config file
-            (replication.networkCompression.compressors) or an initial --setParameter, but cannot
-            be changed at runtime. Changing the algorithm requires editing the configuration and
-            restarting mongod so that the requested algorithms are registered in the process-wide
-            capability set. See SERVER-130410.
+            Controls wire compression for replication data-plane connections (oplog fetcher,
+            initial-sync collection cloner, and rollback remote oplog reads). Other connections,
+            including heartbeats, shard RPC, and external clients, continue to use
+            net.compression.compressors. Accepted values:
+              ""         - (default) inherit net.compression.compressors.
+              "disabled" - negotiate replication data-plane connections uncompressed.
+              "<name>[,<name>...]" - use only the listed compressors, in client preference order.
+                           Unknown or not-compiled compressors are startup errors.
+            This node-local startup-only policy applies both when this node fetches replication data
+            and when another member fetches replication data from this node. It can be set via the
+            command line, replication.networkCompression.compressors in YAML, or initial
+            --setParameter.
         set_at: [startup]
         cpp_vartype: synchronized_value<std::string>
         cpp_varname: gReplicationNetworkCompression

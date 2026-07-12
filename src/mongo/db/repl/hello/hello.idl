@@ -287,12 +287,9 @@ commands:
                 optional: true
                 stability: stable
             replicationCompressionClient:
-                # SERVER-130410: set to true by the replication oplog fetcher, initial-sync cloner,
-                # and rollback remote oplog reader so the server negotiates wire compression for
-                # this connection using replication.networkCompression.compressors instead of
-                # net.compression.compressors. Absent on all other connections (external clients,
-                # heartbeats, shard RPC), which
-                # continue to use net.compression.compressors.
+                # Set by replication data-plane clients so the server applies the replication
+                # compression policy for this connection. Absent on external clients, heartbeats,
+                # and shard RPC, which continue using the normal net.compression policy.
                 type: safeBool
                 optional: true
                 stability: internal

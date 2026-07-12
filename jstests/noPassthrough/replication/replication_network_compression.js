@@ -18,7 +18,8 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
-import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
+import {waitForState} from "jstests/replsets/rslib.js";
 
 // The default/inherit scenario advertises the full snappy/zstd/zlib set on the process-wide port.
 // Explicit replication-compressor scenarios disable net compression and configure the requested
@@ -29,7 +30,7 @@ const kProcessCompressors = "snappy,zstd,zlib";
 // Read the sync source's per-compressor COMPRESSOR bytesIn counters. Returns a plain object
 // keyed by compressor name so the test math is easy to read.
 //
-// SERVER-130410: the oplog fetcher pulls batches FROM the sync source over an exhaust cursor, so
+// The oplog fetcher pulls batches FROM the sync source over an exhaust cursor, so
 // the sync source COMPRESSES those oplog responses on the fetcher's connection. That
 // compressor direction carries the bulk replicated data and is the reliable signal for which
 // algorithm the replication channel negotiated. The reverse (sync source decompressor) only sees
@@ -52,7 +53,7 @@ function getCompressorBytesIn(node) {
 // Read a node's per-compressor DECOMPRESSOR bytesIn counters. Returns a plain object keyed by
 // compressor name.
 //
-// SERVER-130410: use this on the RECEIVING side of a data transfer, i.e. the node that DECOMPRESSES
+// Use this on the RECEIVING side of a data transfer, i.e. the node that DECOMPRESSES
 // inbound compressed messages:
 //   - the initial-sync collection cloner and the rollback common-point reader pull bulk data FROM
 //     the sync source as query responses, so the SYNCING/ROLLING-BACK node decompresses it, and
@@ -70,6 +71,24 @@ function getDecompressorBytesIn(node) {
     }
     for (const name of Object.keys(ss.network.compression)) {
         const d = ss.network.compression[name].decompressor;
+        out[name] = d ? d.bytesIn : 0;
+    }
+    return out;
+}
+
+// Read a node's serverStatus().repl.compression per-compressor byte counters, which
+// account for the replication-data-plane subset of network.compression. `direction` is "compressor"
+// or "decompressor". Returns {name: bytesIn}. Unlike the process-wide network.compression counters,
+// these only include traffic on replication-marked connections, so they are attributable to the
+// replication channel even when net compression is also enabled.
+function getReplCompressionBytesIn(node, direction) {
+    const ss = assert.commandWorked(node.adminCommand({serverStatus: 1}));
+    const out = {};
+    if (!ss.repl || !ss.repl.compression) {
+        return out;
+    }
+    for (const name of Object.keys(ss.repl.compression)) {
+        const d = ss.repl.compression[name][direction];
         out[name] = d ? d.bytesIn : 0;
     }
     return out;
@@ -175,11 +194,13 @@ function runScenario({label, secondaryValue, expectCompressorGrew, extraForbid})
     const primary = rst.getPrimary();
     const secondary = rst.getSecondary();
 
-    // Baseline: some traffic already flowed during initiate; snapshot the sync source (primary)
-    // counters AFTER the secondary is up and steady so any growth we observe is attributable
-    // to the writes we drive below on this fetcher's channel.
+    // Baseline: some traffic already flowed during initiate; snapshot process-wide and
+    // repl.compression counters AFTER the secondary is up and steady so any growth we observe is
+    // attributable to the writes we drive below on this fetcher's channel.
     rst.awaitReplication();
     const before = getCompressorBytesIn(primary);
+    const replCompressorBefore = getReplCompressionBytesIn(primary, "compressor");
+    const replDecompressorBefore = getReplCompressionBytesIn(secondary, "decompressor");
 
     // Drive several rounds of writes so the fetcher pulls new batches through its already-
     // established sync-source connection. We deliberately do NOT force a reconnect here: the
@@ -191,9 +212,21 @@ function runScenario({label, secondaryValue, expectCompressorGrew, extraForbid})
 
     const after = getCompressorBytesIn(primary);
     const grew = decompressorDelta(before, after);
+    const replCompressorGrew = decompressorDelta(
+        replCompressorBefore, getReplCompressionBytesIn(primary, "compressor"));
+    const replDecompressorGrew = decompressorDelta(
+        replDecompressorBefore, getReplCompressionBytesIn(secondary, "decompressor"));
     jsTest.log.info(
         `[replicationNetworkCompression] scenario ${label} compressor delta on sync source: ` +
             tojson(grew),
+    );
+    jsTest.log.info(
+        `[replicationNetworkCompression] scenario ${label} repl.compression compressor delta: ` +
+            tojson(replCompressorGrew),
+    );
+    jsTest.log.info(
+        `[replicationNetworkCompression] scenario ${label} repl.compression decompressor delta: ` +
+            tojson(replDecompressorGrew),
     );
 
     if (expectCompressorGrew === null) {
@@ -206,11 +239,35 @@ function runScenario({label, secondaryValue, expectCompressorGrew, extraForbid})
             `[${label}] expected no compressor growth on sync source (channel should be ` +
                 `uncompressed), but saw: ${tojson(grew)}`,
         );
+        assert.eq(
+            {},
+            replCompressorGrew,
+            `[${label}] expected no repl.compression compressor growth on sync source, but saw: ` +
+                tojson(replCompressorGrew),
+        );
+        assert.eq(
+            {},
+            replDecompressorGrew,
+            `[${label}] expected no repl.compression decompressor growth on fetcher, but saw: ` +
+                tojson(replDecompressorGrew),
+        );
     } else {
         assert(
             grew[expectCompressorGrew] && grew[expectCompressorGrew] > 0,
             `[${label}] expected compressor '${expectCompressorGrew}' bytesIn to grow on ` +
                 `sync source, delta was: ${tojson(grew)}`,
+        );
+        assert(
+            replCompressorGrew[expectCompressorGrew] &&
+                replCompressorGrew[expectCompressorGrew] > 0,
+            `[${label}] expected repl.compression.${expectCompressorGrew}.compressor to grow on ` +
+                `sync source, delta was: ${tojson(replCompressorGrew)}`,
+        );
+        assert(
+            replDecompressorGrew[expectCompressorGrew] &&
+                replDecompressorGrew[expectCompressorGrew] > 0,
+            `[${label}] expected repl.compression.${expectCompressorGrew}.decompressor to grow ` +
+                `on fetcher, delta was: ${tojson(replDecompressorGrew)}`,
         );
         // If the operator listed only one algorithm, no other compressor should have been
         // used on the replication channel.
@@ -220,6 +277,18 @@ function runScenario({label, secondaryValue, expectCompressorGrew, extraForbid})
                     !grew[name],
                     `[${label}] compressor '${name}' unexpectedly grew on sync source ` +
                         `despite not being in the allow-list: ${tojson(grew)}`,
+                );
+                assert(
+                    !replCompressorGrew[name],
+                    `[${label}] repl.compression compressor '${name}' unexpectedly grew on ` +
+                        `sync source despite not being in the allow-list: ` +
+                        tojson(replCompressorGrew),
+                );
+                assert(
+                    !replDecompressorGrew[name],
+                    `[${label}] repl.compression decompressor '${name}' unexpectedly grew on ` +
+                        `fetcher despite not being in the allow-list: ` +
+                        tojson(replDecompressorGrew),
                 );
             }
         }
@@ -249,6 +318,20 @@ function runScenario({label, secondaryValue, expectCompressorGrew, extraForbid})
             setParameter: {replicationNetworkCompression: ","},
         }),
     );
+
+    // A value that is only whitespace is non-empty but contains no compressor names, so it must be
+    // rejected rather than silently treated as inherit (which is reserved for a truly empty "").
+    for (const blank of [" ", "\t", "  ,  "]) {
+        assert.throws(
+            () =>
+                MongoRunner.runMongod({
+                    setParameter: {replicationNetworkCompression: blank},
+                }),
+            [],
+            `replicationNetworkCompression=${tojson(blank)} (whitespace/separators only) must ` +
+                `fail startup, not be treated as inherit`,
+        );
+    }
 })();
 
 // ---------------------------------------------------------------------------
@@ -277,7 +360,7 @@ function runScenario({label, secondaryValue, expectCompressorGrew, extraForbid})
 })();
 
 // ---------------------------------------------------------------------------
-// 3. Runtime setParameter must be REJECTED (SERVER-130410): replicationNetworkCompression is
+// 3. Runtime setParameter must be REJECTED: replicationNetworkCompression is
 //    declared set_at: [startup] only. Attempting to change it at runtime - with a legal value,
 //    with an illegal value, and even with a value that equals the current one - must fail and
 //    must NOT mutate the stored value. Changing compression requires editing the config /
@@ -402,8 +485,12 @@ runScenario({
 
     // Open a NEW connection to the secondary that negotiates snappy on the client side. The
     // default Mongo shell connection used by rst.getSecondary() is uncompressed, so we build
-    // a compressed one explicitly via the raw mongo program.
+    // a compressed one explicitly via the raw mongo program. Snapshot repl.compression too: external
+    // client traffic must grow network.compression but must NOT be attributed to the replication
+    // data-plane subset.
     const before = getDecompressorBytesIn(secondary);
+    const replCompressorBefore = getReplCompressionBytesIn(secondary, "compressor");
+    const replDecompressorBefore = getReplCompressionBytesIn(secondary, "decompressor");
     assert.eq(
         0,
         runMongoProgram(
@@ -427,11 +514,31 @@ runScenario({
             tojson(grew),
     );
 
+    // The same external client connection must not pollute serverStatus().repl.compression. This
+    // directly verifies that the new repl.compression counters are a replication-marker subset, not
+    // just another view of all network compression traffic.
+    const replCompressorGrew = decompressorDelta(
+        replCompressorBefore, getReplCompressionBytesIn(secondary, "compressor"));
+    const replDecompressorGrew = decompressorDelta(
+        replDecompressorBefore, getReplCompressionBytesIn(secondary, "decompressor"));
+    assert.eq(
+        {},
+        replCompressorGrew,
+        "external client response compression must not be counted in repl.compression compressor " +
+            "counters; delta: " + tojson(replCompressorGrew),
+    );
+    assert.eq(
+        {},
+        replDecompressorGrew,
+        "external client request compression must not be counted in repl.compression decompressor " +
+            "counters; delta: " + tojson(replDecompressorGrew),
+    );
+
     rst.stopSet();
 })();
 
 // ---------------------------------------------------------------------------
-// 5b. Scoping (SERVER-130410): replicationNetworkCompression must scope to the replication
+// 5b. Scoping: replicationNetworkCompression must scope to the replication
 //     sync-source connection ONLY. Other internal (internalClient) connections - heartbeats and,
 //     in a sharded cluster, intra-cluster RPC - must keep using net.compression.compressors. The
 //     server distinguishes them via the "replicationCompressionClient" hello marker that only
@@ -469,15 +576,35 @@ runScenario({
             "replicationNetworkCompression=disabled and net compression stayed enabled",
     );
 
-    // Drive fresh replication traffic while net compression remains enabled. We intentionally do
-    // NOT assert on process-wide decompressor counters here: heartbeat/internal RPC can legitimately
-    // use snappy and share those counters. The dedicated disabled scenario above verifies the
-    // replication data channel with net compression disabled to keep the counter signal isolated.
+    // Drive fresh replication traffic while net compression remains enabled. Process-wide counters
+    // are intentionally not used here because heartbeat/internal RPC can legitimately use snappy and
+    // share those counters. The dedicated repl.compression counters, however, must stay flat because
+    // the marked replication data-plane connection negotiated uncompressed.
     rst.awaitReplication();
+    const replCompressorBefore = getReplCompressionBytesIn(primary, "compressor");
+    const replDecompressorBefore = getReplCompressionBytesIn(secondary, "decompressor");
     for (let i = 0; i < 5; ++i) {
         generateOplogTraffic(primary, "netcompress_scope", "c", i);
     }
     rst.awaitReplication();
+    const replCompressorGrew = decompressorDelta(
+        replCompressorBefore, getReplCompressionBytesIn(primary, "compressor"));
+    const replDecompressorGrew = decompressorDelta(
+        replDecompressorBefore, getReplCompressionBytesIn(secondary, "decompressor"));
+    assert.eq(
+        {},
+        replCompressorGrew,
+        "replicationNetworkCompression=disabled must keep the replication data-plane uncompressed " +
+            "even when net compression is enabled; sync-source repl.compression compressor delta: " +
+            tojson(replCompressorGrew),
+    );
+    assert.eq(
+        {},
+        replDecompressorGrew,
+        "replicationNetworkCompression=disabled must keep the replication data-plane uncompressed " +
+            "even when net compression is enabled; fetcher repl.compression decompressor delta: " +
+            tojson(replDecompressorGrew),
+    );
 
     // Heartbeats are internal, non-replication connections. If replication=disabled had leaked into
     // them, the replica set could not maintain its topology. A healthy set (stable primary, both
@@ -515,7 +642,7 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
 }
 
 // ---------------------------------------------------------------------------
-// 7. Decoupling headline (SERVER-130410): net.compression.compressors DISABLED while replication
+// 7. Decoupling headline: net.compression.compressors DISABLED while replication
 //    compression is ENABLED. This is the whole point of the feature and was previously impossible.
 //    We prove three things at once:
 //      (a) the node STARTS even though the only requested compressor comes from the replication
@@ -560,6 +687,10 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
     // The sync source compresses the oplog batches it streams to the fetcher, so its compressor is
     // the reliable signal; its decompressor only sees the fetcher's tiny exhaust requests.
     const before = getCompressorBytesIn(primary);
+    // Observability: the primary is the sync source, so it COMPRESSES oplog for the
+    // fetcher. serverStatus().repl.compression.<algo>.compressor must grow for the replication
+    // portion specifically (a subset of network.compression).
+    const replBefore = getReplCompressionBytesIn(primary, "compressor");
     for (let i = 0; i < 5; ++i) {
         generateOplogTraffic(primary, "netcompress_decouple", "c", i);
     }
@@ -569,6 +700,17 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
     assert(
         grew[kReplAlgo] && grew[kReplAlgo] > 0,
         `expected replication channel to use '${kReplAlgo}' despite net disabled; delta: ${tojson(grew)}`,
+    );
+
+    // The dedicated repl.compression counter must attribute this to the replication data plane.
+    const replGrew = decompressorDelta(replBefore, getReplCompressionBytesIn(primary, "compressor"));
+    jsTest.log.info(
+        "[replicationNetworkCompression] decouple repl.compression compressor delta: " +
+            tojson(replGrew));
+    assert(
+        replGrew[kReplAlgo] && replGrew[kReplAlgo] > 0,
+        `expected serverStatus().repl.compression.${kReplAlgo}.compressor to grow on the sync ` +
+            `source; delta: ${tojson(replGrew)}`,
     );
 
     // (c) An external client that advertises the very same algorithm must NOT get it: with net
@@ -585,7 +727,7 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
 })();
 
 // ---------------------------------------------------------------------------
-// 8. Independent algorithm selection (SERVER-130410): net advertises ONE algorithm to clients,
+// 8. Independent algorithm selection: net advertises ONE algorithm to clients,
 //    while replication uses a DIFFERENT algorithm that is not in the net list at all. This proves
 //    the two policies are chosen from independent candidate sets even though both algorithms share
 //    a single process-wide capability union:
@@ -627,6 +769,7 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
     // snappy is the net-only algorithm and zstd is replication-only is the pair of external-client
     // negotiation checks below.
     const before = getCompressorBytesIn(primary);
+    const replBefore = getReplCompressionBytesIn(primary, "compressor");
     for (let i = 0; i < 5; ++i) {
         generateOplogTraffic(primary, "netcompress_independent", "c", i);
     }
@@ -638,6 +781,20 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
     assert(
         grew[kReplAlgo] && grew[kReplAlgo] > 0,
         `expected replication channel to use '${kReplAlgo}'; delta: ${tojson(grew)}`,
+    );
+
+    // The replication-data-plane subset must attribute the same growth to zstd specifically. This
+    // pins that the replication channel (not net snappy) drove the zstd bytes.
+    const replGrew = decompressorDelta(replBefore, getReplCompressionBytesIn(primary, "compressor"));
+    assert(
+        replGrew[kReplAlgo] && replGrew[kReplAlgo] > 0,
+        `expected serverStatus().repl.compression.${kReplAlgo}.compressor to grow on the sync ` +
+            `source; delta: ${tojson(replGrew)}`,
+    );
+    assert(
+        !replGrew[kNetAlgo],
+        `net-only algorithm '${kNetAlgo}' must not appear in the replication-data-plane counters; ` +
+            `delta: ${tojson(replGrew)}`,
     );
 
     // External client advertising the net algorithm gets it (net set governs client-facing).
@@ -660,7 +817,7 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
 
 // ---------------------------------------------------------------------------
 // 9. Initial (full) sync uses replication compression on the collection-cloner connection
-//    (SERVER-130410). The cloner connection now applies the exact same replicationNetworkCompression
+//    The cloner connection now applies the exact same replicationNetworkCompression
 //    policy as the steady-state oplog fetcher (shared helper applyReplicationNetworkCompressionToManager),
 //    so full sync gets compressed just like incremental sync, and even works when
 //    net.compression.compressors: disabled.
@@ -741,6 +898,18 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
             `oplog fetcher); delta: ${tojson(grew)}`,
     );
 
+    // Observability: the syncing node DECOMPRESSES the cloned collection data, so its
+    // replication-only decompressor counter must also reflect it (subset of network.compression).
+    const replGrew = decompressorDelta({}, getReplCompressionBytesIn(newNode, "decompressor"));
+    jsTest.log.info(
+        "[replicationNetworkCompression] initial sync repl.compression decompressor delta: " +
+            tojson(replGrew));
+    assert(
+        replGrew[kReplAlgo] && replGrew[kReplAlgo] > kMinClonerBytes,
+        `expected serverStatus().repl.compression.${kReplAlgo}.decompressor on the syncing node ` +
+            `to grow from the cloner connection; delta: ${tojson(replGrew)}`,
+    );
+
     // Sanity: the freshly-synced node actually cloned the data.
     assert.eq(
         kNumDocs,
@@ -752,7 +921,7 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
 })();
 
 // ---------------------------------------------------------------------------
-// 10. Inheritance under net disabled (SERVER-130410): when replicationNetworkCompression is left
+// 10. Inheritance under net disabled: when replicationNetworkCompression is left
 //     unset (its default value is the empty string ""), it INHERITS net.compression.compressors
 //     rather than forcing any particular behavior of its own (see
 //     parseReplicationNetworkCompression: "" -> inheritProcessDefault). Therefore, if net is
@@ -804,7 +973,7 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
 })();
 
 // ---------------------------------------------------------------------------
-// 11. Asymmetric / disjoint allow-lists (SERVER-130410): the fetcher and its sync source advertise
+// 11. Asymmetric / disjoint allow-lists: the fetcher and its sync source advertise
 //     DISJOINT replication allow-lists. With net disabled on both nodes, one node permits only
 //     snappy on the replication connection and the other permits only zstd, so their candidate sets
 //     do not intersect on the replication channel. serverNegotiate() then finds no mutually
@@ -838,11 +1007,15 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
     rst.initiate();
 
     const primary = rst.getPrimary();
+    const secondary = rst.getSecondary();
     rst.awaitReplication();
 
     // Measure the sync source's COMPRESSOR (it compresses the oplog it streams to the fetcher). A
     // successful negotiation would grow it; a correct fall-back-to-uncompressed leaves it flat.
+    // The dedicated repl.compression counters must also stay flat for a disjoint negotiation.
     const before = getCompressorBytesIn(primary);
+    const replCompressorBefore = getReplCompressionBytesIn(primary, "compressor");
+    const replDecompressorBefore = getReplCompressionBytesIn(secondary, "decompressor");
     for (let i = 0; i < 5; ++i) {
         generateOplogTraffic(primary, "netcompress_asym", "c", i);
     }
@@ -857,6 +1030,22 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
         "disjoint replication allow-lists (snappy vs zstd) must negotiate an UNCOMPRESSED channel " +
             "rather than pick a non-permitted algorithm; delta: " + tojson(grew),
     );
+    const replCompressorGrew = decompressorDelta(
+        replCompressorBefore, getReplCompressionBytesIn(primary, "compressor"));
+    const replDecompressorGrew = decompressorDelta(
+        replDecompressorBefore, getReplCompressionBytesIn(secondary, "decompressor"));
+    assert.eq(
+        {},
+        replCompressorGrew,
+        "disjoint allow-lists must leave sync-source repl.compression compressor counters flat; " +
+            "delta: " + tojson(replCompressorGrew),
+    );
+    assert.eq(
+        {},
+        replDecompressorGrew,
+        "disjoint allow-lists must leave fetcher repl.compression decompressor counters flat; " +
+            "delta: " + tojson(replDecompressorGrew),
+    );
 
     // A failed compression negotiation must not break replication: the set stays healthy and data
     // still flows (the traffic above already replicated via awaitReplication).
@@ -867,7 +1056,7 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
 })();
 
 // ---------------------------------------------------------------------------
-// 12. Rollback uses replication compression on the sync-source connection (SERVER-130410).
+// 12. Rollback uses replication compression on the sync-source connection.
 //     Rollback is a replication data-plane path too: to find the common point, the rolling-back
 //     node reads its sync source's remote oplog over a dedicated DBClientConnection created in
 //     BackgroundSync::_runRollback (via OplogInterfaceRemote). That connection now applies the same
@@ -875,12 +1064,23 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
 //     cloner, so rollback traffic is compressed identically - and, in particular, honors
 //     replication.networkCompression.compressors even when net.compression.compressors: disabled.
 //
+//     BRIDGE-FREE by design: the usual RollbackTest harness routes ALL replication through
+//     mongobridge to create the partitions it needs, but mongobridge cannot relay a COMPRESSED
+//     replication stream - it proxies the wire protocol and desynchronizes the request/response ids
+//     on OP_COMPRESSED exhaust frames (bridge error Location50765 "Response ID did not match the
+//     sent message ID"), so the bridged set never forms once replicationNetworkCompression is
+//     enabled with net disabled. We therefore induce the rollback WITHOUT any network proxy, using
+//     the stopReplProducer failpoint (stopServerReplication) plus a forced election. A single
+//     arbiter gives the surviving data node a voting majority after the future-rollback node steps
+//     down, so no partition is required.
+//
 //     Discriminating signal: with net disabled everywhere and replication=zstd, the ONLY way the
 //     rolling-back node's zstd decompressor can advance is through a repl-compressed connection.
 //     We isolate the rollback connection specifically from the (also-compressed) steady-state oplog
 //     fetcher using two facts:
-//       - a baseline is taken while the rolling-back node is still partitioned from its sync source
-//         (its fetcher cannot pull, so the counter is quiescent), and
+//       - the rolling-back node's producer is STALLED (stopServerReplication) while we stage the
+//         divergent branches, so a baseline snapshot taken then finds the zstd decompressor
+//         quiescent, and
 //       - the `bgSyncHangAfterRunRollback` failpoint freezes the node the instant _runRollback()
 //         returns - i.e. AFTER the common-point search read the remote oplog over the rollback
 //         connection, but BEFORE the oplog fetcher resumes. A watcher shell snapshots the counter
@@ -900,15 +1100,69 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
     // threshold modest because the remote oplog query projects each oplog entry down to {ts, t}.
     const kMinRollbackRemoteBytes = 4 * 1024;
 
-    const nodeOptions = {
+    const dataOpts = {
         networkMessageCompressors: "disabled",
         setParameter: {replicationNetworkCompression: kReplAlgo},
     };
-    const rollbackTest = new RollbackTest(
-        "replication_network_compression_rollback", undefined, nodeOptions);
+    // 3-node set, NO mongobridge: two data nodes plus an arbiter. The arbiter lets the surviving
+    // data node win the election after the future-rollback node steps down, so we can force the
+    // divergence with failpoints instead of a network partition.
+    const rst = new ReplSetTest({
+        name: "replication_network_compression_rollback",
+        nodes: [
+            {rsConfig: {priority: 1}},        // node 0: starts primary, will roll back
+            {rsConfig: {priority: 1}},        // node 1: becomes primary / rollback sync source
+            {rsConfig: {arbiterOnly: true}},  // arbiter: sways the election without a bridge
+        ],
+        nodeOptions: dataOpts,
+        settings: {
+            // Disable catchup takeover. Node 0 accumulates the (uncommitted) doomed branch, making
+            // it FRESHER than node 1; with catchup takeover enabled it would repeatedly re-seize the
+            // primary from the freshly elected node 1 (vote denials "can see a healthy primary ... of
+            // equal or greater priority"), so node 1 could never hold the primary long enough to
+            // build the divergent branch node 0 must roll back.
+            catchUpTakeoverDelayMillis: -1,
+            // Disable new-primary catch-up. When node 1 is elected it is BEHIND node 0 (which holds
+            // the doomed branch). With catch-up enabled the new primary would try to pull node 0's
+            // fresher oplog before becoming writable - but node 1's producer is stalled
+            // (stopServerReplication), so catch-up would stall and node 1 would never become a
+            // writable primary, hanging ReplSetTest.stepUp() in an election-retry loop. Disabling
+            // catch-up makes node 1 writable immediately AND ensures it never applies node 0's doomed
+            // ops, which is exactly the divergence node 0 must roll back.
+            catchUpTimeoutMillis: 0,
+        },
+    });
+    rst.startSet();
+    rst.initiate();
 
-    // Divergent branch on the rolling-back node (these ops get rolled back).
-    const rollbackNode = rollbackTest.transitionToRollbackOperations();
+    const rollbackNode = rst.nodes[0];
+    const syncSource = rst.nodes[1];
+
+    // Make node 0 the initial primary (everything is caught up here, so a normal stepUp is fine).
+    // Compare by host: getPrimary() may return a different connection object than rst.nodes[0], so an
+    // object-identity (!==) check could wrongly stepUp again and perturb the election.
+    if (rst.getPrimary().host !== rollbackNode.host) {
+        rst.stepUp(rollbackNode);
+    }
+    waitForState(rollbackNode, ReplSetTest.State.PRIMARY);
+
+    // Local (w:1) writes must commit without a majority so the doomed branch can form on node 0
+    // alone. The default majority write concern would otherwise block once we stall node 1.
+    assert.commandWorked(rollbackNode.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }));
+    assert.commandWorked(rollbackNode.getDB("rollback_compress").seed.insert(
+        {_id: "seed"}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
+    rst.awaitReplication();
+
+    // Stall the future sync source so it never learns the doomed branch, and stall the rolling-back
+    // node so it will NOT begin rollback until we have staged the full sync-source branch to read.
+    stopServerReplication(syncSource);
+    stopServerReplication(rollbackNode);
+
+    // Doomed branch: ops that exist only on node 0 (w:1) and must be rolled back.
     {
         const bulk = rollbackNode.getDB("rollback_compress").doomed.initializeUnorderedBulkOp();
         for (let i = 0; i < 50; ++i) {
@@ -917,11 +1171,23 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
         assert.commandWorked(bulk.execute({w: 1}));
     }
 
-    // Sync-source branch: a large set of ops the rolling-back node has never seen. The common-point
-    // search must read all of these back over the rollback connection, which is the traffic we
-    // measure.
-    rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
-    const syncSource = rollbackTest.getPrimary();
+    // Step node 0 down (this also freezes it from elections) and elect node 1. Node 1 is behind (it
+    // never saw the doomed branch) and is still stalled, but the arbiter gives it a voting majority
+    // and stopReplProducer does not block elections. Use ReplSetTest.stepUp with
+    // awaitReplicationBeforeStepUp:false: node 1 must NOT wait to catch up to node 0's doomed ops
+    // (that divergence is exactly what we are creating). The helper retries replSetStepUp and waits
+    // for the set to agree on the new primary, so it is robust against the election-timing races that
+    // a hand-rolled replSetStepUp loop would hit (repeated stepUps can knock a freshly elected
+    // primary back down).
+    assert.commandWorked(rollbackNode.adminCommand({replSetStepDown: 300, force: true}));
+    rst.stepUp(syncSource, {awaitReplicationBeforeStepUp: false});
+    waitForState(syncSource, ReplSetTest.State.PRIMARY);
+    // node 1 is primary now; clear its producer stall (harmless while primary) for a clean teardown.
+    restartServerReplication(syncSource);
+
+    // Sync-source branch: a large set of ops on the NEW primary's divergent branch. Node 0's
+    // common-point search reads all of these back over the rollback connection - the traffic we
+    // measure. OplogInterfaceRemote projects entries to {ts, t}, so volume comes from entry count.
     {
         const bulk = syncSource.getDB("rollback_compress").winner.initializeUnorderedBulkOp();
         for (let i = 0; i < 5000; ++i) {
@@ -930,9 +1196,10 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
         assert.commandWorked(bulk.execute({w: 1}));
     }
 
-    // Baseline BEFORE rollback: the node is still partitioned from its sync source, so its fetcher
-    // is idle and the zstd decompressor is quiescent.
+    // Baseline BEFORE node 0 resumes fetching and rolls back: its producer is still stalled, so the
+    // zstd decompressor is quiescent.
     const before = getDecompressorBytesIn(rollbackNode);
+    const replBefore = getReplCompressionBytesIn(rollbackNode, "decompressor");
 
     // Freeze the node right after the common-point search completes but before the fetcher resumes.
     assert.commandWorked(rollbackNode.adminCommand(
@@ -940,32 +1207,79 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
 
     // Watcher: wait for the frozen point, snapshot the rollback node's compressed-bytes counter,
     // stash it on the (healthy) sync source, then release the failpoint so rollback can finish.
+    //
+    // IMPORTANT: rollback via recoverToStableTimestamp CLOSES the node's client connections while it
+    // runs, so any single cached connection to the rolling-back node will throw a network error
+    // mid-rollback. The watcher therefore reconnects with a FRESH Mongo() on every poll iteration and
+    // tolerates transient failures, only succeeding once the node has hung at the post-rollback
+    // failpoint (at which point it serves commands again and the counters reflect exactly the
+    // common-point read done over the rollback connection, before the steady-state fetcher resumes).
     const awaitWatcher = startParallelShell(
         funWithArgs(
             function (rbPort, ssHost, algo) {
-                const rb = new Mongo("localhost:" + rbPort);
-                // Poll the log for the failpoint-hit marker (id 21095). serverStatus keeps
-                // responding while the producer thread sleeps in the failpoint loop.
+                const rbHost = "localhost:" + rbPort;
+                let snapped = null;
                 assert.soon(
                     () => {
-                        const log = assert.commandWorked(rb.adminCommand({getLog: "global"})).log;
-                        return log.some(
-                            (line) => line.includes("bgSyncHangAfterRunRollback failpoint is set"));
+                        try {
+                            const rb = new Mongo(rbHost);
+                            const res = rb.adminCommand({getLog: "global"});
+                            if (!res.ok || !res.log ||
+                                !res.log.some((line) => line.includes(
+                                    "bgSyncHangAfterRunRollback failpoint is set"))) {
+                                return false;
+                            }
+                            const ss = rb.adminCommand({serverStatus: 1});
+                            if (!ss.ok) {
+                                return false;
+                            }
+                            let bytes = 0;
+                            if (ss.network && ss.network.compression &&
+                                ss.network.compression[algo] &&
+                                ss.network.compression[algo].decompressor) {
+                                bytes = ss.network.compression[algo].decompressor.bytesIn;
+                            }
+                            let replBytes = 0;
+                            if (ss.repl && ss.repl.compression && ss.repl.compression[algo] &&
+                                ss.repl.compression[algo].decompressor) {
+                                replBytes = ss.repl.compression[algo].decompressor.bytesIn;
+                            }
+                            snapped = {bytes: bytes, replBytes: replBytes};
+                            return true;
+                        } catch (e) {
+                            // Rollback closes client connections; retry with a fresh connection.
+                            return false;
+                        }
                     },
                     "timed out waiting for bgSyncHangAfterRunRollback failpoint to engage",
                     5 * 60 * 1000,
                 );
-                const ss = assert.commandWorked(rb.adminCommand({serverStatus: 1}));
-                let bytes = 0;
-                if (ss.network && ss.network.compression && ss.network.compression[algo] &&
-                    ss.network.compression[algo].decompressor) {
-                    bytes = ss.network.compression[algo].decompressor.bytesIn;
+                try {
+                    const src = new Mongo(ssHost);
+                    assert.commandWorked(src.getDB("rollback_compress").probe.insert({
+                        _id: "atRollbackHang",
+                        bytes: snapped.bytes,
+                        replBytes: snapped.replBytes,
+                    }));
+                } finally {
+                    // Always release the rollback failpoint (resiliently), else the main thread would
+                    // hang in awaitSecondaryNodes() until the test's global timeout.
+                    assert.soon(
+                        () => {
+                            try {
+                                const rb = new Mongo(rbHost);
+                                return rb.adminCommand({
+                                    configureFailPoint: "bgSyncHangAfterRunRollback",
+                                    mode: "off",
+                                }).ok === 1;
+                            } catch (e) {
+                                return false;
+                            }
+                        },
+                        "failed to release bgSyncHangAfterRunRollback failpoint",
+                        60 * 1000,
+                    );
                 }
-                const src = new Mongo(ssHost);
-                assert.commandWorked(src.getDB("rollback_compress")
-                                         .probe.insert({_id: "atRollbackHang", bytes: bytes}));
-                assert.commandWorked(rb.adminCommand(
-                    {configureFailPoint: "bgSyncHangAfterRunRollback", mode: "off"}));
             },
             rollbackNode.port,
             syncSource.host,
@@ -974,12 +1288,14 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
         true,
     );
 
-    // Trigger the rollback. This reconnects the partition; the rolling-back node reads the remote
-    // oplog over the rollback connection, hits the failpoint (watcher snapshots + releases), then
-    // resumes and rejoins as a secondary.
-    rollbackTest.transitionToSyncSourceOperationsDuringRollback();
-    rollbackTest.transitionToSteadyStateOperations();
+    // Trigger the rollback WITHOUT a bridge: resume node 0's replication. It syncs from the new
+    // primary, detects the divergent doomed branch (OplogStartMissing), and runs rollback - reading
+    // the sync source's remote oplog over the compressed rollback connection, hitting the failpoint
+    // (watcher snapshots + releases), then rejoining as a secondary.
+    restartServerReplication(rollbackNode);
     awaitWatcher();
+    rst.awaitSecondaryNodes(null, [rollbackNode]);
+    rst.awaitReplication();
 
     const probe = syncSource.getDB("rollback_compress").probe.findOne({_id: "atRollbackHang"});
     assert(probe, "watcher did not record a rollback-hang decompressor snapshot");
@@ -991,17 +1307,36 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
         `expected the rollback common-point connection to negotiate '${kReplAlgo}' despite ` +
             `net.compression.compressors: disabled (need > ${kMinRollbackRemoteBytes} compressed ` +
             `bytes read from the sync source's remote oplog), but delta was ${delta}. A zero/near-` +
-            `zero delta means the rollback connection was left uncompressed (the SERVER-130410 gap ` +
+            `zero delta means the rollback connection was left uncompressed (the gap ` +
             `in BackgroundSync::_runRollback).`,
     );
 
-    // stop() runs RollbackTest's built-in data-consistency checks, proving the rollback itself
-    // completed correctly under replication-only compression (functional coverage of the path).
-    rollbackTest.stop();
+    const replDelta = probe.replBytes - (replBefore[kReplAlgo] || 0);
+    jsTest.log.info(
+        `[replicationNetworkCompression] rollback repl.compression zstd decompressor delta: ` +
+            `${replDelta}`);
+    assert(
+        replDelta > kMinRollbackRemoteBytes,
+        `expected serverStatus().repl.compression.${kReplAlgo}.decompressor on the rolling-back ` +
+            `node to grow from the rollback common-point connection, but delta was ${replDelta}`,
+    );
+
+    // Data-consistency checks after a rollback performed under replication-only compression prove
+    // the rollback itself completed correctly (functional coverage of the path), and that the doomed
+    // branch was actually discarded.
+    rst.awaitReplication();
+    rst.checkReplicatedDataHashes();
+    rst.checkOplogs();
+    assert.eq(
+        0,
+        rollbackNode.getDB("rollback_compress").doomed.countDocuments({}),
+        "doomed branch was not rolled back off node 0",
+    );
+    rst.stopSet();
 })();
 
 // ---------------------------------------------------------------------------
-// 13. Both disabled (SERVER-130410): net.compression.compressors=disabled AND
+// 13. Both disabled: net.compression.compressors=disabled AND
 //     replicationNetworkCompression=disabled on both nodes. Nothing on the node may negotiate
 //     compression - neither the replication data channel nor client-facing connections. This is the
 //     "fully uncompressed" corner of the net x repl matrix and complements the inherit-under-net-
@@ -1032,8 +1367,10 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
     rst.awaitReplication();
 
     // Replication channel must be uncompressed: the sync source's compressor must not grow from
-    // fetcher traffic.
+    // fetcher traffic. The dedicated repl.compression counters must also stay flat.
     const before = getCompressorBytesIn(primary);
+    const replCompressorBefore = getReplCompressionBytesIn(primary, "compressor");
+    const replDecompressorBefore = getReplCompressionBytesIn(secondary, "decompressor");
     for (let i = 0; i < 5; ++i) {
         generateOplogTraffic(primary, "netcompress_both_disabled", "c", i);
     }
@@ -1047,6 +1384,22 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
         grew,
         "with net.compression.compressors=disabled and replicationNetworkCompression=disabled the " +
             "replication channel must be uncompressed; delta: " + tojson(grew),
+    );
+    const replCompressorGrew = decompressorDelta(
+        replCompressorBefore, getReplCompressionBytesIn(primary, "compressor"));
+    const replDecompressorGrew = decompressorDelta(
+        replDecompressorBefore, getReplCompressionBytesIn(secondary, "decompressor"));
+    assert.eq(
+        {},
+        replCompressorGrew,
+        "with both net and replication compression disabled, sync-source repl.compression " +
+            "compressor counters must not grow; delta: " + tojson(replCompressorGrew),
+    );
+    assert.eq(
+        {},
+        replDecompressorGrew,
+        "with both net and replication compression disabled, fetcher repl.compression decompressor " +
+            "counters must not grow; delta: " + tojson(replDecompressorGrew),
     );
 
     // Client-facing connections must also be uncompressed: even advertising a real algorithm, an
@@ -1068,7 +1421,7 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
 })();
 
 // ---------------------------------------------------------------------------
-// 14. CLI config path (SERVER-130410): the feature is exposed both as a setParameter
+// 14. CLI config path: the feature is exposed both as a setParameter
 //     (replicationNetworkCompression) and as a config option
 //     (replication.networkCompression.compressors, short name replicationNetworkCompressionCompressors,
 //     source: [yaml, cli]). All earlier scenarios drive the setParameter form; this one exercises the
@@ -1113,6 +1466,7 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
 
     // (b) The replication channel must use the configured algorithm even though net is disabled.
     const before = getCompressorBytesIn(primary);
+    const replBefore = getReplCompressionBytesIn(primary, "compressor");
     for (let i = 0; i < 5; ++i) {
         generateOplogTraffic(primary, "netcompress_config_path", "c", i);
     }
@@ -1127,11 +1481,19 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
             `replication channel; delta: ${tojson(grew)}`,
     );
 
+    // The replication-data-plane subset must attribute the growth to the configured algorithm.
+    const replGrew = decompressorDelta(replBefore, getReplCompressionBytesIn(primary, "compressor"));
+    assert(
+        replGrew[kReplAlgo] && replGrew[kReplAlgo] > 0,
+        `expected serverStatus().repl.compression.${kReplAlgo}.compressor to grow on the sync ` +
+            `source for the config-supplied compressor; delta: ${tojson(replGrew)}`,
+    );
+
     rst.stopSet();
 })();
 
 // ---------------------------------------------------------------------------
-// 15. Conflicting config + setParameter must be REJECTED (SERVER-130410): storeMongodOptions()
+// 15. Conflicting config + setParameter must be REJECTED: storeMongodOptions()
 //     seeds the setParameter from replication.networkCompression.compressors and calls
 //     checkConflictWithSetParameter(), so supplying BOTH the config option AND an initial
 //     --setParameter replicationNetworkCompression is an ambiguous startup command and must fail
@@ -1153,7 +1515,7 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
 })();
 
 // ---------------------------------------------------------------------------
-// 16. Unknown / not-compiled algorithm fails startup (SERVER-130410): a syntactically valid but
+// 16. Unknown / not-compiled algorithm fails startup: a syntactically valid but
 //     unregistered compressor name is folded into the process-wide capability union and then caught
 //     by MessageCompressorRegistry::finalizeSupportedCompressors() (AllCompressorsRegistered
 //     initializer), which uassertStatusOK()s a BadValue. This is a HARD startup error, not a silent
@@ -1180,4 +1542,247 @@ function externalClientNegotiatedCompression(host, clientAdvertises) {
         `replicationNetworkCompressionCompressors='${kBogusAlgo}' (config/CLI) must fail startup, ` +
             `not be silently dropped`,
     );
+})();
+
+// ---------------------------------------------------------------------------
+// 17. Replication narrows to a SUBSET of a full net set. Both the net list and the
+//     replication list share a single process-wide capability union; here net advertises the full
+//     snappy,zstd,zlib set to clients while replication narrows to a single algorithm (zstd) that
+//     is ALSO in the net set. This is the "repl is a subset of net" case (distinct from #8, where
+//     the replication algorithm is NOT in the net set). We prove two independent facts:
+//       (a) the replication channel negotiates exactly zstd - even though net ordering would pick
+//           snappy first for any non-replication client - because the fetcher advertises only the
+//           replication allow-list, and
+//       (b) narrowing replication to zstd does NOT shrink the client-facing net set: external
+//           clients advertising snappy or zlib (net members that are NOT the replication algorithm)
+//           still negotiate them, proving the two policies are selected independently from the
+//           shared union.
+// ---------------------------------------------------------------------------
+(function testReplicationNarrowsToSubsetOfFullNetSet() {
+    jsTest.log.info(
+        "[replicationNetworkCompression] subset: net=full union, replication narrows to zstd");
+    const kReplAlgo = "zstd";
+
+    const rst = new ReplSetTest({
+        name: "replication_network_compression_subset_of_full_net",
+        nodes: [
+            {
+                networkMessageCompressors: kProcessCompressors,
+                setParameter: {replicationNetworkCompression: kReplAlgo},
+            },
+            {
+                networkMessageCompressors: kProcessCompressors,
+                setParameter: {replicationNetworkCompression: kReplAlgo},
+            },
+        ],
+    });
+    rst.startSet();
+    rst.initiate();
+
+    const primary = rst.getPrimary();
+    const secondary = rst.getSecondary();
+    rst.awaitReplication();
+
+    // (a) The replication channel used zstd. Because the fetcher advertises only its replication
+    // allow-list ([zstd]), the sync source compresses the oplog it streams with zstd, so its zstd
+    // compressor grows. zstd is in the net set too, but internal (non-replication) clients advertise
+    // the net list in its configured order (snappy first), so heartbeats negotiate snappy - leaving
+    // the zstd growth attributable to the replication fetcher.
+    const before = getCompressorBytesIn(primary);
+    for (let i = 0; i < 5; ++i) {
+        generateOplogTraffic(primary, "netcompress_subset", "c", i);
+    }
+    rst.awaitReplication();
+    const grew = decompressorDelta(before, getCompressorBytesIn(primary));
+    jsTest.log.info(
+        "[replicationNetworkCompression] subset compressor delta on sync source: " + tojson(grew));
+    assert(
+        grew[kReplAlgo] && grew[kReplAlgo] > 0,
+        `expected the replication channel to narrow to '${kReplAlgo}' even though net offered the ` +
+            `full set; delta: ${tojson(grew)}`,
+    );
+    // Pin it: the repl-marked fetcher connection negotiated EXACTLY [zstd], not snappy/zlib, despite
+    // net advertising all three.
+    assert.soon(
+        () => hasReplicationCompressionNegotiationLog(secondary, true, [kReplAlgo]),
+        `replication connection should negotiate exactly [${kReplAlgo}] when replication narrows a ` +
+            `full net set to that subset`,
+    );
+
+    // (b) Narrowing replication to zstd must not remove the other net algorithms from the
+    // client-facing set. External clients advertising snappy or zlib (net members other than the
+    // replication algorithm) still negotiate them; if replication narrowing had wrongly shrunk the
+    // client-facing net set to just zstd, these would return NONE.
+    assert.eq(
+        "snappy",
+        externalClientNegotiatedCompression(secondary.host, "snappy"),
+        "external client advertising snappy must still negotiate snappy: narrowing " +
+            "replication to zstd must not shrink the client-facing net set",
+    );
+    assert.eq(
+        "zlib",
+        externalClientNegotiatedCompression(secondary.host, "zlib"),
+        "external client advertising zlib must still negotiate zlib: narrowing " +
+            "replication to zstd must not shrink the client-facing net set",
+    );
+
+    rst.stopSet();
+})();
+
+// ---------------------------------------------------------------------------
+// 18. Ordered replication list is independent of a single (non-disabled) net algorithm
+//     net advertises ONE algorithm to clients (snappy) while replication uses an
+//     ORDERED list of two OTHER algorithms (zlib,zstd), neither present in the net set. Earlier
+//     ordered-preference coverage (zstd_then_snappy) runs only with net disabled; this exercises
+//     ordering while net compression stays ACTIVE. We prove:
+//       (a) the replication channel picks the FIRST advertised algorithm (zlib) - client-advertised
+//           order is the negotiation preference - and does NOT fall through to the second (zstd),
+//       (b) neither replication-only algorithm is ever offered to external clients (only snappy is),
+//           and
+//       (c) an external client advertising snappy still negotiates snappy.
+//     Because zlib/zstd are NOT in the net set, their compressor growth on the sync source can only
+//     originate from the replication channel (heartbeats use snappy), giving a clean ordering signal.
+// ---------------------------------------------------------------------------
+(function testReplicationOrderedListIndependentOfSingleNetAlgo() {
+    jsTest.log.info(
+        "[replicationNetworkCompression] ordered: net=snappy, replication=zlib,zstd (prefers zlib)");
+    const kNetAlgo = "snappy";
+    const kReplFirst = "zlib";
+    const kReplSecond = "zstd";
+    const kReplList = `${kReplFirst},${kReplSecond}`;
+
+    const rst = new ReplSetTest({
+        name: "replication_network_compression_ordered_independent",
+        nodes: [
+            {
+                networkMessageCompressors: kNetAlgo,
+                setParameter: {replicationNetworkCompression: kReplList},
+            },
+            {
+                networkMessageCompressors: kNetAlgo,
+                setParameter: {replicationNetworkCompression: kReplList},
+            },
+        ],
+    });
+    rst.startSet();
+    rst.initiate();
+
+    const primary = rst.getPrimary();
+    const secondary = rst.getSecondary();
+    rst.awaitReplication();
+
+    // (a) The sync source compresses the oplog stream with the FIRST negotiated compressor (zlib).
+    // zlib and zstd are not in the net set, so only the replication channel could grow either of
+    // their compressors; a growing zlib with a flat zstd proves the client-advertised order won even
+    // while net=snappy stayed enabled.
+    const before = getCompressorBytesIn(primary);
+    for (let i = 0; i < 5; ++i) {
+        generateOplogTraffic(primary, "netcompress_ordered", "c", i);
+    }
+    rst.awaitReplication();
+    const grew = decompressorDelta(before, getCompressorBytesIn(primary));
+    jsTest.log.info(
+        "[replicationNetworkCompression] ordered compressor delta on sync source: " + tojson(grew));
+    assert(
+        grew[kReplFirst] && grew[kReplFirst] > 0,
+        `expected the replication channel to use the first-preference '${kReplFirst}'; delta: ` +
+            `${tojson(grew)}`,
+    );
+    assert(
+        !grew[kReplSecond],
+        `second-preference '${kReplSecond}' must not have carried replication data while ` +
+            `'${kReplFirst}' was available; delta: ${tojson(grew)}`,
+    );
+    // The channel is compressed (repl-marked connection negotiated a non-empty set).
+    assert.soon(
+        () => hasReplicationCompressionNegotiationLog(secondary, true),
+        "replication connection should negotiate a compressed channel for an ordered repl list " +
+            "even under a single non-disabled net algorithm",
+    );
+
+    // (b) The replication-only algorithms must never be offered to external clients.
+    assert.eq(
+        "NONE",
+        externalClientNegotiatedCompression(secondary.host, kReplFirst),
+        `replication-only algorithm '${kReplFirst}' must not be offered to external clients`,
+    );
+    assert.eq(
+        "NONE",
+        externalClientNegotiatedCompression(secondary.host, kReplSecond),
+        `replication-only algorithm '${kReplSecond}' must not be offered to external clients`,
+    );
+    // (c) The net algorithm is still offered to clients.
+    assert.eq(
+        kNetAlgo,
+        externalClientNegotiatedCompression(secondary.host, kNetAlgo),
+        `external client advertising the net algorithm '${kNetAlgo}' must negotiate it`,
+    );
+
+    rst.stopSet();
+})();
+
+// ---------------------------------------------------------------------------
+// 19. Inherit under a single net algorithm. replicationNetworkCompression is left
+//     UNSET (default "" -> inherit net.compression.compressors). #4 covers inherit under the full
+//     net set and #10 covers inherit under net disabled; this pins the remaining inherit corner: a
+//     net set with exactly one algorithm (snappy). The replication channel must inherit and
+//     negotiate that algorithm.
+//
+//     Signal: snappy is the ONLY process-wide algorithm here, so heartbeats also use snappy and the
+//     process-wide snappy compressor counter cannot isolate the replication channel. We therefore
+//     assert via the replication negotiation log (id 10130422), which is emitted ONLY for the
+//     repl-marked fetcher connection and records that connection's negotiated compressors.
+// ---------------------------------------------------------------------------
+(function testInheritFollowsSingleNetAlgo() {
+    jsTest.log.info(
+        "[replicationNetworkCompression] inherit: net=snappy + replication unset -> snappy");
+    const kNetAlgo = "snappy";
+
+    const rst = new ReplSetTest({
+        name: "replication_network_compression_inherit_single_net",
+        nodes: [
+            // Both nodes advertise a single net algorithm and leave replicationNetworkCompression at
+            // its default (""), i.e. inherit the net set on the replication connection.
+            {networkMessageCompressors: kNetAlgo},
+            {networkMessageCompressors: kNetAlgo},
+        ],
+    });
+    rst.startSet();
+    rst.initiate();
+
+    const primary = rst.getPrimary();
+    const secondary = rst.getSecondary();
+    rst.awaitReplication();
+
+    // The repl-marked fetcher connection inherited the net set and negotiated snappy.
+    assert.soon(
+        () => hasReplicationCompressionNegotiationLog(secondary, true, [kNetAlgo]),
+        `inherit under net=${kNetAlgo}: the replication connection should negotiate ${kNetAlgo}`,
+    );
+
+    // Drive traffic and confirm the inherited algorithm is attributed to the replication data plane.
+    const replCompressorBefore = getReplCompressionBytesIn(primary, "compressor");
+    const replDecompressorBefore = getReplCompressionBytesIn(secondary, "decompressor");
+    for (let i = 0; i < 5; ++i) {
+        generateOplogTraffic(primary, "netcompress_inherit_single", "c", i);
+    }
+    rst.awaitReplication();
+    assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
+
+    const replCompressorGrew = decompressorDelta(
+        replCompressorBefore, getReplCompressionBytesIn(primary, "compressor"));
+    const replDecompressorGrew = decompressorDelta(
+        replDecompressorBefore, getReplCompressionBytesIn(secondary, "decompressor"));
+    assert(
+        replCompressorGrew[kNetAlgo] && replCompressorGrew[kNetAlgo] > 0,
+        `expected inherited algorithm '${kNetAlgo}' to grow on the sync source's ` +
+            `repl.compression compressor; delta: ${tojson(replCompressorGrew)}`,
+    );
+    assert(
+        replDecompressorGrew[kNetAlgo] && replDecompressorGrew[kNetAlgo] > 0,
+        `expected inherited algorithm '${kNetAlgo}' to grow on the fetcher's ` +
+            `repl.compression decompressor; delta: ${tojson(replDecompressorGrew)}`,
+    );
+
+    rst.stopSet();
 })();

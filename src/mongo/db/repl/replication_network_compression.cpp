@@ -71,11 +71,15 @@ Status parseReplicationNetworkCompression(std::string_view value,
                                           ReplicationNetworkCompressionSetting* out) {
     *out = ReplicationNetworkCompressionSetting{};
 
-    const std::string trimmed = trim(value);
-    if (trimmed.empty()) {
+    // Only a truly empty value inherits the process default. A non-empty value that is only
+    // whitespace/separators is an explicit (mis)configuration and must fail below rather than be
+    // silently treated as inherit, matching the "does not contain any compressor names" rejection.
+    if (value.empty()) {
         out->inheritProcessDefault = true;
         return Status::OK();
     }
+
+    const std::string trimmed = trim(value);
 
     // Any non-empty value is an explicit override of the process default. The struct defaults to
     // inherit=true, so clear it before returning from either the disabled or allow-list branches.
@@ -89,13 +93,8 @@ Status parseReplicationNetworkCompression(std::string_view value,
         return Status::OK();
     }
 
-    // Comma-separated list of compressor names. Empty segments (e.g. from a trailing comma such as
-    // "snappy,") are tolerated and ignored; duplicates are deduplicated while preserving first-seen
-    // order (client-advertised order is the negotiation preference order, so keeping the
-    // first occurrence gives the operator predictable ordering). Note: a truly empty value ("") was
-    // already handled above as "inherit"; here 'trimmed' is non-empty, so an input consisting solely
-    // of separators (e.g. "," or ",,") is a malformed list and is rejected below rather than being
-    // silently downgraded to inherit, which would hide a configuration typo.
+    // Parse comma-separated compressor names. Empty segments are ignored, duplicates are removed
+    // while preserving first-seen order, and a non-empty value with no names is rejected.
     std::vector<std::string> parsed;
     size_t start = 0;
     while (start <= trimmed.size()) {
@@ -120,10 +119,8 @@ Status parseReplicationNetworkCompression(std::string_view value,
     }
 
     if (parsed.empty()) {
-        // 'trimmed' was non-empty (the empty "" case is handled earlier as inherit) yet produced no
-        // names, i.e. the value was nothing but separators/whitespace (e.g. "," or ", ,"). Reject it
-        // as malformed rather than silently treating it as inherit, so an operator's typo surfaces
-        // immediately instead of quietly leaving replication compression at the process default.
+        // Reject non-empty values that contained only separators/whitespace instead of treating
+        // them as inherit, so configuration typos surface at startup.
         return {ErrorCodes::BadValue,
                 str::stream() << "replicationNetworkCompression: '" << value
                               << "' does not contain any compressor names"};
@@ -141,15 +138,9 @@ Status validateReplicationNetworkCompression(std::string_view value,
 
 ReplicationNetworkCompressionSetting getReplicationNetworkCompressionSetting() {
     ReplicationNetworkCompressionSetting result;
-    // synchronized_value<std::string> exposes a locked accessor via operator*; take a snapshot
-    // as a plain std::string so we don't hold the lock while parsing.
+    // Take a plain std::string snapshot so we don't hold the synchronized_value lock while parsing.
     std::string snapshot = *gReplicationNetworkCompression;
-    // The value can only be set at startup (set_at: [startup]) and is checked by
-    // validateReplicationNetworkCompression before it is stored, so by the time replication reads
-    // it here it MUST parse cleanly. A parse failure therefore means the invariant was violated
-    // (e.g. a future code path wrote gReplicationNetworkCompression directly, bypassing the
-    // validator). Fail loudly with the offending value rather than silently degrading to "inherit
-    // process default", which would mask the bug and could change compression behavior invisibly.
+    // Startup validation should guarantee this parses; fail loudly if that invariant is broken.
     auto status = parseReplicationNetworkCompression(snapshot, &result);
     tassert(10130420,
             str::stream() << "stored replicationNetworkCompression value did not parse: '"
@@ -160,10 +151,11 @@ ReplicationNetworkCompressionSetting getReplicationNetworkCompressionSetting() {
 
 void applyReplicationNetworkCompressionToManager(MessageCompressorManager& mgr) {
     auto setting = getReplicationNetworkCompressionSetting();
-    // SERVER-130410: mark this connection as a replication client so the server routes it (and only
-    // it) through the replication candidate set. This must be set in every branch below, including
-    // "inherit", so heartbeats / shard RPC (which never call this helper) stay on the net set.
+    // Mark replication data-plane connections so hello carries the replication marker and compressed
+    // bytes are counted under serverStatus().repl.compression. Other internal connections do not
+    // call this helper and continue using the normal net.compression policy.
     mgr.markReplicationClientForThisSession(true);
+    mgr.countAsReplicationCompressionTrafficForThisSession(true);
     if (setting.inheritProcessDefault) {
         // Advertise the process-wide net.compression.compressors list: clear any per-session
         // suppression and allow-list left over from a previous (re)connect.

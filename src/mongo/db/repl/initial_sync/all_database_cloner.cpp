@@ -107,14 +107,10 @@ Status AllDatabaseCloner::ensurePrimaryOrSecondary(
 
 BaseCloner::AfterStageBehavior AllDatabaseCloner::connectStage() {
     auto* client = getClient();
-    // SERVER-130410: apply the node-local replicationNetworkCompression setting to the cloner's
-    // sync-source connection before the handshake runs, using the exact same helper (and thus the
-    // exact same policy) as the oplog fetcher. This is what extends replication-only compressor
-    // negotiation to the bulk collection-data transfer of initial sync, not just the oplog stream.
-    // It must run before connect()/ensureConnection() below (which is where DBClientConnection
-    // sends "hello"). The setting is startup-only, so re-applying it on every connectStage()
-    // invocation is idempotent; doing so mirrors the fetcher and keeps the manager state
-    // consistent across in-attempt reconnects.
+    // Initial sync clones collection data from the sync source, so treat this connection as
+    // replication data-plane traffic. Apply the replication compression policy before
+    // connect()/ensureConnection(), where DBClientConnection sends hello and negotiates compression.
+    // Reapplying is safe across reconnects because it resets this manager's per-session state.
     applyReplicationNetworkCompressionToManager(client->getCompressorManager());
     // If the client already has the address (from a previous attempt), we must allow it to
     // handle the reconnect itself. This is necessary to get correct backoff behavior.

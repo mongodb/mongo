@@ -1747,6 +1747,37 @@ TEST_F(SessionWorkflowTest, OversizedDecompressedMessage) {
     joinSessions();
 }
 
+// A client that sends OP_COMPRESSED before the server has negotiated compression (no permit list
+// engaged for this session) must have the frame rejected and the connection ended - not crash the
+// server. This guards the pre-negotiation boundary: an unnegotiated connection must not fall back
+// to the process-wide registry (net union replication) to decompress arbitrary frames.
+TEST_F(SessionWorkflowTest, CompressedMessageBeforeNegotiationIsRejected) {
+    auto& registry = MessageCompressorRegistry::get();
+    const auto& compressorNames = registry.getCompressorNames();
+    if (std::ranges::find(compressorNames, "snappy") == compressorNames.end()) {
+        registry.setSupportedCompressors({"snappy"});
+        registry.registerImplementation(std::make_unique<SnappyMessageCompressor>());
+        uassertStatusOK(registry.finalizeSupportedCompressors());
+    }
+
+    // Deliberately do NOT call permitSnappyCompressionForCurrentSession(): this session never ran
+    // serverNegotiate(), so it has no compressor permit list.
+    startSession();
+
+    // Build a real snappy-compressed OP_COMPRESSED frame with a throwaway, un-negotiated manager
+    // (its permit list is unengaged, so it can produce any registered algorithm - exactly what an
+    // unnegotiated peer could put on the wire).
+    MessageCompressorManager producer{};
+    const auto snappyId = static_cast<MessageCompressorId>(MessageCompressor::kSnappy);
+    auto compressed = uassertStatusOK(producer.compressMessage(makeOpMsg(), &snappyId));
+
+    // The workflow sources the compressed frame, rejects it during decompression because no
+    // negotiation has occurred, and ends the session instead of crashing.
+    expect<Event::sessionSourceMessage>(StatusWith{compressed});
+    expect<Event::sepEndSession>();
+    joinSessions();
+}
+
 /** Builds a minimal opReply (OP_QUERY response) message using LegacyReplyBuilder. */
 Message makeOpReplyMsg() {
     rpc::LegacyReplyBuilder builder;

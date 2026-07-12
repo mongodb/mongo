@@ -584,14 +584,9 @@ public:
             return;
         auto& mgr = compressorMgr();
         if (!mgr.hasCompressorPermitListForThisSession()) {
-            // SERVER-130410: reject OP_COMPRESSED before the server has processed a hello and
-            // established this connection's compressor permit list. Historically decompression was
-            // negotiation-agnostic because the registry was the single net.compression.compressors
-            // set. With the registry now being net union replication, allowing pre-negotiation
-            // compressed frames would let an external connection use a replication-only compressor
-            // before it has been routed through serverNegotiate(). Apply this before-negotiation
-            // guard in auth-disabled and mongoBridge modes as well; compression negotiation, not
-            // authentication state, is the boundary for accepting OP_COMPRESSED.
+            // Reject OP_COMPRESSED before hello establishes this connection's compressor permit
+            // list. The process-wide registry may include replication-only compressors, so
+            // compression negotiation is the boundary for accepting compressed frames.
             uasserted(ErrorCodes::BadValue,
                       "Compressed messages are not accepted before compression negotiation");
         }

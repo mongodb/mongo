@@ -82,7 +82,7 @@ configs:
         source: [yaml, cli]
 
     #
-    # SERVER-130410: replication-specific network compression control, negotiated independently
+    # replication-specific network compression control, negotiated independently
     # of the client-facing net.compression.compressors. Value semantics:
     #   ""         -> inherit process-wide net.compression.compressors (default)
     #   "disabled" -> negotiate replication data-plane connections uncompressed

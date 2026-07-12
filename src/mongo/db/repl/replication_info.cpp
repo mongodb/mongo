@@ -61,6 +61,7 @@
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/message_compressor_manager.h"
+#include "mongo/transport/message_compressor_registry.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -269,6 +270,13 @@ public:
                 result);
         }
 
+        // replication-data-plane view of network compression. Same shape as
+        // serverStatus().network.compression, but the byte counters include only traffic on
+        // replication-marked connections (oplog fetcher, initial-sync cloner, rollback remote oplog
+        // reader, and this node's oplog responses to its secondaries). Reported as a subset view:
+        // the same bytes are still present in network.compression.
+        appendReplicationMessageCompressionStats(&result);
+
         return result.obj();
     }
 };
@@ -439,21 +447,11 @@ public:
         // line.
         auto result = replyBuilder->getBodyBuilder();
         if (opCtx->getClient()->session()) {
-            // SERVER-130410: negotiate compression using a candidate set that depends on the
-            // connection type so that net.compression.compressors (client-facing) and
-            // replication.networkCompression.compressors negotiate independently. The oplog fetcher,
-            // initial-sync cloner, and rollback remote oplog reader tag their pre-auth hello with
-            // "replicationCompressionClient" so the sync-source data-plane connection uses the
-            // replication candidate set; other connections normally omit that marker and fall back
-            // to the net set inside serverNegotiate(),
-            // matching pre-SERVER-130410 behavior.
-            //
-            // This marker is a routing hint, not an authorization boundary: hello is pre-auth and
-            // the internalClient field is also client-supplied. A peer that spoofs both fields can
-            // at most select the compressor policy for its own connection; it still cannot access
-            // replication data without completing the normal internal (__system) authentication.
-            // The compressor-id permit list in MessageCompressorManager remains the wire-level
-            // guard that prevents out-of-domain compressors on a negotiated connection.
+            // Choose the server-side compressor candidate set per connection. Replication
+            // data-plane clients send replicationCompressionClient so their sync-source connection
+            // can use the replication compression policy; all other connections use net.compression.
+            // The marker is only a negotiation hint: replication data access still requires normal
+            // internal authentication.
             const bool isReplicationCompressionClient =
                 isInternalClient && cmd.getReplicationCompressionClient().value_or(false);
             boost::optional<std::vector<std::string>> replCompressorAllowList;
@@ -469,8 +467,12 @@ public:
                 // inheritProcessDefault: leave disengaged so serverNegotiate() uses the net set
                 // (the replication connection inherits net.compression.compressors).
             }
-            MessageCompressorManager::forSession(opCtx->getClient()->session())
-                .serverNegotiate(cmd.getCompression(), &result, replCompressorAllowList);
+            auto& mgr = MessageCompressorManager::forSession(opCtx->getClient()->session());
+            // Count server-side compressed bytes for replication-marked connections under
+            // serverStatus().repl.compression. This is accounting-only; the inbound server-side
+            // manager does not emit client hello markers.
+            mgr.countAsReplicationCompressionTrafficForThisSession(isReplicationCompressionClient);
+            mgr.serverNegotiate(cmd.getCompression(), &result, replCompressorAllowList);
         }
 
         bool isInitialHandshake = false;

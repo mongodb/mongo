@@ -260,7 +260,7 @@ TEST(MessageCompressorManager, FullNormalCompression) {
     clientManager.clientFinish(serverObj);
 }
 
-// SERVER-130410: when a client opts out via disableCompressionForThisSession(), clientBegin()
+// When a client opts out via disableCompressionForThisSession(), clientBegin()
 // must not emit a "compression" field, the server responds without one, and clientFinish()
 // leaves the negotiated compressor list empty so subsequent compressMessage() calls become
 // no-ops. This is the mechanism that lets the oplog fetcher run uncompressed independently of
@@ -291,7 +291,7 @@ TEST(MessageCompressorManager, ClientCanSuppressCompressionOfferForThisSession) 
     ASSERT_TRUE(serverManager.getNegotiatedCompressors().empty());
 }
 
-// SERVER-130410: verify that re-enabling before the next clientBegin() restores normal
+// Verify that re-enabling before the next clientBegin() restores normal
 // advertisement. This models a replication client that first disabled compression on its
 // manager and then, on a later (re)connect, re-enabled it before the next handshake ran.
 TEST(MessageCompressorManager, ClientCanReenableCompressionOfferAfterSuppressing) {
@@ -323,7 +323,7 @@ TEST(MessageCompressorManager, ClientCanReenableCompressionOfferAfterSuppressing
     ASSERT_FALSE(clientManager.getNegotiatedCompressors().empty());
 }
 
-// SERVER-130410: an allow-list restricts advertisement to the intersection of the caller's
+// An allow-list restricts advertisement to the intersection of the caller's
 // list and the process-wide compressor list, preserving the caller's ordering so it becomes
 // the client's negotiation preference order.
 TEST(MessageCompressorManager, ClientAllowListNarrowsAdvertisedCompressors) {
@@ -363,7 +363,7 @@ TEST(MessageCompressorManager, ClientAllowListNarrowsAdvertisedCompressors) {
     ASSERT_FALSE(clientManager.getNegotiatedCompressors().empty());
 }
 
-// SERVER-130410: unknown names in the allow-list are silently dropped so an operator cannot
+// Unknown names in the allow-list are silently dropped so an operator cannot
 // use the per-session hook to widen the process-wide compressor list. If every name is
 // unknown, the connection is negotiated uncompressed rather than falling back to the full
 // process list, so the operator gets a predictable failure mode.
@@ -406,7 +406,7 @@ TEST(MessageCompressorManager, ClientAllowListDropsUnknownNamesAndCanCollapseToD
     }
 }
 
-// SERVER-130410: builds a registry that mimics `net.compression.compressors: disabled` combined
+// Builds a registry that mimics `net.compression.compressors: disabled` combined
 // with `replication.networkCompression.compressors: snappy`. The net set is empty, snappy is
 // folded into the process-wide capability set (union) via addReplicationCompressors(), and snappy
 // is registered so it can be negotiated for internal connections and decoded on any connection.
@@ -482,7 +482,7 @@ TEST(MessageCompressorManager, ClientBeginAllowListAdvertisesReplicationOnlyComp
     checkNegotiationResult(out.done(), {"snappy"});
 }
 
-// SERVER-130410: mimics `net.compression.compressors: snappy` combined with
+// Mimics `net.compression.compressors: snappy` combined with
 // `replication.networkCompression.compressors: zlib`. Both algorithms are registered process-wide,
 // so the union registry contains {snappy, zlib}, but the net candidate set is only {snappy} and the
 // replication candidate set is only {zlib}. This is the configuration where the union registry is
@@ -498,7 +498,7 @@ MessageCompressorRegistry buildNetSnappyReplZlibRegistry() {
 }
 
 // Produces an OP_COMPRESSED frame compressed with 'name' using a throwaway, un-negotiated manager.
-// Because that manager never ran serverNegotiate(), its whitelist is unengaged and it can emit any
+// Because that manager never ran serverNegotiate(), its permit list is unengaged and it can emit any
 // registered algorithm - exactly what a peer (or a hand-crafted malicious client) could put on the
 // wire.
 Message compressWith(MessageCompressorRegistry* registry, const Message& msg, std::string_view name) {
@@ -507,7 +507,7 @@ Message compressWith(MessageCompressorRegistry* registry, const Message& msg, st
     return assertOk(producer.compressMessage(msg, &id));
 }
 
-// SERVER-130410 (P1/P2): an external connection negotiates the net set (snappy) only. A frame
+// An external connection negotiates the net set (snappy) only. A frame
 // compressed with a replication-only algorithm (zlib) must be rejected at decompression even though
 // zlib is registered process-wide, so the union registry can no longer be used to smuggle an
 // out-of-domain algorithm onto an external connection.
@@ -526,7 +526,7 @@ TEST(MessageCompressorManager, ServerExternalRejectsDecompressOfReplicationOnlyF
     ASSERT_EQ(ErrorCodes::BadValue, sw.getStatus());
 }
 
-// SERVER-130410 (P1/P3): the server echo-back path must never emit a compressor outside this
+// The server echo-back path must never emit a compressor outside this
 // connection's candidate set. Forcing the zlib id on an external connection returns the message
 // uncompressed instead of producing an OP_COMPRESSED zlib frame.
 TEST(MessageCompressorManager, ServerExternalEchoBackOfReplicationOnlyCompressorFallsBackUncompressed) {
@@ -544,8 +544,8 @@ TEST(MessageCompressorManager, ServerExternalEchoBackOfReplicationOnlyCompressor
     ASSERT_EQ(sw.getValue().operation(), dbQuery);
 }
 
-// SERVER-130410: the same registry, but a replication connection (candidate set {zlib}) both
-// decompresses a zlib frame and echoes it back with zlib. This confirms the whitelist keeps
+// The same registry, but a replication connection (candidate set {zlib}) both
+// decompresses a zlib frame and echoes it back with zlib. This confirms the permit list keeps
 // in-domain behavior fully working and only blocks cross-domain use.
 TEST(MessageCompressorManager, ServerReplicationConnectionAcceptsReplicationCompressor) {
     auto registry = buildNetSnappyReplZlibRegistry();
@@ -565,8 +565,8 @@ TEST(MessageCompressorManager, ServerReplicationConnectionAcceptsReplicationComp
     ASSERT_EQ(echoed.operation(), dbCompressed);
 }
 
-// SERVER-130410 (P2): with net.compression.compressors: disabled the external candidate set is
-// empty, so the whitelist is empty and even a registered, replication-attributed algorithm (snappy)
+// With net.compression.compressors: disabled the external candidate set is
+// empty, so the permit list is empty and even a registered, replication-attributed algorithm (snappy)
 // cannot be decompressed on an external connection. This makes "disabled" truly mean uncompressed
 // for external clients despite the union registry containing snappy.
 TEST(MessageCompressorManager, ServerExternalWithNetDisabledRejectsAnyCompressedFrame) {
@@ -584,7 +584,7 @@ TEST(MessageCompressorManager, ServerExternalWithNetDisabledRejectsAnyCompressed
     ASSERT_EQ(ErrorCodes::BadValue, sw.getStatus());
 }
 
-// SERVER-130410: client-side inbound decompression is also constrained by the negotiated result.
+// Client-side inbound decompression is also constrained by the negotiated result.
 // A server response compressed with a replication-only algorithm that the client did not advertise
 // or negotiate must be rejected even though that algorithm is registered process-wide in the union.
 TEST(MessageCompressorManager, ClientSideDecompressionRejectsUnnegotiatedCompressor) {
@@ -620,7 +620,7 @@ TEST(MessageCompressorManager, ClientSideDisabledNegotiationRejectsCompressedRes
     ASSERT_EQ(ErrorCodes::BadValue, sw.getStatus());
 }
 
-// SERVER-130410: a manager NOT marked as a replication client must never emit the
+// A manager NOT marked as a replication client must never emit the
 // "replicationCompressionClient" hello marker, so the server treats it like any other internal or
 // external connection (heartbeats, shard RPC, external clients all keep using the net set). This
 // is the guard that scopes replication.networkCompression to actual sync-source connections.
@@ -634,7 +634,7 @@ TEST(MessageCompressorManager, ClientBeginDoesNotMarkReplicationByDefault) {
     ASSERT_FALSE(obj.hasField(MessageCompressorManager::kReplicationCompressionClientFieldName));
 }
 
-// SERVER-130410: once marked as a replication client, clientBegin() must emit
+// Once marked as a replication client, clientBegin() must emit
 // "replicationCompressionClient": true so the server routes this connection (and only this
 // connection) through the replication candidate set. The marker must be present in every state
 // (inherit / allow-list / suppressed) because the server needs to identify the connection type
@@ -686,7 +686,7 @@ TEST(MessageCompressorManager, ClientBeginMarksReplicationClientInEveryState) {
 // an unavailable net compressor. This keeps replication.networkCompression.compressors consistent
 // with net.compression.compressors: a configured-but-uncompiled algorithm can never be silently
 // ignored (which would leave the operator believing replication compression is active when it is
-// not). See SERVER-130410.
+// not).
 TEST(MessageCompressorRegistryTest, FinalizeRejectsUnavailableReplicationCompressor) {
     MessageCompressorRegistry registry;
     registry.setSupportedCompressors(std::vector<std::string>{});

@@ -36,14 +36,16 @@ class [[MONGO_MOD_PUBLIC]] MessageCompressorManager {
     // with initializers appears at the end of the class.
     bool _offerCompressionOnClientBegin{true};
     std::vector<std::string> _allowListedCompressors;
-    // SERVER-130410: true only on the manager of a replication data-plane client connection (the
-    // oplog fetcher, initial-sync cloner, or rollback remote oplog reader, marked via
-    // markReplicationClientForThisSession()). When set, clientBegin() adds the
-    // "replicationCompressionClient" marker to the hello request so the server routes this
-    // connection (and ONLY this connection) through the replication candidate
-    // set. Other internal connections (heartbeats, shard RPC) leave this false and are negotiated
-    // like any external client (net.compression.compressors), restoring pre-SERVER-130410 behavior.
+    // True for replication data-plane client connections (oplog fetcher, initial sync, rollback).
+    // When set, clientBegin() adds the replicationCompressionClient marker so the server applies
+    // the replication compression policy; other internal clients keep using net.compression.
     bool _isReplicationClient{false};
+
+    // true when compression bytes on this connection should be attributed to
+    // serverStatus().repl.compression. This is intentionally independent from _isReplicationClient:
+    // client-side replication data-plane connections need both (send marker + count bytes), while
+    // the server side of a marked replication connection only needs the accounting flag.
+    bool _countAsReplicationCompressionTraffic{false};
 
 public:
     /*
@@ -61,20 +63,9 @@ public:
     MessageCompressorManager& operator=(MessageCompressorManager&&) = default;
 
     /*
-     * Called by a client constructing a "hello" request. With no per-session state this appends
-     * the client-facing net set (MessageCompressorRegistry::getNetCompressorNames(), i.e.
-     * net.compression.compressors) to the BSONObjBuilder as a BSON array. If no net compressors
-     * are configured, it won't append anything.
-     *
-     * If a per-session allow-list has been set (setCompressorAllowListForThisSession(), used by
-     * replication data-plane connections), it instead advertises the intersection of that list with
-     * the process-wide capability set (getCompressorNames(), the net union replication union). This
-     * is what lets a replication-only compressor be advertised even when net.compression.compressors:
-     * disabled (SERVER-130410).
-     *
-     * If disableCompressionForThisSession() has been called on this manager, this function will
-     * not advertise any compressor to the server, and the resulting connection will be negotiated
-     * uncompressed regardless of any setting.
+     * Called by a client constructing a "hello" request. By default, advertises the client-facing
+     * net.compression compressors. A per-session allow-list restricts what is advertised for
+     * replication data-plane connections; disableCompressionForThisSession() advertises nothing.
      */
     void clientBegin(BSONObjBuilder* output);
 
@@ -108,20 +99,9 @@ public:
     }
 
     /*
-     * Restricts the compressors advertised by clientBegin() on this manager to the given
-     * allow-list, intersected with the process-wide capability set (getCompressorNames(), the
-     * union of net.compression.compressors and replication.networkCompression.compressors). Names
-     * not present in that union are silently ignored so that a per-session preference can never
-     * widen the process capability surface. Intersecting against the union (rather than only the
-     * net set) is what lets a replication-only compressor be advertised even when
-     * net.compression.compressors: disabled. Passing an empty vector clears the allow-list and
-     * returns to advertising the net set.
-     *
-     * This is meant for replication data-plane connections using
-     * replication.networkCompression.compressors YAML/setParameter (SERVER-130410) which lets
-     * an operator negotiate sync-source data transfer with a subset of the process-wide compressor
-     * list (e.g. force zstd on replication while the client-facing port keeps snappy,zstd,zlib).
-     * It has no effect on any other connection.
+     * Restricts compressors advertised by clientBegin() to this per-session allow-list,
+     * intersected with the process-wide net/repl capability set. This lets replication data-plane
+     * clients advertise replication-only compressors; passing an empty vector returns to the net set.
      */
     void setCompressorAllowListForThisSession(std::vector<std::string> allowList) {
         _allowListedCompressors = std::move(allowList);
@@ -132,23 +112,16 @@ public:
     }
 
     /*
-     * Name of the boolean "hello" field used by replication data-plane clients (oplog fetcher,
-     * initial-sync cloner, rollback remote oplog reader). internalClient is too broad: heartbeats,
-     * mongos-to-mongod traffic, and shard RPC are internal too but must keep using
-     * net.compression.compressors. This marker routes only replication data-plane connections
-     * through the replication compression policy, which may inherit net.compression.compressors.
-     * Older servers ignore the unknown field because "hello" is non-strict.
+     * Hello marker used by replication data-plane clients so the server applies the replication
+     * compression policy instead of the normal net.compression policy. Older servers ignore the
+     * unknown field because hello is non-strict.
      */
     static constexpr auto kReplicationCompressionClientFieldName = "replicationCompressionClient";
 
     /*
-     * SERVER-130410: Marks (or unmarks) this manager as belonging to a replication data-plane
-     * client connection. Set by applyReplicationNetworkCompressionToManager() for the oplog fetcher,
-     * the initial-sync cloner, and the rollback remote oplog reader. When marked, clientBegin()
-     * appends kReplicationCompressionClientFieldName:true to the hello request. This is orthogonal
-     * to the allow-list / suppression state: an "inherit" replication connection is still a
-     * replication client even though it advertises the net set. Persists across DBClientConnection
-     * auto-reconnects because the manager instance is reused.
+     * Marks this manager as a replication data-plane client. clientBegin() will add
+     * kReplicationCompressionClientFieldName to hello; the flag persists across reconnects because
+     * the manager instance is reused.
      */
     void markReplicationClientForThisSession(bool isReplicationClient) {
         _isReplicationClient = isReplicationClient;
@@ -156,6 +129,19 @@ public:
 
     bool isReplicationClientForThisSession() const {
         return _isReplicationClient;
+    }
+
+    /*
+     * Marks whether this connection's compression bytes count toward serverStatus().repl.compression.
+     * Kept separate from markReplicationClientForThisSession(): server-side inbound replication
+     * connections need accounting without emitting the client hello marker.
+     */
+    void countAsReplicationCompressionTrafficForThisSession(bool countAsReplicationTraffic) {
+        _countAsReplicationCompressionTraffic = countAsReplicationTraffic;
+    }
+
+    bool countsAsReplicationCompressionTrafficForThisSession() const {
+        return _countAsReplicationCompressionTraffic;
     }
 
     /*
@@ -181,7 +167,7 @@ public:
      *     (replication.networkCompression.compressors for this node). An empty list forces the
      *     connection uncompressed.
      * This is what lets net.compression.compressors and replication.networkCompression.compressors
-     * negotiate independently. See SERVER-130410.
+     * negotiate independently.
      *
      * If no compressors are configured that match those requested by the client, then it will
      * not append anything to the BSONObjBuilder output.
@@ -208,22 +194,13 @@ public:
     /*
      * Returns a new Message containing the decompressed copy of the input message.
      *
-     * If the compressor specified in the input message is not supported, it will return a Status
-     * error.
+     * If the compressor is not supported or decompression fails, it returns a Status error.
+     * Once this connection has established a permit list via negotiation, only compressors permitted
+     * for this connection may be decompressed. Legacy/direct callers without a permit list keep the
+     * historical registry-wide behavior.
      *
-     * If an error occurs in the compressor, it will return a Status error.
-     *
-     * This class has a pointer to the global MessageCompressorRegistry and can look up a message's
-     * compressor by ID number through that registry. Callers that have not engaged a per-connection
-     * permit list keep the historical negotiation-agnostic behavior for any process-wide registered
-     * compressor. Once serverNegotiate() or the clientBegin()/clientFinish() handshake has
-     * established this connection's permit list, only compressors permitted for this connection may
-     * be decompressed.
-     *
-     * If the 'compressorId' parameter is non-null, it will be populated with the compressor
-     * used. If 'decompressMessage' returns successfully, then that value can be fed back into
-     * compressMessage, ensuring that the same compressor is used on both sides of a conversation
-     * subject to the same per-connection permit-list check.
+     * If 'compressorId' is non-null, it is populated with the compressor used and may be fed back
+     * into compressMessage(), subject to the same per-connection permit-list check.
      */
     StatusWith<Message> decompressMessage(const Message& msg,
                                           MessageCompressorId* compressorId = nullptr,
@@ -231,12 +208,9 @@ public:
 
     const std::vector<MessageCompressorBase*>& getNegotiatedCompressors() const;
 
-    // SERVER-130410: true once this connection has established a compressor-id permit list. On the
-    // server side this happens via serverNegotiate(); on the client side it is initialized empty by
-    // clientBegin() and finalized by clientFinish(). Used by the ingress workflow to reject
-    // OP_COMPRESSED messages that arrive before any compression negotiation has run; otherwise a
-    // pre-negotiation frame would fall back to the process-wide union registry and could use a
-    // replication-only compressor on an external connection.
+    // True once this connection has an explicit compressor-id permit list, established by
+    // serverNegotiate() or the clientBegin()/clientFinish() handshake. Used to reject compressed
+    // frames before negotiation completes.
     bool hasCompressorPermitListForThisSession() const {
         return _permittedCompressorIds.has_value();
     }
@@ -244,26 +218,13 @@ public:
     static MessageCompressorManager& forSession(const std::shared_ptr<transport::Session>& session);
 
 private:
-    // SERVER-130410: per-connection permit list of compressor ids that are allowed to appear on the
-    // wire for THIS connection. On the server it is engaged by serverNegotiate() from the
-    // connection's candidate set 'allowed' (net.compression.compressors for external clients,
-    // replication.networkCompression.compressors for replication connections) intersected with the
-    // process-wide registry. On the client it is initialized empty by clientBegin() and populated by
-    // clientFinish() from the compressors the client both advertised and accepted from the server.
-    //
-    // Rationale: the process-wide registry is the union net union replication, so it is larger than
-    // any single connection's candidate set. Before SERVER-130410 registry == the single candidate
-    // set, which made the negotiation-agnostic decompressMessage()/echo-back compressMessage()
-    // lookups (which consult the registry directly) safe. The union broke that invariant. This
-    // permit list re-establishes "registry-visible == this connection's candidate set" per connection.
-    // When boost::none (legacy/direct callers that have not negotiated) the check below returns true
-    // and the original full-registry semantics are preserved unchanged.
+    // Per-connection compressor-id permit list. Once engaged, only these ids may appear on the
+    // wire for this connection. This is needed because the process-wide registry may contain both
+    // net and replication compressors, while each connection must enforce its own candidate set.
+    // boost::none preserves legacy/direct-call behavior before negotiation.
     boost::optional<std::array<bool, std::numeric_limits<MessageCompressorId>::max() + 1>>
         _permittedCompressorIds;
 
-    // Returns true if 'id' may be used on the wire for this connection. Returns true unconditionally
-    // when the permit list has not been engaged, preserving pre-SERVER-130410 behavior only for
-    // legacy/direct callers that have not run compression negotiation.
     bool _isCompressorPermittedForThisSession(MessageCompressorId id) const {
         if (!_permittedCompressorIds) {
             return true;

@@ -72,10 +72,9 @@ public:
     const std::vector<std::string>& getCompressorNames() const;
 
     /*
-     * Returns the compressor names sourced from net.compression.compressors. This is the candidate
-     * set for external, client-facing connections. It is empty when net.compression.compressors is
-     * "disabled", which is what keeps external connections uncompressed independently of any
-     * replication.networkCompression.compressors setting (SERVER-130410).
+     * Returns compressor names from net.compression.compressors. This is the candidate set for
+     * external, client-facing connections and is empty when net.compression is disabled,
+     * independently of replication.networkCompression.compressors.
      */
     const std::vector<std::string>& getNetCompressorNames() const;
 
@@ -111,7 +110,7 @@ public:
      * Merges replication-configured compressor names into the process-wide capability union so
      * their implementations get registered, without adding them to the client-facing net candidate
      * set. Names already in the union are deduplicated. Must run after setSupportedCompressors()
-     * and before compressor implementations register. See SERVER-130410.
+     * and before compressor implementations register.
      */
     void addReplicationCompressors(const std::vector<std::string>& replCompressorNames);
 
@@ -119,12 +118,8 @@ public:
      * Finalizes the list of supported compressors for this registry. Should be called after all
      * calls to registerImplementation.
      *
-     * Any name that was requested but is not provided by this build is a hard startup error
-     * (fail-fast), regardless of whether it came from net.compression.compressors or
-     * replication.networkCompression.compressors. The two sources are treated identically so a
-     * compressor named in the replication configuration can never be silently ignored, which would
-     * otherwise leave the operator believing replication compression is active when it is not.
-     * See SERVER-130410.
+     * Any requested name that is not provided by this build is a hard startup error, regardless of
+     * whether it came from net.compression or replication.networkCompression.
      */
     Status finalizeSupportedCompressors();
 
@@ -139,12 +134,15 @@ private:
     // Names from net.compression.compressors. Candidate set for external client-facing
     // connections; empty when net.compression.compressors: disabled.
     std::vector<std::string> _netCompressorNames;
-    // Names from replication.networkCompression.compressors. Recorded for observability
-    // (getReplCompressorNames()); after startup finalization, these have been validated the same
-    // way as net.compression algorithms.
+    // Names from replication.networkCompression.compressors. Recorded for observability; after
+    // startup finalization, these have been validated the same way as net.compression algorithms.
     std::vector<std::string> _replCompressorNames;
 };
 
 Status storeMessageCompressionOptions(const std::string& compressors);
 void appendMessageCompressionStats(BSONObjBuilder* b);
+// Appends a "compression" subobject (same shape as appendMessageCompressionStats) containing the
+// replication-data-plane subset of the per-algorithm byte counters. Used by
+// serverStatus().repl.compression.
+void appendReplicationMessageCompressionStats(BSONObjBuilder* b);
 }  // namespace mongo

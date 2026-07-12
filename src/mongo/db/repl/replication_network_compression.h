@@ -45,19 +45,11 @@ class MessageCompressorManager;
 namespace repl {
 
 /*
- * Parsed form of the replicationNetworkCompression setParameter /
- * replication.networkCompression.compressors YAML value.
+ * Parsed form of replicationNetworkCompression / replication.networkCompression.compressors.
  *
- *   inheritProcessDefault == true  -> caller must not touch the manager (advertise the
- *                                     process-wide net.compression.compressors list). This is the
- *                                     default (empty value); inheriting net keeps replication
- *                                     compression unchanged on upgrade.
- *   inheritProcessDefault == false && disabled == true
- *                                  -> caller must call disableCompressionForThisSession()
- *                                     and NOT set an allow-list.
- *   inheritProcessDefault == false && disabled == false
- *                                  -> caller must clear disable state and pass allowList as
- *                                     the per-session allow-list. Order is preserved.
+ *   inheritProcessDefault == true  -> inherit net.compression.compressors (default empty value).
+ *   disabled == true               -> negotiate replication data-plane connections uncompressed.
+ *   otherwise                      -> use allowList as the ordered per-session compressor list.
  */
 struct ReplicationNetworkCompressionSetting {
     bool inheritProcessDefault{true};
@@ -67,17 +59,12 @@ struct ReplicationNetworkCompressionSetting {
 
 /*
  * Parses a replicationNetworkCompression value. Accepts:
- *   - ""          -> inheritProcessDefault=true
- *   - "disabled"  -> inheritProcessDefault=false, disabled=true (case-insensitive)
- *   - "a,b,c"     -> inheritProcessDefault=false, allowList={"a","b","c"}
- *                    (trimmed, non-empty entries only)
+ *   - ""          -> inherit net.compression.compressors
+ *   - "disabled"  -> negotiate uncompressed (case-insensitive)
+ *   - "a,b,c"     -> ordered allow-list, with whitespace trimmed and empty entries ignored
  *
- * Returns a non-OK Status only for structurally invalid input. Empty segments in an otherwise
- * non-empty list are tolerated (for example "snappy,"), but a non-empty value that consists only
- * of separators/whitespace (for example ",") is rejected rather than silently treated as inherit.
- * Individual compressor names are NOT validated against the process-wide registry here; startup
- * folds this list into the registry union and finalizeSupportedCompressors() performs the same
- * fail-fast availability check as net.compression.compressors.
+ * A non-empty value containing only separators/whitespace is rejected. Compressor availability is
+ * checked later during startup finalization, not by this parser.
  */
 MONGO_MOD_PUBLIC Status parseReplicationNetworkCompression(
     std::string_view value, ReplicationNetworkCompressionSetting* out);
@@ -96,30 +83,13 @@ MONGO_MOD_PUBLIC ReplicationNetworkCompressionSetting getReplicationNetworkCompr
 
 /*
  * Applies the node-local replicationNetworkCompression setting to a client-side
- * MessageCompressorManager (i.e. the manager owned by a DBClientConnection used to talk to the
- * sync source) right before its "hello" handshake runs. This is the single source of truth for
- * the client side of SERVER-130410 and is shared by every replication client connection so their
- * compressor negotiation cannot drift:
+ * MessageCompressorManager before DBClientConnection sends hello. Used by replication data-plane
+ * clients such as the oplog fetcher, initial-sync collection cloner, and rollback remote oplog
+ * reader.
  *
- *   - the steady-state / initial-sync oplog fetcher (OplogFetcher::_connect),
- *   - the initial-sync collection cloner connection (AllDatabaseCloner::connectStage), and
- *   - the rollback remote oplog connection (BackgroundSync::_runRollback).
- *
- * The mapping is:
- *   inheritProcessDefault -> enableCompressionForThisSession() + clear allow-list (advertise the
- *                            process-wide net.compression.compressors list);
- *   disabled              -> disableCompressionForThisSession() + clear allow-list (negotiate
- *                            uncompressed regardless of net.compression.compressors);
- *   otherwise             -> enableCompressionForThisSession() + set the allow-list (advertise the
- *                            operator-chosen subset, intersected with the process-wide capability
- *                            set inside clientBegin()).
- *
- * MUST be called before the handshake is sent, and only from the thread that drives that
- * connection's (re)connect (the manager setters are not internally synchronized). Because the
- * same manager instance is reused across DBClientConnection auto-reconnects, re-invoking this on
- * each (re)connect keeps the manager's state consistent with the stored setting; the setting
- * itself is startup-only, so on a running mongod this simply re-applies the fixed configuration.
- * This is purely a client-side decision and requires no server-side change.
+ * Must be called by the connection's (re)connect thread before the handshake. Reapply on reconnect
+ * because DBClientConnection reuses the same manager and these per-session setters are not
+ * internally synchronized.
  */
 MONGO_MOD_PUBLIC void applyReplicationNetworkCompressionToManager(MessageCompressorManager& mgr);
 
