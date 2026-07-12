@@ -30,20 +30,16 @@ public:
         : BatchedEnrichmentStage("$mockEnrich", expCtx, limits) {}
 
     // The transform applied to each data event in enrich(). Defaults to tagging it 'enriched:
-    // true'. Returning boost::none drops the event.
-    std::function<boost::optional<Document>(Document)> enrichFn = [](Document d) {
+    // true'.
+    std::function<Document(Document)> enrichFn = [](Document d) {
         MutableDocument md(std::move(d));
         md.addField("enriched", Value(true));
         return md.freeze();
     };
 
-    // Optional output cap: when set and it returns true, the base stops filling and finishes.
-    std::function<bool()> shouldStopFn;
-
     int beginCalls = 0;
     int closeCalls = 0;
     int enrichCalls = 0;
-    int exhaustedCalls = 0;
     bool scopeOpen = false;
 
 protected:
@@ -57,16 +53,10 @@ protected:
         scopeOpen = false;
         ++closeCalls;
     }
-    boost::optional<Document> enrich(Document event) override {
+    Document enrich(Document event) override {
         ASSERT_TRUE(scopeOpen) << "enrich() called outside an open scope";
         ++enrichCalls;
         return enrichFn(std::move(event));
-    }
-    bool shouldStopEmittingDocuments() const override {
-        return shouldStopFn ? shouldStopFn() : false;
-    }
-    void onExhausted() override {
-        ++exhaustedCalls;
     }
 };
 
@@ -412,7 +402,7 @@ TEST_F(BatchedEnrichmentStageTest, EnrichThrowClosesScopeAndPropagates) {
     auto source =
         MockStage::createForTest(std::vector<Document>{dataEvent(1), dataEvent(2)}, _expCtx);
     auto stage = makeStage(std::move(source), looseLimits());
-    stage->enrichFn = [](Document) -> boost::optional<Document> {
+    stage->enrichFn = [](Document) -> Document {
         uasserted(ErrorCodes::InternalError, "simulated enrich failure");
     };
 
@@ -564,119 +554,6 @@ TEST_F(BatchedEnrichmentStageTest, InterruptIsCheckedAndPropagates) {
     // exact counts depend on interrupt timing, but begin/close must balance).
     ASSERT_FALSE(stage->scopeOpen);
     ASSERT_EQ(stage->beginCalls, stage->closeCalls);
-}
-
-TEST_F(BatchedEnrichmentStageTest, DroppedEventsAreNotEmitted) {
-    auto source = MockStage::createForTest(
-        std::vector<Document>{dataEvent(0), dataEvent(1), dataEvent(2), dataEvent(3)}, _expCtx);
-    auto stage = makeStage(std::move(source), looseLimits());
-    // Drop odd _ids by returning boost::none; even _ids pass through.
-    stage->enrichFn = [](Document d) -> boost::optional<Document> {
-        if (d["_id"].getInt() % 2 != 0) {
-            return boost::none;
-        }
-        return d;
-    };
-
-    auto out = drainToEOF(*stage);
-
-    ASSERT_EQ(out.size(), 2u);
-    ASSERT_EQ(out[0].getDocument()["_id"].getInt(), 0);
-    ASSERT_EQ(out[1].getDocument()["_id"].getInt(), 2);
-    // All four entered enrich (two dropped) under a single scope.
-    ASSERT_EQ(stage->enrichCalls, 4);
-    ASSERT_EQ(stage->beginCalls, 1);
-    ASSERT_EQ(stage->closeCalls, 1);
-}
-
-TEST_F(BatchedEnrichmentStageTest, WholeWindowDroppedInOneFillReturnsEOF) {
-    auto source = MockStage::createForTest(
-        std::vector<Document>{dataEvent(1), dataEvent(2), dataEvent(3)}, _expCtx);
-    auto stage = makeStage(std::move(source), looseLimits());
-    stage->enrichFn = [](Document) -> boost::optional<Document> {
-        return boost::none;
-    };
-
-    auto out = drainToEOF(*stage);
-
-    ASSERT_TRUE(out.empty());
-    // One window enriched (and dropped) all three, opened/closed once, then EOF surfaced.
-    ASSERT_EQ(stage->enrichCalls, 3);
-    ASSERT_EQ(stage->beginCalls, 1);
-    ASSERT_EQ(stage->closeCalls, 1);
-    ASSERT_GTE(stage->exhaustedCalls, 1);
-}
-
-TEST_F(BatchedEnrichmentStageTest, WholeWindowDroppedAcrossFillsRefillsUntilEOF) {
-    auto source = MockStage::createForTest(
-        std::vector<Document>{dataEvent(1), dataEvent(2), dataEvent(3)}, _expCtx);
-    auto limits = looseLimits();
-    limits.maxInputEvents = 1;  // one event per fill -> a separate window each
-    auto stage = makeStage(std::move(source), limits);
-    stage->enrichFn = [](Document) -> boost::optional<Document> {
-        return boost::none;
-    };
-
-    auto out = drainToEOF(*stage);
-
-    ASSERT_TRUE(out.empty());
-    // Each event fills+enriches(drops) in its own window; doGetNext() loops and refills until EOF.
-    ASSERT_EQ(stage->enrichCalls, 3);
-    ASSERT_EQ(stage->beginCalls, 3);
-    ASSERT_EQ(stage->closeCalls, 3);
-}
-
-TEST_F(BatchedEnrichmentStageTest, ShouldStopEmittingStopsAndDropsLeftoverInput) {
-    auto source = MockStage::createForTest(
-        std::vector<Document>{dataEvent(1), dataEvent(2), dataEvent(3), dataEvent(4), dataEvent(5)},
-        _expCtx);
-    auto stage = makeStage(std::move(source), looseLimits());
-    int emitted = 0;
-    stage->enrichFn = [&](Document d) -> boost::optional<Document> {
-        ++emitted;
-        return d;
-    };
-    // Cap output at 2 events; the third enrich must never run.
-    stage->shouldStopFn = [&] {
-        return emitted >= 2;
-    };
-
-    auto out = drainToEOF(*stage);
-
-    ASSERT_EQ(out.size(), 2u);
-    ASSERT_EQ(out[0].getDocument()["_id"].getInt(), 1);
-    ASSERT_EQ(out[1].getDocument()["_id"].getInt(), 2);
-    // The window stops at the cap; leftover buffered input (3,4,5) is dropped, not enriched.
-    ASSERT_EQ(stage->enrichCalls, 2);
-    ASSERT_GTE(stage->exhaustedCalls, 1);
-    ASSERT_FALSE(stage->scopeOpen);
-}
-
-TEST_F(BatchedEnrichmentStageTest, ShouldStopEmittingAtStartReturnsEOFWithoutFillingOrEnriching) {
-    auto source =
-        MockStage::createForTest(std::vector<Document>{dataEvent(1), dataEvent(2)}, _expCtx);
-    auto stage = makeStage(std::move(source), looseLimits());
-    stage->shouldStopFn = [] {
-        return true;
-    };
-
-    ASSERT_TRUE(stage->getNext().isEOF());
-    // Capped before any fill: nothing pulled, no scope opened, no event enriched.
-    ASSERT_EQ(stage->enrichCalls, 0);
-    ASSERT_EQ(stage->beginCalls, 0);
-    ASSERT_GTE(stage->exhaustedCalls, 1);
-    ASSERT_FALSE(stage->scopeOpen);
-}
-
-TEST_F(BatchedEnrichmentStageTest, OnExhaustedFiresWhenUpstreamReachesEOF) {
-    auto source =
-        MockStage::createForTest(std::vector<Document>{dataEvent(1), dataEvent(2)}, _expCtx);
-    auto stage = makeStage(std::move(source), looseLimits());
-
-    auto out = drainToEOF(*stage);
-
-    ASSERT_EQ(out.size(), 2u);
-    ASSERT_GTE(stage->exhaustedCalls, 1);
 }
 
 }  // namespace

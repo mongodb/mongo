@@ -1345,68 +1345,6 @@ server_parameters:
         default: false
         redact: false
 
-    internalSearchIdLookupMaxBatchSize:
-        description: >-
-            Maximum number of search results the $_internalSearchIdLookup stage buffers before
-            resolving them as one batch. Effective only when featureFlagSearchOptimizedIdLookup is
-            enabled; with the flag off the stage always runs batch-of-one (master-equivalent).
-            Batching only amortizes cost behind a caching (SBE) executor, so production keeps this
-            at 1 until that executor is wired in; raised only by tests.
-        set_at: [startup, runtime]
-        cpp_varname: "internalSearchIdLookupMaxBatchSize"
-        cpp_vartype: AtomicWord<int>
-        default: 1
-        validator:
-            gte: 1
-            lte: 1024
-        redact: false
-        annotations:
-            query_knob:
-                wire_name: searchIdLookupMaxBatchSize
-                pqs_settable: true
-                fcv:
-                    min: "9.0"
-
-    internalSearchIdLookupMaxInputBytes:
-        description: >-
-            Byte budget for buffered (pre-lookup) search results in the $_internalSearchIdLookup
-            batch stage. Fill stops once buffered input crosses this bound, so a few large events
-            cannot grow the buffer without limit; at least one event is always admitted.
-        set_at: [startup, runtime]
-        cpp_varname: "internalSearchIdLookupMaxInputBytes"
-        cpp_vartype: AtomicWord<long long>
-        default: 16777216
-        validator:
-            gte: 1
-            lte: 16777216
-        redact: false
-        annotations:
-            query_knob:
-                wire_name: searchIdLookupMaxInputBytes
-                pqs_settable: true
-                fcv:
-                    min: "9.0"
-
-    internalSearchIdLookupMaxOutputBytes:
-        description: >-
-            Byte budget for resolved (looked-up) documents in the $_internalSearchIdLookup batch
-            stage. The enrich scope suspends after the document that crosses this bound; a single
-            oversized document is resolved as a batch-of-one and never split.
-        set_at: [startup, runtime]
-        cpp_varname: "internalSearchIdLookupMaxOutputBytes"
-        cpp_vartype: AtomicWord<long long>
-        default: 16777216
-        validator:
-            gte: 1
-            lte: 16777216
-        redact: false
-        annotations:
-            query_knob:
-                wire_name: searchIdLookupMaxOutputBytes
-                pqs_settable: true
-                fcv:
-                    min: "9.0"
-
     internalOperationResponseMaxMS:
         description: >-
             Limits the time that individual aggregate or getMore command requests are allowed to spend inside

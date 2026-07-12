@@ -55,10 +55,9 @@ private:
 
     /**
      * Enriches one buffered event: for an update event, attaches the looked-up post-image as
-     * 'fullDocument'; any other event passes through unchanged. Never drops an event, so it always
-     * returns an engaged optional.
+     * 'fullDocument'; any other event passes through unchanged.
      */
-    boost::optional<Document> enrich(Document event) override;
+    Document enrich(Document event) override;
 
     /**
      * Extracts the lookup parameters from the update event and invokes the injected executor.

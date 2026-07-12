@@ -13,10 +13,7 @@
 #include "mongo/db/exec/single_doc_lookup/local_lookup_eligibility.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/query_knob_descriptors_execution.h"
-#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 
@@ -27,45 +24,23 @@
 namespace mongo {
 MONGO_FAIL_POINT_DEFINE(hangBeforeResultsInInternalSearchIdLookup);
 
-namespace {
-/**
- * Batch limits for the $_internalSearchIdLookup stage. The event count is pinned to 1 unless the
- * optimization is on, so with the flag off the stage is byte-for-byte the old per-result path.
- * Batching only pays off behind a caching/SBE executor (SERVER-130900), so the knob stays at 1 in
- * production for now and is raised only by tests. Byte budgets always come from their knobs.
- */
-exec::agg::BatchedEnrichmentStage::Limits buildIdLookupLimits(
-    const QueryKnobConfiguration& queryKnobsConfig, bool isOptimized) {
-    return exec::agg::BatchedEnrichmentStage::Limits{
-        .maxInputEvents =
-            isOptimized ? static_cast<size_t>(queryKnobsConfig.getSearchIdLookupMaxBatchSize()) : 1,
-        .maxInputBytes = static_cast<size_t>(queryKnobsConfig.getSearchIdLookupMaxInputBytes()),
-        .maxOutputBytes = static_cast<size_t>(queryKnobsConfig.getSearchIdLookupMaxOutputBytes())};
-}
-}  // namespace
-
 boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalSearchIdLookupToStageFn(
     const boost::intrusive_ptr<DocumentSource>& source) {
     auto documentSource = dynamic_cast<DocumentSourceInternalSearchIdLookUp*>(source.get());
 
     tassert(10807804, "expected 'DocumentSourceInternalSearchIdLookUp' type", documentSource);
 
-    const auto& expCtx = documentSource->getExpCtx();
-    const auto& ifrContext = expCtx->getIfrContext();
-    const bool isOptimized = ifrContext &&
-        ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagSearchOptimizedIdLookup);
-
-    auto lookupExecutor = exec::agg::buildIdLookupExecutor(
-        expCtx, documentSource->_catalogResourceHandle, documentSource->_spec.getViewPipeline());
+    auto lookupExecutor = exec::agg::buildIdLookupExecutor(documentSource->getExpCtx(),
+                                                           documentSource->_catalogResourceHandle,
+                                                           documentSource->_spec.getViewPipeline());
 
     return make_intrusive<exec::agg::InternalSearchIdLookUpStage>(
         documentSource->kStageName,
         documentSource->_spec,
-        expCtx,
+        documentSource->getExpCtx(),
         documentSource->_catalogResourceHandle,
         documentSource->_searchIdLookupMetrics,
-        std::move(lookupExecutor),
-        buildIdLookupLimits(expCtx->getQueryKnobConfiguration(), isOptimized));
+        std::move(lookupExecutor));
 }
 
 namespace exec::agg {
@@ -107,9 +82,8 @@ InternalSearchIdLookUpStage::InternalSearchIdLookUpStage(
     const boost::intrusive_ptr<DSInternalSearchIdLookUpCatalogResourceHandle>&
         catalogResourceHandle,
     const std::shared_ptr<SearchIdLookupMetrics>& searchIdLookupMetrics,
-    std::unique_ptr<SingleDocumentLookupExecutor> lookupExecutor,
-    Limits limits)
-    : BatchedEnrichmentStage(stageName, expCtx, limits),
+    std::unique_ptr<SingleDocumentLookupExecutor> lookupExecutor)
+    : Stage(stageName, expCtx),
       _stageName(stageName),
       _spec(std::move(spec)),
       _catalogResourceHandle(catalogResourceHandle),
@@ -119,10 +93,6 @@ InternalSearchIdLookUpStage::InternalSearchIdLookUpStage(
     // Point the installed executor's per-lookup stats at this stage's SpecificStats so explain
     // reports totalDocs/KeysExamined. Executors that don't surface stats no-op this.
     _lookupExecutor->setPlanSummaryStatsSink(&_stats.planSummaryStats);
-
-    // Register metrics on the first batch's OpDebug now; reattachToOperationContext() re-points it
-    // on every subsequent getMore.
-    registerMetricsOnOpDebug(expCtx->getOperationContext());
 }
 
 Document InternalSearchIdLookUpStage::getExplainOutput(
@@ -141,94 +111,89 @@ Document InternalSearchIdLookUpStage::getExplainOutput(
     return output.freeze();
 }
 
-void InternalSearchIdLookUpStage::beginBatch() {
-    // Open the per-batch resource scope over the lookup executor; closeBatch() releases it.
-    _batch.emplace(*_lookupExecutor);
-}
-
-void InternalSearchIdLookUpStage::reattachToOperationContext(OperationContext* opCtx) {
-    // OpDebug is reset on each new getMore; re-point it at this stage's metrics when the operation
-    // reattaches (once per getMore) instead of on every enrich sub-batch.
-    registerMetricsOnOpDebug(opCtx);
-}
-
-void InternalSearchIdLookUpStage::registerMetricsOnOpDebug(OperationContext* opCtx) {
-    if (!opCtx) {
-        return;
-    }
-    auto& opDebug = CurOp::get(opCtx)->debug();
+GetNextResult InternalSearchIdLookUpStage::doGetNext() {
+    // Register the IdLookup's metrics on OpDebug. It's important that we check this on each
+    // doGetNext(), since the OpDebug metrics will get reset on each new getMore.
+    auto& opDebug = CurOp::get(pExpCtx->getOperationContext())->debug();
     if (!opDebug.searchIdLookupMetrics) {
         opDebug.searchIdLookupMetrics = _searchIdLookupMetrics;
     }
-}
 
-void InternalSearchIdLookUpStage::closeBatch() noexcept {
-    _batch.reset();
-}
-
-bool InternalSearchIdLookUpStage::shouldStopEmittingDocuments() const {
-    // Honour the spec's 'limit' (0 or unset means no cap): stop once that many documents have been
-    // returned. Mirrors the previous per-getNext() limit check.
-    auto limit = _spec.getLimit();
-    return limit && *limit != 0 && _searchIdLookupMetrics->getDocsReturnedByIdLookup() >= *limit;
-}
-
-void InternalSearchIdLookUpStage::onExhausted() {
-    // Open a non-ticketed interval exactly once (idempotent), to cover any subsequent in-memory
+    // Opens a non-ticketed interval exactly once (idempotent), to cover any subsequent in-memory
     // aggregation work (e.g. $sort, $group) that runs after the search source is exhausted.
-    auto opCtx = pExpCtx->getOperationContext();
-    auto& tracker = getAggNonTicketedIntervalTracker(opCtx);
-    if (!tracker.hasIntervalStart) {
-        tracker.openInterval(opCtx->tickSource().getTicks());
-    }
-}
+    auto openIntervalForSubsequentWork = [&]() {
+        auto opCtx = pExpCtx->getOperationContext();
+        auto& tracker = getAggNonTicketedIntervalTracker(opCtx);
+        if (!tracker.hasIntervalStart) {
+            tracker.openInterval(opCtx->tickSource().getTicks());
+        }
+    };
 
-boost::optional<Document> InternalSearchIdLookUpStage::enrich(Document event) {
-    _searchIdLookupMetrics->incrementDocsSeenByIdLookup();
-
-    auto documentId = event["_id"];
-    if (documentId.missing()) {
-        // Inputs without an _id are skipped (dropped).
-        return boost::none;
-    }
-
-    if (MONGO_unlikely(hangBeforeResultsInInternalSearchIdLookup.shouldFail())) {
-        CurOpFailpointHelpers::waitWhileFailPointEnabled(
-            &hangBeforeResultsInInternalSearchIdLookup,
-            pExpCtx->getOperationContext(),
-            "hangBeforeResultsInInternalSearchIdLookup",
-            []() {
-                LOGV2(11147700,
-                      "Hanging aggregation due to "
-                      "'hangBeforeResultsInInternalSearchIdLookup' "
-                      "failpoint");
-            });
+    boost::optional<Document> result;
+    Document inputDoc;
+    if (auto limit = _spec.getLimit();
+        limit && *limit != 0 && _searchIdLookupMetrics->getDocsReturnedByIdLookup() >= *limit) {
+        openIntervalForSubsequentWork();
+        return GetNextResult::makeEOF();
     }
 
-    auto documentKey = Document({{"_id", documentId}});
+    while (!result) {
+        auto nextInput = pSource->getNext();
+        if (!nextInput.isAdvanced()) {
+            if (nextInput.isEOF()) {
+                openIntervalForSubsequentWork();
+            }
+            return nextInput;
+        }
 
-    tassert(31052,
-            "Collection should exist when using $_internalSearchIdLookup",
-            pExpCtx->getUUID().has_value());
+        _searchIdLookupMetrics->incrementDocsSeenByIdLookup();
+        inputDoc = nextInput.releaseDocument();
+        auto documentId = inputDoc["_id"];
 
-    // Resolve the _id via the installed strategy. documentKey always carries an _id, so the result
-    // is found or not found, never kNotHandled; a miss (deleted doc or orphan) is dropped.
-    using HandledStatus = SingleDocumentLookupExecutor::LookupResult::HandledStatus;
-    auto lookupResult = _lookupExecutor->performLookup(pExpCtx,
-                                                       pExpCtx->getNamespaceString(),
-                                                       pExpCtx->getUUID(),
-                                                       documentKey,
-                                                       boost::none /* afterClusterTime */);
-    tassert(13006201,
-            "$_internalSearchIdLookup executor did not handle an _id lookup",
-            lookupResult.status != HandledStatus::kNotHandled);
-    if (lookupResult.status != HandledStatus::kDocumentFound) {
-        return boost::none;
+        if (!documentId.missing()) {
+            if (MONGO_unlikely(hangBeforeResultsInInternalSearchIdLookup.shouldFail())) {
+                CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                    &hangBeforeResultsInInternalSearchIdLookup,
+                    pExpCtx->getOperationContext(),
+                    "hangBeforeResultsInInternalSearchIdLookup",
+                    []() {
+                        LOGV2(11147700,
+                              "Hanging aggregation due to "
+                              "'hangBeforeResultsInInternalSearchIdLookup' "
+                              "failpoint");
+                    });
+            }
+
+            auto documentKey = Document({{"_id", documentId}});
+
+            tassert(31052,
+                    "Collection should exist when using $_internalSearchIdLookup",
+                    pExpCtx->getUUID().has_value());
+
+            // Resolve the _id via the installed strategy. documentKey always carries an _id, so the
+            // result is found or not found, never kNotHandled; a miss is dropped like an empty
+            // read.
+            using HandledStatus = SingleDocumentLookupExecutor::LookupResult::HandledStatus;
+            auto lookupResult = _lookupExecutor->performLookup(pExpCtx,
+                                                               pExpCtx->getNamespaceString(),
+                                                               pExpCtx->getUUID(),
+                                                               documentKey,
+                                                               boost::none /* afterClusterTime */);
+            tassert(13006201,
+                    "$_internalSearchIdLookup executor did not handle an _id lookup",
+                    lookupResult.status != HandledStatus::kNotHandled);
+            if (lookupResult.status == HandledStatus::kDocumentFound) {
+                result = std::move(lookupResult.document);
+            }
+        }
     }
 
-    // Transfer searchScore metadata from the input event to the resolved document.
-    MutableDocument output(std::move(*lookupResult.document));
-    output.copyMetaDataFrom(event);
+    // Result must be populated here - EOF returns above.
+    invariant(result);
+    MutableDocument output(*result);
+
+    // Transfer searchScore metadata from inputDoc to the result.
+    output.copyMetaDataFrom(inputDoc);
     _searchIdLookupMetrics->incrementDocsReturnedByIdLookup();
     return output.freeze();
 }

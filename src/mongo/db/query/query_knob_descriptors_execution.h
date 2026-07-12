@@ -121,18 +121,6 @@
          kInternalQueryMaxMemoryUsageBytesPerOperationName,                               \
          internalQueryMaxMemoryUsageBytesPerOperation,                                    \
          getMaxMemoryUsageBytesPerOperation)                                              \
-    KNOB(kSearchIdLookupMaxBatchSize,                                                     \
-         kInternalSearchIdLookupMaxBatchSizeName,                                         \
-         internalSearchIdLookupMaxBatchSize,                                              \
-         getSearchIdLookupMaxBatchSize)                                                   \
-    KNOB(kSearchIdLookupMaxInputBytes,                                                    \
-         kInternalSearchIdLookupMaxInputBytesName,                                        \
-         internalSearchIdLookupMaxInputBytes,                                             \
-         getSearchIdLookupMaxInputBytes)                                                  \
-    KNOB(kSearchIdLookupMaxOutputBytes,                                                   \
-         kInternalSearchIdLookupMaxOutputBytesName,                                       \
-         internalSearchIdLookupMaxOutputBytes,                                            \
-         getSearchIdLookupMaxOutputBytes)                                                 \
     /* End MONGO_EXPAND_QUERY_KNOBS_EXECUTION */
 // clang-format on
 
