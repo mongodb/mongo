@@ -7,14 +7,14 @@ export function buildSupportsOtel() {
 }
 
 /**
- * Finds metrics files in the given directory.
+ * Finds files in the given directory whose names end with the given suffix.
  * @param {string} directory - The directory path to search in.
- * @param {string} fileSuffix - The suffix of the metrics files to search for. Defaults to "-metrics.jsonl" (the suffix
+ * @param {string} fileSuffix - The suffix of the files to search for. Defaults to "-metrics.jsonl" (the suffix
  *    for the opentelemetry metrics files in JSONL format).
  * @returns {Array<Object>} An array of file objects (from listFiles()) whose names end with `fileSuffix`. Each file
  *     object has a 'name' property containing the full file path.
  */
-export function findMetricsFiles(directory, fileSuffix = "-metrics.jsonl") {
+export function findOtelFilesWithSuffix(directory, fileSuffix = "-metrics.jsonl") {
     const files = listFiles(directory);
     return files.filter(function (file) {
         if (!file.name.endsWith(fileSuffix)) {
@@ -48,7 +48,7 @@ export function getFlatMetricsList(record) {
  *     Returns an empty array if the file is empty, doesn't exist, or if parsing fails
  *     (which can happen if the file is read mid-write).
  */
-function readJsonlFile(filePath) {
+export function readJsonlFile(filePath) {
     const content = cat(filePath);
     if (!content || content.trim() === "") {
         return [];
@@ -104,7 +104,7 @@ function latestTime(record) {
  * Returns the most recent raw OTLP JSON record from the metrics directory, or null if none exist.
  */
 export function getLatestRawRecord(directory) {
-    const files = findMetricsFiles(directory);
+    const files = findOtelFilesWithSuffix(directory);
     const records = files
         .map((file) => {
             const record = readJsonlFile(file.name);

@@ -18,9 +18,9 @@ namespace mongo::otel::traces {
  */
 namespace span_names {
 
-#define SPAN_NAME_(id, name)                                  \
-    [[MONGO_MOD_PUBLIC]] inline constexpr auto id = SpanName( \
-        SpanName::passkeyForNetworkingAndObservabilityOnly, name, SampledByDefault{false})
+#define SPAN_NAME_(id, name)                        \
+    [[MONGO_MOD_PUBLIC]] inline constexpr auto id = \
+        SpanName(SpanName::passkeyForNetworkingAndObservabilityOnly, name)
 
 // Resharding spans
 SPAN_NAME_(kReshardCollectionCmdInvocationTypedRun, "ReshardCollectionCmd::Invocation::typedRun");
@@ -106,8 +106,7 @@ SPAN_NAME_(kTest4, "test_only.span4");
  * Do not add calls to this function anywhere else.
  * The returned reference is stable for the lifetime of the process.
  */
-[[MONGO_MOD_PUBLIC]] const SpanName& registerCommandSpanName(
-    std::string_view name, SampledByDefault sampledByDefault = SampledByDefault{false});
+[[MONGO_MOD_PUBLIC]] const SpanName& registerCommandSpanName(std::string_view name);
 
 /**
  * Gets the span name for a command name. Returns nullptr if the command name is not found. The

@@ -28,6 +28,7 @@
 #include "mongo/db/service_entry_point_shard_role.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/traces/sampler/sampler.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/transport/session.h"
@@ -37,13 +38,16 @@
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/sockaddr.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
+#include <string>
 #include <string_view>
+#include <vector>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -641,6 +645,32 @@ TEST_F(RouterCommandRegistryTest, ServicesInit) {
 TEST_F(RouterCommandRegistryTest, ExecutePlanForService) {
     auto result = testExecutePlanForService(ClusterRole::RouterServer);
     ASSERT_EQ(result.commandTypes, result.fullSet);
+}
+
+/**
+ * Check that all mongos commands are sampled by default, as a proxy for the entry points of sharded
+ * operations.
+ */
+TEST(Commands, AllRouterCommandsSampledByDefault) {
+    auto& sampler = otel::traces::TracingSampler::get();
+
+    auto savedConfig = sampler.getConfig();
+    ScopeGuard restoreConfig([&] {
+        sampler.updateInternalConfig(savedConfig.defaultSpans, savedConfig.perSpanOverrides);
+    });
+    sampler.updateInternalConfig(
+        {.factor = 1.0, .rateLimits = {.refillRate = 1e6, .maxTokens = 1'000'000}}, {});
+
+    auto* registry = getCommandRegistry(ClusterRole::RouterServer);
+
+    std::vector<std::string> checkedCommands;
+    registry->forEachCommand([&](Command* c) {
+        const auto& spanName = c->getTraceSpanName();
+        ASSERT_TRUE(sampler.shouldSample(spanName.getName(), 0))
+            << "command should be sampled: " << c->getName();
+        checkedCommands.push_back(c->getName());
+    });
+    ASSERT_GT(checkedCommands.size(), 0u);
 }
 
 using ShardCommandRegistryTest = CommandRegistryTest<ServerRoleIndex::shard>;

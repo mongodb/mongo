@@ -16,7 +16,7 @@ import {
     createMetricsDirectory,
     extractPrometheusMetricIntValue,
     extractPrometheusMetricTime,
-    findMetricsFiles,
+    findOtelFilesWithSuffix,
 } from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
 
 /**
@@ -27,7 +27,7 @@ function getConnectionsMetricValue(metricsDir, metricsFileName, afterDate) {
     let metricsText;
     assert.soon(
         () => {
-            let files = findMetricsFiles(metricsDir, metricsFileName);
+            let files = findOtelFilesWithSuffix(metricsDir, metricsFileName);
             if (files.length === 0) {
                 jsTest.log.info(`No metrics files found in ${metricsDir}`);
                 return false;

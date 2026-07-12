@@ -11,16 +11,13 @@ namespace mongo::otel::traces {
 namespace {
 
 TEST(SpanNamesTest, RegisterAndLookupCommandSpanNames) {
-    const auto& firstSpan = registerCommandSpanName("test_only.command1", SampledByDefault{false});
-    const auto& secondSpan = registerCommandSpanName("test_only.command2", SampledByDefault{true});
-    const auto& thirdSpan = registerCommandSpanName("test_only.command3", SampledByDefault{false});
+    const auto& firstSpan = registerCommandSpanName("test_only.command1");
+    const auto& secondSpan = registerCommandSpanName("test_only.command2");
+    const auto& thirdSpan = registerCommandSpanName("test_only.command3");
 
     EXPECT_EQ(firstSpan.getName(), "test_only.command1");
-    EXPECT_EQ(static_cast<bool>(firstSpan.getSampledByDefault()), false);
     EXPECT_EQ(secondSpan.getName(), "test_only.command2");
-    EXPECT_EQ(static_cast<bool>(secondSpan.getSampledByDefault()), true);
     EXPECT_EQ(thirdSpan.getName(), "test_only.command3");
-    EXPECT_EQ(static_cast<bool>(thirdSpan.getSampledByDefault()), false);
 
     auto* foundFirst = lookupCommandSpanName("test_only.command1");
     EXPECT_TRUE(foundFirst != nullptr);
@@ -40,14 +37,11 @@ TEST(SpanNamesTest, LookupUnregisteredNameReturnsNullptr) {
 }
 
 TEST(SpanNamesTest, DuplicateRegistrationReturnsExistingSpanName) {
-    const auto& first =
-        registerCommandSpanName("test_only.duplicate_command", SampledByDefault{false});
-    const auto& second =
-        registerCommandSpanName("test_only.duplicate_command", SampledByDefault{false});
+    const auto& first = registerCommandSpanName("test_only.duplicate_command");
+    const auto& second = registerCommandSpanName("test_only.duplicate_command");
 
     EXPECT_EQ(&first, &second);
     EXPECT_EQ(first.getName(), "test_only.duplicate_command");
-    EXPECT_EQ(static_cast<bool>(first.getSampledByDefault()), false);
 
     auto* found = lookupCommandSpanName("test_only.duplicate_command");
     EXPECT_EQ(found, &first);

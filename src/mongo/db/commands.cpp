@@ -28,6 +28,7 @@
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/traces/sampler/sampler.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
@@ -1080,6 +1081,13 @@ Command::Command(std::string_view name, std::vector<std::string_view> aliases)
     : _name(std::string{name}), _aliases(std::move(aliases)) {}
 
 void Command::initializeClusterRole(ClusterRole role) {
+    // Commands served by mongos are entry points for sharded operations, so they are "upgraded" to
+    // be sampled by default. Commands served by mongod inherit the sampling decision from the
+    // mongos that dispatched them, if applicable.
+    if (role.hasExclusively(ClusterRole::RouterServer)) {
+        otel::traces::TracingSampler::get().sampleByDefault(_traceSpanName);
+    }
+
     if (includeInCommandStats()) {
         for (auto&& [ptr, stat] : {
                  std::pair{&_commandsExecuted, "total"},

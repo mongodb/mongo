@@ -76,7 +76,11 @@ public:
     }
 
     /**
-     * Registers a span name so that it is eligible for sampling if no config specifies otherwise.
+     * Registers a span name as a root span eligible for the default sampling config.
+     *
+     * Only a small number of spans should be registered this way — typically the outermost entry
+     * points to operations we want to gather traces for by default. Child spans within a sampled
+     * trace are captured automatically regardless.
      */
     virtual void sampleByDefault(SpanName name) {}
 };

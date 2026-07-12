@@ -16,19 +16,17 @@ namespace mongo::otel::traces {
 namespace {
 class SpanNameRegistry {
 public:
-    SpanName& insert(std::string_view name, SampledByDefault sampledByDefault) {
+    SpanName& insert(std::string_view name) {
         std::lock_guard lk(_mutex);
         // Commands are constructed once per ClusterRole/Service, so the same command name may be
         // registered more than once.
         auto existing = _spanMap.makeSnapshot();
         if (auto it = existing->find(name); it != existing->end()) {
-            invariant(it->second->getSampledByDefault() == sampledByDefault,
-                      "duplicate span name registered with a different sampledByDefault");
             return *it->second;
         }
         std::string& storedName = _names.emplace_back(name);
-        SpanName& storedSpan = _spans.emplace_back(SpanName(
-            SpanName::passkeyForNetworkingAndObservabilityOnly, storedName, sampledByDefault));
+        SpanName& storedSpan = _spans.emplace_back(
+            SpanName(SpanName::passkeyForNetworkingAndObservabilityOnly, storedName));
         auto newMap = std::make_shared<absl::flat_hash_map<std::string_view, SpanName*>>(*existing);
         invariant(newMap->insert({storedName, &storedSpan}).second);
         _spanMap.update(std::move(newMap));
@@ -63,8 +61,8 @@ SpanNameRegistry& globalSpanNameRegistry() {
 }
 }  // namespace
 
-const SpanName& registerCommandSpanName(std::string_view name, SampledByDefault sampledByDefault) {
-    return globalSpanNameRegistry().insert(name, sampledByDefault);
+const SpanName& registerCommandSpanName(std::string_view name) {
+    return globalSpanNameRegistry().insert(name);
 }
 
 const SpanName* lookupCommandSpanName(std::string_view name) {

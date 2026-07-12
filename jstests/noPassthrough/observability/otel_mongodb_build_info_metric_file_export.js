@@ -11,7 +11,7 @@ import {
     createMetricsDirectory,
     extractPrometheusMetricIntValue,
     extractPrometheusMetricLabels,
-    findMetricsFiles,
+    findOtelFilesWithSuffix,
     getFlatMetricsList,
     getLatestMetrics,
     getLatestRawRecord,
@@ -114,7 +114,7 @@ describe("OTel build info attributes (mongod) (Prometheus file export)", functio
         // this metric on slow machines.
         assert.soon(
             () => {
-                const files = findMetricsFiles(this.metricsDir, "my-test-metrics.prom");
+                const files = findOtelFilesWithSuffix(this.metricsDir, "my-test-metrics.prom");
                 if (files.length === 0) return false;
                 const content = cat(files[0].name);
                 const attrs = extractPrometheusMetricLabels(content, "mongodb.build.info");
@@ -217,7 +217,7 @@ describe("OTel build info attributes (mongos) (Prometheus file export)", functio
 
         assert.soon(
             () => {
-                const files = findMetricsFiles(this.metricsDir, "my-test-metrics.prom");
+                const files = findOtelFilesWithSuffix(this.metricsDir, "my-test-metrics.prom");
                 if (files.length === 0) return false;
                 const content = cat(files[0].name);
                 const attrs = extractPrometheusMetricLabels(content, "mongodb.build.info");

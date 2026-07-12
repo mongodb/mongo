@@ -27,7 +27,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 import {
-    findMetricsFiles,
+    findOtelFilesWithSuffix,
     otelFileExportParams,
 } from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
 
@@ -1603,7 +1603,7 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
      */
     static _readResumeMetrics(metricsDir) {
         const result = {succeeded: {}, failed: 0};
-        const files = findMetricsFiles(metricsDir);
+        const files = findOtelFilesWithSuffix(metricsDir);
         for (const file of files) {
             const content = cat(file.name);
             if (!content || !content.trim()) continue;
