@@ -1,6 +1,7 @@
 /**
  * Tests that the _id lookups performed by $search have a shard filter applied to them so that
  * orphans are not returned.
+ * TODO (SERVER-131069): Remove this mocked test file now that this test has been migrated to an e2e suite (e2e/sharding_no_passthrough/search_shard_filtering.js).
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {

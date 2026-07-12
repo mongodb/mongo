@@ -1,5 +1,6 @@
 /**
  * Sharding tests that cover a variety of different possible distributed execution scenarios.
+ * TODO (SERVER-131069): Remove this mocked test file now that this test has been migrated to an e2e suite (e2e/sharding_no_passthrough/search_different_merging_locations.js). The non-search-view failure case is covered by e2e/search/search_meta_var.js.
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
