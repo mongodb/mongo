@@ -840,6 +840,7 @@ __btree_get_last_recno(WT_SESSION_IMPL *session)
     WT_BTREE *btree;
     WT_PAGE *page;
     WT_REF *next_walk;
+    uint64_t last_recno;
     uint32_t flags;
 
     btree = S2BT(session);
@@ -854,12 +855,12 @@ __btree_get_last_recno(WT_SESSION_IMPL *session)
     }
 
     /*
-     * The endpoint for append is global; read the last page with global visibility to make sure
-     * that if the end of the tree is truncated we don't start appending in the truncated space
-     * unless the truncation has become globally visible. (Note that this path does not examine the
-     * visibility of individual data items; it only checks whether whole pages are deleted.)
+     * The endpoint for append is global; read the last page with global visibility (even if it's
+     * deleted) to make sure that if the end of the tree is truncated, the tree walk finds the
+     * correct page. (Note that this path does not examine the visibility of individual data items;
+     * it only checks whether whole pages are deleted.)
      */
-    flags = WT_READ_PREV | WT_READ_VISIBLE_ALL;
+    flags = WT_READ_PREV | WT_READ_VISIBLE_ALL | WT_READ_SEE_DELETED;
 
     next_walk = NULL;
     WT_RET(__wt_tree_walk(session, &next_walk, flags));
@@ -867,8 +868,21 @@ __btree_get_last_recno(WT_SESSION_IMPL *session)
         return (WT_NOTFOUND);
 
     page = next_walk->page;
-    btree->last_recno = page->type == WT_PAGE_COL_VAR ? __col_var_last_recno(next_walk) :
-                                                        __col_fix_last_recno(next_walk);
+    last_recno = page->type == WT_PAGE_COL_VAR ? __col_var_last_recno(next_walk) :
+                                                 __col_fix_last_recno(next_walk);
+
+    /*
+     * If the right-most page is deleted and globally visible, we skip reading the page from disk
+     * and instead instantiate an empty page in memory. It's possible that next_walk points to this
+     * empty page. When this happens, it has no entries and the last record number will be out of
+     * bounds, i.e. zero.
+     *
+     * In this context, the page also can't have an insert (or append) list, so it's safe to simply
+     * take the last ref's starting record number as the last record number of the tree.
+     */
+    if (last_recno == WT_RECNO_OOB)
+        last_recno = next_walk->key.recno;
+    btree->last_recno = last_recno;
 
     return (__wt_page_release(session, next_walk, 0));
 }

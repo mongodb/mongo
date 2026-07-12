@@ -421,8 +421,8 @@ tree with no leaves at all causes problems.
 
 There are two separate skip functions for skipping deleted pages during tree walks.
 The basic skip function is \c __wt_delete_page_skip in \c bt_delete.c; it is always called
-in tree walks when \c WT_READ_SKIP_DELETED is set, which is all tree walks except @ref
-arch-rts.
+in tree walks when \c WT_READ_SEE_DELETED is not set, which is all tree walks except @ref
+arch-rts and column-store appends.
 It checks for whether the ref state is \c WT_REF_DELETED and the truncation is visible to
 the caller.
 
@@ -772,9 +772,7 @@ cells.}
 @row{bt_walk.c, Hook, in \c __tree_walk_internal,
 Disable fast-truncate for FLCS.}
 @row{bt_walk.c, Hook, in \c __tree_walk_internal,
-Engage \c WT_READ_SKIP_DELETED by default.}
-@row{bt_walk.c, Hook, in \c __tree_walk_internal,
-Call \c __wt_delete_page_skip when \c WT_READ_SKIP_DELETED is set.}
+Call \c __wt_delete_page_skip when \c WT_READ_SEE_DELETED is not set.}
 @row{bt_walk.c, Hook, in \c __tree_walk_internal,
 Call \c __wt_delete_page when \c WT_READ_TRUNCATE is set.}
 @row{bt_walk.c, Hook, in \c __tree_walk_skip_count_callback,
