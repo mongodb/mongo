@@ -586,5 +586,69 @@ TEST_F(ExpressionContextTest, ExpressionFallbackTrackerRebuiltWhenOperationConte
     rebuilt.add(-100);
 }
 
+// A context that opts out of operation-wide memory tracking gets a standalone fallback tracker
+// even when an OperationContext is available and both memory-tracking flags are enabled: the
+// per-expression cap is still enforced, but nothing counts toward the per-operation limit.
+TEST_F(ExpressionContextTest,
+       ExpressionFallbackTrackerIsStandaloneWhenOperationMemoryTrackingExcluded) {
+    unittest::ServerParameterGuard queryMemTracking{"featureFlagQueryMemoryTracking", true};
+    unittest::ServerParameterGuard exprMemTracking{"featureFlagExpressionMemoryTracking", true};
+
+    // Tiny per-operation limit, generous per-expression cap: an opted-out fallback must not
+    // enforce the per-operation limit.
+    {
+        unittest::ServerParameterGuard exprCap{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                               10 * 1024 * 1024};
+        unittest::ServerParameterGuard perOpLimit{"internalQueryMaxMemoryUsageBytesPerOperation",
+                                                  4};
+
+        auto opCtx = makeOperationContext();
+        auto expCtx = ExpressionContextBuilder{}
+                          .opCtx(opCtx.get())
+                          .ns(NamespaceString::createNamespaceString_forTest("test"sv, "coll"sv))
+                          .excludeOperationMemoryTracking(true)
+                          .build();
+
+        auto& tracker = expCtx->getExpressionFallbackTracker();
+        tracker.add(100);  // Exceeds the per-operation limit; a rolled-up tracker would fail.
+        ASSERT_TRUE(tracker.withinMemoryLimit(opCtx.get()));
+        tracker.add(-100);
+    }
+
+    // Tiny per-expression cap, generous per-operation limit: the standalone per-expression cap
+    // must still be enforced.
+    {
+        unittest::ServerParameterGuard exprCap{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                               4};
+        unittest::ServerParameterGuard perOpLimit{"internalQueryMaxMemoryUsageBytesPerOperation",
+                                                  10 * 1024 * 1024};
+
+        auto opCtx = makeOperationContext();
+        auto expCtx = ExpressionContextBuilder{}
+                          .opCtx(opCtx.get())
+                          .ns(NamespaceString::createNamespaceString_forTest("test"sv, "coll"sv))
+                          .excludeOperationMemoryTracking(true)
+                          .build();
+
+        auto& tracker = expCtx->getExpressionFallbackTracker();
+        tracker.add(100);  // 100 > per-expression cap of 4.
+        ASSERT_FALSE(tracker.withinMemoryLimit(opCtx.get()));
+        tracker.add(-100);
+    }
+}
+
+TEST_F(ExpressionContextTest, ExcludeOperationMemoryTrackingIsPropagatedToCopies) {
+    auto opCtx = makeOperationContext();
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx.get())
+                      .ns(NamespaceString::createNamespaceString_forTest("test"sv, "coll"sv))
+                      .excludeOperationMemoryTracking(true)
+                      .build();
+
+    auto copy = makeCopyFromExpressionContext(
+        expCtx, NamespaceString::createNamespaceString_forTest("test"sv, "other"sv));
+    ASSERT_TRUE(copy->getExcludeOperationMemoryTracking());
+}
+
 }  // namespace
 }  // namespace mongo

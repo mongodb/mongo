@@ -8,6 +8,8 @@
 #include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/logv2/log.h"
 
+#include <limits>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
@@ -16,7 +18,7 @@ namespace {
 const OperationContext::Decoration<std::unique_ptr<OperationMemoryUsageTracker>> _getFromOpCtx =
     OperationContext::declareDecoration<std::unique_ptr<OperationMemoryUsageTracker>>();
 
-}
+}  // namespace
 
 OperationMemoryUsageTracker::OperationMemoryUsageTracker(OperationContext* opCtx)
     : SimpleMemoryUsageTracker(MemoryUsageLimit{query_knobs::kMaxMemoryUsageBytesPerOperation}),
@@ -49,7 +51,10 @@ OperationMemoryUsageTracker* OperationMemoryUsageTracker::getOperationMemoryUsag
 
 SimpleMemoryUsageTracker OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
     const ExpressionContext& expCtx, MemoryUsageLimit maxMemoryUsageBytes) {
-    return createSimpleMemoryUsageTrackerImpl(expCtx.getOperationContext(), maxMemoryUsageBytes);
+    return createSimpleMemoryUsageTrackerImpl(expCtx.getOperationContext(),
+                                              maxMemoryUsageBytes,
+                                              0 /* chunkSize */,
+                                              expCtx.getExcludeOperationMemoryTracking());
 }
 
 SimpleMemoryUsageTracker OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(
@@ -70,7 +75,8 @@ SimpleMemoryUsageTracker OperationMemoryUsageTracker::createChunkedSimpleMemoryU
     return createSimpleMemoryUsageTrackerImpl(
         expCtx.getOperationContext(),
         maxMemoryUsageBytes,
-        internalQueryMaxWriteToCurOpMemoryUsageBytes.loadRelaxed());
+        internalQueryMaxWriteToCurOpMemoryUsageBytes.loadRelaxed(),
+        expCtx.getExcludeOperationMemoryTracking());
 }
 
 SimpleMemoryUsageTracker OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForSBE(
@@ -80,8 +86,12 @@ SimpleMemoryUsageTracker OperationMemoryUsageTracker::createChunkedSimpleMemoryU
 }
 
 SimpleMemoryUsageTracker OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerImpl(
-    OperationContext* opCtx, MemoryUsageLimit maxMemoryUsageBytes, int64_t chunkSize) {
-    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+    OperationContext* opCtx,
+    MemoryUsageLimit maxMemoryUsageBytes,
+    int64_t chunkSize,
+    bool excludeOperationMemoryTracking) {
+    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() ||
+        excludeOperationMemoryTracking) {
         return SimpleMemoryUsageTracker{maxMemoryUsageBytes, chunkSize};
     }
 
@@ -107,7 +117,8 @@ MemoryUsageTracker OperationMemoryUsageTracker::createMemoryUsageTrackerImpl(
     bool allowDiskUse,
     MemoryUsageLimit maxMemoryUsageBytes,
     int64_t chunkSize) {
-    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() ||
+        expCtx.getExcludeOperationMemoryTracking()) {
         return MemoryUsageTracker{allowDiskUse, maxMemoryUsageBytes};
     }
 

@@ -174,6 +174,35 @@ TEST_F(OperationMemoryUsageTrackerTest, CurOpStatsAreNotUpdatedIfFeatureFlagOff)
 }
 
 /**
+ * Contexts that opt out of operation-wide memory tracking get standalone stage trackers: per-stage
+ * limits still apply, but usage neither counts toward the per-operation limit nor reaches CurOp.
+ */
+TEST_F(OperationMemoryUsageTrackerTest, StageTrackersAreStandaloneWhenOperationTrackingExcluded) {
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard perOpLimit("internalQueryMaxMemoryUsageBytesPerOperation", 4);
+
+    auto expCtx = getExpCtx();
+    expCtx->setExcludeOperationMemoryTracking(true);
+
+    auto assertStandalone = [&](auto tracker) {
+        tracker.add(100);  // Exceeds the per-operation limit; a chained tracker would fail.
+        ASSERT_TRUE(tracker.withinMemoryLimit(expCtx->getOperationContext()));
+
+        int64_t inUseTrackedMemBytes, peakTrackedMemBytes;
+        std::tie(inUseTrackedMemBytes, peakTrackedMemBytes) = getCurOpMemoryStats();
+        ASSERT_EQ(inUseTrackedMemBytes, 0);
+        ASSERT_EQ(peakTrackedMemBytes, 0);
+        tracker.add(-100);
+    };
+
+    assertStandalone(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*expCtx));
+    assertStandalone(
+        OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*expCtx));
+    assertStandalone(OperationMemoryUsageTracker::createMemoryUsageTrackerForStage(*expCtx));
+    assertStandalone(OperationMemoryUsageTracker::createChunkedMemoryUsageTrackerForStage(*expCtx));
+}
+
+/**
  * A knob-backed limit built via loadMemoryLimit() must resolve its value from the query knob (its
  * backing server parameter) against the operation, not from any snapshot taken at construction.
  */

@@ -112,9 +112,10 @@ server_parameters:
         description: >-
             Maximum amount of memory in bytes that a single expression evaluation may use when no
             stage-level tracker has been wired to the EvaluationContext. If an OperationContext is
-            available and both query/expression memory-tracking feature flags are enabled, the
-            fallback tracker rolls up to the operation-wide tracker and is bounded by the per-query
-            limit; otherwise this per-expression safety cap is enforced.
+            available, both query/expression memory-tracking feature flags are enabled, and the
+            ExpressionContext is not excluded from operation-wide memory tracking, the fallback
+            tracker rolls up to the operation-wide tracker and is bounded by the per-query limit;
+            otherwise this per-expression safety cap is enforced.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxSingleExpressionMemoryUsageBytes"
         cpp_vartype: Atomic<long long>

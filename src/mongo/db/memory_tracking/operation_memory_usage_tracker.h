@@ -123,7 +123,10 @@ private:
     static OperationMemoryUsageTracker* getOperationMemoryUsageTracker(OperationContext* opCtx);
 
     static SimpleMemoryUsageTracker createSimpleMemoryUsageTrackerImpl(
-        OperationContext* opCtx, MemoryUsageLimit maxMemoryUsageBytes, int64_t chunkSize = 0);
+        OperationContext* opCtx,
+        MemoryUsageLimit maxMemoryUsageBytes,
+        int64_t chunkSize = 0,
+        bool excludeOperationMemoryTracking = false);
     static MemoryUsageTracker createMemoryUsageTrackerImpl(const ExpressionContext& expCtx,
                                                            bool allowDiskUse,
                                                            MemoryUsageLimit maxMemoryUsageBytes,

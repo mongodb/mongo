@@ -5,12 +5,14 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/memory_tracking/memory_usage_limit.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
+#include <limits>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -216,6 +218,32 @@ TEST(ExpressionObjectEvaluate, FallbackTrackerEnforcesLimit) {
     }
     ASSERT_EQ(expCtx.getExpressionFallbackTracker().inUseTrackedMemoryBytes(), 0);
     ASSERT_GT(expCtx.getExpressionFallbackTracker().peakTrackedMemoryBytes(), limit);
+}
+
+TEST(ExpressionObjectEvaluate, ExcludedContextUsesFallbackTrackerEvenWithStageTracker) {
+    auto expCtx = ExpressionContextForTest{};
+    expCtx.setExcludeOperationMemoryTracking(true);
+    auto object = makeFieldPathObject(&expCtx);
+
+    Document doc{{"a", std::string(100, 'x')}, {"b", std::string(100, 'y')}};
+
+    const int64_t limit = 8;
+    unittest::ServerParameterGuard limitGuard{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                              limit};
+
+    // Wire an unlimited stage tracker into the EvaluationContext: if evaluation charged it, no
+    // limit would trip. A context excluded from operation-wide memory tracking (e.g. stream
+    // processing) must route expression memory to the fallback tracker instead, which is
+    // standalone and enforces the per-expression safety cap.
+    SimpleMemoryUsageTracker stageTracker{MemoryUsageLimit{std::numeric_limits<int64_t>::max()}};
+    EvaluationContext ctx{};
+    ctx.tracker = &stageTracker;
+
+    ASSERT_THROWS_CODE(object->evaluate(doc, &expCtx.variables, ctx),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
+    ASSERT_EQ(stageTracker.peakTrackedMemoryBytes(), 0);
+    ASSERT_EQ(expCtx.getExpressionFallbackTracker().inUseTrackedMemoryBytes(), 0);
 }
 
 }  // namespace expression_evaluation_test

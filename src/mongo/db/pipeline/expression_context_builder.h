@@ -43,6 +43,7 @@ public:
     ExpressionContextBuilder& mergeType(MergeType);
     ExpressionContextBuilder& inRouter(bool);
     ExpressionContextBuilder& forPerShardCursor(bool);
+    ExpressionContextBuilder& excludeOperationMemoryTracking(bool);
     ExpressionContextBuilder& allowDiskUse(bool);
     ExpressionContextBuilder& allowPartialResults(bool);
     ExpressionContextBuilder& bypassDocumentValidation(bool);

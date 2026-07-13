@@ -30,7 +30,8 @@ namespace mongo {
 
 SimpleMemoryUsageTracker& ExpressionContext::getExpressionFallbackTracker() {
     if (!_expressionFallbackTracker) {
-        if (getOperationContext() && feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
+        if (getOperationContext() && !_params.excludeOperationMemoryTracking &&
+            feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
             feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
             // Memory tracking is enabled and an OperationContext is available: wire the fallback to
             // the operation-wide tracker so expression memory on call sites without a stage tracker
@@ -39,8 +40,9 @@ SimpleMemoryUsageTracker& ExpressionContext::getExpressionFallbackTracker() {
             _expressionFallbackTracker =
                 OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*this);
         } else {
-            // Memory tracking is disabled, or there is no OperationContext: fall back to a
-            // standalone tracker that just enforces the per-expression safety cap.
+            // Memory tracking is disabled, there is no OperationContext, or this context is
+            // excluded from operation-wide memory tracking: fall back to a standalone tracker
+            // that just enforces the per-expression safety cap.
             _expressionFallbackTracker.emplace(
                 MemoryUsageLimit{query_knobs::kMaxSingleExpressionMemoryUsageBytes});
         }
