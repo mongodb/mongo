@@ -163,10 +163,34 @@ class Tests(unittest.TestCase):
         def buildozer_output(autocomplete_query):
             return "//some:test [source1.cpp source2.cpp]\n//some:test2 [source1.cpp source4.cpp]"
 
-        args = ["wrapper_hook", "test", "+test", "+source3"]
+        # source1 is ambiguous (in both //some:test and //some:test2), so
+        # requesting +source1 must raise and list both conflicting targets.
+        args = ["wrapper_hook", "test", "+source1"]
 
-        with self.assertRaises(DuplicateSourceNames):
+        with self.assertRaises(DuplicateSourceNames) as ctx:
             test_runner_interface(args, False, buildozer_output)
+
+        message = str(ctx.exception)
+        assert "//some:test" in message
+        assert "//some:test2" in message
+
+    def test_duplicate_source_name_does_not_break_unrelated_target(self):
+        """A duplicate source elsewhere must not break resolving an unrelated +target."""
+
+        def buildozer_output(autocomplete_query):
+            return "//some:test [source1.cpp source2.cpp]\n//some:test2 [source1.cpp source4.cpp]"
+
+        # source2 is unique even though source1 is duplicated; it should resolve.
+        args = ["wrapper_hook", "test", "+source2"]
+
+        result = test_runner_interface(args, False, buildozer_output)
+
+        assert result == [
+            "test",
+            "//some:test",
+            "--test_arg=--fileNameFilter",
+            "--test_arg=source2",
+        ]
 
     def test_autocomplete(self):
         if "linux" not in sys.platform:

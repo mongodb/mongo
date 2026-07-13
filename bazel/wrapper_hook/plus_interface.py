@@ -202,6 +202,7 @@ def test_runner_interface(
     compiledb_target_scope = None
     lint_targets = ["//:lint", ":lint", "lint"]
     sources_to_bin = {}
+    duplicate_sources = {}
     select_sources = {}
     current_select = None
     in_select = False
@@ -373,9 +374,11 @@ def test_runner_interface(
             pathlib.Path(source_file.replace("//", "").replace(":", "/")).name
         ).stem
         if src_key in sources_to_bin:
-            raise DuplicateSourceNames(
-                f"Two test files with the same name:\n  {bin_file}->{src_key}\n  {sources_to_bin[src_key]}->{src_key}"
-            )
+            # Don't fail eagerly: a collision on one source name shouldn't break
+            # unrelated `+` invocations. Record the conflicting binaries and only
+            # raise if the ambiguous name is actually the one being resolved.
+            duplicate_sources.setdefault(src_key, [sources_to_bin[src_key]]).append(bin_file)
+            return
         if src_key == pathlib.Path(bin_file.replace("//", "").replace(":", "/")).name:
             src_key = f"{src_key}-{src_key}"
         sources_to_bin[src_key] = bin_file
@@ -409,7 +412,9 @@ def test_runner_interface(
                     add_source_test(token.strip(), current_select, sources_to_bin)
 
     if plus_autocomplete_query:
-        autocomplete_target = ["//:+" + test for test in sources_to_bin.keys()]
+        autocomplete_target = [
+            "//:+" + test for test in sources_to_bin.keys() if test not in duplicate_sources
+        ]
         autocomplete_target += [
             "//:+" + pathlib.Path(test.replace("//", "").replace(":", "/")).name
             for test in set(sources_to_bin.values())
@@ -427,6 +432,14 @@ def test_runner_interface(
     for arg in args[1:]:
         if arg.startswith(plus_starts):
             test_name = arg[arg.find("+") + 1 :]
+            if test_name in duplicate_sources:
+                bins = "\n  ".join(
+                    f"{bin_file}->{test_name}" for bin_file in duplicate_sources[test_name]
+                )
+                raise DuplicateSourceNames(
+                    f"Ambiguous test name '+{test_name}': multiple test files share this name:\n  {bins}\n"
+                    "Use the full bazel target instead (e.g. //path/to:target)."
+                )
             if test_name in rust_bin_targets:
                 real_target = rust_bin_targets[test_name]
                 bin_targets.append(real_target)
