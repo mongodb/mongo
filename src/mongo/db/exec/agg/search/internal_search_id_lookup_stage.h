@@ -4,9 +4,10 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/exec/agg/stage.h"
+#include "mongo/db/exec/agg/batched_enrichment_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/single_doc_lookup/scoped_batched_lookup.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
@@ -24,7 +25,19 @@
 
 namespace mongo::exec::agg {
 
-class InternalSearchIdLookUpStage final : public Stage {
+/**
+ * Execution stage for $search / $vectorSearch '$_internalSearchIdLookup'. For each _id emitted by
+ * mongot it resolves the local document and forwards it (carrying the search-score metadata),
+ * dropping results whose _id no longer resolves or that are orphans, and honouring the spec's
+ * 'limit'.
+ *
+ * Built on BatchedEnrichmentStage: results are buffered and resolved in batches inside a single
+ * resource scope, so the lookup executor never holds catalog state across upstream getNext() calls.
+ * The production batch size is governed by the factory (batch-of-one unless a caching executor
+ * makes batching pay), so behaviour is byte-for-byte the previous per-result path; only the batch
+ * size changes once an SBE executor is wired in (SERVER-130900).
+ */
+class InternalSearchIdLookUpStage final : public BatchedEnrichmentStage {
 public:
     using SearchIdLookupMetrics = DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics;
 
@@ -35,7 +48,8 @@ public:
         const boost::intrusive_ptr<DSInternalSearchIdLookUpCatalogResourceHandle>&
             catalogResourceHandle,
         const std::shared_ptr<SearchIdLookupMetrics>& searchIdLookupMetrics,
-        std::unique_ptr<SingleDocumentLookupExecutor> lookupExecutor);
+        std::unique_ptr<SingleDocumentLookupExecutor> lookupExecutor,
+        Limits limits);
 
     const SpecificStats* getSpecificStats() const override {
         return &_stats;
@@ -53,21 +67,61 @@ public:
     }
 
 private:
-    GetNextResult doGetNext() final;
+    /**
+     * Opens / closes the per-batch resource scope over the lookup executor. closeBatch() releases
+     * any attached catalog state (idempotent; a no-op for the executors used today, which cache
+     * nothing across lookups).
+     */
+    void beginBatch() override;
+    void closeBatch() noexcept override;
+
+    /**
+     * Re-points this operation's OpDebug at the stage's idLookup metrics on each getMore. OpDebug
+     * is per-command and reset on each getMore, so pointing happens here (once per getMore) plus
+     * once at construction to cover the first batch, rather than on every enrich sub-batch.
+     */
+    void reattachToOperationContext(OperationContext* opCtx) override;
+
+    /**
+     * Points 'opCtx''s OpDebug at this stage's idLookup metrics so explain / profiler can report
+     * them, unless already set. A no-op if 'opCtx' is null.
+     */
+    void registerMetricsOnOpDebug(OperationContext* opCtx);
+
+    /**
+     * Resolves one buffered search result to its local document (with search-score metadata carried
+     * over), or boost::none to drop it (missing _id, no local document, or an orphan).
+     */
+    boost::optional<Document> enrich(Document event) override;
+
+    /**
+     * Caps output at the spec's 'limit' (0 or unset means no cap): stops emitting once that many
+     * documents have been returned, even though mongot may still have results to hand up.
+     */
+    bool shouldStopEmittingDocuments() const override;
+
+    /**
+     * Opens the non-ticketed interval for post-search in-memory work once the search source is
+     * exhausted, so time in subsequent stages (e.g. $sort, $group) is attributed correctly.
+     */
+    void onExhausted() override;
 
     const std::string _stageName;
     const DocumentSourceIdLookupSpec _spec;
 
-    // Handle on catalog state that can be acquired and released during doGetNext(). Also contains
-    // the collection needed for execution.
+    // Handle on catalog state that can be acquired and released during a lookup. Also contains the
+    // collection needed for execution.
     boost::intrusive_ptr<DSInternalSearchIdLookUpCatalogResourceHandle> _catalogResourceHandle;
 
     std::shared_ptr<SearchIdLookupMetrics> _searchIdLookupMetrics;
     DocumentSourceIdLookupStats _stats;
 
-    // Lookup strategy doGetNext() drives for every _id (never null): the Express fast path or the
+    // Lookup strategy enrich() drives for every _id (never null): the Express fast path or the
     // local-read executor, chosen by buildIdLookupExecutor().
     std::unique_ptr<SingleDocumentLookupExecutor> _lookupExecutor;
+
+    // The active per-batch resource scope, present only while a batch is being enriched.
+    boost::optional<ScopedBatchedLookup> _batch;
 };
 
 /**
