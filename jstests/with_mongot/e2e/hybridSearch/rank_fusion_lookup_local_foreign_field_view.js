@@ -10,6 +10,7 @@
  */
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {before, describe, it} from "jstests/libs/mochalite.js";
+import {assertIfLocalForeignFieldNotAllowedInHybridSearchLookup} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 const productsName = jsTestName() + "_products";
 const ordersName = jsTestName() + "_orders";
@@ -90,131 +91,155 @@ describe("$rankFusion in $lookup with localField/foreignField on a view", functi
     it("single-pipeline $rankFusion: view filter applied, out-of-stock products excluded", function () {
         // Query "office" matches product 3 (Desk, out-of-stock) and product 4 (Chair, in-stock),
         // so the view filter is what excludes Bob's result and includes Carol's.
-        const results = orders
-            .aggregate([
-                {
-                    $lookup: {
-                        from: viewName,
-                        localField: "product_id",
-                        foreignField: "_id",
-                        pipeline: [
-                            {
-                                $rankFusion: {
-                                    input: {
-                                        pipelines: {
-                                            a: [
-                                                {
-                                                    $search: {
-                                                        index: searchIndexName,
-                                                        text: {
-                                                            query: "office",
-                                                            path: "description",
-                                                        },
+        const pipeline = [
+            {
+                $lookup: {
+                    from: viewName,
+                    localField: "product_id",
+                    foreignField: "_id",
+                    pipeline: [
+                        {
+                            $rankFusion: {
+                                input: {
+                                    pipelines: {
+                                        a: [
+                                            {
+                                                $search: {
+                                                    index: searchIndexName,
+                                                    text: {
+                                                        query: "office",
+                                                        path: "description",
                                                     },
                                                 },
-                                            ],
-                                        },
+                                            },
+                                        ],
                                     },
                                 },
                             },
-                        ],
-                        as: "product",
-                    },
+                        },
+                    ],
+                    as: "product",
                 },
-            ])
-            .toArray();
+            },
+        ];
 
-        const byCustomer = Object.fromEntries(results.map((r) => [r.customer, r.product]));
-        // Carol's product (Chair, "comfortable office chair") is in-stock and matches "office".
-        assert.eq(byCustomer["Carol"].length, 1, "Carol should match in-stock product 4", {
-            byCustomer,
-        });
-        assert.eq(byCustomer["Carol"][0]._id, 4);
-        // Alice's product (Laptop, "powerful computing device") does not match "office".
-        assert.eq(
-            byCustomer["Alice"].length,
-            0,
-            "Alice's product does not match the search query",
-            {byCustomer},
-        );
-        // Bob's product (Desk, "wooden office desk") matches "office" but is out-of-stock:
-        // the view filter must exclude it.
-        assert.eq(
-            byCustomer["Bob"].length,
-            0,
-            "Bob's product is out of stock, view should exclude it",
-            {byCustomer},
-        );
-        assert.eq(
-            byCustomer["Dave"].length,
-            0,
-            "Dave's product is out of stock, view should exclude it",
-            {byCustomer},
+        assertIfLocalForeignFieldNotAllowedInHybridSearchLookup(
+            db,
+            () => orders.runCommand("aggregate", {pipeline, cursor: {}}),
+            () => {
+                const results = orders.aggregate(pipeline).toArray();
+
+                const byCustomer = Object.fromEntries(results.map((r) => [r.customer, r.product]));
+                // Carol's product (Chair, "comfortable office chair") is in-stock and matches
+                // "office".
+                assert.eq(byCustomer["Carol"].length, 1, "Carol should match in-stock product 4", {
+                    byCustomer,
+                });
+                assert.eq(byCustomer["Carol"][0]._id, 4);
+                // Alice's product (Laptop, "powerful computing device") does not match "office".
+                assert.eq(
+                    byCustomer["Alice"].length,
+                    0,
+                    "Alice's product does not match the search query",
+                    {byCustomer},
+                );
+                // Bob's product (Desk, "wooden office desk") matches "office" but is out-of-stock:
+                // the view filter must exclude it.
+                assert.eq(
+                    byCustomer["Bob"].length,
+                    0,
+                    "Bob's product is out of stock, view should exclude it",
+                    {byCustomer},
+                );
+                assert.eq(
+                    byCustomer["Dave"].length,
+                    0,
+                    "Dave's product is out of stock, view should exclude it",
+                    {byCustomer},
+                );
+            },
         );
     });
 
     it("multi-pipeline $rankFusion: view filter applied across desugared $unionWith stages", function () {
-        const results = orders
-            .aggregate([
-                {
-                    $lookup: {
-                        from: viewName,
-                        localField: "product_id",
-                        foreignField: "_id",
-                        pipeline: [
-                            {
-                                $rankFusion: {
-                                    input: {
-                                        pipelines: {
-                                            a: [
-                                                {
-                                                    $search: {
-                                                        index: searchIndexName,
-                                                        text: {
-                                                            query: "device",
-                                                            path: "description",
-                                                        },
+        const pipeline = [
+            {
+                $lookup: {
+                    from: viewName,
+                    localField: "product_id",
+                    foreignField: "_id",
+                    pipeline: [
+                        {
+                            $rankFusion: {
+                                input: {
+                                    pipelines: {
+                                        a: [
+                                            {
+                                                $search: {
+                                                    index: searchIndexName,
+                                                    text: {
+                                                        query: "device",
+                                                        path: "description",
                                                     },
                                                 },
-                                            ],
-                                            b: [
-                                                {
-                                                    $search: {
-                                                        index: searchIndexName,
-                                                        text: {
-                                                            query: "office",
-                                                            path: "description",
-                                                        },
+                                            },
+                                        ],
+                                        b: [
+                                            {
+                                                $search: {
+                                                    index: searchIndexName,
+                                                    text: {
+                                                        query: "office",
+                                                        path: "description",
                                                     },
                                                 },
-                                            ],
-                                        },
+                                            },
+                                        ],
                                     },
                                 },
                             },
-                        ],
-                        as: "product",
-                    },
+                        },
+                    ],
+                    as: "product",
                 },
-            ])
-            .toArray();
+            },
+        ];
 
-        const byCustomer = Object.fromEntries(results.map((r) => [r.customer, r.product]));
-        assert.eq(byCustomer["Alice"].length, 1, "Alice should match in-stock product 1", {
-            byCustomer,
-        });
-        assert.eq(byCustomer["Alice"][0]._id, 1);
-        assert.eq(byCustomer["Carol"].length, 1, "Carol should match in-stock product 4", {
-            byCustomer,
-        });
-        assert.eq(byCustomer["Carol"][0]._id, 4);
-        // View must exclude out-of-stock products from the $unionWith-desugared pipelines too.
-        assert.eq(byCustomer["Bob"].length, 0, "view should exclude out-of-stock product 3", {
-            byCustomer,
-        });
-        assert.eq(byCustomer["Dave"].length, 0, "view should exclude out-of-stock product 5", {
-            byCustomer,
-        });
+        assertIfLocalForeignFieldNotAllowedInHybridSearchLookup(
+            db,
+            () => orders.runCommand("aggregate", {pipeline, cursor: {}}),
+            () => {
+                const results = orders.aggregate(pipeline).toArray();
+
+                const byCustomer = Object.fromEntries(results.map((r) => [r.customer, r.product]));
+                assert.eq(byCustomer["Alice"].length, 1, "Alice should match in-stock product 1", {
+                    byCustomer,
+                });
+                assert.eq(byCustomer["Alice"][0]._id, 1);
+                assert.eq(byCustomer["Carol"].length, 1, "Carol should match in-stock product 4", {
+                    byCustomer,
+                });
+                assert.eq(byCustomer["Carol"][0]._id, 4);
+                // View must exclude out-of-stock products from the $unionWith-desugared pipelines
+                // too.
+                assert.eq(
+                    byCustomer["Bob"].length,
+                    0,
+                    "view should exclude out-of-stock product 3",
+                    {
+                        byCustomer,
+                    },
+                );
+                assert.eq(
+                    byCustomer["Dave"].length,
+                    0,
+                    "view should exclude out-of-stock product 5",
+                    {
+                        byCustomer,
+                    },
+                );
+            },
+        );
     });
 
     it("multi-pipeline $rankFusion with trailing stages: join filters before trailing $set", function () {
@@ -223,75 +248,93 @@ describe("$rankFusion in $lookup with localField/foreignField on a view", functi
         // desugaring, before the $set), not the mutated value. If the join $match were positioned
         // after the trailing stages, the comparison product_id == (_id + 100) would never match
         // and every result would be empty.
-        const results = orders
-            .aggregate([
-                {
-                    $lookup: {
-                        from: viewName,
-                        localField: "product_id",
-                        foreignField: "_id",
-                        pipeline: [
-                            {
-                                $rankFusion: {
-                                    input: {
-                                        pipelines: {
-                                            a: [
-                                                {
-                                                    $search: {
-                                                        index: searchIndexName,
-                                                        text: {
-                                                            query: "device",
-                                                            path: "description",
-                                                        },
+        const pipeline = [
+            {
+                $lookup: {
+                    from: viewName,
+                    localField: "product_id",
+                    foreignField: "_id",
+                    pipeline: [
+                        {
+                            $rankFusion: {
+                                input: {
+                                    pipelines: {
+                                        a: [
+                                            {
+                                                $search: {
+                                                    index: searchIndexName,
+                                                    text: {
+                                                        query: "device",
+                                                        path: "description",
                                                     },
                                                 },
-                                            ],
-                                            b: [
-                                                {
-                                                    $search: {
-                                                        index: searchIndexName,
-                                                        text: {
-                                                            query: "office",
-                                                            path: "description",
-                                                        },
+                                            },
+                                        ],
+                                        b: [
+                                            {
+                                                $search: {
+                                                    index: searchIndexName,
+                                                    text: {
+                                                        query: "office",
+                                                        path: "description",
                                                     },
                                                 },
-                                            ],
-                                        },
+                                            },
+                                        ],
                                     },
                                 },
                             },
-                            {$set: {_id: {$add: ["$_id", 100]}}},
-                        ],
-                        as: "product",
-                    },
+                        },
+                        {$set: {_id: {$add: ["$_id", 100]}}},
+                    ],
+                    as: "product",
                 },
-            ])
-            .toArray();
+            },
+        ];
 
-        const byCustomer = Object.fromEntries(results.map((r) => [r.customer, r.product]));
-        // Alice's product (original _id 1) matches "device" and is in-stock; after the trailing
-        // $set its _id is 101. The join must still have matched on the original _id.
-        assert.eq(
-            byCustomer["Alice"].length,
-            1,
-            "Alice should match in-stock product 1 (join on original _id)",
-            {
-                byCustomer,
+        assertIfLocalForeignFieldNotAllowedInHybridSearchLookup(
+            db,
+            () => orders.runCommand("aggregate", {pipeline, cursor: {}}),
+            () => {
+                const results = orders.aggregate(pipeline).toArray();
+
+                const byCustomer = Object.fromEntries(results.map((r) => [r.customer, r.product]));
+                // Alice's product (original _id 1) matches "device" and is in-stock; after the
+                // trailing $set its _id is 101. The join must still have matched on the original
+                // _id.
+                assert.eq(
+                    byCustomer["Alice"].length,
+                    1,
+                    "Alice should match in-stock product 1 (join on original _id)",
+                    {
+                        byCustomer,
+                    },
+                );
+                assert.eq(byCustomer["Alice"][0]._id, 101);
+                // Carol's product (original _id 4) matches "office" and is in-stock; _id becomes
+                // 104.
+                assert.eq(byCustomer["Carol"].length, 1, "Carol should match in-stock product 4", {
+                    byCustomer,
+                });
+                assert.eq(byCustomer["Carol"][0]._id, 104);
+                // Out-of-stock products are still excluded by the view.
+                assert.eq(
+                    byCustomer["Bob"].length,
+                    0,
+                    "view should exclude out-of-stock product 3",
+                    {
+                        byCustomer,
+                    },
+                );
+                assert.eq(
+                    byCustomer["Dave"].length,
+                    0,
+                    "view should exclude out-of-stock product 5",
+                    {
+                        byCustomer,
+                    },
+                );
             },
         );
-        assert.eq(byCustomer["Alice"][0]._id, 101);
-        // Carol's product (original _id 4) matches "office" and is in-stock; _id becomes 104.
-        assert.eq(byCustomer["Carol"].length, 1, "Carol should match in-stock product 4", {
-            byCustomer,
-        });
-        assert.eq(byCustomer["Carol"][0]._id, 104);
-        // Out-of-stock products are still excluded by the view.
-        assert.eq(byCustomer["Bob"].length, 0, "view should exclude out-of-stock product 3", {
-            byCustomer,
-        });
-        assert.eq(byCustomer["Dave"].length, 0, "view should exclude out-of-stock product 5", {
-            byCustomer,
-        });
     });
 });

@@ -1389,9 +1389,12 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
 
         // TODO SERVER-121094 Remove this assertion when featureFlagExtensionsInsideHybridSearch is
         // removed (this whole code path will be dead code as well)
+        auto ifrCtx = pExpCtx->getIfrContext();
+        bool hybridSearchFlagEnabled = ifrCtx &&
+            ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
         uassert(12982600,
                 "$lookup with $rankFusion/$scoreFusion cannot use localField/foreignField syntax.",
-                localField.empty() && foreignField.empty());
+                hybridSearchFlagEnabled || (localField.empty() && foreignField.empty()));
     }
 
     boost::intrusive_ptr<DocumentSourceLookUp> lookupStage = nullptr;
