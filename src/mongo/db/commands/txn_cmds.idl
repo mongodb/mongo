@@ -56,6 +56,12 @@ structs:
                 optional: true
                 stability: stable
 
+    EndOfTransactionScopesInfo:
+        description: >-
+            Currently not used, but declared here for forward-compatibility with proposed
+            changes in an upcoming update adding change stream endOfTransaction (EOT) support.
+        strict: false
+
     CommitTransactionOplogObject:
         description: A document representing the 'o' field of a 'commitTransaction' oplog entry.
         fields:
@@ -75,6 +81,12 @@ structs:
                 description:
                     "The number of in-transaction operations applied in a transaction.
                     This field is required only for unprepared transactions."
+            endOfTransactionScopes:
+                type: EndOfTransactionScopesInfo
+                optional: true
+                description:
+                    "Currently not used, but declared here for forward-compatibility with proposed
+                    changes in an upcoming update adding change stream endOfTransaction (EOT) support."
 
     AbortTransactionOplogObject:
         description: A document representing the 'o' field of an 'abortTransaction' oplog entry.
