@@ -14,7 +14,9 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
+#include "mongo/db/scoped_read_concern.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/testing_proctor.h"
@@ -75,20 +77,40 @@ public:
             const auto& primaryShardId = request().getPrimaryShardId();
             const auto checkRangeDeletionIndexes =
                 request().getCommonFields().getCheckRangeDeletionIndexes();
+            const auto checkSecondariesMode =
+                request().getCommonFields().get_checkSecondariesMode();
             const auto checkIndexes = request().getCommonFields().getCheckIndexes();
 
-            auto inconsistencies =
+            tassert(12922306,
+                    "_shardsvrCheckMetadataConsistencySecondaryParticipantCommand must be invoked "
+                    "with _checkSecondariesMode != kNoSecondaryCheck",
+                    checkSecondariesMode.has_value() &&
+                        checkSecondariesMode !=
+                            CheckMetadataConsistencySecondaryModeEnum::kNoSecondaryCheck);
+            tassert(12922307,
+                    "ReadConcern must have afterClusterTime with _checkSecondariesMode == "
+                    "kCheckAtPrimaryTimestamp",
+                    checkSecondariesMode !=
+                            CheckMetadataConsistencySecondaryModeEnum::kCheckAtPrimaryTimestamp ||
+                        repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime().has_value());
+
+            auto [inconsistencies, timestamp] =
                 metadata_consistency_util::runCheckMetadataConsistencyOnParticipant(
                     opCtx,
                     nss,
                     primaryShardId,
                     checkRangeDeletionIndexes,
                     checkIndexes,
-                    false /* asRSPrimaryNode */);
+                    checkSecondariesMode ==
+                            CheckMetadataConsistencySecondaryModeEnum::kCheckAtPrimaryTimestamp
+                        ? metadata_consistency_util::RSNodeMode::kSecondary
+                        : metadata_consistency_util::RSNodeMode::kDelayedSecondary);
 
             const auto& shardId = ShardingState::get(opCtx)->shardId();
             for (auto& inconsistency : inconsistencies) {
-                inconsistency.getProvenance().emplace(shardId, hostAndPort);
+                auto& provenance = inconsistency.getProvenance();
+                provenance.emplace(shardId, hostAndPort);
+                provenance->setTimestamp(timestamp);
             }
 
             return metadata_consistency_util::createInitialCursorReplyMongod(
@@ -102,15 +124,6 @@ public:
 
         bool supportsWriteConcern() const override {
             return false;
-        }
-
-        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
-                                                     bool isImplicitDefault) const final {
-            if (level == repl::ReadConcernLevel::kSnapshotReadConcern) {
-                return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
-            } else {
-                return CommandInvocation::supportsReadConcern(level, isImplicitDefault);
-            }
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {

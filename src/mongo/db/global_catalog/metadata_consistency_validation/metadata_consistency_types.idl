@@ -123,6 +123,14 @@ enums:
             kDatabaseLevel: "DatabaseLevel"
             kCollectionLevel: "CollectionLevel"
 
+    CheckMetadataConsistencySecondaryMode:
+        description: "How is metadata checked on secondaries"
+        type: string
+        values:
+            kNoSecondaryCheck: "noSecondaryCheck"
+            kCheckAtPrimaryTimestamp: "checkAtPrimaryTimestamp"
+            kCheckAtSecondaryTimestamp: "checkAtSecondaryTimestamp"
+
 structs:
     MisplacedCollectionDetails:
         description: "Details about a misplaced collection inconsistency."
@@ -594,6 +602,10 @@ structs:
             hostAndPort:
                 type: HostAndPort
                 description: "Replica set member identification"
+            timestamp:
+                type: timestamp
+                description: "Timestamp at which the check was performed"
+                optional: true
 
     MetadataInconsistencyItem:
         description: "Object representing a single metadata inconsistency found in a specific shard"
@@ -637,6 +649,13 @@ structs:
                 description: "Check that in the presence of outstanding range deletion tasks a shard key index must exists"
                 type: safeBool
                 default: false
+            # _checkSecondariesMode is an internal, test-only parameter. It has no effect with the
+            # test proctor disabled, hence the leading underscore.
+            # TODO (SERVER-131058): consider exposing it publicly and remove the underscore.
+            _checkSecondariesMode:
+                description: "How metadata is checked on secondaries"
+                type: CheckMetadataConsistencySecondaryMode
+                optional: true
 
     UniqueIndexInconsistencyInfo:
         description: "Details about unique index misconfiguration."

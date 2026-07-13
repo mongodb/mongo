@@ -88,6 +88,21 @@ export var MetadataConsistencyChecker = (function () {
 
             // Temporary workaround: tolerate these inconsistencies until linked tickets are fixed.
             const shouldIgnoreInconsistencyTempWorkaround = (inconsistency) => {
+                // In initial sync suites, delayed secondaries may report unexpected collection in
+                // the durable shard catalog that are not found in the global catalog.
+                // TODO (SERVER-131102): Re-enable this check for initial sync suites.
+                if (
+                    inconsistency.type === "InconsistentShardCatalogCollectionMetadata" &&
+                    Boolean(TestData.isRunningInitialSync) &&
+                    inconsistency.details &&
+                    inconsistency.details.details &&
+                    inconsistency.details.details.reason.includes(
+                        "entry unexpectedly found in the durable shard catalog",
+                    )
+                ) {
+                    return true;
+                }
+
                 if (inconsistency.type !== "InconsistentShardCatalogCollectionMetadata") {
                     return false;
                 }
