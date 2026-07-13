@@ -18,7 +18,6 @@ const expectedParamList = [
     "internalLookupStageIntermediateDocumentMaxSizeBytes",
     "internalQueryProhibitBlockingMergeOnMongoS",
     "internalQueryFacetMaxOutputDocSizeBytes",
-    "internalQueryMaxAddToSetBytes",
     "internalQueryFrameworkControl",
 ];
 

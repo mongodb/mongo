@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/util/rank_fusion_util.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -557,6 +558,37 @@ const char* ExpressionAnyElementTrue::getOpName() const {
 
 /* ---------------------- ExpressionArray --------------------------- */
 
+Value Expression::foldConstant(bool retainResult) const {
+    // Fold against a standalone tracker seeded with the per-expression fallback cap rather than the
+    // operation-wide tracker. Constant folding can run before query settings are resolved (e.g.
+    // representative query-shape serialization and 'let'-parameter evaluation at ExpressionContext
+    // construction). The operation-wide limit is pqs-settable, so reading it here would materialize
+    // (and latch) a value before settings had a chance to override it, tripping the
+    // settings-ordering invariant. The fallback cap is a plain constant that is always safe to
+    // read, so it bounds the fold without touching the per-operation limit; the result is rolled up
+    // into the operation tracker below purely for accounting.
+    SimpleMemoryUsageTracker foldingTracker{
+        MemoryUsageLimit{query_knobs::kMaxSingleExpressionMemoryUsageBytes}};
+    Value folded = evaluate(Document{},
+                            &(getExpressionContext()->variables),
+                            EvaluationContext{.tracker = &foldingTracker});
+    // Only charge the fallback when it rolls up into the operation tracker (same condition under
+    // which the ExpressionContext creates that flavor): charging the standalone flavor would pin
+    // unreleased bytes against the per-expression cap it shares with later evaluations.
+    auto* expCtx = getExpressionContext();
+    if (int64_t peak = foldingTracker.peakTrackedMemoryBytes(); peak > 0 &&
+        expCtx->getOperationContext() &&
+        feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
+        feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
+        const int64_t retained =
+            retainResult ? std::min<int64_t>(folded.getApproximateSize(), peak) : 0;
+        auto& fallbackTracker = expCtx->getExpressionFallbackTracker();
+        fallbackTracker.add(peak);
+        fallbackTracker.add(retained - peak);
+    }
+    return folded;
+}
+
 Value ExpressionArray::evaluate(const Document& root,
                                 Variables* variables,
                                 const EvaluationContext& ctx) const {
@@ -565,8 +597,12 @@ Value ExpressionArray::evaluate(const Document& root,
 
 Value ExpressionArray::serialize(const query_shape::SerializationOptions& options) const {
     if (!options.isKeepingLiteralsUnchanged() && selfAndChildrenAreConstant()) {
-        return ExpressionConstant::serializeConstant(
-            options, evaluate(Document{}, &(getExpressionContext()->variables), {}));
+        // Query-shape serialization folds before query settings are applied; other serialization
+        // modes run post-settings and keep charging the operation-wide tracker.
+        Value folded = options.isReplacingLiteralsWithRepresentativeValues()
+            ? foldConstant(false /* retainResult */)
+            : evaluate(Document{}, &(getExpressionContext()->variables), {});
+        return ExpressionConstant::serializeConstant(options, folded);
     }
     vector<Value> expressions;
     expressions.reserve(_children.size());
@@ -588,8 +624,7 @@ intrusive_ptr<Expression> ExpressionArray::optimize() {
 
     // If all values in ExpressionArray are constant evaluate to ExpressionConstant.
     if (allValuesConstant) {
-        return ExpressionConstant::create(
-            getExpressionContext(), evaluate(Document(), &(getExpressionContext()->variables), {}));
+        return ExpressionConstant::create(getExpressionContext(), foldConstant());
     }
     return this;
 }
@@ -1654,8 +1689,7 @@ intrusive_ptr<Expression> ExpressionObject::optimize() {
     }
     // If all values in ExpressionObject are constant evaluate to ExpressionConstant.
     if (allValuesConstant) {
-        return ExpressionConstant::create(
-            getExpressionContext(), evaluate(Document(), &(getExpressionContext()->variables), {}));
+        return ExpressionConstant::create(getExpressionContext(), foldConstant());
     }
     return this;
 }
@@ -2461,8 +2495,8 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
     // If all the operands are constant expressions, collapse the expression into one constant
     // expression.
     if (constOperandCount == _children.size()) {
-        return intrusive_ptr<Expression>(ExpressionConstant::create(
-            getExpressionContext(), evaluate(Document(), &(getExpressionContext()->variables))));
+        return intrusive_ptr<Expression>(
+            ExpressionConstant::create(getExpressionContext(), foldConstant()));
     }
 
     // An operator cannot be left-associative and commutative, because left-associative
@@ -4166,8 +4200,7 @@ boost::intrusive_ptr<Expression> ExpressionConvert::optimize() {
                                                _children[_kOnError],
                                                _children[_kOnNull],
                                                _children[_kByteOrder]})) {
-        return ExpressionConstant::create(
-            getExpressionContext(), evaluate(Document{}, &(getExpressionContext()->variables), {}));
+        return ExpressionConstant::create(getExpressionContext(), foldConstant());
     }
 
     return this;

@@ -17,9 +17,6 @@
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
-#include "mongo/db/query/query_integration_knobs_gen.h"
-#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
@@ -739,7 +736,7 @@ SbExpr::Vector buildAccumAggsConcatArraysHelper(SbExpr arg,
 
     auto argWithTypeCheck = b.makeLet(frameId, SbExpr::makeSeq(std::move(arg)), std::move(expr));
 
-    const int cap = internalQueryMaxConcatArraysBytes.load();
+    const int cap = state.expCtx->getQueryKnobConfiguration().getMaxConcatArraysBytes();
 
     return SbExpr::makeSeq(
         b.makeFunction(funcName, std::move(argWithTypeCheck), b.makeInt32Constant(cap)));
@@ -778,7 +775,7 @@ SbExpr::Vector buildAccumAggsSetUnionHelper(SbExpr arg,
 
     auto argWithTypeCheck = b.makeLet(frameId, SbExpr::makeSeq(std::move(arg)), std::move(expr));
 
-    const int cap = internalQueryMaxSetUnionBytes.load();
+    const int cap = state.expCtx->getQueryKnobConfiguration().getMaxSetUnionBytes();
 
     auto collatorSlot = state.getCollatorSlot();
 
@@ -819,7 +816,7 @@ SbExpr::Vector buildAccumAggsAddToSetHelper(SbExpr arg,
                                             StageBuilderState& state) {
     SbExprBuilder b(state);
 
-    const int cap = internalQueryMaxAddToSetBytes.load();
+    const int cap = state.expCtx->getQueryKnobConfiguration().getMaxAddToSetBytes();
 
     auto collatorSlot = state.getCollatorSlot();
 
@@ -877,7 +874,7 @@ SbExpr::Vector buildAccumAggsPushHelper(SbExpr arg,
                                         StageBuilderState& state) {
     SbExprBuilder b(state);
 
-    const int cap = internalQueryMaxPushBytes.load();
+    const int cap = state.expCtx->getQueryKnobConfiguration().getMaxPushBytes();
     return SbExpr::makeSeq(b.makeFunction(aggFuncName, std::move(arg), b.makeInt32Constant(cap)));
 }
 
@@ -1041,7 +1038,7 @@ SbExpr::Vector buildInitializeAccumN(const AccumOp& acc,
 
     // Create an array of four elements [value holder, max size, memory used, memory limit,
     // isGroupAccum].
-    auto maxAccumulatorBytes = internalQueryTopNAccumulatorBytes.load();
+    auto maxAccumulatorBytes = state.expCtx->getQueryKnobConfiguration().getTopNAccumulatorBytes();
     if (maxSizeExpr.isConstantExpr()) {
         auto [tag, val] = maxSizeExpr.getConstantValue();
         auto convert = genericNumConvert(tag, val, sbe::value::TypeTags::NumberInt64);

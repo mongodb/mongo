@@ -11,7 +11,6 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/code_fragment.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/util/modules.h"
@@ -380,16 +379,6 @@ public:
     AddToSetHashAggAccumulator(value::SlotId outSlot,
                                value::SlotId spillSlot,
                                std::unique_ptr<EExpression> transformExpr,
-                               boost::optional<value::SlotId> collatorSlot)
-        : SinglePurposeHashAggAccumulator(
-              outSlot, spillSlot, std::move(transformExpr), collatorSlot),
-          _collatorSlot(collatorSlot) {
-        _sizeCap = internalQueryMaxAddToSetBytes.load();
-    }
-
-    AddToSetHashAggAccumulator(value::SlotId outSlot,
-                               value::SlotId spillSlot,
-                               std::unique_ptr<EExpression> transformExpr,
                                boost::optional<value::SlotId> collatorSlot,
                                int64_t sizeCap)
         : SinglePurposeHashAggAccumulator(
@@ -432,23 +421,15 @@ public:
     PushHashAggAccumulator(value::SlotId outSlot,
                            value::SlotId spillSlot,
                            std::unique_ptr<EExpression> transformExpr,
-                           boost::optional<value::SlotId> collatorSlot)
-        : SinglePurposeHashAggAccumulator(
-              outSlot, spillSlot, std::move(transformExpr), collatorSlot) {
-        _sizeCap = internalQueryMaxPushBytes.load();
-    }
-
-    PushHashAggAccumulator(value::SlotId outSlot,
-                           value::SlotId spillSlot,
-                           std::unique_ptr<EExpression> transformExpr,
+                           boost::optional<value::SlotId> collatorSlot,
                            int64_t sizeCap)
         : SinglePurposeHashAggAccumulator(
-              outSlot, spillSlot, std::move(transformExpr), boost::none),
+              outSlot, spillSlot, std::move(transformExpr), collatorSlot),
           _sizeCap(sizeCap) {}
 
     std::unique_ptr<HashAggAccumulator> clone() const final {
         return std::make_unique<PushHashAggAccumulator>(
-            _outSlot, _spillSlot, _transformExpr->clone(), _sizeCap);
+            _outSlot, _spillSlot, _transformExpr->clone(), boost::none, _sizeCap);
     }
 
     void initialize(vm::ByteCode& bytecode, HashAggAccessor& accumulatorState) const final;

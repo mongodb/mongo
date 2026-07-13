@@ -716,6 +716,8 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeHashAgg(
         }
     }
 
+    const auto& knobConfig = _state.expCtx->getQueryKnobConfiguration();
+
     std::vector<std::unique_ptr<sbe::HashAggAccumulator>> loweredAccumulatorList;
     SbSlotVector aggOutSlots;
     for (auto& sbAccumulator : accumulatorList) {
@@ -732,6 +734,24 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeHashAgg(
                         implementation.agg.clone().lower(_state, &varTypes),
                         implementation.merge.clone().lower(_state, &varTypes),
                         implementation.init.clone().lower(_state, &varTypes));
+                },
+                [&](const SbHashAggSinglePurposeScalarAccumulator<sbe::AddToSetHashAggAccumulator>&
+                        implementation) -> std::unique_ptr<sbe::HashAggAccumulator> {
+                    return std::make_unique<sbe::AddToSetHashAggAccumulator>(
+                        outSlot.getId(),
+                        sbAccumulator.spillSlot.getId(),
+                        implementation.transform.clone().lower(_state, &varTypes),
+                        collatorSlot,
+                        knobConfig.getMaxAddToSetBytes());
+                },
+                [&](const SbHashAggSinglePurposeScalarAccumulator<sbe::PushHashAggAccumulator>&
+                        implementation) -> std::unique_ptr<sbe::HashAggAccumulator> {
+                    return std::make_unique<sbe::PushHashAggAccumulator>(
+                        outSlot.getId(),
+                        sbAccumulator.spillSlot.getId(),
+                        implementation.transform.clone().lower(_state, &varTypes),
+                        collatorSlot,
+                        knobConfig.getMaxPushBytes());
                 },
                 [&]<class Implementation>(
                     const SbHashAggSinglePurposeScalarAccumulator<Implementation>& implementation)

@@ -17,6 +17,7 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration_test_util.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
@@ -750,18 +751,15 @@ TEST_F(ExpressionNaryTest, ConstantFoldingObeysExpressionCapWithoutOperationCont
     ASSERT_THROWS_CODE(expr->optimize(), AssertionException, ErrorCodes::ExceededMemoryLimit);
 }
 
-TEST_F(ExpressionNaryTest, ConstantFoldingObeysOperationMemoryLimit) {
+TEST_F(ExpressionNaryTest, ConstantFoldingIsEnforcedAgainstOperationLimitAtNextCheck) {
     unittest::ServerParameterGuard queryFlag("featureFlagQueryMemoryTracking", true);
     unittest::ServerParameterGuard exprFlag("featureFlagExpressionMemoryTracking", true);
-    // Constant folding evaluates with a default EvaluationContext, so it charges the
-    // ExpressionContext's fallback tracker. Pin the per-expression cap large so it cannot be the
-    // cause of the throw -- the folded array is only a few hundred bytes. With an OperationContext
-    // present, the fallback tracker rolls up into the per-operation tracker, so the tiny per-query
-    // limit is the only limit it can exceed.
-    unittest::ServerParameterGuard exprCap("internalQueryMaxSingleExpressionMemoryUsageBytes",
-                                           1LL << 30);
-    unittest::ServerParameterGuard limitGuard("internalQueryMaxMemoryUsageBytesPerOperation",
-                                              100LL);
+    // Constant folding may run before query settings are applied to the operation, so optimize()
+    // itself must not resolve the operation-wide limit. The folded value's footprint stays
+    // charged to the operation, so the next ordinary limit check, which runs once query settings
+    // are applied, enforces the tiny per-operation limit against the fold.
+    QueryKnobGuardForTest limitGuard(
+        expCtx.getOperationContext(), "internalQueryMaxMemoryUsageBytesPerOperation", 100LL);
     // The opCtx-path fallback is chunked; disable chunking so the small folded array propagates to
     // the operation tracker immediately instead of being buffered below the chunk threshold.
     unittest::ServerParameterGuard chunkSize("internalQueryMaxWriteToCurOpMemoryUsageBytes", 0);
@@ -776,7 +774,44 @@ TEST_F(ExpressionNaryTest, ConstantFoldingObeysOperationMemoryLimit) {
                                     BSON("$concatArrays" << BSON_ARRAY(arr1.arr() << arr2.arr())),
                                     expCtx.variablesParseState);
 
-    ASSERT_THROWS_CODE(expr->optimize(), AssertionException, ErrorCodes::ExceededMemoryLimit);
+    auto folded = expr->optimize();
+    ASSERT(dynamic_cast<ExpressionConstant*>(folded.get()));
+
+    auto& fallbackTracker = expCtx.getExpressionFallbackTracker();
+    ASSERT_GT(fallbackTracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_THROWS_CODE(
+        fallbackTracker.assertWithinMemoryLimit(expCtx.getOperationContext(), "constant folding"),
+        AssertionException,
+        ErrorCodes::ExceededMemoryLimit);
+}
+
+TEST_F(ExpressionNaryTest, LetParameterSeedingIsEnforcedAgainstOperationLimitAtNextCheck) {
+    unittest::ServerParameterGuard queryFlag("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard exprFlag("featureFlagExpressionMemoryTracking", true);
+    // 'let' parameters are evaluated at ExpressionContext construction, before query settings are
+    // applied, so seeding itself must not resolve the operation-wide limit. The seeded value
+    // lives on for the whole operation, so its footprint stays charged and the next ordinary
+    // limit check enforces the tiny per-operation limit against it.
+    QueryKnobGuardForTest limitGuard(
+        expCtx.getOperationContext(), "internalQueryMaxMemoryUsageBytesPerOperation", 100LL);
+    // The opCtx-path fallback is chunked; disable chunking so the small seeded array propagates
+    // to the operation tracker immediately instead of being buffered below the chunk threshold.
+    unittest::ServerParameterGuard chunkSize("internalQueryMaxWriteToCurOpMemoryUsageBytes", 0);
+
+    BSONArrayBuilder arr;
+    for (int i = 0; i < 20; ++i)
+        arr.append(i);
+    expCtx.variables.seedVariablesWithLetParameters(
+        &expCtx,
+        BSON("c" << BSON("$concatArrays" << BSON_ARRAY(arr.arr()))),
+        [](const Expression*) { return true; });
+
+    auto& fallbackTracker = expCtx.getExpressionFallbackTracker();
+    ASSERT_GT(fallbackTracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_THROWS_CODE(
+        fallbackTracker.assertWithinMemoryLimit(expCtx.getOperationContext(), "let seeding"),
+        AssertionException,
+        ErrorCodes::ExceededMemoryLimit);
 }
 
 }  // anonymous namespace

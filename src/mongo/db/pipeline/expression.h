@@ -457,6 +457,23 @@ public:
         return false;
     }
 
+    /**
+     * Evaluates this expression, which must be a constant expression, without checking the
+     * operation-wide memory limit: constant folds may run (e.g. parse-time inline optimize(),
+     * 'let' parameter seeding) before query settings are applied, when the operation-wide,
+     * settings-overridable limit may not be read yet. The fold is bounded by the per-expression
+     * limit (internalQueryMaxSingleExpressionMemoryUsageBytes, deliberately never pqs-settable)
+     * via a standalone tracker.
+     *
+     * The fold's usage is still charged to the operation with add(), which never resolves a
+     * limit: its transient peak and, when 'retainResult' is set (the fold's output lives on for
+     * the operation, e.g. as an ExpressionConstant in the plan or a seeded 'let' value), the
+     * folded value's footprint. The retained charge makes the next ordinary limit check, which
+     * runs once query settings are applied, enforce the operation-wide limit against the fold.
+     * Pass 'retainResult' = false when the folded value is throwaway (query-shape serialization).
+     */
+    Value foldConstant(bool retainResult = true) const;
+
 protected:
     Expression(ExpressionContext* const expCtx) : Expression(expCtx, {}) {}
 

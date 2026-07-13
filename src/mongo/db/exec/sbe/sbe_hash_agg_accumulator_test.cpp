@@ -36,6 +36,12 @@
 
 
 namespace mongo::sbe {
+// The capped accumulators (push, addToSet) now take their size cap as a constructor argument
+// rather than reading a server parameter. Tests that do not exercise cap enforcement pass the
+// former default cap (100MB), which is large enough never to trigger. The cap is lowered to an
+// int32 in the VM builtins, so this must fit in an int32.
+static constexpr int64_t kDefaultCap = 100 * 1024 * 1024;
+
 class HashAggAccumulatorTest : public unittest::Test {
 public:
     void setUp() override {
@@ -494,7 +500,7 @@ BSONArray sortSbeArray(value::TypeTags tagArray, value::Value valArray) {
 
 TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulator) {
     AddToSetHashAggAccumulator accumulator(
-        outSlot(), spillSlot(), makeVariable(inSlot()), boost::none);
+        outSlot(), spillSlot(), makeVariable(inSlot()), boost::none, kDefaultCap);
 
     vm::ByteCode bytecode;
     accumulator.prepare(compileContext(), &accumulatorState());
@@ -567,7 +573,7 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulator) {
 
 TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorEmpty) {
     AddToSetHashAggAccumulator accumulator(
-        outSlot(), spillSlot(), makeVariable(inSlot()), boost::none);
+        outSlot(), spillSlot(), makeVariable(inSlot()), boost::none, kDefaultCap);
 
     vm::ByteCode bytecode;
     accumulator.prepare(compileContext(), &accumulatorState());
@@ -585,7 +591,7 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorEmpty) {
 
 TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorWithCollator) {
     AddToSetHashAggAccumulator accumulator(
-        outSlot(), spillSlot(), makeVariable(inSlot()), collatorSlot());
+        outSlot(), spillSlot(), makeVariable(inSlot()), collatorSlot(), kDefaultCap);
 
     vm::ByteCode bytecode;
     accumulator.prepare(compileContext(), &accumulatorState());
@@ -626,7 +632,7 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorWithCollator) {
 
 TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorSpilled) {
     AddToSetHashAggAccumulator accumulator(
-        outSlot(), spillSlot(), makeVariable(inSlot()), boost::none);
+        outSlot(), spillSlot(), makeVariable(inSlot()), boost::none, kDefaultCap);
 
     vm::ByteCode bytecode;
     accumulator.prepare(compileContext(), &accumulatorState());
@@ -709,7 +715,7 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorSpilled) {
 
 TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorWithCollatorSpilled) {
     AddToSetHashAggAccumulator accumulator(
-        outSlot(), spillSlot(), makeVariable(inSlot()), collatorSlot());
+        outSlot(), spillSlot(), makeVariable(inSlot()), collatorSlot(), kDefaultCap);
 
     vm::ByteCode bytecode;
     accumulator.prepare(compileContext(), &accumulatorState());
@@ -875,7 +881,8 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorEnforcesCapSpilled) {
 }
 
 TEST_F(HashAggAccumulatorTest, PushHashAggAccumulator) {
-    PushHashAggAccumulator accumulator(outSlot(), spillSlot(), makeVariable(inSlot()), boost::none);
+    PushHashAggAccumulator accumulator(
+        outSlot(), spillSlot(), makeVariable(inSlot()), boost::none, kDefaultCap);
 
     vm::ByteCode bytecode;
     accumulator.prepare(compileContext(), &accumulatorState());
@@ -947,7 +954,8 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulator) {
 }
 
 TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorEmpty) {
-    PushHashAggAccumulator accumulator(outSlot(), spillSlot(), makeVariable(inSlot()), boost::none);
+    PushHashAggAccumulator accumulator(
+        outSlot(), spillSlot(), makeVariable(inSlot()), boost::none, kDefaultCap);
 
     vm::ByteCode bytecode;
     accumulator.prepare(compileContext(), &accumulatorState());
@@ -964,7 +972,8 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorEmpty) {
 }
 
 TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorSpilled) {
-    PushHashAggAccumulator accumulator(outSlot(), spillSlot(), makeVariable(inSlot()), boost::none);
+    PushHashAggAccumulator accumulator(
+        outSlot(), spillSlot(), makeVariable(inSlot()), boost::none, kDefaultCap);
 
     vm::ByteCode bytecode;
     accumulator.prepare(compileContext(), &accumulatorState());
@@ -1049,7 +1058,8 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorSpilled) {
 
 TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorEnforcesCap) {
     int64_t sizeCap = 192;
-    PushHashAggAccumulator accumulator(outSlot(), spillSlot(), makeVariable(inSlot()), sizeCap);
+    PushHashAggAccumulator accumulator(
+        outSlot(), spillSlot(), makeVariable(inSlot()), boost::none, sizeCap);
 
     vm::ByteCode bytecode;
     accumulator.prepare(compileContext(), &accumulatorState());
@@ -1074,7 +1084,8 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorEnforcesCap) {
 
 TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorEnforcesCapSpilled) {
     int64_t sizeCap = 192;
-    PushHashAggAccumulator accumulator(outSlot(), spillSlot(), makeVariable(inSlot()), sizeCap);
+    PushHashAggAccumulator accumulator(
+        outSlot(), spillSlot(), makeVariable(inSlot()), boost::none, sizeCap);
 
     vm::ByteCode bytecode;
     accumulator.prepare(compileContext(), &accumulatorState());

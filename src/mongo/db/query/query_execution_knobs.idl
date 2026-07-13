@@ -83,7 +83,6 @@ server_parameters:
         redact: false
 
     internalQueryMaxMemoryUsageBytesPerOperation:
-        mod_visibility: needs_replacement
         description: >-
             Maximum amount of memory in bytes that all memory-tracked stages of a single query
             operation may collectively use. SimpleMemoryUsageTracker::withinMemoryLimit() walks
@@ -92,6 +91,9 @@ server_parameters:
             std::numeric_limits<long long>::max() leaves the operation-wide limit effectively
             unbounded, preserving existing per-stage behavior.
         set_at: [startup, runtime]
+        # TODO SERVER-131159: Replace the periodic job in query_memory_metrics.cpp with a query
+        # knob listener so this knob no longer needs to be visible outside query.knobs.
+        mod_visibility: needs_replacement
         cpp_varname: "internalQueryMaxMemoryUsageBytesPerOperation"
         cpp_vartype: Atomic<long long>
         default:
@@ -102,6 +104,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: queryMaxMemoryUsageBytesPerOperation
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryMaxSingleExpressionMemoryUsageBytes:
         description: >-
@@ -280,7 +285,6 @@ server_parameters:
         redact: false
 
     internalQueryMaxPushBytes:
-        mod_visibility: needs_replacement
         description: >-
             Limits the vector of values pushed into a single array while grouping with the
             $push accumulator.
@@ -297,6 +301,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: queryMaxPushBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryMaxRangeBytes:
         mod_visibility: needs_replacement
@@ -325,7 +332,6 @@ server_parameters:
         redact: false
 
     internalQueryMaxAddToSetBytes:
-        mod_visibility: needs_replacement
         description: >-
             Limits the vector of values pushed into a single array while grouping with the
             $addToSet accumulator.
@@ -340,9 +346,11 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: queryMaxAddToSetBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryMaxConcatArraysBytes:
-        mod_visibility: needs_replacement
         description: >-
             Limits the vector of values pushed into a single array while grouping with the
             $concatArrays accumulator.
@@ -357,9 +365,11 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: queryMaxConcatArraysBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryMaxSetUnionBytes:
-        mod_visibility: needs_replacement
         description: >-
             Limits the vector of values pushed into a single array while grouping with the
             $setUnion accumulator.
@@ -374,6 +384,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: queryMaxSetUnionBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryMaxPercentileAccumulatorBytes:
         description: "The maximum amount of memory that can be used by an individual $percentile accumulator."
@@ -388,6 +401,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: queryMaxPercentileAccumulatorBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryJavaScriptHeapSizeLimitMB:
         mod_visibility: needs_replacement
@@ -597,7 +613,6 @@ server_parameters:
         redact: false
 
     internalQueryTopNAccumulatorBytes:
-        mod_visibility: needs_replacement
         description: >-
             Limits the vector of values pushed into a single array while grouping with the 'N'
             family of accumulators.
@@ -614,6 +629,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: queryTopNAccumulatorBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryRegexHeapLimitKB:
         mod_visibility: needs_replacement

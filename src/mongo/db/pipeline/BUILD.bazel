@@ -1290,6 +1290,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/memory_tracking",
         "//src/mongo/db/query/collation:collator_factory_mock",
         "//src/mongo/db/query/collation:collator_interface_mock",
+        "//src/mongo/db/query/query_knobs:query_knob_configuration_test_util",
         "//src/mongo/scripting:scripting_server",
         "//src/mongo/unittest",
         "//src/mongo/unittest:server_parameter_guard",

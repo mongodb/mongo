@@ -279,7 +279,10 @@ void Variables::seedVariablesWithLetParameters(
                 "Command let Expression tried to access a field, but this is not allowed because"
                 "Command let Expressions run before the query examines any documents.",
                 exprRequirementsValidator(expr.get()));
-        Value value = expr->evaluate(Document{}, &expCtx->variables);
+        // Let parameters are evaluated at ExpressionContext construction, before query settings
+        // are applied, when the operation-wide limit may not be read yet; the seeded value lives
+        // on for the whole operation, so its footprint stays charged.
+        Value value = expr->foldConstant();
 
         if (maybeSystemVarValidator) {
             (*maybeSystemVarValidator)(value);

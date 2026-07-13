@@ -245,7 +245,7 @@ SbExpr::Vector buildWindowAddConcatArrays(const WindowOp& op,
     auto argWithTypeCheck =
         b.makeLet(frameId, SbExpr::makeSeq(std::move(inputs->inputExpr)), std::move(expr));
 
-    const int cap = internalQueryMaxConcatArraysBytes.load();
+    const int cap = state.expCtx->getQueryKnobConfiguration().getMaxConcatArraysBytes();
     return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kAggRemovableConcatArraysAdd,
                                           std::move(argWithTypeCheck),
                                           b.makeInt32Constant(cap)));
@@ -556,7 +556,7 @@ SbExpr::Vector buildWindowAddAddToSet(const WindowOp& op,
                                       StageBuilderState& state) {
     SbExprBuilder b(state);
 
-    const int cap = internalQueryMaxAddToSetBytes.load();
+    const int cap = state.expCtx->getQueryKnobConfiguration().getMaxAddToSetBytes();
     return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kAggRemovableAddToSetAdd,
                                           std::move(inputs->inputExpr),
                                           b.makeInt32Constant(cap)));
@@ -596,7 +596,7 @@ SbExpr::Vector buildWindowAddSetUnion(const WindowOp& op,
     auto argWithTypeCheck =
         b.makeLet(frameId, SbExpr::makeSeq(std::move(inputs->inputExpr)), std::move(expr));
 
-    const int cap = internalQueryMaxSetUnionBytes.load();
+    const int cap = state.expCtx->getQueryKnobConfiguration().getMaxSetUnionBytes();
     return SbExpr::makeSeq(b.makeFunction(
         sbe::EFn::kAggRemovableSetUnionAdd, std::move(argWithTypeCheck), b.makeInt32Constant(cap)));
 }
@@ -625,7 +625,7 @@ SbExpr::Vector buildWindowInitializeMinMax(const WindowOp& op, StageBuilderState
 
     SbExpr::Vector exprs;
 
-    auto cap = internalQueryTopNAccumulatorBytes.load();
+    auto cap = state.expCtx->getQueryKnobConfiguration().getTopNAccumulatorBytes();
 
     if (collatorSlot) {
         exprs.push_back(b.makeFunction(sbe::EFn::kAggRemovableMinMaxNCollInit,
@@ -649,7 +649,7 @@ SbExpr::Vector buildWindowInitializeMinMaxN(const WindowOp& op,
 
     SbExpr::Vector exprs;
 
-    auto cap = internalQueryTopNAccumulatorBytes.load();
+    auto cap = state.expCtx->getQueryKnobConfiguration().getTopNAccumulatorBytes();
 
     auto collatorSlot = state.getCollatorSlot();
 
@@ -722,7 +722,7 @@ SbExpr::Vector buildWindowInitializeTopBottomN(StageBuilderState& state,
                                                std::unique_ptr<InitAccumNInputs> inputs) {
     SbExprBuilder b(state);
 
-    auto maxAccumulatorBytes = internalQueryTopNAccumulatorBytes.load();
+    auto maxAccumulatorBytes = state.expCtx->getQueryKnobConfiguration().getTopNAccumulatorBytes();
 
     auto nExpr = std::move(inputs->maxSize);
     uassert(8155720, "$topN/$bottomN init argument should be a constant", nExpr.isConstantExpr());
