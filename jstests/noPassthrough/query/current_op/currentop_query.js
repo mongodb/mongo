@@ -649,11 +649,17 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
 
         TestData.commandResult = cmdRes;
 
-        currentOpFilter = {
-            "command.getMore": isRemoteShardCurOp ? {$gt: 0} : TestData.commandResult.cursor.id,
-            "cursor.originatingCommand.$truncated": {$regex: truncatedQueryString},
-            "cursor.originatingCommand.comment": "currentop_query",
-        };
+        currentOpFilter = isRemoteShardCurOp
+            ? {
+                  op: "getmore",
+                  "cursor.originatingCommand.$truncated": {$regex: truncatedQueryString},
+                  "cursor.originatingCommand.comment": "currentop_query",
+              }
+            : {
+                  "command.getMore": TestData.commandResult.cursor.id,
+                  "cursor.originatingCommand.$truncated": {$regex: truncatedQueryString},
+                  "cursor.originatingCommand.comment": "currentop_query",
+              };
 
         confirmCurrentOpContents({
             test: function (db) {
