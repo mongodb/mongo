@@ -59,7 +59,7 @@ function assertSbeWithCbrFallbackBehavior() {
     const config = getPlanRankerConfig(db);
     const cbrEnabled = config.featureFlagCostBasedRanker;
     const mpWithCbrFallbackEnabled =
-        cbrEnabled && config.automaticCEPlanRankingStrategy === "CBRForNoMultiplanningResults";
+        cbrEnabled && config.internalQueryMixedPlanRankingStrategy === "NoMultiplanningResults";
 
     const pipelines = [
         // Queries that return results during the multiplanning trial period (no CBR fallback).
@@ -136,12 +136,15 @@ try {
         internalQueryCBRCEMode: "samplingCE",
     });
 
-    const cbrFallbackStrategies = ["CBRForNoMultiplanningResults", "CBRCostBasedRankerChoice"];
+    const cbrFallbackStrategies = ["NoMultiplanningResults", "EstimateRankingEffort"];
 
     for (const cbrFallbackStrategy of cbrFallbackStrategies) {
         jsTest.log.info("Running tests with mixed plan ranking.", {cbrFallbackStrategy});
         assert.commandWorked(
-            db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: cbrFallbackStrategy}),
+            db.adminCommand({
+                setParameter: 1,
+                internalQueryMixedPlanRankingStrategy: cbrFallbackStrategy,
+            }),
         );
         runTests();
     }

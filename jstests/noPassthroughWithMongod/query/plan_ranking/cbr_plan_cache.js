@@ -131,18 +131,15 @@ function runReplanningTest(isMultiplanning) {
     const strategy = assert.commandWorked(
         db.adminCommand({
             getParameter: 1,
-            automaticCEPlanRankingStrategy: 1,
+            internalQueryMixedPlanRankingStrategy: 1,
         }),
-    )["automaticCEPlanRankingStrategy"];
-    // We happen to use CBR to pick the winning plan for 'bIndexQuery' with CBRCostBasedRankerChoice,
-    // and MP with CBRForNoMultiplanningResults.
-    if (isMultiplanning || strategy === "CBRForNoMultiplanningResults") {
+    )["internalQueryMixedPlanRankingStrategy"];
+    // We happen to use CBR to pick the winning plan for 'bIndexQuery' with EstimateRankingEffort,
+    // and MP with NoMultiplanningResults.
+    if (isMultiplanning || strategy === "NoMultiplanningResults") {
         assert.eq(entry.creationExecStats.length, 2); // One for each candidate plan.
         assert.eq(entry.candidatePlanScores.length, 2); // One for each candidate plan.
-    } else if (
-        strategy == "CBRCostBasedRankerChoice" ||
-        strategy === "HistogramCEWithHeuristicFallback"
-    ) {
+    } else if (strategy === "EstimateRankingEffort") {
         // TODO SERVER-116684: Change these assertions.
         assert.eq(entry.creationExecStats.length, 1);
         assert.eq(entry.candidatePlanScores.length, 1);
@@ -230,11 +227,14 @@ try {
         internalQueryCBRCEMode: "samplingCE",
     });
 
-    const cbrFallbackStrategies = ["CBRForNoMultiplanningResults", "CBRCostBasedRankerChoice"];
+    const cbrFallbackStrategies = ["NoMultiplanningResults", "EstimateRankingEffort"];
 
     for (const cbrFallbackStrategy of cbrFallbackStrategies) {
         jsTest.log.info("Running runInitialCacheTest", {cbrFallbackStrategy});
-        db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: cbrFallbackStrategy});
+        db.adminCommand({
+            setParameter: 1,
+            internalQueryMixedPlanRankingStrategy: cbrFallbackStrategy,
+        });
         runInitialCacheTest(false /* isMultiplanning */);
 
         jsTest.log.info("Running replanningTest", {cbrFallbackStrategy});

@@ -70,12 +70,15 @@ assert.commandWorked(
 );
 
 try {
-    const cbrFallbackStrategies = ["CBRForNoMultiplanningResults", "CBRCostBasedRankerChoice"];
+    const cbrFallbackStrategies = ["NoMultiplanningResults", "EstimateRankingEffort"];
 
     for (const cbrFallbackStrategy of cbrFallbackStrategies) {
         jsTest.log.info("Running with:", {cbrFallbackStrategy});
         assert.commandWorked(
-            db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: cbrFallbackStrategy}),
+            db.adminCommand({
+                setParameter: 1,
+                internalQueryMixedPlanRankingStrategy: cbrFallbackStrategy,
+            }),
         );
         runTestIxscan();
         runTestFastScan();

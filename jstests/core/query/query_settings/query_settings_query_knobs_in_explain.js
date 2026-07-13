@@ -29,7 +29,7 @@ const qsutils = new QuerySettingsUtils(db, coll.getName());
 const kWireNameToServerParam = {
     planRanker: "internalQueryPlanRanker",
     cbrCEMode: "internalQueryCBRCEMode",
-    automaticCEPlanRankingStrategy: "automaticCEPlanRankingStrategy",
+    mixedPlanRankingStrategy: "internalQueryMixedPlanRankingStrategy",
     samplingConfidenceInterval: "samplingConfidenceInterval",
     samplingMarginOfError: "samplingMarginOfError",
     samplingCEMethod: "internalQuerySamplingCEMethod",
@@ -39,7 +39,7 @@ const kWireNameToServerParam = {
 const kPqsKnobsDefaults = {
     planRanker: "mixed",
     cbrCEMode: "samplingCE",
-    automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults",
+    mixedPlanRankingStrategy: "NoMultiplanningResults",
     samplingConfidenceInterval: "95",
     samplingMarginOfError: 5.0,
     samplingCEMethod: "chunk",
@@ -49,7 +49,7 @@ const kPqsKnobsDefaults = {
 const kPqsKnobsNonDefault = {
     planRanker: "costBased",
     cbrCEMode: "heuristicCE",
-    automaticCEPlanRankingStrategy: "CBRCostBasedRankerChoice",
+    mixedPlanRankingStrategy: "EstimateRankingEffort",
     samplingConfidenceInterval: "90",
     samplingMarginOfError: 2.5,
     samplingCEMethod: "random",

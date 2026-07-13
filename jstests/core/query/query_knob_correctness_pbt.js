@@ -52,7 +52,10 @@ const excludeKnobs = [
      * }
      */
     "internalQueryCBRCEMode",
-    "automaticCEPlanRankingStrategy",
+    // Forcing a non-default plan ranker (e.g. costBased) engages CBR, hitting the same
+    // SERVER-99091 "index union is a top-level node" limitation as the CE knobs above.
+    "internalQueryPlanRanker",
+    "internalQueryMixedPlanRankingStrategy",
     "internalQueryPlannerEnableHashIntersection",
     "internalQuerySamplingCEMethod",
     // Disallows collection scans; if the generated query has no covering index this is a

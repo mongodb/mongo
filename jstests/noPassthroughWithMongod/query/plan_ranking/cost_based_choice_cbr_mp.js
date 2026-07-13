@@ -164,7 +164,7 @@ assert.commandWorked(
         featureFlagCostBasedRanker: true,
         internalQueryPlanRanker: "mixed",
         internalQueryCBRCEMode: "samplingCE",
-        automaticCEPlanRankingStrategy: "CBRCostBasedRankerChoice",
+        internalQueryMixedPlanRankingStrategy: "EstimateRankingEffort",
     }),
 );
 try {

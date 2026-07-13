@@ -1899,11 +1899,9 @@ StatusWith<PlanRankingResult> QueryPlanner::planWithCostBasedRanking(
         if (!ceRes.isOK()) {
             // This plan's cardinality cannot be estimated.
             numPlansFailedCostEstimation.increment();
-            if (cbrMode == QueryCBRCEModeEnum::kAutomaticCE ||
-                ceRes.getStatus().code() == ErrorCodes::UnsupportedCbrNode) {
-                // We'll fallback to multi-planning for an inestimable plan if either:
-                // * We are in automatic CE mode
-                // * The reason for the inestimable plan was an unsupported node
+            if (ceRes.getStatus().code() == ErrorCodes::UnsupportedCbrNode) {
+                // Fallback to multi-planning when the reason for the inestimable plan was an
+                // unsupported node.
                 acceptedSoln.push_back(std::move(soln));
             } else {
                 // All other CE modes are considered "strict", that is, when a CE method couldn't

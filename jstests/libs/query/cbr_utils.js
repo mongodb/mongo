@@ -65,20 +65,20 @@ export function getPlanRanker(db) {
     }
 }
 
-export function getAutomaticCEPlanRankingStrategy(db) {
+export function getMixedPlanRankingStrategy(db) {
     if (db !== null) {
         const getParam = db.adminCommand({
             getParameter: 1,
-            automaticCEPlanRankingStrategy: 1,
+            internalQueryMixedPlanRankingStrategy: 1,
         });
 
-        return getParam.hasOwnProperty("automaticCEPlanRankingStrategy")
-            ? getParam.automaticCEPlanRankingStrategy
-            : "HistogramCEWithHeuristicFallback";
+        return getParam.hasOwnProperty("internalQueryMixedPlanRankingStrategy")
+            ? getParam.internalQueryMixedPlanRankingStrategy
+            : "NoMultiplanningResults";
     } else {
-        return TestData.setParameters.automaticCEPlanRankingStrategy
-            ? TestData.setParameters.automaticCEPlanRankingStrategy
-            : "HistogramCEWithHeuristicFallback";
+        return TestData.setParameters.internalQueryMixedPlanRankingStrategy
+            ? TestData.setParameters.internalQueryMixedPlanRankingStrategy
+            : "NoMultiplanningResults";
     }
 }
 
@@ -125,7 +125,8 @@ export function getPlanRankerConfig(db) {
             featureFlagCostBasedRanker: params.featureFlagCostBasedRanker ?? false,
             internalQueryPlanRanker: params.internalQueryPlanRanker ?? "multiPlanning",
             internalQueryCBRCEMode: params.internalQueryCBRCEMode ?? "",
-            automaticCEPlanRankingStrategy: params.automaticCEPlanRankingStrategy ?? "",
+            internalQueryMixedPlanRankingStrategy:
+                params.internalQueryMixedPlanRankingStrategy ?? "",
         };
     }
 
@@ -135,7 +136,7 @@ export function getPlanRankerConfig(db) {
             featureFlagCostBasedRanker: 1,
             internalQueryPlanRanker: 1,
             internalQueryCBRCEMode: 1,
-            automaticCEPlanRankingStrategy: 1,
+            internalQueryMixedPlanRankingStrategy: 1,
             internalSamplingSizeOverride: 1,
         }),
     );
@@ -144,7 +145,7 @@ export function getPlanRankerConfig(db) {
         featureFlagCostBasedRanker: config.featureFlagCostBasedRanker.value,
         internalQueryPlanRanker: config.internalQueryPlanRanker,
         internalQueryCBRCEMode: config.internalQueryCBRCEMode,
-        automaticCEPlanRankingStrategy: config.automaticCEPlanRankingStrategy,
+        internalQueryMixedPlanRankingStrategy: config.internalQueryMixedPlanRankingStrategy,
         internalSamplingSizeOverride: config.internalSamplingSizeOverride,
     };
 }
@@ -155,7 +156,7 @@ export function setPlanRankerConfig(
         featureFlagCostBasedRanker = true,
         internalQueryPlanRanker = "mixed",
         internalQueryCBRCEMode = "samplingCE",
-        automaticCEPlanRankingStrategy = "CBRForNoMultiplanningResults",
+        internalQueryMixedPlanRankingStrategy = "NoMultiplanningResults",
         internalSamplingSizeOverride = 0,
     } = {},
 ) {
@@ -165,7 +166,7 @@ export function setPlanRankerConfig(
             featureFlagCostBasedRanker,
             internalQueryPlanRanker,
             internalQueryCBRCEMode,
-            automaticCEPlanRankingStrategy,
+            internalQueryMixedPlanRankingStrategy,
             internalSamplingSizeOverride,
         }),
     );

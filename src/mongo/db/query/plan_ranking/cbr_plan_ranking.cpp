@@ -116,8 +116,7 @@ StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
         ceMode = QueryCBRCEModeEnum::kHeuristicCE;
     }
 
-    // TODO SERVER-127563: Remove AutomaticCE when HistogramCEWithHeuristicFallback is removed.
-    if (ceMode == QueryCBRCEModeEnum::kAutomaticCE || ceMode == QueryCBRCEModeEnum::kSamplingCE) {
+    if (ceMode == QueryCBRCEModeEnum::kSamplingCE) {
         auto meTopLevelFields =
             ce::extractTopLevelFieldsFromMatchExpression(query.getPrimaryMatchExpression());
         topLevelSampleFieldNames.merge(meTopLevelFields);
@@ -136,9 +135,7 @@ StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
     if (ceMode == QueryCBRCEModeEnum::kExactCE) {
         exactCardinality = std::make_unique<ce::ExactCardinalityImpl>(
             collections.getMainCollectionAcquisition(), query, opCtx);
-        // TODO SERVER-127563: Remove AutomaticCE when HistogramCEWithHeuristicFallback is removed.
-    } else if (ceMode == QueryCBRCEModeEnum::kAutomaticCE ||
-               ceMode == QueryCBRCEModeEnum::kSamplingCE) {
+    } else if (ceMode == QueryCBRCEModeEnum::kSamplingCE) {
         samplingEstimator = ce::SamplingEstimatorImpl::makeDefaultSamplingEstimator(
             query,
             CardinalityEstimate{

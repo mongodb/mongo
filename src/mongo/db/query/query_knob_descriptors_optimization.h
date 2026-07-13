@@ -252,10 +252,10 @@ inline Atomic<bool>& gKnobNoTableScan = storageGlobalParams.noTableScan;
          kInternalQueryCBRCEModeName,                                                     \
          QueryCBRCEMode,                                                                  \
          getCBRCEMode)                                                                    \
-    KNOB(kPlanRankingStrategyForAutomaticQueryPlanRankerMode,                             \
-         kAutomaticCEPlanRankingStrategyName,                                             \
-         QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode,                         \
-         getPlanRankingStrategyForAutomaticQueryPlanRankerMode)                           \
+    KNOB(kMixedPlanRankingStrategy,                                                       \
+         kInternalQueryMixedPlanRankingStrategyName,                                      \
+         QueryMixedPlanRankingStrategy,                                                   \
+         getMixedPlanRankingStrategy)                                                     \
     KNOB(kSamplingConfidenceInterval,                                                     \
          kSamplingConfidenceIntervalName,                                                 \
          SamplingConfidenceInterval,                                                      \

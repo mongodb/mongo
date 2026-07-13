@@ -84,7 +84,7 @@ coll.drop();
 
 // The multi-planner works each candidate plan up to a per-plan trial budget of
 // max(internalQueryPlanEvaluationWorks, internalQueryPlanEvaluationCollFraction * numRecords)
-// (the coll fraction is 0.3 for these two-plan queries). For CBRForNoMultiplanningResults to
+// (the coll fraction is 0.3 for these two-plan queries). For NoMultiplanningResults to
 // engage on the no-results query below, no candidate plan may hit EOF (or return results) within
 // that budget on any single shard. If a plan finishes first, earlyExit is set to true and CBR is
 // not considered.
@@ -313,7 +313,7 @@ setPlanRankerConfigOnAllNonConfigNodes(db.getMongo(), {
     featureFlagCostBasedRanker: true,
     internalQueryPlanRanker: "mixed",
     internalQueryCBRCEMode: "samplingCE",
-    automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults",
+    internalQueryMixedPlanRankingStrategy: "NoMultiplanningResults",
 });
 
 // Deterministic sample generation to ensure plan selection stability.

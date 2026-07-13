@@ -10,7 +10,7 @@ executor:
       objcheck: ""
       eval: |
         // histogramCE is banned except if test commands are enabled,
-        // so we cannot set is in mongod_options.set_parameters
+        // so we cannot set it in mongod_options.set_parameters
         db.adminCommand({setParameter:1, internalQueryCBRCEMode: "histogramCE"});
         // Keep in sync with query_golden_*.yml.
         await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
@@ -25,5 +25,5 @@ executor:
       set_parameters:
         enableTestCommands: 1
         featureFlagCostBasedRanker: true
-        # We also have internalQueryCBRCEMode: "histogramCE",
-        # see above.
+        internalQueryPlanRanker: "costBased"
+        # "histogramCE" is set above in the eval section because it is banned except if test commands are enabled.

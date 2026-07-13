@@ -241,7 +241,6 @@ function checkWinningPlan({query = {}, project = {}, order = {}}) {
             featureFlagCostBasedRanker: true,
             internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "samplingCE",
-            //automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults",
         }),
     );
     const e1 = coll.find(query, project).sort(order).explain("executionStats");
@@ -447,7 +446,7 @@ try {
     // With strict mode Histogram CE without an applicable histogram should produce
     // an error. Automatic mode should result in heuristicCE or mixedCE.
 
-    // TODO SERVER-97867: Since in automaticCE mode we always fallback to heuristic CE,
+    // TODO SERVER-97867: Since in mixed plan ranking mode we always fallback to heuristic CE,
     // it is not possible to ever fallback to multi-planning.
 
     assert.commandWorked(coll1.insertOne({a: 1}));

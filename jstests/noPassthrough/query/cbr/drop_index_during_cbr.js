@@ -37,17 +37,18 @@ import {checkSbeCompletelyDisabled} from "jstests/libs/query/sbe_util.js";
     assert.commandWorked(coll.insertMany(docs));
     assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}]));
 
-    function runTestHelper(planRanker, autoStrategy, findFilter) {
+    function runTestHelper(planRanker, mixedPlanRankerStrategy, findFilter) {
         jsTest.log.info(
-            `Running drop-index-during-CBR test: planRanker=${planRanker}, autoStrategy=${autoStrategy}, filter=${tojson(findFilter)}`,
+            `Running drop-index-during-CBR test: planRanker=${planRanker}, mixedPlanRankerStrategy=${mixedPlanRankerStrategy}, filter=${tojson(findFilter)}`,
         );
 
         const cbrConfig = {
             internalQueryPlanRanker: planRanker,
             internalQueryCBRCEMode: "samplingCE",
         };
-        if (autoStrategy !== null) {
-            cbrConfig.automaticCEPlanRankingStrategy = autoStrategy;
+
+        if (mixedPlanRankerStrategy !== null) {
+            cbrConfig.internalQueryMixedPlanRankingStrategy = mixedPlanRankerStrategy;
         }
         setPlanRankerConfig(db, cbrConfig);
 
@@ -106,8 +107,8 @@ import {checkSbeCompletelyDisabled} from "jstests/libs/query/sbe_util.js";
     }
 
     runTest("costBased", null);
-    runTest("mixed", "CBRForNoMultiplanningResults");
-    runTest("mixed", "CBRCostBasedRankerChoice");
+    runTest("mixed", "NoMultiplanningResults");
+    runTest("mixed", "EstimateRankingEffort");
 
     MongoRunner.stopMongod(conn);
 }

@@ -62,5 +62,5 @@ executor:
         featureFlagCostBasedRanker: true
         internalQueryPlanRanker: "mixed"
         internalQueryCBRCEMode: "samplingCE"
-        automaticCEPlanRankingStrategy: "CBRCostBasedRankerChoice"
+        internalQueryMixedPlanRankingStrategy: "EstimateRankingEffort"
         internalQuerySamplingBySequentialScan: true

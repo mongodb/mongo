@@ -14,25 +14,18 @@ assert.commandFailedWithCode(
     ErrorCodes.BadValue,
 );
 
-assert.commandFailedWithCode(
-    mongo.getDB("admin").adminCommand({
-        setParameter: 1,
-        automaticCEPlanRankingStrategy: "HistogramCEWithHeuristicFallback",
-    }),
-    ErrorCodes.BadValue,
-);
-
 assert.commandWorked(
     mongo.getDB("admin").adminCommand({
         setParameter: 1,
         internalQueryPlanRanker: "mixed",
+        internalQueryCBRCEMode: "samplingCE",
     }),
 );
 
 assert.commandWorked(
     mongo.getDB("admin").adminCommand({
         setParameter: 1,
-        automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults",
+        internalQueryMixedPlanRankingStrategy: "NoMultiplanningResults",
     }),
 );
 

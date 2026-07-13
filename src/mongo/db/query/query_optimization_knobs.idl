@@ -31,21 +31,19 @@ enums:
         description: "Enum for possible values for internalQueryCBRCEMode."
         type: string
         values:
-            kAutomaticCE: "automaticCE"
             # This mode is for testing purposes only, it is not meant to be efficient at all.
             kExactCE: "exactCE"
             kHistogramCE: "histogramCE"
             kSamplingCE: "samplingCE"
             kHeuristicCE: "heuristicCE"
 
-    QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode:
+    QueryMixedPlanRankingStrategy:
         mod_visibility: public
-        description: "Enum for possible values for QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode."
+        description: "Enum for possible values for QueryMixedPlanRankingStrategy when the plan ranker is mixed."
         type: string
         values:
-            kCBRForNoMultiplanningResults: "CBRForNoMultiplanningResults"
-            kCBRCostBasedRankerChoice: "CBRCostBasedRankerChoice"
-            kHistogramCEWithHeuristicFallback: "HistogramCEWithHeuristicFallback"
+            kNoMultiplanningResults: "NoMultiplanningResults"
+            kEstimateRankingEffort: "EstimateRankingEffort"
 
     SamplingCEMethod:
         mod_visibility: public
@@ -1057,7 +1055,7 @@ server_parameters:
                 fcv:
                     min: "9.0"
 
-    automaticCEPlanRankingStrategy:
+    internalQueryMixedPlanRankingStrategy:
         mod_visibility: public
         description: >-
             Second-level parameter to control the plan ranking strategy when
@@ -1065,14 +1063,14 @@ server_parameters:
             no effect for multiPlanner and costBased values of internalQueryPlanRanker.
         set_at: [startup, runtime]
         cpp_class:
-            name: QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode
-            data: WithOnUpdateHook<synchronized_value<QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum>>
+            name: QueryMixedPlanRankingStrategy
+            data: WithOnUpdateHook<synchronized_value<QueryMixedPlanRankingStrategyEnum>>
         default:
-            expr: QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::kCBRForNoMultiplanningResults
+            expr: QueryMixedPlanRankingStrategyEnum::kNoMultiplanningResults
         redact: false
         annotations:
             query_knob:
-                wire_name: automaticCEPlanRankingStrategy
+                wire_name: mixedPlanRankingStrategy
                 pqs_settable: true
                 fcv:
                     min: "9.0"

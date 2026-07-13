@@ -290,8 +290,7 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] QueryPlannerParams {
         // histogramCE will cause queries to fail if the query contains a predicate on a field
         // without a histogram. We don't create histograms on internal collections. To prevent such
         // queries from failing, we use multiplanning in this case.
-        // TODO SERVER-127563 : Verify this check when HistogramCEWithHeuristicFallback is removed.
-        if (isCBREnabled() &&
+        if (planRanker == QueryPlanRankerEnum::kCostBased &&
             args.canonicalQuery.getExpCtx()->getQueryKnobConfiguration().getCBRCEMode() ==
                 QueryCBRCEModeEnum::kHistogramCE &&
             args.canonicalQuery.nss().dbName().isInternalDb()) {

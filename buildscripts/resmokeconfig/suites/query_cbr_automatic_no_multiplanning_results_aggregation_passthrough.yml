@@ -30,5 +30,5 @@ executor:
         featureFlagCostBasedRanker: true
         internalQueryPlanRanker: "mixed"
         internalQueryCBRCEMode: "samplingCE"
-        automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults"
+        internalQueryMixedPlanRankingStrategy: "NoMultiplanningResults"
         internalQuerySamplingBySequentialScan: true

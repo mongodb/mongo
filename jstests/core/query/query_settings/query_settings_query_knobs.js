@@ -93,7 +93,7 @@ describe("setQuerySettings with queryKnobs", function () {
             samplingMarginOfError: 3.0,
             planRanker: "mixed",
             cbrCEMode: "histogramCE",
-            automaticCEPlanRankingStrategy: "CBRCostBasedRankerChoice",
+            mixedPlanRankingStrategy: "EstimateRankingEffort",
             samplingConfidenceInterval: "99",
             samplingCEMethod: "random",
             noTableScan: false,

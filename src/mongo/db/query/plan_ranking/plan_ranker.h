@@ -27,9 +27,8 @@ public:
     virtual ~PlanRankingStrategy() = default;
 };
 
-std::unique_ptr<PlanRankingStrategy> makeStrategy(
-    QueryPlanRankerEnum planRanker,
-    QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum autoStrategy);
+std::unique_ptr<PlanRankingStrategy> makeStrategy(QueryPlanRankerEnum planRanker,
+                                                  QueryMixedPlanRankingStrategyEnum mixedStrategy);
 
 /**
  * The PlanRanker is responsible for ranking candidate query plans and selecting the best plan(s)

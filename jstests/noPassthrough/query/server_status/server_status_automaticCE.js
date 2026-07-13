@@ -2,7 +2,7 @@
  * Tests the serverStatus metrics for Mixed plan ranker planning with CBRForNoMPResultsStrategy.
  *
  * Verifies all query.cbr.* and query.multiPlanner.* metrics under mixed plan ranking mode. There are
- * three possible planning paths in CBRForNoMPResultsStrategy:
+ * three possible planning paths in the NoMPResultsStrategy:
  *
  *   Path 1a (MP wins)          – multiplanner reaches EOF during the capped trial phase.
  *   Path 1b (MP wins)          – multiplanner finds results during the capped trial phase and

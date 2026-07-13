@@ -25,7 +25,7 @@ if (checkSbeFullyEnabled(null)) {
 
 const dbName = jsTestName();
 const collName = "testColl";
-const automaticCECollName = "automaticCETestColl";
+const mixedCollName = "mixedTestColl";
 const multiSolnCollName = "multiSolnTestColl";
 
 /**
@@ -70,7 +70,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
         let conn;
         let testDB;
         let coll;
-        let automaticCEColl;
+        let mixedColl;
         let multiSolnColl;
         let isSbeEnabled;
 
@@ -93,9 +93,9 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
             assert.commandWorked(coll.createIndex({b: 1}));
             assert.commandWorked(coll.createIndex({c: 1}));
 
-            // Setup collection for automaticCE tests (pattern from cbr_plan_cache.js).
-            automaticCEColl = testDB[automaticCECollName];
-            automaticCEColl.drop();
+            // Setup collection for mixed plan ranking tests (pattern from cbr_plan_cache.js).
+            mixedColl = testDB[mixedCollName];
+            mixedColl.drop();
             const docs = [];
             const kNumDocs = 15000;
             for (let i = 0; i < kNumDocs; i++) {
@@ -103,8 +103,8 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
             }
             docs.push({a: 7001, b: 7001, c: 1});
             docs.push({a: 8001, b: 8001, c: 1});
-            assert.commandWorked(automaticCEColl.insertMany(docs));
-            assert.commandWorked(automaticCEColl.createIndexes([{a: 1}, {b: 1}]));
+            assert.commandWorked(mixedColl.insertMany(docs));
+            assert.commandWorked(mixedColl.createIndexes([{a: 1}, {b: 1}]));
 
             // Setup collection for testing CBR metrics when CBR returns multiple solutions.
             // A sparse index is unsupported by CBR's cardinality estimator, so a plan using
@@ -535,7 +535,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                                 featureFlagCostBasedRanker: true,
                                 internalQueryPlanRanker: "mixed",
                                 internalQueryCBRCEMode: "samplingCE",
-                                automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults",
+                                internalQueryMixedPlanRankingStrategy: "NoMultiplanningResults",
                             }),
                         );
                     },
@@ -544,9 +544,9 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
 
                 // We do not expect this query to hit the CBR fallback.
                 const bIndexQuery = {a: {$gte: 1}, b: {$gte: 14500}, c: 1};
-                automaticCEColl.find(bIndexQuery).toArray();
+                mixedColl.find(bIndexQuery).toArray();
 
-                const stats = getQueryStats(conn, {collName: automaticCECollName});
+                const stats = getQueryStats(conn, {collName: mixedCollName});
                 assert.eq(1, stats.length, `Expected 1 query stats entry: ${tojson(stats)}`);
 
                 const queryPlannerSection = getQueryPlannerMetrics(stats[0].metrics);
@@ -597,7 +597,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                                 featureFlagCostBasedRanker: true,
                                 internalQueryPlanRanker: "mixed",
                                 internalQueryCBRCEMode: "samplingCE",
-                                automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults",
+                                internalQueryMixedPlanRankingStrategy: "NoMultiplanningResults",
                             }),
                         );
                     },
@@ -606,9 +606,9 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
 
                 // We expect this query to hit the CBR fallback.
                 const aIndexQuery = {a: {$gte: 1}, b: {$gte: 2}, c: 1};
-                automaticCEColl.find(aIndexQuery).toArray();
+                mixedColl.find(aIndexQuery).toArray();
 
-                const stats = getQueryStats(conn, {collName: automaticCECollName});
+                const stats = getQueryStats(conn, {collName: mixedCollName});
                 assert.eq(1, stats.length, `Expected 1 query stats entry: ${tojson(stats)}`);
 
                 const queryPlannerSection = getQueryPlannerMetrics(stats[0].metrics);
@@ -667,7 +667,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
             try {
                 // We temporarily add a sparse compound index {a: 1, b: 1}. All docs have both fields so the index has 15000+ entries, which is enough that the MP trial budget is exhausted before finding the rare c:1
                 // matches. CBR cannot cost the sparse index, producing multiple solutions.
-                assert.commandWorked(automaticCEColl.createIndex(sparseIdxSpec, {sparse: true}));
+                assert.commandWorked(mixedColl.createIndex(sparseIdxSpec, {sparse: true}));
 
                 FixtureHelpers.mapOnEachShardNode({
                     db: testDB.getSiblingDB("admin"),
@@ -679,7 +679,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                                 featureFlagCostBasedRanker: true,
                                 internalQueryPlanRanker: "mixed",
                                 internalQueryCBRCEMode: "samplingCE",
-                                automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults",
+                                internalQueryMixedPlanRankingStrategy: "NoMultiplanningResults",
                             }),
                         );
                     },
@@ -690,9 +690,9 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                 // (using {a:1}, {b:1}, or the sparse {a:1,b:1}) must scan thousands of
                 // entries before finding a match, so the capped MP trial produces 0 results,
                 // triggering the CBR fallback.
-                automaticCEColl.find({a: {$gte: 3}, b: {$gte: 3}, c: 1}).toArray();
+                mixedColl.find({a: {$gte: 3}, b: {$gte: 3}, c: 1}).toArray();
 
-                const stats = getQueryStats(conn, {collName: automaticCECollName});
+                const stats = getQueryStats(conn, {collName: mixedCollName});
                 assert.eq(1, stats.length, `Expected 1 query stats entry: ${tojson(stats)}`);
 
                 const queryPlannerSection = getQueryPlannerMetrics(stats[0].metrics);
@@ -730,7 +730,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                 }
             } finally {
                 // Drop the temporary sparse index so other tests are unaffected.
-                automaticCEColl.dropIndex(sparseIdxSpec);
+                mixedColl.dropIndex(sparseIdxSpec);
                 // Reset knobs to defaults on all nodes.
                 FixtureHelpers.mapOnEachShardNode({
                     db: testDB.getSiblingDB("admin"),
@@ -755,7 +755,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                                 featureFlagCostBasedRanker: true,
                                 internalQueryPlanRanker: "mixed",
                                 internalQueryCBRCEMode: "samplingCE",
-                                automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults",
+                                internalQueryMixedPlanRankingStrategy: "NoMultiplanningResults",
                             }),
                         );
                     },
@@ -764,11 +764,11 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
 
                 // Put a plan into the cache, we expect this query to use multiplanning.
                 const bIndexQuery = {a: {$gte: 1}, b: {$gte: 14500}, c: 1};
-                automaticCEColl.find(bIndexQuery).toArray(); // Insert inactive plan into cache
-                automaticCEColl.find(bIndexQuery).toArray(); // Activate plan
+                mixedColl.find(bIndexQuery).toArray(); // Insert inactive plan into cache
+                mixedColl.find(bIndexQuery).toArray(); // Activate plan
 
                 // Since we used multiplanning, no CBR metrics should be populated.
-                let stats = getQueryStats(conn, {collName: automaticCECollName});
+                let stats = getQueryStats(conn, {collName: mixedCollName});
                 assert.eq(1, stats.length, `Expected 1 query stats entry: ${tojson(stats)}`);
 
                 let queryPlannerSection = getQueryPlannerMetrics(stats[0].metrics);
@@ -790,9 +790,9 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
 
                 // We expect this query (same shape, different constants) to trigger replanning, and hit the CBR fallback.
                 const aIndexQuery = {a: {$gte: 1}, b: {$gte: 2}, c: 1};
-                automaticCEColl.find(aIndexQuery).toArray();
+                mixedColl.find(aIndexQuery).toArray();
 
-                stats = getQueryStats(conn, {collName: automaticCECollName});
+                stats = getQueryStats(conn, {collName: mixedCollName});
                 assert.eq(1, stats.length, `Expected 1 query stats entry: ${tojson(stats)}`);
 
                 queryPlannerSection = getQueryPlannerMetrics(stats[0].metrics);

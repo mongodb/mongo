@@ -1,10 +1,10 @@
 /**
  * Verifies which plan ranker (the cost-based ranker, CBR, or the multi-planner, MP) produces the
  * winning plan, and the reason, across the AutomaticCE plan-ranking strategies:
- *   - CBRCostBasedRankerChoice:     after a brief MP estimation trial, CBR is chosen when it is
- *                                   estimated cheaper than finishing MP.
- *   - CBRForNoMultiplanningResults: CBR is engaged only when MP produced no results within its
- *                                   trial budget.
+ *   - EstimateRankingEffort:     after a brief MP estimation trial, CBR is chosen when it is
+ *                                estimated cheaper than finishing MP.
+ *   - NoMultiplanningResults:    CBR is engaged only when MP produced no results within its
+ *                                trial budget.
  *
  * Each case documents its expected chosenRanker/reason and asserts it via assertChosenRanker().
  */
@@ -127,7 +127,7 @@ assert.commandWorked(
         featureFlagCostBasedRanker: true,
         internalQueryPlanRanker: "mixed",
         internalQueryCBRCEMode: "samplingCE",
-        automaticCEPlanRankingStrategy: "CBRCostBasedRankerChoice",
+        internalQueryMixedPlanRankingStrategy: "EstimateRankingEffort",
     }),
 );
 try {
@@ -415,7 +415,7 @@ try {
     });
 
     // ----------------------------------------------------------------------------------------
-    // CBRForNoMultiplanningResults: CBR is engaged only when MP produced no results within its
+    // NoMultiplanningResults: CBR is engaged only when MP produced no results within its
     // trial budget. (Scenarios ported from cbr_for_no_mp_results.js.)
     // ----------------------------------------------------------------------------------------
     assert.commandWorked(
@@ -424,7 +424,7 @@ try {
             featureFlagCostBasedRanker: true,
             internalQueryPlanRanker: "mixed",
             internalQueryCBRCEMode: "samplingCE",
-            automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults",
+            internalQueryMixedPlanRankingStrategy: "NoMultiplanningResults",
         }),
     );
 
@@ -566,7 +566,8 @@ try {
             featureFlagCostBasedRanker: prevCBRConfig.featureFlagCostBasedRanker,
             internalQueryPlanRanker: prevCBRConfig.internalQueryPlanRanker,
             internalQueryCBRCEMode: prevCBRConfig.internalQueryCBRCEMode,
-            automaticCEPlanRankingStrategy: prevCBRConfig.automaticCEPlanRankingStrategy,
+            internalQueryMixedPlanRankingStrategy:
+                prevCBRConfig.internalQueryMixedPlanRankingStrategy,
         }),
     );
 }

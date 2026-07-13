@@ -33,7 +33,7 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
         ? config.internalQueryPlanRanker
         : "multiPlanning";
     const ceMode = config.internalQueryCBRCEMode;
-    const autoPlanRankingStrategy = config.automaticCEPlanRankingStrategy;
+    const mixedPlanRankingStrategy = config.internalQueryMixedPlanRankingStrategy;
 
     const joinOptimizationStatus = checkJoinOptimizationStatus(
         typeof db === "undefined" ? null : db,
@@ -48,18 +48,16 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
                 return relativePathToExpectedOutput;
             case "mixed":
                 return (
-                    relativePathToExpectedOutput + "/" + planRanker + "/" + autoPlanRankingStrategy
+                    relativePathToExpectedOutput + "/" + planRanker + "/" + mixedPlanRankingStrategy
                 );
             default:
                 return relativePathToExpectedOutput + "/" + ceMode;
         }
     })();
     const planRankerModeExpectedExists = fileExists(outputDirPlanRanking + "/" + outputName);
-
     const joinOptimizationExpectedExists = fileExists(
         relativePathToExpectedOutput + "/internalEnableJoinOptimization/" + outputName,
     );
-
     if (joinOptimizationStatus && joinOptimizationExpectedExists) {
         relativePathToExpectedOutput += "/internalEnableJoinOptimization";
     } else if (sbeExpectedExists && planRankerModeExpectedExists) {

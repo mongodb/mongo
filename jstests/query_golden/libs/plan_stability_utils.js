@@ -274,10 +274,10 @@ export function runPlanStabilityPipelines(db, collName, pipelines) {
             parameters["internalQueryCBRCEMode"] = internalQueryCBRCEMode;
 
             if (internalQueryPlanRanker === "mixed") {
-                parameters["automaticCEPlanRankingStrategy"] = db.adminCommand({
+                parameters["internalQueryMixedPlanRankingStrategy"] = db.adminCommand({
                     getParameter: 1,
-                    automaticCEPlanRankingStrategy: 1,
-                }).automaticCEPlanRankingStrategy;
+                    internalQueryMixedPlanRankingStrategy: 1,
+                }).internalQueryMixedPlanRankingStrategy;
             }
 
             if (internalQueryCBRCEMode === "samplingCE") {

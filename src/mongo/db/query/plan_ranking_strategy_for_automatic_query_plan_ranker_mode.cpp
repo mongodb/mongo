@@ -19,21 +19,17 @@
 
 namespace mongo {
 
-void QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode::append(
-    OperationContext*, BSONObjBuilder* b, std::string_view name, const boost::optional<TenantId>&) {
+void QueryMixedPlanRankingStrategy::append(OperationContext*,
+                                           BSONObjBuilder* b,
+                                           std::string_view name,
+                                           const boost::optional<TenantId>&) {
     *b << name << idl::serialize(_data.get());
 }
 
-Status QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode::setFromString(
-    std::string_view value, const boost::optional<TenantId>&) {
-    auto mode = idl::deserialize<QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum>(
-        value, IDLParserContext("automaticCEPlanRankingStrategy"));
-    if (mode ==
-            QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::
-                kHistogramCEWithHeuristicFallback &&
-        !getTestCommandsEnabled()) {
-        return Status(ErrorCodes::BadValue, "histogramCE not allowed");
-    }
+Status QueryMixedPlanRankingStrategy::setFromString(std::string_view value,
+                                                    const boost::optional<TenantId>&) {
+    auto mode = idl::deserialize<QueryMixedPlanRankingStrategyEnum>(
+        value, IDLParserContext("internalQueryMixedPlanRankingStrategy"));
     _data = mode;
     return Status::OK();
 }

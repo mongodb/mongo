@@ -21,26 +21,20 @@
 namespace mongo {
 namespace plan_ranking {
 
-std::unique_ptr<PlanRankingStrategy> makeStrategy(
-    QueryPlanRankerEnum planRanker,
-    QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum autoStrategy) {
-    using AutoStrategy = QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum;
+std::unique_ptr<PlanRankingStrategy> makeStrategy(QueryPlanRankerEnum planRanker,
+                                                  QueryMixedPlanRankingStrategyEnum mixedStrategy) {
+    using MixedStrategy = QueryMixedPlanRankingStrategyEnum;
     switch (planRanker) {
         case QueryPlanRankerEnum::kCostBased: {
             return std::make_unique<CBRPlanRankingStrategy>();
         }
         case QueryPlanRankerEnum::kMixed: {
-            switch (autoStrategy) {
-                case AutoStrategy::kCBRForNoMultiplanningResults: {
+            switch (mixedStrategy) {
+                case MixedStrategy::kNoMultiplanningResults: {
                     return std::make_unique<CBRForNoMPResultsStrategy>();
                 }
-                case AutoStrategy::kCBRCostBasedRankerChoice: {
+                case MixedStrategy::kEstimateRankingEffort: {
                     return std::make_unique<CostBasedPlanRankingStrategy>();
-                }
-                // TODO: SERVER-127563: Remove this case when HistogramCEWithHeuristicFallback is
-                // removed.
-                case AutoStrategy::kHistogramCEWithHeuristicFallback: {
-                    return std::make_unique<CBRPlanRankingStrategy>();
                 }
                 default:
                     MONGO_UNREACHABLE;
@@ -59,9 +53,8 @@ StatusWith<PlanRankingResult> PlanRanker::rankPlans(OperationContext* opCtx,
                                                     const MultipleCollectionAccessor& collections,
                                                     PlannerData plannerData,
                                                     bool isClassic) {
-    auto autoStrategy = query.getExpCtx()
-                            ->getQueryKnobConfiguration()
-                            .getPlanRankingStrategyForAutomaticQueryPlanRankerMode();
+    auto mixedStrategy =
+        query.getExpCtx()->getQueryKnobConfiguration().getMixedPlanRankingStrategy();
 
     const bool canUseCBR = plannerParams.isCBREnabled() && isClassic;
 
@@ -124,7 +117,7 @@ StatusWith<PlanRankingResult> PlanRanker::rankPlans(OperationContext* opCtx,
     }
 
     std::unique_ptr<PlanRankingStrategy> strategy = canUseCBR
-        ? makeStrategy(plannerParams.planRanker, autoStrategy)
+        ? makeStrategy(plannerParams.planRanker, mixedStrategy)
         : std::make_unique<MPPlanRankingStrategy>();
 
     auto swRankingResult = strategy->rankPlans(plannerData, rctx);

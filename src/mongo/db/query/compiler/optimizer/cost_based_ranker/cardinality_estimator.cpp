@@ -46,10 +46,9 @@ CardinalityEstimator::CardinalityEstimator(const CollectionInfo& collInfo,
       _samplingEstimator(samplingEstimator),
       _qsnEstimates{qsnEstimates},
       _ceMode(rankerMode) {
-    // TODO SERVER-127563: Remove AutomaticCE.
-    if (_ceMode == QueryCBRCEModeEnum::kSamplingCE || _ceMode == QueryCBRCEModeEnum::kAutomaticCE) {
+    if (_ceMode == QueryCBRCEModeEnum::kSamplingCE) {
         tassert(9746501,
-                "samplingEstimator cannot be null when ranker mode is samplingCE or automaticCE",
+                "samplingEstimator cannot be null when CBRCEMode is samplingCE",
                 _samplingEstimator != nullptr);
     }
     for (auto&& indexEntry : _collInfo.indexes) {
@@ -288,12 +287,7 @@ CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool 
 
     CEResult ceRes(ErrorCodes::CEFailure, "Unable to estimate expression");
 
-    // TODO SERVER-127563: Revisit strict and fallback histogram when
-    // HistogramCEWithHeuristicFallback is removed.
-    bool fallbackToHeuristicCE = true;
-    bool strict = _ceMode == QueryCBRCEModeEnum::kHistogramCE;
-    bool useHistogram =
-        _ceMode == QueryCBRCEModeEnum::kHistogramCE || _ceMode == QueryCBRCEModeEnum::kAutomaticCE;
+    bool useHistogram = _ceMode == QueryCBRCEModeEnum::kHistogramCE;
 
     /**
      * Sargable expressions are those that can be transformed into intervals. They can be estimated
@@ -303,9 +297,7 @@ CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool 
      */
     if (useHistogram && isSargableExpr(node)) {
         ceRes = estimateConjWithHistogram(getPath(node), {node});
-        if (ceRes.isOK()) {
-            fallbackToHeuristicCE = false;
-        } else if (strict) {
+        if (!ceRes.isOK()) {
             return ceRes;
         }
     }
@@ -313,9 +305,9 @@ CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool 
     /**
      * Estimate via heuristic CE any leaf match expression. Notice that there are other such nodes
      * besides LeafMatchExpression subclasses. Heuristic CE doesn't estimate non-leaf nodes. This
-     * is done be the switch statment below.
+     * is done be the switch statement below.
      */
-    bool useHeuristic = _ceMode == QueryCBRCEModeEnum::kHeuristicCE || fallbackToHeuristicCE;
+    bool useHeuristic = _ceMode == QueryCBRCEModeEnum::kHeuristicCE;
     if (useHeuristic && heuristicIsEstimable(node)) {
         tassert(9902901, "CE reestimation not allowed", !ceRes.isOK());
         const SelectivityEstimate sel = heuristicLeafMatchExpressionSel(node, _inputCard);
@@ -1091,9 +1083,7 @@ CEResult CardinalityEstimator::estimate(const AndMatchExpression* node) {
     // TODO SERVER-122571: Suppose we have an AND with some predicates on 'a' that can answered with
     // a histogram and some predicates on 'b' that can't. Should we still try to use histogram for
     // 'a'? The code as written will not.
-    // TODO SERVER-127563 Revisit the logic here when HistogramCEWithHeuristicFallback is removed.
-    if (_ceMode == QueryCBRCEModeEnum::kHistogramCE ||
-        _ceMode == QueryCBRCEModeEnum::kAutomaticCE) {
+    if (_ceMode == QueryCBRCEModeEnum::kHistogramCE) {
         size_t selOffset = _conjSels.size();
         auto ceRes = tryHistogramAnd(node);
         if (ceRes.isOK()) {
@@ -1164,8 +1154,7 @@ CEResult CardinalityEstimator::estimate(const ElemMatchValueMatchExpression* nod
     // Sampling and histogram handle this case higher up.
     uassert(9808601,
             "direct estimation of $elemMatch is currently only supported for heuristicCE",
-            _ceMode == QueryCBRCEModeEnum::kHeuristicCE ||
-                _ceMode == QueryCBRCEModeEnum::kAutomaticCE);
+            _ceMode == QueryCBRCEModeEnum::kHeuristicCE);
 
     size_t selOffset = _conjSels.size();
 
@@ -1396,8 +1385,7 @@ CEResult CardinalityEstimator::estimate(const OrderedIntervalList* node, bool fo
     const bool strict = _ceMode == QueryCBRCEModeEnum::kHistogramCE || forceHistogram;
     const stats::CEHistogram* histogram = nullptr;
 
-    if (_ceMode == QueryCBRCEModeEnum::kHistogramCE ||
-        _ceMode == QueryCBRCEModeEnum::kAutomaticCE || forceHistogram) {
+    if (_ceMode == QueryCBRCEModeEnum::kHistogramCE || forceHistogram) {
         histogram = _collInfo.collStats->getHistogram(node->name);
         if (!histogram) {
             if (strict) {
@@ -1413,8 +1401,7 @@ CEResult CardinalityEstimator::estimate(const OrderedIntervalList* node, bool fo
     CardinalityEstimate resultCard = minCE;
     for (const auto& interval : node->intervals) {
         bool fallbackToHeuristicCE = false;
-        if (localRankerMode == QueryCBRCEModeEnum::kHistogramCE ||
-            localRankerMode == QueryCBRCEModeEnum::kAutomaticCE) {
+        if (localRankerMode == QueryCBRCEModeEnum::kHistogramCE) {
             if (ce::HistogramEstimator::canEstimateInterval(*histogram, interval)) {
                 resultCard += ce::HistogramEstimator::estimateCardinality(
                     *histogram,
