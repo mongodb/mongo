@@ -107,10 +107,6 @@ public:
         _allowListedCompressors = std::move(allowList);
     }
 
-    const std::vector<std::string>& getCompressorAllowListForThisSession() const {
-        return _allowListedCompressors;
-    }
-
     /*
      * Hello marker used by replication data-plane clients so the server applies the replication
      * compression policy instead of the normal net.compression policy. Older servers ignore the
@@ -127,10 +123,6 @@ public:
         _isReplicationClient = isReplicationClient;
     }
 
-    bool isReplicationClientForThisSession() const {
-        return _isReplicationClient;
-    }
-
     /*
      * Marks whether this connection's compression bytes count toward serverStatus().repl.compression.
      * Kept separate from markReplicationClientForThisSession(): server-side inbound replication
@@ -138,10 +130,6 @@ public:
      */
     void countAsReplicationCompressionTrafficForThisSession(bool countAsReplicationTraffic) {
         _countAsReplicationCompressionTraffic = countAsReplicationTraffic;
-    }
-
-    bool countsAsReplicationCompressionTrafficForThisSession() const {
-        return _countAsReplicationCompressionTraffic;
     }
 
     /*
