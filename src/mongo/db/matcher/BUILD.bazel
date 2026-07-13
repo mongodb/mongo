@@ -45,6 +45,21 @@ mongo_cc_library(
         "//src/mongo/db/exec:js_function",
         "//src/mongo/db/fts:base_fts",
         "//src/mongo/scripting:scripting_server",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "expression_text_test",
+    srcs = [
+        "expression_text_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":expressions_mongod_only",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/util:fail_point",
     ],
 )
 

@@ -52,12 +52,17 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_text.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
 
+MONGO_FAIL_POINT_DEFINE(hangBeforeUsingFTSIndexInfo);
+
 namespace {
-const FTSAccessMethod* validateFTSIndex(OperationContext* opCtx, const NamespaceString& nss) {
+
+std::pair<fts::TextIndexVersion, std::string> validateFTSIndex(OperationContext* opCtx,
+                                                               const NamespaceString& nss) {
     auto collection = acquireCollectionOrViewMaybeLockFree(
         opCtx,
         CollectionOrViewAcquisitionRequest(
@@ -96,7 +101,8 @@ const FTSAccessMethod* validateFTSIndex(OperationContext* opCtx, const Namespace
     const FTSAccessMethod* fam = static_cast<const FTSAccessMethod*>(
         collectionPtr->getIndexCatalog()->getEntry(index)->accessMethod());
     invariant(fam);
-    return fam;
+
+    return {fam->getSpec().getTextIndexVersion(), fam->getSpec().defaultLanguage().str()};
 }
 }  // namespace
 
@@ -112,19 +118,16 @@ TextMatchExpression::TextMatchExpression(OperationContext* opCtx,
     _ftsQuery.setCaseSensitive(params.caseSensitive);
     _ftsQuery.setDiacriticSensitive(params.diacriticSensitive);
 
-    fts::TextIndexVersion version;
-    {
-        const FTSAccessMethod* fam = validateFTSIndex(opCtx, nss);
+    auto [version, defaultLanguage] = validateFTSIndex(opCtx, nss);
 
-        // Extract version and default language from text index.
-        version = fam->getSpec().getTextIndexVersion();
-        if (_ftsQuery.getLanguage().empty()) {
-            _ftsQuery.setLanguage(fam->getSpec().defaultLanguage().str());
-        }
+    // Snapshot closed. 'version' and 'defaultLanguage' are owned copies.
+    hangBeforeUsingFTSIndexInfo.pauseWhileSet(opCtx);
+
+    if (_ftsQuery.getLanguage().empty()) {
+        _ftsQuery.setLanguage(std::move(defaultLanguage));
     }
 
-    Status parseStatus = _ftsQuery.parse(version);
-    uassertStatusOK(parseStatus);
+    uassertStatusOK(_ftsQuery.parse(version));
 }
 
 std::unique_ptr<MatchExpression> TextMatchExpression::clone() const {
