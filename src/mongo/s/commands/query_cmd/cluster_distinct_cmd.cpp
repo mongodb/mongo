@@ -395,6 +395,7 @@ public:
         void executeDistinct(OperationContext* opCtx,
                              boost::optional<ExplainOptions::Verbosity> verbosity,
                              rpc::ReplyBuilderInterface* reply) {
+            setReadWriteConcern(opCtx, request(), this);
             sharding::router::CollectionRouter router(opCtx, _ns);
             router.routeWithRoutingContext(
                 verbosity ? "explain distinct"sv : definition()->getName(),

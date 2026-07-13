@@ -187,6 +187,12 @@ function runTest(conn, {isUnique, isShardedColl, st, rst}) {
               ? "not monotonic"
               : "monotonic";
 
+        // On a replica set, the analyzeShardKey command runs the aggregate commands locally, i.e.
+        // the commands do not go through the service entry point so do not get profiled. On sharded
+        // clusters with data living on a single shard and unique shard key, analyzeShardKey also
+        // opts into the local read optimized path.
+        const expectAggregateQueryPlanEntries = !rst && !isUnique;
+
         const comment = UUID();
 
         // Cannot specify both sampleRate and sampleSize.
@@ -233,10 +239,7 @@ function runTest(conn, {isUnique, isShardedColl, st, rst}) {
             dbName,
             collName,
             comment,
-            // On a replica set, the analyzeShardKey command runs the
-            // aggregate commands locally, i.e. the commands do not go
-            // through the service entry point so do not get profiled.
-            !rst /* expectEntries */,
+            expectAggregateQueryPlanEntries,
         );
 
         for (let {sampleSize, expectedErrCodes} of sampleSizeTestCases) {
@@ -276,10 +279,7 @@ function runTest(conn, {isUnique, isShardedColl, st, rst}) {
                 dbName,
                 collName,
                 comment,
-                // On a replica set, the analyzeShardKey command runs the
-                // aggregate commands locally, i.e. the commands do not go
-                // through the service entry point so do not get profiled.
-                !rst /* expectEntries */,
+                expectAggregateQueryPlanEntries,
             );
         }
 
@@ -325,10 +325,7 @@ function runTest(conn, {isUnique, isShardedColl, st, rst}) {
                 dbName,
                 collName,
                 comment,
-                // On a replica set, the analyzeShardKey command runs the
-                // aggregate commands locally, i.e. the commands do not go
-                // through the service entry point so do not get profiled.
-                !rst /* expectEntries */,
+                expectAggregateQueryPlanEntries,
             );
         }
     }

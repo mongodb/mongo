@@ -671,7 +671,7 @@ for (let command of commands) {
                 {
                     "command.shardVersion": {"$exists": false},
                     "command.$readPreference": {$exists: false},
-                    "command.readConcern": {"level": "local"},
+                    "command.readConcern.level": "local",
                     "errCode": {"$exists": false},
                 },
                 commandProfile,
@@ -686,7 +686,7 @@ for (let command of commands) {
                 {
                     "command.shardVersion": {"$exists": true},
                     "command.$readPreference": {"mode": "secondary"},
-                    "command.readConcern": {"level": "available"},
+                    "command.readConcern.level": "available",
                     "errCode": {"$ne": ErrorCodes.StaleConfig},
                 },
                 commandProfile,
@@ -712,14 +712,17 @@ for (let command of commands) {
         });
 
         // Check that the recipient shard secondary received the request with local read concern
-        // and returned success, since the previous command refreshed the metadata.
+        // and returned success, since the previous command refreshed the metadata. Filter on
+        // provenance "clientSupplied" to distinguish this from an implicit-default retry that
+        // may have also landed on the recipient with the same readConcern.level.
         profilerHasSingleMatchingEntryOrThrow({
             profileDB: recipientShardSecondary.getDB(db),
             filter: Object.extend(
                 {
                     "command.shardVersion": {"$exists": true},
                     "command.$readPreference": {"mode": "secondary"},
-                    "command.readConcern": {"level": "local"},
+                    "command.readConcern.level": "local",
+                    "command.readConcern.provenance": "clientSupplied",
                     "errCode": {"$ne": ErrorCodes.StaleConfig},
                 },
                 commandProfile,

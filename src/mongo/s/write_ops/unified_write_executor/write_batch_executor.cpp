@@ -695,7 +695,7 @@ BSONObj WriteBatchExecutor::buildFindAndModifyRequestObj(
     auto cmdObj = request.toBSON();
 
     if (shouldAppendReadWriteConcern) {
-        cmdObj = applyReadWriteConcern(opCtx, /*appendRC*/ true, /*appendWC*/ true, cmdObj);
+        cmdObj = applyReadWriteConcern(opCtx, /*setRC*/ true, /*setWC*/ true, cmdObj);
     }
 
     BSONObjBuilder builder(cmdObj);

@@ -4,12 +4,9 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
@@ -23,15 +20,6 @@ const int kMaxNumDecimalPlaces = 10;
  * Otherwise, returns an OK status.
  */
 Status validateNamespace(const NamespaceString& nss);
-
-/**
- * If the operation has a readConcern, returns a BSON object of the following form:
- * { level: "...",
- *   afterClusterTime: Timestamp(...) }
- *
- * Otherwise, returns an empty BSON object.
- */
-repl::ReadConcernArgs extractReadConcern(OperationContext* opCtx);
 
 /**
  * If the shard key is invalid, returns a BadValue error. Otherwise, returns an OK status. This

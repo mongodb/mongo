@@ -189,6 +189,7 @@ public:
         Reply typedRun(OperationContext* opCtx) {
             Impl::checkCanRunHere(opCtx);
             constexpr auto cmdName = Request::kCommandName;
+            setReadWriteConcern(opCtx, request(), true /* setRC */, false /* setWC */);
             const auto originalCountRequest = request();
 
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
@@ -310,11 +311,8 @@ public:
                                 expCtx,
                                 routingCtx,
                                 nss,
-                                applyReadWriteConcern(
-                                    opCtx,
-                                    this,
-                                    prepareCountForPassthrough(
-                                        opCtx, countRequestForShard.toBSON(), requestQueryStats)),
+                                prepareCountForPassthrough(
+                                    opCtx, countRequestForShard.toBSON(), requestQueryStats),
                                 ReadPreferenceSetting::get(opCtx),
                                 Shard::RetryPolicy::kIdempotent,
                                 countRequestForShard.getQuery(),

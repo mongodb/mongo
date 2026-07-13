@@ -80,13 +80,14 @@ public:
 
             ShardSvrRecreateRangeDeletionTasksParticipant req{
                 nss, request().getSkipEmptyRanges(), collectionUuid};
+            setReadWriteConcern(opCtx, req, true /* setRC */, true /* setWC */);
 
-            auto shardResponses = scatterGatherUnversionedTargetAllShards(
-                opCtx,
-                nss.dbName(),
-                applyReadWriteConcern(opCtx, this, req.toBSON()),
-                ReadPreferenceSetting::get(opCtx),
-                Shard::RetryPolicy::kIdempotent);
+            auto shardResponses =
+                scatterGatherUnversionedTargetAllShards(opCtx,
+                                                        nss.dbName(),
+                                                        req.toBSON(),
+                                                        ReadPreferenceSetting::get(opCtx),
+                                                        Shard::RetryPolicy::kIdempotent);
 
             for (const auto& response : shardResponses) {
                 uassertStatusOK(response.swResponse.getStatus());

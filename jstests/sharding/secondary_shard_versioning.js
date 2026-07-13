@@ -62,7 +62,7 @@ profilerHasSingleMatchingEntryOrThrow({
         "command.query": {x: 1},
         "command.shardVersion": {"$exists": true},
         "command.$readPreference": {"mode": "secondary"},
-        "command.readConcern": {"level": "local"},
+        "command.readConcern.level": "local",
         "errCode": ErrorCodes.StaleConfig,
     },
 });
@@ -77,7 +77,7 @@ profilerHasSingleMatchingEntryOrThrow({
         "command.query": {x: 1},
         "command.shardVersion": {"$exists": true},
         "command.$readPreference": {"mode": "secondary"},
-        "command.readConcern": {"level": "local"},
+        "command.readConcern.level": "local",
         "errCode": ErrorCodes.StaleConfig,
     },
 });
@@ -91,7 +91,7 @@ profilerHasSingleMatchingEntryOrThrow({
         "command.query": {x: 1},
         "command.shardVersion": {"$exists": true},
         "command.$readPreference": {"mode": "secondary"},
-        "command.readConcern": {"level": "local"},
+        "command.readConcern.level": "local",
         "errCode": {"$exists": false},
     },
 });

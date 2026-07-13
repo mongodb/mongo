@@ -59,6 +59,7 @@ public:
         Response typedRun(OperationContext* opCtx) {
             const auto& nss = ns();
             uassertStatusOK(validateNamespace(nss));
+            setReadWriteConcern(opCtx, request(), true /* setRC */, false /* setWC */);
 
             sharding::router::CollectionRouter router(opCtx, nss);
             return router.routeWithRoutingContext(
@@ -82,12 +83,8 @@ public:
                     // On secondaries, the database and shard version check is only performed for
                     // commands that specify a readConcern (that is not "available"). Therefore, to
                     // opt into the check, explicitly attach the readConcern.
-                    auto newRequest = request();
-                    if (!newRequest.getReadConcern()) {
-                        newRequest.setReadConcern(extractReadConcern(opCtx));
-                    }
                     const auto unversionedCmdObj =
-                        CommandHelpers::filterCommandRequestForPassthrough(newRequest.toBSON());
+                        CommandHelpers::filterCommandRequestForPassthrough(request().toBSON());
 
                     while (true) {
                         // Select a random shard.

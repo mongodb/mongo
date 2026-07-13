@@ -247,8 +247,8 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
 
     // Apply RW concern to the final shard command.
     return applyReadWriteConcern(expCtx->getOperationContext(),
-                                 true,              /* appendRC */
-                                 !explainVerbosity, /* appendWC */
+                                 !readConcern,      /* setRC */
+                                 !explainVerbosity, /* setWC */
                                  filteredCommand);
 }
 

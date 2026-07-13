@@ -169,6 +169,7 @@ public:
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* result) override {
             Impl::checkCanExplainHere(opCtx);
+            setReadWriteConcern(opCtx, request(), true /* setRC */, false /* setWC */);
 
             auto curOp = CurOp::get(opCtx);
             curOp->debug().getQueryStatsInfo().disableForSubqueryExecution = true;
@@ -183,10 +184,8 @@ public:
                 auto nss = ns();
                 // We create a mutable copy and apply mutations inside the lambda rather
                 // than before it to avoid an extra copy, since this lambda may be retried
-                // on stale router cache. Setting readConcern and applying FLE rewrite are
-                // idempotent operations so it is safe to do in a loop.
+                // on stale router cache.
                 auto cmdRequest = query_request_helper::makeFromFindCommand(request());
-                setReadConcern(opCtx, *cmdRequest);
                 doFLERewriteIfNeeded(opCtx, *cmdRequest);
                 bool cmdShouldBeTranslatedForRawData = false;
                 const auto targeter = CollectionRoutingInfoTargeter(opCtx, ns());
@@ -331,9 +330,9 @@ public:
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
             Impl::checkCanRunHere(opCtx);
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
+            setReadWriteConcern(opCtx, request(), true /* setRC */, false /* setWC */);
 
             auto cmdRequest = query_request_helper::makeFromFindCommand(request());
-            setReadConcern(opCtx, *cmdRequest);
             doFLERewriteIfNeeded(opCtx, *cmdRequest);
 
             ClusterFind::runQuery(opCtx,
@@ -366,18 +365,6 @@ public:
 
             uassertStatusOK(ClusterAggregate::retryOnViewOrIFRKickbackError(
                 opCtx, aggRequestOnView, resolvedView, ns(), privileges, verbosity, &bodyBuilder));
-        }
-
-        void setReadConcern(OperationContext* opCtx, FindCommandRequest& cmdRequest) {
-            if (cmdRequest.getReadConcern() ||
-                (opCtx->inMultiDocumentTransaction() &&
-                 !opCtx->isStartingMultiDocumentTransaction())) {
-                return;
-            }
-
-            // Use the readConcern from the opCtx (which may be a cluster-wide default).
-            const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-            cmdRequest.setReadConcern(readConcernArgs);
         }
 
         void doFLERewriteIfNeeded(OperationContext* opCtx, FindCommandRequest& cmdRequest) {

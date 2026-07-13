@@ -365,8 +365,8 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
 
     // Attach the read and write concerns if needed, and return the final command object.
     return applyReadWriteConcern(mergeCtx->getOperationContext(),
-                                 !(txnRouter && mergingShardContributesData), /* appendRC */
-                                 !mergeCtx->getExplain(),                     /* appendWC */
+                                 !(txnRouter && mergingShardContributesData), /* setRC */
+                                 !mergeCtx->getExplain(),                     /* setWC */
                                  mergeCmd.freeze().toBson());
 }
 

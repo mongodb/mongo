@@ -980,7 +980,9 @@ export function getAggregateQueryStatsKey({conn, collName, queryShapeExtra, extr
         cursor: {batchSize: "?number"},
     };
 
-    if (!conn.isMongos()) {
+    if (conn.isMongos()) {
+        baseStatsKey.readConcern = {level: "local", provenance: "implicitDefault"};
+    } else {
         // TODO SERVER-76263 - make this apply to mongos once it has collection telemetry info.
         baseStatsKey.collectionType =
             collName == "$cmd.aggregate" ? "virtual" : isView(conn, coll) ? "view" : "collection";
@@ -1013,7 +1015,9 @@ export function getCountQueryStatsKey(conn, collName, queryShapeExtra) {
     };
 
     const coll = conn.getDB("test")[collName];
-    if (!conn.isMongos()) {
+    if (conn.isMongos()) {
+        queryStatsKey.readConcern = {level: "local", provenance: "implicitDefault"};
+    } else {
         // TODO SERVER-76263 - make this apply to mongos once it has collection telemetry info.
         queryStatsKey.collectionType = isView(conn, coll) ? "view" : "collection";
     }
@@ -1043,7 +1047,9 @@ export function getDistinctQueryStatsKey(conn, collName, queryShapeExtra) {
     };
 
     const coll = conn.getDB("test")[collName];
-    if (!conn.isMongos()) {
+    if (conn.isMongos()) {
+        queryStatsKey.readConcern = {level: "local", provenance: "implicitDefault"};
+    } else {
         // TODO SERVER-76263 - make this apply to mongos once it has collection telemetry info.
         queryStatsKey.collectionType = isView(conn, coll) ? "view" : "collection";
     }

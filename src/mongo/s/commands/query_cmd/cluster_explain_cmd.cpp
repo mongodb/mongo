@@ -83,6 +83,15 @@ public:
             explainArgs.setMaxTimeMS(explain_cmd_helpers::resolveMaxTimeMS(
                 explainArgs.getMaxTimeMS(),
                 _innerInvocation->getGenericArguments().getMaxTimeMS()));
+
+            // The explained command's readConcern takes precedence: semantically it is the read
+            // concern of the operation being explained, the analog of a normal command's top-level
+            // readConcern. Promote it onto this explain command's generic arguments so the standard
+            // machinery sources it onto the opCtx.
+            if (const auto& innerReadConcern =
+                    _innerInvocation->getGenericArguments().getReadConcern()) {
+                explainArgs.setReadConcern(*innerReadConcern);
+            }
         }
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,

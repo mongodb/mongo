@@ -44,6 +44,7 @@ const db = mongos.getDB("test");
         },
         cursor: {batchSize: "?number"},
         applicationName: "MongoDB Shell",
+        readConcern: {level: "local", provenance: "implicitDefault"},
     };
 
     const cursor = coll.aggregate([{$match: {v: {$gt: 0, $lt: 5}}}, {$project: {hello: true}}], {
@@ -111,6 +112,7 @@ const db = mongos.getDB("test");
         },
         cursor: {batchSize: "?number"},
         applicationName: "MongoDB Shell",
+        readConcern: {level: "local", provenance: "implicitDefault"},
     };
 
     const cursor1 = coll.aggregate([{$match: {v: {$gt: 0, $lt: 5}}}], {cursor: {batchSize: 1}}); // returns 1 doc

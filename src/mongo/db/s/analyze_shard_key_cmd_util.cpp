@@ -43,6 +43,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/analyze_shard_key_read_write_distribution.h"
 #include "mongo/db/s/analyze_shard_key_util.h"
@@ -540,7 +541,7 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyUnique(OperationCont
     pipeline.push_back(BSON("$match" << BSONObj()));
     pipeline.push_back(BSON("$limit" << numMostCommonValues));
     AggregateCommandRequest aggRequest(nss, pipeline);
-    aggRequest.setReadConcern(extractReadConcern(opCtx));
+    setReadWriteConcern(opCtx, aggRequest, true /* setRC */, false /* setWC */);
 
     runAggregate(opCtx, aggRequest, [&](const BSONObj& doc) {
         auto value = bson::extractElementsBasedOnTemplate(doc.getOwned(), shardKey);
@@ -875,7 +876,7 @@ CollStatsMetrics calculateCollStats(OperationContext* opCtx, const NamespaceStri
                                << BSON("$sum" << "$storageStats.count") << kNumOrphanDocsFieldName
                                << BSON("$sum" << "$storageStats.numOrphanDocs"))));
     AggregateCommandRequest aggRequest(nss, pipeline);
-    aggRequest.setReadConcern(extractReadConcern(opCtx));
+    setReadWriteConcern(opCtx, aggRequest, true /* setRC */, false /* setWC */);
 
     auto isShardedCollection = [&] {
         if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
@@ -1212,7 +1213,7 @@ std::pair<ReadDistributionMetrics, WriteDistributionMetrics> calculateReadWriteD
     pipeline.push_back(
         BSON(DocumentSourceAnalyzeShardKeyReadWriteDistribution::kStageName << spec.toBSON()));
     AggregateCommandRequest aggRequest(nss, pipeline);
-    aggRequest.setReadConcern(extractReadConcern(opCtx));
+    setReadWriteConcern(opCtx, aggRequest, true /* setRC */, false /* setWC */);
 
     runAggregate(opCtx, aggRequest, [&](const BSONObj& doc) {
         const auto response = DocumentSourceAnalyzeShardKeyReadWriteDistributionResponse::parse(

@@ -23,6 +23,8 @@
  * - skipMultiversion: If this is set to true then the test will be skipped for multiversion suites
  *   only. This is useful if the command was behind a feature flag in previous versions and is now
  *   enabled.
+ * - skipWCProvenanceCheck: [OPTIONAL] If true, skips asserting on writeConcern.provenance.
+ * - skipWCWtimeoutCheck: [OPTIONAL] If true, skips asserting on writeConcern.wtimeout.
  *
  * @tags: [
  *   does_not_support_stepdowns,
@@ -77,6 +79,12 @@ let validateTestCase = function (test) {
     }
     if ("useLogs" in test) {
         assert(typeof test.useLogs === "boolean");
+    }
+    if ("skipWCProvenanceCheck" in test) {
+        assert(typeof test.skipWCProvenanceCheck === "boolean");
+    }
+    if ("skipWCWtimeoutCheck" in test) {
+        assert(typeof test.skipWCWtimeoutCheck === "boolean");
     }
 };
 
@@ -1020,6 +1028,14 @@ let setDefaultRWConcernActualTestCase = {
     checkWriteConcern: true,
     shardedTargetsConfigServer: true,
     useLogs: true,
+    // setDefaultRWConcern forwards to the config server via appendMajorityWriteConcern on the
+    // original client cmdObj (TODO SERVER-91373), not via applyReadWriteConcern. When the client
+    // provides a WC field (partial or empty), appendMajorityWriteConcern builds the forwarded WC
+    // from the parsed client WC without inheriting provenance or wtimeout from the opCtx. The
+    // config server independently determines "clientSupplied" and wtimeout comes from the raw
+    // client WC (0 for empty, 9999999 for partial). We can only reliably verify w == "majority".
+    skipWCProvenanceCheck: true,
+    skipWCWtimeoutCheck: true,
 };
 
 // Example log line (broken over several lines), indicating the sections matched by the regex
@@ -1031,16 +1047,76 @@ let setDefaultRWConcernActualTestCase = {
 //                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 //      writeConcern:{ w: "majority", wtimeout: 1234567 } storage:{} protocol:op_msg 275ms
 //     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-function createLogLineRegularExpressionForTestCase(test, targetId, explicitRWC) {
-    let expectedProvenance = explicitRWC ? "clientSupplied" : "customDefault";
-    let pattern = `"comment":"${targetId}"`;
+// Finds the slow-query log entry whose command has the given comment, parses it as JSON, and
+// asserts that the RC/WC fields satisfy the expected values. Preferred over regex matching because
+// it operates on the parsed object rather than the serialized string, which makes field access
+// straightforward and avoids fragility around field ordering and BSON value serialization.
+function checkLogEntryRWC(
+    checkConn,
+    targetId,
+    test,
+    explicitRWC,
+    {expectAfterClusterTime = false, expectedWtimeout = 1234567} = {},
+    testDesc,
+) {
+    // Some commands (e.g. bulkWrite, createRole) propagate the comment to inner write sub-ops,
+    // which are also logged with the same comment but without a top-level writeConcern/readConcern
+    // in the log attr. Require those fields to be present so we skip inner-op entries and land on
+    // the outer command log entry.
+    const logs = checkLog.getGlobalLog(checkConn);
+    const logLine =
+        logs?.find((l) => {
+            if (!l.includes(targetId)) return false;
+            if (test.checkWriteConcern && !l.includes('"writeConcern"')) return false;
+            if (test.checkReadConcern && !l.includes('"readConcern"')) return false;
+            return true;
+        }) ?? null;
+    assert(
+        logLine !== null,
+        "No log entry found containing comment " + targetId + " for " + testDesc,
+    );
+
+    const entry = JSON.parse(logLine);
+    const attr = entry.attr;
+    const expectedProvenance = explicitRWC ? "clientSupplied" : "customDefault";
+
     if (test.checkReadConcern) {
-        pattern += `.*"readConcern":{"level":"majority","provenance":"${expectedProvenance}"}`;
+        assert.eq(attr.readConcern?.level, "majority", "RC level mismatch for " + testDesc, {
+            entry,
+        });
+        assert.eq(
+            attr.readConcern?.provenance,
+            expectedProvenance,
+            "RC provenance mismatch for " + testDesc,
+            {entry},
+        );
+        if (expectAfterClusterTime) {
+            assert(
+                attr.readConcern?.afterClusterTime !== undefined,
+                "afterClusterTime missing from RC for " + testDesc,
+                {entry},
+            );
+        }
     }
     if (test.checkWriteConcern) {
-        pattern += `.*"writeConcern":{"w":"majority","wtimeout":1234567,"provenance":"${expectedProvenance}"}`;
+        assert.eq(attr.writeConcern?.w, "majority", "WC w mismatch for " + testDesc, {entry});
+        if (!test.skipWCWtimeoutCheck) {
+            assert.eq(
+                attr.writeConcern?.wtimeout,
+                expectedWtimeout,
+                "WC wtimeout mismatch for " + testDesc,
+                {entry},
+            );
+        }
+        if (!test.skipWCProvenanceCheck) {
+            assert.eq(
+                attr.writeConcern?.provenance,
+                expectedProvenance,
+                "WC provenance mismatch for " + testDesc,
+                {entry},
+            );
+        }
     }
-    return new RegExp(pattern);
 }
 
 // Example profile document, indicating the fields matched by the filter generated by this function:
@@ -1072,7 +1148,12 @@ function createLogLineRegularExpressionForTestCase(test, targetId, explicitRWC) 
 //     "planSummary" : "COLLSCAN",
 //      ...
 // }
-function createProfileFilterForTestCase(test, targetId, explicitRWC) {
+function createProfileFilterForTestCase(
+    test,
+    targetId,
+    explicitRWC,
+    {expectAfterClusterTime = false, expectedWtimeout = 1234567} = {},
+) {
     let expectedProvenance = explicitRWC ? "clientSupplied" : "customDefault";
     let commandProfile = {
         "command.comment": targetId,
@@ -1084,12 +1165,15 @@ function createProfileFilterForTestCase(test, targetId, explicitRWC) {
             {"readConcern.level": "majority", "readConcern.provenance": expectedProvenance},
             commandProfile,
         );
+        if (expectAfterClusterTime) {
+            commandProfile["readConcern.afterClusterTime"] = {$exists: true};
+        }
     }
     if (test.checkWriteConcern) {
         commandProfile = Object.extend(
             {
                 "writeConcern.w": "majority",
-                "writeConcern.wtimeout": 1234567,
+                "writeConcern.wtimeout": expectedWtimeout,
                 "writeConcern.provenance": expectedProvenance,
             },
             commandProfile,
@@ -1103,7 +1187,14 @@ function runScenario(
     conn,
     regularCheckConn,
     configSvrCheckConn,
-    {explicitRWC, explicitProvenance = false},
+    {
+        explicitRWC,
+        explicitProvenance = false,
+        partialRC = false, // inject {readConcern:{afterClusterTime:T}}, expect level from CWRC
+        partialWC = false, // inject {writeConcern:{wtimeout:9999999}}, expect w from CWWC
+        emptyRC = false, // inject {readConcern:{}}, expect full RC from CWRC
+        emptyWC = false, // inject {writeConcern:{}}, expect full WC from CWWC
+    },
 ) {
     let runCommandTest = function (cmdName, test) {
         // The emptycapped command was removed but breaks this test in multiversion. The same
@@ -1205,6 +1296,29 @@ function runScenario(
                 }
                 actualCmd = Object.extend(actualCmd, {writeConcern: explicitWC});
             }
+        } else {
+            // Partial and empty RC/WC scenarios: inject a concern that is missing some fields so
+            // the router must fill them in from the cluster-wide defaults.
+            if (partialRC && test.checkReadConcern) {
+                // No level — the router must merge the level from CWRC.
+                const clusterTime =
+                    conn.getDB("admin").runCommand({hello: 1}).$clusterTime?.clusterTime ??
+                    Timestamp(1, 0);
+                actualCmd = Object.extend(actualCmd, {
+                    readConcern: {afterClusterTime: clusterTime},
+                });
+            }
+            if (partialWC && test.checkWriteConcern) {
+                // No 'w' — the router must merge 'w' from CWWC. Use a wtimeout that differs from
+                // the default (1234567) so a match in the profiler is unambiguous.
+                actualCmd = Object.extend(actualCmd, {writeConcern: {wtimeout: 9999999}});
+            }
+            if (emptyRC && test.checkReadConcern) {
+                actualCmd = Object.extend(actualCmd, {readConcern: {}});
+            }
+            if (emptyWC && test.checkWriteConcern) {
+                actualCmd = Object.extend(actualCmd, {writeConcern: {}});
+            }
         }
         if (!sharded) {
             actualCmd = Object.extend(actualCmd, {comment: targetId});
@@ -1222,21 +1336,16 @@ function runScenario(
 
         if (res.ok) {
             // Check that the command applied the correct RWC.
+            const filterOpts = {
+                expectAfterClusterTime: partialRC && test.checkReadConcern,
+                expectedWtimeout: partialWC && test.checkWriteConcern ? 9999999 : 1234567,
+            };
             if (test.useLogs) {
-                let re = createLogLineRegularExpressionForTestCase(test, targetId, explicitRWC);
-                assert(
-                    checkLog.checkContainsOnce(checkConn, re),
-                    "unable to find pattern " +
-                        re +
-                        " in logs on " +
-                        checkConn +
-                        " for test " +
-                        thisTestDesc,
-                );
+                checkLogEntryRWC(checkConn, targetId, test, explicitRWC, filterOpts, thisTestDesc);
             } else {
                 profilerHasSingleMatchingEntryOrThrow({
                     profileDB: checkConn.getDB(db),
-                    filter: createProfileFilterForTestCase(test, targetId, explicitRWC),
+                    filter: createProfileFilterForTestCase(test, targetId, explicitRWC, filterOpts),
                 });
             }
         }
@@ -1334,6 +1443,67 @@ function runTests(conn, regularCheckConn, configSvrCheckConn) {
         regularCheckConn,
         configSvrCheckConn,
         {explicitRWC: true, explicitProvenance: true},
+    );
+
+    // Partial RC: client sends {readConcern:{afterClusterTime:T}} with no level; the router must
+    // merge the level from CWRC so the shard receives {level:"majority", afterClusterTime:T}.
+    assert.commandWorked(
+        conn.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultReadConcern: {level: "majority"},
+            defaultWriteConcern: {w: "majority", wtimeout: 1234567},
+        }),
+    );
+    runScenario(
+        "Scenario: CWRC set, partial client RC (afterClusterTime only, no level)",
+        conn,
+        regularCheckConn,
+        configSvrCheckConn,
+        {explicitRWC: false, partialRC: true},
+    );
+
+    // Empty RC: client sends {readConcern:{}}; the router should treat this like absent RC and
+    // apply CWRC, so the shard receives {level:"majority"}.
+    runScenario(
+        "Scenario: CWRC set, empty client RC ({})",
+        conn,
+        regularCheckConn,
+        configSvrCheckConn,
+        {explicitRWC: false, emptyRC: true},
+    );
+
+    // Partial WC: client sends {writeConcern:{wtimeout:9999999}} with no 'w'; the router must
+    // merge 'w' from CWWC so the shard receives {w:"majority", wtimeout:9999999}. CWWC has no
+    // wtimeout so the client's value is unambiguously the one that arrives at the shard.
+    assert.commandWorked(
+        conn.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultReadConcern: {level: "majority"},
+            defaultWriteConcern: {w: "majority"},
+        }),
+    );
+    runScenario(
+        "Scenario: CWWC set, partial client WC (wtimeout only, no w)",
+        conn,
+        regularCheckConn,
+        configSvrCheckConn,
+        {explicitRWC: false, partialWC: true},
+    );
+
+    // Empty WC: client sends {writeConcern:{}}; the router should apply the full CWWC.
+    assert.commandWorked(
+        conn.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultReadConcern: {level: "majority"},
+            defaultWriteConcern: {w: "majority", wtimeout: 1234567},
+        }),
+    );
+    runScenario(
+        "Scenario: CWWC set, empty client WC ({})",
+        conn,
+        regularCheckConn,
+        configSvrCheckConn,
+        {explicitRWC: false, emptyWC: true},
     );
 }
 

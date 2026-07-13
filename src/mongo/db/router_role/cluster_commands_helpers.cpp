@@ -452,8 +452,8 @@ void appendShardVersion(BSONObjBuilder& cmd, ShardVersion version) {
 }
 
 BSONObj applyReadWriteConcern(OperationContext* opCtx,
-                              bool appendRC,
-                              bool appendWC,
+                              bool setRC,
+                              bool setWC,
                               const BSONObj& cmdObj) {
     if (TransactionRouter::get(opCtx)) {
         // When running in a transaction, the rules are:
@@ -466,7 +466,7 @@ BSONObj applyReadWriteConcern(OperationContext* opCtx,
             return cmdObj;
         }
 
-        if (!appendRC) {
+        if (!setRC) {
             // First operation in transaction, but the caller has not requested readConcern be
             // applied, so there's nothing to do.
             return cmdObj;
@@ -474,43 +474,30 @@ BSONObj applyReadWriteConcern(OperationContext* opCtx,
 
         // First operation in transaction, so ensure that writeConcern is not applied, then continue
         // and apply the readConcern.
-        appendWC = false;
+        setWC = false;
     }
 
-    // Append all original fields to the new command.
+    // Append all original fields to the new command, dropping any existing read/write concern that
+    // will be overwritten below.
     BSONObjBuilder output;
-    bool seenReadConcern = false;
-    bool seenWriteConcern = false;
-    const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     for (const auto& elem : cmdObj) {
         const auto name = elem.fieldNameStringData();
-        if (appendRC && name == repl::ReadConcernArgs::kReadConcernFieldName) {
-            seenReadConcern = true;
+        if (setRC && name == repl::ReadConcernArgs::kReadConcernFieldName) {
+            continue;
         }
-        if (appendWC && name == WriteConcernOptions::kWriteConcernField) {
-            seenWriteConcern = true;
+        if (setWC && name == WriteConcernOptions::kWriteConcernField) {
+            continue;
         }
-        if (!output.hasField(name)) {
-            // Forward opCtx's RC to the shard when mongos selected atClusterTime, or when the
-            // wire RC carries no level (the dispatcher merged any CWRC default into opCtx in
-            // that case; the partial wire RC would otherwise reach the shard without the merge).
-            // TODO(SERVER-127620): unconditionally source RC from opCtx once every caller routes
-            // RC there.
-            if (name == repl::ReadConcernArgs::kReadConcernFieldName &&
-                (readConcernArgs.wasAtClusterTimeSelected() ||
-                 !elem.Obj().hasField(repl::ReadConcernArgs::kLevelFieldName))) {
-                output.appendElements(readConcernArgs.toBSON());
-            } else {
-                output.append(elem);
-            }
-        }
+
+        output.append(elem);
     }
 
-    // Finally, add the new read/write concern.
-    if (appendRC && !seenReadConcern) {
-        output.appendElements(readConcernArgs.toBSON());
+    // Unconditionally set the read/write concern from opCtx, overwriting whatever the caller
+    // provided.
+    if (setRC) {
+        output.appendElements(repl::ReadConcernArgs::get(opCtx).toBSON());
     }
-    if (appendWC && !seenWriteConcern) {
+    if (setWC) {
         output.append(WriteConcernOptions::kWriteConcernField, opCtx->getWriteConcern().toBSON());
     }
 

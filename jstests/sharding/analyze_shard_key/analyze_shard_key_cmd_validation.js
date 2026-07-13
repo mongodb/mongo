@@ -170,7 +170,7 @@ function testValidationOnShardedTimeseriesCollections(cmdConn, validationTest, p
     // TODO SERVER-111315: for viewless timeseries we should get CollectionUUIDMismatch
     const expectedError = areViewlessTimeseriesEnabled(cmdConn)
         ? 7826501
-        : ErrorCodes.CommandNotSupportedOnView;
+        : [ErrorCodes.CommandNotSupportedOnView, ErrorCodes.IllegalOperation];
     // Start the analyzeShardKey command in parallel.
     const awaitResult = startParallelShell(
         funWithArgs(

@@ -131,6 +131,9 @@ filters:
   - "incompatible_shard_key_indexes.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "secondary_shard_versioning.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
   - "all_commands_direct_shard_connection_auth.js":
     approvers:
       - 10gen/server-catalog-and-routing

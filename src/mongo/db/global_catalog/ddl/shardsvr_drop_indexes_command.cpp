@@ -194,8 +194,6 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
     static constexpr std::string_view lockReason{"dropIndexes"sv};
     const DDLLockManager::ScopedCollectionDDLLock collDDLLock{opCtx, ns(), lockReason, MODE_X};
 
-    setReadWriteConcern(opCtx, dropIdxCmd, this);
-
     auto resolvedNs = ns();
     auto dropIdxBSON = dropIdxCmd.toBSON();
 

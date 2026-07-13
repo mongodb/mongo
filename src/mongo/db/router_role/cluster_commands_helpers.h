@@ -225,8 +225,10 @@ BSONObj appendShardVersion(BSONObj cmdObj, ShardVersion version);
 void appendShardVersion(BSONObjBuilder& cmd, ShardVersion version);
 
 /**
- * Returns a copy of 'cmdObj' with the read/writeConcern from the OpCtx appended, unless the
- * cmdObj explicitly specifies read/writeConcern.
+ * Returns a copy of 'cmdObj' with the readConcern/writeConcern from the OpCtx set, overwriting
+ * whatever readConcern/writeConcern 'cmdObj' already specifies. 'setRC'/'setWC' each
+ * independently control whether the corresponding concern is applied this way; when false, that
+ * concern is left in 'cmdObj' exactly as the caller passed it in (neither stripped nor replaced).
  *
  * TODO SERVER-91373: Callers of applyReadWriteConcern that come from a basic command should use
  * setReadWriteConcern after they are converted to a typed command.
@@ -235,8 +237,8 @@ void appendShardVersion(BSONObjBuilder& cmd, ShardVersion version);
  * replaced with setReadWriteConcern.
  */
 BSONObj applyReadWriteConcern(OperationContext* opCtx,
-                              bool appendRC,
-                              bool appendWC,
+                              bool setRC,
+                              bool setWC,
                               const BSONObj& cmdObj);
 
 /**
@@ -252,7 +254,10 @@ BSONObj applyReadWriteConcern(OperationContext* opCtx,
                               const BSONObj& cmdObj);
 
 /**
- * Sets the read/write concern from the opCtx onto the idl command struct given setRc and setWc.
+ * Sets the readConcern/writeConcern from the opCtx onto 'cmd', overwriting whatever
+ * readConcern/writeConcern 'cmd' already has set. 'setRC'/'setWC' each independently control
+ * whether the corresponding concern is applied this way; when false, that concern is left on
+ * 'cmd' exactly as it already was (neither cleared nor replaced).
  */
 template <typename CommandType>
 void setReadWriteConcern(OperationContext* opCtx, CommandType& cmd, bool setRC, bool setWC) {
@@ -266,14 +271,9 @@ void setReadWriteConcern(OperationContext* opCtx, CommandType& cmd, bool setRC, 
     }
 
     const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    // Forward opCtx's RC when mongos selected atClusterTime, or when the cmd's RC carries no
-    // level — the dispatcher merged any CWRC default into opCtx, so a partial wire RC (e.g.
-    // {afterClusterTime: T}) would otherwise reach the shard without the merge.
-    // TODO(SERVER-127620): unconditionally source RC from opCtx once every caller routes RC there.
-    if (readConcernArgs.wasAtClusterTimeSelected() ||
-        (setRC && (!cmd.getReadConcern() || !cmd.getReadConcern()->hasLevel())))
+    if (setRC)
         cmd.setReadConcern(readConcernArgs);
-    if (setWC && !cmd.getWriteConcern())
+    if (setWC)
         cmd.setWriteConcern(opCtx->getWriteConcern());
 }
 
