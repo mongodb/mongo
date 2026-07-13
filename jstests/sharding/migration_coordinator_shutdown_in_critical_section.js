@@ -23,7 +23,6 @@ import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 function getNewNs(dbName) {
     if (typeof getNewNs.counter == "undefined") {
@@ -37,13 +36,15 @@ function getNewNs(dbName) {
 const dbName = "test";
 const st = new ShardingTest({shards: 2});
 
-// TODO (SERVER-129909): adapt this test to work with MoveRangeCoordinator.
-skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
-
 const donorShard = st.shard0;
 const recipientShard = st.shard1;
 assert.commandWorked(
     st.s.adminCommand({enableSharding: dbName, primaryShard: donorShard.shardName}),
+);
+
+const usesAuthoritativePath = FeatureFlagUtil.isPresentAndEnabled(
+    st.s.getDB("admin"),
+    "AuthoritativeShardsDDL",
 );
 
 function testShutDownAfterFailPoint(failPointName) {
@@ -62,18 +63,15 @@ function testShutDownAfterFailPoint(failPointName) {
 
     // Simulate a network error on sending commit to the config server, so that the donor tries to
     // recover the commit decision.
-    configureFailPoint(donorShard.rs.getPrimary(), "migrationCommitNetworkError");
-
-    const isAuthoritativeDDLEnabled = FeatureFlagUtil.isPresentAndEnabled(
-        st.s.getDB("admin"),
-        "AuthoritativeShardsDDL",
-    );
+    if (!usesAuthoritativePath) {
+        configureFailPoint(donorShard.rs.getPrimary(), "migrationCommitNetworkError");
+    }
 
     // Set the requested failpoint and launch the moveChunk asynchronously.
     let failPoint = configureFailPoint(donorShard.rs.getPrimary(), failPointName);
     const awaitResult = startParallelShell(
         funWithArgs(
-            function (ns, toShardName, isAuthoritativeDDLEnabled) {
+            function (ns, toShardName, usesAuthoritativePath) {
                 // When authoritative shards DDL is enabled, processManualMigrationOutcome
                 // faithfully returns the error from _shardsvrMoveRange rather than
                 // reconstructing the commit decision by reading the routing table. Reading
@@ -81,7 +79,7 @@ function testShutDownAfterFailPoint(failPointName) {
                 // the config server may be in a partial-commit state. Depending on how far
                 // recovery has progressed when the donor is shut down, moveChunk may succeed
                 // or fail, so we do not assert on its outcome.
-                if (isAuthoritativeDDLEnabled) {
+                if (usesAuthoritativePath) {
                     db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName});
                 } else {
                     assert.commandWorked(
@@ -91,7 +89,7 @@ function testShutDownAfterFailPoint(failPointName) {
             },
             ns,
             recipientShard.shardName,
-            isAuthoritativeDDLEnabled,
+            usesAuthoritativePath,
         ),
         st.s.port,
     );
@@ -116,11 +114,17 @@ function testShutDownAfterFailPoint(failPointName) {
     awaitResult();
 }
 
-testShutDownAfterFailPoint("hangInEnsureChunkVersionIsGreaterThanInterruptible");
-testShutDownAfterFailPoint("hangInRefreshFilteringMetadataUntilSuccessInterruptible");
-testShutDownAfterFailPoint("hangInPersistMigrateCommitDecisionInterruptible");
-testShutDownAfterFailPoint("hangInDeleteRangeDeletionOnRecipientInterruptible");
-testShutDownAfterFailPoint("hangInReadyRangeDeletionLocallyInterruptible");
-testShutDownAfterFailPoint("hangInAdvanceTxnNumInterruptible");
+if (usesAuthoritativePath) {
+    testShutDownAfterFailPoint("hangInMoveRangeCoordinatorGlobalCatalogCommit");
+    testShutDownAfterFailPoint("hangInMoveRangeCoordinatorShardCatalogCommit");
+} else {
+    // TODO(SERVER-127253): Remove legacy branch.
+    testShutDownAfterFailPoint("hangInEnsureChunkVersionIsGreaterThanInterruptible");
+    testShutDownAfterFailPoint("hangInRefreshFilteringMetadataUntilSuccessInterruptible");
+    testShutDownAfterFailPoint("hangInPersistMigrateCommitDecisionInterruptible");
+    testShutDownAfterFailPoint("hangInDeleteRangeDeletionOnRecipientInterruptible");
+    testShutDownAfterFailPoint("hangInReadyRangeDeletionLocallyInterruptible");
+    testShutDownAfterFailPoint("hangInAdvanceTxnNumInterruptible");
+}
 
 st.stop();

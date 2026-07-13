@@ -71,6 +71,15 @@ runMoveChunkMakeDonorStepDownAfterFailpoint(
     expectedMigrationCommitFailureCodes,
 );
 
+if (usesMoveRangeCoordinatorPath) {
+    runMoveChunkMakeDonorStepDownAfterFailpoint(
+        st,
+        dbName,
+        "hangInMoveRangeCoordinatorShardCatalogCommit",
+        false /* shouldMakeMigrationFailToCommitOnConfig */,
+    );
+}
+
 if (!usesMoveRangeCoordinatorPath) {
     // This scenario forces the migration commit to fail after the donor has refreshed its filtering
     // metadata. The authoritative MoveRangeCoordinator rejects a disallowed commit at the earlier global

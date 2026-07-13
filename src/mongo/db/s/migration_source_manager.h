@@ -332,6 +332,11 @@ private:
     // move chunk sequence
     Timer _cloneAndCommitTimer;
 
+    // Times the commit phase on the MoveRangeCoordinator path (when the critical section is
+    // promoted to block reads) through finishCommit(), used for
+    // totalCriticalSectionCommitTimeMillis
+    Timer _commitPhaseTimer;
+
     // The current state. Used only for diagnostics and validation.
     State _state{kCreated};
 

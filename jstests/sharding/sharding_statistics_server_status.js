@@ -47,10 +47,7 @@ function incrementStatsAndCheckServerShardStats(db, donor, recipient, numDocs) {
             : statsFromServerStatus[i].countDocsDeletedByRangeDeleter;
         assert(statsFromServerStatus[i]);
         assert(statsFromServerStatus[i].countStaleConfigErrors);
-        // TODO(SERVER-129909): Re-enable once the authoritative MoveRangeCoordinator path records
-        // totalCriticalSectionCommitTimeMillis.
-        //
-        // assert(statsFromServerStatus[i].totalCriticalSectionCommitTimeMillis);
+        assert(statsFromServerStatus[i].totalCriticalSectionCommitTimeMillis);
         assert(statsFromServerStatus[i].totalCriticalSectionTimeMillis);
         assert(statsFromServerStatus[i].totalDonorChunkCloneTimeMillis);
         assert(statsFromServerStatus[i].countDonorMoveChunkLockTimeout);

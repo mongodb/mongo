@@ -926,6 +926,8 @@ void MigrationSourceManager::promoteCriticalSectionToBlockReads() {
         _critSecReason,
         defaultMajorityWriteConcernDoNotUse(),
         Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
+
+    _commitPhaseTimer.reset();
 }
 
 void MigrationSourceManager::markCommitInProgress() {
@@ -1013,6 +1015,8 @@ void MigrationSourceManager::finishCommit() {
     // _cleanupOnError(). _errMsg, set by the failing migration step, is still populated here.
     if (!reachedConfigCommit) {
         _logMoveChunkErrorToChangelog();
+    } else {
+        _stats.totalCriticalSectionCommitTimeMillis.addAndFetch(_commitPhaseTimer.millis());
     }
 
     // Complete the migration coordinator (releases the recipient critical section, schedules range
