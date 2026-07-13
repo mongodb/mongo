@@ -2,6 +2,7 @@
  * Contains common test utilities for e2e search tests involving mongot.
  */
 import {stringifyArray} from "jstests/aggregation/extras/utils.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     createSearchIndex,
     dropSearchIndex,
@@ -364,6 +365,28 @@ export function waitUntilDocIsVisibleByQuery({docId, coll, queryPipeline}) {
     assert.soon(
         () => coll.aggregate(queryPipeline.concat([{$match: {_id: docId}}])).itcount() === 1,
     );
+}
+
+/**
+ * $vectorSearch inside a $lookup/$graphLookup subpipeline is only supported when
+ * featureFlagExtensionsInsideHybridSearch is enabled. If the flag is off, this asserts that
+ * running the pipeline is rejected with error 51047. If the flag is on, it invokes 'onAllowed' so
+ * the caller can assert success.
+ *
+ * TODO SERVER-121094 Remove this once featureFlagExtensionsInsideHybridSearch is removed.
+ *
+ * @param {DB} db - used to check the feature flag value.
+ * @param {Function} runPipeline - runs the aggregate command and returns its raw result, e.g.
+ *     `() => coll.runCommand("aggregate", {pipeline, cursor: {}})`.
+ * @param {Function} onAllowed - invoked with no arguments to assert success when the flag is
+ *     enabled.
+ */
+export function assertIfVectorSearchNotAllowedInLookup(db, runPipeline, onAllowed) {
+    if (!FeatureFlagUtil.isPresentAndEnabled(db, "ExtensionsInsideHybridSearch")) {
+        assert.commandFailedWithCode(runPipeline(), 51047);
+        return;
+    }
+    onAllowed();
 }
 
 export const datasets = {

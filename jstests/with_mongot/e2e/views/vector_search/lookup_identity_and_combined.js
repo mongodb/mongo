@@ -20,6 +20,7 @@ import {
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {
     assertDocArrExpectedFuzzy,
+    assertIfVectorSearchNotAllowedInLookup,
     datasets,
     stripScores,
 } from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
@@ -157,47 +158,54 @@ describe("$vectorSearch in $lookup: identity view, nested $lookup, and dual-view
                 },
             );
 
-            const results = localColl
-                .aggregate([
-                    {
-                        $lookup: {
-                            from: kIdentityViewName,
-                            pipeline: subPipeline,
-                            as: "movies",
-                        },
+            const pipeline = [
+                {
+                    $lookup: {
+                        from: kIdentityViewName,
+                        pipeline: subPipeline,
+                        as: "movies",
                     },
-                    {$sort: {_id: 1}},
-                ])
-                .toArray();
+                },
+                {$sort: {_id: 1}},
+            ];
+            assertIfVectorSearchNotAllowedInLookup(
+                viewDb,
+                () => localColl.runCommand("aggregate", {pipeline, cursor: {}}),
+                () => {
+                    const results = localColl.aggregate(pipeline).toArray();
 
-            assert.eq(results.length, 2, "expected one result per local document", {results});
+                    assert.eq(results.length, 2, "expected one result per local document", {
+                        results,
+                    });
 
-            for (const resultDoc of results) {
-                assert.eq(
-                    resultDoc.movies.length,
-                    kLimit,
-                    "expected kLimit movies in identity-view lookup result",
-                    {
-                        resultDoc,
-                    },
-                );
+                    for (const resultDoc of results) {
+                        assert.eq(
+                            resultDoc.movies.length,
+                            kLimit,
+                            "expected kLimit movies in identity-view lookup result",
+                            {
+                                resultDoc,
+                            },
+                        );
 
-                // Scores sorted descending.
-                for (let i = 1; i < resultDoc.movies.length; i++) {
-                    assert.lte(
-                        resultDoc.movies[i].score,
-                        resultDoc.movies[i - 1].score,
-                        "scores not sorted descending in identity-view lookup",
-                        {resultDoc},
-                    );
-                }
+                        // Scores sorted descending.
+                        for (let i = 1; i < resultDoc.movies.length; i++) {
+                            assert.lte(
+                                resultDoc.movies[i].score,
+                                resultDoc.movies[i - 1].score,
+                                "scores not sorted descending in identity-view lookup",
+                                {resultDoc},
+                            );
+                        }
 
-                // Results must match ground truth.
-                assertDocArrExpectedFuzzy(
-                    stripScores(expectedFromView),
-                    stripScores(resultDoc.movies),
-                );
-            }
+                        // Results must match ground truth.
+                        assertDocArrExpectedFuzzy(
+                            stripScores(expectedFromView),
+                            stripScores(resultDoc.movies),
+                        );
+                    }
+                },
+            );
         });
     });
 
@@ -238,38 +246,48 @@ describe("$vectorSearch in $lookup: identity view, nested $lookup, and dual-view
                 {$sort: {_id: 1}},
             ];
 
-            const results = outerColl.aggregate(pipeline).toArray();
-            assert.eq(results.length, 2, "expected one result per outer document", {results});
+            assertIfVectorSearchNotAllowedInLookup(
+                viewDb,
+                () => outerColl.runCommand("aggregate", {pipeline, cursor: {}}),
+                () => {
+                    const results = outerColl.aggregate(pipeline).toArray();
+                    assert.eq(results.length, 2, "expected one result per outer document", {
+                        results,
+                    });
 
-            for (const outerDoc of results) {
-                // Each outer doc joined all local docs.
-                assert.gt(outerDoc.local_docs.length, 0, "outer doc has no local_docs", {outerDoc});
+                    for (const outerDoc of results) {
+                        // Each outer doc joined all local docs.
+                        assert.gt(outerDoc.local_docs.length, 0, "outer doc has no local_docs", {
+                            outerDoc,
+                        });
 
-                for (const localDoc of outerDoc.local_docs) {
-                    // Every local doc must carry the inner movies.
-                    assert.eq(
-                        localDoc.inner_movies.length,
-                        expectedInner.length,
-                        "inner nested lookup returned unexpected count",
-                        {localDoc},
-                    );
+                        for (const localDoc of outerDoc.local_docs) {
+                            // Every local doc must carry the inner movies.
+                            assert.eq(
+                                localDoc.inner_movies.length,
+                                expectedInner.length,
+                                "inner nested lookup returned unexpected count",
+                                {localDoc},
+                            );
 
-                    // Each inner movie must have the view-added enriched_title.
-                    for (const movie of localDoc.inner_movies) {
-                        assert(
-                            movie.hasOwnProperty("enriched_title"),
-                            "inner nested movie missing enriched_title from view transform",
-                            {movie},
-                        );
+                            // Each inner movie must have the view-added enriched_title.
+                            for (const movie of localDoc.inner_movies) {
+                                assert(
+                                    movie.hasOwnProperty("enriched_title"),
+                                    "inner nested movie missing enriched_title from view transform",
+                                    {movie},
+                                );
+                            }
+
+                            // Inner movies must match ground truth.
+                            assertDocArrExpectedFuzzy(
+                                stripScores(expectedInner),
+                                stripScores(localDoc.inner_movies),
+                            );
+                        }
                     }
-
-                    // Inner movies must match ground truth.
-                    assertDocArrExpectedFuzzy(
-                        stripScores(expectedInner),
-                        stripScores(localDoc.inner_movies),
-                    );
-                }
-            }
+                },
+            );
         });
     });
 
@@ -293,79 +311,86 @@ describe("$vectorSearch in $lookup: identity view, nested $lookup, and dual-view
             assert.gt(actionExpected.length, 0, "action view ground truth empty");
 
             // Run the dual-lookup pipeline.
-            const results = localColl
-                .aggregate([
-                    {
-                        $lookup: {
-                            from: enrichedView.getName(),
-                            pipeline: enrichedSubPipeline,
-                            as: "enriched_movies",
-                        },
+            const pipeline = [
+                {
+                    $lookup: {
+                        from: enrichedView.getName(),
+                        pipeline: enrichedSubPipeline,
+                        as: "enriched_movies",
                     },
-                    {
-                        $lookup: {
-                            from: actionView.getName(),
-                            pipeline: actionSubPipeline,
-                            as: "action_movies",
-                        },
+                },
+                {
+                    $lookup: {
+                        from: actionView.getName(),
+                        pipeline: actionSubPipeline,
+                        as: "action_movies",
                     },
-                    {$sort: {_id: 1}},
-                ])
-                .toArray();
+                },
+                {$sort: {_id: 1}},
+            ];
+            assertIfVectorSearchNotAllowedInLookup(
+                viewDb,
+                () => localColl.runCommand("aggregate", {pipeline, cursor: {}}),
+                () => {
+                    const results = localColl.aggregate(pipeline).toArray();
 
-            assert.eq(results.length, 2, "expected one result per local document", {results});
+                    assert.eq(results.length, 2, "expected one result per local document", {
+                        results,
+                    });
 
-            for (const resultDoc of results) {
-                // Enriched view results must match ground truth.
-                assert.eq(
-                    resultDoc.enriched_movies.length,
-                    enrichedExpected.length,
-                    "enriched_movies count mismatch",
-                    {
-                        resultDoc,
-                    },
-                );
-                for (const movie of resultDoc.enriched_movies) {
-                    assert(
-                        movie.hasOwnProperty("enriched_title"),
-                        "enriched_movies doc missing enriched_title",
-                        {
-                            movie,
-                        },
-                    );
-                }
-                assertDocArrExpectedFuzzy(
-                    stripScores(enrichedExpected),
-                    stripScores(resultDoc.enriched_movies),
-                );
+                    for (const resultDoc of results) {
+                        // Enriched view results must match ground truth.
+                        assert.eq(
+                            resultDoc.enriched_movies.length,
+                            enrichedExpected.length,
+                            "enriched_movies count mismatch",
+                            {
+                                resultDoc,
+                            },
+                        );
+                        for (const movie of resultDoc.enriched_movies) {
+                            assert(
+                                movie.hasOwnProperty("enriched_title"),
+                                "enriched_movies doc missing enriched_title",
+                                {
+                                    movie,
+                                },
+                            );
+                        }
+                        assertDocArrExpectedFuzzy(
+                            stripScores(enrichedExpected),
+                            stripScores(resultDoc.enriched_movies),
+                        );
 
-                // Action view results must match ground truth.
-                assert.eq(
-                    resultDoc.action_movies.length,
-                    actionExpected.length,
-                    "action_movies count mismatch",
-                    {
-                        resultDoc,
-                    },
-                );
-                assertDocArrExpectedFuzzy(
-                    stripScores(actionExpected),
-                    stripScores(resultDoc.action_movies),
-                );
+                        // Action view results must match ground truth.
+                        assert.eq(
+                            resultDoc.action_movies.length,
+                            actionExpected.length,
+                            "action_movies count mismatch",
+                            {
+                                resultDoc,
+                            },
+                        );
+                        assertDocArrExpectedFuzzy(
+                            stripScores(actionExpected),
+                            stripScores(resultDoc.action_movies),
+                        );
 
-                // The two result sets are DIFFERENT views; they may overlap (both are
-                // subsets of the movies corpus) but the enriched results include
-                // non-action movies while action results exclude them.  We assert that
-                // action_movies does NOT include movie _id=4 (King Kong, Adventure).
-                const actionIds = resultDoc.action_movies.map((d) => d._id);
-                assert(
-                    !actionIds.includes(4),
-                    "action_movies in dual-lookup includes non-action movie _id=4",
-                    {
-                        resultDoc,
-                    },
-                );
-            }
+                        // The two result sets are DIFFERENT views; they may overlap (both are
+                        // subsets of the movies corpus) but the enriched results include
+                        // non-action movies while action results exclude them.  We assert that
+                        // action_movies does NOT include movie _id=4 (King Kong, Adventure).
+                        const actionIds = resultDoc.action_movies.map((d) => d._id);
+                        assert(
+                            !actionIds.includes(4),
+                            "action_movies in dual-lookup includes non-action movie _id=4",
+                            {
+                                resultDoc,
+                            },
+                        );
+                    }
+                },
+            );
         });
     });
 });

@@ -17,6 +17,7 @@ import {
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {
     assertDocArrExpectedFuzzy,
+    assertIfVectorSearchNotAllowedInLookup,
     datasets,
     stripScores,
 } from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
@@ -139,56 +140,66 @@ describe("$vectorSearch in $lookup subpipeline: nested view and $match-transform
             }
 
             // Run via $lookup.
-            const results = localColl
-                .aggregate([
-                    {
-                        $lookup: {
-                            from: nestedView.getName(),
-                            pipeline: subPipeline,
-                            as: "movies",
-                        },
+            const pipeline = [
+                {
+                    $lookup: {
+                        from: nestedView.getName(),
+                        pipeline: subPipeline,
+                        as: "movies",
                     },
-                    {$sort: {_id: 1}},
-                ])
-                .toArray();
+                },
+                {$sort: {_id: 1}},
+            ];
+            assertIfVectorSearchNotAllowedInLookup(
+                viewDb,
+                () => localColl.runCommand("aggregate", {pipeline, cursor: {}}),
+                () => {
+                    const results = localColl.aggregate(pipeline).toArray();
 
-            assert.eq(results.length, 2, "expected one result per local document", {results});
+                    assert.eq(results.length, 2, "expected one result per local document", {
+                        results,
+                    });
 
-            for (const resultDoc of results) {
-                assert.eq(
-                    resultDoc.movies.length,
-                    expected.length,
-                    "lookup result movie count differs from ground truth",
-                    {resultDoc},
-                );
+                    for (const resultDoc of results) {
+                        assert.eq(
+                            resultDoc.movies.length,
+                            expected.length,
+                            "lookup result movie count differs from ground truth",
+                            {resultDoc},
+                        );
 
-                // Scores must be sorted descending.
-                for (let i = 1; i < resultDoc.movies.length; i++) {
-                    assert.lte(
-                        resultDoc.movies[i].score,
-                        resultDoc.movies[i - 1].score,
-                        "scores not sorted descending in nested-view lookup result",
-                        {resultDoc},
-                    );
-                }
+                        // Scores must be sorted descending.
+                        for (let i = 1; i < resultDoc.movies.length; i++) {
+                            assert.lte(
+                                resultDoc.movies[i].score,
+                                resultDoc.movies[i - 1].score,
+                                "scores not sorted descending in nested-view lookup result",
+                                {resultDoc},
+                            );
+                        }
 
-                // Each joined doc must carry the view-added enriched_title.
-                for (const movieDoc of resultDoc.movies) {
-                    assert(
-                        movieDoc.hasOwnProperty("enriched_title"),
-                        "joined doc from nested-view lookup missing enriched_title",
-                        {movieDoc},
-                    );
-                    assert(
-                        movieDoc.enriched_title.endsWith("(Action)"),
-                        "nested-view joined doc is not an Action movie",
-                        {movieDoc},
-                    );
-                }
+                        // Each joined doc must carry the view-added enriched_title.
+                        for (const movieDoc of resultDoc.movies) {
+                            assert(
+                                movieDoc.hasOwnProperty("enriched_title"),
+                                "joined doc from nested-view lookup missing enriched_title",
+                                {movieDoc},
+                            );
+                            assert(
+                                movieDoc.enriched_title.endsWith("(Action)"),
+                                "nested-view joined doc is not an Action movie",
+                                {movieDoc},
+                            );
+                        }
 
-                // Results must match ground truth (ignoring scores).
-                assertDocArrExpectedFuzzy(stripScores(expected), stripScores(resultDoc.movies));
-            }
+                        // Results must match ground truth (ignoring scores).
+                        assertDocArrExpectedFuzzy(
+                            stripScores(expected),
+                            stripScores(resultDoc.movies),
+                        );
+                    }
+                },
+            );
         });
     });
 
@@ -221,42 +232,52 @@ describe("$vectorSearch in $lookup subpipeline: nested view and $match-transform
             );
 
             // Run via $lookup.
-            const results = localColl
-                .aggregate([
-                    {
-                        $lookup: {
-                            from: matchView.getName(),
-                            pipeline: subPipeline,
-                            as: "movies",
-                        },
+            const pipeline = [
+                {
+                    $lookup: {
+                        from: matchView.getName(),
+                        pipeline: subPipeline,
+                        as: "movies",
                     },
-                    {$sort: {_id: 1}},
-                ])
-                .toArray();
+                },
+                {$sort: {_id: 1}},
+            ];
+            assertIfVectorSearchNotAllowedInLookup(
+                viewDb,
+                () => localColl.runCommand("aggregate", {pipeline, cursor: {}}),
+                () => {
+                    const results = localColl.aggregate(pipeline).toArray();
 
-            assert.eq(results.length, 2, "expected one result per local document", {results});
+                    assert.eq(results.length, 2, "expected one result per local document", {
+                        results,
+                    });
 
-            for (const resultDoc of results) {
-                // The $match view filters, so there may be fewer than kLimit results.
-                assert.eq(
-                    resultDoc.movies.length,
-                    expected.length,
-                    "lookup result count differs from ground truth",
-                    {
-                        resultDoc,
-                    },
-                );
+                    for (const resultDoc of results) {
+                        // The $match view filters, so there may be fewer than kLimit results.
+                        assert.eq(
+                            resultDoc.movies.length,
+                            expected.length,
+                            "lookup result count differs from ground truth",
+                            {
+                                resultDoc,
+                            },
+                        );
 
-                // Non-action movie _id=4 must NOT appear in lookup results either.
-                const resultIds = resultDoc.movies.map((d) => d._id);
-                assert(
-                    !resultIds.includes(4),
-                    "$lookup result from $match view incorrectly includes non-action movie _id=4",
-                    {resultDoc},
-                );
+                        // Non-action movie _id=4 must NOT appear in lookup results either.
+                        const resultIds = resultDoc.movies.map((d) => d._id);
+                        assert(
+                            !resultIds.includes(4),
+                            "$lookup result from $match view incorrectly includes non-action movie _id=4",
+                            {resultDoc},
+                        );
 
-                assertDocArrExpectedFuzzy(stripScores(expected), stripScores(resultDoc.movies));
-            }
+                        assertDocArrExpectedFuzzy(
+                            stripScores(expected),
+                            stripScores(resultDoc.movies),
+                        );
+                    }
+                },
+            );
         });
     });
 
@@ -269,51 +290,58 @@ describe("$vectorSearch in $lookup subpipeline: nested view and $match-transform
                 },
             );
 
-            const results = localColl
-                .aggregate([
-                    {
-                        $lookup: {
-                            from: nestedView.getName(),
-                            let: {wanted: "$targetEnrichedTitle"},
-                            pipeline: subPipeline.concat([
-                                {$match: {$expr: {$eq: ["$enriched_title", "$$wanted"]}}},
-                            ]),
-                            as: "movies",
-                        },
+            const pipeline = [
+                {
+                    $lookup: {
+                        from: nestedView.getName(),
+                        let: {wanted: "$targetEnrichedTitle"},
+                        pipeline: subPipeline.concat([
+                            {$match: {$expr: {$eq: ["$enriched_title", "$$wanted"]}}},
+                        ]),
+                        as: "movies",
                     },
-                    {$sort: {_id: 1}},
-                ])
-                .toArray();
+                },
+                {$sort: {_id: 1}},
+            ];
+            assertIfVectorSearchNotAllowedInLookup(
+                viewDb,
+                () => localColl.runCommand("aggregate", {pipeline, cursor: {}}),
+                () => {
+                    const results = localColl.aggregate(pipeline).toArray();
 
-            assert.eq(results.length, 2, "expected one result per local document", {results});
+                    assert.eq(results.length, 2, "expected one result per local document", {
+                        results,
+                    });
 
-            const tarzanDoc = results.find((d) => d._id === 300);
-            const kingKongDoc = results.find((d) => d._id === 301);
+                    const tarzanDoc = results.find((d) => d._id === 300);
+                    const kingKongDoc = results.find((d) => d._id === 301);
 
-            assert(tarzanDoc, "result for _id=300 (Tarzan) missing", {results});
-            assert(kingKongDoc, "result for _id=301 (King Kong) missing", {results});
+                    assert(tarzanDoc, "result for _id=300 (Tarzan) missing", {results});
+                    assert(kingKongDoc, "result for _id=301 (King Kong) missing", {results});
 
-            // Tarzan IS an action movie — should match in the nested view.
-            assert.eq(
-                tarzanDoc.movies.length,
-                1,
-                "expected exactly one matched movie for Tarzan in nested-view correlated lookup",
-                {tarzanDoc},
-            );
-            assert.eq(
-                tarzanDoc.movies[0].enriched_title,
-                tarzanDoc.targetEnrichedTitle,
-                "correlated $match returned wrong movie for Tarzan",
-                {tarzanDoc},
-            );
+                    // Tarzan IS an action movie — should match in the nested view.
+                    assert.eq(
+                        tarzanDoc.movies.length,
+                        1,
+                        "expected exactly one matched movie for Tarzan in nested-view correlated lookup",
+                        {tarzanDoc},
+                    );
+                    assert.eq(
+                        tarzanDoc.movies[0].enriched_title,
+                        tarzanDoc.targetEnrichedTitle,
+                        "correlated $match returned wrong movie for Tarzan",
+                        {tarzanDoc},
+                    );
 
-            // King Kong is NOT an action movie — the nested view filters it out, so the
-            // correlated $match must return zero results.
-            assert.eq(
-                kingKongDoc.movies.length,
-                0,
-                "expected zero results for non-action movie in nested-view correlated lookup",
-                {kingKongDoc},
+                    // King Kong is NOT an action movie — the nested view filters it out, so the
+                    // correlated $match must return zero results.
+                    assert.eq(
+                        kingKongDoc.movies.length,
+                        0,
+                        "expected zero results for non-action movie in nested-view correlated lookup",
+                        {kingKongDoc},
+                    );
+                },
             );
         });
     });

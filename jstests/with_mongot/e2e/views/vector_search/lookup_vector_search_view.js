@@ -20,6 +20,7 @@ import {
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {
     assertDocArrExpectedFuzzy,
+    assertIfVectorSearchNotAllowedInLookup,
     datasets,
     stripScores,
 } from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
@@ -121,51 +122,64 @@ describe("$vectorSearch in $lookup subpipeline where the foreign collection is a
         }
 
         // Run $lookup with $vectorSearch subpipeline targeting the view.
-        const results = localColl
-            .aggregate([
-                {
-                    $lookup: {
-                        from: moviesViewName,
-                        pipeline: getViewVectorSearchSubPipeline(),
-                        as: "movies",
-                    },
+        const pipeline = [
+            {
+                $lookup: {
+                    from: moviesViewName,
+                    pipeline: getViewVectorSearchSubPipeline(),
+                    as: "movies",
                 },
-                {$sort: {_id: 1}},
-            ])
-            .toArray();
+            },
+            {$sort: {_id: 1}},
+        ];
+        assertIfVectorSearchNotAllowedInLookup(
+            viewDb,
+            () => localColl.runCommand("aggregate", {pipeline, cursor: {}}),
+            () => {
+                const results = localColl.aggregate(pipeline).toArray();
 
-        assert.eq(results.length, 2, "expected one result per local document", {results});
+                assert.eq(results.length, 2, "expected one result per local document", {results});
 
-        for (const resultDoc of results) {
-            assert.eq(resultDoc.movies.length, limit, "expected 'limit' movies in the 'as' array", {
-                resultDoc,
-            });
+                for (const resultDoc of results) {
+                    assert.eq(
+                        resultDoc.movies.length,
+                        limit,
+                        "expected 'limit' movies in the 'as' array",
+                        {
+                            resultDoc,
+                        },
+                    );
 
-            // Scores must be sorted descending.
-            for (let i = 1; i < resultDoc.movies.length; i++) {
-                assert.lte(
-                    resultDoc.movies[i].score,
-                    resultDoc.movies[i - 1].score,
-                    "scores not sorted descending",
-                    {
-                        resultDoc,
-                    },
-                );
-            }
+                    // Scores must be sorted descending.
+                    for (let i = 1; i < resultDoc.movies.length; i++) {
+                        assert.lte(
+                            resultDoc.movies[i].score,
+                            resultDoc.movies[i - 1].score,
+                            "scores not sorted descending",
+                            {
+                                resultDoc,
+                            },
+                        );
+                    }
 
-            // Each joined document must carry the view-transform field,
-            // proving that idLookup applied the view pipeline.
-            for (const movieDoc of resultDoc.movies) {
-                assert(
-                    movieDoc.hasOwnProperty("enriched_title"),
-                    "joined doc missing enriched_title — view transforms were NOT applied",
-                    {movieDoc},
-                );
-            }
+                    // Each joined document must carry the view-transform field,
+                    // proving that idLookup applied the view pipeline.
+                    for (const movieDoc of resultDoc.movies) {
+                        assert(
+                            movieDoc.hasOwnProperty("enriched_title"),
+                            "joined doc missing enriched_title — view transforms were NOT applied",
+                            {movieDoc},
+                        );
+                    }
 
-            // Results (by '_id' + 'title') must match ground truth.
-            assertDocArrExpectedFuzzy(stripScores(expectedMovies), stripScores(resultDoc.movies));
-        }
+                    // Results (by '_id' + 'title') must match ground truth.
+                    assertDocArrExpectedFuzzy(
+                        stripScores(expectedMovies),
+                        stripScores(resultDoc.movies),
+                    );
+                }
+            },
+        );
     });
 
     it("supports a correlated let + $match after $vectorSearch on the view", function () {
@@ -173,44 +187,49 @@ describe("$vectorSearch in $lookup subpipeline where the foreign collection is a
         // variable, against the view-added 'enriched_title' field of the
         // $vectorSearch results. This proves both correlated execution and that
         // the view transform's output is visible to the correlated $match.
-        const results = localColl
-            .aggregate([
-                {
-                    $lookup: {
-                        from: moviesViewName,
-                        let: {wanted: "$targetEnrichedTitle"},
-                        pipeline: getViewVectorSearchSubPipeline().concat([
-                            {$match: {$expr: {$eq: ["$enriched_title", "$$wanted"]}}},
-                        ]),
-                        as: "movies",
-                    },
+        const pipeline = [
+            {
+                $lookup: {
+                    from: moviesViewName,
+                    let: {wanted: "$targetEnrichedTitle"},
+                    pipeline: getViewVectorSearchSubPipeline().concat([
+                        {$match: {$expr: {$eq: ["$enriched_title", "$$wanted"]}}},
+                    ]),
+                    as: "movies",
                 },
-                {$sort: {_id: 1}},
-            ])
-            .toArray();
+            },
+            {$sort: {_id: 1}},
+        ];
+        assertIfVectorSearchNotAllowedInLookup(
+            viewDb,
+            () => localColl.runCommand("aggregate", {pipeline, cursor: {}}),
+            () => {
+                const results = localColl.aggregate(pipeline).toArray();
 
-        assert.eq(results.length, 2, "expected one result per local document", {results});
+                assert.eq(results.length, 2, "expected one result per local document", {results});
 
-        for (const resultDoc of results) {
-            assert.eq(
-                resultDoc.movies.length,
-                1,
-                "expected exactly one movie matching the let-bound enriched title",
-                {
-                    resultDoc,
-                },
-            );
+                for (const resultDoc of results) {
+                    assert.eq(
+                        resultDoc.movies.length,
+                        1,
+                        "expected exactly one movie matching the let-bound enriched title",
+                        {
+                            resultDoc,
+                        },
+                    );
 
-            const joinedMovie = resultDoc.movies[0];
+                    const joinedMovie = resultDoc.movies[0];
 
-            // The joined movie's view-added field must equal the let-bound value
-            // from this specific local doc.
-            assert.eq(
-                joinedMovie.enriched_title,
-                resultDoc.targetEnrichedTitle,
-                "correlated $match returned the wrong movie",
-                {resultDoc},
-            );
-        }
+                    // The joined movie's view-added field must equal the let-bound value
+                    // from this specific local doc.
+                    assert.eq(
+                        joinedMovie.enriched_title,
+                        resultDoc.targetEnrichedTitle,
+                        "correlated $match returned the wrong movie",
+                        {resultDoc},
+                    );
+                }
+            },
+        );
     });
 });

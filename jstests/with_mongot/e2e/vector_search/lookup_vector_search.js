@@ -13,6 +13,7 @@ import {
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {
     assertDocArrExpectedFuzzy,
+    assertIfVectorSearchNotAllowedInLookup,
     stripScores,
 } from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
@@ -85,82 +86,105 @@ describe("$vectorSearch in $lookup subpipeline", function () {
     });
 
     it("returns identical, score-sorted $vectorSearch results for every input document", function () {
-        // Ground truth: the same $vectorSearch run as a top-level aggregate on the movies
-        // collection.
-        const expectedMovies = moviesColl.aggregate(getVectorSearchSubPipeline()).toArray();
-        assert.eq(
-            expectedMovies.length,
-            limit,
-            "ground truth $vectorSearch returned unexpected count",
-            {
-                expectedMovies,
-            },
-        );
-
-        const results = localColl.aggregate(makeLookupPipeline()).toArray();
-        assert.eq(results.length, 2, "expected one result per local document", {results});
-
-        for (const resultDoc of results) {
-            assert.eq(resultDoc.movies.length, limit, "expected 'limit' movies in the 'as' array", {
-                resultDoc,
-            });
-            // Scores must be sorted descending.
-            for (let i = 1; i < resultDoc.movies.length; i++) {
-                assert.lte(
-                    resultDoc.movies[i].score,
-                    resultDoc.movies[i - 1].score,
-                    "scores not sorted descending",
+        assertIfVectorSearchNotAllowedInLookup(
+            db,
+            () =>
+                localColl.runCommand("aggregate", {
+                    pipeline: makeLookupPipeline(),
+                    cursor: {},
+                }),
+            () => {
+                // Ground truth: the same $vectorSearch run as a top-level aggregate on the movies
+                // collection.
+                const expectedMovies = moviesColl.aggregate(getVectorSearchSubPipeline()).toArray();
+                assert.eq(
+                    expectedMovies.length,
+                    limit,
+                    "ground truth $vectorSearch returned unexpected count",
                     {
-                        resultDoc,
+                        expectedMovies,
                     },
                 );
-            }
-            // The uncorrelated subpipeline must produce the same results (by '_id' + 'title')
-            // as the top-level $vectorSearch for every input document.
-            assertDocArrExpectedFuzzy(stripScores(expectedMovies), stripScores(resultDoc.movies));
-        }
+
+                const results = localColl.aggregate(makeLookupPipeline()).toArray();
+                assert.eq(results.length, 2, "expected one result per local document", {results});
+
+                for (const resultDoc of results) {
+                    assert.eq(
+                        resultDoc.movies.length,
+                        limit,
+                        "expected 'limit' movies in the 'as' array",
+                        {
+                            resultDoc,
+                        },
+                    );
+                    // Scores must be sorted descending.
+                    for (let i = 1; i < resultDoc.movies.length; i++) {
+                        assert.lte(
+                            resultDoc.movies[i].score,
+                            resultDoc.movies[i - 1].score,
+                            "scores not sorted descending",
+                            {
+                                resultDoc,
+                            },
+                        );
+                    }
+                    // The uncorrelated subpipeline must produce the same results (by '_id' +
+                    // 'title') as the top-level $vectorSearch for every input document.
+                    assertDocArrExpectedFuzzy(
+                        stripScores(expectedMovies),
+                        stripScores(resultDoc.movies),
+                    );
+                }
+            },
+        );
     });
 
     it("supports a correlated $match with let variables after $vectorSearch", function () {
-        // This relies on both target titles appearing in the top-'limit' vector results for
-        // Tarzan's embedding: 'Tarzan the Ape Man' (id 6) is rank-1 by construction (the query
-        // vector is its own embedding), while 'King Kong' (id 4) is empirically within the top
-        // 10 of this small ape/jungle-heavy movie corpus.
-        const results = localColl
-            .aggregate([
-                {
-                    $lookup: {
-                        from: moviesCollName,
-                        let: {wantedTitle: "$targetTitle"},
-                        pipeline: getVectorSearchSubPipeline().concat([
-                            {$match: {$expr: {$eq: ["$title", "$$wantedTitle"]}}},
-                        ]),
-                        as: "movies",
-                    },
+        const pipeline = [
+            {
+                $lookup: {
+                    from: moviesCollName,
+                    let: {wantedTitle: "$targetTitle"},
+                    pipeline: getVectorSearchSubPipeline().concat([
+                        {$match: {$expr: {$eq: ["$title", "$$wantedTitle"]}}},
+                    ]),
+                    as: "movies",
                 },
-                {$sort: {_id: 1}},
-            ])
-            .toArray();
+            },
+            {$sort: {_id: 1}},
+        ];
+        assertIfVectorSearchNotAllowedInLookup(
+            db,
+            () => localColl.runCommand("aggregate", {pipeline, cursor: {}}),
+            () => {
+                // This relies on both target titles appearing in the top-'limit' vector results
+                // for Tarzan's embedding: 'Tarzan the Ape Man' (id 6) is rank-1 by construction
+                // (the query vector is its own embedding), while 'King Kong' (id 4) is empirically
+                // within the top 10 of this small ape/jungle-heavy movie corpus.
+                const results = localColl.aggregate(pipeline).toArray();
 
-        assert.eq(results.length, 2, "expected one result per local document", {results});
-        for (const resultDoc of results) {
-            assert.eq(
-                resultDoc.movies.length,
-                1,
-                "expected exactly one movie matching the let variable",
-                {
-                    resultDoc,
-                },
-            );
-            assert.eq(
-                resultDoc.movies[0].title,
-                resultDoc.targetTitle,
-                "correlated $match returned wrong movie",
-                {
-                    resultDoc,
-                },
-            );
-        }
+                assert.eq(results.length, 2, "expected one result per local document", {results});
+                for (const resultDoc of results) {
+                    assert.eq(
+                        resultDoc.movies.length,
+                        1,
+                        "expected exactly one movie matching the let variable",
+                        {
+                            resultDoc,
+                        },
+                    );
+                    assert.eq(
+                        resultDoc.movies[0].title,
+                        resultDoc.targetTitle,
+                        "correlated $match returned wrong movie",
+                        {
+                            resultDoc,
+                        },
+                    );
+                }
+            },
+        );
     });
 
     it("rejects $vectorSearch in a $lookup subpipeline against a timeseries collection", function () {
@@ -169,44 +193,42 @@ describe("$vectorSearch in $lookup subpipeline", function () {
         assert.commandWorked(
             db.createCollection(tsCollName, {timeseries: {timeField: "t", metaField: "m"}}),
         );
+        const pipeline = [
+            {
+                $lookup: {
+                    from: tsCollName,
+                    pipeline: getVectorSearchSubPipeline(),
+                    as: "movies",
+                },
+            },
+        ];
+        const runPipeline = () => db.runCommand({aggregate: localCollName, pipeline, cursor: {}});
         try {
-            assert.commandFailedWithCode(
-                db.runCommand({
-                    aggregate: localCollName,
-                    pipeline: [
-                        {
-                            $lookup: {
-                                from: tsCollName,
-                                pipeline: getVectorSearchSubPipeline(),
-                                as: "movies",
-                            },
-                        },
-                    ],
-                    cursor: {},
-                }),
-                [12093200, 10557302],
-            );
+            assertIfVectorSearchNotAllowedInLookup(db, runPipeline, () => {
+                // With the flag on, $vectorSearch in $lookup is legal, so this instead fails for
+                // an unrelated reason: $lookup against a timeseries collection.
+                assert.commandFailedWithCode(runPipeline(), [12093200, 10557302]);
+            });
         } finally {
             db.getCollection(tsCollName).drop();
         }
     });
 
     it("rejects $vectorSearch that is not the first stage of the subpipeline with error 40602", function () {
-        assert.commandFailedWithCode(
-            db.runCommand({
-                aggregate: localCollName,
-                pipeline: [
-                    {
-                        $lookup: {
-                            from: moviesCollName,
-                            pipeline: [{$limit: 1}].concat(getVectorSearchSubPipeline()),
-                            as: "movies",
-                        },
-                    },
-                ],
-                cursor: {},
-            }),
-            40602,
-        );
+        const pipeline = [
+            {
+                $lookup: {
+                    from: moviesCollName,
+                    pipeline: [{$limit: 1}].concat(getVectorSearchSubPipeline()),
+                    as: "movies",
+                },
+            },
+        ];
+        const runPipeline = () => db.runCommand({aggregate: localCollName, pipeline, cursor: {}});
+        assertIfVectorSearchNotAllowedInLookup(db, runPipeline, () => {
+            // With the flag on, $vectorSearch in $lookup is legal, so this instead fails for an
+            // unrelated reason: $vectorSearch is not the first stage of the subpipeline.
+            assert.commandFailedWithCode(runPipeline(), 40602);
+        });
     });
 });

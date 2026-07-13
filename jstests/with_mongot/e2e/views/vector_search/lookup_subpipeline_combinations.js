@@ -19,6 +19,7 @@ import {
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {
     assertDocArrExpectedFuzzy,
+    assertIfVectorSearchNotAllowedInLookup,
     datasets,
     stripScores,
 } from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
@@ -143,46 +144,57 @@ describe("$vectorSearch in $lookup subpipeline: $unionWith combinations, returnS
                 },
             ];
 
-            const results = localColl
-                .aggregate([
-                    {
-                        $lookup: {
-                            from: enrichedView.getName(),
-                            pipeline: subPipeline,
-                            as: "combined",
-                        },
+            const pipeline = [
+                {
+                    $lookup: {
+                        from: enrichedView.getName(),
+                        pipeline: subPipeline,
+                        as: "combined",
                     },
-                    {$sort: {_id: 1}},
-                ])
-                .toArray();
+                },
+                {$sort: {_id: 1}},
+            ];
+            assertIfVectorSearchNotAllowedInLookup(
+                viewDb,
+                () => localColl.runCommand("aggregate", {pipeline, cursor: {}}),
+                () => {
+                    const results = localColl.aggregate(pipeline).toArray();
 
-            assert.eq(results.length, 2, "expected one result per local doc", {results});
+                    assert.eq(results.length, 2, "expected one result per local doc", {results});
 
-            const expectedTotal = enrichedExpected.length + actionExpected.length;
+                    const expectedTotal = enrichedExpected.length + actionExpected.length;
 
-            for (const resultDoc of results) {
-                assert.eq(
-                    resultDoc.combined.length,
-                    expectedTotal,
-                    "combined lookup+unionWith result count mismatch",
-                    {
-                        resultDoc,
-                    },
-                );
+                    for (const resultDoc of results) {
+                        assert.eq(
+                            resultDoc.combined.length,
+                            expectedTotal,
+                            "combined lookup+unionWith result count mismatch",
+                            {
+                                resultDoc,
+                            },
+                        );
 
-                // NOTE: the sibling whole-array pattern (unionWith.js) cannot be used here
-                // because assertDocArrExpectedFuzzy forbids duplicate '_id's in the expected
-                // array, and the enriched and action result sets overlap (both contain
-                // movies 6, 9, 10 for this query vector).  Instead, exploit the
-                // deterministic $unionWith ordering: the subpipeline's own results come
-                // first, followed by the unioned results, so the slice boundary at
-                // enrichedExpected.length cleanly separates the two parts.
-                const enrichedPart = resultDoc.combined.slice(0, enrichedExpected.length);
-                const actionPart = resultDoc.combined.slice(enrichedExpected.length);
+                        // NOTE: the sibling whole-array pattern (unionWith.js) cannot be used here
+                        // because assertDocArrExpectedFuzzy forbids duplicate '_id's in the expected
+                        // array, and the enriched and action result sets overlap (both contain
+                        // movies 6, 9, 10 for this query vector).  Instead, exploit the
+                        // deterministic $unionWith ordering: the subpipeline's own results come
+                        // first, followed by the unioned results, so the slice boundary at
+                        // enrichedExpected.length cleanly separates the two parts.
+                        const enrichedPart = resultDoc.combined.slice(0, enrichedExpected.length);
+                        const actionPart = resultDoc.combined.slice(enrichedExpected.length);
 
-                assertDocArrExpectedFuzzy(stripScores(enrichedExpected), stripScores(enrichedPart));
-                assertDocArrExpectedFuzzy(stripScores(actionExpected), stripScores(actionPart));
-            }
+                        assertDocArrExpectedFuzzy(
+                            stripScores(enrichedExpected),
+                            stripScores(enrichedPart),
+                        );
+                        assertDocArrExpectedFuzzy(
+                            stripScores(actionExpected),
+                            stripScores(actionPart),
+                        );
+                    }
+                },
+            );
         });
     });
 
@@ -220,30 +232,45 @@ describe("$vectorSearch in $lookup subpipeline: $unionWith combinations, returnS
                 },
             ];
 
-            const results = localColl.aggregate(pipeline).toArray();
+            assertIfVectorSearchNotAllowedInLookup(
+                viewDb,
+                () => localColl.runCommand("aggregate", {pipeline, cursor: {}}),
+                () => {
+                    const results = localColl.aggregate(pipeline).toArray();
 
-            // 2 docs from outer $project + 2 docs from $unionWith (each with movies).
-            assert.eq(results.length, 4, "expected 4 docs (2 outer + 2 unionWith)", {results});
+                    // 2 docs from outer $project + 2 docs from $unionWith (each with movies).
+                    assert.eq(results.length, 4, "expected 4 docs (2 outer + 2 unionWith)", {
+                        results,
+                    });
 
-            // The first 2 docs (from outer $project) have no movies array.
-            const outerDocs = results.slice(0, 2);
-            for (const d of outerDocs) {
-                assert(!d.hasOwnProperty("movies"), "outer doc should not have movies", {d});
-            }
+                    // The first 2 docs (from outer $project) have no movies array.
+                    const outerDocs = results.slice(0, 2);
+                    for (const d of outerDocs) {
+                        assert(!d.hasOwnProperty("movies"), "outer doc should not have movies", {
+                            d,
+                        });
+                    }
 
-            // The last 2 docs (from $unionWith) each have a movies array.
-            const unionWithDocs = results.slice(2);
-            for (const d of unionWithDocs) {
-                assert(d.hasOwnProperty("movies"), "$unionWith doc missing movies array", {d});
-                assert.eq(
-                    d.movies.length,
-                    innerExpected.length,
-                    "movies array in $unionWith doc has wrong count",
-                    {d},
-                );
+                    // The last 2 docs (from $unionWith) each have a movies array.
+                    const unionWithDocs = results.slice(2);
+                    for (const d of unionWithDocs) {
+                        assert(d.hasOwnProperty("movies"), "$unionWith doc missing movies array", {
+                            d,
+                        });
+                        assert.eq(
+                            d.movies.length,
+                            innerExpected.length,
+                            "movies array in $unionWith doc has wrong count",
+                            {d},
+                        );
 
-                assertDocArrExpectedFuzzy(stripScores(innerExpected), stripScores(d.movies));
-            }
+                        assertDocArrExpectedFuzzy(
+                            stripScores(innerExpected),
+                            stripScores(d.movies),
+                        );
+                    }
+                },
+            );
         });
     });
 
@@ -265,45 +292,54 @@ describe("$vectorSearch in $lookup subpipeline: $unionWith combinations, returnS
                 "expected top-level returnStoredSource to fail when storedSource not configured",
             );
 
-            // $lookup must fail the same way.
-            const lookupErr = assert.throws(
-                () => {
-                    localColl
-                        .aggregate([
-                            {
-                                $lookup: {
-                                    from: enrichedView.getName(),
-                                    pipeline: subPipeline,
-                                    as: "movies",
-                                },
-                            },
-                        ])
-                        .toArray();
+            const pipeline = [
+                {
+                    $lookup: {
+                        from: enrichedView.getName(),
+                        pipeline: subPipeline,
+                        as: "movies",
+                    },
                 },
-                [],
-                "expected $lookup with returnStoredSource to fail when storedSource not configured",
-            );
+            ];
+            // With the flag off, $vectorSearch in $lookup is rejected with 51047 before ever
+            // reaching mongot to discover the storedSource misconfiguration, so the "same error
+            // code as top-level" comparison below only holds with the flag on.
+            assertIfVectorSearchNotAllowedInLookup(
+                viewDb,
+                () => localColl.runCommand("aggregate", {pipeline, cursor: {}}),
+                () => {
+                    // $lookup must fail the same way.
+                    const lookupErr = assert.throws(
+                        () => {
+                            localColl.aggregate(pipeline).toArray();
+                        },
+                        [],
+                        "expected $lookup with returnStoredSource to fail when storedSource not configured",
+                    );
 
-            // Both runs must surface the SAME error code.
-            assert.eq(
-                topLevelErr.code,
-                lookupErr.code,
-                "top-level and $lookup returnStoredSource failures should have the same error code",
-                {topLevelErr, lookupErr},
-            );
+                    // Both runs must surface the SAME error code.
+                    assert.eq(
+                        topLevelErr.code,
+                        lookupErr.code,
+                        "top-level and $lookup returnStoredSource failures should have the same error code",
+                        {topLevelErr, lookupErr},
+                    );
 
-            // Both errors must reference "storedSource is not configured".
-            const topLevelMsg = topLevelErr.message || topLevelErr.errmsg || String(topLevelErr);
-            const lookupMsg = lookupErr.message || lookupErr.errmsg || String(lookupErr);
-            assert(
-                topLevelMsg.includes("storedSource is not configured"),
-                "top-level error should mention storedSource not configured",
-                {topLevelMsg},
-            );
-            assert(
-                lookupMsg.includes("storedSource is not configured"),
-                "$lookup error should mention storedSource not configured (consistent with top-level)",
-                {lookupMsg},
+                    // Both errors must reference "storedSource is not configured".
+                    const topLevelMsg =
+                        topLevelErr.message || topLevelErr.errmsg || String(topLevelErr);
+                    const lookupMsg = lookupErr.message || lookupErr.errmsg || String(lookupErr);
+                    assert(
+                        topLevelMsg.includes("storedSource is not configured"),
+                        "top-level error should mention storedSource not configured",
+                        {topLevelMsg},
+                    );
+                    assert(
+                        lookupMsg.includes("storedSource is not configured"),
+                        "$lookup error should mention storedSource not configured (consistent with top-level)",
+                        {lookupMsg},
+                    );
+                },
             );
         });
     });
@@ -327,40 +363,53 @@ describe("$vectorSearch in $lookup subpipeline: $unionWith combinations, returnS
             }
 
             // Run via $lookup.
-            const results = localColl
-                .aggregate([
-                    {
-                        $lookup: {
-                            from: enrichedView.getName(),
-                            pipeline: subPipeline,
-                            as: "movies",
-                        },
+            const pipeline = [
+                {
+                    $lookup: {
+                        from: enrichedView.getName(),
+                        pipeline: subPipeline,
+                        as: "movies",
                     },
-                    {$sort: {_id: 1}},
-                ])
-                .toArray();
+                },
+                {$sort: {_id: 1}},
+            ];
+            assertIfVectorSearchNotAllowedInLookup(
+                viewDb,
+                () => localColl.runCommand("aggregate", {pipeline, cursor: {}}),
+                () => {
+                    const results = localColl.aggregate(pipeline).toArray();
 
-            assert.eq(results.length, 2, "expected one result per local doc", {results});
+                    assert.eq(results.length, 2, "expected one result per local doc", {results});
 
-            for (const resultDoc of results) {
-                assert.eq(
-                    resultDoc.movies.length,
-                    expected.length,
-                    "filtered lookup result count mismatch",
-                    {
-                        resultDoc,
-                    },
-                );
+                    for (const resultDoc of results) {
+                        assert.eq(
+                            resultDoc.movies.length,
+                            expected.length,
+                            "filtered lookup result count mismatch",
+                            {
+                                resultDoc,
+                            },
+                        );
 
-                // All results must satisfy the filter.
-                for (const movie of resultDoc.movies) {
-                    assert.gte(movie._id, 6, "filtered lookup result violates _id >= 6 filter", {
-                        movie,
-                    });
-                }
+                        // All results must satisfy the filter.
+                        for (const movie of resultDoc.movies) {
+                            assert.gte(
+                                movie._id,
+                                6,
+                                "filtered lookup result violates _id >= 6 filter",
+                                {
+                                    movie,
+                                },
+                            );
+                        }
 
-                assertDocArrExpectedFuzzy(stripScores(expected), stripScores(resultDoc.movies));
-            }
+                        assertDocArrExpectedFuzzy(
+                            stripScores(expected),
+                            stripScores(resultDoc.movies),
+                        );
+                    }
+                },
+            );
         });
     });
 });
