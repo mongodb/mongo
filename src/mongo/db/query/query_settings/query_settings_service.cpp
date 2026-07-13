@@ -618,6 +618,31 @@ private:
     bool _dirty = false;
 };
 
+/**
+ * Checks 'settings' getQueryKnobs() for parse/validation errors accumulated while parsing an
+ * incoming per-request QuerySettings override. If 'uassertOnError' is true, throws the first
+ * error (fresh, directly client-supplied settings must be rejected outright). Otherwise, logs the
+ * errors and continues (the settings originated from a trusted, already-validated source, e.g. a
+ * router forwarding a previously-accepted value; a locally-invalid knob should be dropped rather
+ * than fail the query, exactly as fromBSON() already did when it recorded the error).
+ */
+void checkQueryKnobOverrideErrors(const QuerySettings& settings,
+                                  bool uassertOnError,
+                                  const query_shape::QueryShapeHash* queryShapeHash = nullptr) {
+    const auto& knobs = settings.getQueryKnobs();
+    if (!knobs || !knobs->hasErrors()) {
+        // No-error is the common case on the hot per-query path; return before building any log
+        // context.
+        return;
+    }
+    if (uassertOnError) {
+        knobs->uassertNoErrors();
+        return;
+    }
+    knobs->logErrors(queryShapeHash ? BSON("queryShapeHash" << queryShapeHash->toHexString())
+                                    : BSONObj());
+}
+
 }  // namespace
 
 void QuerySettingsService::initializeSettingsForQuery(
@@ -799,12 +824,25 @@ public:
         const boost::optional<QuerySettings>& querySettingsFromOriginalCommand) const override {
         auto* opCtx = expCtx->getOperationContext();
         if (isInternalOrDirectClient(opCtx->getClient())) {
-            // Mongos already looked up and merged - use the forwarded settings as-is. The
-            // shard's initial command deadline, however, was computed from the forwarded
-            // (pre-merge) 'maxTimeMS' field before query settings were considered, so
-            // 'maxTimeMS' must be (re-)applied here: otherwise a query settings override that
-            // loosens the deadline is silently lost, since the transport layer's
-            // 'maxTimeMS'/'maxTimeMSOpOnly' precedence always favors whichever is shorter.
+            // Mongos already looked up, validated, and merged this value, so use the forwarded
+            // settings as-is rather than repeating that work here. Two things still need to
+            // happen locally, though:
+            //   1. A knob that has since become locally invalid (e.g. removed, or its range
+            //      tightened) must be logged and dropped rather than fail the query, since the
+            //      router already vetted the request.
+            //      These forwarded settings are per-request and transient (they are never cached
+            //      in QuerySettingsManager), so the recorded errors do not need to be cleared
+            //      after logging.
+            if (querySettingsFromOriginalCommand.has_value()) {
+                checkQueryKnobOverrideErrors(*querySettingsFromOriginalCommand,
+                                             /* uassertOnError */ false,
+                                             &queryShapeHash);
+            }
+            //   2. The shard's initial command deadline was computed from the forwarded
+            //      (pre-merge) 'maxTimeMS' field before query settings were considered, so
+            //      'maxTimeMS' must be (re-)applied here: otherwise a query settings override
+            //      that loosens the deadline is silently lost, since the transport layer's
+            //      'maxTimeMS'/'maxTimeMSOpOnly' precedence always favors whichever is shorter.
             auto settings = querySettingsFromOriginalCommand.get_value_or(QuerySettings());
             applyMaxTimeMSFromSettings(expCtx, settings);
             return settings;
@@ -1135,6 +1173,9 @@ void QuerySettingsService::validateQueryKnobs(OperationContext* opCtx,
             feature_flags::gFeatureFlagPqsQueryKnobs.isEnabled(VersionContext::getDecoration(opCtx),
                                                                fcvSnapshot));
 
+    checkQueryKnobOverrideErrors(querySettings,
+                                 /* uassertOnError */ true);
+
     // Reject knobs that are not supported on the current FCV, including transitional versions:
     // during a downgrade the knobs being removed must not be re-settable behind the migration's
     // stripping pass. Skip the check if the FCV is not initialized (mongos, early startup).
@@ -1175,6 +1216,10 @@ void QuerySettingsService::validateQuerySettings(const QuerySettings& querySetti
     // duplicates are adjacent. Also tasserts that simplifyQuerySettings() was called first so that
     // no DeleteQueryKnobOverride sentinels survive into stored settings.
     if (const auto& knobs = querySettings.getQueryKnobs()) {
+        // A fresh setQuerySettings command must reject any knob that failed to parse/validate,
+        // rather than silently applying only the valid subset.
+        knobs->uassertNoErrors();
+
         auto entries = knobs->entries();
         for (size_t i = 0; i < entries.size(); ++i) {
             tassert(12366200,
@@ -1243,7 +1288,10 @@ void QuerySettingsService::simplifyQuerySettings(QuerySettings& settings) const 
     }
     if (auto knobs = settings.getQueryKnobs()) {
         knobs->simplify();
-        settings.setQueryKnobs(knobs->empty() ? boost::none : knobs);
+        // Preserve a knob override that carries recorded parse/validation errors even when it has
+        // no valid entries left, so validateQuerySettings()'s uassertNoErrors() check can still
+        // see and reject it with its original error code.
+        settings.setQueryKnobs((knobs->empty() && !knobs->hasErrors()) ? boost::none : knobs);
     }
 
     const auto& indexes = settings.getIndexHints();

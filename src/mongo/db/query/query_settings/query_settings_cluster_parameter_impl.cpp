@@ -9,6 +9,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/query_settings/query_knob_overrides.h"
 #include "mongo/db/query/query_settings/query_settings_cluster_parameter_gen.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/query_settings/query_settings_usage_tracker.h"
@@ -17,8 +18,25 @@
 
 #include <string_view>
 
-
 namespace mongo::query_settings {
+namespace {
+
+void logQueryKnobOverrideErrors(std::vector<QueryShapeConfiguration>& settingsArray) {
+    for (auto& config : settingsArray) {
+        auto& settings = config.getSettings();
+        if (auto knobs = settings.getQueryKnobs()) {
+            knobs->logErrors(BSON("queryShapeHash" << config.getQueryShapeHash().toHexString()));
+            // These errors have now been reported; don't let them linger in the value that gets
+            // cached in QuerySettingsManager, or a later per-query merge with a fresh, error-free
+            // override (see lookupQuerySettingsWithRejectionCheck) would spuriously reject the
+            // query over an already-handled, stale error.
+            knobs->clearErrors();
+            settings.setQueryKnobs(std::move(*knobs));
+        }
+    }
+}
+
+}  // namespace
 
 void QuerySettingsClusterParameter::append(OperationContext* opCtx,
                                            BSONObjBuilder* bob,
@@ -60,6 +78,12 @@ Status QuerySettingsClusterParameter::set(const BSONElement& newValueElement,
     }
 
     auto& settingsArray = newSettings.getSettingsArray();
+
+    // A knob override may have become invalid since it was accepted (e.g. removed, or its range
+    // tightened) by the time this already-accepted value is (re-)applied via oplog application or
+    // startup load. fromBSON() already dropped any such offending knob; just log it here rather
+    // than letting it take down the node.
+    logQueryKnobOverrideErrors(settingsArray);
 
     // TODO SERVER-97546 Remove PQS index hint sanitization.
     querySettingsService.sanitizeQuerySettingsHints(settingsArray);

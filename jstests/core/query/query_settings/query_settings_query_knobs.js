@@ -50,7 +50,7 @@ describe("setQuerySettings with queryKnobs", function () {
     });
 
     it("Should reject unknown knob names", function () {
-        assertQueryKnobsNotSettable({unknownKnob: 1}, 12194500);
+        assertQueryKnobsNotSettable({unknownKnob: 1}, 12194501);
     });
 
     it("Should reject knob values of the wrong type", function () {
@@ -74,7 +74,7 @@ describe("setQuerySettings with queryKnobs", function () {
     });
 
     it("Should reject knobs not marked with pqs_settable: true", function () {
-        assertQueryKnobsNotSettable({queryFrameworkControl: "trySbeEngine"}, 12194500);
+        assertQueryKnobsNotSettable({queryFrameworkControl: "trySbeEngine"}, 12194501);
     });
 
     it("Should accept bool values for noTableScan", function () {

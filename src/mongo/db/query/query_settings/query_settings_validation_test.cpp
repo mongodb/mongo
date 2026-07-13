@@ -402,5 +402,11 @@ TEST_F(QuerySettingsValidationTestFixture, ValidateQueryKnobsRejectsKnobsOnLower
                   DBException);
 }
 
+TEST_F(QuerySettingsValidationTestFixture, ValidateRejectsKnobOverrideParseErrors) {
+    QuerySettings settings;
+    settings.setQueryKnobs(QuerySettingsKnobOverrides::fromBSON(BSON("totallyUnknownKnob" << 1)));
+    ASSERT_THROWS_CODE(service().validateQuerySettings(settings), DBException, 12194501);
+}
+
 }  // namespace
 }  // namespace mongo::query_settings

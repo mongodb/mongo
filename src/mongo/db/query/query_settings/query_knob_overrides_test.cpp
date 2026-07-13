@@ -10,6 +10,7 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/ensure_fcv.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/version/releases.h"
 
 namespace mongo::query_settings {
@@ -103,19 +104,22 @@ TEST(QuerySettingsKnobOverridesTest, DoubleKnobAcceptsNumberLong) {
 }
 
 TEST(QuerySettingsKnobOverridesTest, IntKnobRejectsInt32Overflow) {
-    ASSERT_THROWS_CODE(QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << (1LL << 40))),
+    ASSERT_THROWS_CODE(QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << (1LL << 40)))
+                           .uassertNoErrors(),
                        DBException,
                        12194501);
 }
 
 TEST(QuerySettingsKnobOverridesTest, DoubleKnobRejectsNonNumeric) {
-    ASSERT_THROWS_CODE(QuerySettingsKnobOverrides::fromBSON(BSON("testDoubleKnobWire" << "5.0")),
-                       DBException,
-                       12194501);
+    ASSERT_THROWS_CODE(
+        QuerySettingsKnobOverrides::fromBSON(BSON("testDoubleKnobWire" << "5.0")).uassertNoErrors(),
+        DBException,
+        12194501);
 }
 
 TEST(QuerySettingsKnobOverridesTest, WrongTypeThrows) {
-    ASSERT_THROWS_CODE(QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << "notAnInt")),
+    ASSERT_THROWS_CODE(QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << "notAnInt"))
+                           .uassertNoErrors(),
                        DBException,
                        12194501);
 }
@@ -123,7 +127,9 @@ TEST(QuerySettingsKnobOverridesTest, WrongTypeThrows) {
 TEST(QuerySettingsKnobOverridesTest, IntValidatorRejectsOutOfRangeValue) {
     // testIntKnob has validator: {gt: 0}; 0 must be rejected.
     ASSERT_THROWS_CODE(
-        QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 0)), DBException, 12194501);
+        QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 0)).uassertNoErrors(),
+        DBException,
+        12194501);
 }
 
 TEST(QuerySettingsKnobOverridesTest, IntValidatorAcceptsInRangeValue) {
@@ -134,9 +140,10 @@ TEST(QuerySettingsKnobOverridesTest, IntValidatorAcceptsInRangeValue) {
 
 // testIntKnob has validator: {gt: 0, lt: 1000} — covers the exclusive upper bound (lt).
 TEST(QuerySettingsKnobOverridesTest, IntValidatorRejectsAtExclusiveUpperBound) {
-    ASSERT_THROWS_CODE(QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 1000)),
-                       DBException,
-                       12194501);
+    ASSERT_THROWS_CODE(
+        QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 1000)).uassertNoErrors(),
+        DBException,
+        12194501);
 }
 
 TEST(QuerySettingsKnobOverridesTest, IntValidatorAcceptsBelowExclusiveUpperBound) {
@@ -147,7 +154,9 @@ TEST(QuerySettingsKnobOverridesTest, IntValidatorAcceptsBelowExclusiveUpperBound
 // testIntKnob also has a callback validator that rejects the sentinel value 13.
 TEST(QuerySettingsKnobOverridesTest, IntCallbackValidatorRejectsForbiddenSentinel) {
     ASSERT_THROWS_CODE(
-        QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 13)), DBException, 12194501);
+        QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 13)).uassertNoErrors(),
+        DBException,
+        12194501);
 }
 
 TEST(QuerySettingsKnobOverridesTest, IntCallbackValidatorAcceptsNonSentinel) {
@@ -157,9 +166,10 @@ TEST(QuerySettingsKnobOverridesTest, IntCallbackValidatorAcceptsNonSentinel) {
 
 // testDoubleKnob has validator: {gte: 1.0, lte: 10.0} — covers inclusive bounds (gte, lte).
 TEST(QuerySettingsKnobOverridesTest, DoubleValidatorRejectsBelowMin) {
-    ASSERT_THROWS_CODE(QuerySettingsKnobOverrides::fromBSON(BSON("testDoubleKnobWire" << 0.5)),
-                       DBException,
-                       12194501);
+    ASSERT_THROWS_CODE(
+        QuerySettingsKnobOverrides::fromBSON(BSON("testDoubleKnobWire" << 0.5)).uassertNoErrors(),
+        DBException,
+        12194501);
 }
 
 TEST(QuerySettingsKnobOverridesTest, DoubleValidatorAcceptsAtMin) {
@@ -178,21 +188,24 @@ TEST(QuerySettingsKnobOverridesTest, DoubleValidatorAcceptsAtMax) {
 }
 
 TEST(QuerySettingsKnobOverridesTest, DoubleValidatorRejectsAboveMax) {
-    ASSERT_THROWS_CODE(QuerySettingsKnobOverrides::fromBSON(BSON("testDoubleKnobWire" << 10.1)),
-                       DBException,
-                       12194501);
+    ASSERT_THROWS_CODE(
+        QuerySettingsKnobOverrides::fromBSON(BSON("testDoubleKnobWire" << 10.1)).uassertNoErrors(),
+        DBException,
+        12194501);
 }
 
 TEST(QuerySettingsKnobOverridesTest, ValidKnobBeforeInvalidKnobThrows) {
     auto bson = BSON("testIntKnobWire" << 5 << "testBoolKnobWire"
                                        << "notABool");
-    ASSERT_THROWS_CODE(QuerySettingsKnobOverrides::fromBSON(bson), DBException, 12194501);
+    ASSERT_THROWS_CODE(
+        QuerySettingsKnobOverrides::fromBSON(bson).uassertNoErrors(), DBException, 12194501);
 }
 
 TEST(QuerySettingsKnobOverridesTest, UnknownKnobThrows) {
-    ASSERT_THROWS_CODE(QuerySettingsKnobOverrides::fromBSON(BSON("totallyUnknownKnob" << 1)),
-                       DBException,
-                       12194500);
+    ASSERT_THROWS_CODE(
+        QuerySettingsKnobOverrides::fromBSON(BSON("totallyUnknownKnob" << 1)).uassertNoErrors(),
+        DBException,
+        12194501);
 }
 
 TEST(QuerySettingsKnobOverridesTest, ToBSONSerializesDeleteSentinelAsNull) {
@@ -321,6 +334,65 @@ TEST(QuerySettingsKnobOverridesTest, RemoveKnobsRequiringHigherFcvRemovesDeleteS
     // (Generic FCV reference): FCV-gated query knob removal test.
     ASSERT_TRUE(overrides.removeKnobsRequiringHigherFcv(multiversion::GenericFCV::kLastLTS));
     ASSERT_TRUE(overrides.empty());
+}
+
+TEST(QuerySettingsKnobOverridesTest, FailpointRecordsErrorButDoesNotThrowKeepsOthers) {
+    FailPointEnableBlock fp("failQueryKnobOverridesParsing", BSON("name" << "testIntKnobWire"));
+
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(
+        BSON("testIntKnobWire" << 5 << "testBoolKnobWire" << true));
+
+    ASSERT_EQ(overrides.entries().size(), 1u);
+    ASSERT_TRUE(std::holds_alternative<bool>(overrides.entries()[0].value));
+    ASSERT_TRUE(std::get<bool>(overrides.entries()[0].value));
+    ASSERT_EQ(overrides.errors().size(), 1u);
+    ASSERT_EQ(overrides.errors()[0].code(), 12194501);
+}
+
+TEST(QuerySettingsKnobOverridesTest, UnknownKnobRecordsErrorKeepsOthers) {
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(
+        BSON("totallyUnknownKnob" << 1 << "testBoolKnobWire" << true));
+
+    ASSERT_EQ(overrides.entries().size(), 1u);
+    ASSERT_TRUE(std::get<bool>(overrides.entries()[0].value));
+    ASSERT_EQ(overrides.errors().size(), 1u);
+    ASSERT_EQ(overrides.errors()[0].code(), 12194501);
+}
+
+TEST(QuerySettingsKnobOverridesTest, ValidationFailureRecordsErrorKeepsOthers) {
+    // testIntKnob's validator rejects 0 (gt: 0).
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(
+        BSON("testIntKnobWire" << 0 << "testBoolKnobWire" << true));
+
+    ASSERT_EQ(overrides.entries().size(), 1u);
+    ASSERT_TRUE(std::get<bool>(overrides.entries()[0].value));
+    ASSERT_EQ(overrides.errors().size(), 1u);
+    ASSERT_EQ(overrides.errors()[0].code(), 12194501);
+}
+
+TEST(QuerySettingsKnobOverridesTest, AllInvalidYieldsEmptyEntriesButHasErrors) {
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(BSON("totallyUnknownKnob" << 1));
+    ASSERT_TRUE(overrides.empty());
+    ASSERT_TRUE(overrides.hasErrors());
+    ASSERT_EQ(overrides.errors().size(), 1u);
+}
+
+TEST(QuerySettingsKnobOverridesTest, UassertNoErrorsIsNoopWhenNoErrors) {
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 5));
+    overrides.uassertNoErrors();
+}
+
+TEST(QuerySettingsKnobOverridesTest, UassertNoErrorsThrowsFirstRecordedError) {
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(
+        BSON("totallyUnknownKnob" << 1 << "testIntKnobWire" << 0));
+    ASSERT_THROWS_CODE(overrides.uassertNoErrors(), DBException, 12194501);
+}
+
+TEST(QuerySettingsKnobOverridesTest, MergeConcatenatesErrorsFromBothOperands) {
+    auto lhs = QuerySettingsKnobOverrides::fromBSON(BSON("totallyUnknownKnob" << 1));
+    auto rhs = QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 0));
+    auto result = QuerySettingsKnobOverrides::merge(lhs, rhs);
+    ASSERT_EQ(result.errors().size(), 2u);
 }
 
 }  // namespace

@@ -13,6 +13,7 @@
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/query/query_settings/query_knob_overrides.h"
 #include "mongo/db/query/query_settings/query_settings_cluster_parameter_gen.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
@@ -21,6 +22,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/serialization_context.h"
 
 #include <string_view>
@@ -321,5 +323,47 @@ TEST_F(QuerySettingsClusterParameterTest, SetClusterParameterAndAssertResultIsSa
     assertTransformInvalidQuerySettings(
         {{initialIndexHintSpec1, expectedIndexHintSpec1}, {initialIndexHintSpec2, {}}});
 }
+/**
+ * Reproduces a bug where a knob-override error recorded while applying the cluster parameter
+ * (e.g. because the knob has since become invalid) is logged once but then never cleared from the
+ * stored QuerySettings, so it lingers in QuerySettingsManager's cache indefinitely. If that stored
+ * settings object is later merged with a per-query override (see
+ * QuerySettingsService::lookupQuerySettingsWithRejectionCheck), the stale error would cause
+ * validateQuerySettings() to reject a query that should have succeeded with just the valid knobs
+ * applied.
+ */
+TEST_F(QuerySettingsClusterParameterTest, SetClearsKnobOverrideErrorsAfterLogging) {
+    boost::optional<TenantId> tenantId;
+    auto sp = std::make_unique<QuerySettingsClusterParameter>(
+        QuerySettingsService::getQuerySettingsClusterParameterName(),
+        ServerParameterType::kClusterWide);
+
+    QuerySettings settings;
+    settings.setQueryKnobs(QuerySettingsKnobOverrides::fromBSON(
+        BSON("testBoolKnobWire" << true << "testIntKnobWire" << 5)));
+    auto findCmdBSON = BSON("find" << "exampleColl"
+                                   << "$db"
+                                   << "foo");
+    auto config = makeQueryShapeConfiguration(findCmdBSON, settings);
+    QueryShapeConfigurationsWithTimestamp configsWithTs{{config}, LogicalTime(Timestamp(1, 2))};
+    const auto clusterParamValue = makeQuerySettingsClusterParameter(configsWithTs);
+
+    {
+        // Simulate testBoolKnobWire having since become invalid by the time this already-accepted
+        // value is (re-)applied; testIntKnobWire remains valid.
+        FailPointEnableBlock fp("failQueryKnobOverridesParsing",
+                                BSON("name" << "testBoolKnobWire"));
+        ASSERT_OK(sp->set(BSON("" << clusterParamValue).firstElement(), tenantId));
+    }
+
+    auto storedConfigs =
+        service().getAllQueryShapeConfigurations(tenantId).queryShapeConfigurations;
+    ASSERT_EQ(storedConfigs.size(), 1u);
+    auto knobs = storedConfigs[0].getSettings().getQueryKnobs();
+    ASSERT_TRUE(knobs.has_value());
+    ASSERT_EQ(knobs->entries().size(), 1u);
+    ASSERT_FALSE(knobs->hasErrors());
+}
+
 }  // namespace
 }  // namespace mongo::query_settings
