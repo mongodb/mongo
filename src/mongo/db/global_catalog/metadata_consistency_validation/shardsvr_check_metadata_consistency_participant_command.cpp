@@ -85,21 +85,25 @@ public:
                 request().getCommonFields().getCheckRangeDeletionIndexes();
             const auto checkIndexes = request().getCommonFields().getCheckIndexes();
 
-            _invokeCommandOnSecondaries(opCtx, primaryShardId);
+            // TODO SERVER-129223: Re-enable metadata checks on secondaries once it correctly solves
+            // PIT _invokeCommandOnSecondaries(opCtx, primaryShardId);
 
-            auto [inconsistencies, _] =
+            auto inconsistencies =
                 metadata_consistency_util::runCheckMetadataConsistencyOnParticipant(
                     opCtx,
                     nss,
                     primaryShardId,
                     checkRangeDeletionIndexes,
                     checkIndexes,
-                    metadata_consistency_util::RSNodeMode::kPrimary);
+                    true /* asRSPrimaryNode */);
 
+            // TODO SERVER-129223: Re-enable metadata checks on secondaries once it correctly solves
+            // PIT
+            //
             // Build a streaming executor that merges the secondaries' cursors (or null if there are
             // none). The locally-computed inconsistencies are prepended by
             // 'createInitialCursorReplyMongod' so they are emitted before the streamed results.
-            auto secondaryCursorsExec = _mergeSecondaryCursors(opCtx);
+            // auto secondaryCursorsExec = _mergeSecondaryCursors(opCtx);
 
             return metadata_consistency_util::createInitialCursorReplyMongod(
                 opCtx,
@@ -107,7 +111,7 @@ public:
                 std::move(inconsistencies),
                 request().getCursor(),
                 request().toBSON(),
-                std::move(secondaryCursorsExec));
+                {});
         }
 
     private:
@@ -123,17 +127,6 @@ public:
                 return;
             }
 
-            const auto secondaryCheckMode = request().getCommonFields().get_checkSecondariesMode();
-            uassert(
-                ErrorCodes::BadValue,
-                "Called _shardsvrCheckMetadataConsistencyParticipant with empty secondaryCheckMode",
-                secondaryCheckMode);
-
-            if (*secondaryCheckMode ==
-                CheckMetadataConsistencySecondaryModeEnum::kNoSecondaryCheck) {
-                return;
-            }
-
             const auto& nss = ns();
             const auto* const replCoord = repl::ReplicationCoordinator::get(opCtx);
             const auto replSetConfig = replCoord->getConfig();
@@ -145,25 +138,19 @@ public:
             command.setCursor(request().getCursor());
 
             // Secondaries may be lagged, so we need to make sure they see a consistent metadata
-            // view.
-            // With kCheckAtPrimaryTimestamp, we achieve this by sending a readConcern with
-            // afterClusterTime set at majority commit time.
-            // With kCheckAtSecondaryTimestamp, we don't set any readConcern. That signals the
-            // secondary to perform checkMetadataConsistency assuming it may be lagged.
-            if (*secondaryCheckMode ==
-                CheckMetadataConsistencySecondaryModeEnum::kCheckAtPrimaryTimestamp) {
-                const auto snapshotTimestamp = replCoord->getCurrentCommittedSnapshotOpTime();
-                if (snapshotTimestamp.isNull()) {
-                    LOGV2_WARNING(13017701,
-                                  "The majority committed timestamp is null. Skipping calling "
-                                  "checkMetadataConsistency on secondary nodes");
-                    return;
-                }
-                repl::ReadConcernArgs readConcern{
-                    LogicalTime{snapshotTimestamp.getTimestamp()} /* afterClusterTime */,
-                    repl::ReadConcernLevel::kLocalReadConcern};
-                command.setReadConcern(std::move(readConcern));
+            // view. We achieve this by reading at majority timestamp.
+            // TODO (SERVER-129223): investigate whether we can run this command on lagged
+            // secondaries without a readConcern.
+            const auto snapshotTimestamp = replCoord->getCurrentCommittedSnapshotOpTime();
+            if (snapshotTimestamp.isNull()) {
+                LOGV2_WARNING(13017701,
+                              "The majority committed timestamp is null. Skipping calling "
+                              "checkMetadataConsistency on secondary nodes");
+                return;
             }
+            repl::ReadConcernArgs snapshotReadConcern{repl::ReadConcernLevel::kSnapshotReadConcern};
+            snapshotReadConcern.setArgsAtClusterTimeForSnapshot(snapshotTimestamp.getTimestamp());
+            command.setReadConcern(std::move(snapshotReadConcern));
 
             _executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
             const auto commandBSON = command.toBSON();
@@ -238,35 +225,28 @@ public:
                 }
 
                 auto cursorWithStatus = CursorResponse::parseFromBSON(response->data);
+                CursorResponse cursor;
+                switch (cursorWithStatus.getStatus().code()) {
+                    case ErrorCodes::NotYetInitialized:
+                        // The secondary has not completed replica set initialization yet.
+                        LOGV2_WARNING(12922003,
+                                      "Secondary node hasn't completed replica set initialization",
+                                      "hostAndPort"_attr = hostAndPort,
+                                      "error"_attr = cursorWithStatus.getStatus());
+                        continue;
 
-                if (cursorWithStatus.getStatus().code() == ErrorCodes::NotYetInitialized) {
-                    // The secondary has not completed replica set initialization yet.
-                    LOGV2_WARNING(12922003,
-                                  "Secondary node hasn't completed replica set initialization",
-                                  "hostAndPort"_attr = hostAndPort,
-                                  "error"_attr = cursorWithStatus.getStatus());
-                    continue;
+                    case ErrorCodes::SnapshotTooOld:
+                        // The secondary can't serve the snapshot read, probably it had just
+                        // completed initial sync.
+                        LOGV2_WARNING(13017700,
+                                      "Secondary node can't read at the requested timestamp",
+                                      "hostAndPort"_attr = hostAndPort,
+                                      "error"_attr = cursorWithStatus.getStatus());
+                        continue;
+
+                    default:
+                        cursor = uassertStatusOK(std::move(cursorWithStatus));
                 }
-
-                if (cursorWithStatus.getStatus().isA<ErrorCategory::SnapshotError>()) {
-                    // The secondary or config server can't serve the snapshot read.
-                    LOGV2_WARNING(13017700,
-                                  "Secondary node can't read at the requested timestamp",
-                                  "hostAndPort"_attr = hostAndPort,
-                                  "error"_attr = cursorWithStatus.getStatus());
-                    continue;
-                }
-
-                if (cursorWithStatus.getStatus().code() == ErrorCodes::CallbackCanceled) {
-                    // Thrown if interrupted while waiting for readConcern.
-                    LOGV2_WARNING(12922308,
-                                  "Secondary node was interrupted",
-                                  "hostAndPort"_attr = hostAndPort,
-                                  "error"_attr = cursorWithStatus.getStatus());
-                    continue;
-                }
-
-                auto cursor = uassertStatusOK(std::move(cursorWithStatus));
 
                 // All other members belong to this same shard, so they share its shardId.
                 remoteCursors.emplace_back(shardId.toString(), response->target, std::move(cursor));

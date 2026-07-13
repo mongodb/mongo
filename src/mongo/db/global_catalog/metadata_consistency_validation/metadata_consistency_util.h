@@ -24,19 +24,6 @@ namespace mongo {
 namespace metadata_consistency_util {
 
 /**
- * The replica set status of this node.
- *  - kPrimary: this node is an RS primary.
- *  - kSecondary: this node is an up to date RS secondary (meaning it is running at a timestamp
- *                where the DB primary is holding the DDL lock).
- *  - kDelayedSecondary: this node is an RS secondary running at an arbitrarily delayed timestamp.
- */
-enum class RSNodeMode {
-    kPrimary,
-    kSecondary,
-    kDelayedSecondary,
-};
-
-/**
  * Creates a MetadataInconsistencyItem object from the given parameters.
  */
 template <typename MetadataDetailsType>
@@ -90,8 +77,7 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
     const std::vector<CollectionPtr>& localCatalogCollections,
     bool checkRangeDeletionIndexes,
     bool optionalCheckIndexes,
-    RSNodeMode rsMode = RSNodeMode::kPrimary,
-    const stdx::unordered_set<NamespaceString>& collectionsUnderCs = {});
+    bool asRSPrimaryNode = true);
 
 /**
  * For every collection, check that all the shards currently owning chunks for that collection have
@@ -154,9 +140,7 @@ std::vector<MetadataInconsistencyItem> checkCollectionShardingMetadataConsistenc
  * there is no inconsistency, it returns an empty vector.
  */
 std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistency(
-    OperationContext* opCtx,
-    const DatabaseType& dbInGlobalCatalog,
-    RSNodeMode rsMode = RSNodeMode::kPrimary);
+    OperationContext* opCtx, const DatabaseType& dbInGlobalCatalog);
 
 /**
  * Checks that this shard's config database shard catalog collections match the current FCV
@@ -169,26 +153,16 @@ std::vector<MetadataInconsistencyItem> checkShardCatalogCollectionsConsistentWit
  * Main check consistency metadata logic ran by the participant commands (i.e.
  * _shardsvrCheckMetadataConsistencyParticipant and
  * _shardsvrCheckMetadataConsistencySecondaryParticipant).
- * `rsMode` must be set to the correct RS status of this node. It can take three values:
- *  - kPrimary: this node is an RS primary. It will perform all checks, including checks across
- *              shards.
- *  - kSecondary: this node is an up to date RS secondary (meaning it is running at a timestamp
- *                where the DB primary is holding the DDL lock). The command must have been called
- *                with `afterClusterTime` readConcern set at the timestamp of the primary to ensure
- *                consistency. Almost all checks are performed, except inter-shard checks.
- *  - kDelayedSecondary: this node is an RS secondary running at an arbitrarily delayed timestamp.
- *                       It will establish a snapshot internally and perform checks at that
- *                       timestamp. Checks of in-memory metadata aren't performed, since in-memory
- *                       metadata is not versioned. The returned boost::optional<Timestamp> contains
- *                       the timestamp of the snapshot it chose.
+ * `asRSPrimaryNode` is set to true if this command is called by the shard *RS* primary (not the
+ * shard DB primary). Setting it to false skips some cluster-wide checks.
  */
-std::pair<std::vector<MetadataInconsistencyItem>, boost::optional<Timestamp>>
-runCheckMetadataConsistencyOnParticipant(OperationContext* opCtx,
-                                         const NamespaceString& nss,
-                                         const ShardId& primaryShardId,
-                                         bool checkRangeDeletionIndexes,
-                                         bool checkIndexes,
-                                         RSNodeMode rsMode);
+std::vector<MetadataInconsistencyItem> runCheckMetadataConsistencyOnParticipant(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ShardId& primaryShardId,
+    bool checkRangeDeletionIndexes,
+    bool checkIndexes,
+    bool asRSPrimaryNode);
 
 }  // namespace metadata_consistency_util
 }  // namespace mongo

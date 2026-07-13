@@ -169,21 +169,6 @@ public:
                         repl::ReplicationCoordinator::get(opCtx)->getMemberState().primary());
             }
 
-            if (TestingProctor::instance().isEnabled()) {
-                _secondaryMode =
-                    request().getCommonFields().get_checkSecondariesMode().value_or_eval([&] {
-                        const auto mode = opCtx->getClient()->getPrng().trueWithProbability(0.5)
-                            ? CheckMetadataConsistencySecondaryModeEnum::kCheckAtPrimaryTimestamp
-                            : CheckMetadataConsistencySecondaryModeEnum::kCheckAtSecondaryTimestamp;
-
-                        LOGV2(12922304,
-                              "Running checkMetadataConsistency with random secondary mode",
-                              "secondaryMode"_attr = idl::serialize(mode));
-
-                        return mode;
-                    });
-            }
-
             auto response = [&] {
                 const auto nss = ns();
                 const auto commandLevel = metadata_consistency_util::getCommandLevel(nss);
@@ -424,7 +409,6 @@ public:
             const auto shardOpKey = UUID::gen();
             ShardsvrCheckMetadataConsistencyParticipant participantRequest{nss};
             participantRequest.setCommonFields(request().getCommonFields());
-            participantRequest.getCommonFields().set_checkSecondariesMode(_secondaryMode);
             participantRequest.setPrimaryShardId(ShardingState::get(opCtx)->shardId());
             participantRequest.setCursor(request().getCursor());
             auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
@@ -515,9 +499,6 @@ public:
                             ResourcePattern::forClusterResource(request().getDbName().tenantId()),
                             ActionType::internal));
         }
-
-        // TODO (SERVER-131057): consider getting rid of this variable.
-        boost::optional<CheckMetadataConsistencySecondaryModeEnum> _secondaryMode;
     };
 };
 MONGO_REGISTER_COMMAND(ShardsvrCheckMetadataConsistencyCommand).forShard();

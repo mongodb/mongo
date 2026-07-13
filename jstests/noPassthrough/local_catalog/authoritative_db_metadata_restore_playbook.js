@@ -65,10 +65,7 @@ function validateShardCatalogCache(dbName, shard, expectedDbMetadata) {
 }
 
 function checkConsistency(db) {
-    // Since this test is introducing inconsistencies deliberately, secondaries must be checked at
-    // the primary's timestamp, otherwise they could be checked at a timestamp where the database
-    // was still inconsistent.
-    const res = db.checkMetadataConsistency({_checkSecondariesMode: "checkAtPrimaryTimestamp"});
+    const res = db.checkMetadataConsistency();
     const inconsistencies = res.toArray();
     jsTest.log.info({name: "inconsistencies found", inconsistencies});
     assert.eq(0, inconsistencies.length);
