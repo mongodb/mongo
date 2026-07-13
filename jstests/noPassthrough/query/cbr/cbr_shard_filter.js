@@ -3,8 +3,14 @@
  * @tags: [requires_fcv_90]
  */
 
-import {getAllPlans} from "jstests/libs/query/analyze_plan.js";
-import {assertPlanCosted} from "jstests/libs/query/cbr_utils.js";
+import {
+    getAllPlans,
+    getEngine,
+    getRejectedPlans,
+    getWinningPlanFromExplain,
+} from "jstests/libs/query/analyze_plan.js";
+import {assertPlanCosted, assertPlanNotCosted} from "jstests/libs/query/cbr_utils.js";
+import {isDeferredGetExecutorEnabled} from "jstests/libs/query/sbe_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({
@@ -25,9 +31,24 @@ assert.commandWorked(
 assert.commandWorked(coll.insert({a: 1, b: 2}));
 assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}]));
 
-// CBR must cost all plans even when a SHARDING_FILTER stage is present; it should not fall back
-// to multiplanning.
 const explain = coll.find({a: 1, b: 1}).explain();
-getAllPlans(explain).forEach(assertPlanCosted);
+
+if (getEngine(explain) === "classic") {
+    // CBR must cost all plans even when a SHARDING_FILTER stage is present; it
+    // should not fall back to multiplanning.
+    getAllPlans(explain).forEach(assertPlanCosted);
+} else {
+    const winningPlan = getWinningPlanFromExplain(explain, true /* SBE plan */);
+    // TODO SERVER-129522. Winning plan's explain should also populate cost info in SBE.
+    assertPlanNotCosted(winningPlan);
+    const rejected = getRejectedPlans(explain);
+    assert.gt(rejected.length, 0, `Expected at least one rejected plan: ${tojson(explain)}`);
+    // TODO SERVER-117707. Remove this conditional once CBR fully supports SBE.
+    if (isDeferredGetExecutorEnabled(db)) {
+        rejected.forEach(assertPlanCosted);
+    } else {
+        rejected.forEach(assertPlanNotCosted);
+    }
+}
 
 st.stop();
