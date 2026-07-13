@@ -1401,10 +1401,10 @@ std::vector<MetadataInconsistencyItem> _checkInconsistenciesBetweenBothCatalogs(
     // Check shardKey index inconsistencies.
     // Skip the check in case of unsplittable collections as we don't strictly require an index on
     // the shard key for unsplittable collections.
-    //
-    // TODO (SERVER-130807): Re-enable shard-key indexes check on secondaries
+    // These checks rely on acquiring the CSR for the collection, so exclude delayed secondaries.
+    // TODO (SERVER-130947): revisit if we can make those checks on delayed secondaries.
     const bool isSharded = !catalogColl.getUnsplittable();
-    if (rsMode == RSNodeMode::kPrimary && catalogUUID == localUUID && isSharded) {
+    if (rsMode != RSNodeMode::kDelayedSecondary && catalogUUID == localUUID && isSharded) {
         _checkShardKeyIndexInconsistencies(opCtx,
                                            nss,
                                            shardId,
